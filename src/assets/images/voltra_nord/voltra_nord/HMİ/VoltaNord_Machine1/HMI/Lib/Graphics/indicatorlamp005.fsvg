@@ -1,0 +1,190 @@
+<GraphInfo xmlns="http://schemas.flexem.com/fs/model/1" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <GraphStatuses>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>4fe6ed44-13e2-49e5-b1bb-22393f3402cd</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="EllipseInfo">
+          <GraphicsName>Ellipse</GraphicsName>
+          <IconKey>Icon.FlexemStudio.Ellipse</IconKey>
+          <UniqueId>7b6f6623-6083-4082-b71e-82b5ed820506</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <BorderStyle>
+              <LineColor>Black</LineColor>
+              <LineWidth>1</LineWidth>
+            </BorderStyle>
+            <EllipseType>Circle</EllipseType>
+            <Fill>
+              <BackgroundFillColor>#FFFF0000</BackgroundFillColor>
+              <ForegroundFillColor>White</ForegroundFillColor>
+              <GradientOrientation>Vertical</GradientOrientation>
+              <TextureUri>pack://application:,,,/Flexem.Studio.Models;component/Images/Textures/texture00200.png</TextureUri>
+              <UseFill>true</UseFill>
+            </Fill>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+          </NormalInfo>
+        </GraphicsBase>
+        <GraphicsBase i:type="LineInfo">
+          <GraphicsName>Straight Line</GraphicsName>
+          <IconKey>Icon.FlexemStudio.Line</IconKey>
+          <UniqueId>683d90c0-7faa-468c-967f-78cc93e1930e</UniqueId>
+          <ZIndex>5</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <BorderStyle>
+              <IsLineUsed>true</IsLineUsed>
+              <LineColor>#FFFFFFFF</LineColor>
+              <LineWidth>5</LineWidth>
+            </BorderStyle>
+            <GraphicsArrow />
+            <PointCollect>32,30 70,68 </PointCollect>
+            <Position>
+              <Height>38</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>38</Width>
+              <X>32</X>
+              <Y>30</Y>
+            </Position>
+            <Rotate />
+          </NormalInfo>
+        </GraphicsBase>
+        <GraphicsBase i:type="LineInfo">
+          <GraphicsName>Straight Line</GraphicsName>
+          <IconKey>Icon.FlexemStudio.Line</IconKey>
+          <UniqueId>2880b329-2142-4e71-97ef-e09000b36a3a</UniqueId>
+          <ZIndex>6</ZIndex>
+          <Comment />
+          <ComponentId>2</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <BorderStyle>
+              <IsLineUsed>true</IsLineUsed>
+              <LineColor>#FFFFFFFF</LineColor>
+              <LineWidth>5</LineWidth>
+            </BorderStyle>
+            <GraphicsArrow />
+            <PointCollect>32,30 70,68 </PointCollect>
+            <Position>
+              <Height>38</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>38</Width>
+              <X>32</X>
+              <Y>30</Y>
+            </Position>
+            <Rotate>
+              <Angle>90</Angle>
+            </Rotate>
+          </NormalInfo>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status0</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>4e2b1c0c-15d2-498c-aac9-dbd78aebd74b</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="EllipseInfo">
+          <GraphicsName>Ellipse</GraphicsName>
+          <IconKey>Icon.FlexemStudio.Ellipse</IconKey>
+          <UniqueId>a50c3fe5-9c98-4640-977c-84e57118d268</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <BorderStyle>
+              <LineColor>Black</LineColor>
+              <LineWidth>1</LineWidth>
+            </BorderStyle>
+            <EllipseType>Circle</EllipseType>
+            <Fill>
+              <BackgroundFillColor>#FF00FF00</BackgroundFillColor>
+              <ForegroundFillColor>White</ForegroundFillColor>
+              <GradientOrientation>Vertical</GradientOrientation>
+              <TextureUri>pack://application:,,,/Flexem.Studio.Models;component/Images/Textures/texture00200.png</TextureUri>
+              <UseFill>true</UseFill>
+            </Fill>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+          </NormalInfo>
+        </GraphicsBase>
+        <GraphicsBase i:type="PolyLineInfo">
+          <GraphicsName>Polyline</GraphicsName>
+          <IconKey>Icon.FlexemStudio.PolyLine</IconKey>
+          <UniqueId>a6978d3a-4376-4650-90d1-80502199339b</UniqueId>
+          <ZIndex>2</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <BorderStyle>
+              <IsLineUsed>true</IsLineUsed>
+              <LineColor>#FFFFFFFF</LineColor>
+              <LineWidth>5</LineWidth>
+            </BorderStyle>
+            <GraphicsArrow />
+            <Position>
+              <Height>35</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>51</Width>
+              <X>26.5</X>
+              <Y>32</Y>
+            </Position>
+            <Rotate />
+          </NormalInfo>
+          <PointCollect>26.5,49.7536231884058 42.5,67 77.5,32 </PointCollect>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status1</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+  </GraphStatuses>
+  <Id>ae2cfc1b-7bf4-4ea5-bd46-e02dcc3de648</Id>
+  <Name>indicatorlamp00502</Name>
+  <Height>100</Height>
+  <Version>1</Version>
+  <Width>100</Width>
+</GraphInfo>

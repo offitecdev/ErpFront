@@ -1,0 +1,23 @@
+TiaPortal:
+  MinimumRequired:
+  - Version: V21.0
+  - TechnicalVersion: 21.00.00.00
+  LastUsed:
+  - Version: V21 Update 1
+  - TechnicalVersion: 21.00.01.00
+
+UsedProducts:
+- Name: STEP 7 Professional
+  Version: V21
+  TechnicalVersion: 21.00.00.00
+- Name: Tech WebApplication
+  Version: V21
+  TechnicalVersion: 20.00.00.00
+- Name: Totally Integrated Automation Portal
+  Version: V21
+  TechnicalVersion: 21.00.00.00
+
+UsedSupportPackages:
+- Name: PID Control and Auxiliary functions
+  Version: V19
+  TechnicalVersion: 19.00.00.00

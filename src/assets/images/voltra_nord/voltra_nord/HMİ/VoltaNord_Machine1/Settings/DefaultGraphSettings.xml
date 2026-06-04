@@ -1,0 +1,44 @@
+<DefaultGraphSettings xmlns="http://schemas.flexem.com/fs/settings/defaultgraph" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <Ids xmlns:a="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+    <a:KeyValueOfstringguid>
+      <a:Key>Switch</a:Key>
+      <a:Value>6c0b37b8-46de-462f-849b-00c213bbc81b</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>SwitchChange</a:Key>
+      <a:Value>6c0b37b8-46de-462f-849b-00c213bbc81b</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>NumberOrTextDisplay</a:Key>
+      <a:Value>6c0b37b8-46de-462f-849b-00c213bbc81b</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>NumberOrTextEdit</a:Key>
+      <a:Value>cb9a998e-dcc1-4105-ae79-25bc57b98a3e</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>Indicator</a:Key>
+      <a:Value>5c332db2-b89f-44ac-a565-7922be15e5d7</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>Move</a:Key>
+      <a:Value>cb9a998e-dcc1-4105-ae79-25bc57b98a3e</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>SlidingBackground</a:Key>
+      <a:Value>b8ec661f-fe1e-413e-bdc9-0b01d9933b20</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>SlidingBar</a:Key>
+      <a:Value>6c0b37b8-46de-462f-849b-00c213bbc81b</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>Pipeline</a:Key>
+      <a:Value>30192b57-b5ba-4f36-9f0a-3945f9303e46</a:Value>
+    </a:KeyValueOfstringguid>
+    <a:KeyValueOfstringguid>
+      <a:Key>ElbowComponent</a:Key>
+      <a:Value>8ad52d3f-6afc-4279-8fff-bd41f485f12b</a:Value>
+    </a:KeyValueOfstringguid>
+  </Ids>
+</DefaultGraphSettings>

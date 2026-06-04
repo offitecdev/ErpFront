@@ -1,0 +1,231 @@
+<GraphInfo xmlns="http://schemas.flexem.com/fs/model/1" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <GraphStatuses>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>528cb8c6-9e45-4a10-b59d-1a7e243b198d</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="StaticPictureInfo">
+          <GraphicsName>Static Picture</GraphicsName>
+          <IconKey>Icon.FlexemStudio.StaticPicture</IconKey>
+          <UniqueId>9bbca7e2-5c56-4426-bba3-d986ce5cd6b4</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <AlphaColor>
+              <IsUsePngAlphaChannel>true</IsUsePngAlphaChannel>
+              <SpecifyColor>White</SpecifyColor>
+            </AlphaColor>
+            <ImageData>iVBORw0KGgoAAAANSUhEUgAAALYAAACvCAYAAABQKSRXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAcZJREFUeNrs3U0NwkAQgNGW1MTcKgEHRQpOQAIS6oS6GRn9CQI40MDQvHfZ6yTzZbO3bed5buBTmXldj77IOFNnJexkC3uoMszJPjgiYSNsEDYIG4QNwkbYIGwQNggbhA3CRtggbBA2CBuEDcJG2CBsEDYIG4SNsEHYIGwQNggbhI2wQdggbPgmPxoUkJl98/oRoISIuAubPWxh3wrN8/dhe4rgjQ3CBmGDsEHYCBuEDcIGYYOwQdgIG4QNwgZhg7BB2AgbhA3CBmGDsBE2CBuEDcIGYYOwETYIG4QNwgZhg7ARNggbhA3CBmGDsBE2CBt+7hB/qWfmYz3ORcYZI2KUlrD3sEU9FJllkpWnCAgbhI2wQdggbBA2CBuEjbBB2CBsEDYIG4SNsEHYIGwQNggbhI2wQdggbBA2CBthg7BB2CBsEDYIG2GDsKGiLjMv6/msMlBEtNaCGxuEjbBB2CBsEDYIG4SNsEHYIGwQNggbYYOwQdggbBA2CBthg7BB2CBsEDYIG2GDsEHYIGwQNggbYYOwQdggbBA2wgZhg7BB2CBsEDbCBmGDsEHYIGwQNsIGYYOwQdggbBA2wgZhg7BB2PDeIsAALUYYSahuBGcAAAAASUVORK5CYII=</ImageData>
+            <PictureOrigin>File</PictureOrigin>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+            <SizeZoom>
+              <IsFixLatitudeScale>true</IsFixLatitudeScale>
+            </SizeZoom>
+            <StatusIndex>-1</StatusIndex>
+            <Version>1</Version>
+          </NormalInfo>
+          <Version>1</Version>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status0</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>7a348ce5-831f-483e-82c6-ae0c6c01309d</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="StaticPictureInfo">
+          <GraphicsName>Static Picture</GraphicsName>
+          <IconKey>Icon.FlexemStudio.StaticPicture</IconKey>
+          <UniqueId>d2110c18-12ca-4749-b51e-df86d5279dc4</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <AlphaColor>
+              <IsUsePngAlphaChannel>true</IsUsePngAlphaChannel>
+              <SpecifyColor>White</SpecifyColor>
+            </AlphaColor>
+            <ImageData>iVBORw0KGgoAAAANSUhEUgAAALYAAACvCAYAAABQKSRXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAeNJREFUeNrs3bGJAkEUgOFVtgDBaDIDC7CDsxTT60I7MLMc1w4s4AKzFwl2sM6BFeggT/k+WCYSnryfZbOZjOPYwasiYlOPRZJxht5KaOQ/7J8sw0ztg28kbIQNwgZhg7BB2AgbhA3CBmGDsEHYCBuEDcIGYYOwQdgIG4QNwgZhg7ARNggbhA3CBmGDsBE2CBuEDe/kRoMEImJVj32WeUopa2HTwqxLdM2FTxEQNggbhA3CRtggbBA2CBuEDcJG2CBsEDYIG4SNsEHYIGwQNggbhI2wQdggbBA2CBuEjbBB2CBsEDYIG4SNsEHYIGwQNggbYYOwQdggbGjgK+5Sj4ihy3MX+a6UspWWNzYIG4SNsEHYIGwQNggbhI2wQdggbBA2CBuEjbBB2CBsEDYIG4SNsEHYIGwQNggbYYOwQdggbBA2CBthg7Ahm35++JvVc5VloOvvcrAWXg77EfUx0UwTa8GnCAgbYYOwQdggbBA2CBthg7BB2CBsEDbCBmGDsEHYIGwQNsIGYYOwQdggbBA2wgZhg7BB2CBsEDbCBmGDsEHYIGyEDcIGYYOwQdggbIQNwgZhg7BB2CBshA3CBmGDsEHYIGyEDcIGYUNjfX1u9Tl9+P84J5rl8sRv7KDxDu4CDABMBh3+i9R7+QAAAABJRU5ErkJggg==</ImageData>
+            <PictureOrigin>File</PictureOrigin>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+            <SizeZoom />
+            <StatusIndex>-1</StatusIndex>
+            <Version>1</Version>
+          </NormalInfo>
+          <Version>1</Version>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status1</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>687852f9-4aca-4697-9478-8602654aaa48</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="StaticPictureInfo">
+          <GraphicsName>Static Picture</GraphicsName>
+          <IconKey>Icon.FlexemStudio.StaticPicture</IconKey>
+          <UniqueId>cc24d010-f17e-4c4b-9ddb-473e0234a5b3</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <AlphaColor>
+              <IsUsePngAlphaChannel>true</IsUsePngAlphaChannel>
+              <SpecifyColor>White</SpecifyColor>
+            </AlphaColor>
+            <ImageData>iVBORw0KGgoAAAANSUhEUgAAALYAAACvCAYAAABQKSRXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAdNJREFUeNrs3bENgkAUgGE1bGBFzyAwDlOgU9i6ibCBA1jQXUXiBkjBBB6JT/J9yYWK5MH9IddxnOf5ALlSSpFCak62hD0SNsIGYYOwQdggbIQNwgZhg7BB2CBshA3CBmGDsEHYIGyEDcIGYYOwQdgIG4QNwgZhg7BB2AgbhA3CBmFDpsIr+L2U0mW5dEHGGcqyrH2xQdggbBA2CBthg7BB2CBsEDYIG2GDsEHYIGwQNsIGYYOwQdggbBA2wgZhg7BB2CBsEDbCBmGDsEHYIGyEDcIGYYOwQdggbIQNwgZhg7Ah0y7+pX6+vepA4zyntnpLS9hbeASapVlWLy1HERA2CBthg7BB2CBsEDYIG2GDsEHYIGwQNggbYYOwQdggbBA2CBthg7BB2CBsEDbCBmGDsEHYIGwQNsIGYUM0xfr/ljrIPOPUVnfbQnbYa9RdkHmGZQkbRxEQNsIGYYOwQdggbBA2wgZhg7BB2CBshA3CBmGDsEHYIGyEDcIGYYOwQdggbIQNwgZhg7BB2CBshA3CBmGDsEHYCBuEDcIGYYOwQdgIG4QNwgZhg7BB2AgbhA3CBmGDsEHYCBuEDcKGrRXL6gPNM3553/XPn8EebPwMHwEGAHtFIT6LfVV8AAAAAElFTkSuQmCC</ImageData>
+            <PictureOrigin>File</PictureOrigin>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+            <SizeZoom />
+            <StatusIndex>-1</StatusIndex>
+            <Version>1</Version>
+          </NormalInfo>
+          <Version>1</Version>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status2</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>350eea23-eeac-4da5-91c0-648618d22f99</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="StaticPictureInfo">
+          <GraphicsName>Static Picture</GraphicsName>
+          <IconKey>Icon.FlexemStudio.StaticPicture</IconKey>
+          <UniqueId>3763a5cd-c0cf-4cec-bc21-bcca078c1bdf</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <AlphaColor>
+              <IsUsePngAlphaChannel>true</IsUsePngAlphaChannel>
+              <SpecifyColor>White</SpecifyColor>
+            </AlphaColor>
+            <ImageData>iVBORw0KGgoAAAANSUhEUgAAALYAAACvCAYAAABQKSRXAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAeBJREFUeNrs3bEJg1AUQFETHCDgAhbukWQTWzs3yBiuoxs4gEU6K8ENzJ9BJTzkHPhYCY+8S7D7t23bMjhqnuc+0DhtbiWc5BlolsfdPrgiYSNsEDYIG4QNwkbYIGwQNggbhA3CRtggbBA2CBuEDcJG2CBsEDYIG4SNsEHYIGwQNggbhI2wQdggbPgnNxoEUHRTnR51kHHGpalaYXOGMot11YVPERA2CBuEDcJG2CBsEDYIG4QNwkbYIGwQNggbhI2wQdggbBA2CBuEjbBB2CBsEDYIG4SNsEHYIGwQNggbYYOwQdggbBA2CBthg7BB2CBsOOoSd6kX3bQFGue9NFUvLf/YIGwQNsIGYYOwQdggbBA2wgZhg7BB2CBsEDbCBmGDsEHYIGwQNsIGYYOwQdggbIQNwgZhg7BB2CBshA3ChmjyopvK9CyDzLMuTTVaC4fDTqdO5xNkniGdl7XgUwSEjbBB2CBsEDYIG4SNsEHYIGwQNggbYYOwQdggbBA2CBthg7BB2CBsEDYIG2GDsEHYIGwQNggbYYOwQdggbBA2wgZhg7BB2CBsEDbCBmGDsEHYIGwQNsIGYYOwQdggbBA2wgZhg7DhZHk633SGIPOMO98bAv2m64537ODkHfwEGADCPCIgXVKyZQAAAABJRU5ErkJggg==</ImageData>
+            <PictureOrigin>File</PictureOrigin>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+            <SizeZoom />
+            <StatusIndex>-1</StatusIndex>
+            <Version>1</Version>
+          </NormalInfo>
+          <Version>1</Version>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status3</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+    <GraphStatusInfo>
+      <GraphicsName />
+      <IconKey>Icon.FlexemStudio.GraphLib</IconKey>
+      <UniqueId>c9c68781-9958-412d-8925-11c65eae144c</UniqueId>
+      <Graphicses>
+        <GraphicsBase i:type="StaticPictureInfo">
+          <GraphicsName>Static Picture</GraphicsName>
+          <IconKey>Icon.FlexemStudio.StaticPicture</IconKey>
+          <UniqueId>72e1c9e9-5d97-4342-a643-71249c542d78</UniqueId>
+          <ZIndex>1</ZIndex>
+          <Comment />
+          <ComponentId>1</ComponentId>
+          <IsGraphLibraryComponent>true</IsGraphLibraryComponent>
+          <NormalInfo>
+            <AlphaColor>
+              <IsUsePngAlphaChannel>true</IsUsePngAlphaChannel>
+              <SpecifyColor>White</SpecifyColor>
+            </AlphaColor>
+            <ImageData>iVBORw0KGgoAAAANSUhEUgAAALUAAACvCAYAAAC7Hp9UAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAdVJREFUeNrs3cENgkAQQFExdEAL9CHtUAVYBVc7EfrYAw1QA64HGxBiBnwv2XAymTg/ZG8U67peYItqSE1+NFHmKa2EHbyD7qIMc7UPzkbUiBpEDaIGUYOoETWIGkQNogZRI2oQNYgaRA2iRtQgahA1iBpEDaJG1CBqEDWIGkSNqEHUIGoQNYia/+JLAgFUQxoDjfNY2vohara6BZplPPqf6fqBOzWIGkQNogZRI2oQNYgaRA2iRtQgahA1iBpEjahB1CBqEDWIGkSNqEHUIGoQNYgaUYOoQdQgahA1ogZRg6hB1CBqRA2iBlGDqEHUIGpO6vDfJq+G1OdHF2Wepa0LWXlTg6hB1IgaRA2iBlGDqBE1iBpEDaIGUYOoETWIGkQNogZRI2oQNYgaRA2iRtQgahA1iBpEjahB1CBqEDWIGj7KakhNoHnmpa1na2FT1Pk8A81zz6e3Flw/QNSIGkQNogZRg6gRNYgaRA2iBlEjahA1iBpEDaIGUSNqEDWIGkQNokbUIGoQNYgaRI2oQdQgahA1iBpRg6hB1CBqEDWIGlGDqEHUIGoQNaIGUYOoQdQgakQNogZRg6hB1IgaRA2ihp8p85kCzTN/+Zvp4Huwgx29BBgAvToecQKqa6QAAAAASUVORK5CYII=</ImageData>
+            <PictureOrigin>File</PictureOrigin>
+            <Position>
+              <Height>100</Height>
+              <MaxHeight>INF</MaxHeight>
+              <MaxWidth>INF</MaxWidth>
+              <MinHeight>1</MinHeight>
+              <MinWidth>1</MinWidth>
+              <Width>100</Width>
+            </Position>
+            <Rotate />
+            <Shadow>
+              <ShadowColor>Black</ShadowColor>
+              <ShadowX>4</ShadowX>
+              <ShadowY>4</ShadowY>
+            </Shadow>
+            <SizeZoom />
+            <StatusIndex>-1</StatusIndex>
+            <Version>1</Version>
+          </NormalInfo>
+          <Version>1</Version>
+        </GraphicsBase>
+      </Graphicses>
+      <Name>Status4</Name>
+      <Version>3</Version>
+    </GraphStatusInfo>
+  </GraphStatuses>
+  <Id>96c1b511-0364-4ba1-806c-19c928d4faf3</Id>
+  <Name>Signal Intensity02</Name>
+  <Height>100</Height>
+  <Version>1</Version>
+  <Width>100</Width>
+</GraphInfo>
