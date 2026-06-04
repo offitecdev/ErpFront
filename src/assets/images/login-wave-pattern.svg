@@ -1,0 +1,62 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <path d="M-108 628C82 502 222 733 426 578C596 449 652 301 872 230C1063 168 1197 236 1326 162" stroke="url(#ribbon0)" stroke-width="132" stroke-linecap="round"/>
+  <path d="M-72 662C118 545 265 762 456 619C632 487 692 347 902 281C1072 228 1212 284 1324 224" stroke="url(#ribbon1)" stroke-width="58" stroke-linecap="round"/>
+  <path d="M-40 248C165 322 262 439 452 326C623 224 676 78 896 48C1077 23 1214 100 1322 35" stroke="url(#ribbon2)" stroke-width="96" stroke-linecap="round"/>
+  <path d="M-90 298C128 376 263 502 486 379C656 285 706 151 910 116C1066 89 1206 142 1315 89" stroke="url(#ribbon3)" stroke-width="34" stroke-linecap="round"/>
+  <path d="M-118 792C100 654 236 883 482 739C650 640 708 528 910 489C1080 456 1209 520 1320 462" stroke="url(#ribbon4)" stroke-width="42" stroke-linecap="round"/>
+  <path d="M-96 128C96 62 236 218 424 139C612 60 674 -38 904 -42C1072 -45 1210 28 1320 -22" stroke="url(#line0)" stroke-width="12" stroke-linecap="round"/>
+  <path d="M-84 714C96 608 242 796 456 665C636 555 694 422 904 370C1078 327 1215 392 1326 332" stroke="url(#line1)" stroke-width="16" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="bg" x1="94" y1="42" x2="1056" y2="842" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFF"/>
+      <stop offset="0.52" stop-color="#E7ECF6"/>
+      <stop offset="1" stop-color="#D3DCEB"/>
+    </linearGradient>
+    <linearGradient id="ribbon0" x1="-108" y1="458" x2="1326" y2="458" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0DB8C8"/>
+      <stop offset="0.28" stop-color="#272F67"/>
+      <stop offset="0.55" stop-color="#EEF2F8"/>
+      <stop offset="0.78" stop-color="#272F67"/>
+      <stop offset="1" stop-color="#101A52"/>
+    </linearGradient>
+    <linearGradient id="ribbon1" x1="-72" y1="504" x2="1324" y2="504" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.2" stop-color="#AAB4CB"/>
+      <stop offset="0.52" stop-color="#F7F9FC"/>
+      <stop offset="0.76" stop-color="#566088"/>
+      <stop offset="1" stop-color="#D30F15"/>
+    </linearGradient>
+    <linearGradient id="ribbon2" x1="-40" y1="148" x2="1322" y2="148" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0DB8C8"/>
+      <stop offset="0.32" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#6F55E7"/>
+      <stop offset="0.8" stop-color="#EEF2F8"/>
+      <stop offset="1" stop-color="#101A52"/>
+    </linearGradient>
+    <linearGradient id="ribbon3" x1="-90" y1="236" x2="1315" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#272F67"/>
+      <stop offset="0.36" stop-color="#EEF2F8"/>
+      <stop offset="0.66" stop-color="#D30F15"/>
+      <stop offset="1" stop-color="#272F67"/>
+    </linearGradient>
+    <linearGradient id="ribbon4" x1="-118" y1="666" x2="1320" y2="666" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D30F15"/>
+      <stop offset="0.35" stop-color="#EEF2F8"/>
+      <stop offset="0.64" stop-color="#9AA4C0"/>
+      <stop offset="1" stop-color="#272F67"/>
+    </linearGradient>
+    <linearGradient id="line0" x1="-96" y1="52" x2="1320" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#272F67" stop-opacity="0"/>
+      <stop offset="0.16" stop-color="#272F67" stop-opacity="0.5"/>
+      <stop offset="0.84" stop-color="#272F67" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#272F67" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="line1" x1="-84" y1="560" x2="1326" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D30F15" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#D30F15" stop-opacity="0.42"/>
+      <stop offset="0.84" stop-color="#D30F15" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#D30F15" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>

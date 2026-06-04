@@ -1,0 +1,119 @@
+{
+  "metadata": {
+    "format": "PDF",
+    "exportedAt": "2026-05-11T20:59:12.530Z",
+    "tenderNumber": "TKF-2026-5720"
+  },
+  "tree": [
+    {
+      "id": "95Ra0Da9FS",
+      "tenantId": "main-tenant",
+      "tenderId": "SVaZ2KYNaf",
+      "parentPositionId": null,
+      "npkCode": "515",
+      "positionNumber": "1",
+      "shortDescription": "Yeni Başlık",
+      "longDescription": null,
+      "quantity": 1,
+      "unit": "Stk",
+      "hierarchyLevel": 0,
+      "calculation": null,
+      "subPositions": [
+        {
+          "id": "r4q2uQSNl0",
+          "tenantId": "main-tenant",
+          "tenderId": "SVaZ2KYNaf",
+          "parentPositionId": "95Ra0Da9FS",
+          "npkCode": "661",
+          "positionNumber": "ded",
+          "shortDescription": "sadad",
+          "longDescription": "dadadadadadad",
+          "quantity": 1,
+          "unit": null,
+          "hierarchyLevel": 2,
+          "calculation": {
+            "id": "0_rSOVC0",
+            "positionId": "r4q2uQSNl0",
+            "materialCost": 0,
+            "laborCost": 0,
+            "overheadCost": 5.1,
+            "riskAmount": 0,
+            "profitMargin": 0,
+            "totalCalculatedPrice": 5.1
+          },
+          "subPositions": []
+        }
+      ]
+    },
+    {
+      "id": "iHmYizCHcp",
+      "tenantId": "main-tenant",
+      "tenderId": "SVaZ2KYNaf",
+      "parentPositionId": null,
+      "npkCode": "152.115",
+      "positionNumber": "101.14",
+      "shortDescription": "ölml",
+      "longDescription": "llmlm",
+      "quantity": 1,
+      "unit": "kmkm",
+      "hierarchyLevel": 5,
+      "calculation": null,
+      "subPositions": []
+    },
+    {
+      "id": "DuJfkc8wbP",
+      "tenantId": "main-tenant",
+      "tenderId": "SVaZ2KYNaf",
+      "parentPositionId": null,
+      "npkCode": "151",
+      "positionNumber": "2",
+      "shortDescription": "wfwf",
+      "longDescription": null,
+      "quantity": 1,
+      "unit": "Stk",
+      "hierarchyLevel": 0,
+      "calculation": {
+        "id": "yBa33TNs",
+        "positionId": "DuJfkc8wbP",
+        "materialCost": 50,
+        "laborCost": 20,
+        "overheadCost": 0,
+        "riskAmount": 0.15,
+        "profitMargin": 0.09,
+        "totalCalculatedPrice": 70.24000000000001
+      },
+      "subPositions": []
+    },
+    {
+      "id": "HkcltHuFr4",
+      "tenantId": "main-tenant",
+      "tenderId": "SVaZ2KYNaf",
+      "parentPositionId": null,
+      "npkCode": "948",
+      "positionNumber": "4",
+      "shortDescription": "fefwf",
+      "longDescription": null,
+      "quantity": 1,
+      "unit": "Stk",
+      "hierarchyLevel": 0,
+      "calculation": null,
+      "subPositions": [
+        {
+          "id": "d5vBX-EINX",
+          "tenantId": "main-tenant",
+          "tenderId": "SVaZ2KYNaf",
+          "parentPositionId": "HkcltHuFr4",
+          "npkCode": "4848",
+          "positionNumber": "ffsf",
+          "shortDescription": "sfff",
+          "longDescription": "sfsfsf",
+          "quantity": 1,
+          "unit": null,
+          "hierarchyLevel": 0,
+          "calculation": null,
+          "subPositions": []
+        }
+      ]
+    }
+  ]
+}

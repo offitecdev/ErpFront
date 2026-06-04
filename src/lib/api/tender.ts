@@ -1,0 +1,300 @@
+import { apiClient } from '../axios';
+import type {
+    TenderListItem,
+    TenderDetailDto,
+    TenderSummaryReport,
+    PositionDto,
+    CalculationItemDto,
+    CostInput,
+    ArticleDto,
+    TenderFormat,
+    TenderChangeLog,
+    OfferScheduleSlotDto,
+    PositionArticleMappingDto,
+    PositionMaterialMappingDto,
+    TenderMaterialUsageDto,
+} from '../../types/tender';
+
+export interface TenderListFilter {
+    customerId?: string;
+    status?: 'Draft' | 'Approved' | 'Exported';
+    search?: string;
+    page?: number;
+    pageSize?: number;
+}
+
+export interface PaginatedResult<T> {
+    items: T[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+}
+
+export const tenderApi = {
+    list: async (filter: TenderListFilter = {}): Promise<TenderListItem[]> => {
+        const params = new URLSearchParams();
+        if (filter.customerId) params.set('customerId', filter.customerId);
+        if (filter.status) params.set('status', filter.status);
+        if (filter.search) params.set('search', filter.search);
+        if (filter.page) params.set('page', String(filter.page));
+        if (filter.pageSize) params.set('pageSize', String(filter.pageSize));
+        const res = await apiClient.get(`/tenders${params.toString() ? '?' + params : ''}`);
+        return Array.isArray(res.data) ? res.data : res.data.items || [];
+    },
+
+    listPaged: async (filter: TenderListFilter = {}): Promise<PaginatedResult<TenderListItem>> => {
+        const params = new URLSearchParams();
+        if (filter.customerId) params.set('customerId', filter.customerId);
+        if (filter.status) params.set('status', filter.status);
+        if (filter.search) params.set('search', filter.search);
+        params.set('page', String(filter.page ?? 1));
+        params.set('pageSize', String(filter.pageSize ?? 10));
+        const res = await apiClient.get(`/tenders?${params.toString()}`);
+        if (Array.isArray(res.data)) {
+            return { items: res.data, total: res.data.length, page: 1, pageSize: res.data.length || 10, totalPages: 1 };
+        }
+        return res.data;
+    },
+
+    getById: async (id: string, options?: { includeImages?: boolean }): Promise<TenderDetailDto> => {
+        const res = await apiClient.get(`/tenders/${id}${options?.includeImages ? '?includeImages=true' : ''}`);
+        return res.data;
+    },
+
+    createManual: async (input: {
+        customerId: string;
+        tenderNumber: string;
+        format: TenderFormat;
+        validUntil?: string | null;
+    }): Promise<TenderListItem> => {
+        const res = await apiClient.post('/tenders', input);
+        return res.data;
+    },
+
+    importXml: async (input: {
+        customerId: string;
+        xmlContent: string;
+        format: TenderFormat;
+    }): Promise<{ message: string; tender: TenderListItem }> => {
+        const res = await apiClient.post('/tenders/import', input);
+        return res.data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+        await apiClient.delete(`/tenders/${id}`);
+    },
+
+    addPosition: async (
+        tenderId: string,
+        position: Partial<PositionDto>
+    ): Promise<{ message: string; positionId: string }> => {
+        const res = await apiClient.post(`/tenders/${tenderId}/positions`, position);
+        return res.data;
+    },
+
+    deletePosition: async (
+        tenderId: string,
+        positionId: string
+    ): Promise<void> => {
+        await apiClient.delete(`/tenders/${tenderId}/positions/${positionId}`);
+    },
+
+    calculate: async (
+        tenderId: string,
+        positionId: string,
+        cost: CostInput
+    ): Promise<{ message: string; calculation: CalculationItemDto }> => {
+        const res = await apiClient.post(
+            `/tenders/${tenderId}/positions/${positionId}/calculate`,
+            cost
+        );
+        return res.data;
+    },
+
+    approve: async (id: string): Promise<{ message: string; tender: TenderListItem }> => {
+        const res = await apiClient.patch(`/tenders/${id}/approve`);
+        return res.data;
+    },
+
+    createVersion: async (id: string): Promise<{ message: string; tender: TenderListItem }> => {
+        const res = await apiClient.post(`/tenders/${id}/version`);
+        return res.data;
+    },
+
+    exportFile: async (
+        id: string,
+        format: 'PDF' | 'CRBX' | 'SIA451'
+    ): Promise<{ message: string; data: any }> => {
+        const res = await apiClient.get(`/tenders/${id}/export?format=${format}`);
+        return res.data;
+    },
+
+    getSummary: async (id: string): Promise<TenderSummaryReport> => {
+        const res = await apiClient.get(`/tenders/${id}/report`);
+        return res.data;
+    },
+
+    updatePosition: async (
+        tenderId: string,
+        positionId: string,
+        patch: {
+            shortDescription?: string;
+            longDescription?: string | null;
+            quantity?: number;
+            unit?: string | null;
+            unitPrice?: number | null;
+            discount?: number | null;
+            taxRate?: number | null;
+            imageUrl?: string | null;
+            npkCode?: string | null;
+        }
+    ): Promise<PositionDto> => {
+        const res = await apiClient.patch(`/tenders/${tenderId}/positions/${positionId}`, patch);
+        return res.data;
+    },
+
+    mapArticle: async (
+        tenderId: string,
+        positionId: string,
+        articleId: string,
+        quantityMultiplier: number,
+        options?: { discount?: number }
+    ): Promise<any> => {
+        const res = await apiClient.post(
+            `/tenders/${tenderId}/positions/${positionId}/articles`,
+            {
+                articleId,
+                quantityMultiplier,
+                discount: options?.discount ?? 0,
+            }
+        );
+        return res.data;
+    },
+
+    removeArticleMapping: async (
+        tenderId: string,
+        positionId: string,
+        mappingId: string
+    ): Promise<{ message: string; mappingId: string; positionId: string; updatedCalculation?: CalculationItemDto | null }> => {
+        const res = await apiClient.delete(`/tenders/${tenderId}/positions/${positionId}/articles/${mappingId}`);
+        return res.data;
+    },
+
+    updateArticleMapping: async (
+        tenderId: string,
+        positionId: string,
+        mappingId: string,
+        patch: { quantityMultiplier?: number; discount?: number | null }
+    ): Promise<{ message: string; mapping: PositionArticleMappingDto; updatedCalculation?: CalculationItemDto | null }> => {
+        const res = await apiClient.patch(`/tenders/${tenderId}/positions/${positionId}/articles/${mappingId}`, patch);
+        return res.data;
+    },
+
+    mapMaterial: async (
+        tenderId: string,
+        materialId: string,
+        quantity: number,
+        description?: string
+    ): Promise<{ message: string; usage: TenderMaterialUsageDto }> => {
+        const res = await apiClient.post(
+            `/tenders/${tenderId}/materials`,
+            {
+                materialId,
+                quantity,
+                description,
+            }
+        );
+        return res.data;
+    },
+
+    getMaterials: async (tenderId: string): Promise<TenderMaterialUsageDto[]> => {
+        const res = await apiClient.get(`/tenders/${tenderId}/materials`);
+        return res.data;
+    },
+
+    updateMaterialMapping: async (
+        tenderId: string,
+        positionId: string,
+        mappingId: string,
+        patch: { quantityMultiplier?: number; discount?: number | null }
+    ): Promise<{ message: string; mapping: PositionMaterialMappingDto; updatedCalculation?: CalculationItemDto | null }> => {
+        const res = await apiClient.patch(`/tenders/${tenderId}/positions/${positionId}/materials/${mappingId}`, patch);
+        return res.data;
+    },
+
+    removeMaterialMapping: async (
+        tenderId: string,
+        mappingId: string
+    ): Promise<{ message: string; mappingId: string }> => {
+        const res = await apiClient.delete(`/tenders/${tenderId}/materials/${mappingId}`);
+        return res.data;
+    },
+
+    getActivities: async (id: string): Promise<any[]> => {
+        const res = await apiClient.get(`/tenders/${id}/activities`);
+        return res.data;
+    },
+
+    getLogs: async (id: string): Promise<TenderChangeLog[]> => {
+        const res = await apiClient.get(`/tenders/${id}/logs`);
+        return res.data;
+    },
+
+    getScheduleSlots: async (id: string): Promise<OfferScheduleSlotDto[]> => {
+        const res = await apiClient.get(`/tenders/${id}/schedule-slots`);
+        return res.data;
+    },
+
+    createScheduleSlot: async (id: string, input: { startTime: string; endTime: string; notes?: string }) => {
+        const res = await apiClient.post(`/tenders/${id}/schedule-slots`, input);
+        return res.data;
+    },
+
+    updateScheduleSlot: async (id: string, slotId: string, input: { startTime: string; endTime: string; notes?: string }) => {
+        const res = await apiClient.patch(`/tenders/${id}/schedule-slots/${slotId}`, input);
+        return res.data;
+    },
+
+    deleteScheduleSlot: async (id: string, slotId: string): Promise<void> => {
+        await apiClient.delete(`/tenders/${id}/schedule-slots/${slotId}`);
+    },
+
+    sendOfferMail: async (id: string, input: {
+        fromEmail?: string;
+        fromName?: string;
+        to: string;
+        subject: string;
+        message: string;
+        attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+    }) => {
+        const res = await apiClient.post(`/tenders/${id}/send-offer-mail`, input);
+        return res.data;
+    },
+
+    markOfferAccepted: async (id: string) => {
+        const res = await apiClient.patch(`/tenders/${id}/mark-offer-accepted`);
+        return res.data;
+    },
+};
+
+export const articleApi = {
+    list: async (): Promise<ArticleDto[]> => {
+        const res = await apiClient.get('/articles');
+        return res.data;
+    },
+    listWithStock: async (): Promise<any[]> => {
+        const res = await apiClient.get('/articles?includeStock=true');
+        return res.data;
+    },
+    create: async (data: {
+        articleCode: string;
+        name: string;
+        baseCost: number;
+        unit: string;
+        description?: string | null;
+    }): Promise<ArticleDto> => {
+        const res = await apiClient.post('/articles', data);
+        return res.data;
+    },
+};
