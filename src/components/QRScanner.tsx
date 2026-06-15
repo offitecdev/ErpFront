@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useId } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
+import { t } from '@/i18n/translate';
+
 interface Props {
     onScan: (text: string) => void | Promise<void>;
 }
@@ -51,7 +53,7 @@ export const QRScanner: React.FC<Props> = ({ onScan }) => {
                 );
             } catch {
                 if (aliveRef.current) {
-                    setError('Kamera başlatılamadı. Lütfen tarayıcı izinlerini kontrol edin.');
+                    setError(t('auto.kamera_baslatilamadi_lutfen_tarayici_izinlerini_'));
                 }
             }
         };
@@ -83,7 +85,7 @@ export const QRScanner: React.FC<Props> = ({ onScan }) => {
                 id={elementId}
                 style={{
                     width: '100%',
-                    borderRadius: 12,
+                    borderRadius: 10,
                     overflow: 'hidden',
                     border: '3px solid #1677ff',
                     backgroundColor: '#000',

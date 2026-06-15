@@ -4,13 +4,10 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
     AlertTriangle,
-    Bold01 as Bold,
     Calculator,
     CalendarPlus01 as CalendarPlus,
     Camera01 as Camera,
     Check,
-    ChevronDown,
-    ChevronRight,
     ChevronUp,
     Clipboard as ClipboardList,
     DownloadCloud02 as Download,
@@ -18,27 +15,24 @@ import {
     File05 as FileText,
     Hash01 as Hash,
     Image01 as ImageIcon,
-    Italic01 as Italic,
     List,
     Mail01 as Mail,
-    Minus,
     Package,
     Plus,
     Save01 as Save,
     Scan as ScanBarcode,
     Tag01 as Tag,
     Trash01 as Trash2,
-    Type01 as Type,
     UploadCloud02 as Upload,
     XClose as X,
-} from '@untitledui/icons';
+} from '@/components/icons/antIconCompat';
 
 import { BarcodeScannerModal } from '../../../components/ui-shared/BarcodeScannerModal';
 import { Button } from '../../../components/ui-shared/Button';
 import { Card } from '../../../components/ui-shared/Card';
 import { Field, Input, Select, Textarea } from '../../../components/ui-shared/Field';
 import { Modal } from '../../../components/ui-shared/Modal';
-import { Checkbox } from '../../../components/base/checkbox/checkbox';
+import { Checkbox } from '../../../components/ui-shared/Checkbox';
 import { tenderApi } from '../../../lib/api/tender';
 import { projectApi } from '../../../lib/api/project';
 import { useAuthStore } from '../../../store/authStore';
@@ -52,10 +46,18 @@ import {
     fmtMoney,
     fmtNumber,
     fmtVatRate,
+    flattenTenderTreeForPdf,
     lineTotalWithTax,
     mergeArticleMappingUpdate,
     type TreeNode,
 } from './tenderDetailUtils';
+
+import { t } from '@/i18n/translate';
+
+const getArticlePrice = (article?: { salePrice?: number | null; baseCost?: number | null } | null) => {
+    const salePrice = Number(article?.salePrice ?? 0);
+    return salePrice > 0 ? salePrice : Number(article?.baseCost ?? 0);
+};
 
 
 /* ── TreeRow ──
@@ -65,9 +67,9 @@ import {
 const logDateLabel = (date: string) => {
     const d = dayjs(date);
     const now = dayjs();
-    if (d.isSame(now, 'day')) return 'Bugün';
-    if (d.isSame(now.subtract(1, 'day'), 'day')) return 'Dün';
-    return d.format('D MMMM YYYY');
+    if (d.isSame(now, 'day')) return t('tenders.bugun');
+    if (d.isSame(now.subtract(1, 'day'), 'day')) return t('tenders.dun');
+    return d.format("D MMMM YYYY");
 };
 
 const bytesToBase64 = (bytes: Uint8Array) => {
@@ -76,62 +78,26 @@ const bytesToBase64 = (bytes: Uint8Array) => {
     return btoa(binary);
 };
 
-const flattenTenderTreeForPdf = (tree: any[]) => {
-    const flatTree: any[] = [];
-    const flatten = (nodes: any[], isRootLevel = false) => {
-        nodes.forEach((n) => {
-            flatTree.push({
-                positionNumber: n.positionNumber,
-                shortDescription: n.shortDescription,
-                longDescription: n.longDescription,
-                quantity: n.children.length > 0 ? undefined : n.quantity,
-                unit: n.children.length > 0 ? undefined : n.unit,
-                npkCode: n.npkCode,
-                imageUrl: n.imageUrl,
-                discount: n.children.length > 0 ? undefined : (n.discount ?? 0),
-                taxRate: n.children.length > 0 ? undefined : 8.1,
-                unitPrice: n.children.length > 0 ? undefined : n.unitPrice,
-                total: n.totalWithChildren,
-                isParent: n.children.length > 0,
-                isTopLevel: isRootLevel,
-                hierarchyLevel: n.hierarchyLevel,
-            });
-            flatten(n.children, false);
-            if (isRootLevel) {
-                flatTree.push({
-                    positionNumber: `${n.positionNumber}-subtotal`,
-                    shortDescription: '',
-                    quantity: 0,
-                    total: n.totalWithChildren,
-                    isSectionSubtotal: true,
-                });
-            }
-        });
-    };
-    flatten(tree, true);
-    return flatTree;
-};
-
 const fieldLabel = (field?: string | null) => {
     const labels: Record<string, string> = {
-        quantity: 'Miktar',
-        quantityMultiplier: 'Miktar',
-        unitPrice: 'Birim fiyat',
-        baseCost: 'Ürün fiyatı',
-        discount: 'İndirim',
+        quantity:t('common.quantity'),
+        quantityMultiplier:t('common.quantity'),
+        unitPrice:t('tenders.unit_price'),
+        baseCost:t('tenders.unit_cost'),
+        discount:t('common.discount'),
         taxRate: 'KDV',
-        shortDescription: 'Açıklama',
-        longDescription: 'Uzun açıklama',
-        description: 'Açıklama',
+        shortDescription:t('common.description'),
+        longDescription:t('tenders.line_content'),
+        description:t('common.description'),
         name: 'Ürün adı',
-        unit: 'Birim',
-        articleCode: 'Stok kodu',
-        minStockLevel: 'Minimum stok',
-        criticalStockLevel: 'Kritik stok',
-        maxStockLevel: 'Maksimum stok',
+        unit:t('tenders.unit'),
+        articleCode:t('tenders.stock_code'),
+        minStockLevel:t('tenders.minimum_stock'),
+        criticalStockLevel:t('tenders.critical_stock'),
+        maxStockLevel:t('tenders.maksimum_stock'),
         status: 'Durum',
     };
-    return field ? (labels[field] ?? field) : 'İşlem';
+    return field ? (labels[field] ?? field) :t('common.actions');
 };
 
 const escapeHtml = (value: string) =>
@@ -143,17 +109,13 @@ const escapeHtml = (value: string) =>
         .replace(/'/g, '&#39;');
 
 const renderInlineMarkdownHtml = (value: string) => {
-    const html = escapeHtml(value)
+    return escapeHtml(value)
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/(^|[^_])_([^_]+)_/g, '$1<em>$2</em>');
-
-    return html
-        .replace(/<em>\s*\*{1,2}\s*<\/em>/g, '')
-        .replace(/<strong>\s*_\s*<\/strong>/g, '')
+        .replace(/(^|[^_])_([^_]+)_/g, '$1<em>$2</em>')
         .replace(/(^|[\s>])(?:\*\*|__|_)(?=($|[\s<]))/g, '$1');
 };
 
-const markdownToHtml = (value: string) => {
+export const markdownToHtml = (value: string) => {
     const lines = value.split('\n');
     let html = '';
     let inList = false;
@@ -174,6 +136,15 @@ const markdownToHtml = (value: string) => {
             inList = false;
         }
 
+        const heading = line.match(/^(#{1,2})\s+(.*)$/);
+        if (heading) {
+            const marker = heading[1] ?? '#';
+            const headingText = heading[2] ?? '';
+            const tag = marker.length === 1 ? 'h2' : 'h3';
+            html += `<${tag}>${renderInlineMarkdownHtml(headingText) || '<br>'}</${tag}>`;
+            return;
+        }
+
         html += renderInlineMarkdownHtml(line) || '<br>';
         if (index < lines.length - 1) html += '<br>';
     });
@@ -191,8 +162,10 @@ const htmlToMarkdown = (root: HTMLElement) => {
         const tag = el.tagName.toLowerCase();
         const children = Array.from(el.childNodes).map(walk).join('');
 
-        if (tag === 'strong' || tag === 'b') return children ? `**${children}**` : '';
-        if (tag === 'em' || tag === 'i') return children ? `_${children}_` : '';
+        if (tag === 'h1' || tag === 'h2') return `# ${children.trim()}\n`;
+        if (tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') return `## ${children.trim()}\n`;
+        if (tag === 'strong' || tag === 'b') return children.trim() ? `**${children}**` : children;
+        if (tag === 'em' || tag === 'i') return children.trim() ? `_${children}_` : children;
         if (tag === 'li') return `- ${children.trim()}\n`;
         if (tag === 'ul' || tag === 'ol') return `${children}\n`;
         if (tag === 'div' || tag === 'p') return `${children}\n`;
@@ -207,18 +180,22 @@ const htmlToMarkdown = (root: HTMLElement) => {
         .replace(/[ \t]+\n/g, '\n');
 };
 
-const RichTextMarkdownEditor: React.FC<{
+export const RichTextMarkdownEditor: React.FC<{
     value: string;
     onChange: (value: string) => void;
     minHeight?: number;
     className?: string;
     placeholder?: string;
     variant?: 'boxed' | 'inline';
-}> = ({ value, onChange, minHeight = 92, className = '', placeholder = 'Açıklama yazın...', variant = 'boxed' }) => {
+    showToolbar?: boolean;
+}> = ({ value, onChange, minHeight = 92, className = '', placeholder = t('tenders.description_yazin'), variant = 'boxed', showToolbar = true }) => {
     const editorRef = useRef<HTMLDivElement>(null);
-    const [active, setActive] = useState({ bold: false, italic: false, list: false });
+    const [active, setActive] = useState({ list: false, largeHeading: false, smallHeading: false });
+    const [focused, setFocused] = useState(false);
     const hasContent = value.trim().length > 0;
     const isInline = variant === 'inline';
+    const showInlineToolbar = isInline && focused;
+    const shouldShowPlaceholder = !hasContent && placeholder.trim().length > 0;
 
     useEffect(() => {
         const el = editorRef.current;
@@ -227,18 +204,32 @@ const RichTextMarkdownEditor: React.FC<{
         if (el.innerHTML !== nextHtml) el.innerHTML = nextHtml;
     }, [value]);
 
+    const getCurrentBlockTag = (root: HTMLElement) => {
+        const selection = window.getSelection();
+        let node = selection?.anchorNode || null;
+        while (node && node !== root) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tag = (node as HTMLElement).tagName.toLowerCase();
+                if (/^h[1-6]$/.test(tag) || tag === 'p' || tag === 'div' || tag === 'li') return tag;
+            }
+            node = node.parentNode;
+        }
+        return '';
+    };
+
     const updateActiveState = () => {
         const el = editorRef.current;
         if (!el || document.activeElement !== el) return;
 
         try {
+            const tag = getCurrentBlockTag(el);
             setActive({
-                bold: document.queryCommandState('bold'),
-                italic: document.queryCommandState('italic'),
                 list: document.queryCommandState('insertUnorderedList'),
+                largeHeading: tag === 'h1' || tag === 'h2',
+                smallHeading: tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6',
             });
         } catch {
-            setActive({ bold: false, italic: false, list: false });
+            setActive({ list: false, largeHeading: false, smallHeading: false });
         }
     };
 
@@ -263,15 +254,90 @@ const RichTextMarkdownEditor: React.FC<{
         updateActiveState();
     };
 
-    const runCommand = (command: 'bold' | 'italic' | 'insertUnorderedList') => {
+    const getTextLengthBeforeCaret = (root: HTMLElement) => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) return null;
+        const range = selection.getRangeAt(0);
+        if (!root.contains(range.startContainer)) return null;
+
+        const prefixRange = range.cloneRange();
+        prefixRange.selectNodeContents(root);
+        prefixRange.setEnd(range.startContainer, range.startOffset);
+        return prefixRange.toString().length;
+    };
+
+    const selectTextRange = (root: HTMLElement, start: number, end: number) => {
+        const selection = window.getSelection();
+        if (!selection) return false;
+
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let currentIndex = 0;
+        let startNode: Text | null = null;
+        let endNode: Text | null = null;
+        let startOffset = 0;
+        let endOffset = 0;
+
+        while (walker.nextNode()) {
+            const node = walker.currentNode as Text;
+            const nextIndex = currentIndex + node.data.length;
+            if (!startNode && start >= currentIndex && start <= nextIndex) {
+                startNode = node;
+                startOffset = start - currentIndex;
+            }
+            if (!endNode && end >= currentIndex && end <= nextIndex) {
+                endNode = node;
+                endOffset = end - currentIndex;
+                break;
+            }
+            currentIndex = nextIndex;
+        }
+
+        if (!startNode || !endNode) return false;
+        const range = document.createRange();
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    };
+
+    const convertDashAtLineStartToList = () => {
+        const el = editorRef.current;
+        const textLengthBeforeCaret = el ? getTextLengthBeforeCaret(el) : null;
+        if (!el || textLengthBeforeCaret == null || textLengthBeforeCaret < 1) return false;
+
+        const textBeforeCaret = el.innerText.slice(0, textLengthBeforeCaret).replace(/\u00a0/g, ' ');
+        const currentLine = textBeforeCaret.slice(Math.max(textBeforeCaret.lastIndexOf('\n') + 1, 0));
+        if (!/^\s*-$/.test(currentLine)) return false;
+
+        if (!selectTextRange(el, textLengthBeforeCaret - 1, textLengthBeforeCaret)) return false;
+        document.execCommand('delete');
+        document.execCommand('insertUnorderedList');
+        emitChange(true);
+        updateActiveState();
+        return true;
+    };
+
+    const runListCommand = () => {
         editorRef.current?.focus();
-        document.execCommand(command);
+        document.execCommand('insertUnorderedList');
         emitChange(true);
         updateActiveState();
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-        if (event.key !== 'Enter') return;
+        if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'q') {
+            event.preventDefault();
+            runListCommand();
+            return;
+        }
+
+        if (event.key === ' ' && !event.ctrlKey && !event.metaKey && !event.altKey && convertDashAtLineStartToList()) {
+            event.preventDefault();
+            return;
+        }
+
+        if (event.key !== "Enter") return;
 
         if (document.queryCommandState('insertUnorderedList')) {
             window.setTimeout(() => emitChange(true), 0);
@@ -284,39 +350,46 @@ const RichTextMarkdownEditor: React.FC<{
     };
 
     const toolbarButtonClass = (isActive: boolean) =>
-        `flex h-6 w-6 items-center justify-center rounded text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 ${isActive ? 'bg-brand-solid !text-white shadow-xs hover:bg-brand-solid hover:!text-white' : ''}`;
+        isInline
+            ? `flex h-7 w-7 items-center justify-center rounded-md border bg-white shadow-xs transition-colors duration-150 ${isActive ?t('tenders.border_1f2654_svg_text_1f2654') :t('tenders.border_1f2654_25_svg_text_1f2654_60_hover_svg_te')}`
+            : `flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white !text-slate-950 shadow-sm transition-colors hover:bg-[#1f2654] hover:!text-white hover:[&_svg]:!text-white [&_svg]:!text-slate-950 ${isActive ?"bg-[#1f2654] !text-white [&_svg]:!text-white" : ''}`;
 
     const frameClass = isInline
-        ? `rounded-md border border-slate-200 bg-white px-2 py-1 transition-colors hover:border-slate-300 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-200 ${className}`
+        ? `relative overflow-visible rounded-md border border-slate-200 bg-white px-2 py-1 transition-[margin,border-color,box-shadow] duration-150 ease-out focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-200 ${showInlineToolbar ? 'mt-10' : 'mt-0'} ${className}`
         : `overflow-hidden rounded-md border border-slate-300 bg-white shadow-xs transition-colors hover:border-slate-400 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-200 ${className}`;
     const toolbarClass = isInline
-        ? 'mb-1 inline-flex items-center gap-1 rounded-md bg-white px-1 py-0.5'
-        : 'flex items-center gap-1 border-b border-slate-100 bg-slate-50/90 px-1.5 py-1';
-    const editorClass = `rich-text-editor w-full cursor-text text-[13px] leading-6 text-slate-800 outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 ${isInline ? 'bg-transparent px-0 py-0.5' : 'px-3 py-2 focus:bg-white'} ${hasContent ? '' : 'before:pointer-events-none before:text-slate-400 before:content-[attr(data-placeholder)]'}`;
+        ? `absolute -top-9 left-1 z-20 inline-flex h-7 items-center bg-transparent p-0 transition-all duration-150 ease-out ${showInlineToolbar ?t('tenders.pointer_events_auto_translate_y_0_scale_100_opac') :t('tenders.pointer_events_none_translate_y_1_scale_95_opaci')}`
+        :"flex items-center gap-1 border-b border-slate-100 bg-slate-50/90 px-1.5 py-1";
+    const editorClass = `rich-text-editor w-full cursor-text text-[13px] leading-6 text-slate-800 outline-none [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h2]:leading-6 [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_h3]:leading-5 [&_ul]:list-disc [&_ul]:pl-7 [&_li]:my-0.5 [&_li]:pl-1 ${isInline ?t('tenders.bg_transparent_px_0_py_0_5') :"px-3 py-2 focus:bg-white"} ${shouldShowPlaceholder ?"before:pointer-events-none before:text-slate-400 before:content-[attr(data-placeholder)]" : ''}`;
 
     return (
         <div
             className={frameClass}
             onClick={() => editorRef.current?.focus()}
         >
-            <div className={toolbarClass}>
-                <button type="button" title="Kalın" aria-pressed={active.bold} onMouseDown={(e) => e.preventDefault()} onClick={() => runCommand('bold')} className={toolbarButtonClass(active.bold)}>
-                    <Bold size={12} />
-                </button>
-                <button type="button" title="İtalik" aria-pressed={active.italic} onMouseDown={(e) => e.preventDefault()} onClick={() => runCommand('italic')} className={toolbarButtonClass(active.italic)}>
-                    <Italic size={12} />
-                </button>
-                <button type="button" title="Madde işareti" aria-pressed={active.list} onMouseDown={(e) => e.preventDefault()} onClick={() => runCommand('insertUnorderedList')} className={toolbarButtonClass(active.list)}>
-                    <List size={12} />
-                </button>
-            </div>
+            {showToolbar && (!isInline || showInlineToolbar) && (
+                <div className={toolbarClass} title={t('tenders.bullet_ctrl_q_or_space')}>
+                    <button type="button" aria-label={t('tenders.bullet_ctrl_q_or_space')} title={t('tenders.bullet_ctrl_q_or_space')} aria-pressed={active.list} onMouseDown={(e) => e.preventDefault()} onClick={runListCommand} className={toolbarButtonClass(active.list)}>
+                        <List size={14} />
+                    </button>
+                    {!isInline && (
+                        <span className="ml-1 text-[10.5px] font-medium text-slate-400">{t('tenders.ctrl_q_bosluk')}</span>
+                    )}
+                </div>
+            )}
             <div
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={() => emitChange()}
-                onBlur={() => emitChange()}
-                onFocus={updateActiveState}
+                onFocus={() => {
+                    setFocused(true);
+                    updateActiveState();
+                }}
+                onBlur={() => {
+                    setFocused(false);
+                    emitChange();
+                }}
                 onKeyDown={handleKeyDown}
                 onKeyUp={updateActiveState}
                 onMouseUp={updateActiveState}
@@ -335,7 +408,7 @@ const RichTextMarkdownEditor: React.FC<{
 };
 
 const logValue = (value?: string | null) => {
-    if (value == null || value === '') return 'boş';
+    if (value == null || value === '') return t('tenders.empty');
     const n = Number(value);
     if (!Number.isNaN(n) && value.trim() !== '') return fmtNumber(n);
     return value;
@@ -348,14 +421,14 @@ const logSubject = (log: TenderChangeLog) => {
         const match = text.match(pattern);
         if (match?.[1]) return match[1].trim();
     }
-    if (log.actionType.includes('POSITION')) return 'Pozisyon';
-    if (log.actionType.includes('ARTICLE')) return 'Ürün';
-    return 'İşlem';
+    if (log.actionType.includes('POSITION')) return t('tenders.line');
+    if (log.actionType.includes('ARTICLE')) return t('tenders.product');
+    return t('common.actions');
 };
 
 const logTitle = (log: TenderChangeLog) => {
     const subject = logSubject(log);
-    if (log.actionType === 'ARTICLE_MAPPED') return `${subject} pozisyona eklendi`;
+    if (log.actionType === 'ARTICLE_MAPPED') return `${subject} satıra eklendi`;
     if (log.actionType === 'ARTICLE_MAPPING_REMOVED') return `${subject} tekliften kaldırıldı`;
     if (log.actionType === 'ARTICLE_PRICE_UPDATED') return `${subject} ürün fiyatı güncellendi`;
     if (log.actionType === 'ARTICLE_UPDATED') return `${subject} ürün bilgisi güncellendi`;
@@ -372,7 +445,7 @@ const logDetail = (log: TenderChangeLog) => {
     const hasBrokenEncoding = log.description ? /[\u00C2-\u00C5\uFFFD]/.test(log.description) : false;
     if (log.description && !hasBrokenEncoding) return log.description;
     if (log.oldValue != null || log.newValue != null) return `${field}: ${logValue(log.oldValue)} → ${logValue(log.newValue)}`;
-    return log.description || 'İşlem kaydedildi.';
+    return log.description ||t('tenders.action_kaydedildi');
 };
 
 export const TenderLogsSheet: React.FC<{
@@ -397,21 +470,21 @@ export const TenderLogsSheet: React.FC<{
             >
                 <div className="flex items-start justify-between gap-4 border-b border-secondary px-6 py-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-primary">İşlem Logları</h2>
-                        <p className="mt-1 text-sm text-tertiary">Teklifte yapılan ürün, pozisyon, fiyat ve stok hareketleri</p>
-                        <h2 className="hidden">Eski log başlığı</h2>
-                        <p className="hidden">Eski log açıklaması</p>
+                        <h2 className="text-lg font-semibold text-primary">{t('tenders.action_loglari')}</h2>
+                        <p className="mt-1 text-sm text-tertiary">{t('tenders.tender_yapilan_product_line_price_ve_stock_hareke')}</p>
+                        <h2 className="hidden">{t('tenders.old_log_basligi')}</h2>
+                        <p className="hidden">{t('tenders.old_log_description')}</p>
                     </div>
-                    <button onClick={onClose} className="flex size-9 shrink-0 items-center justify-center rounded-lg text-fg-quaternary outline-focus-ring transition-colors hover:bg-primary_hover hover:text-fg-quaternary_hover focus-visible:outline-2 focus-visible:outline-offset-2">
-                        <X size={17} />
+                    <button onClick={onClose} className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-xs outline-focus-ring transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={t('common.close')}>
+                        <X size={16} />
                     </button>
                 </div>
 
                 <div className="h-[calc(100vh-73px)] overflow-y-auto px-5 py-5">
                     {loading ? (
-                        <div className="py-10 text-center text-[12.5px] text-slate-400">Loglar yukleniyor...</div>
+                        <div className="py-10 text-center text-[12.5px] text-slate-400">{t('tenders.loglar_loading')}</div>
                     ) : logs.length === 0 ? (
-                        <div className="py-10 text-center text-[12.5px] text-slate-400">Henüz log kaydı yok.</div>
+                        <div className="py-10 text-center text-[12.5px] text-slate-400">{t('tenders.no_log_records_yet')}</div>
                     ) : (
                         Object.entries(groups).map(([date, rows]) => (
                             <div key={date} className="mb-5 last:mb-0">
@@ -429,7 +502,7 @@ export const TenderLogsSheet: React.FC<{
                                             <div className="min-w-0">
                                                 <div className="flex flex-wrap items-baseline gap-1.5">
                                                     <span className="text-[13px] font-semibold text-slate-800">{log.employeeName || log.employeeEmail || log.employeeId}</span>
-                                                    <span className="text-[11px] text-slate-400">{dayjs(log.createdAt).format('DD.MM, HH:mm')}</span>
+                                                    <span className="text-[11px] text-slate-400">{dayjs(log.createdAt).format("DD.MM, HH:mm")}</span>
                                                 </div>
                                                 <div className="mt-0.5 text-[14px] font-semibold text-slate-800">
                                                     {logTitle(log)}
@@ -439,9 +512,9 @@ export const TenderLogsSheet: React.FC<{
                                                     {log.oldValue != null || log.newValue != null ? (
                                                         <>
                                                             <span className="mx-1 text-slate-400">•</span>
-                                                            <span className="font-mono text-slate-500">{log.oldValue ?? 'boş'}</span>
+                                                            <span className="font-mono text-slate-500">{log.oldValue ??t('tenders.empty')}</span>
                                                             <span className="mx-1.5 text-slate-500">→</span>
-                                                            <span className="font-mono font-semibold text-blue-700">{log.newValue ?? 'boş'}</span>
+                                                            <span className="font-mono font-semibold text-blue-700">{log.newValue ??t('tenders.empty')}</span>
                                                         </>
                                                     ) : (
                                                         <span className="ml-1">{log.description || log.actionType}</span>
@@ -464,24 +537,32 @@ export const TenderLogsSheet: React.FC<{
 export const TreeRow: React.FC<{
     node: TreeNode;
     level: number;
-    expanded: Record<string, boolean>;
-    onToggle: (id: string) => void;
     selectedId: string | null;
     onSelect: (id: string) => void;
     checkedIds: Record<string, boolean>;
     onCheckedChange: (id: string, checked: boolean) => void;
     isDraft: boolean;
     tenderId: string;
-    onEditArticle?: (node: TreeNode) => void;
-    articleEditLoadingId?: string | null;
-    onInlinePositionChange?: (positionId: string, patch: Pick<Partial<PositionDto>, 'quantity' | 'unit' | 'unitPrice' | 'discount' | 'shortDescription' | 'longDescription'>) => void;
+    onInlinePositionChange?: (positionId: string, patch: Pick<Partial<PositionDto>, 'quantity' | 'unit' | 'unitPrice' | 'discount' | 'shortDescription' | 'longDescription' | 'rowType' | 'imageUrl'>) => void;
     onInlineMappingChange?: (positionId: string, mappingId: string, patch: { quantityMultiplier?: number; discount?: number | null }) => void;
+    onAddChild?: (parentId: string | null, rowType: 'SECTION' | 'DESCRIPTION', afterRowId?: string) => void;
+    onAddProduct?: (parentId: string | null, afterRowId?: string) => void;
     onUpdated: () => void;
-}> = ({ node, level, expanded, onToggle, selectedId, onSelect, checkedIds, onCheckedChange, isDraft, tenderId, onEditArticle = () => undefined, articleEditLoadingId = null, onInlinePositionChange, onInlineMappingChange, onUpdated }) => {
+}> = ({ node, level, selectedId, onSelect, checkedIds, onCheckedChange, isDraft, tenderId, onInlinePositionChange, onInlineMappingChange, onAddChild, onAddProduct, onUpdated }) => {
     const hasChildren = node.children.length > 0;
-    const isExpanded = expanded[node.id] ?? false;
     const isSelected = selectedId === node.id;
     const { updatePosition, deletePosition } = useTenderStore();
+    const rowType = (node.rowType || (node.isArticleMapping ? 'PRODUCT' : 'SECTION')).toUpperCase();
+    const isSectionRow = !node.isArticleMapping && rowType === 'SECTION';
+    const isRootSection = isSectionRow && level === 0;
+    const isInlineContentRow = !node.isArticleMapping && (rowType === 'DESCRIPTION' || rowType === 'CUSTOM');
+    const insertionParentId = isSectionRow ? node.id : (node.parentPositionId || null);
+    // SECTION satırı için: bölüm içindeki son child'ın ID'sini afterRowId olarak ver
+    // → yeni satır/ürün bölüm içindeki SON SATIRIN hemen altına eklenir
+    const lastNonMappingChildId = isSectionRow
+        ? node.children.filter((c) => !c.isArticleMapping).at(-1)?.id
+        : undefined;
+    const insertionAfterRowId = isSectionRow ? lastNonMappingChildId : node.id;
 
     const [editingDesc, setEditingDesc] = useState(false);
     const [descVal, setDescVal] = useState(node.shortDescription);
@@ -489,6 +570,7 @@ export const TreeRow: React.FC<{
     const [longVal, setLongVal] = useState(node.longDescription || '');
     const [logOpen, setLogOpen] = useState(false);
     const longEditorRef = useRef<HTMLDivElement>(null);
+    const inlineImageInputRef = useRef<HTMLInputElement>(null);
 
     const qty = node.quantity;
     const effectivePrice = node.unitPrice ?? null;
@@ -498,15 +580,49 @@ export const TreeRow: React.FC<{
         : calcTotal;
     const derivedTotal = lineTotalWithTax(derivedNetTotal, node.taxRate);
     const displayTotal = hasChildren ? node.totalWithChildren : (derivedTotal > 0 ? derivedTotal : node.totalWithChildren);
+    const showRowTotal = !isSectionRow && displayTotal > 0;
     const displayUnitPrice = effectivePrice != null
         ? effectivePrice
         : (qty > 0 && calcTotal > 0 ? calcTotal / qty : null);
-    const indent = level * 16;
+    const hasOwnAmount = (qty > 0 && displayUnitPrice != null) || calcTotal > 0;
+    const indent = level * 18;
     const anyEditing = editingDesc || editingLong;
     const rowLogs: TenderChangeLog[] = [];
-    const canInlineEdit = isDraft && !hasChildren;
+    const canInlineEdit = isDraft && !node.isArticleMapping;
+    const displayDescription = node.shortDescription?.trim() || '';
+    // SECTION → font-semibold (bölüm başlığı gibi); TITLE → direkt bold başlık (line-through yok)
+    const titleClass = rowType === 'TITLE'
+        ? (level === 0 ?"text-[15px] font-bold text-slate-900" :"text-[14px] font-bold text-slate-800")
+        : rowType === 'CUSTOM'
+            ?"text-[13px] font-semibold text-slate-800"
+            : rowType === 'DESCRIPTION'
+                ?"text-[12.5px] leading-5 text-slate-600"
+                : rowType === 'PRODUCT'
+                    ?"text-[13px] font-semibold text-slate-900"
+                    : isSectionRow
+                        ? (isRootSection ?"text-[13px] font-semibold text-slate-900" :"text-[12.5px] font-semibold text-slate-800")
+                        :"text-[13px] text-slate-800";
     const inlineInputClass = "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right font-mono text-[11px] text-slate-700 outline-none transition-colors hover:border-slate-200 focus:border-blue-400 focus:bg-white";
     const inlineTextInputClass = "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-left text-[11px] text-slate-600 outline-none transition-colors hover:border-slate-200 focus:border-blue-400 focus:bg-white";
+    const actionButtonClass = t('tenders.inline_flex_h_7_items_center_gap_1_rounded_borde');
+    const headingButtonClass = (active: boolean) =>
+        `inline-flex h-6 min-w-6 items-center justify-center rounded border px-1 text-[11px] font-semibold transition-colors ${
+            active
+                ?"border-slate-400 bg-slate-100 text-slate-900"
+                :"border-transparent text-slate-500 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+        }`;
+    const isTitleRow = !node.isArticleMapping && rowType === 'TITLE';
+    const isSeparatedContentRow = rowType === 'PRODUCT' || rowType === 'DESCRIPTION' || rowType === 'CUSTOM';
+    // isRootSection için üst kalın çizgi kaldırıldı → direkt başlık görünümü
+    const rowBorderClass = isRootSection
+        ?"border-b border-slate-200"
+        : isSectionRow
+            ?"border-b border-slate-200"
+            : isTitleRow
+                ?"border-b border-slate-100"
+                : isSeparatedContentRow
+                    ?"border-b border-slate-100"
+                    :"border-b border-slate-100";
     const parseInlineNumber = (value: string) => {
         const normalized = value.replace(/'/g, '').replace(',', '.');
         const parsed = Number(normalized);
@@ -531,14 +647,14 @@ export const TreeRow: React.FC<{
 
     const saveDesc = async () => {
         const next = descVal.trim();
-        if (next && next !== node.shortDescription && onInlinePositionChange) {
+        if (next !== node.shortDescription && onInlinePositionChange) {
             onInlinePositionChange(node.id, { shortDescription: next });
             setEditingDesc(false);
             return;
         }
-        if (descVal.trim() && descVal !== node.shortDescription) {
-            try { await updatePosition(tenderId, node.id, { shortDescription: descVal.trim() }); onUpdated(); }
-            catch { toast.error('Güncellenemedi.'); }
+        if (next !== node.shortDescription) {
+            try { await updatePosition(tenderId, node.id, { shortDescription: next }); onUpdated(); }
+            catch { toast.error(t('tenders.guncellenemedi')); }
         }
         setEditingDesc(false);
     };
@@ -552,7 +668,7 @@ export const TreeRow: React.FC<{
         }
         if (longVal !== (node.longDescription || '')) {
             try { await updatePosition(tenderId, node.id, { longDescription: longVal || null }); onUpdated(); }
-            catch { toast.error('Güncellenemedi.'); }
+            catch { toast.error(t('tenders.guncellenemedi')); }
         }
         setEditingLong(false);
     };
@@ -563,16 +679,68 @@ export const TreeRow: React.FC<{
         setEditingLong(true);
     };
 
+    const handleInlineImageFile = (file?: File | null) => {
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            toast.error(t('tenders.only_gorsel_dosyalar_yuklenebilir'));
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error(t('tenders.gorsel_2mb_tan_buyuk_olamaz'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = async () => {
+            const imageUrl = reader.result as string;
+            if (onInlinePositionChange) {
+                onInlinePositionChange(node.id, { imageUrl });
+                return;
+            }
+            try {
+                await updatePosition(tenderId, node.id, { imageUrl });
+                onUpdated();
+            } catch (err: any) {
+                toast.error(err.response?.data?.error ||t('tenders.gorsel_kaydedilemedi'));
+            }
+        };
+        reader.onerror = () => toast.error(t('tenders.gorsel_okunamadi'));
+        reader.readAsDataURL(file);
+    };
+
+    const toggleBullet = async () => {
+        if (!isDraft || node.isArticleMapping) return;
+        const current = node.shortDescription || '';
+        const nextText = current.trimStart().startsWith('- ')
+            ? current.replace(/^\s*-\s?/, '')
+            : `- ${current.trim()}`;
+        if (onInlinePositionChange) {
+            onInlinePositionChange(node.id, { shortDescription: nextText, rowType: 'DESCRIPTION' });
+            return;
+        }
+
+        try {
+            await updatePosition(tenderId, node.id, { shortDescription: nextText, rowType: 'DESCRIPTION' });
+            onUpdated();
+        } catch {
+            toast.error(t('tenders.bullet_could_not_apply'));
+        }
+    };
+
     return (
         <>
+            {/* isRootSection için üstte ince grup ayırıcısı */}
+            {isRootSection && (
+                <tr aria-hidden="true">
+                    <td colSpan={8} className="h-3 bg-slate-50/70" />
+                </tr>
+            )}
             <tr
                 onClick={() => { if (!anyEditing) onSelect(node.id); }}
-                className={`border-b border-slate-100 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/40'
-                    }`}
+                className={`group cursor-pointer transition-colors ${rowBorderClass} ${isRootSection ? 'bg-slate-50/40' : ''} ${isSelected ? 'bg-blue-50/60' : 'hover:bg-slate-50/40'}`}
             >
                 <td className="px-1.5 py-2 text-center align-top">
                     <Checkbox
-                        aria-label="Satırı seç"
+                        aria-label={t('tenders.line_select')}
                         size="sm"
                         isSelected={!!checkedIds[node.id]}
                         onChange={(checked) => onCheckedChange(node.id, checked)}
@@ -589,31 +757,10 @@ export const TreeRow: React.FC<{
                 >
                     {/* Short description row */}
                     <div className="flex items-center gap-1" style={{ paddingLeft: indent }}>
-                        {hasChildren ? (
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); onToggle(node.id); }}
-                                className="p-0.5 rounded hover:bg-slate-200/60 text-slate-400 shrink-0"
-                            >
-                                {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                            </button>
-                        ) : <span className="w-4 shrink-0" />}
-                        {false && node.isArticleMapping && node.articleId && (
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); onEditArticle(node); }}
-                                className="w-8 h-8 shrink-0 rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 flex items-center justify-center disabled:opacity-50"
-                                title="Ürün ayarlarını aç"
-                                disabled={articleEditLoadingId === node.articleId}
-                            >
-                                {articleEditLoadingId === node.articleId ? (
-                                    <span className="w-3.5 h-3.5 rounded-full border-2 border-blue-300 border-t-blue-700 animate-spin" />
-                                ) : (
-                                    <Pencil size={15} />
-                                )}
-                            </button>
+                        <span className="w-4 shrink-0" />
+                        {rowType === 'PRODUCT' && (
+                            <Package size={13} className="shrink-0 text-blue-700" />
                         )}
-                        <span className="text-[10px] font-mono text-black shrink-0 mr-0.5 select-none">{node.positionNumber}</span>
 
                         {editingDesc ? (
                             <>
@@ -621,34 +768,50 @@ export const TreeRow: React.FC<{
                                     autoFocus
                                     value={descVal}
                                     onChange={(e) => setDescVal(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') saveDesc(); if (e.key === 'Escape') { setDescVal(node.shortDescription); setEditingDesc(false); } }}
+                                    onKeyDown={(e) => { if (e.key === "Enter") saveDesc(); if (e.key === "Escape") { setDescVal(node.shortDescription); setEditingDesc(false); } }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-1 min-w-0 rounded border border-blue-400 bg-white px-2 py-1 text-[13px] text-slate-900 outline-none"
+                                    className={`min-w-0 flex-1 border-0 border-b border-slate-300 bg-transparent px-1 py-0.5 text-slate-900 outline-none focus:border-slate-600 ${titleClass}`}
                                 />
                                 <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); saveDesc(); }}
                                     className="shrink-0 p-1 rounded bg-blue-600 hover:bg-blue-700 text-white"
-                                    title="Kaydet"
+                                    title={t('common.save')}
                                 >
                                     <Check size={10} />
                                 </button>
                             </>
-                        ) : (
+                        ) : isInlineContentRow ? (
                             <>
-                                <span className={`flex-1 truncate text-[13px] leading-5 ${hasChildren ? 'font-semibold text-slate-900' : 'text-slate-800'}`}>
-                                    {node.shortDescription}
-                                </span>
-                                {node.npkCode && (
-                                    <span className="shrink-0 text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{node.npkCode}</span>
-                                )}
+                                <span className="min-w-0 flex-1 text-[12.5px] font-medium text-slate-700">{t('common.description')}</span>
                                 {isDraft && !node.isArticleMapping && (
-                                    <>
+                                    <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                                         <button
                                             type="button"
-                                            onClick={(e) => { e.stopPropagation(); setDescVal(node.shortDescription); setEditingDesc(true); }}
-                                            className="shrink-0 p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500"
-                                            title="Açıklamayı düzenle"
+                                            onClick={(e) => { e.stopPropagation(); inlineImageInputRef.current?.click(); }}
+                                            className={actionButtonClass}
+                                            title={t('tenders.gorsel_add')}
+                                        >
+                                            <ImageIcon size={13} />{t('tenders.gorsel')}</button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onAddProduct?.(insertionParentId, insertionAfterRowId); }}
+                                            className={actionButtonClass}
+                                            title={t('tenders.product_add')}
+                                        >
+                                            <Package size={11} />{t('tenders.product')}</button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onAddChild?.(insertionParentId, 'DESCRIPTION', insertionAfterRowId); }}
+                                            className={actionButtonClass}
+                                            title={t('tenders.line_add')}
+                                        >
+                                            <FileText size={11} />{t('tenders.line')}</button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); openLongEditor(); }}
+                                            className="shrink-0 rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                                            title={t('tenders.edit_line_content')}
                                         >
                                             <Pencil size={10} />
                                         </button>
@@ -657,35 +820,128 @@ export const TreeRow: React.FC<{
                                             onClick={async (e) => {
                                                 e.stopPropagation();
                                                 const label = hasChildren
-                                                    ? `"${node.shortDescription}" ve tüm alt pozisyonları`
+                                                    ? `"${node.shortDescription}" ve tüm alt satırları`
                                                     : `"${node.shortDescription}"`;
                                                 if (!confirm(`${label} silinsin mi?`)) return;
                                                 try {
                                                     await deletePosition(tenderId, node.id);
-                                                    toast.success('Pozisyon silindi.');
+                                                    toast.success(t('tenders.line_silindi'));
                                                     onUpdated();
                                                 } catch (err: any) {
-                                                    toast.error(err.response?.data?.error || 'Silinemedi.');
+                                                    toast.error(err.response?.data?.error ||t('tenders.silinemedi'));
                                                 }
                                             }}
                                             className="shrink-0 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500"
-                                            title="Pozisyonu sil"
+                                            title={t('tenders.line_sil')}
                                         >
                                             <Trash2 size={10} />
                                         </button>
-                                    </>
+                                    </div>
                                 )}
+                            </>
+                        ) : (
+                            <>
+                                <span
+                                    className={`min-w-0 flex-1 whitespace-pre-wrap break-words leading-5 ${titleClass} ${canInlineEdit ?"cursor-text rounded px-1 -mx-1 hover:bg-white/70" : ''} ${displayDescription ? '' : 'text-slate-400'}`}
+                                    onClick={(e) => {
+                                        if (!canInlineEdit) return;
+                                        e.stopPropagation();
+                                        setDescVal(node.shortDescription || '');
+                                        setEditingDesc(true);
+                                    }}
+                                >
+                                    {displayDescription || (rowType === 'PRODUCT' ?t('tenders.product_adi') : isSectionRow && level > 0 ?t('tenders.subsection') :t('tenders.yazi_yazin'))}
+                                </span>
+                                {false && node.npkCode && (
+                                    <span className="shrink-0 text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{node.npkCode}</span>
+                                )}
+                                {isDraft && !node.isArticleMapping && (
+                                    <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onAddProduct?.(insertionParentId, insertionAfterRowId); }}
+                                            className={actionButtonClass}
+                                            title={t('tenders.product_add')}
+                                        >
+                                            <Package size={11} />{t('tenders.product')}</button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onAddChild?.(insertionParentId, 'DESCRIPTION', insertionAfterRowId); }}
+                                            className={actionButtonClass}
+                                            title={t('tenders.line_add')}
+                                        >
+                                            <FileText size={11} />{t('tenders.line')}</button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); void toggleBullet(); }}
+                                            className={headingButtonClass((node.shortDescription || '').trimStart().startsWith('- '))}
+                                            title={t('tenders.bullet_ctrl_q_or_space')}
+                                        >
+                                            <List size={13} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setDescVal(node.shortDescription || ''); setEditingDesc(true); }}
+                                            className="shrink-0 rounded p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                                            title={t('tenders.yaziyi_edit')}
+                                        >
+                                            <Pencil size={10} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const label = hasChildren
+                                                    ? `"${node.shortDescription}" ve tüm alt satırları`
+                                                    : `"${node.shortDescription}"`;
+                                                if (!confirm(`${label} silinsin mi?`)) return;
+                                                try {
+                                                    await deletePosition(tenderId, node.id);
+                                                    toast.success(t('tenders.line_silindi'));
+                                                    onUpdated();
+                                                } catch (err: any) {
+                                                    toast.error(err.response?.data?.error ||t('tenders.silinemedi'));
+                                                }
+                                            }}
+                                            className="shrink-0 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500"
+                                            title={t('tenders.line_sil')}
+                                        >
+                                            <Trash2 size={10} />
+                                        </button>
+                                    </div>
+                                )}
+                                <input
+                                    ref={inlineImageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="sr-only"
+                                    onChange={(e) => {
+                                        handleInlineImageFile(e.currentTarget.files?.[0]);
+                                        e.currentTarget.value = '';
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
                             </>
                         )}
                     </div>
 
+                    {node.imageUrl && !isInlineContentRow && (
+                        <div className="mt-1" style={{ paddingLeft: indent + 20 }}>
+                            <img
+                                src={node.imageUrl}
+                                alt=""
+                                className="h-24 max-w-[200px] rounded border border-slate-200 object-cover"
+                            />
+                        </div>
+                    )}
+
                     {/* Long description row */}
-                    {(node.longDescription || editingLong || (isDraft && !node.isArticleMapping)) && (
-                        <div className="mt-0.5" style={{ paddingLeft: indent + 20 }}>
+                    {(node.longDescription || editingLong || isInlineContentRow) && (
+                        <div className="mt-1" style={{ paddingLeft: isInlineContentRow ? indent : indent + 20 }}>
                             {editingLong ? (
                                 <div
                                     ref={longEditorRef}
-                                    className="w-full max-w-[720px]"
+                                    className={isInlineContentRow ?"w-full max-w-none" :"w-full max-w-[720px]"}
                                     onClick={(e) => e.stopPropagation()}
                                     onBlur={(e) => {
                                         if (!longEditorRef.current?.contains(e.relatedTarget as Node | null)) {
@@ -693,37 +949,59 @@ export const TreeRow: React.FC<{
                                         }
                                     }}
                                 >
+                                    {isInlineContentRow && node.imageUrl && (
+                                        <img
+                                            src={node.imageUrl}
+                                            alt=""
+                                            className="mb-2 h-20 w-32 rounded-md border border-slate-200 bg-white object-cover"
+                                        />
+                                    )}
                                     <RichTextMarkdownEditor
                                         value={longVal}
                                         onChange={setLongVal}
-                                        minHeight={54}
-                                        variant="inline"
-                                        placeholder="Uzun açıklama yaz..."
+                                        minHeight={isInlineContentRow ? 150 : 54}
+                                        variant={isInlineContentRow ? 'boxed' : 'inline'}
+                                        placeholder={t('tenders.line_content_yaz')}
                                     />
                                 </div>
                             ) : node.longDescription ? (
                                 <div
-                                    className={`group flex max-w-[520px] items-start gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 ${isDraft && !node.isArticleMapping ? 'cursor-text hover:border-slate-300 hover:shadow-xs' : ''}`}
+                                    className={`${isInlineContentRow ?"min-h-[150px] w-full max-w-none rounded-md border border-slate-200 bg-white px-3 py-2 shadow-xs" :"flex max-w-[640px] items-start gap-1 px-1 py-0.5"} ${isDraft && !node.isArticleMapping ?"cursor-text hover:border-slate-300 hover:bg-white" : ''}`}
                                     onClick={(e) => {
                                         if (!isDraft || node.isArticleMapping) return;
                                         e.stopPropagation();
                                         openLongEditor();
                                     }}
                                 >
+                                    {isInlineContentRow && node.imageUrl && (
+                                        <img
+                                            src={node.imageUrl}
+                                            alt=""
+                                            className="mb-2 h-20 w-32 rounded-md border border-slate-200 bg-white object-cover"
+                                        />
+                                    )}
                                     <span
-                                        className="rich-text-preview min-w-0 text-[12.5px] leading-5 text-slate-700 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5"
+                                        className={`rich-text-preview min-w-0 leading-5 [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h2]:text-slate-900 [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_h3]:text-slate-800 [&_ul]:list-disc [&_ul]:pl-7 [&_li]:my-0.5 [&_li]:pl-1 ${rowType === 'DESCRIPTION' ?"text-[12.5px] text-slate-600" :"text-[12.5px] text-slate-700"}`}
                                         dangerouslySetInnerHTML={{ __html: markdownToHtml(node.longDescription || '') }}
                                     />
                                 </div>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); openLongEditor(); }}
-                                    className="mt-1 inline-flex min-h-7 items-center rounded-md border border-slate-200 bg-white px-2 text-left text-[12px] text-slate-400 transition-colors hover:border-slate-300 hover:text-blue-700"
+                            ) : isInlineContentRow ? (
+                                <div
+                                    className={`min-h-[150px] w-full max-w-none rounded-md border border-slate-200 bg-white px-3 py-2 text-[12.5px] text-slate-400 shadow-xs ${isDraft ?"cursor-text hover:border-slate-300" : ''}`}
+                                    onClick={(e) => {
+                                        if (!isDraft) return;
+                                        e.stopPropagation();
+                                        openLongEditor();
+                                    }}
                                 >
-                                    Uzun açıklama yaz...
-                                </button>
-                            )}
+                                    {node.imageUrl && (
+                                        <img
+                                            src={node.imageUrl}
+                                            alt=""
+                                            className="mb-2 h-20 w-32 rounded-md border border-slate-200 bg-white object-cover"
+                                        />
+                                    )}{t('tenders.line_content_yazin')}</div>
+                            ) : null}
                         </div>
                     )}
                 </td>
@@ -732,7 +1010,7 @@ export const TreeRow: React.FC<{
                 <td className="px-1.5 py-2 text-right align-top">
                     {canInlineEdit ? (
                         <input
-                            aria-label="Miktar"
+                            aria-label={t('common.quantity')}
                             className={inlineInputClass}
                             inputMode="decimal"
                             min={0}
@@ -744,16 +1022,16 @@ export const TreeRow: React.FC<{
                         />
                     ) : (
                         <span className="font-mono text-[11px] text-slate-700">
-                            {!hasChildren && qty > 0 ? qty : ''}
+                            {qty > 0 ? qty : ''}
                         </span>
                     )}
                 </td>
 
                 {/* Unit (read-only) */}
-                <td className="px-1.5 py-2 text-left align-top">
+                <td className="min-w-[64px] px-1.5 py-2 text-left align-top">
                     {canInlineEdit && !node.isArticleMapping ? (
                         <input
-                            aria-label="Birim"
+                            aria-label={t('tenders.unit')}
                             className={inlineTextInputClass}
                             value={node.unit ?? ''}
                             onChange={(e) => onInlinePositionChange?.(node.id, { unit: e.target.value || null })}
@@ -761,16 +1039,16 @@ export const TreeRow: React.FC<{
                         />
                     ) : (
                         <span className="text-[11px] text-slate-500">
-                            {!hasChildren && node.unit ? node.unit : ''}
+                            {node.unit ? node.unit : ''}
                         </span>
                     )}
                 </td>
 
                 {/* Unit Price (read-only) */}
-                <td className="px-1.5 py-2 text-right align-top">
+                <td className="min-w-[88px] px-1.5 py-2 text-right align-top">
                     {canInlineEdit && !node.isArticleMapping ? (
                         <input
-                            aria-label="Birim fiyat"
+                            aria-label={t('tenders.unit_price')}
                             className={inlineInputClass}
                             inputMode="decimal"
                             min={0}
@@ -782,16 +1060,16 @@ export const TreeRow: React.FC<{
                         />
                     ) : (
                         <span className="font-mono text-[11px] text-slate-600">
-                            {!hasChildren && displayUnitPrice != null ? fmtMoney(displayUnitPrice) : ''}
+                            {displayUnitPrice != null ? fmtMoney(displayUnitPrice) : ''}
                         </span>
                     )}
                 </td>
 
                 {/* Discount (read-only) */}
-                <td className="px-1.5 py-2 text-right align-top">
+                <td className="min-w-[64px] px-1.5 py-2 text-right align-top">
                     {canInlineEdit ? (
                         <input
-                            aria-label="İndirim"
+                            aria-label={t('common.discount')}
                             className={inlineInputClass}
                             inputMode="decimal"
                             max={100}
@@ -804,17 +1082,17 @@ export const TreeRow: React.FC<{
                         />
                     ) : (
                         <span className="font-mono text-[11px] text-slate-600">
-                            {!hasChildren && node.discount && node.discount > 0 ? `${node.discount}%` : ''}
+                            {node.discount && node.discount > 0 ? `${node.discount}%` : ''}
                         </span>
                     )}
                 </td>
 
-                {/* KDV — her ürün/pozisyon için sabit %8.1, gri badge */}
-                <td className="px-1.5 py-2 text-right align-top">
-                    {!hasChildren ? (
+                {/* KDV — her ürün/satır için sabit %8.1, gri badge */}
+                <td className="min-w-[72px] px-1.5 py-2 text-right align-top">
+                    {hasOwnAmount ? (
                         <span
                             className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 font-mono whitespace-nowrap"
-                            title="Sabit KDV oranı"
+                            title={t('tenders.fixed_kdv_orani')}
                         >
                             %{fmtVatRate(node.taxRate != null && node.taxRate > 0 ? node.taxRate : FIXED_VAT)}
                         </span>
@@ -825,8 +1103,8 @@ export const TreeRow: React.FC<{
 
                 {/* Total (read-only) */}
                 <td className="px-2 py-2 text-right font-mono text-[10.5px] align-top">
-                    {displayTotal > 0 ? (
-                        <span className={`font-semibold ${hasChildren ? 'text-slate-600' : 'text-slate-800'}`}>
+                    {showRowTotal ? (
+                        <span className="font-semibold text-slate-800">
                             {fmtMoney(displayTotal)}
                         </span>
                     ) : <span className="text-slate-300">—</span>}
@@ -837,10 +1115,10 @@ export const TreeRow: React.FC<{
                         onClick={(e) => { e.stopPropagation(); if (rowLogs.length > 0) setLogOpen((v) => !v); }}
                         disabled={rowLogs.length === 0}
                         className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${rowLogs.length > 0
-                                ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-700'
-                                : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                                ?"border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-700"
+                                :"border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed"
                             }`}
-                        title="Satır logları"
+                        title={t('tenders.line_loglari')}
                     >
                         <ChevronUp size={14} />
                     </button>
@@ -850,7 +1128,7 @@ export const TreeRow: React.FC<{
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">Satır Logları</span>
+                                <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider">{t('tenders.line_loglari')}</span>
                                 <span className="text-[10px] font-mono text-slate-400">{rowLogs.length}</span>
                             </div>
                             <ul className="max-h-[240px] overflow-y-auto divide-y divide-slate-100">
@@ -861,13 +1139,13 @@ export const TreeRow: React.FC<{
                                                 {log.fieldName || log.actionType}
                                             </span>
                                             <span className="ml-auto text-[10px] text-slate-400">
-                                                {dayjs(log.createdAt).format('DD.MM.YYYY HH:mm')}
+                                                {dayjs(log.createdAt).format("DD.MM.YYYY HH:mm")}
                                             </span>
                                         </div>
                                         <div className="mt-1 text-slate-700">{log.description || log.actionType}</div>
                                         {(log.oldValue != null || log.newValue != null) && (
                                             <div className="mt-1 font-mono text-[10.5px] text-slate-500">
-                                                {log.oldValue ?? 'boş'} → {log.newValue ?? 'boş'}
+                                                {log.oldValue ??t('tenders.empty')} → {log.newValue ??t('tenders.empty')}
                                             </div>
                                         )}
                                         <div className="mt-1 text-[10.5px] text-slate-400">
@@ -880,34 +1158,35 @@ export const TreeRow: React.FC<{
                     )}
                 </td>
             </tr>
-            {isExpanded &&
-                node.children.map((c) => (
+            {node.children.map((c) => {
+                const childRowType = (c.rowType || (c.isArticleMapping ? 'PRODUCT' : 'SECTION')).toUpperCase();
+                const childLevel = !c.isArticleMapping && childRowType === 'SECTION' ? level + 1 : level;
+
+                return (
                     <TreeRow
                         key={c.id}
                         node={c}
-                        level={level + 1}
-                        expanded={expanded}
-                        onToggle={onToggle}
+                        level={childLevel}
                         selectedId={selectedId}
                         onSelect={onSelect}
                         checkedIds={checkedIds}
                         onCheckedChange={onCheckedChange}
                         isDraft={isDraft}
                         tenderId={tenderId}
-                        onEditArticle={onEditArticle}
-                        articleEditLoadingId={articleEditLoadingId}
                         onInlinePositionChange={onInlinePositionChange}
                         onInlineMappingChange={onInlineMappingChange}
+                        onAddChild={onAddChild}
+                        onAddProduct={onAddProduct}
                         onUpdated={onUpdated}
                     />
-                ))}
-            {isExpanded && hasChildren && (
-                <tr aria-hidden="true">
-                    <td colSpan={8} className="p-0">
-                        <div
-                            className="border-b border-slate-300"
-                            style={{ marginLeft: indent + 20 }}
-                        />
+                );
+            })}
+            {isRootSection && (
+                <tr className="border-b-2 border-slate-200 bg-slate-50/80">
+                    <td />
+                    <td colSpan={6} className="px-2 py-1 text-right text-[10.5px] font-semibold text-slate-500">{t('tenders.section_total')}</td>
+                    <td className="px-2 py-1 text-right font-mono text-[11px] font-bold text-slate-700">
+                        {fmtMoney(node.totalWithChildren)}
                     </td>
                 </tr>
             )}
@@ -929,17 +1208,13 @@ export const PositionDetailPanel: React.FC<{
     stockArticlesLoaded: boolean;
     activeTab: 'calc' | 'articles' | 'meta';
     setActiveTab: (t: 'calc' | 'articles' | 'meta') => void;
-    isRoot?: boolean;
     onSaveCalc: (c: CostInput) => Promise<void>;
     onMapArticle: (articleId: string, qty: number, opts?: { discount?: number }) => Promise<void>;
     onRemoveArticleMapping: (mappingId: string) => Promise<void>;
-    onOpenNewArticle: () => void;
-    onEditArticle: (articleId: string, positionId?: string | null, mappingId?: string | null) => void;
     onSelectArticleMapping: (mappingId: string) => void;
     onLocalPositionChange?: (positionId: string, patch: PositionPricingPatch) => void;
     onLocalMappingChange?: (positionId: string, mappingId: string, patch: MappingPricingPatch) => void;
-    articleEditLoadingId: string | null;
-}> = ({ position, tenderId, isDraft, canCalc, stockArticles, stockArticlesLoading, stockArticlesLoaded, activeTab, setActiveTab, isRoot, onSaveCalc, onMapArticle, onRemoveArticleMapping, onOpenNewArticle, onEditArticle, onSelectArticleMapping, onLocalPositionChange, onLocalMappingChange, articleEditLoadingId }) => {
+}> = ({ position, tenderId, isDraft, canCalc, stockArticles, stockArticlesLoading, stockArticlesLoaded, activeTab, setActiveTab, onSaveCalc, onMapArticle, onRemoveArticleMapping, onSelectArticleMapping, onLocalPositionChange, onLocalMappingChange }) => {
     const { settings } = usePdfSettingsStore();
     const defaultTaxRate = settings.vatRate ?? 8.1;
     const { updatePosition: storeUpdatePosition } = useTenderStore();
@@ -983,9 +1258,6 @@ export const PositionDetailPanel: React.FC<{
     const [appliedMappingDiscounts, setAppliedMappingDiscounts] = useState<Record<string, number>>({});
     const [hiddenMappingIds, setHiddenMappingIds] = useState<Record<string, boolean>>({});
     const [mappingLoadingId, setMappingLoadingId] = useState<string | null>(null);
-    const [editingMappingDescriptionId, setEditingMappingDescriptionId] = useState<string | null>(null);
-    const [mappingDescriptionDrafts, setMappingDescriptionDrafts] = useState<Record<string, string>>({});
-    const mappingDescriptionRef = useRef<HTMLTextAreaElement>(null);
     const autoSaveSeq = useRef(0);
     const mappingDiscountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -1025,8 +1297,6 @@ export const PositionDetailPanel: React.FC<{
         setBulkMappingDiscount(0);
         setAppliedMappingDiscounts({});
         setHiddenMappingIds({});
-        setEditingMappingDescriptionId(null);
-        setMappingDescriptionDrafts({});
     }, [position.id]);
 
     useEffect(() => {
@@ -1101,7 +1371,7 @@ export const PositionDetailPanel: React.FC<{
         (pricing.discount ?? 0) !== (savedPricing.discount ?? 0) ||
         (pricing.taxRate ?? 0) !== (savedPricing.taxRate ?? defaultTaxRate);
 
-    const calculationDirty = !isArticle && !isRoot && (
+    const calculationDirty = !isArticle && (
         !position.calculation ||
         (cost.materialCost ?? 0) !== (position.calculation.materialCost ?? 0) ||
         (cost.laborCost ?? 0) !== (position.calculation.laborCost ?? 0) ||
@@ -1110,7 +1380,7 @@ export const PositionDetailPanel: React.FC<{
         (cost.additionalCost ?? 0) !== (position.calculation.additionalCost ?? 0) ||
         (finalMargin ?? 0) !== (position.calculation.profitMargin ?? 0)
     );
-    const autoSaveDirty = isDraft && canCalc && !isRoot && (pricingDirty || calculationDirty);
+    const autoSaveDirty = isDraft && canCalc && (pricingDirty || calculationDirty);
 
     const savePricing = async () => {
         try {
@@ -1143,7 +1413,7 @@ export const PositionDetailPanel: React.FC<{
             ]);
             savedPricingRef.current = { ...pricing };
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Kaydedilemedi.');
+            toast.error(e.response?.data?.error ||t('tenders.kaydedilemedi'));
             throw e;
         }
     };
@@ -1196,7 +1466,7 @@ export const PositionDetailPanel: React.FC<{
                 delete next[mappingId];
                 return next;
             });
-            toast.error(err.response?.data?.error || 'İndirim güncellenemedi.');
+            toast.error(err.response?.data?.error ||t('tenders.discount_guncellenemedi'));
         } finally {
             setMappingLoadingId(null);
         }
@@ -1250,95 +1520,45 @@ export const PositionDetailPanel: React.FC<{
                 const mapping = mappings[index];
                 if (mapping) mergeArticleMappingUpdate(position.id, mapping.id, result, { discount: nextDiscount });
             });
-            toast.success('Toplu indirim uygulandi.');
+            toast.success(t('tenders.bulk_discount_uygulandi'));
         } catch (err: any) {
             setAppliedMappingDiscounts({});
-            toast.error(err.response?.data?.error || 'Toplu indirim guncellenemedi.');
+            toast.error(err.response?.data?.error ||t('tenders.bulk_discount_guncellenemedi'));
         } finally {
             setMappingLoadingId(null);
         }
     };
 
-
-
-    const startEditMappingDescription = (mappingId: string, currentDescription?: string | null) => {
-        setEditingMappingDescriptionId(mappingId);
-        setMappingDescriptionDrafts((prev) => ({ ...prev, [mappingId]: currentDescription ?? '' }));
-        requestAnimationFrame(() => mappingDescriptionRef.current?.focus());
-    };
-    void startEditMappingDescription;
-
-    const insertMappingDescriptionFormat = (before: string, after = '') => {
-        if (!editingMappingDescriptionId) return;
-        const current = mappingDescriptionDrafts[editingMappingDescriptionId] ?? '';
-        const el = mappingDescriptionRef.current;
-        const start = el?.selectionStart ?? current.length;
-        const end = el?.selectionEnd ?? current.length;
-        const selected = current.slice(start, end) || 'metin';
-        const next = `${current.slice(0, start)}${before}${selected}${after}${current.slice(end)}`;
-        setMappingDescriptionDrafts((prev) => ({ ...prev, [editingMappingDescriptionId]: next }));
-        requestAnimationFrame(() => {
-            mappingDescriptionRef.current?.focus();
-            mappingDescriptionRef.current?.setSelectionRange(start + before.length, start + before.length + selected.length);
-        });
-    };
-
-    const insertMappingDescriptionBullet = () => {
-        if (!editingMappingDescriptionId) return;
-        const current = mappingDescriptionDrafts[editingMappingDescriptionId] ?? '';
-        const el = mappingDescriptionRef.current;
-        const start = el?.selectionStart ?? current.length;
-        const prefix = start === 0 || current[start - 1] === '\n' ? '- ' : '\n- ';
-        const next = `${current.slice(0, start)}${prefix}${current.slice(start)}`;
-        setMappingDescriptionDrafts((prev) => ({ ...prev, [editingMappingDescriptionId]: next }));
-        requestAnimationFrame(() => mappingDescriptionRef.current?.focus());
-    };
-
-    const saveMappingDescription = async (mappingId: string) => {
-        void mappingId;
-        setEditingMappingDescriptionId(null);
-    };
-
-    // Render rich text preview inline
     const renderLong = (text: string) =>
         text.split('\n').flatMap((line, i, arr) => {
             const isBullet = line.trimStart().startsWith('- ');
             const content = isBullet ? line.trimStart().slice(2) : line;
             return [
                 isBullet ? <span key={`bullet-${i}`}>• </span> : null,
-                ...content.split(/(\*\*[^*]+\*\*|_[^_]+_)/g).map((seg, j) => {
-                    if (seg.startsWith('**') && seg.endsWith('**'))
-                        return <strong key={`${i}-${j}`}>{seg.slice(2, -2)}</strong>;
-                    if (seg.startsWith('_') && seg.endsWith('_'))
-                        return <em key={`${i}-${j}`}>{seg.slice(1, -1)}</em>;
-                    return <span key={`${i}-${j}`}>{seg}</span>;
-                }),
+                <span key={`${i}-text`}>
+                    {content.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|[^_])_([^_]+)_/g, '$1$2')}
+                </span>,
                 ...(i < arr.length - 1 ? [<br key={`br-${i}`} />] : []),
             ];
         });
 
     return (
         <Card
-            title={isArticle ? position.shortDescription : `Pozisyon ${position.positionNumber}`}
+            title={isArticle ? position.shortDescription :t('tenders.line_detayi')}
             icon={<Tag size={13} />}
             noPadding
             actions={
                 <span className="text-[10.5px] text-slate-400 font-mono">
-                    {isArticle ? 'Ürün Detayı' : `Seviye ${position.hierarchyLevel}`}
+                    {isArticle ?t('tenders.product_detayi') : `Girinti ${position.hierarchyLevel}`}
                 </span>
             }
         >
             {/* Position description header — always visible */}
             <div className="px-4 py-3 border-b border-slate-100 space-y-1">
                 <div className="flex items-center gap-2">
-                    <p className={`flex-1 text-[13px] leading-snug ${position.shortDescription ? 'font-medium text-slate-800' : 'italic text-slate-400'}`}>
-                        {position.shortDescription || 'Açıklama girilmemiş'}
+                    <p className={`flex-1 text-[13px] leading-snug ${position.shortDescription ?"font-medium text-slate-800" : 'text-slate-400'}`}>
+                        {position.shortDescription ||t('tenders.description_not_entered')}
                     </p>
-                    {position.npkCode && (
-                        <span className="shrink-0 text-[10px] font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200/60">
-                            NPK {position.npkCode}
-                        </span>
-                    )}
                 </div>
                 {position.longDescription && (
                     <p className="text-[11.5px] text-slate-600 leading-relaxed">
@@ -1350,15 +1570,9 @@ export const PositionDetailPanel: React.FC<{
             {/* Tabs */}
             {!isArticle && (
                 <div className="border-b border-slate-100 flex">
-                    <TabBtn active={activeTab === 'calc'} onClick={() => setActiveTab('calc')} icon={<Calculator size={12} />}>
-                        Maliyet
-                    </TabBtn>
-                    <TabBtn active={activeTab === 'articles'} onClick={() => setActiveTab('articles')} icon={<Package size={12} />}>
-                        Ürün (BOM)
-                    </TabBtn>
-                    <TabBtn active={activeTab === 'meta'} onClick={() => setActiveTab('meta')} icon={<ClipboardList size={12} />}>
-                        Düzenle
-                    </TabBtn>
+                    <TabBtn active={activeTab === 'calc'} onClick={() => setActiveTab('calc')} icon={<Calculator size={12} />}>{t('tenders.cost')}</TabBtn>
+                    <TabBtn active={activeTab === 'articles'} onClick={() => setActiveTab('articles')} icon={<Package size={12} />}>{t('tenders.product')}</TabBtn>
+                    <TabBtn active={activeTab === 'meta'} onClick={() => setActiveTab('meta')} icon={<ClipboardList size={12} />}>{t('common.edit')}</TabBtn>
                 </div>
             )}
 
@@ -1368,31 +1582,23 @@ export const PositionDetailPanel: React.FC<{
                         {!isDraft && (
                             <div className="flex items-start gap-2 text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200/60 rounded p-2">
                                 <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                                <span>Bu teklif onaylanmış. Fiyatları değiştirmek için yeni versiyon oluşturmanız gerekir.</span>
+                                <span>{t('tenders.bu_tender_approved_prices_change_icin')}</span>
                             </div>
                         )}
 
-                        {/* ── Pozisyon Fiyatlandırması — Quick pricing block ── */}
+                        {/* ── Satır Fiyatı — Quick pricing block ── */}
                         <div className="border border-slate-200/70 rounded-md p-3 bg-white space-y-2.5">
                             <div className="flex items-center justify-between">
-                                <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                                    Pozisyon Fiyatlandırması
-                                </h4>
-                                <span className="text-[10px] text-slate-400">tabloya yansır</span>
+                                <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.line_price')}</h4>
+                                <span className="text-[10px] text-slate-400">{t('tenders.tabloya_yansir')}</span>
                             </div>
 
-                            {isRoot && (
-                                <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200/60 p-2 rounded">
-                                    Bu pozisyonun altında alt pozisyon veya ürün (BOM) olduğu için <strong>Kök Pozisyon</strong> olarak davranmaktadır. Fiyat ve miktar, altındaki kalemlerin toplamından otomatik hesaplanır.
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <Field label="Miktar">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                <Field label={t('common.quantity')} className="sm:col-span-2">
                                     <div className="flex items-center gap-1">
                                         <button
                                             type="button"
-                                            disabled={!isDraft || isRoot}
+                                            disabled={!isDraft}
                                             onClick={() => updatePricing({ quantity: Math.max(0, pricing.quantity - 1) })}
                                             className="w-6 h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 flex items-center justify-center text-sm leading-none disabled:opacity-50"
                                         >−</button>
@@ -1402,40 +1608,40 @@ export const PositionDetailPanel: React.FC<{
                                             min={0}
                                             value={pricing.quantity}
                                             onChange={(e) => updatePricing({ quantity: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
-                                            disabled={!isDraft || isRoot}
+                                            disabled={!isDraft}
                                             className="text-center"
                                         />
                                         <button
                                             type="button"
-                                            disabled={!isDraft || isRoot}
+                                            disabled={!isDraft}
                                             onClick={() => updatePricing({ quantity: pricing.quantity + 1 })}
                                             className="w-6 h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 flex items-center justify-center text-sm leading-none disabled:opacity-50"
                                         >+</button>
                                     </div>
                                 </Field>
-                                {!isArticle && !isRoot && (
+                                {!isArticle && (
                                     <>
-                                        <Field label="Birim">
+                                        <Field label={t('tenders.unit')} className="sm:col-span-2">
                                             <Input
                                                 value={pricing.unit}
-                                                placeholder="stk, m², kg…"
+                                                placeholder={t('tenders.stk_m_kg')}
                                                 onChange={(e) => updatePricing({ unit: e.target.value })}
-                                                disabled={!isDraft || isRoot}
+                                                disabled={!isDraft}
                                             />
                                         </Field>
-                                        <Field label="Birim Fiyat (CHF)" className="col-span-2">
+                                        <Field label={t('tenders.unit_price_chf')} className="sm:col-span-4">
                                             <Input
                                                 type="number"
                                                 step="0.01"
                                                 min={0}
                                                 value={pricing.unitPrice}
                                                 onChange={(e) => updatePricing({ unitPrice: parseFloat(e.target.value) || 0 })}
-                                                disabled={!isDraft || isRoot}
+                                                disabled={!isDraft}
                                             />
                                         </Field>
                                     </>
                                 )}
-                                <Field label="İndirim (%)">
+                                <Field label={t('tenders.discount')} className="sm:col-span-2">
                                     <Input
                                         type="number"
                                         step="0.1"
@@ -1443,29 +1649,29 @@ export const PositionDetailPanel: React.FC<{
                                         max={100}
                                         value={pricing.discount}
                                         onChange={(e) => updatePricing({ discount: parseFloat(e.target.value) || 0 })}
-                                        disabled={!isDraft || isRoot}
+                                        disabled={!isDraft}
                                     />
                                 </Field>
                                 {!isArticle && (
-                                    <Field label="Ek Maliyet">
+                                    <Field label={t('tenders.additional_cost')}>
                                         <Input
                                             type="number"
                                             step="0.01"
                                             min={0}
                                             value={cost.additionalCost}
                                             onChange={(e) => setCost({ ...cost, additionalCost: parseFloat(e.target.value) || 0 })}
-                                            disabled={!isDraft || isRoot}
+                                            disabled={!isDraft}
                                         />
                                     </Field>
                                 )}
-                                <Field label="KDV · Sabit">
+                                <Field label={t('tenders.kdv_fixed')} className="sm:col-span-2">
                                     <div className="flex items-center gap-2 h-[34px] px-2.5 rounded border border-slate-200 bg-slate-50 cursor-not-allowed">
                                         <span
                                             className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200 font-mono"
                                         >
                                             %{fmtVatRate(effectiveVat)}
                                         </span>
-                                        <span className="text-[11px] text-slate-500">sabit oran · her ürüne uygulanır</span>
+                                        <span className="text-[11px] text-slate-500">{t('tenders.fixed_rate_applies_to_each_product')}</span>
                                     </div>
                                 </Field>
                             </div>
@@ -1473,23 +1679,23 @@ export const PositionDetailPanel: React.FC<{
                             {/* Live summary */}
                             <div className="border-t border-slate-100 pt-2 space-y-1 text-[11.5px]">
                                 <div className="flex items-center justify-between text-slate-500">
-                                    <span>Brüt ({pricing.quantity} × {fmtMoney(pricing.unitPrice)})</span>
+                                    <span>{t('tenders.brut')}{pricing.quantity} × {fmtMoney(pricing.unitPrice)})</span>
                                     <span className="font-mono">{fmtMoney(pricingGross)}</span>
                                 </div>
                                 {pricing.discount > 0 && (
                                     <div className="flex items-center justify-between text-slate-500">
-                                        <span>İndirim ({pricing.discount}%)</span>
+                                        <span>{t('tenders.discount')}{pricing.discount}%)</span>
                                         <span className="font-mono text-red-600">−{fmtMoney(pricingDiscountAmount)}</span>
                                     </div>
                                 )}
                                 {!isArticle && (
                                     <div className="flex items-center justify-between text-slate-500">
-                                        <span>Ek Maliyet</span>
+                                        <span>{t('tenders.additional_cost')}</span>
                                         <span className="font-mono">{cost.additionalCost > 0 ? '+' : ''}{fmtMoney(cost.additionalCost)}</span>
                                     </div>
                                 )}
                                 <div className="flex items-center justify-between font-semibold text-slate-700">
-                                    <span>Net Tutar</span>
+                                    <span>{t('tenders.net_amount')}</span>
                                     <span className="font-mono">{fmtMoney(pricingTaxBase)}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-slate-500">
@@ -1502,23 +1708,21 @@ export const PositionDetailPanel: React.FC<{
                                     <span className="font-mono">+{fmtMoney(pricingTaxAmount)}</span>
                                 </div>
                                 <div className="flex items-center justify-between font-semibold text-blue-800 border-t border-slate-100 pt-1">
-                                    <span>Toplam (KDV dahil)</span>
+                                    <span>{t('tenders.total_kdv_dahil')}</span>
                                     <span className="font-mono">{fmtMoney(pricingTotalWithTax)}</span>
                                 </div>
                             </div>
 
                             {autoSaveDirty && (
                                 <div className="text-[10px] text-slate-400 text-right">
-                                    {saving ? 'Kaydediliyor...' : 'Otomatik kaydedilecek...'}
+                                    {saving ? 'Kaydediliyor...' :t('tenders.otomatik_kaydedilecek')}
                                 </div>
                             )}
                         </div>
 
                         {isArticle && (
                             <div className="border border-slate-200/70 rounded-md p-3 bg-white space-y-2.5">
-                                <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                                    Ürün İşlemi
-                                </h4>
+                                <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.product_islemi')}</h4>
                                 <Button
                                     variant="danger"
                                     icon={<Trash2 size={12} />}
@@ -1530,92 +1734,84 @@ export const PositionDetailPanel: React.FC<{
                                         setSaving(true);
                                         try {
                                             await onRemoveArticleMapping(position.mappingId);
-                                            toast.success('Ürün tekliften kaldırıldı.');
+                                            toast.success(t('tenders.product_from_tender_removed'));
                                         } catch (err: any) {
-                                            toast.error(err.response?.data?.error || 'İşlem tamamlanamadı.');
+                                            toast.error(err.response?.data?.error ||t('tenders.action_tamamlanamadi'));
                                         } finally {
                                             setSaving(false);
                                         }
                                     }}
                                     className="w-full"
-                                >
-                                    Tekliften Kaldır
-                                </Button>
+                                >{t('tenders.tender_kaldir')}</Button>
                             </div>
                         )}
 
                         {/* Advanced cost build-up (collapsed by default visually) */}
                         {!isArticle && (
                             <details className="border border-slate-200/70 rounded-md bg-white">
-                                <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-50/60 select-none">
-                                    Ek Maliyet (opsiyonel)
-                                </summary>
+                                <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-50/60 select-none">{t('tenders.additional_cost_opsiyonel')}</summary>
                                 <div className="px-3 pb-3 space-y-3">
                                     <div className="grid grid-cols-2 gap-2.5">
-                                        <Field label="Malzeme">
+                                        <Field label={t('tenders.material')}>
                                             <Input type="number" step="0.01" value={cost.materialCost}
                                                 onChange={(e) => setCost({ ...cost, materialCost: parseFloat(e.target.value) || 0 })}
-                                                disabled={!isDraft || !canCalc || isRoot} />
+                                                disabled={!isDraft || !canCalc} />
                                         </Field>
-                                        <Field label="İşçilik">
+                                        <Field label={t('tenders.iscilik')}>
                                             <Input type="number" step="0.01" value={cost.laborCost}
                                                 onChange={(e) => setCost({ ...cost, laborCost: parseFloat(e.target.value) || 0 })}
-                                                disabled={!isDraft || !canCalc || isRoot} />
+                                                disabled={!isDraft || !canCalc} />
                                         </Field>
-                                        <Field label="Genel Gider">
+                                        <Field label={t('tenders.general_gider')}>
                                             <Input type="number" step="0.01" value={cost.overheadCost}
                                                 onChange={(e) => setCost({ ...cost, overheadCost: parseFloat(e.target.value) || 0 })}
-                                                disabled={!isDraft || !canCalc || isRoot} />
+                                                disabled={!isDraft || !canCalc} />
                                         </Field>
-                                        <Field label="Risk">
+                                        <Field label={t('tenders.risk')}>
                                             <Input type="number" step="0.01" value={cost.riskAmount}
                                                 onChange={(e) => setCost({ ...cost, riskAmount: parseFloat(e.target.value) || 0 })}
-                                                disabled={!isDraft || !canCalc || isRoot} />
+                                                disabled={!isDraft || !canCalc} />
                                         </Field>
-                                        <Field label="Ek Maliyet">
+                                        <Field label={t('tenders.additional_cost')}>
                                             <Input type="number" step="0.01" value={cost.additionalCost}
                                                 onChange={(e) => setCost({ ...cost, additionalCost: parseFloat(e.target.value) || 0 })}
-                                                disabled={!isDraft || !canCalc || isRoot} />
+                                                disabled={!isDraft || !canCalc} />
                                         </Field>
                                     </div>
 
                                     <div className="bg-slate-50/60 border border-slate-200/60 rounded-md p-2.5 space-y-2">
                                         <div className="flex items-center justify-between text-[12px]">
-                                            <span className="text-slate-500">Maliyet Toplamı (Marjsız)</span>
+                                            <span className="text-slate-500">{t('tenders.cost_total_without_margin')}</span>
                                             <span className="font-mono font-semibold text-slate-700">{fmtMoney(subtotal)}</span>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setMarginMode('amount')}
-                                                className={`flex-1 py-1 text-[11.5px] rounded ${marginMode === 'amount' ? 'bg-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
-                                            >
-                                                Tutar
-                                            </button>
+                                                className={`flex-1 py-1 text-[11.5px] rounded ${marginMode === 'amount' ?"bg-blue-700 text-white" :"bg-white border border-slate-200 text-slate-600"}`}
+                                            >{t('common.amount')}</button>
                                             <button
                                                 onClick={() => setMarginMode('percent')}
-                                                className={`flex-1 py-1 text-[11.5px] rounded ${marginMode === 'percent' ? 'bg-blue-700 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
-                                            >
-                                                Yüzde %
-                                            </button>
+                                                className={`flex-1 py-1 text-[11.5px] rounded ${marginMode === 'percent' ?"bg-blue-700 text-white" :"bg-white border border-slate-200 text-slate-600"}`}
+                                            >{t('tenders.yuzde')}</button>
                                         </div>
                                         {marginMode === 'amount' ? (
-                                            <Field label="Kâr Marjı (tutar)">
+                                            <Field label={t('tenders.profit_margin_amount')}>
                                                 <Input type="number" step="0.01" value={cost.profitMargin}
                                                     onChange={(e) => setCost({ ...cost, profitMargin: parseFloat(e.target.value) || 0 })}
-                                                    disabled={!isDraft || !canCalc || isRoot} />
+                                                    disabled={!isDraft || !canCalc} />
                                             </Field>
                                         ) : (
-                                            <Field label="Kâr Marjı (%)">
+                                            <Field label={t('tenders.profit_margin')}>
                                                 <Input type="number" step="0.1" value={marginPercent}
                                                     onChange={(e) => setMarginPercent(parseFloat(e.target.value) || 0)}
-                                                    disabled={!isDraft || !canCalc || isRoot} />
+                                                    disabled={!isDraft || !canCalc} />
                                             </Field>
                                         )}
                                     </div>
 
                                     <div className="bg-blue-50 border border-blue-200/60 rounded-md p-3 space-y-1.5">
                                         <div className="flex items-center justify-between text-[12px]">
-                                            <span className="text-blue-900">Hesaplanan Toplam Fiyat (Net)</span>
+                                            <span className="text-blue-900">{t('tenders.hesaplanan_total_price_net')}</span>
                                             <span className="font-mono font-bold text-blue-900 text-[14px]">{fmtMoney(total)}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-[11px] text-slate-500">
@@ -1623,12 +1819,12 @@ export const PositionDetailPanel: React.FC<{
                                             <span className="font-mono">+{fmtMoney(total * effectiveVat / 100)}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-[12px] pt-1 border-t border-blue-200/40">
-                                            <span className="text-blue-900 font-semibold">Toplam (KDV Dahil)</span>
+                                            <span className="text-blue-900 font-semibold">{t('tenders.total_kdv_dahil')}</span>
                                             <span className="font-mono font-bold text-blue-900">{fmtMoney(totalWithTax)}</span>
                                         </div>
                                         {position.quantity > 0 && (
                                             <div className="flex items-center justify-between text-[11px] text-blue-700/80 mt-1">
-                                                <span>Birim Fiyat ({fmtNumber(position.quantity)} {position.unit || ''})</span>
+                                                <span>{t('tenders.unit_price')}{fmtNumber(position.quantity)} {position.unit || ''})</span>
                                                 <span className="font-mono">{fmtMoney(unitPrice)}</span>
                                             </div>
                                         )}
@@ -1642,23 +1838,19 @@ export const PositionDetailPanel: React.FC<{
 
                 {visibleActiveTab === 'articles' && (
                     <>
-                        <div className="text-[11.5px] text-slate-500 leading-relaxed">
-                            Pozisyona stoktan ürün bağlayın. Malzeme maliyeti BOM üzerinden otomatik hesaplanır.
-                            Stok seviyesi bu işlemden etkilenmez — stok yönetimi ayrı modülden yapılır.
-                        </div>
+                        <div className="text-[11.5px] text-slate-500 leading-relaxed">{t('tenders.stock_urunden_tender_line_create_burada')}</div>
 
                         {/* Currently bound articles */}
                         {position.articleMappings && position.articleMappings.length > 0 && (
                             <div className="border border-slate-200/70 rounded-md bg-white">
                                 <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-                                    <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                                        Bağlı Ürünler ({position.articleMappings.length})
+                                    <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.linked_products')}{position.articleMappings.length})
                                     </h4>
-                                    <span className="text-[10px] text-slate-400">BOM maliyetine dahil</span>
+                                    <span className="text-[10px] text-slate-400">{t('tenders.old_baglanti_record')}</span>
                                 </div>
                                 {isDraft && (
                                     <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/40 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
-                                        <Field label="Toplu İndirim (%)">
+                                        <Field label={t('tenders.bulk_discount')}>
                                             <Input
                                                 type="number"
                                                 step="0.1"
@@ -1672,15 +1864,13 @@ export const PositionDetailPanel: React.FC<{
                                             variant="secondary"
                                             loading={mappingLoadingId === '__bulk__'}
                                             onClick={applyBulkMappingDiscount}
-                                        >
-                                            Toplu İndirimi Uygula
-                                        </Button>
+                                        >{t('tenders.bulk_discounti_apply')}</Button>
                                     </div>
                                 )}
                                 <ul className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
                                     {position.articleMappings.filter((m) => !hiddenMappingIds[m.id]).map((m) => {
                                         const appliedDiscount = appliedMappingDiscounts[m.id] ?? m.discount ?? 0;
-                                        const discountedNet = m.article ? m.quantityMultiplier * m.article.baseCost * (1 - appliedDiscount / 100) : 0;
+                                        const discountedNet = m.article ? m.quantityMultiplier * getArticlePrice(m.article) * (1 - appliedDiscount / 100) : 0;
                                         return (
                                             <li
                                                 key={m.id}
@@ -1696,31 +1886,12 @@ export const PositionDetailPanel: React.FC<{
                                                         {/* Sabit KDV badge — açık gri */}
                                                         <span
                                                             className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 font-mono shrink-0"
-                                                            title="Sabit KDV oranı"
-                                                        >
-                                                            KDV %{fmtVatRate((position.taxRate != null && position.taxRate > 0) ? position.taxRate : FIXED_VAT)}
+                                                            title={t('tenders.fixed_kdv_orani')}
+                                                        >{t('tenders.kdv')}{fmtVatRate((position.taxRate != null && position.taxRate > 0) ? position.taxRate : FIXED_VAT)}
                                                         </span>
-                                                        {isDraft && m.article && (
-                                                            <button
-                                                                type="button"
-                                                                title="Ürün ayarlarını aç"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    onEditArticle(m.article!.id, position.id, m.id);
-                                                                }}
-                                                                className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-                                                                disabled={articleEditLoadingId === m.article?.id}
-                                                            >
-                                                                {articleEditLoadingId === m.article?.id ? (
-                                                                    <span className="h-3.5 w-3.5 rounded-full border-2 border-blue-300 border-t-blue-700 animate-spin" />
-                                                                ) : (
-                                                                    <Pencil size={14} />
-                                                                )}
-                                                            </button>
-                                                        )}
                                                     </div>
                                                     <div className="text-[10.5px] font-mono text-slate-500">
-                                                        {m.article?.articleCode ?? '—'} · {m.quantityMultiplier} {m.article?.unit ?? 'adet'} × {m.article ? fmtMoney(m.article.baseCost) : '—'}
+                                                        {m.article?.articleCode ?? '—'} · {m.quantityMultiplier} {m.article?.unit ?? 'adet'} × {m.article ? fmtMoney(getArticlePrice(m.article)) : '—'}
                                                     </div>
                                                     {false && (
                                                         <div className="mt-1 text-[11.5px] text-slate-600 leading-relaxed line-clamp-3">
@@ -1732,43 +1903,12 @@ export const PositionDetailPanel: React.FC<{
                                                     <div className="text-[11.5px] font-mono font-semibold text-slate-700">
                                                         {m.article ? fmtMoney(lineTotalWithTax(discountedNet, (position.taxRate != null && position.taxRate > 0) ? position.taxRate : FIXED_VAT)) : '—'}
                                                     </div>
-                                                    <div className="text-[9.5px] text-slate-400 font-mono">
-                                                        net: {m.article ? fmtMoney(discountedNet) : '—'}
+                                                    <div className="text-[9.5px] text-slate-400 font-mono">{t('tenders.net')}{m.article ? fmtMoney(discountedNet) : '—'}
                                                     </div>
                                                 </div>
-                                                {false && editingMappingDescriptionId === m.id && (
-                                                    <div className="basis-full rounded-md border border-slate-200 bg-white overflow-hidden">
-                                                        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/70">
-                                                            <button type="button" onClick={() => insertMappingDescriptionFormat('**', '**')} className="w-7 h-6 rounded text-[11px] font-bold hover:bg-white border border-transparent hover:border-slate-200">B</button>
-                                                            <button type="button" onClick={() => insertMappingDescriptionFormat('_', '_')} className="w-7 h-6 rounded text-[11px] italic hover:bg-white border border-transparent hover:border-slate-200">I</button>
-                                                            <button type="button" onClick={insertMappingDescriptionBullet} className="px-2 h-6 rounded text-[11px] hover:bg-white border border-transparent hover:border-slate-200">Liste</button>
-                                                            <div className="ml-auto flex items-center gap-1">
-                                                                <button type="button" disabled={mappingLoadingId === m.id} onClick={() => saveMappingDescription(m.id)} className="p-1.5 rounded text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
-                                                                    <Check size={13} />
-                                                                </button>
-                                                                <button type="button" onClick={() => setEditingMappingDescriptionId(null)} className="p-1.5 rounded text-slate-500 hover:bg-slate-100">
-                                                                    <Minus size={13} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <textarea
-                                                            ref={mappingDescriptionRef}
-                                                            rows={5}
-                                                            value={mappingDescriptionDrafts[m.id] ?? ''}
-                                                            onChange={(e) => setMappingDescriptionDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
-                                                            className="w-full min-h-[120px] px-3 py-2 text-[12.5px] bg-white focus:outline-none resize-y"
-                                                            placeholder="Urun aciklamasi..."
-                                                        />
-                                                        {(mappingDescriptionDrafts[m.id] ?? '').trim() && (
-                                                            <div className="border-t border-slate-100 px-3 py-2 text-[12px] text-slate-900 leading-relaxed bg-slate-50/40">
-                                                                {renderLong(mappingDescriptionDrafts[m.id] ?? '')}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
                                                 {isDraft && (
                                                     <div className="basis-full grid grid-cols-1 gap-2 items-end">
-                                                        <Field label="İndirim (%)">
+                                                        <Field label={t('tenders.discount')}>
                                                             <Input
                                                                 type="number"
                                                                 step="0.1"
@@ -1785,12 +1925,12 @@ export const PositionDetailPanel: React.FC<{
                                     })}
                                 </ul>
                                 <div className="px-3 py-2 border-t border-slate-100 bg-slate-50/40 flex items-center justify-between text-[11.5px]">
-                                    <span className="text-slate-600 font-medium">Toplam Ürün</span>
+                                    <span className="text-slate-600 font-medium">{t('inventory.dashboard.totalProducts')}</span>
                                     <span className="font-mono font-bold text-slate-800">
                                         {fmtMoney(position.articleMappings.filter((m) => !hiddenMappingIds[m.id]).reduce((s, m) => {
                                             const appliedDiscount = appliedMappingDiscounts[m.id] ?? m.discount ?? 0;
                                             const vatRate = (position.taxRate != null && position.taxRate > 0) ? position.taxRate : FIXED_VAT;
-                                            return s + (m.article ? lineTotalWithTax(m.quantityMultiplier * m.article.baseCost * (1 - appliedDiscount / 100), vatRate) : 0);
+                                            return s + (m.article ? lineTotalWithTax(m.quantityMultiplier * getArticlePrice(m.article) * (1 - appliedDiscount / 100), vatRate) : 0);
                                         }, 0))}
                                     </span>
                                 </div>
@@ -1809,41 +1949,40 @@ export const PositionDetailPanel: React.FC<{
                                 <div className="min-w-0 flex-1">
                                     <div className="text-[12.5px] font-semibold text-slate-800 truncate">{selectedStockArticle.name}</div>
                                     <div className="text-[10.5px] font-mono text-slate-500">
-                                        {selectedStockArticle.articleCode} · {fmtMoney(selectedStockArticle.baseCost)}/{selectedStockArticle.unit}
+                                        {selectedStockArticle.articleCode} · {fmtMoney(getArticlePrice(selectedStockArticle))}/{selectedStockArticle.unit}
                                     </div>
-                                    <div className="text-[10.5px] text-slate-500 mt-0.5">
-                                        Toplam mevcut: <span className="font-mono font-medium text-slate-700">{fmtNumber(selectedStockArticle.totalQuantity)} {selectedStockArticle.unit}</span>
+                                    <div className="text-[10.5px] text-slate-500 mt-0.5">{"Toplam mevcut:"}<span className="font-mono font-medium text-slate-700">{fmtNumber(selectedStockArticle.totalQuantity)} {selectedStockArticle.unit}</span>
                                     </div>
                                 </div>
                             </div>
                         )}
 
                         <div className="space-y-2">
-                            <Field label="Stoktan Ürün Seçin">
+                            <Field label={t('tenders.select_product_from_stock')}>
                                 <Select
                                     value={articleId}
                                     onChange={(e) => setArticleId(e.target.value)}
                                     disabled={stockArticlesLoading}
                                 >
-                                    <option value="">Ürün seçin</option>
+                                    <option value="">{t('tenders.product_select')}</option>
                                     {stockArticles.map((article) => (
                                         <option key={article.id} value={article.id}>
-                                            {article.articleCode} · {article.name} · Mevcut: {fmtNumber(article.totalQuantity)} {article.unit}
+                                            {article.articleCode} · {article.name}{t('tenders.mevcut')}{fmtNumber(article.totalQuantity)} {article.unit}
                                         </option>
                                     ))}
                                 </Select>
                                 {stockArticlesLoading && (
-                                    <p className="mt-1 text-[11px] text-slate-400">Urunler yukleniyor...</p>
+                                    <p className="mt-1 text-[11px] text-slate-400">{t('tenders.productler_loading')}</p>
                                 )}
                                 {stockArticlesLoaded && stockArticles.length === 0 && (
-                                    <p className="mt-1 text-[11px] text-slate-400">Kayitli urun bulunamadi.</p>
+                                    <p className="mt-1 text-[11px] text-slate-400">{t('tenders.registered_product_not_found')}</p>
                                 )}
                             </Field>
-                            <Field label="Miktar (kullanılacak)">
+                            <Field label={t('tenders.quantity_kullanilacak')}>
                                 <Input type="number" step="1" min={1} value={articleQty}
                                     onChange={(e) => setArticleQty(parseInt(e.target.value, 10) || 0)} />
                             </Field>
-                            <Field label="İndirim (%)">
+                            <Field label={t('tenders.discount')}>
                                 <Input
                                     type="number"
                                     step="0.1"
@@ -1878,12 +2017,7 @@ export const PositionDetailPanel: React.FC<{
                                     }
                                 }}
                                 className="flex-1"
-                            >
-                                Ürün Bağla
-                            </Button>
-                            <Button variant="secondary" icon={<Plus size={12} />} onClick={onOpenNewArticle}>
-                                Yeni
-                            </Button>
+                            >{t('tenders.product_add')}</Button>
                         </div>
                     </>
                 )}
@@ -1909,33 +2043,29 @@ const MetaEditTab: React.FC<{
     const { updatePosition } = useTenderStore();
     const [desc, setDesc] = useState(position.shortDescription);
     const [longDesc, setLongDesc] = useState(position.longDescription || '');
-    const [npkCodeVal, setNpkCodeVal] = useState(position.npkCode || '');
     const [imageUrl, setImageUrl] = useState<string | null>(position.imageUrl || null);
     const [saving, setSaving] = useState(false);
     const [uploadingImg, setUploadingImg] = useState(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         setDesc(position.shortDescription);
         setLongDesc(position.longDescription || '');
-        setNpkCodeVal(position.npkCode || '');
         setImageUrl(position.imageUrl || null);
     }, [position.id]);
 
     const hasChanges =
         desc !== position.shortDescription
         || longDesc !== (position.longDescription || '')
-        || npkCodeVal !== (position.npkCode || '')
         || imageUrl !== (position.imageUrl || null);
 
     const handleImageFile = (file: File) => {
         if (!file.type.startsWith('image/')) {
-            toast.error('Sadece görsel dosyalar yüklenebilir.');
+            toast.error(t('tenders.only_gorsel_dosyalar_yuklenebilir'));
             return;
         }
         if (file.size > 2 * 1024 * 1024) {
-            toast.error('Görsel 2MB\'tan büyük olamaz.');
+            toast.error(t('tenders.gorsel_2mb_tan_buyuk_olamaz'));
             return;
         }
         setUploadingImg(true);
@@ -1945,24 +2075,10 @@ const MetaEditTab: React.FC<{
             setUploadingImg(false);
         };
         reader.onerror = () => {
-            toast.error('Görsel okunamadı.');
+            toast.error(t('tenders.gorsel_okunamadi'));
             setUploadingImg(false);
         };
         reader.readAsDataURL(file);
-    };
-
-    const insertFormat = (before: string, after: string) => {
-        const el = textareaRef.current;
-        if (!el) return;
-        const start = el.selectionStart;
-        const end = el.selectionEnd;
-        const selected = longDesc.slice(start, end);
-        const newText = longDesc.slice(0, start) + before + selected + after + longDesc.slice(end);
-        setLongDesc(newText);
-        setTimeout(() => {
-            el.focus();
-            el.setSelectionRange(start + before.length, end + before.length);
-        }, 0);
     };
 
     const save = async () => {
@@ -1971,62 +2087,29 @@ const MetaEditTab: React.FC<{
             await updatePosition(tenderId, position.id, {
                 shortDescription: desc.trim(),
                 longDescription: longDesc || null,
-                npkCode: npkCodeVal.trim() || null,
                 imageUrl: imageUrl,
             });
-            toast.success('Güncellendi.');
+            toast.success(t('tenders.updated'));
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Kaydedilemedi.');
+            toast.error(e.response?.data?.error ||t('tenders.kaydedilemedi'));
         } finally {
             setSaving(false);
         }
     };
 
-    // Render rich text preview
-    const renderPreview = (text: string) =>
-        text.split('\n').map((line, i) => (
-            <span key={i}>
-                {line.split(/(\*\*[^*]+\*\*|_[^_]+_)/g).map((seg, j) => {
-                    if (seg.startsWith('**') && seg.endsWith('**'))
-                        return <strong key={j}>{seg.slice(2, -2)}</strong>;
-                    if (seg.startsWith('_') && seg.endsWith('_'))
-                        return <em key={j}>{seg.slice(1, -1)}</em>;
-                    return seg;
-                })}
-                {i < text.split('\n').length - 1 && <br />}
-            </span>
-        ));
-
     return (
         <div className="space-y-3">
             <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                <span>No: {position.positionNumber}</span>
-                <span>·</span>
-                <span>Seviye: {position.hierarchyLevel}</span>
-                {position.npkCode && (
-                    <>
-                        <span>·</span>
-                        <span className="text-blue-600">NPK: {position.npkCode}</span>
-                    </>
-                )}
+                <span>{t('tenders.girinti')}{position.hierarchyLevel}</span>
             </div>
-
-            <Field label="NPK Kodu" hint="CRB/NPK pozisyon kodu (örn: 111.100)">
-                <Input
-                    value={npkCodeVal}
-                    onChange={(e) => setNpkCodeVal(e.target.value)}
-                    placeholder="NPK kodu giriniz"
-                    disabled={!isDraft}
-                />
-            </Field>
 
             {/* Position Image */}
             <div>
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Görsel</div>
+                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{t('tenders.gorsel')}</div>
                 <div className="flex items-start gap-3">
                     <div className="w-20 h-20 border border-slate-200 rounded-md bg-slate-50/60 flex items-center justify-center overflow-hidden shrink-0">
                         {imageUrl ? (
-                            <img src={imageUrl} alt="Pozisyon görseli" className="w-full h-full object-cover" />
+                            <img src={imageUrl} alt="Satır görseli" className="w-full h-full object-cover" />
                         ) : (
                             <ImageIcon size={20} className="text-slate-300" />
                         )}
@@ -2051,23 +2134,21 @@ const MetaEditTab: React.FC<{
                                 loading={uploadingImg}
                                 onClick={() => fileInputRef.current?.click()}
                             >
-                                {imageUrl ? 'Değiştir' : 'Görsel Yükle'}
+                                {imageUrl ?t('tenders.degistir') :t('tenders.gorsel_yukle')}
                             </Button>
                             {imageUrl && (
                                 <button
                                     type="button"
                                     className="text-[11px] text-red-600 hover:text-red-700 self-start"
                                     onClick={() => setImageUrl(null)}
-                                >
-                                    Kaldır
-                                </button>
+                                >{t('common.remove')}</button>
                             )}
                         </div>
                     )}
                 </div>
             </div>
 
-            <Field label="Açıklama">
+            <Field label={t('common.description')}>
                 <Input
                     value={desc}
                     onChange={(e) => setDesc(e.target.value)}
@@ -2077,29 +2158,7 @@ const MetaEditTab: React.FC<{
 
             <div>
                 <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Uzun Açıklama</span>
-                    {isDraft && (
-                        <div className="flex items-center gap-1">
-                            <button type="button" title="Kalın" onClick={() => insertFormat('**', '**')}
-                                className="px-1.5 py-0.5 border border-slate-200 rounded text-[11px] font-bold hover:bg-slate-50">
-                                <Bold size={11} />
-                            </button>
-                            <button type="button" title="İtalik" onClick={() => insertFormat('_', '_')}
-                                className="px-1.5 py-0.5 border border-slate-200 rounded text-[11px] italic hover:bg-slate-50">
-                                <Italic size={11} />
-                            </button>
-                            <button type="button" title="Normal (seçimi temizle)" onClick={() => {
-                                const el = textareaRef.current;
-                                if (!el) return;
-                                const s = el.selectionStart, e = el.selectionEnd;
-                                const sel = longDesc.slice(s, e).replace(/\*\*(.+?)\*\*/g, '$1').replace(/_(.+?)_/g, '$1');
-                                setLongDesc(longDesc.slice(0, s) + sel + longDesc.slice(e));
-                            }} className="px-1.5 py-0.5 border border-slate-200 rounded hover:bg-slate-50">
-                                <Type size={11} />
-                            </button>
-                            <span className="text-[10px] text-slate-400 ml-1">**kalın** _italik_</span>
-                        </div>
-                    )}
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.line_content')}</span>
                 </div>
                 {isDraft ? (
                     <RichTextMarkdownEditor
@@ -2107,21 +2166,20 @@ const MetaEditTab: React.FC<{
                         onChange={setLongDesc}
                         minHeight={120}
                         className="focus-within:border-blue-400"
-                        placeholder="Detaylı açıklama… **kalın**, _italik_"
+                        placeholder={t('tenders.baslik_veya_description_yazin')}
                     />
                 ) : longDesc ? (
-                    <div className="rounded-md border border-slate-200 bg-white p-3 text-[13px] leading-6 text-slate-800">
-                        {renderPreview(longDesc)}
-                    </div>
+                    <div
+                        className="rounded-md border border-slate-200 bg-white p-3 text-[13px] leading-6 text-slate-800 [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-7 [&_li]:pl-1"
+                        dangerouslySetInnerHTML={{ __html: markdownToHtml(longDesc) }}
+                    />
                 ) : (
-                    <div className="text-slate-400 text-[12px] italic">Uzun açıklama yok.</div>
+                    <div className="text-slate-400 text-[12px]">{t('tenders.line_content_not_found')}</div>
                 )}
             </div>
 
             {isDraft && hasChanges && (
-                <Button variant="primary" icon={<Save size={13} />} loading={saving} onClick={save} className="w-full">
-                    Değişiklikleri Kaydet
-                </Button>
+                <Button variant="primary" icon={<Save size={13} />} loading={saving} onClick={save} className="w-full">{t('tenders.degisiklikleri_kaydet')}</Button>
             )}
         </div>
     );
@@ -2130,7 +2188,7 @@ const MetaEditTab: React.FC<{
 const TabBtn: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }> = ({ active, onClick, icon, children }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 transition-colors ${active ? 'border-blue-700 text-blue-800' : 'border-transparent text-slate-500 hover:text-slate-700'
+        className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 transition-colors ${active ?"border-blue-700 text-blue-800" :"border-transparent text-slate-500 hover:text-slate-700"
             }`}
     >
         {icon}
@@ -2141,7 +2199,7 @@ const TabBtn: React.FC<{ active: boolean; onClick: () => void; icon: React.React
 
 
 export const SummaryStat: React.FC<{ label: string; value: string; icon: React.ReactNode; primary?: boolean }> = ({ label, value, icon, primary }) => (
-    <div className={`border rounded-md px-4 py-3 ${primary ? 'bg-blue-50/60 border-blue-200/60' : 'bg-white border-slate-200/70'}`}>
+    <div className={`border rounded-md px-4 py-3 ${primary ?"bg-blue-50/60 border-blue-200/60" :"bg-white border-slate-200/70"}`}>
         <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
             {icon}
             {label}
@@ -2151,184 +2209,6 @@ export const SummaryStat: React.FC<{ label: string; value: string; icon: React.R
         </div>
     </div>
 );
-
-/** Auto-generate next position number based on siblings under a parent */
-function autoNextPositionNumber(positions: PositionDto[], parentId: string | null): string {
-    const siblings = positions.filter((p) =>
-        parentId ? p.parentPositionId === parentId : !p.parentPositionId
-    );
-    if (siblings.length === 0) {
-        if (!parentId) return '100';
-        const parent = positions.find((p) => p.id === parentId);
-        if (parent) return `${parent.positionNumber}.1`;
-        return '1';
-    }
-    // Find the highest sibling number and increment
-    const nums = siblings.map((p) => {
-        const parts = p.positionNumber.split('.');
-        return parseInt(parts[parts.length - 1], 10) || 0;
-    });
-    const max = Math.max(...nums);
-    const base = siblings[0].positionNumber.split('.').slice(0, -1).join('.');
-    const next = max + 1;
-    return base ? `${base}.${next}` : String(next < 100 ? next * 100 : next + 100);
-}
-
-/* ── Add Position Modal ── */
-export const AddPositionModal: React.FC<{
-    open: boolean;
-    onClose: () => void;
-    positions: PositionDto[];
-    onSubmit: (data: Partial<PositionDto>) => Promise<void>;
-}> = ({ open, onClose, positions, onSubmit }) => {
-    const [parentPositionId, setParentPositionId] = useState('');
-    const [shortDescription, setShortDescription] = useState('');
-    const [longDescription, setLongDescription] = useState('');
-    const [quantity, setQuantity] = useState<number | ''>('');
-    const [unit, setUnit] = useState('');
-    const [npkCode, setNpkCode] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [submitAttempted, setSubmitAttempted] = useState(false);
-
-    useEffect(() => {
-        if (open) {
-            setParentPositionId('');
-            setShortDescription('');
-            setLongDescription('');
-            setQuantity('');
-            setUnit('');
-            setNpkCode('');
-            setSubmitAttempted(false);
-        }
-    }, [open]);
-
-    const autoNumber = autoNextPositionNumber(positions, parentPositionId || null);
-    const parentPos = positions.find((p) => p.id === parentPositionId);
-    const hierarchyLevel = parentPos ? parentPos.hierarchyLevel + 1 : 0;
-
-    return (
-        <Modal
-            open={open}
-            title="Yeni Pozisyon Ekle"
-            description="Üst pozisyon seçerek alt pozisyon oluşturun veya kök pozisyon ekleyin."
-            onClose={onClose}
-            width="lg"
-            footer={
-                <>
-                    <Button variant="secondary" onClick={onClose}>İptal</Button>
-                    <Button
-                        variant="primary"
-                        loading={submitting}
-                        onClick={async () => {
-                            setSubmitAttempted(true);
-                            if (!shortDescription.trim()) {
-                                return;
-                            }
-                            setSubmitting(true);
-                            try {
-                                await onSubmit({
-                                    positionNumber: autoNumber,
-                                    shortDescription: shortDescription.trim(),
-                                    longDescription: longDescription || null,
-                                    npkCode: npkCode.trim() || null,
-                                    quantity: typeof quantity === 'number' ? quantity : 0,
-                                    unit: unit || null,
-                                    hierarchyLevel,
-                                    parentPositionId: parentPositionId || null,
-                                });
-                                setSubmitAttempted(false);
-                            } finally {
-                                setSubmitting(false);
-                            }
-                        }}
-                    >
-                        Ekle
-                    </Button>
-                </>
-            }
-        >
-            <div className="space-y-3">
-                <Field label="Üst Pozisyon" hint="Seçmezseniz kök (bölüm) pozisyon oluşturulur">
-                    <Select value={parentPositionId} onChange={(e) => setParentPositionId(e.target.value)}>
-                        <option value="">— Kök Pozisyon (Bölüm) —</option>
-                        {positions.map((p) => (
-                            <option key={p.id} value={p.id}>
-                                {'  '.repeat(p.hierarchyLevel)}{p.positionNumber} · {p.shortDescription}
-                            </option>
-                        ))}
-                    </Select>
-                </Field>
-
-                <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 border border-slate-200/60 rounded-md text-[12px]">
-                    <span className="text-slate-500">Pozisyon No:</span>
-                    <span className="font-mono font-semibold text-slate-800">{autoNumber}</span>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-slate-500">Seviye:</span>
-                    <span className="font-semibold text-slate-800">{hierarchyLevel === 0 ? 'Bölüm' : hierarchyLevel === 1 ? 'Alt Pozisyon' : `Detay (${hierarchyLevel})`}</span>
-                </div>
-
-                <Field label="NPK Kodu" hint="Örn: 111.100, 343.210">
-                    <Input
-                        value={npkCode}
-                        onChange={(e) => setNpkCode(e.target.value)}
-                        placeholder="NPK kodu (opsiyonel)"
-                    />
-                </Field>
-
-                <Field
-                    label="Açıklama"
-                    required
-                    error={submitAttempted && !shortDescription.trim() ? 'Açıklama zorunludur.' : null}
-                >
-                    <Input
-                        autoFocus
-                        value={shortDescription}
-                        onChange={(e) => setShortDescription(e.target.value)}
-                        placeholder="Pozisyon başlığı / kısa açıklama"
-                    />
-                </Field>
-
-                <Field label="Uzun Açıklama" hint="**kalın** ve _italik_ yazı desteklenir">
-                    <RichTextMarkdownEditor
-                        value={longDescription}
-                        onChange={setLongDescription}
-                        minHeight={86}
-                        placeholder="Detaylı açıklama… **kalın**, _italik_ yazabilirsiniz"
-                        className="focus-within:border-blue-400"
-                    />
-                </Field>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <Field label="Miktar" hint="Tam sayı">
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                className="w-7 h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center"
-                                onClick={() => setQuantity((q) => Math.max(0, (typeof q === 'number' ? q : 0) - 1))}
-                            ><Minus size={11} /></button>
-                            <input
-                                type="number"
-                                min={0}
-                                value={quantity === '' ? '' : quantity}
-                                onChange={(e) => setQuantity(e.target.value === '' ? '' : Math.round(Number(e.target.value)))}
-                                className="flex-1 text-center px-2 py-1.5 border border-slate-200 rounded-md text-[12.5px] focus:outline-none focus:ring-2 focus:ring-blue-700/10 focus:border-blue-400 bg-white font-mono"
-                                placeholder="0"
-                            />
-                            <button
-                                type="button"
-                                className="w-7 h-7 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center"
-                                onClick={() => setQuantity((q) => (typeof q === 'number' ? q : 0) + 1)}
-                            ><Plus size={11} /></button>
-                        </div>
-                    </Field>
-                    <Field label="Birim" hint="Adet, m², kg, Psch...">
-                        <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Adet" />
-                    </Field>
-                </div>
-            </div>
-        </Modal>
-    );
-};
 
 type TenderArticleFormData = Partial<InventoryArticle> & {
     adjustQty?: number;
@@ -2355,11 +2235,10 @@ export const TenderArticleFormModal: React.FC<{
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerMode, setScannerMode] = useState<'serial' | 'general'>('serial');
     const fileRef = useRef<HTMLInputElement>(null);
-    const descRef = useRef<HTMLTextAreaElement>(null);
 
     const handleImage = (file: File) => {
         if (file.size > 2 * 1024 * 1024) {
-            toast.error('Gorsel 2 MB sinirini asiyor.');
+            toast.error(t('tenders.gorsel_2_mb_sinirini_asiyor'));
             return;
         }
         const reader = new FileReader();
@@ -2367,48 +2246,23 @@ export const TenderArticleFormModal: React.FC<{
         reader.readAsDataURL(file);
     };
 
-    const insertDescriptionFormat = (before: string, after = '') => {
-        const current = form.description ?? '';
-        const el = descRef.current;
-        const start = el?.selectionStart ?? current.length;
-        const end = el?.selectionEnd ?? current.length;
-        const selected = current.slice(start, end) || 'metin';
-        setForm((p) => ({
-            ...p,
-            description: `${current.slice(0, start)}${before}${selected}${after}${current.slice(end)}`,
-        }));
-        requestAnimationFrame(() => {
-            descRef.current?.focus();
-            descRef.current?.setSelectionRange(start + before.length, start + before.length + selected.length);
-        });
-    };
-
-    const insertDescriptionBullet = () => {
-        const current = form.description ?? '';
-        const el = descRef.current;
-        const start = el?.selectionStart ?? current.length;
-        const prefix = start === 0 || current[start - 1] === '\n' ? '- ' : '\n- ';
-        setForm((p) => ({ ...p, description: `${current.slice(0, start)}${prefix}${current.slice(start)}` }));
-        requestAnimationFrame(() => descRef.current?.focus());
-    };
-
     return (
         <Modal
             open
-            title="Ürünü Düzenle"
-            description="Stok kartını teklif ekranından güncelleyin."
+            title={initial.id ?t('tenders.productu_edit') :t('tenders.create_new_product')}
+            description={initial.id ?t('tenders.update_product_card_for_stock_management') :t('tenders.productler_screen_stock_karti_formu_with_new_ur')}
             onClose={onClose}
             width="full"
             closeOnBackdrop={false}
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose}>Iptal</Button>
+                    <Button variant="secondary" onClick={onClose}>{t('tenders.iptal')}</Button>
                     <Button
                         variant="primary"
                         loading={submitting}
                         onClick={async () => {
                             if (!form.articleCode || !form.name || !form.unit) {
-                                toast.error('Kod, ad ve birim zorunludur.');
+                                toast.error(t('tenders.code_ad_ve_unit_zorunludur'));
                                 return;
                             }
                             setSubmitting(true);
@@ -2424,7 +2278,7 @@ export const TenderArticleFormModal: React.FC<{
                             }
                         }}
                     >
-                        Güncelle
+                        {initial.id ?t('common.update') :t('common.create')}
                     </Button>
                 </>
             }
@@ -2432,43 +2286,37 @@ export const TenderArticleFormModal: React.FC<{
             <div className="grid grid-cols-3 items-start gap-3">
                 <div className="col-span-3 rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
                     <div className="mb-3 flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
-                        <ScanBarcode size={13} />
-                        Barkod Bilgileri
-                    </div>
+                        <ScanBarcode size={13} />{t('tenders.barcode_info')}</div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <Field label="Genel Ürün Kodu" hint="Kategori barkodu · isteğe bağlı · manuel veya kamera">
+                        <Field label={t('tenders.general_product_code')} hint={t('tenders.optional_category_barcode_manual_or_camera')}>
                             <button
                                 type="button"
                                 onClick={() => { setScannerMode('general'); setScannerOpen(true); }}
                                 className="mb-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
                             >
-                                <Camera size={16} />
-                                Kamera ile Genel Kod Tara
-                            </button>
+                                <Camera size={16} />{t('tenders.scan_general_code_with_camera')}</button>
                             <div className="flex items-center gap-1.5">
                                 <Hash size={13} className="shrink-0 text-muted-foreground" />
-                                <Input value={form.systemBarcode ?? ''} onChange={(e) => setForm({ ...form, systemBarcode: e.target.value })} placeholder="Barkod okutun veya yazın..." />
+                                <Input value={form.systemBarcode ?? ''} onChange={(e) => setForm({ ...form, systemBarcode: e.target.value })} placeholder={t('tenders.barcode_okutun_veya_yazin')} />
                             </div>
                         </Field>
-                        <Field label="Ürün Seri Kodu" hint="Zorunlu · her ürüne özgü · manuel veya kamera" required>
+                        <Field label={t('tenders.product_serial_code')} hint={t('tenders.required_unique_for_each_product_manual_or_camera')} required>
                             <button
                                 type="button"
                                 onClick={() => { setScannerMode('serial'); setScannerOpen(true); }}
                                 className="mb-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
                             >
-                                <Camera size={16} />
-                                Kamera ile Seri Kod Tara
-                            </button>
+                                <Camera size={16} />{t('tenders.scan_serial_code_with_camera')}</button>
                             <div className="flex items-center gap-1.5">
                                 <ScanBarcode size={13} className="shrink-0 text-blue-600" />
-                                <Input value={form.supplierBarcode ?? ''} onChange={(e) => setForm({ ...form, supplierBarcode: e.target.value })} placeholder="Seri kodu okutun veya yazın..." />
+                                <Input value={form.supplierBarcode ?? ''} onChange={(e) => setForm({ ...form, supplierBarcode: e.target.value })} placeholder={t('tenders.serial_code_okutun_veya_yazin')} />
                             </div>
                         </Field>
                     </div>
                 </div>
 
                 <div className="col-span-3 md:col-span-1">
-                    <Field label="Ürün Görseli">
+                    <Field label={t('tenders.product_gorseli')}>
                         <div className="flex flex-col items-center gap-2 rounded-md border border-border bg-card p-3">
                             {form.imageUrl ? (
                                 <div className="relative h-48 w-full overflow-hidden rounded bg-muted md:h-56">
@@ -2497,52 +2345,55 @@ export const TenderArticleFormModal: React.FC<{
                                 }}
                             />
                             <Button type="button" variant="secondary" size="sm" icon={<Upload size={11} />} onClick={() => fileRef.current?.click()}>
-                                {form.imageUrl ? 'Görseli Değiştir' : 'Görsel Yükle'}
+                                {form.imageUrl ?t('tenders.gorseli_degistir') :t('tenders.gorsel_yukle')}
                             </Button>
-                            <p className="text-[10.5px] text-slate-400 text-center">PNG/JPG, en fazla 2 MB</p>
+                            <p className="text-[10.5px] text-slate-400 text-center">{"PNG/JPG, en fazla 2 MB"}</p>
                         </div>
                     </Field>
                 </div>
 
                 <div className="col-span-3 grid grid-cols-2 content-start gap-3 md:col-span-2">
-                    <Field label="Stok Kodu" required>
+                    <Field label={t('tenders.stock_code')} required>
                         <Input value={form.articleCode ?? ''} onChange={(e) => setForm({ ...form, articleCode: e.target.value })} />
                     </Field>
-                    <Field label="Birim" required>
+                    <Field label={t('tenders.unit')} required>
                         <Input value={form.unit ?? ''} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
                     </Field>
-                    <Field label="Ürün Adı" required className="col-span-2">
+                    <Field label={t('tenders.product_adi')} required className="col-span-2">
                         <Input value={form.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                     </Field>
-                    <Field label="Kategori">
-                        <Input value={form.category ?? ''} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Hidrolik, Servis..." />
+                    <Field label={t('common.category')}>
+                        <Input value={form.category ?? ''} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t('tenders.hydraulic_service')} />
                     </Field>
-                    <Field label="Birim Maliyet (CHF)">
+                    <Field label={t('tenders.unit_sales_price_chf')}>
+                        <Input type="number" step="0.01" min={0} value={form.salePrice ?? 0} onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) || 0 })} />
+                    </Field>
+                    <Field label={t('tenders.unit_cost_chf')}>
                         <Input type="number" step="0.01" min={0} value={form.baseCost ?? 0} onChange={(e) => setForm({ ...form, baseCost: Number(e.target.value) || 0 })} />
                     </Field>
                 </div>
 
                 <div className="col-span-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Field label="Minimum Seviye">
+                    <Field label={t('tenders.minimum_seviye')}>
                         <Input type="number" step="1" min={0} value={form.minStockLevel ?? 0} onChange={(e) => setForm({ ...form, minStockLevel: Number(e.target.value) || 0 })} />
                     </Field>
-                    <Field label="Kritik Esik">
+                    <Field label={t('tenders.critical_threshold')}>
                         <Input type="number" step="1" min={0} value={form.criticalStockLevel ?? 0} onChange={(e) => setForm({ ...form, criticalStockLevel: Number(e.target.value) || 0 })} />
                     </Field>
-                    <Field label="Maksimum">
+                    <Field label={t('tenders.maksimum')}>
                         <Input type="number" step="1" min={0} value={form.maxStockLevel ?? ''} onChange={(e) => setForm({ ...form, maxStockLevel: e.target.value === '' ? null : Number(e.target.value) })} />
                     </Field>
-                    <Field label="Durum">
+                    <Field label={t('common.status')}>
                         <Select value={form.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, status: e.target.value as ArticleStatus })}>
-                            <option value="ACTIVE">Aktif</option>
-                            <option value="INACTIVE">Pasif</option>
-                            <option value="IN_SUPPLY">Tedarikte</option>
-                            <option value="IN_PRODUCTION">Uretimde</option>
+                            <option value="ACTIVE">{t('common.active')}</option>
+                            <option value="INACTIVE">{t('common.inactive')}</option>
+                            <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
+                            <option value="IN_PRODUCTION">{t('tenders.uretimde')}</option>
                         </Select>
                     </Field>
                 </div>
 
-                <Field label="Son Siparis / Alim Tarihi" className="col-span-3 md:col-span-1">
+                <Field label= "Son Siparis / Alim Tarihi" className="col-span-3 md:col-span-1">
                     <Input
                         type="date"
                         value={form.lastPurchaseDate ? dayjs(form.lastPurchaseDate).format('YYYY-MM-DD') : ''}
@@ -2551,19 +2402,8 @@ export const TenderArticleFormModal: React.FC<{
                 </Field>
 
 
-                <Field label="Aciklama" className="col-span-3">
+                <Field label={t('tenders.description')} className="col-span-3">
                     <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
-                        <div className="hidden items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/70">
-                            <button type="button" title="Kalin" onClick={() => insertDescriptionFormat('**', '**')} className="w-7 h-6 rounded flex items-center justify-center hover:bg-white border border-transparent hover:border-slate-200">
-                                <Bold size={12} />
-                            </button>
-                            <button type="button" title="Italik" onClick={() => insertDescriptionFormat('_', '_')} className="w-7 h-6 rounded flex items-center justify-center hover:bg-white border border-transparent hover:border-slate-200">
-                                <Italic size={12} />
-                            </button>
-                            <button type="button" title="Madde isareti" onClick={insertDescriptionBullet} className="w-7 h-6 rounded flex items-center justify-center hover:bg-white border border-transparent hover:border-slate-200">
-                                <List size={12} />
-                            </button>
-                        </div>
                         <RichTextMarkdownEditor
                             value={form.description ?? ''}
                             onChange={(description) => setForm({ ...form, description })}
@@ -2596,61 +2436,34 @@ export const TenderArticleFormModal: React.FC<{
 export const NewArticleModal: React.FC<{
     open: boolean;
     onClose: () => void;
-    onSubmit: (a: { articleCode: string; name: string; baseCost: number; unit: string; description?: string; systemBarcode?: string; supplierBarcode?: string }) => Promise<void>;
+    onSubmit: (a: { articleCode: string; name: string; baseCost: number; salePrice?: number; unit: string; description?: string; systemBarcode?: string; supplierBarcode?: string }) => Promise<void>;
 }> = ({ open, onClose, onSubmit }) => {
-    const [form, setForm] = useState({ articleCode: '', name: '', baseCost: 0, unit: '', description: '', systemBarcode: '', supplierBarcode: '' });
+    const [form, setForm] = useState({ articleCode: '', name: '', baseCost: 0, salePrice: 0, unit: '', description: '', systemBarcode: '', supplierBarcode: '' });
     const [submitting, setSubmitting] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerMode, setScannerMode] = useState<'serial' | 'general'>('serial');
-    const descRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
-        if (open) setForm({ articleCode: '', name: '', baseCost: 0, unit: '', description: '', systemBarcode: '', supplierBarcode: '' });
+        if (open) setForm({ articleCode: '', name: '', baseCost: 0, salePrice: 0, unit: '', description: '', systemBarcode: '', supplierBarcode: '' });
     }, [open]);
-
-    const insertDescFormat = (before: string, after = '') => {
-        const el = descRef.current;
-        if (!el) {
-            setForm((prev) => ({ ...prev, description: `${prev.description}${before}${after}` }));
-            return;
-        }
-        const start = el.selectionStart;
-        const end = el.selectionEnd;
-        const selected = form.description.slice(start, end);
-        const next = `${form.description.slice(0, start)}${before}${selected || 'metin'}${after}${form.description.slice(end)}`;
-        setForm((prev) => ({ ...prev, description: next }));
-        requestAnimationFrame(() => {
-            el.focus();
-            el.setSelectionRange(start + before.length, start + before.length + (selected || 'metin').length);
-        });
-    };
-
-    const insertBullet = () => {
-        const el = descRef.current;
-        const start = el?.selectionStart ?? form.description.length;
-        const prefix = start === 0 || form.description[start - 1] === '\n' ? '- ' : '\n- ';
-        const next = `${form.description.slice(0, start)}${prefix}${form.description.slice(start)}`;
-        setForm((prev) => ({ ...prev, description: next }));
-        requestAnimationFrame(() => descRef.current?.focus());
-    };
 
     return (
         <Modal
             open={open}
-            title="Yeni Ürün / Malzeme"
-            description="ERP ürün/malzeme kataloğuna kayıt ekleyin."
+            title={t('tenders.new_product_material')}
+            description={t('tenders.add_record_to_erp_product_material_catalog')}
             onClose={onClose}
             width="full"
             closeOnBackdrop={false}
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose}>İptal</Button>
+                    <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
                     <Button
                         variant="primary"
                         loading={submitting}
                         onClick={async () => {
                             if (!form.articleCode || !form.name || !form.unit) {
-                                toast.error('Kod, ad ve birim zorunludur.');
+                                toast.error(t('tenders.code_ad_ve_unit_zorunludur'));
                                 return;
                             }
                             setSubmitting(true);
@@ -2665,81 +2478,72 @@ export const NewArticleModal: React.FC<{
                                 setSubmitting(false);
                             }
                         }}
-                    >
-                        Oluştur
-                    </Button>
+                    >{t('common.create')}</Button>
                 </>
             }
         >
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm lg:col-span-2">
                     <div className="mb-3 flex items-center gap-1.5 text-xs font-medium uppercase text-muted-foreground">
-                        <ScanBarcode size={13} />
-                        Barkod Bilgileri
-                    </div>
+                        <ScanBarcode size={13} />{t('tenders.barcode_info')}</div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <Field label="Genel Ürün Kodu" hint="Kategori barkodu · isteğe bağlı">
+                        <Field label={t('tenders.general_product_code')} hint={t('tenders.optional_category_barcode')}>
                             <button
                                 type="button"
                                 onClick={() => { setScannerMode('general'); setScannerOpen(true); }}
                                 className="mb-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
                             >
-                                <Camera size={16} />
-                                Kamera ile Genel Kod Tara
-                            </button>
+                                <Camera size={16} />{t('tenders.scan_general_code_with_camera')}</button>
                             <div className="flex items-center gap-1.5">
                                 <Hash size={13} className="shrink-0 text-muted-foreground" />
-                                <Input value={form.systemBarcode} onChange={(e) => setForm({ ...form, systemBarcode: e.target.value })} placeholder="Barkod okutun veya yazın..." />
+                                <Input value={form.systemBarcode} onChange={(e) => setForm({ ...form, systemBarcode: e.target.value })} placeholder={t('tenders.barcode_okutun_veya_yazin')} />
                             </div>
                         </Field>
-                        <Field label="Ürün Seri Kodu" hint="Zorunlu · her ürüne özgü" required>
+                        <Field label={t('tenders.product_serial_code')} hint={t('tenders.required_unique_for_each_product')} required>
                             <button
                                 type="button"
                                 onClick={() => { setScannerMode('serial'); setScannerOpen(true); }}
                                 className="mb-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
                             >
-                                <Camera size={16} />
-                                Kamera ile Seri Kod Tara
-                            </button>
+                                <Camera size={16} />{t('tenders.scan_serial_code_with_camera')}</button>
                             <div className="flex items-center gap-1.5">
                                 <ScanBarcode size={13} className="shrink-0 text-blue-600" />
-                                <Input value={form.supplierBarcode} onChange={(e) => setForm({ ...form, supplierBarcode: e.target.value })} placeholder="Seri kodu okutun veya yazın..." />
+                                <Input value={form.supplierBarcode} onChange={(e) => setForm({ ...form, supplierBarcode: e.target.value })} placeholder={t('tenders.serial_code_okutun_veya_yazin')} />
                             </div>
                         </Field>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 content-start">
-                    <Field label="Ürün Kodu" required>
+                    <Field label={t('tenders.product_code')} required>
                         <Input value={form.articleCode}
                             onChange={(e) => setForm({ ...form, articleCode: e.target.value })} />
                     </Field>
-                    <Field label="Birim" required>
+                    <Field label={t('tenders.unit')} required>
                         <Input value={form.unit}
-                            onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="m², kg..." />
+                            onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder={t('tenders.m_kg')} />
                     </Field>
-                    <Field label="Ürün Adı" required className="col-span-2">
+                    <Field label={t('tenders.product_adi')} required className="col-span-2">
                         <Input value={form.name}
                             onChange={(e) => setForm({ ...form, name: e.target.value })} />
                     </Field>
-                    <Field label="Birim Maliyet (CHF)" className="col-span-2">
+                    <Field label={t('tenders.unit_sales_price_chf')} className="col-span-2">
+                        <Input type="number" step="0.01" value={form.salePrice}
+                            onChange={(e) => setForm({ ...form, salePrice: parseFloat(e.target.value) || 0 })} />
+                    </Field>
+                    <Field label={t('tenders.unit_cost_chf')} className="col-span-2">
                         <Input type="number" step="0.01" value={form.baseCost}
                             onChange={(e) => setForm({ ...form, baseCost: parseFloat(e.target.value) || 0 })} />
                     </Field>
                 </div>
-                <Field label="Açıklama" hint="PDF çıktısında kalın, italik ve madde işaretleri aynı stil ile gösterilir.">
+                <Field label={t('common.description')} hint={t('tenders.pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor')}>
                     <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
-                        <div className="hidden items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/70">
-                            <button type="button" onClick={() => insertDescFormat('**', '**')} className="px-2 py-1 rounded text-[11px] font-bold hover:bg-white border border-transparent hover:border-slate-200">B</button>
-                            <button type="button" onClick={() => insertDescFormat('_', '_')} className="px-2 py-1 rounded text-[11px] italic hover:bg-white border border-transparent hover:border-slate-200">I</button>
-                            <button type="button" onClick={insertBullet} className="px-2 py-1 rounded text-[11px] hover:bg-white border border-transparent hover:border-slate-200">• Liste</button>
-                        </div>
                         <RichTextMarkdownEditor
                             value={form.description}
                             onChange={(description) => setForm({ ...form, description })}
                             minHeight={260}
                             className="border-0"
-                            placeholder="Örn:&#10;**Bakım seti**&#10;- Lecksuchspray&#10;- Reinigungstücher&#10;_Not: servis için uygundur_"
+                            placeholder={t('tenders.orn_10_bakim_seti_10_lecksuchspray_10_reinigungs')}
                         />
                     </div>
                 </Field>
@@ -2768,23 +2572,28 @@ const flattenTreeForSettings = (node: TreeNode): TreeNode[] => [
     ...node.children.flatMap((child) => flattenTreeForSettings(child)),
 ];
 
+type TenderSettingsTabKey = 'mail' | 'schedule' | 'overtime' | 'materials';
+
 export const TenderSettingsModal: React.FC<{
     open: boolean;
     onClose: () => void;
     tenderId: string;
     tree: TreeNode[];
     grandTotal: number;
+    initialTab?: TenderSettingsTabKey;
+    inline?: boolean;
+    hideTabs?: boolean;
     overtimeHourlyRate: number;
     onOvertimeHourlyRateChange: (value: number) => void;
     onChanged: () => Promise<void>;
-}> = ({ open, onClose, tenderId, tree, grandTotal, overtimeHourlyRate, onOvertimeHourlyRateChange, onChanged }) => {
+}> = ({ open, onClose, tenderId, tree, grandTotal, initialTab = 'mail', inline = false, hideTabs = false, overtimeHourlyRate, onOvertimeHourlyRateChange, onChanged }) => {
     const { detail, activities } = useTenderStore();
     const { user } = useAuthStore();
     const { settings } = usePdfSettingsStore();
     const [slots, setSlots] = useState<OfferScheduleSlotDto[]>([]);
     const [slotForm, setSlotForm] = useState({ date: dayjs().format('YYYY-MM-DD'), start: '09:00', end: '17:00', notes: '' });
     const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'mail' | 'schedule' | 'overtime' | 'materials'>('mail');
+    const [activeTab, setActiveTab] = useState<TenderSettingsTabKey>(initialTab);
     const [localOvertimeRate, setLocalOvertimeRate] = useState(overtimeHourlyRate || 0);
     const [availableMaterials, setAvailableMaterials] = useState<ProjectMaterial[]>([]);
     const [tenderMaterials, setTenderMaterials] = useState<TenderMaterialUsageDto[]>([]);
@@ -2792,11 +2601,11 @@ export const TenderSettingsModal: React.FC<{
     const [materialLoading, setMaterialLoading] = useState(false);
     const [materialSaving, setMaterialSaving] = useState(false);
     const [form, setForm] = useState({
-        fromName: 'Offitec ERP',
+        fromName:t('tenders.offitec_erp'),
         fromEmail: user?.email || '',
         to: '',
         subject: '',
-        message: 'Merhaba,\n\nTeklifimizi PDF olarak ekte iletiyoruz. Planlanan çalışma tarih ve saatleri aşağıdadır. Uygun görmeniz halinde bu e-postaya yanıt verebilirsiniz.\n\nSaygılarımızla',
+        message:t('tenders.merhaba_teklifimizi_pdf_olarak_ekte_iletiyoruz_p'),
     });
     const [loading, setLoading] = useState(false);
 
@@ -2820,7 +2629,7 @@ export const TenderSettingsModal: React.FC<{
             setAvailableMaterials(materials);
             setTenderMaterials(usages);
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Malzemeler yüklenemedi.');
+            toast.error(e.response?.data?.error ||t('tenders.materials_yuklenemedi'));
         } finally {
             setMaterialLoading(false);
         }
@@ -2828,6 +2637,7 @@ export const TenderSettingsModal: React.FC<{
 
     useEffect(() => {
         if (!open || !detail) return;
+        setActiveTab(initialTab);
         setLocalOvertimeRate(overtimeHourlyRate || 0);
         setForm((prev) => ({
             ...prev,
@@ -2836,7 +2646,7 @@ export const TenderSettingsModal: React.FC<{
         }));
         void loadSlots();
         void loadMaterials();
-    }, [open, detail?.tender.id, overtimeHourlyRate]);
+    }, [open, detail?.tender.id, overtimeHourlyRate, initialTab]);
 
     const selectedTenderMaterial = useMemo(
         () => availableMaterials.find((material) => material.id === materialForm.materialId) || null,
@@ -2844,9 +2654,9 @@ export const TenderSettingsModal: React.FC<{
     );
 
     const addTenderMaterial = async () => {
-        if (!materialForm.materialId) return toast.error('Malzeme seçin.');
+        if (!materialForm.materialId) return toast.error(t('tenders.material_select'));
         const quantity = Number(materialForm.quantity || 0);
-        if (quantity <= 0) return toast.error('Miktar 0dan büyük olmalı.');
+        if (quantity <= 0) return toast.error(t('tenders.quantity_0dan_buyuk_olmali'));
         setMaterialSaving(true);
         try {
             const res = await tenderApi.mapMaterial(tenderId, materialForm.materialId, quantity, materialForm.description);
@@ -2857,9 +2667,9 @@ export const TenderSettingsModal: React.FC<{
                     : material
             ));
             setMaterialForm({ materialId: '', quantity: 1, description: '' });
-            toast.success('Malzeme eklendi. Fiyata dahil edilmedi.');
+            toast.success(t('tenders.material_added_fiyata_dahil_edilmedi'));
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Malzeme eklenemedi.');
+            toast.error(e.response?.data?.error ||t('tenders.material_eklenemedi'));
         } finally {
             setMaterialSaving(false);
         }
@@ -2875,9 +2685,9 @@ export const TenderSettingsModal: React.FC<{
                     ? { ...material, stockQuantity: Number(material.stockQuantity || 0) + Number(usage.quantity || 0) }
                     : material
             ));
-            toast.success('Malzeme kaldırıldı.');
+            toast.success(t('tenders.material_kaldirildi'));
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Malzeme kaldırılamadı.');
+            toast.error(e.response?.data?.error ||t('tenders.material_kaldirilamadi'));
         } finally {
             setMaterialSaving(false);
         }
@@ -2892,19 +2702,19 @@ export const TenderSettingsModal: React.FC<{
     const saveSlot = async () => {
         const startTime = dayjs(`${slotForm.date}T${slotForm.start}`).toISOString();
         const endTime = dayjs(`${slotForm.date}T${slotForm.end}`).toISOString();
-        if (!dayjs(endTime).isAfter(dayjs(startTime))) return toast.error('Bitiş saati başlangıçtan sonra olmalıdır.');
+        if (!dayjs(endTime).isAfter(dayjs(startTime))) return toast.error(t('tenders.bitis_saati_baslangictan_sonra_olmalidir'));
         try {
             if (editingSlotId) {
                 await tenderApi.updateScheduleSlot(tenderId, editingSlotId, { startTime, endTime, notes: slotForm.notes });
-                toast.success('Randevu güncellendi.');
+                toast.success(t('tenders.appointment_updated'));
             } else {
                 await tenderApi.createScheduleSlot(tenderId, { startTime, endTime, notes: slotForm.notes });
-                toast.success('Randevu eklendi.');
+                toast.success(t('tenders.appointment_added'));
             }
             resetSlotForm();
             await loadSlots();
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Randevu kaydedilemedi.');
+            toast.error(e.response?.data?.error ||t('tenders.appointment_kaydedilemedi'));
         }
     };
 
@@ -2916,7 +2726,7 @@ export const TenderSettingsModal: React.FC<{
             const overtimeNote = Number(localOvertimeRate || 0) > 0
                 ? `\n\nNot: Planlanan günlük çalışma süresinin %15 üzerindeki fazla çalışmalar ${localOvertimeRate} CHF/saat üzerinden ayrıca hesaplanır.`
                 : '';
-            const { buildTenderPdfBytes } = await import('../../../utils/pdf/tenderPdf');
+            const { buildTenderPdfBytes } = await import("../../../utils/pdf/tenderPdf");
             const pdfBytes = await buildTenderPdfBytes({
                 tenderNumber: detail.tender.tenderNumber,
                 version: detail.tender.version,
@@ -2940,72 +2750,62 @@ export const TenderSettingsModal: React.FC<{
                     contentBase64: bytesToBase64(pdfBytes),
                 }],
             });
-            toast.success(res.message || 'Teklif maili gönderildi.');
+            toast.success(res.message ||t('tenders.tender_maili_gonderildi'));
             await onChanged();
             onClose();
         } catch (e: any) {
-            toast.error(e.response?.data?.error || e.message || 'Teklif maili gönderilemedi.');
+            toast.error(e.response?.data?.error || e.message ||t('tenders.tender_maili_gonderilemedi'));
         } finally {
             setLoading(false);
         }
     };
 
     const tabs = [
-        { key: 'mail' as const, label: 'Mail' },
-        { key: 'overtime' as const, label: 'Ek Ücret' },
-        { key: 'schedule' as const, label: 'Randevu' },
-        { key: 'materials' as const, label: 'Malzemeler' },
+        { key: 'mail' as const, label:t('tenders.mail') },
+        { key: 'overtime' as const, label:t('tenders.additional_fee') },
+        { key: 'schedule' as const, label:t('tenders.appointment') },
+        { key: 'materials' as const, label:t('nav.materials') },
     ];
 
     const usedMaterials = tenderMaterials.map((item) => ({
         id: item.id,
-        positionNumber: item.material?.serialId || '-',
-        name: item.material?.name || 'Malzeme',
+        serialLabel: item.material?.serialId || '-',
+        name: item.material?.name ||t('tenders.material'),
         quantity: item.quantity || 0,
         unit: 'adet',
         unitPrice: item.unitCost || 0,
         total: Number(item.quantity || 0) * Number(item.unitCost || 0),
     }));
 
-    return (
-        <Modal
-            open={open}
-            title="Teklif Ayarları"
-            description="Mail, ek ücret ve randevu ayarlarını tek yerden yönetin."
-            onClose={onClose}
-            placement="drawer"
-            drawerWidth="wide"
-            closeOnBackdrop={false}
-            closeOnEscape={false}
-        >
-            <div className="flex h-full min-h-[calc(100dvh-9rem)] flex-col">
-                <div className="mb-6 flex items-center gap-8 border-b border-slate-200">
+    const content = (
+        <div className={inline ?"flex flex-col" :"flex h-full min-h-[calc(100dvh-9rem)] flex-col"}>
+                {!hideTabs && (
+                    <div className="mb-6 flex items-center gap-8 border-b border-slate-200">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
                             type="button"
                             onClick={() => setActiveTab(tab.key)}
                             className={`border-b-2 px-0 pb-3 pt-1 text-sm font-semibold transition-colors ${
-                                activeTab === tab.key ? 'border-blue-700 text-blue-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
+                                activeTab === tab.key ?"border-blue-700 text-blue-700" :"border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
                             }`}
                         >
                             {tab.label}
                         </button>
                     ))}
-                </div>
+                    </div>
+                )}
 
                 {activeTab === 'mail' && (
                     <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label="Gönderici adı"><Input value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} /></Field>
-                            <Field label="Gönderici e-posta"><Input value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></Field>
+                            <Field label={t('settings.mail.senderName')}><Input value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} /></Field>
+                            <Field label={t('settings.mail.senderEmail')}><Input value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></Field>
                         </div>
-                        <Field label="Alıcı"><Input value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></Field>
-                        <Field label="Konu"><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></Field>
-                        <Field label="Ek mesaj"><Textarea rows={12} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></Field>
-                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
-                            Mail göndermek opsiyoneldir; sipariş oluşturmak için mail, ek ücret veya randevu ekleme zorunluluğu yoktur.
-                        </div>
+                        <Field label={t('tenders.alici')}><Input value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></Field>
+                        <Field label={t('tenders.konu')}><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></Field>
+                        <Field label={t('tenders.additional_mesaj')}><Textarea rows={12} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></Field>
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{t('tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i')}</div>
                     </div>
                 )}
 
@@ -3013,27 +2813,25 @@ export const TenderSettingsModal: React.FC<{
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
                         <div className="xl:col-span-2">
                             <div className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
-                                <Field label="Tarih"><Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} /></Field>
+                                <Field label={t('common.date')}><Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} /></Field>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Field label="Başlangıç"><Input type="time" value={slotForm.start} onChange={(e) => setSlotForm({ ...slotForm, start: e.target.value })} /></Field>
-                                    <Field label="Bitiş"><Input type="time" value={slotForm.end} onChange={(e) => setSlotForm({ ...slotForm, end: e.target.value })} /></Field>
+                                    <Field label={t('common.start')}><Input type="time" value={slotForm.start} onChange={(e) => setSlotForm({ ...slotForm, start: e.target.value })} /></Field>
+                                    <Field label={t('common.end')}><Input type="time" value={slotForm.end} onChange={(e) => setSlotForm({ ...slotForm, end: e.target.value })} /></Field>
                                 </div>
-                                <Field label="Not"><Input value={slotForm.notes} onChange={(e) => setSlotForm({ ...slotForm, notes: e.target.value })} /></Field>
+                                <Field label={t('tenders.note')}><Input value={slotForm.notes} onChange={(e) => setSlotForm({ ...slotForm, notes: e.target.value })} /></Field>
                                 <div className="flex gap-2">
                                     <Button className="flex-1" icon={<CalendarPlus size={13} />} onClick={saveSlot}>
-                                        {editingSlotId ? 'Randevuyu Güncelle' : 'Randevu Ekle'}
+                                        {editingSlotId ?t('tenders.randevuyu_update') :t('tenders.appointment_add')}
                                     </Button>
                                     {editingSlotId && (
-                                        <Button variant="secondary" icon={<X size={13} />} onClick={resetSlotForm}>
-                                            İptal
-                                        </Button>
+                                        <Button variant="secondary" icon={<X size={13} />} onClick={resetSlotForm}>{t('common.cancel')}</Button>
                                     )}
                                 </div>
                             </div>
                         </div>
                         <div className="xl:col-span-3">
                             <div className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
-                                {slots.length === 0 && <div className="px-3 py-10 text-center text-[12px] text-slate-400">Randevu yok.</div>}
+                                {slots.length === 0 && <div className="px-3 py-10 text-center text-[12px] text-slate-400">{t('tenders.appointment_not_found')}</div>}
                                 {slots.map((slot) => (
                                     <div key={slot.id} className="flex items-center justify-between gap-3 px-4 py-3 text-[12.5px]">
                                         <div>
@@ -3078,7 +2876,7 @@ export const TenderSettingsModal: React.FC<{
 
                 {activeTab === 'overtime' && (
                     <div className="max-w-xl space-y-4">
-                        <Field label="%15 üzeri fazla çalışma saat ücreti (CHF)">
+                        <Field label={t('tenders.15_uzeri_fazla_work_saat_ucreti_chf')}>
                             <Input
                                 type="number"
                                 value={localOvertimeRate}
@@ -3086,12 +2884,8 @@ export const TenderSettingsModal: React.FC<{
                                 placeholder="0"
                             />
                         </Field>
-                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">
-                            Bu alan boş bırakılırsa ya da 0 girilirse, %15 üzeri fazla çalışma için ek ücret 0 CHF olarak projeye aktarılır.
-                        </div>
-                        <Button onClick={() => { onOvertimeHourlyRateChange(Math.max(0, Number(localOvertimeRate || 0))); toast.success('Fazla çalışma saat ücreti hazır.'); }}>
-                            Ücreti Uygula
-                        </Button>
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">{t('tenders.bu_field_empty_when_empty_ya_da_0_girilirse_15_uze')}</div>
+                        <Button onClick={() => { onOvertimeHourlyRateChange(Math.max(0, Number(localOvertimeRate || 0))); toast.success(t('tenders.fazla_work_saat_ucreti_hazir')); }}>{t('tenders.ucreti_uygula')}</Button>
                     </div>
                 )}
 
@@ -3099,11 +2893,11 @@ export const TenderSettingsModal: React.FC<{
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                         <div className="rounded-md border border-slate-200 bg-white">
                             <div className="border-b border-slate-100 px-3 py-2">
-                                <h3 className="text-[12px] font-semibold text-slate-800">Kullanılan Malzemeler</h3>
-                                <p className="mt-0.5 text-[11px] text-slate-500">Bu fiyatlar görünür, ancak teklif toplamına dahil edilmez.</p>
+                                <h3 className="text-[12px] font-semibold text-slate-800">{t('tenders.used_materials')}</h3>
+                                <p className="mt-0.5 text-[11px] text-slate-500">{t('tenders.bu_fiyatlar_gorunur_ancak_tender_toplamina_dahil')}</p>
                             </div>
                             {usedMaterials.length === 0 ? (
-                                <div className="px-3 py-8 text-center text-[12px] text-slate-400">Kullanılan malzeme yok.</div>
+                                <div className="px-3 py-8 text-center text-[12px] text-slate-400">{t('tenders.used_material_not_found')}</div>
                             ) : (
                                 <div className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto">
                                     {usedMaterials.map((item) => (
@@ -3111,12 +2905,12 @@ export const TenderSettingsModal: React.FC<{
                                             <div className="min-w-0">
                                                 <div className="truncate text-[12.5px] font-medium text-slate-800">{item.name}</div>
                                                 <div className="mt-0.5 text-[11px] font-mono text-slate-500">
-                                                    {item.positionNumber} · {fmtNumber(item.quantity)} {item.unit} x {fmtMoney(item.unitPrice)}
+                                                    {item.serialLabel} · {fmtNumber(item.quantity)} {item.unit} x {fmtMoney(item.unitPrice)}
                                                 </div>
                                             </div>
                                             <div className="shrink-0 text-right">
                                                 <div className="font-mono text-[12px] font-semibold text-slate-800">{fmtMoney(item.total)}</div>
-                                                <div className="text-[10px] text-slate-400">dahil değil</div>
+                                                <div className="text-[10px] text-slate-400">{t('tenders.dahil_not')}</div>
                                             </div>
                                         </div>
                                     ))}
@@ -3125,21 +2919,20 @@ export const TenderSettingsModal: React.FC<{
                         </div>
                         <div className="rounded-md border border-slate-200 bg-white">
                             <div className="border-b border-slate-100 px-3 py-2">
-                                <h3 className="text-[12px] font-semibold text-slate-800">Malzemeler</h3>
-                                <p className="mt-0.5 text-[11px] text-slate-500">Malzeme stoktan düşer; fiyat sadece bilgi amaçlı gösterilir.</p>
+                                <h3 className="text-[12px] font-semibold text-slate-800">{t('nav.materials')}</h3>
+                                <p className="mt-0.5 text-[11px] text-slate-500">{t('tenders.material_stock_duser_price_only_info_amacli')}</p>
                             </div>
                             <div className="space-y-3 p-3">
-                                <Field label="Malzeme">
+                                <Field label={t('tenders.material')}>
                                     <Select
                                         value={materialForm.materialId}
                                         onChange={(event) => setMaterialForm({ ...materialForm, materialId: event.target.value })}
                                         disabled={materialLoading || materialSaving}
                                     >
-                                        <option value="">Malzeme seçin</option>
+                                        <option value="">{t('tenders.material_select')}</option>
                                         {availableMaterials.map((material) => (
                                             <option key={material.id} value={material.id}>
-                                                {material.serialId} · {material.name} · Mevcut: {fmtNumber(material.stockQuantity)} adet
-                                            </option>
+                                                {material.serialId} · {material.name}{t('tenders.mevcut')}{fmtNumber(material.stockQuantity)}{t('tenders.adet')}</option>
                                         ))}
                                     </Select>
                                 </Field>
@@ -3149,32 +2942,53 @@ export const TenderSettingsModal: React.FC<{
                                             <span>{selectedTenderMaterial.name}</span>
                                             <span className="font-mono">{fmtMoney(selectedTenderMaterial.unitCost)}</span>
                                         </div>
-                                        <div className="mt-1 font-mono text-[11px] text-slate-500">
-                                            Stok: {fmtNumber(selectedTenderMaterial.stockQuantity)} adet
-                                        </div>
+                                        <div className="mt-1 font-mono text-[11px] text-slate-500">{t('tenders.stock')}{fmtNumber(selectedTenderMaterial.stockQuantity)}{t('tenders.adet')}</div>
                                     </div>
                                 )}
-                                <Field label="Miktar">
+                                <Field label={t('common.quantity')}>
                                     <Input type="number" min={1} step="1" value={materialForm.quantity} onChange={(event) => setMaterialForm({ ...materialForm, quantity: Number(event.target.value) || 0 })} />
                                 </Field>
-                                <Field label="Açıklama">
+                                <Field label={t('common.description')}>
                                     <Input value={materialForm.description} onChange={(event) => setMaterialForm({ ...materialForm, description: event.target.value })} />
                                 </Field>
-                                <Button className="w-full" icon={<Plus size={13} />} loading={materialSaving} disabled={!materialForm.materialId || materialForm.quantity <= 0} onClick={addTenderMaterial}>
-                                    Malzeme Ekle
-                                </Button>
+                                <Button className="w-full" icon={<Plus size={13} />} loading={materialSaving} disabled={!materialForm.materialId || materialForm.quantity <= 0} onClick={addTenderMaterial}>{t('tenders.material_add')}</Button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                <div className="mt-auto flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
-                    <Button variant="secondary" onClick={onClose}>Kapat</Button>
+                {(!inline || activeTab === 'mail') && (
+                <div className={`${inline ? 'mt-6' : 'mt-auto'} flex items-center justify-end gap-2 border-t border-slate-200 pt-4`}>
+                    {!inline && <Button variant="secondary" onClick={onClose}>{t('common.close')}</Button>}
                     {activeTab === 'mail' && (
-                        <Button variant="primary" loading={loading} icon={<Mail size={13} />} onClick={send}>PDF ile Teklif Maili Gönder</Button>
+                        <Button variant="primary" loading={loading} icon={<Mail size={13} />} onClick={send}>{t('tenders.pdf_ile_tender_maili_gonder')}</Button>
                     )}
                 </div>
+                )}
+        </div>
+    );
+
+    if (inline) {
+        if (!open) return null;
+        return (
+            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+                {content}
             </div>
+        );
+    }
+
+    return (
+        <Modal
+            open={open}
+            title={t('tenders.tender_settings')}
+            description={t('tenders.mail_additional_fee_ve_appointment_ayarlarini_tek_place_y')}
+            onClose={onClose}
+            placement="drawer"
+            drawerWidth="wide"
+            closeOnBackdrop={false}
+            closeOnEscape={false}
+        >
+            {content}
         </Modal>
     );
 };
@@ -3200,41 +3014,8 @@ export const ExportModal: React.FC<{
         setLoading(true);
         try {
             if (format === 'PDF') {
-                const flatTree: any[] = [];
-                const flatten = (nodes: any[], isRootLevel = false) => {
-                    nodes.forEach(n => {
-                        flatTree.push({
-                            positionNumber: n.positionNumber,
-                            shortDescription: n.shortDescription,
-                            longDescription: n.longDescription,
-                            quantity: n.children.length > 0 ? undefined : n.quantity,
-                            unit: n.children.length > 0 ? undefined : n.unit,
-                            npkCode: n.npkCode,
-                            imageUrl: n.imageUrl,
-                            discount: n.children.length > 0 ? undefined : (n.discount ?? 0),
-                            taxRate: n.children.length > 0 ? undefined : 8.1,
-                            unitPrice: n.children.length > 0 ? undefined : n.unitPrice,
-                            total: n.totalWithChildren,
-                            isParent: n.children.length > 0,
-                            isTopLevel: isRootLevel,
-                            hierarchyLevel: n.hierarchyLevel,
-                        });
-                        flatten(n.children, false);
-                        if (isRootLevel) {
-                            flatTree.push({
-                                positionNumber: `${n.positionNumber}-subtotal`,
-                                shortDescription: '',
-                                quantity: 0,
-                                total: n.totalWithChildren,
-                                isSectionSubtotal: true,
-                            });
-                        }
-                    });
-                };
-                flatten(tree, true);
-
-                const positions = flatTree;
-                const { exportTenderPdf } = await import('../../../utils/pdf/tenderPdf');
+                const positions = flattenTenderTreeForPdf(tree);
+                const { exportTenderPdf } = await import("../../../utils/pdf/tenderPdf");
                 await exportTenderPdf(
                     {
                         tenderNumber: detail.tender.tenderNumber,
@@ -3254,7 +3035,7 @@ export const ExportModal: React.FC<{
                     },
                     settings
                 );
-                toast.success('PDF indirildi.');
+                toast.success(t('tenders.pdf_indirildi'));
                 onClose();
             } else {
                 const res = await tenderApi.exportFile(tenderId, format);
@@ -3269,7 +3050,7 @@ export const ExportModal: React.FC<{
                 onClose();
             }
         } catch (e: any) {
-            toast.error(e.response?.data?.error || e.message || 'Dışa aktarım başarısız.');
+            toast.error(e.response?.data?.error || e.message ||t('tenders.export_aktarim_basarisiz'));
         } finally {
             setLoading(false);
         }
@@ -3278,21 +3059,19 @@ export const ExportModal: React.FC<{
     return (
         <Modal
             open={open}
-            title="Teklifi Dışa Aktar"
-            description="İsviçre standartlarında PDF veya makine-okunur CRBX/SIA çıktısı oluşturun."
+            title={t('tenders.tender_export')}
+            description={t('tenders.isvicre_standartlarinda_pdf_veya_makine_okunur_c')}
             onClose={onClose}
             width="md"
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose}>İptal</Button>
-                    <Button variant="primary" loading={loading} icon={<Download size={13} />} onClick={handleExport}>
-                        İndir
-                    </Button>
+                    <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+                    <Button variant="primary" loading={loading} icon={<Download size={13} />} onClick={handleExport}>{t('common.download')}</Button>
                 </>
             }
         >
             <div className="space-y-3">
-                <Field label="Çıktı Formatı">
+                <Field label={t('tenders.output_formati')}>
                     <div className="grid grid-cols-3 gap-2">
                         {(['PDF', 'CRBX', 'SIA451'] as const).map((f) => (
                             <button
@@ -3300,8 +3079,8 @@ export const ExportModal: React.FC<{
                                 type="button"
                                 onClick={() => setFormat(f)}
                                 className={`px-3 py-3 border rounded text-[12.5px] font-medium transition-colors flex flex-col items-center gap-1 ${format === f
-                                        ? 'border-blue-700 bg-blue-50 text-blue-800'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                        ?"border-blue-700 bg-blue-50 text-blue-800"
+                                        :"border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                     }`}
                             >
                                 <FileText size={14} />
@@ -3313,11 +3092,11 @@ export const ExportModal: React.FC<{
 
                 {format === 'PDF' && (
                     <>
-                        <Field label="Referans Numarası" hint="Boş bırakılırsa QR-Bill referans bölümü atlanır">
-                            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="RF18 5390 0754 7034" />
+                        <Field label={t('tenders.reference_numarasi')} hint={t('tenders.qr_bill_reference_skipped_when_empty')}>
+                            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t('tenders.rf18_5390_0754_7034')} />
                         </Field>
                         <Checkbox
-                            label="Sayfanın altına İsviçre QR-Bill (Empfangsschein + Zahlteil) ekle"
+                            label={t('tenders.sayfanin_altina_isvicre_qr_bill_empfangsschein_z')}
                             size="sm"
                             isSelected={includeQrBill}
                             onChange={setIncludeQrBill}
@@ -3327,15 +3106,11 @@ export const ExportModal: React.FC<{
                         {!settings.letterheadBackground && (
                             <div className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200/70 rounded p-2 flex items-start gap-2">
                                 <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                                <span>
-                                    Antetli kağıt arka planı yüklenmemiş - PDF varsayılan OffiTec başlığı ile oluşturulacak.
-                                    <button
+                                <span>{t('tenders.antetli_kagit_arka_plani_yuklenmemis_pdf_varsayi')}<button
                                         type="button"
                                         className="text-blue-700 underline ml-1"
                                         onClick={() => { onClose(); navigate('/settings/pdf'); }}
-                                    >
-                                        Şimdi ekle
-                                    </button>
+                                    >{t('tenders.simdi_add')}</button>
                                 </span>
                             </div>
                         )}

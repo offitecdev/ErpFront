@@ -14,7 +14,7 @@ import {
     Save01 as Save,
     SearchLg as Search,
     X as XIcon,
-} from '@untitledui/icons';
+} from '@/components/icons/antIconCompat';
 
 import { apiClient } from '../../lib/axios';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -23,6 +23,8 @@ import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
+
+import { t } from '@/i18n/translate';
 
 interface CustomerRow {
     id: string;
@@ -37,9 +39,9 @@ interface CustomerRow {
 }
 
 const SEGMENT_LABEL: Record<string, string> = {
-    Enterprise: 'Kurumsal',
-    SMB: 'KOBİ',
-    Startup: 'Startup',
+    Enterprise:t('crm.customers.segmentEnterprise'),
+    SMB:t('crm.customers.segmentSMB'),
+    Startup:t('crm.customers.segmentStartup'),
 };
 
 export const CustomerList = () => {
@@ -84,7 +86,7 @@ export const CustomerList = () => {
                 setPage(res.data.page || nextPage);
             }
         } catch {
-            toast.error('Müşteriler yüklenemedi.');
+            toast.error(t('crm.customers.errorLoad'));
             setCustomers([]);
             setTotal(0);
             setTotalPages(1);
@@ -102,13 +104,13 @@ export const CustomerList = () => {
         e.preventDefault();
         setSubmitAttempted(true);
         if (!form.companyName.trim()) {
-            toast.error('Firma adı zorunludur.');
+            toast.error(t('crm.customers.companyNameRequired'));
             return;
         }
         try {
             setSubmitting(true);
             await apiClient.post('/customers', form);
-            toast.success('Müşteri eklendi.');
+            toast.success(t('crm.customers.successAdd'));
             setForm({
                 companyName: '', segment: '', taxOffice: '', taxNumber: '',
                 mainEmail: '', mainPhone: '', address: '',
@@ -117,7 +119,7 @@ export const CustomerList = () => {
             setShowForm(false);
             fetchCustomers(1, search);
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Müşteri eklenemedi.');
+            toast.error(e.response?.data?.error ||t('crm.customers.errorAdd'));
         } finally {
             setSubmitting(false);
         }
@@ -127,8 +129,8 @@ export const CustomerList = () => {
         <div>
             <PageHeader
                 breadcrumb="CRM"
-                title="Müşteri Listesi"
-                description="Müşteri kayıtlarını yönetin, 360° detaylarını ve tekliflerini görüntüleyin."
+                title={t('nav.customerList')}
+                description={t('crm.customers.description')}
                 actions={
                     <>
                         <div className="relative">
@@ -139,7 +141,7 @@ export const CustomerList = () => {
                                     setPage(1);
                                     setSearch(e.target.value);
                                 }}
-                                placeholder="Müşteri ara..."
+                                placeholder={t('crm.customers.search')}
                                 className="pl-7 pr-2.5 py-1.5 text-[12.5px] border border-slate-200 rounded bg-slate-50/80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10 focus:border-blue-400 w-[200px]"
                             />
                         </div>
@@ -151,7 +153,7 @@ export const CustomerList = () => {
                                 setShowForm(!showForm);
                             }}
                         >
-                            {showForm ? 'Kapat' : 'Yeni Müşteri'}
+                            {showForm ?t('common.close') :t('crm.customers.newCustomer')}
                         </Button>
                     </>
                 }
@@ -160,70 +162,66 @@ export const CustomerList = () => {
             {/* Inline add form (NOT a popup/modal) */}
             {showForm && (
                 <Card
-                    title="Yeni Müşteri"
-                    description="Sistemde aktif olarak yer alacak yeni bir müşteri kaydı oluşturun."
+                    title={t('crm.customers.newCustomer')}
+                    description={t('crm.customers.newCustomerDesc')}
                     icon={<Plus size={13} />}
                     className="mb-4"
                 >
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {submitAttempted && !form.companyName.trim() && (
                             <div className="md:col-span-3 flex flex-wrap items-center gap-2 rounded-md border border-utility-yellow-200 bg-warning-primary px-3 py-2 text-[12px] text-warning-primary">
-                                <StatusChip variant="warning">Zorunlu alan</StatusChip>
-                                <span className="font-medium">Firma Adı doldurulmadan müşteri kaydı oluşturulamaz.</span>
+                                <StatusChip variant="warning">{t('common.required')}</StatusChip>
+                                <span className="font-medium">{t('crm.customers.requiredFieldWarning')}</span>
                             </div>
                         )}
-                        <Field label="Firma Adı" required className="md:col-span-2" error={submitAttempted && !form.companyName.trim() ? 'Firma adı zorunludur.' : null}>
+                        <Field label={t('crm.customers.companyName')} required className="md:col-span-2" error={submitAttempted && !form.companyName.trim() ?t('crm.customers.companyNameRequired') : null}>
                             <Input
                                 value={form.companyName}
                                 onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                                placeholder="Örn. Offitec AG"
+                                placeholder={t('crm.customers.companyNamePlaceholder')}
                             />
                         </Field>
-                        <Field label="Segment">
+                        <Field label={t('crm.customers.colSegment')}>
                             <Select
                                 value={form.segment}
                                 onChange={(e) => setForm({ ...form, segment: e.target.value })}
                             >
-                                <option value="">Seçiniz</option>
-                                <option value="Enterprise">Kurumsal</option>
-                                <option value="SMB">KOBİ</option>
-                                <option value="Startup">Startup</option>
+                                <option value="">{t('common.select')}</option>
+                                <option value="Enterprise">{t('crm.customers.segmentEnterprise')}</option>
+                                <option value="SMB">{t('crm.customers.segmentSMB')}</option>
+                                <option value="Startup">{t('crm.customers.segmentStartup')}</option>
                             </Select>
                         </Field>
-                        <Field label="Vergi Dairesi">
+                        <Field label={t('crm.customers.taxOffice')}>
                             <Input value={form.taxOffice}
                                 onChange={(e) => setForm({ ...form, taxOffice: e.target.value })} />
                         </Field>
-                        <Field label="Vergi No">
+                        <Field label={t('crm.customers.taxNumber')}>
                             <Input value={form.taxNumber}
                                 onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} />
                         </Field>
-                        <Field label="E-posta">
+                        <Field label={t('common.email')}>
                             <Input type="email" value={form.mainEmail}
                                 onChange={(e) => setForm({ ...form, mainEmail: e.target.value })} />
                         </Field>
-                        <Field label="Telefon">
+                        <Field label={t('common.phone')}>
                             <Input value={form.mainPhone}
                                 onChange={(e) => setForm({ ...form, mainPhone: e.target.value })} />
                         </Field>
-                        <Field label="Açık Adres" className="md:col-span-3">
+                        <Field label={t('crm.customers.address')} className="md:col-span-3">
                             <Textarea rows={2} value={form.address}
                                 onChange={(e) => setForm({ ...form, address: e.target.value })} />
                         </Field>
                         <div className="md:col-span-3 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                            <Button variant="secondary" type="button" onClick={() => { setSubmitAttempted(false); setShowForm(false); }}>
-                                İptal
-                            </Button>
-                            <Button variant="primary" type="submit" loading={submitting} icon={<Save size={13} />}>
-                                Müşteriyi Kaydet
-                            </Button>
+                            <Button variant="secondary" type="button" onClick={() => { setSubmitAttempted(false); setShowForm(false); }}>{t('common.cancel')}</Button>
+                            <Button variant="primary" type="submit" loading={submitting} icon={<Save size={13} />}>{t('crm.customers.saveCustomer')}</Button>
                         </div>
                     </form>
                 </Card>
             )}
 
             <Card
-                title={`Müşteriler · ${total}`}
+                title={t('crm.customers.tableTitle', { count: total })}
                 icon={<Building2 size={13} />}
                 noPadding
             >
@@ -236,13 +234,11 @@ export const CustomerList = () => {
                 ) : customers.length === 0 ? (
                     <EmptyState
                         icon={<Building2 size={32} />}
-                        title="Müşteri bulunamadı"
-                        description={search ? 'Arama kriterinize uygun kayıt yok.' : 'Henüz hiç müşteri eklenmemiş.'}
+                        title={t('crm.customers.noCustomers')}
+                        description={search ?t('crm.customers.noCustomersSearch') :t('crm.customers.noCustomersEmpty')}
                         action={
                             !search && (
-                                <Button variant="primary" icon={<Plus size={13} />} onClick={() => { setSubmitAttempted(false); setShowForm(true); }}>
-                                    İlk Müşteriyi Ekle
-                                </Button>
+                                <Button variant="primary" icon={<Plus size={13} />} onClick={() => { setSubmitAttempted(false); setShowForm(true); }}>{t('crm.customers.addFirst')}</Button>
                             )
                         }
                     />
@@ -251,19 +247,19 @@ export const CustomerList = () => {
                         <table className="w-full text-[13px] text-left">
                             <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                                 <tr>
-                                    <th className="px-4 py-2.5 font-semibold">Firma</th>
-                                    <th className="px-4 py-2.5 font-semibold">Segment</th>
-                                    <th className="px-4 py-2.5 font-semibold">Vergi</th>
-                                    <th className="px-4 py-2.5 font-semibold">İletişim</th>
-                                    <th className="px-4 py-2.5 font-semibold">Durum</th>
-                                    <th className="px-4 py-2.5 font-semibold text-right">İşlem</th>
+                                    <th className="px-4 py-2.5 font-semibold">{t('common.company')}</th>
+                                    <th className="px-4 py-2.5 font-semibold">{t('crm.customers.colSegment')}</th>
+                                    <th className="px-4 py-2.5 font-semibold">{t('common.tax')}</th>
+                                    <th className="px-4 py-2.5 font-semibold">{t('crm.customers.colContact')}</th>
+                                    <th className="px-4 py-2.5 font-semibold">{t('common.status')}</th>
+                                    <th className="px-4 py-2.5 font-semibold text-right">{t('common.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {customers.map((c) => (
                                     <tr
                                         key={c.id}
-                                        className="hover:bg-slate-50/60 cursor-pointer transition-colors"
+                                        className="cursor-pointer transition-colors hover:bg-slate-50/80 active:bg-slate-100"
                                         onClick={() => navigate(`/crm/customers/${c.id}`)}
                                     >
                                         <td className="px-4 py-2.5">
@@ -313,15 +309,15 @@ export const CustomerList = () => {
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <StatusChip variant={c.isActive ? 'active' : 'passive'}>
-                                                {c.isActive ? 'Aktif' : 'Pasif'}
+                                                {c.isActive ?t('common.active') :t('common.inactive')}
                                             </StatusChip>
                                         </td>
                                         <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 onClick={() => navigate(`/crm/customers/${c.id}`)}
-                                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[12px] text-blue-700 hover:bg-blue-50 transition-colors"
+                                                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100"
                                             >
-                                                <Eye size={12} /> Detay <ChevronRight size={11} />
+                                                <Eye size={12} />{t('common.detail')}<ChevronRight size={11} />
                                             </button>
                                         </td>
                                     </tr>
@@ -355,7 +351,7 @@ const PaginationBar: React.FC<{
     onPage: (page: number) => void;
 }> = ({ page, totalPages, total, onPage }) => (
     <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-[12px]">
-        <span className="text-slate-500">Toplam {total} kayit</span>
+        <span className="text-slate-500">{t('common.total')} {total} {t('crm.record')}</span>
         <div className="inline-flex items-center gap-1">
             <button
                 type="button"
@@ -370,7 +366,7 @@ const PaginationBar: React.FC<{
                     key={p}
                     type="button"
                     onClick={() => onPage(p)}
-                    className={`h-8 min-w-8 rounded-md border px-2 font-medium ${p === page ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                    className={`h-8 min-w-8 rounded-md border px-2 font-medium transition-colors active:bg-slate-100 ${p === page ?"border-blue-700 bg-blue-700 text-white" :"border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
                 >
                     {p}
                 </button>

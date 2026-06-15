@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Save01 as Save } from '@untitledui/icons';
+import { Save01 as Save } from '@/components/icons/antIconCompat';
 import { apiClient } from '../../lib/axios';
 import { useAuthStore } from '../../store/authStore';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -9,6 +10,7 @@ import { Button } from '../../components/ui-shared/Button';
 import { Field, Input } from '../../components/ui-shared/Field';
 
 export const AttendanceSettings: React.FC = () => {
+    const { t } = useTranslation();
     const user = useAuthStore((s) => s.user);
     const [form, setForm] = useState({ checkInQrSecret: '', checkOutQrSecret: '' });
     const [loading, setLoading] = useState(false);
@@ -20,14 +22,14 @@ export const AttendanceSettings: React.FC = () => {
                 if (!cancelled) setForm({ checkInQrSecret: '', checkOutQrSecret: '' });
             })
             .catch(() => {
-                if (!cancelled) toast.error('Ayarlar yüklenemedi.');
+                if (!cancelled) toast.error(t('attendance.settings.errorLoad'));
             });
         return () => { cancelled = true; };
-    }, []);
+    }, [t]);
 
     const save = async () => {
         if (!user?.tenantId) {
-            toast.error('Tenant bilgisi yok.');
+            toast.error(t('attendance.settings.errorNoTenant'));
             return;
         }
         setLoading(true);
@@ -37,9 +39,9 @@ export const AttendanceSettings: React.FC = () => {
             if (form.checkOutQrSecret.trim()) body.checkOutQrSecret = form.checkOutQrSecret.trim();
             await apiClient.patch(`/tenants/${user.tenantId}`, body);
             setForm({ checkInQrSecret: '', checkOutQrSecret: '' });
-            toast.success('QR anahtarları kaydedildi.');
+            toast.success(t('attendance.settings.successSave'));
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Kayıt başarısız.');
+            toast.error(e.response?.data?.error || t('attendance.settings.errorSave'));
         } finally {
             setLoading(false);
         }
@@ -48,33 +50,33 @@ export const AttendanceSettings: React.FC = () => {
     return (
         <div className="max-w-[820px]">
             <PageHeader
-                breadcrumb="Personel"
-                title="Mesai & QR Yönetimi"
-                description="İstasyon QR anahtarlarını yönetin. Boş bırakılan alanlar mevcut anahtarı değiştirmez."
+                breadcrumb={t('attendance.breadcrumb')}
+                title={t('attendance.settings.title')}
+                description={t('attendance.settings.description')}
             />
 
-            <Card title="QR ayarları">
+            <Card title={t('attendance.settings.cardTitle')}>
                 <div className="space-y-3">
-                    <Field label="İstasyon giriş QR metni" hint="İlk ve tekrar okutma bu anahtarla yapılır.">
+                    <Field label={t('attendance.settings.checkInQr')} hint={t('attendance.settings.checkInQrHint')}>
                         <Input
                             type="password"
                             autoComplete="off"
                             value={form.checkInQrSecret}
                             onChange={(e) => setForm({ ...form, checkInQrSecret: e.target.value })}
-                            placeholder="Değiştirmek için yazın (boş = dokunma)"
+                            placeholder={t('attendance.settings.placeholder')}
                         />
                     </Field>
-                    <Field label="Çıkış QR metni" hint="Ayrı bir çıkış kodu kullanmak isterseniz.">
+                    <Field label={t('attendance.settings.checkOutQr')} hint={t('attendance.settings.checkOutQrHint')}>
                         <Input
                             type="password"
                             autoComplete="off"
                             value={form.checkOutQrSecret}
                             onChange={(e) => setForm({ ...form, checkOutQrSecret: e.target.value })}
-                            placeholder="Değiştirmek için yazın (boş = dokunma)"
+                            placeholder={t('attendance.settings.placeholder')}
                         />
                     </Field>
                     <Button variant="primary" icon={<Save size={13} />} loading={loading} onClick={save}>
-                        Kaydet
+                        {t('attendance.settings.save')}
                     </Button>
                 </div>
             </Card>

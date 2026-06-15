@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, HelpCircle, LogOut01, Moon01, Plus, Settings01, User01 } from "@untitledui/icons";
+import { ChevronDown, HelpCircle, LogOut01, Moon01, Plus, Settings01, User01 } from "@/components/icons/antIconCompat";
 import type { Selection } from "react-aria-components";
 import { SubmenuTrigger } from "react-aria-components";
 import { Button } from "@/components/base/buttons/button";

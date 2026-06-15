@@ -1,6 +1,7 @@
 import { apiClient } from '../axios';
 import type {
     MaintenanceContractDto,
+    MaintenanceAppointmentOptionDto,
     MaintenancePeriod,
     MaintenanceReportDto,
     MaintenanceTaskDto,
@@ -86,12 +87,36 @@ export const maintenanceApi = {
         equipmentInfo?: string;
         serviceScope?: string;
         siteName?: string;
+        technicianIds?: string[];
         assignedTechId?: string | null;
         alternativeTechId?: string | null;
         reminderDaysBefore?: number;
+        overtimeHourlyRate?: number;
         notificationChannels?: { inApp?: boolean; email?: boolean; sms?: boolean; push?: boolean };
     }): Promise<{ message: string; contract: MaintenanceContractDto }> => {
         const res = await apiClient.post('/maintenance/contracts', input);
+        return res.data;
+    },
+
+    updateContract: async (contractId: string, input: {
+        title?: string;
+        period?: MaintenancePeriod;
+        startDate?: string;
+        endDate?: string;
+        equipmentInfo?: string | null;
+        serviceScope?: string | null;
+        siteName?: string | null;
+        technicianIds?: string[];
+        reminderDaysBefore?: number;
+        overtimeHourlyRate?: number;
+        notificationChannels?: { inApp?: boolean; email?: boolean; sms?: boolean; push?: boolean };
+    }): Promise<MaintenanceContractDto> => {
+        const res = await apiClient.patch(`/maintenance/contracts/${contractId}`, input);
+        return res.data;
+    },
+
+    archiveContract: async (contractId: string): Promise<{ message: string; contract: MaintenanceContractDto }> => {
+        const res = await apiClient.delete(`/maintenance/contracts/${contractId}`);
         return res.data;
     },
 
@@ -100,14 +125,54 @@ export const maintenanceApi = {
         return res.data;
     },
 
+    getTask: async (taskId: string): Promise<MaintenanceTaskDto> => {
+        const res = await apiClient.get(`/maintenance/tasks/${taskId}`);
+        return res.data;
+    },
+
+    listMyTasks: async (start: string, end: string): Promise<MaintenanceTaskDto[]> => {
+        const res = await apiClient.get('/maintenance/technician/tasks', { params: { start, end } });
+        return res.data;
+    },
+
+    getMyTask: async (taskId: string): Promise<MaintenanceTaskDto> => {
+        const res = await apiClient.get(`/maintenance/technician/tasks/${taskId}`);
+        return res.data;
+    },
+
     updateTask: async (taskId: string, input: {
         plannedDate?: string;
+        startTime?: string | null;
+        endTime?: string | null;
+        technicianIds?: string[];
         assignedTechId?: string | null;
         alternativeTechId?: string | null;
         siteName?: string | null;
         status?: TaskStatus;
     }): Promise<MaintenanceTaskDto> => {
         const res = await apiClient.patch(`/maintenance/tasks/${taskId}`, input);
+        return res.data;
+    },
+
+    saveAppointmentOptionsDraft: async (taskId: string, options: { startTime: string; endTime: string }[]): Promise<{ message: string; options: MaintenanceAppointmentOptionDto[] }> => {
+        const res = await apiClient.put(`/maintenance/tasks/${taskId}/appointment-options/draft`, { options });
+        return res.data;
+    },
+
+    sendAppointmentOptions: async (taskId: string, input: {
+        options: { startTime: string; endTime: string }[];
+        fromEmail?: string;
+        fromName?: string;
+        to: string;
+        subject: string;
+        message: string;
+    }): Promise<{ message: string; bookingLink: string; options: MaintenanceAppointmentOptionDto[]; preview?: boolean }> => {
+        const res = await apiClient.post(`/maintenance/tasks/${taskId}/appointment-options`, input);
+        return res.data;
+    },
+
+    approveAppointmentOption: async (taskId: string, optionId: string): Promise<{ message: string; task: MaintenanceTaskDto }> => {
+        const res = await apiClient.post(`/maintenance/tasks/${taskId}/appointment-options/${optionId}/approve`);
         return res.data;
     },
 
@@ -127,6 +192,7 @@ export const maintenanceApi = {
         afterPhotoUrls?: string[];
         fileUrls?: string[];
         extraMaterials?: MaterialInput[];
+        expenses?: { expenseType: string; amount: number; description?: string }[];
     }): Promise<{ message: string; report: MaintenanceReportDto }> => {
         const res = await apiClient.post('/maintenance/reports', input);
         return res.data;
@@ -134,6 +200,22 @@ export const maintenanceApi = {
 
     signReport: async (reportId: string, signatureBase64: string): Promise<{ message: string; report: MaintenanceReportDto }> => {
         const res = await apiClient.post(`/maintenance/reports/${reportId}/sign`, { signatureBase64 });
+        return res.data;
+    },
+
+    publicBookingOptions: async (token: string): Promise<{
+        contractCode?: string;
+        title?: string;
+        customerName?: string;
+        plannedDate?: string;
+        options: MaintenanceAppointmentOptionDto[];
+    }> => {
+        const res = await apiClient.get(`/maintenance/public/booking/${encodeURIComponent(token)}`);
+        return res.data;
+    },
+
+    confirmPublicBooking: async (token: string, optionId: string): Promise<{ message: string; task: MaintenanceTaskDto }> => {
+        const res = await apiClient.post(`/maintenance/public/booking/${encodeURIComponent(token)}/confirm`, { optionId });
         return res.data;
     },
 };

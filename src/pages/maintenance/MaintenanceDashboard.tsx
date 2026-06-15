@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { AlertTriangle, ArrowRight, Calendar, CheckCircle, Clock, File02 as FileText, Plus } from '@untitledui/icons';
+import { AlertTriangle, ArrowRight, Calendar, CheckCircle, Clock, File02 as FileText, Plus } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -11,6 +11,8 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { maintenanceApi, regieApi } from '../../lib/api/maintenance';
 import type { MaintenanceContractDto, MaintenanceReportDto, MaintenanceTaskDto, ServiceCallDto } from '../../types/maintenance';
 import { fmtDate, PERIOD_LABEL, personName, StatCard, StatusPill } from './MaintenanceShared';
+
+import { t } from '@/i18n/translate';
 
 export const MaintenanceDashboard = () => {
     const navigate = useNavigate();
@@ -36,7 +38,7 @@ export const MaintenanceDashboard = () => {
             setReports(reportRows);
             setCalls(callRows);
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Bakım panosu yüklenemedi.');
+            toast.error(error.response?.data?.error ||t('maintenance.dashboard.errorLoad'));
         } finally {
             setLoading(false);
         }
@@ -71,79 +73,75 @@ export const MaintenanceDashboard = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb="Bakım"
-                title="Bakım yönetimi"
-                description="Sözleşmeli bakım, saha görevleri, imzalı raporlar ve regie operasyonlarını tek ekrandan takip edin."
+                breadcrumb={t('nav.maintenance')}
+                title={t('maintenance.dashboard.title')}
+                description={t('maintenance.dashboard.description')}
                 actions={
                     <>
-                        <Button variant="secondary" icon={<Calendar size={13} />} onClick={() => navigate('/maintenance/tasks')}>
-                            Takvim
-                        </Button>
-                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/maintenance/contracts')}>
-                            Sözleşme
-                        </Button>
+                        <Button variant="secondary" icon={<Calendar size={13} />} onClick={() => navigate('/maintenance/tasks')}>{t('maintenance.dashboard.calendar')}</Button>
+                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/maintenance/contracts/new')}>{t('maintenance.dashboard.newContract')}</Button>
                     </>
                 }
             />
 
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
                 <StatCard
-                    label="Aktif sözleşme"
+                    label={t('maintenance.dashboard.activeContracts')}
                     value={stats.activeContracts}
                     icon={<CheckCircle size={14} />}
                     tone="success"
-                    sub="Süresi geçerli"
+                    sub={t('maintenance.dashboard.validContractsSub')}
                 />
                 <StatCard
-                    label="Yaklaşan bakım görevi"
+                    label={t('maintenance.dashboard.upcomingTasks')}
                     value={stats.upcomingTasks}
                     icon={<Calendar size={14} />}
-                    sub="45 günlük plan"
+                    sub={t('maintenance.dashboard.next45DaysSub')}
                 />
                 <StatCard
-                    label="Geciken görev"
+                    label={t('maintenance.dashboard.overdueTasks')}
                     value={stats.overdueTasks}
                     icon={<AlertTriangle size={14} />}
                     tone={stats.overdueTasks ? 'danger' : 'neutral'}
-                    sub="Tarihi geçmiş"
+                    sub={t('maintenance.dashboard.overdueTasksSub')}
                 />
                 <StatCard
-                    label="İmza bekleyen rapor"
+                    label={t('maintenance.dashboard.unsignedReports')}
                     value={stats.unsignedReports}
                     icon={<FileText size={14} />}
                     tone={stats.unsignedReports ? 'warning' : 'neutral'}
-                    sub="Müşteri imzası yok"
+                    sub={t('maintenance.dashboard.unsignedReportsSub')}
                 />
                 <StatCard
-                    label="Açık regie çağrısı"
+                    label={t('maintenance.dashboard.openCalls')}
                     value={stats.openCalls}
                     icon={<Clock size={14} />}
                     tone={stats.openCalls ? 'warning' : 'neutral'}
-                    sub="Plan dışı işler"
+                    sub={t('maintenance.dashboard.openCallsSub')}
                 />
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
                 <div className="xl:col-span-7">
                     <Card
-                        title="Yaklaşan bakım görevleri"
+                        title={t('maintenance.dashboard.upcomingTasksCard')}
                         icon={<Calendar size={13} />}
                         noPadding
-                        actions={<Button variant="ghost" size="sm" onClick={() => navigate('/maintenance/tasks')}>Tüm takvimi aç <ArrowRight size={11} /></Button>}
+                        actions={<Button variant="ghost" size="sm" onClick={() => navigate('/maintenance/tasks')}>{t('maintenance.dashboard.openAllCalendar')}<ArrowRight size={11} /></Button>}
                     >
                         {loading ? (
                             <SkeletonRows rows={5} />
                         ) : upcoming.length === 0 ? (
-                            <EmptyState icon={<Calendar size={30} />} title="Planlı görev yok" description="Yeni sözleşme oluşturulduğunda periyodik bakım görevleri otomatik üretilir." />
+                            <EmptyState icon={<Calendar size={30} />} title={t('maintenance.dashboard.noPlannedTasks')} description={t('maintenance.dashboard.noPlannedTasksDesc')} />
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-[12.5px]">
                                     <thead className="border-b border-slate-100 bg-slate-50/60 text-[11px] text-slate-500">
                                         <tr>
-                                            <th className="px-3 py-2 text-left font-semibold">Bakım tarihi</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Müşteri / saha</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Teknisyen</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Durum</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('maintenance.dashboard.colDate')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('maintenance.dashboard.colCustomer')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('maintenance.dashboard.colTechnician')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -166,11 +164,11 @@ export const MaintenanceDashboard = () => {
                 </div>
 
                 <div className="flex flex-col gap-4 xl:col-span-5">
-                    <Card title="Süresi yaklaşan sözleşmeler" icon={<Clock size={13} />} noPadding>
+                    <Card title={t('maintenance.dashboard.expiringContracts')} icon={<Clock size={13} />} noPadding>
                         {loading ? (
                             <SkeletonRows rows={4} />
                         ) : expiring.length === 0 ? (
-                            <EmptyState title="Sözleşme yok" description="Aktif bakım sözleşmesi bulunmuyor." />
+                            <EmptyState title={t('maintenance.dashboard.noContracts')} description={t('maintenance.dashboard.noContractsDesc')} />
                         ) : (
                             <div className="divide-y divide-slate-100">
                                 {expiring.map((contract) => (
@@ -184,18 +182,18 @@ export const MaintenanceDashboard = () => {
                                                 {PERIOD_LABEL[contract.period]}
                                             </span>
                                         </div>
-                                        <div className="mt-2 text-[11px] text-slate-500">Bitiş: {fmtDate(contract.endDate)}</div>
+                                        <div className="mt-2 text-[11px] text-slate-500">{t('auto.bitis')}{fmtDate(contract.endDate)}</div>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </Card>
 
-                    <Card title="İmza bekleyen raporlar" icon={<FileText size={13} />} noPadding>
+                    <Card title={t('maintenance.dashboard.unsignedReportsCard')} icon={<FileText size={13} />} noPadding>
                         {loading ? (
                             <SkeletonRows rows={3} />
                         ) : unsigned.length === 0 ? (
-                            <EmptyState icon={<CheckCircle size={28} />} title="Bekleyen imza yok" description="Raporlar imzalandıktan sonra kilitlenir." />
+                            <EmptyState icon={<CheckCircle size={28} />} title={t('maintenance.dashboard.noPendingSignatures')} description={t('maintenance.dashboard.noPendingSignaturesDesc')} />
                         ) : (
                             <div className="divide-y divide-slate-100">
                                 {unsigned.map((report) => (
@@ -206,7 +204,7 @@ export const MaintenanceDashboard = () => {
                                         onClick={() => navigate('/maintenance/reports')}
                                     >
                                         <div className="text-[13px] font-semibold text-slate-900">{report.task?.contract?.customer?.companyName || report.taskId}</div>
-                                        <div className="mt-0.5 text-[12px] text-slate-500">{fmtDate(report.createdAt, 'DD.MM.YYYY HH:mm')} - {personName(report.technician)}</div>
+                                        <div className="mt-0.5 text-[12px] text-slate-500">{fmtDate(report.createdAt,"DD.MM.YYYY HH:mm")} - {personName(report.technician)}</div>
                                     </button>
                                 ))}
                             </div>

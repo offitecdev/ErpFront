@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/tr';
-import { AlertTriangle, CheckCircle, Package, Plus, Trash01 as Trash } from '@untitledui/icons';
+import 'dayjs/locale/de';
+import { AlertTriangle, CheckCircle, Package, Plus, Trash01 as Trash } from '@/components/icons/antIconCompat';
 
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
@@ -11,20 +12,30 @@ import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import type { InventoryArticle, InventoryLocation } from '../../types/inventory';
 import type { MaintenancePeriod, MaterialInput, TaskStatus } from '../../types/maintenance';
 
-dayjs.locale('tr');
+import { t } from '@/i18n/translate';
+import i18n from '@/i18n';
+
+const dayjsLocale = () => {
+    const lang = (i18n.language || 'tr').split('-')[0];
+    return lang === 'de' ? 'de' : lang === 'en' ? 'en' : 'tr';
+};
+
+export const ensureMaintenanceLocale = () => {
+    dayjs.locale(dayjsLocale());
+};
 
 export const PERIOD_LABEL: Record<MaintenancePeriod, string> = {
-    MONTHLY: 'Aylık',
-    QUARTERLY: '3 aylık',
-    BIANNUAL: '6 aylık',
-    YEARLY: 'Yıllık',
+    MONTHLY:t('maintenance.shared.periodMonthly'),
+    QUARTERLY:t('auto.3_aylik'),
+    BIANNUAL:t('auto.6_aylik'),
+    YEARLY:t('maintenance.shared.periodAnnual'),
 };
 
 export const STATUS_LABEL: Record<TaskStatus, string> = {
-    PENDING: 'Planlandı',
-    IN_PROGRESS: 'İmza bekliyor',
-    COMPLETED: 'Tamamlandı',
-    CANCELLED: 'İptal',
+    PENDING:t('maintenance.shared.statusPlanned'),
+    IN_PROGRESS:t('auto.imza_bekliyor'),
+    COMPLETED:t('common.completed'),
+    CANCELLED:t('common.cancel'),
 };
 
 export const STATUS_VARIANT: Record<TaskStatus, 'warning' | 'active' | 'passive' | 'info'> = {
@@ -38,7 +49,7 @@ export const money = (value: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(value || 0);
 
 export const fmtDate = (value?: string | null, format = 'DD.MM.YYYY') =>
-    value ? dayjs(value).format(format) : '-';
+    value ? dayjs(value).locale(dayjsLocale()).format(format) : '-';
 
 export const personName = (person?: { firstName?: string; lastName?: string } | null) =>
     person ? `${person.firstName || ''} ${person.lastName || ''}`.trim() || '-' : '-';
@@ -70,11 +81,11 @@ export const StatCard = ({
     sub?: string;
 }) => {
     const styles = {
-        brand: 'border-brand-200 bg-brand-primary_alt text-brand-secondary',
-        success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-        warning: 'border-amber-200 bg-amber-50 text-amber-950',
-        danger: 'border-rose-200 bg-rose-50 text-rose-900',
-        neutral: 'border-slate-200 bg-white text-slate-900',
+        brand:"border-brand-200 bg-brand-primary_alt text-brand-secondary",
+        success:"border-emerald-200 bg-emerald-50 text-emerald-900",
+        warning:"border-amber-200 bg-amber-50 text-amber-950",
+        danger:"border-rose-200 bg-rose-50 text-rose-900",
+        neutral:"border-slate-200 bg-white text-slate-900",
     }[tone];
 
     return (
@@ -108,29 +119,23 @@ export const MaterialsEditor = ({
         <div className="rounded-lg border border-slate-200/80">
             <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                 <div className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
-                    <Package size={13} />
-                    Ek iş ve malzeme
-                </div>
+                    <Package size={13} />{t('auto.ek_is_ve_malzeme')}</div>
                 <Button
                     type="button"
                     size="sm"
                     variant="secondary"
                     icon={<Plus size={12} />}
                     onClick={() => setRows([...rows, { articleId: '', quantity: 1, unitCost: 0, sourceLocationId: '' }])}
-                >
-                    Satır
-                </Button>
+                >{t('auto.satir')}</Button>
             </div>
             {rows.length === 0 ? (
                 <div className="flex items-start gap-2 px-3 py-3 text-[12px] text-slate-500">
-                    <AlertTriangle size={14} className="mt-0.5 text-slate-400" />
-                    Malzeme yoksa stok hareketi oluşmaz.
-                </div>
+                    <AlertTriangle size={14} className="mt-0.5 text-slate-400" />{t('auto.malzeme_yoksa_stok_hareketi_olusmaz')}</div>
             ) : (
                 <div className="space-y-3 p-3">
                     {rows.map((row, index) => (
                         <div key={index} className="grid grid-cols-1 gap-2 md:grid-cols-12">
-                            <Field label="Ürün" className="md:col-span-4">
+                            <Field label={t('auto.urun')} className="md:col-span-4">
                                 <Select
                                     value={row.articleId}
                                     onChange={(e) => {
@@ -138,7 +143,7 @@ export const MaterialsEditor = ({
                                         update(index, { articleId: e.target.value, unitCost: article?.baseCost ?? row.unitCost });
                                     }}
                                 >
-                                    <option value="">Seçiniz</option>
+                                    <option value="">{t('common.select')}</option>
                                     {articles.map((article) => (
                                         <option key={article.id} value={article.id}>
                                             {article.articleCode} - {article.name}
@@ -146,18 +151,18 @@ export const MaterialsEditor = ({
                                     ))}
                                 </Select>
                             </Field>
-                            <Field label="Depo" className="md:col-span-3">
+                            <Field label={t('auto.depo')} className="md:col-span-3">
                                 <Select value={row.sourceLocationId} onChange={(e) => update(index, { sourceLocationId: e.target.value })}>
-                                    <option value="">Seçiniz</option>
+                                    <option value="">{t('common.select')}</option>
                                     {locations.map((location) => (
                                         <option key={location.id} value={location.id}>{location.locationName}</option>
                                     ))}
                                 </Select>
                             </Field>
-                            <Field label="Miktar" className="md:col-span-2">
+                            <Field label={t('common.quantity')} className="md:col-span-2">
                                 <Input type="number" min="0" step="0.01" value={row.quantity} onChange={(e) => update(index, { quantity: Number(e.target.value) })} />
                             </Field>
-                            <Field label="Birim CHF" className="md:col-span-2">
+                            <Field label={t('auto.birim_chf')} className="md:col-span-2">
                                 <Input type="number" min="0" step="0.01" value={row.unitCost} onChange={(e) => update(index, { unitCost: Number(e.target.value) })} />
                             </Field>
                             <div className="flex items-end md:col-span-1">
@@ -165,8 +170,7 @@ export const MaterialsEditor = ({
                             </div>
                         </div>
                     ))}
-                    <div className="border-t border-slate-100 pt-2 text-right text-[12px] font-semibold text-slate-700">
-                        Toplam: {money(rows.reduce((sum, row) => sum + row.quantity * row.unitCost, 0))}
+                    <div className="border-t border-slate-100 pt-2 text-right text-[12px] font-semibold text-slate-700">{t('auto.toplam')}{money(rows.reduce((sum, row) => sum + row.quantity * row.unitCost, 0))}
                     </div>
                 </div>
             )}
@@ -233,16 +237,14 @@ export const SignatureModal = ({
         <Modal
             open={open}
             title={title}
-            description="Müşteri imzası alındıktan sonra rapor kilitlenir."
+            description={t('auto.musteri_imzasi_alindiktan_sonra_rapor_kilitlenir')}
             onClose={onClose}
             width="lg"
             footer={
                 <>
-                    <Button variant="secondary" onClick={clear}>Temizle</Button>
-                    <Button variant="secondary" onClick={onClose}>İptal</Button>
-                    <Button variant="primary" icon={<CheckCircle size={13} />} loading={loading} disabled={!hasInk} onClick={submit}>
-                        İmzala
-                    </Button>
+                    <Button variant="secondary" onClick={clear}>{t('common.clear')}</Button>
+                    <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+                    <Button variant="primary" icon={<CheckCircle size={13} />} loading={loading} disabled={!hasInk} onClick={submit}>{t('auto.imzala')}</Button>
                 </>
             }
         >

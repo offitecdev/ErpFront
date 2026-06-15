@@ -1,5 +1,5 @@
 import { type FC, type ReactNode } from "react";
-import { Bell01, LifeBuoy01, SearchLg, Settings01 } from "@untitledui/icons";
+import { Bell01, LifeBuoy01, SearchLg, Settings01 } from "@/components/icons/antIconCompat";
 import { TabList, Tabs } from "@/components/application/tabs/tabs";
 import { BadgeWithDot } from "@/components/base/badges/badges";
 import { DropdownAccountButton } from "@/components/base/dropdown/dropdown-account-button";

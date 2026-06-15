@@ -1,6 +1,6 @@
 import type { FC, FocusEventHandler, PointerEventHandler, ReactNode, RefAttributes, RefObject } from "react";
 import { isValidElement, useCallback, useContext, useRef, useState } from "react";
-import { SearchLg } from "@untitledui/icons";
+import { SearchLg } from "@/components/icons/antIconCompat";
 import type { ComboBoxProps as AriaComboBoxProps, GroupProps as AriaGroupProps, ListBoxProps as AriaListBoxProps } from "react-aria-components";
 import { ComboBox as AriaComboBox, Group as AriaGroup, Input as AriaInput, ListBox as AriaListBox, ComboBoxStateContext } from "react-aria-components";
 import { HintText } from "@/components/base/input/hint-text";

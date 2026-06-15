@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import { X as CloseIcon, Menu02 } from "@untitledui/icons";
+import { X as CloseIcon, Menu02 } from "@/components/icons/antIconCompat";
 import {
     Button as AriaButton,
     Dialog as AriaDialog,
@@ -18,7 +18,7 @@ export const MobileNavigationHeader = ({ children, logo }: PropsWithChildren<{ l
 
                 <AriaButton
                     aria-label="Expand navigation menu"
-                    className="group flex items-center justify-center rounded-lg bg-primary p-2 text-fg-secondary outline-focus-ring hover:bg-primary_hover hover:text-fg-secondary_hover focus-visible:outline-2 focus-visible:outline-offset-2"
+                    className="group flex items-center justify-center rounded-lg bg-primary p-2 text-fg-secondary outline-focus-ring hover:bg-primary_hover hover:text-fg-secondary_hover focus-visible:outline-2 focus-visible:outline-offset-2 aria-expanded:bg-[#272f67] aria-expanded:text-white aria-expanded:hover:bg-[#272f67] aria-expanded:hover:text-white"
                 >
                     <Menu02 className="size-6 transition duration-200 ease-in-out group-aria-expanded:opacity-0" />
                     <CloseIcon className="absolute size-6 opacity-0 transition duration-200 ease-in-out group-aria-expanded:opacity-100" />

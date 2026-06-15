@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Building05 as Warehouse, GitBranch01 as Workflow, LayersThree01 as Layers, MarkerPin01 as MapPin, Plus } from '@untitledui/icons';
+import { Building05 as Warehouse, GitBranch01 as Workflow, LayersThree01 as Layers, MarkerPin01 as MapPin, Plus } from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -13,11 +13,13 @@ import { useInventoryStore } from '../../store/inventoryStore';
 import { useAuthStore } from '../../store/authStore';
 import type { InventoryLocation, LocationType } from '../../types/inventory';
 
+import { t } from '@/i18n/translate';
+
 const TYPE_LABEL: Record<LocationType, string> = {
-    MAIN_WAREHOUSE: 'Ana Depo',
-    SUB_WAREHOUSE: 'Alt Depo',
-    STATION_BUFFER: 'İstasyon Buffer',
-    PROJECT_RESERVE: 'Proje Rezerv',
+    MAIN_WAREHOUSE:t('auto.ana_depo'),
+    SUB_WAREHOUSE:t('auto.alt_depo'),
+    STATION_BUFFER:t('auto.istasyon_buffer'),
+    PROJECT_RESERVE:t('auto.proje_rezerv'),
 };
 
 const TYPE_ICON: Record<LocationType, React.ReactNode> = {
@@ -69,28 +71,24 @@ export const Locations = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb="Stok › Lokasyonlar"
-                title="Depo & Lokasyon Yönetimi"
-                description="Ana depo, alt depo, istasyon buffer ve proje rezerv lokasyonlarını hiyerarşik olarak tanımlayın."
+                breadcrumb={t('auto.breadcrumb_locations')}
+                title={t('auto.depo_lokasyon_yonetimi')}
+                description={t('auto.ana_depo_alt_depo_istasyon_buffer_ve_proje_rezer')}
                 actions={
                     canManage && (
-                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
-                            Yeni Lokasyon
-                        </Button>
+                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => setOpen(true)}>{t('auto.yeni_lokasyon')}</Button>
                     )
                 }
             />
 
-            <Card title="Lokasyon Hiyerarşisi" icon={<MapPin size={13} />}>
+            <Card title={t('auto.lokasyon_hiyerarsisi')} icon={<MapPin size={13} />}>
                 {tree.length === 0 ? (
                     <EmptyState
                         icon={<Warehouse size={32} />}
-                        title="Henüz lokasyon yok"
-                        description="Önce bir Ana Depo oluşturarak başlayın, ardından bunun altına alt depolar ve istasyonlar ekleyin."
+                        title={t('auto.henuz_lokasyon_yok')}
+                        description={t('auto.once_bir_ana_depo_olusturarak_baslayin_ardindan_')}
                         action={canManage && (
-                            <Button variant="primary" icon={<Plus size={13} />} onClick={() => setOpen(true)}>
-                                Lokasyon Ekle
-                            </Button>
+                            <Button variant="primary" icon={<Plus size={13} />} onClick={() => setOpen(true)}>{t('auto.lokasyon_ekle')}</Button>
                         )}
                     />
                 ) : (
@@ -104,19 +102,19 @@ export const Locations = () => {
 
             <Modal
                 open={open}
-                title="Yeni Lokasyon"
-                description="Depo türünü ve bağlı olduğu üst lokasyonu seçin."
+                title={t('auto.yeni_lokasyon')}
+                description={t('auto.depo_turunu_ve_bagli_oldugu_ust_lokasyonu_secin')}
                 onClose={() => setOpen(false)}
                 width="md"
                 footer={
                     <>
-                        <Button variant="secondary" onClick={() => setOpen(false)}>İptal</Button>
+                        <Button variant="secondary" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
                         <Button
                             variant="primary"
                             loading={submitting}
                             onClick={async () => {
                                 if (!form.locationName.trim()) {
-                                    toast.error('Lokasyon adı zorunlu.');
+                                    toast.error(t('auto.lokasyon_adi_zorunlu'));
                                     return;
                                 }
                                 setSubmitting(true);
@@ -126,48 +124,46 @@ export const Locations = () => {
                                         locationType: form.locationType,
                                         parentLocationId: form.parentLocationId || null,
                                     });
-                                    toast.success('Lokasyon oluşturuldu.');
+                                    toast.success(t('auto.lokasyon_olusturuldu'));
                                     setForm({ locationName: '', locationType: 'MAIN_WAREHOUSE', parentLocationId: '' });
                                     setOpen(false);
                                 } catch (e: any) {
-                                    toast.error(e.response?.data?.error || 'Oluşturulamadı.');
+                                    toast.error(e.response?.data?.error ||t('auto.olusturulamadi'));
                                 } finally {
                                     setSubmitting(false);
                                 }
                             }}
-                        >
-                            Oluştur
-                        </Button>
+                        >{t('common.create')}</Button>
                     </>
                 }
             >
                 <div className="space-y-3">
-                    <Field label="Lokasyon Adı" required>
+                    <Field label={t('auto.lokasyon_adi')} required>
                         <Input
                             value={form.locationName}
                             onChange={(e) => setForm({ ...form, locationName: e.target.value })}
-                            placeholder="Ana Depo - Schübelbach"
+                            placeholder={t('auto.ana_depo_schubelbach')}
                         />
                     </Field>
-                    <Field label="Tip" required>
+                    <Field label={t('auto.tip')} required>
                         <Select
                             value={form.locationType}
                             onChange={(e) => setForm({ ...form, locationType: e.target.value as LocationType })}
                         >
-                            <option value="MAIN_WAREHOUSE">Ana Depo</option>
-                            <option value="SUB_WAREHOUSE">Alt Depo / Departman Buffer</option>
-                            <option value="STATION_BUFFER">İstasyon Buffer (örn: İstasyon 1)</option>
-                            <option value="PROJECT_RESERVE">Proje Rezerv Alanı</option>
+                            <option value="MAIN_WAREHOUSE">{t('auto.ana_depo')}</option>
+                            <option value="SUB_WAREHOUSE">{t('auto.alt_depo_departman_buffer')}</option>
+                            <option value="STATION_BUFFER">{t('auto.istasyon_buffer_orn_istasyon_1')}</option>
+                            <option value="PROJECT_RESERVE">{t('auto.proje_rezerv_alani')}</option>
                         </Select>
                     </Field>
-                    <Field label="Üst Lokasyon" hint="İsteğe bağlı – hiyerarşik yapı için">
+                    <Field label={t('auto.ust_lokasyon')} hint={t('auto.istege_bagli_hiyerarsik_yapi_icin')}>
                         <Select
                             value={form.parentLocationId}
                             onChange={(e) => setForm({ ...form, parentLocationId: e.target.value })}
                         >
-                            <option value="">— Kök Lokasyon —</option>
+                            <option value="">{t('auto.kok_lokasyon')}</option>
                             {locations.map((l) => (
-                                <option key={l.id} value={l.id}>{l.locationName} · {TYPE_LABEL[l.locationType]}</option>
+                                <option key={l.id} value={l.id}>{t('auto.location_option_label', { name: l.locationName, type: TYPE_LABEL[l.locationType] })}</option>
                             ))}
                         </Select>
                     </Field>
@@ -189,7 +185,7 @@ const LocationNodeView: React.FC<{ node: TreeNode; level: number }> = ({ node, l
                 <div className="text-[10.5px] uppercase tracking-wider text-slate-500">{TYPE_LABEL[node.locationType]}</div>
             </div>
             {!node.isActive && (
-                <span className="text-[11px] text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">Pasif</span>
+                <span className="text-[11px] text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded">{t('common.inactive')}</span>
             )}
         </div>
         {node.children.map((c) => (

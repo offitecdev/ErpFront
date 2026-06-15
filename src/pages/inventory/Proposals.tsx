@@ -7,7 +7,7 @@ import {
     Package,
     PackageX as XCircle,
     ShoppingCart01 as ShoppingCart,
-} from '@untitledui/icons';
+} from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -15,6 +15,8 @@ import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 
 import { useInventoryStore } from '../../store/inventoryStore';
+
+import { t } from '@/i18n/translate';
 
 const fmtNumber = (v: number) =>
     new Intl.NumberFormat('de-CH', { maximumFractionDigits: 2 }).format(v);
@@ -29,26 +31,26 @@ export const Proposals = () => {
     const handle = async (id: string, isApproved: boolean) => {
         try {
             await resolveProposal(id, isApproved);
-            toast.success(isApproved ? 'Satın alma onaylandı.' : 'Öneri reddedildi.');
+            toast.success(isApproved ?t('auto.satin_alma_onaylandi') :t('auto.oneri_reddedildi'));
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'İşlem başarısız.');
+            toast.error(e.response?.data?.error ||t('dashboard.actionFailed'));
         }
     };
 
     return (
         <div>
             <PageHeader
-                breadcrumb="Stok › Satın Alma Önerileri"
-                title="Otomatik Satın Alma Önerileri"
-                description="Kritik stok seviyesine düşen ürünler için sistem otomatik öneri üretir. Onaylayarak satın alma sürecini başlatın."
+                breadcrumb={t('auto.breadcrumb_purchase_proposals')}
+                title={t('auto.otomatik_satin_alma_onerileri')}
+                description={t('auto.kritik_stok_seviyesine_dusen_urunler_icin_sistem')}
             />
 
-            <Card title="Bekleyen Öneriler" icon={<ShoppingCart size={13} />} noPadding>
+            <Card title={t('auto.bekleyen_oneriler')} icon={<ShoppingCart size={13} />} noPadding>
                 {proposals.length === 0 ? (
                     <EmptyState
                         icon={<CheckCircle2 size={32} />}
-                        title="Onay bekleyen öneri yok"
-                        description="Tüm stoklar güvenli seviyede. Sistem otomatik öneri ürettiğinde burada listelenir."
+                        title={t('auto.onay_bekleyen_oneri_yok')}
+                        description={t('auto.tum_stoklar_guvenli_seviyede_sistem_otomatik_one')}
                     />
                 ) : (
                     <div className="divide-y divide-slate-100">
@@ -67,23 +69,21 @@ export const Proposals = () => {
                                         <div className="flex items-center gap-2">
                                             <h4 className="text-[13px] font-semibold text-slate-800 truncate">{p.article?.name ?? p.articleId}</h4>
                                             <span className="inline-flex items-center gap-1 text-[10.5px] bg-amber-50 border border-amber-200/70 text-amber-700 px-1.5 py-0.5 rounded">
-                                                <AlertTriangle size={9} />
-                                                Kritik
-                                            </span>
+                                                <AlertTriangle size={9} />{t('auto.kritik')}</span>
                                         </div>
                                         <div className="text-[11px] font-mono text-slate-500 mt-0.5">{p.article?.articleCode}</div>
                                         <div className="mt-2 grid grid-cols-3 gap-3 text-[12px]">
                                             <div>
-                                                <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold">Önerilen Miktar</div>
+                                                <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold">{t('auto.onerilen_miktar')}</div>
                                                 <div className="font-mono font-semibold text-slate-800">{fmtNumber(p.proposedQuantity)}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold">Tarih</div>
-                                                <div className="text-slate-700">{dayjs(p.createdAt).format('DD.MM.YYYY HH:mm')}</div>
+                                                <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold">{t('common.date')}</div>
+                                                <div className="text-slate-700">{dayjs(p.createdAt).format("DD.MM.YYYY HH:mm")}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold">Tedarikçi</div>
-                                                <div className="text-slate-700">{p.supplierId || 'Atanmadı'}</div>
+                                                <div className="text-[10.5px] text-slate-400 uppercase tracking-wider font-semibold">{t('auto.tedarikci')}</div>
+                                                <div className="text-slate-700">{p.supplierId ||t('auto.atanmadi')}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -94,17 +94,13 @@ export const Proposals = () => {
                                             size="sm"
                                             icon={<CheckCircle2 size={12} />}
                                             onClick={() => handle(p.id, true)}
-                                        >
-                                            Onayla
-                                        </Button>
+                                        >{t('common.confirm')}</Button>
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             icon={<XCircle size={12} />}
                                             onClick={() => handle(p.id, false)}
-                                        >
-                                            Reddet
-                                        </Button>
+                                        >{t('auto.reddet')}</Button>
                                     </div>
                                 </div>
                             </div>

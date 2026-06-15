@@ -9,6 +9,8 @@ import type {
     ArticleDto,
     TenderFormat,
     TenderChangeLog,
+    TenderChatterSummary,
+    TenderDocumentDto,
     OfferScheduleSlotDto,
     PositionArticleMappingDto,
     PositionMaterialMappingDto,
@@ -63,13 +65,24 @@ export const tenderApi = {
     },
 
     createManual: async (input: {
-        customerId: string;
+        customerId?: string | null;
         tenderNumber: string;
         format: TenderFormat;
         validUntil?: string | null;
     }): Promise<TenderListItem> => {
         const res = await apiClient.post('/tenders', input);
         return res.data;
+    },
+
+    updateMeta: async (id: string, input: { customerId?: string | null; format?: TenderFormat; validUntil?: string | null }): Promise<TenderListItem> => {
+        try {
+            const res = await apiClient.patch(`/tenders/${id}/meta`, input);
+            return res.data;
+        } catch (error: any) {
+            if (error.response?.status !== 404) throw error;
+            const fallback = await apiClient.patch(`/tenders/${id}`, input);
+            return fallback.data;
+        }
     },
 
     importXml: async (input: {
@@ -81,6 +94,25 @@ export const tenderApi = {
         return res.data;
     },
 
+    importSalesOrderCsv: async (input: {
+        csvContent: string;
+        fileName?: string | null;
+    }): Promise<{
+        message: string;
+        tender: TenderListItem | null;
+        tenders: TenderListItem[];
+        summary: {
+            tenderCount: number;
+            createdCustomers: number;
+            createdArticles: number;
+            createdPositions: number;
+            sourceRows: number;
+        };
+    }> => {
+        const res = await apiClient.post('/tenders/import-sales-order-csv', input);
+        return res.data;
+    },
+
     delete: async (id: string): Promise<void> => {
         await apiClient.delete(`/tenders/${id}`);
     },
@@ -88,7 +120,7 @@ export const tenderApi = {
     addPosition: async (
         tenderId: string,
         position: Partial<PositionDto>
-    ): Promise<{ message: string; positionId: string }> => {
+    ): Promise<{ message: string; positionId: string; position?: PositionDto }> => {
         const res = await apiClient.post(`/tenders/${tenderId}/positions`, position);
         return res.data;
     },
@@ -148,6 +180,9 @@ export const tenderApi = {
             taxRate?: number | null;
             imageUrl?: string | null;
             npkCode?: string | null;
+            rowType?: string;
+            sourceArticleId?: string | null;
+            displayOrder?: number;
         }
     ): Promise<PositionDto> => {
         const res = await apiClient.patch(`/tenders/${tenderId}/positions/${positionId}`, patch);
@@ -241,6 +276,31 @@ export const tenderApi = {
         return res.data;
     },
 
+    getChatterSummary: async (id: string): Promise<TenderChatterSummary> => {
+        const res = await apiClient.get(`/tenders/${id}/chatter-summary`);
+        return res.data;
+    },
+
+    addNote: async (id: string, input: { noteText: string }): Promise<TenderChangeLog> => {
+        const res = await apiClient.post(`/tenders/${id}/notes`, input);
+        return res.data;
+    },
+
+    getDocuments: async (id: string): Promise<TenderDocumentDto[]> => {
+        const res = await apiClient.get(`/tenders/${id}/documents`);
+        return res.data;
+    },
+
+    addDocument: async (id: string, input: {
+        fileName: string;
+        fileUrl: string;
+        fileType: string;
+        category?: string;
+    }): Promise<TenderDocumentDto> => {
+        const res = await apiClient.post(`/tenders/${id}/documents`, input);
+        return res.data;
+    },
+
     getScheduleSlots: async (id: string): Promise<OfferScheduleSlotDto[]> => {
         const res = await apiClient.get(`/tenders/${id}/schedule-slots`);
         return res.data;
@@ -291,6 +351,7 @@ export const articleApi = {
         articleCode: string;
         name: string;
         baseCost: number;
+        salePrice?: number | null;
         unit: string;
         description?: string | null;
     }): Promise<ArticleDto> => {

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Camera01 as Camera, Hash01 as Hash, Keyboard01 as Keyboard, Scan } from '@untitledui/icons';
+import { AlertTriangle as WarningOutlined, Camera01 as CameraOutlined, Hash01 as NumberOutlined, Scan as ScanOutlined, XClose as CloseOutlined } from '../icons/antIconCompat';
 import { toast } from 'sonner';
-import { CloseButton } from '../base/buttons/close-button';
 import { Button } from './Button';
 import { Input } from './Field';
-import { cx } from '../../lib/utils/cx';
+
+import { t } from '@/i18n/translate';
 
 type DetectedBarcode = { rawValue?: string };
 type BarcodeDetectorInstance = {
@@ -107,7 +107,7 @@ export const BarcodeScannerModal: React.FC<{
         if (startingRef.current || streamRef.current) return;
 
         if (!navigator.mediaDevices?.getUserMedia) {
-            setCameraError('Bu tarayıcı kamera erişimini desteklemiyor. HTTPS/localhost üzerinden açın veya manuel giriş kullanın.');
+            setCameraError(t('auto.bu_tarayici_kamera_erisimini_desteklemiyor_https'));
             return;
         }
 
@@ -130,7 +130,7 @@ export const BarcodeScannerModal: React.FC<{
             streamRef.current = stream;
 
             if (!videoRef.current) {
-                throw new Error('Video alanı hazır değil.');
+                throw new Error(t('auto.video_alani_hazir_degil'));
             }
 
             videoRef.current.srcObject = stream;
@@ -141,20 +141,20 @@ export const BarcodeScannerModal: React.FC<{
             if (Detector) {
                 detectorRef.current = new Detector({ formats: barcodeFormats });
                 frameRef.current = requestAnimationFrame(detectLoop);
-                setScanHint('Kamera açık. Barkodu kutunun içine getirin.');
+                setScanHint(t('auto.kamera_acik_barkodu_kutunun_icine_getirin'));
             } else {
-                setScanHint('Kamera açık. Otomatik okuma desteklenmiyorsa kodu manuel yazabilirsiniz.');
+                setScanHint(t('auto.kamera_acik_otomatik_okuma_desteklenmiyorsa_kodu'));
             }
         } catch (err: any) {
             stopCamera();
             const name = String(err?.name || '');
             const message = String(err?.message || err || '');
             setCameraError(
-                name === 'NotAllowedError' || name === 'PermissionDeniedError'
-                    ? 'Kamera izni reddedildi. Tarayıcı adres çubuğundaki kamera iznini açın.'
+                name === "NotAllowedError" || name === "PermissionDeniedError"
+                    ?t('auto.kamera_izni_reddedildi_tarayici_adres_cubugundak')
                     : message.includes('secure') || message.includes('HTTPS')
-                      ? 'Kamera için sayfa HTTPS veya localhost üzerinden açılmalı.'
-                      : 'Kamera açılamadı. Başka bir uygulama kamerayı kullanıyorsa kapatıp tekrar deneyin.'
+                      ?t('auto.kamera_icin_sayfa_https_veya_localhost_uzerinden')
+                      :t('auto.kamera_acilamadi_baska_bir_uygulama_kamerayi_kul')
             );
         } finally {
             startingRef.current = false;
@@ -176,13 +176,15 @@ export const BarcodeScannerModal: React.FC<{
     const handleManualSubmit = () => {
         const code = manualCode.trim();
         if (!code) {
-            toast.error('Barkod kodu boş olamaz.');
+            toast.error(t('auto.barkod_kodu_bos_olamaz'));
             return;
         }
 
         stopCamera();
         onScan(code);
     };
+
+    const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ');
 
     const scanner = (
         <div
@@ -195,19 +197,24 @@ export const BarcodeScannerModal: React.FC<{
             >
                 <div className="flex items-start justify-between gap-4 border-b border-secondary px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <div className={cx('flex size-10 items-center justify-center rounded-lg text-white', isSerial ? 'bg-brand-solid' : 'bg-success-solid')}>
-                            {isSerial ? <Scan size={19} /> : <Hash size={19} />}
+                        <div className={cx("flex size-10 items-center justify-center rounded-lg text-white", isSerial ? 'bg-brand-solid' : 'bg-success-solid')}>
+                            {isSerial ? <ScanOutlined style={{ fontSize: 19 }} /> : <NumberOutlined style={{ fontSize: 19 }} />}
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold leading-none text-primary">
-                                {isSerial ? 'Ürün Seri Kodu Tara' : 'Genel Ürün Kodu Tara'}
+                                {isSerial ?t('auto.urun_seri_kodu_tara') :t('auto.genel_urun_kodu_tara')}
                             </h3>
-                            <p className="mt-1.5 text-sm text-tertiary">
-                                Açılınca kamera otomatik başlar.
-                            </p>
+                            <p className="mt-1.5 text-sm text-tertiary">{t('auto.acilinca_kamera_otomatik_baslar')}</p>
                         </div>
                     </div>
-                    <CloseButton size="sm" label="Kapat" onPress={onClose} />
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex size-8 items-center justify-center rounded-lg text-fg-quaternary transition-colors hover:bg-secondary hover:text-fg-secondary"
+                        aria-label={t('common.close')}
+                    >
+                        <CloseOutlined style={{ fontSize: 16 }} />
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -217,61 +224,58 @@ export const BarcodeScannerModal: React.FC<{
 
                         {!cameraActive && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black text-fg-white/70">
-                                <Camera size={46} strokeWidth={1.4} />
+                                <CameraOutlined style={{ fontSize: 46 }} />
                                 <span className="text-sm font-medium">
-                                    {isStarting ? 'Kamera açılıyor...' : 'Kamera otomatik açılacak'}
+                                    {isStarting ?t('auto.kamera_aciliyor') :t('auto.kamera_otomatik_acilacak')}
                                 </span>
                             </div>
                         )}
 
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                            <div className={cx('h-[44%] w-[86%] rounded-lg border-2 shadow-[0_0_0_999px_rgba(2,6,23,0.30)]', isSerial ? 'border-brand-400' : 'border-success-solid')} />
-                            <div className={cx('absolute h-0.5 w-[78%] opacity-90', isSerial ? 'bg-brand-300' : 'bg-success-solid')} />
+                            <div className={cx("h-[44%] w-[86%] rounded-lg border-2 shadow-[0_0_0_999px_rgba(2,6,23,0.30)]", isSerial ? 'border-brand-400' : 'border-success-solid')} />
+                            <div className={cx("absolute h-0.5 w-[78%] opacity-90", isSerial ? 'bg-brand-300' : 'bg-success-solid')} />
                         </div>
                     </div>
 
                     {(cameraError || scanHint) && (
-                        <div className={cx('mt-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm', cameraError ? 'border-utility-yellow-200 bg-warning-primary text-warning-primary' : 'border-secondary bg-secondary text-tertiary')}>
-                            {cameraError && <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
+                        <div className={cx("mt-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm", cameraError ?"border-utility-yellow-200 bg-warning-primary text-warning-primary" :"border-secondary bg-secondary text-tertiary")}>
+                            {cameraError && <WarningOutlined style={{ fontSize: 14, marginTop: 2 }} />}
                             <span>{cameraError || scanHint}</span>
                         </div>
                     )}
 
                     <div className="mt-3 flex gap-2">
                         <Button
-                            type="button"
                             onClick={cameraActive ? stopCamera : startCamera}
                             disabled={isStarting}
                             variant={cameraActive ? 'secondary' : 'primary'}
                             className="flex-1"
-                            icon={<Camera size={14} />}
+                            icon={<CameraOutlined style={{ fontSize: 14 }} />}
                         >
-                            {cameraActive ? 'Kamerayı Kapat' : isStarting ? 'Kamera Açılıyor' : 'Kamerayı Aç'}
+                            {cameraActive ?t('auto.kamerayi_kapat') : isStarting ?t('auto.kamera_aciliyor') :t('auto.kamerayi_ac')}
                         </Button>
                     </div>
 
                     <div className="my-4 flex items-center gap-3">
                         <div className="h-px flex-1 bg-border-secondary" />
-                        <span className="text-xs font-medium uppercase text-tertiary">Manuel giriş</span>
+                        <span className="text-xs font-medium uppercase text-tertiary">{t('auto.manuel_giris')}</span>
                         <div className="h-px flex-1 bg-border-secondary" />
                     </div>
 
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <Keyboard size={14} className="absolute left-3 top-1/2 z-10 -translate-y-1/2 text-fg-quaternary" />
+                            <i className="f7-icons absolute left-3 top-1/2 z-10 -translate-y-1/2 text-fg-quaternary" style={{ fontSize: 14 }}>key</i>
                             <Input
                                 value={manualCode}
                                 onChange={(e) => setManualCode(e.target.value)}
                                 onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleManualSubmit();
+                                    if (e.key === "Enter") handleManualSubmit();
                                 }}
-                                placeholder={isSerial ? 'Seri kodu yazın veya okutun...' : 'Genel kodu yazın veya okutun...'}
+                                placeholder={isSerial ?t('auto.seri_kodu_yazin_veya_okutun') :t('auto.genel_kodu_yazin_veya_okutun')}
                                 className="pl-9"
                             />
                         </div>
-                        <Button type="button" onClick={handleManualSubmit}>
-                            Uygula
-                        </Button>
+                        <Button onClick={handleManualSubmit}>{t('auto.uygula')}</Button>
                     </div>
                 </div>
             </div>

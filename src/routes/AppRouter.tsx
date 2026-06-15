@@ -7,11 +7,33 @@ import { useAuthStore } from '../store/authStore';
 
 type RouteComponent = ComponentType<Record<string, never>>;
 
+const CHUNK_RELOAD_KEY = 'offitec:chunk-reload-attempted';
+
+const isChunkLoadError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error || '');
+    return /Failed to fetch dynamically imported module|dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
+};
+
 const lazyNamed = (
     loader: () => Promise<unknown>,
     exportName: string
 ): LazyExoticComponent<RouteComponent> =>
-    lazy<RouteComponent>(() => loader().then((mod) => ({ default: (mod as Record<string, RouteComponent>)[exportName] })));
+    lazy<RouteComponent>(() =>
+        loader()
+            .then((mod) => {
+                sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+                return { default: (mod as Record<string, RouteComponent>)[exportName] };
+            })
+            .catch((error) => {
+                if (isChunkLoadError(error) && sessionStorage.getItem(CHUNK_RELOAD_KEY) !== '1') {
+                    sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+                    window.location.reload();
+                    return new Promise<never>(() => undefined);
+                }
+                throw error;
+            })
+    );
+
 
 const Login = lazyNamed(() => import('../pages/Login'), 'Login');
 const Roles = lazyNamed(() => import('../pages/iam/Roles'), 'Roles');
@@ -21,28 +43,40 @@ const AttendanceSettings = lazyNamed(() => import('../pages/attendance/Attendanc
 const AttendanceRecords = lazyNamed(() => import('../pages/attendance/AttendanceRecords'), 'AttendanceRecords');
 const CustomerDashboard = lazyNamed(() => import('../pages/crm/CustomerDashboard'), 'CustomerDashboard');
 const CustomerList = lazyNamed(() => import('../pages/crm/CustomerList'), 'CustomerList');
+const MyOrders = lazyNamed(() => import('../pages/crm/MyOrders'), 'MyOrders');
+const MyOrderDetail = lazyNamed(() => import('../pages/crm/MyOrderDetail'), 'MyOrderDetail');
 const TenderList = lazyNamed(() => import('../pages/tender/TenderList'), 'TenderList');
 const TenderDetail = lazyNamed(() => import('../pages/tender/TenderDetail'), 'TenderDetail');
 const TenderReport = lazyNamed(() => import('../pages/tender/TenderReport'), 'TenderReport');
-const TenderCreate = lazyNamed(() => import('../pages/tender/TenderCreate'), 'TenderCreate');
 const InventoryDashboard = lazyNamed(() => import('../pages/inventory/InventoryDashboard'), 'InventoryDashboard');
 const Articles = lazyNamed(() => import('../pages/inventory/Articles'), 'Articles');
+const ArticleCreate = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleCreate');
+const ArticleDetail = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleDetail');
+const ArticleEdit = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleEdit');
 const ExtraMaterials = lazyNamed(() => import('../pages/inventory/ExtraMaterials'), 'ExtraMaterials');
+const ExtraMaterialCreate = lazyNamed(() => import('../pages/inventory/ExtraMaterials'), 'ExtraMaterialCreate');
+const ExtraMaterialEdit = lazyNamed(() => import('../pages/inventory/ExtraMaterials'), 'ExtraMaterialEdit');
 const Locations = lazyNamed(() => import('../pages/inventory/Locations'), 'Locations');
 const Movements = lazyNamed(() => import('../pages/inventory/Movements'), 'Movements');
 const Proposals = lazyNamed(() => import('../pages/inventory/Proposals'), 'Proposals');
+const Suppliers = lazyNamed(() => import('../pages/inventory/Suppliers'), 'Suppliers');
+const SupplierDetail = lazyNamed(() => import('../pages/inventory/Suppliers'), 'SupplierDetail');
 const Shipments = lazyNamed(() => import('../pages/logistics/Shipments'), 'Shipments');
 const ShipmentCreate = lazyNamed(() => import('../pages/logistics/ShipmentCreate'), 'ShipmentCreate');
 const MaintenanceDashboard = lazyNamed(() => import('../pages/maintenance/MaintenanceDashboard'), 'MaintenanceDashboard');
 const MaintenanceContracts = lazyNamed(() => import('../pages/maintenance/MaintenanceContracts'), 'MaintenanceContracts');
+const MaintenanceContractCreate = lazyNamed(() => import('../pages/maintenance/MaintenanceContracts'), 'MaintenanceContractCreate');
 const MaintenanceTasks = lazyNamed(() => import('../pages/maintenance/MaintenanceTasks'), 'MaintenanceTasks');
 const MaintenanceReports = lazyNamed(() => import('../pages/maintenance/MaintenanceReports'), 'MaintenanceReports');
 const RegieOperations = lazyNamed(() => import('../pages/maintenance/RegieOperations'), 'RegieOperations');
+const MaintenanceTechnician = lazyNamed(() => import('../pages/maintenance/MaintenanceTechnician'), 'MaintenanceTechnician');
 const PdfSettings = lazyNamed(() => import('../pages/settings/PdfSettings'), 'PdfSettings');
 const MailSettings = lazyNamed(() => import('../pages/settings/MailSettings'), 'MailSettings');
 const Projects = lazyNamed(() => import('../pages/project/Projects'), 'Projects');
 const ProjectDetail = lazyNamed(() => import('../pages/project/ProjectDetail'), 'ProjectDetail');
+const ProjectInstallation = lazyNamed(() => import('../pages/project/ProjectInstallation'), 'ProjectInstallation');
 const BookingPage = lazyNamed(() => import('../pages/project/BookingPage'), 'BookingPage');
+const MaintenanceBookingPage = lazyNamed(() => import('../pages/maintenance/MaintenanceBookingPage'), 'MaintenanceBookingPage');
 
 const RouteFallback = () => (
     <div className="animate-pulse space-y-5">
@@ -94,6 +128,7 @@ export const AppRouter = () => {
             </Route>
 
             <Route path="/booking/:token" element={page(BookingPage)} />
+            <Route path="/maintenance-booking/:token" element={page(MaintenanceBookingPage)} />
 
             <Route element={<ProtectedRoute />}>
                 <Route element={<MainLayout />}>
@@ -104,24 +139,44 @@ export const AppRouter = () => {
                     <Route path="/attendance-records" element={page(AttendanceRecords)} />
                     <Route path="/crm/customers" element={page(CustomerList)} />
                     <Route path="/crm/customers/:id" element={page(CustomerDashboard)} />
+                    <Route path="/crm/my-orders" element={page(MyOrders)} />
+                    <Route path="/crm/my-orders/:id" element={page(MyOrderDetail)} />
                     <Route path="/crm/tenders" element={page(TenderList)} />
-                    <Route path="/crm/tenders/new" element={page(TenderCreate)} />
                     <Route path="/crm/tenders/:id" element={page(TenderDetail)} />
                     <Route path="/crm/tenders/:id/report" element={page(TenderReport)} />
                     <Route path="/inventory" element={page(InventoryDashboard)} />
                     <Route path="/inventory/articles" element={page(Articles)} />
+                    <Route path="/inventory/articles/new" element={page(ArticleCreate)} />
+                    <Route path="/inventory/articles/:id" element={page(ArticleDetail)} />
+                    <Route path="/inventory/articles/:id/edit" element={page(ArticleEdit)} />
                     <Route path="/inventory/extra-materials" element={page(ExtraMaterials)} />
+                    <Route path="/inventory/extra-materials/new" element={page(ExtraMaterialCreate)} />
+                    <Route path="/inventory/extra-materials/:id/edit" element={page(ExtraMaterialEdit)} />
                     <Route path="/inventory/locations" element={page(Locations)} />
                     <Route path="/inventory/movements" element={page(Movements)} />
                     <Route path="/inventory/proposals" element={page(Proposals)} />
+                    <Route path="/inventory/suppliers" element={page(Suppliers)} />
+                    <Route path="/inventory/suppliers/:id" element={page(SupplierDetail)} />
                     <Route path="/logistics/shipments" element={page(Shipments)} />
                     <Route path="/logistics/shipments/new" element={page(ShipmentCreate)} />
                     <Route path="/maintenance" element={page(MaintenanceDashboard)} />
                     <Route path="/maintenance/contracts" element={page(MaintenanceContracts)} />
+                    <Route path="/maintenance/contracts/new" element={page(MaintenanceContractCreate)} />
                     <Route path="/maintenance/tasks" element={page(MaintenanceTasks)} />
+                    <Route path="/maintenance/tasks/:taskId" element={page(MaintenanceTasks)} />
+                    <Route path="/maintenance/technician" element={<Navigate to="/maintenance/technician/calendar" replace />} />
+                    <Route path="maintenance/technician/calendar" element={page(MaintenanceTechnician)} />
+                    <Route path="maintenance/technician/calendar/:taskId" element={page(MaintenanceTechnician)} />
+                    <Route path="maintenance/technician/tasks" element={page(MaintenanceTechnician)} />
+                    <Route path="maintenance/technician/tasks/:taskId" element={page(MaintenanceTechnician)} />
                     <Route path="/maintenance/reports" element={page(MaintenanceReports)} />
                     <Route path="/maintenance/regie" element={page(RegieOperations)} />
                     <Route path="/projects" element={<ProjectModuleRoute component={Projects} />} />
+                    <Route path="/projects/installation" element={<Navigate to="/projects/installation/calendar" replace />} />
+                    <Route path="/projects/installation/calendar" element={<ProjectModuleRoute component={ProjectInstallation} />} />
+                    <Route path="/projects/installation/calendar/:appointmentId" element={<ProjectModuleRoute component={ProjectInstallation} />} />
+                    <Route path="/projects/installation/tasks" element={<ProjectModuleRoute component={ProjectInstallation} />} />
+                    <Route path="/projects/installation/tasks/:appointmentId" element={<ProjectModuleRoute component={ProjectInstallation} />} />
                     <Route path="/projects/:id" element={<ProjectModuleRoute component={ProjectDetail} />} />
                     <Route path="/settings/pdf" element={page(PdfSettings)} />
                     <Route path="/settings/mail" element={<ProjectModuleRoute component={MailSettings} />} />

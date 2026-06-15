@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
-import { CloseButton } from '../base/buttons/close-button';
-import { Dialog, Modal as UntitledModal, ModalOverlay } from '../application/modals/modal';
-import { cx } from '../../lib/utils/cx';
+import { Modal as AntModal, Drawer } from 'antd';
 
 interface ModalProps {
     open: boolean;
@@ -17,19 +15,19 @@ interface ModalProps {
     drawerWidth?: 'md' | 'lg' | 'half' | 'wide';
 }
 
-const widthClass = {
-    sm: 'max-w-md',
-    md: 'max-w-xl',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    full: 'max-w-[min(1180px,calc(100vw-2rem))]',
+const widthMap = {
+    sm: 448,
+    md: 576,
+    lg: 672,
+    xl: 896,
+    full: 1180,
 };
 
-const drawerWidthClass = {
-    md: 'max-w-[min(520px,100vw)]',
-    lg: 'max-w-[min(760px,100vw)]',
-    half: 'max-w-[min(960px,100vw)] lg:w-1/2',
-    wide: 'w-[min(1180px,100vw)] max-w-none',
+const drawerWidthMap = {
+    md: 520,
+    lg: 760,
+    half: '50%' as string | number,
+    wide: 1180,
 };
 
 export const Modal: React.FC<ModalProps> = ({
@@ -54,44 +52,58 @@ export const Modal: React.FC<ModalProps> = ({
         return () => document.removeEventListener('keydown', handler, true);
     }, [closeOnEscape, open]);
 
-    const isDrawer = placement === 'drawer';
+    if (placement === 'drawer') {
+        return (
+            <Drawer
+                open={open}
+                onClose={onClose}
+                title={
+                    <div>
+                        <div className="text-lg font-semibold">{title}</div>
+                        {description && <p className="mt-1 text-sm text-tertiary font-normal">{description}</p>}
+                    </div>
+                }
+                width={drawerWidthMap[drawerWidth]}
+                maskClosable={closeOnBackdrop}
+                keyboard={closeOnEscape}
+                footer={footer ? (
+                    <div className="flex items-center justify-end gap-2">
+                        {footer}
+                    </div>
+                ) : undefined}
+                styles={{
+                    body: { padding: '24px' },
+                    header: { borderBottom: '1px solid #f1f5f9' },
+                    footer: { borderTop: '1px solid #f1f5f9', padding: '12px 24px' },
+                }}
+            >
+                {children}
+            </Drawer>
+        );
+    }
 
     return (
-        <ModalOverlay
-            isOpen={open}
-            isDismissable={closeOnBackdrop}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) onClose();
-            }}
-            className={isDrawer ? 'items-stretch justify-end !bg-transparent p-0 sm:items-stretch sm:justify-end sm:p-0' : undefined}
+        <AntModal
+            open={open}
+            title={
+                <div>
+                    <div className="text-lg font-semibold">{title}</div>
+                    {description && <p className="mt-1 text-sm text-tertiary font-normal">{description}</p>}
+                </div>
+            }
+            onCancel={onClose}
+            footer={footer ? (
+                <div className="flex items-center justify-end gap-2">
+                    {footer}
+                </div>
+            ) : null}
+            width={widthMap[width]}
+            maskClosable={closeOnBackdrop}
+            keyboard={closeOnEscape}
+            centered
+            destroyOnClose
         >
-            <UntitledModal
-                className={cx(
-                    isDrawer
-                        ? `h-dvh ${drawerWidthClass[drawerWidth]} max-sm:rounded-none`
-                        : `${widthClass[width]} max-sm:rounded-xl`,
-                )}
-            >
-                <Dialog>
-                    <div className="flex max-h-full w-full flex-col overflow-hidden rounded-xl bg-primary shadow-xl ring-1 ring-secondary_alt">
-                        <div className="flex items-start justify-between gap-4 border-b border-secondary px-6 py-5">
-                            <div className="min-w-0">
-                                <h2 className="text-lg font-semibold text-primary">{title}</h2>
-                                {description && <p className="mt-1 text-sm text-tertiary">{description}</p>}
-                            </div>
-                            <CloseButton size="sm" label="Kapat" onPress={onClose} />
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
-
-                        {footer && (
-                            <div className="flex items-center justify-end gap-2 border-t border-secondary bg-primary px-6 py-4">
-                                {footer}
-                            </div>
-                        )}
-                    </div>
-                </Dialog>
-            </UntitledModal>
-        </ModalOverlay>
+            {children}
+        </AntModal>
     );
 };

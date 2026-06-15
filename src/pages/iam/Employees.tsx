@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Edit01 as Edit, Plus, UserX01 as UserX } from '@untitledui/icons';
+import { Edit01 as Edit, Plus, UserX01 as UserX } from '@/components/icons/antIconCompat';
 import { apiClient } from '../../lib/axios';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -9,6 +9,8 @@ import { Field, Input, Select } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusBadge } from '../../components/ui-shared/StatusBadge';
+
+import { t } from '@/i18n/translate';
 
 type EmployeeRow = {
     id: string;
@@ -43,7 +45,7 @@ export const Employees: React.FC = () => {
             setEmployees(empRes.data || []);
             setRoles(roleRes.data || []);
         } catch {
-            toast.error('Veriler yüklenemedi.');
+            toast.error(t('iam.employees.errorLoad'));
         } finally {
             setLoading(false);
         }
@@ -70,7 +72,7 @@ export const Employees: React.FC = () => {
 
     const submit = async () => {
         if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || (!editId && !form.password.trim())) {
-            toast.error('Ad, soyad, e-posta ve geçici parola zorunludur.');
+            toast.error(t('iam.employees.errorRequired'));
             return;
         }
         setSaving(true);
@@ -84,28 +86,28 @@ export const Employees: React.FC = () => {
             if (form.password.trim()) payload.password = form.password.trim();
             if (editId) {
                 await apiClient.patch(`/employees/${editId}`, payload);
-                toast.success('Personel güncellendi.');
+                toast.success(t('iam.employees.successUpdate'));
             } else {
                 await apiClient.post('/employees', payload);
-                toast.success('Personel oluşturuldu.');
+                toast.success(t('iam.employees.successCreate'));
             }
             setModalOpen(false);
             await fetchData();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Kayıt işlemi başarısız.');
+            toast.error(error.response?.data?.error ||t('iam.employees.errorSave'));
         } finally {
             setSaving(false);
         }
     };
 
     const deactivate = async (id: string) => {
-        if (!confirm('Bu personel pasife alınsın mı?')) return;
+        if (!confirm(t('iam.employees.deactivateConfirm'))) return;
         try {
             await apiClient.patch(`/employees/${id}/deactivate`);
             setEmployees((prev) => prev.map((e) => e.id === id ? { ...e, isActive: false } : e));
-            toast.success('Personel pasife alındı.');
+            toast.success(t('iam.employees.successDeactivate'));
         } catch {
-            toast.error('İşlem başarısız.');
+            toast.error(t('dashboard.actionFailed'));
         }
     };
 
@@ -113,21 +115,21 @@ export const Employees: React.FC = () => {
         <div>
             <PageHeader
                 breadcrumb="Personel"
-                title="Personel Listesi"
-                description="Sistemdeki personel kayıtlarını yönetin ve yetkilendirin."
-                actions={<Button variant="primary" icon={<Plus size={13} />} onClick={() => openModal()}>Yeni personel</Button>}
+                title={t('nav.employeeList')}
+                description={t('iam.employees.description')}
+                actions={<Button variant="primary" icon={<Plus size={13} />} onClick={() => openModal()}>{t('iam.employees.newEmployee')}</Button>}
             />
 
-            <Card title="Personeller" noPadding>
+            <Card title={t('iam.employees.tableTitle')} noPadding>
                 <div className="overflow-x-auto">
                     <table className="w-full text-[12.5px]">
                         <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                             <tr>
-                                <th className="px-4 py-2.5 text-left font-semibold">Personel</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">E-posta</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Rol</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Durum</th>
-                                <th className="px-4 py-2.5 text-right font-semibold">İşlem</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('nav.personnel')}</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('common.email')}</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('iam.employees.colRole')}</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('common.status')}</th>
+                                <th className="px-4 py-2.5 text-right font-semibold">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -135,14 +137,14 @@ export const Employees: React.FC = () => {
                                 <tr><td colSpan={5} className="px-4 py-10"><div className="h-3 bg-slate-100 rounded animate-pulse" /></td></tr>
                             )}
                             {!loading && employees.length === 0 && (
-                                <tr><td colSpan={5}><EmptyState title="Personel yok" description="Henüz personel kaydı oluşturulmamış." /></td></tr>
+                                <tr><td colSpan={5}><EmptyState title={t('iam.employees.noEmployees')} description={t('iam.employees.noEmployeesDesc')} /></td></tr>
                             )}
                             {!loading && employees.map((e) => (
                                 <tr key={e.id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-2.5 font-semibold text-slate-900">{e.firstName} {e.lastName}</td>
                                     <td className="px-4 py-2.5 text-slate-600">{e.email}</td>
                                     <td className="px-4 py-2.5 text-blue-700 font-medium">{e.roleName || '—'}</td>
-                                    <td className="px-4 py-2.5"><StatusBadge variant={e.isActive ? 'active' : 'passive'}>{e.isActive ? 'Aktif' : 'Pasif'}</StatusBadge></td>
+                                    <td className="px-4 py-2.5"><StatusBadge variant={e.isActive ? 'active' : 'passive'}>{e.isActive ?t('common.active') :t('common.inactive')}</StatusBadge></td>
                                     <td className="px-4 py-2.5 text-right">
                                         <div className="inline-flex gap-1">
                                             <Button variant="ghost" size="sm" icon={<Edit size={12} />} onClick={() => openModal(e)} />
@@ -158,26 +160,26 @@ export const Employees: React.FC = () => {
 
             <Modal
                 open={modalOpen}
-                title={editId ? 'Personeli düzenle' : 'Yeni personel oluştur'}
+                title={editId ?t('iam.employees.modalEditTitle') :t('iam.employees.modalCreateTitle')}
                 onClose={() => setModalOpen(false)}
                 width="lg"
                 footer={
                     <>
-                        <Button variant="secondary" onClick={() => setModalOpen(false)}>İptal</Button>
-                        <Button variant="primary" loading={saving} onClick={submit}>{editId ? 'Kaydet' : 'Oluştur'}</Button>
+                        <Button variant="secondary" onClick={() => setModalOpen(false)}>{t('common.cancel')}</Button>
+                        <Button variant="primary" loading={saving} onClick={submit}>{editId ?t('common.save') :t('common.create')}</Button>
                     </>
                 }
             >
                 <div className="grid grid-cols-2 gap-3">
-                    <Field label="Adı" required><Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></Field>
-                    <Field label="Soyadı" required><Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></Field>
-                    <Field label="E-posta" required><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-                    <Field label={editId ? 'Yeni parola' : 'Geçici parola'} required={!editId}>
-                        <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editId ? 'Değişmeyecekse boş bırakın' : ''} />
+                    <Field label={t('iam.employees.firstName')} required><Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></Field>
+                    <Field label={t('iam.employees.lastName')} required><Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></Field>
+                    <Field label={t('common.email')} required><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+                    <Field label={editId ?t('iam.employees.newPassword') :t('iam.employees.tempPassword')} required={!editId}>
+                        <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editId ?t('iam.employees.passwordHint') : ''} />
                     </Field>
-                    <Field label="Sistem rolü" className="col-span-2">
+                    <Field label={t('iam.employees.role')} className="col-span-2">
                         <Select value={form.roleId} onChange={(e) => setForm({ ...form, roleId: e.target.value })}>
-                            <option value="">Rol seçin</option>
+                            <option value="">{t('iam.employees.roleSelect')}</option>
                             {roles.map((r) => <option key={r.id} value={r.id}>{r.roleName}</option>)}
                         </Select>
                     </Field>

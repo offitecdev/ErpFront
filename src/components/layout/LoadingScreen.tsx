@@ -1,5 +1,6 @@
 import React from 'react';
-import { LoadingIndicator } from '@/components/application/loading-indicator/loading-indicator';
+import { Spin } from 'antd';
+
 
 interface LoadingScreenProps {
     label?: string;
@@ -11,8 +12,8 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
     fullscreen = true,
 }) => {
     return (
-        <div className={`${fullscreen ? 'h-screen w-screen' : 'h-full w-full min-h-[200px]'} flex items-center justify-center bg-white`}>
-            <LoadingIndicator type="line-simple" size="md" label={label} />
+        <div className={`${fullscreen ?"h-screen w-screen" :"h-full w-full min-h-[200px]"} flex items-center justify-center bg-white`}>
+            <Spin tip={label} />
         </div>
     );
 };

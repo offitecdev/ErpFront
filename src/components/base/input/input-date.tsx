@@ -1,5 +1,5 @@
 import { type ComponentType, type HTMLAttributes, type ReactNode, type Ref, createContext, useContext } from "react";
-import { HelpCircle, InfoCircle } from "@untitledui/icons";
+import { HelpCircle, InfoCircle } from "@/components/icons/antIconCompat";
 import type { DateInputProps as AriaDateInputProps } from "react-aria-components";
 import {
     DateField as AriaDateField,

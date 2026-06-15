@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BarChart03 as BarChart3, Coins01 as Coins, Percent01 as Percent, PieChart03 as PieChart, TrendUp01 as TrendingUp } from '@untitledui/icons';
+import { ArrowLeft, BarChart03 as BarChart3, Coins01 as Coins, Percent01 as Percent, PieChart03 as PieChart, TrendUp01 as TrendingUp } from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -8,6 +8,8 @@ import { Button } from '../../components/ui-shared/Button';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { useTenderStore } from '../../store/tenderStore';
+
+import { t } from '@/i18n/translate';
 
 const fmtMoney = (v: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);
@@ -18,9 +20,9 @@ const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info'> = {
     Exported: 'info',
 };
 const STATUS_LABEL: Record<string, string> = {
-    Draft: 'Taslak',
-    Approved: 'Onaylı',
-    Exported: 'Dışa Aktarıldı',
+    Draft:t('crm.tenders.statusDraft'),
+    Approved:t('crm.tenders.statusApproved'),
+    Exported:t('crm.tenders.statusExported'),
 };
 
 export const TenderReport = () => {
@@ -37,11 +39,11 @@ export const TenderReport = () => {
         const f = summary.financialSummary;
         const sub = f.totalMaterialCost + f.totalLaborCost + f.totalOverheadCost + f.totalRiskAmount;
         const items = [
-            { label: 'Malzeme', value: f.totalMaterialCost, color: 'bg-blue-500' },
-            { label: 'İşçilik', value: f.totalLaborCost, color: 'bg-emerald-500' },
-            { label: 'Genel Gider', value: f.totalOverheadCost, color: 'bg-amber-500' },
-            { label: 'Risk', value: f.totalRiskAmount, color: 'bg-rose-500' },
-            { label: 'Kâr Marjı', value: f.totalProfitMargin, color: 'bg-violet-500' },
+            { label:t('tenders.material'), value: f.totalMaterialCost, color: 'bg-blue-500' },
+            { label:t('tenders.iscilik'), value: f.totalLaborCost, color: 'bg-emerald-500' },
+            { label:t('tenders.general_gider'), value: f.totalOverheadCost, color: 'bg-amber-500' },
+            { label:t('tenders.risk'), value: f.totalRiskAmount, color: 'bg-rose-500' },
+            { label:t('tenders.profit_margin'), value: f.totalProfitMargin, color: 'bg-violet-500' },
         ];
         return items.map((it) => ({
             ...it,
@@ -63,9 +65,7 @@ export const TenderReport = () => {
 
     if (loadingSummary || !summary) {
         return (
-            <div className="text-center text-slate-400 py-20 text-[13px]">
-                Rapor yükleniyor...
-            </div>
+            <div className="text-center text-slate-400 py-20 text-[13px]">{t('tenders.report_loading')}</div>
         );
     }
 
@@ -75,43 +75,41 @@ export const TenderReport = () => {
                 breadcrumb={`CRM › Teklif › ${summary.tenderInfo.tenderNumber} › Rapor`}
                 title={
                     <span className="flex items-center gap-3">
-                        <span>Rapor: {summary.tenderInfo.tenderNumber}</span>
+                        <span>{t('tenders.report')}{summary.tenderInfo.tenderNumber}</span>
                         <span className="text-[12px] font-mono text-slate-400">v{summary.tenderInfo.version}</span>
                         <StatusChip variant={STATUS_VARIANT[summary.tenderInfo.status]}>
                             {STATUS_LABEL[summary.tenderInfo.status]}
                         </StatusChip>
                     </span>
                 }
-                description="BKP/NPK bazlı maliyet, marj ve kârlılık analizi."
+                description={t('tenders.line_bazli_cost_margin_ve_karlilik_analizi')}
                 actions={
                     <>
-                        <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate(`/crm/tenders/${id}`)}>
-                            Tekrar Düzenle
-                        </Button>
+                        <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate(`/crm/tenders/${id}`)}>{t('tenders.tekrar_edit')}</Button>
                     </>
                 }
             />
 
             {/* KPI */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <KPI label="Toplam Maliyet" value={fmtMoney(
+                <KPI label={t('tenders.total_cost')} value={fmtMoney(
                     summary.financialSummary.totalMaterialCost
                     + summary.financialSummary.totalLaborCost
                     + summary.financialSummary.totalOverheadCost
                     + summary.financialSummary.totalRiskAmount
                 )} icon={<Coins size={14} />} />
-                <KPI label="Kâr Marjı" value={fmtMoney(summary.financialSummary.totalProfitMargin)} icon={<TrendingUp size={14} />} />
-                <KPI label="Ortalama Marj %" value={summary.averageMarginPercentage} icon={<Percent size={14} />} accent="text-emerald-700" />
-                <KPI label="Genel Toplam" value={fmtMoney(summary.financialSummary.grandTotal)} icon={<PieChart size={14} />} primary />
+                <KPI label={t('tenders.profit_margin')} value={fmtMoney(summary.financialSummary.totalProfitMargin)} icon={<TrendingUp size={14} />} />
+                <KPI label={t('tenders.average_margin')} value={summary.averageMarginPercentage} icon={<Percent size={14} />} accent="text-emerald-700" />
+                <KPI label={t('tenders.general_total')} value={fmtMoney(summary.financialSummary.grandTotal)} icon={<PieChart size={14} />} primary />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card title="Maliyet Bileşenleri" description="Toplam teklif tutarının bileşen dağılımı" icon={<PieChart size={13} />}>
+                <Card title={t('tenders.cost_bilesenleri')} description={t('tenders.total_tender_tutarinin_bilesen_dagilimi')} icon={<PieChart size={13} />}>
                     {breakdown.every((b) => b.value === 0) ? (
                         <EmptyState
                             icon={<PieChart size={28} />}
-                            title="Veri yok"
-                            description="Pozisyonları hesaplayın, rapor otomatik dolacak."
+                            title={t('common.noData')}
+                            description={t('tenders.satirlari_hesaplayin_report_otomatik_dolacak')}
                         />
                     ) : (
                         <div className="space-y-3">
@@ -138,19 +136,19 @@ export const TenderReport = () => {
                     )}
                 </Card>
 
-                <Card title="BKP/NPK Grup Bazlı Dağılım" description="Hangi yapı maliyet kalemine ne kadar pay gidiyor" icon={<BarChart3 size={13} />}>
+                <Card title={t('tenders.cost_grubu_dagilimi')} description={t('tenders.hangi_cost_kalemine_ne_kadar_pay_gidiyor')} icon={<BarChart3 size={13} />}>
                     {npkRows.length === 0 ? (
                         <EmptyState
                             icon={<BarChart3 size={28} />}
-                            title="NPK verisi yok"
-                            description="Pozisyonlarınıza NPK kodu ekleyin ve hesaplama yapın."
+                            title={t('tenders.group_data_not_found')}
+                            description={t('tenders.satirlari_hesaplayinca_dagilim_burada_gorunecek')}
                         />
                     ) : (
                         <div className="space-y-2.5">
                             {npkRows.map((r) => (
                                 <div key={r.code}>
                                     <div className="flex items-center justify-between text-[12px] mb-1">
-                                        <span className="font-mono text-blue-700">NPK {r.code}</span>
+                                        <span className="font-mono text-blue-700">{r.code}</span>
                                         <span className="font-mono font-semibold text-slate-800">{fmtMoney(r.value)}</span>
                                     </div>
                                     <div className="relative h-1.5 bg-slate-100 rounded overflow-hidden">
@@ -173,7 +171,7 @@ export const TenderReport = () => {
 };
 
 const KPI: React.FC<{ label: string; value: string; icon: React.ReactNode; accent?: string; primary?: boolean }> = ({ label, value, icon, accent, primary }) => (
-    <div className={`border rounded-md px-4 py-3 ${primary ? 'bg-blue-50/60 border-blue-200/60' : 'bg-white border-slate-200/70'}`}>
+    <div className={`border rounded-md px-4 py-3 ${primary ?"bg-blue-50/60 border-blue-200/60" :"bg-white border-slate-200/70"}`}>
         <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
             {icon}
             {label}
