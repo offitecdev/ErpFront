@@ -12,7 +12,7 @@ import {
     Scan as ScanLine,
     Sliders02 as SlidersHorizontal,
     SwitchHorizontal01 as ArrowRightLeft,
-} from '@untitledui/icons';
+} from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -25,12 +25,14 @@ import { useInventoryStore } from '../../store/inventoryStore';
 import { articleApi } from '../../lib/api/inventory';
 import type { MovementType, InventoryArticle } from '../../types/inventory';
 
+import { t } from '@/i18n/translate';
+
 const MOVEMENT_LABEL: Record<MovementType, string> = {
-    IN: 'Giriş',
-    OUT: 'Çıkış',
-    TRANSFER: 'Transfer',
-    RETURN: 'İade',
-    ADJUSTMENT: 'Düzeltme',
+    IN:t('dashboard.colCheckIn'),
+    OUT:t('dashboard.colCheckOut'),
+    TRANSFER:t('auto.transfer'),
+    RETURN:t('auto.iade'),
+    ADJUSTMENT:t('auto.duzeltme'),
 };
 
 const MOVEMENT_VARIANT: Record<MovementType, 'active' | 'danger' | 'info' | 'warning' | 'neutral'> = {
@@ -52,6 +54,18 @@ const MOVEMENT_ICON: Record<MovementType, React.ReactNode> = {
 const fmtNumber = (v: number) =>
     new Intl.NumberFormat('de-CH', { maximumFractionDigits: 2 }).format(v);
 
+const fmtMoney = (v: number) =>
+    new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', minimumFractionDigits: 2 }).format(v || 0);
+
+// Stok girişi yapan (maliyet taşıyabilen) hareket tipleri.
+const INBOUND_MOVEMENT_TYPES: MovementType[] = ['IN', 'RETURN', 'ADJUSTMENT'];
+
+const articleAvgCost = (a?: InventoryArticle | null) => {
+    if (!a) return 0;
+    const weighted = Number(a.weightedAverageCost ?? 0);
+    return weighted > 0 ? weighted : Number(a.baseCost || 0);
+};
+
 export const Movements = () => {
     const { locations, fetchLocations, movements, fetchMovements, scanMovement } = useInventoryStore();
 
@@ -59,6 +73,7 @@ export const Movements = () => {
         codeOrBarcode: string;
         movementType: MovementType;
         quantity: number;
+        unitCost: string;
         sourceLocationId: string;
         destLocationId: string;
         description: string;
@@ -66,6 +81,7 @@ export const Movements = () => {
         codeOrBarcode: '',
         movementType: 'IN',
         quantity: 1,
+        unitCost: '',
         sourceLocationId: '',
         destLocationId: '',
         description: '',
@@ -90,27 +106,33 @@ export const Movements = () => {
 
     const handleSubmit = async () => {
         if (!form.codeOrBarcode.trim()) {
-            toast.error('Barkod veya stok kodu girin.');
+            toast.error(t('auto.barkod_veya_stok_kodu_girin'));
             return;
         }
         if (form.quantity <= 0) {
-            toast.error('Miktar 0\'dan büyük olmalı.');
+            toast.error(t('auto.miktar_0_dan_buyuk_olmali'));
             return;
         }
 
         const movementType = form.movementType;
         if ((movementType === 'IN' || movementType === 'RETURN') && !form.destLocationId) {
-            toast.error('Giriş/İade için hedef lokasyon zorunludur.');
+            toast.error(t('auto.giris_iade_icin_hedef_lokasyon_zorunludur'));
             return;
         }
         if (movementType === 'OUT' && !form.sourceLocationId) {
-            toast.error('Çıkış için kaynak lokasyon zorunludur.');
+            toast.error(t('auto.cikis_icin_kaynak_lokasyon_zorunludur'));
             return;
         }
         if (movementType === 'TRANSFER' && (!form.sourceLocationId || !form.destLocationId)) {
-            toast.error('Transfer için kaynak ve hedef lokasyon zorunludur.');
+            toast.error(t('auto.transfer_icin_kaynak_ve_hedef_lokasyon_zorunludu'));
             return;
         }
+
+        const isInbound = INBOUND_MOVEMENT_TYPES.includes(movementType);
+        const parsedUnitCost = Number(form.unitCost.replace(',', '.'));
+        const unitCost = isInbound && form.unitCost.trim() !== '' && Number.isFinite(parsedUnitCost) && parsedUnitCost > 0
+            ? parsedUnitCost
+            : null;
 
         setSubmitting(true);
         try {
@@ -118,15 +140,20 @@ export const Movements = () => {
                 codeOrBarcode: form.codeOrBarcode.trim(),
                 movementType: form.movementType,
                 quantity: form.quantity,
+                unitCost,
                 sourceLocationId: form.sourceLocationId || null,
                 destLocationId: form.destLocationId || null,
                 description: form.description || null,
             });
-            toast.success('Stok hareketi kaydedildi.');
-            if (resolvedArticle) fetchMovements(resolvedArticle.id);
-            setForm((p) => ({ ...p, quantity: 1, description: '' }));
+            toast.success(t('auto.stok_hareketi_kaydedildi'));
+            if (resolvedArticle) {
+                fetchMovements(resolvedArticle.id);
+                // Ortalama maliyet değişmiş olabilir; güncel kartı tekrar çek.
+                articleApi.lookupByCode(form.codeOrBarcode.trim()).then(setResolvedArticle).catch(() => {});
+            }
+            setForm((p) => ({ ...p, quantity: 1, unitCost: '', description: '' }));
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Hareket başarısız.');
+            toast.error(e.response?.data?.error ||t('auto.hareket_basarisiz'));
         } finally {
             setSubmitting(false);
         }
@@ -135,20 +162,17 @@ export const Movements = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb="Stok › Hareketler"
-                title="Stok Hareketleri"
-                description="Barkod tarayarak veya manuel olarak giriş, çıkış, transfer kaydı oluşturun. Negatif stok ve yetkisiz hareket engellenir."
+                breadcrumb={t('auto.breadcrumb_movements')}
+                title={t('auto.stok_hareketleri')}
+                description={t('auto.barkod_tarayarak_veya_manuel_olarak_giris_cikis_')}
             />
 
             {locations.length === 0 && (
                 <div className="mb-4 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
                     <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
                     <div className="flex-1 text-[12.5px] text-amber-800">
-                        <span className="font-semibold">Önce bir depo / lokasyon oluşturmanız gerekiyor.</span>
-                        {' '}Stok hareketi (giriş, çıkış, transfer) kaydetmek için sistemde en az bir lokasyon tanımlanmış olmalıdır.
-                        <Link to="/inventory/locations" className="ml-2 underline font-semibold text-amber-900 hover:text-amber-700">
-                            Lokasyon Oluştur →
-                        </Link>
+                        <span className="font-semibold">{t('auto.once_bir_depo_lokasyon_olusturmaniz_gerekiyor')}</span>
+                        {' '}{t('auto.stok_hareketi_giris_cikis_transfer_kaydetmek_ici')}<Link to="/inventory/locations" className="ml-2 underline font-semibold text-amber-900 hover:text-amber-700">{t('auto.lokasyon_olustur')}</Link>
                     </div>
                 </div>
             )}
@@ -156,14 +180,14 @@ export const Movements = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 {/* Scan Form */}
                 <div className="lg:col-span-5">
-                    <Card title="Yeni Stok Hareketi" icon={<ScanLine size={13} />}>
+                    <Card title={t('auto.yeni_stok_hareketi')} icon={<ScanLine size={13} />}>
                         <div className="space-y-3">
-                            <Field label="Barkod / Stok Kodu" required>
+                            <Field label={t('auto.barkod_stok_kodu')} required>
                                 <Input
                                     value={form.codeOrBarcode}
                                     onChange={(e) => setForm({ ...form, codeOrBarcode: e.target.value })}
                                     onBlur={(e) => lookupArticle(e.target.value)}
-                                    placeholder="EAN-13 veya ART-001"
+                                    placeholder={t('auto.ean_or_article_placeholder')}
                                     autoFocus
                                 />
                             </Field>
@@ -184,7 +208,7 @@ export const Movements = () => {
                                 </div>
                             )}
 
-                            <Field label="Hareket Tipi" required>
+                            <Field label={t('auto.hareket_tipi')} required>
                                 <div className="grid grid-cols-5 gap-1.5">
                                     {(['IN', 'OUT', 'TRANSFER', 'RETURN', 'ADJUSTMENT'] as MovementType[]).map((t) => (
                                         <button
@@ -193,8 +217,8 @@ export const Movements = () => {
                                             onClick={() => setForm({ ...form, movementType: t })}
                                             className={`flex flex-col items-center gap-1 py-2 rounded text-[10.5px] font-medium border ${
                                                 form.movementType === t
-                                                    ? 'border-blue-700 bg-blue-50 text-blue-800'
-                                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                    ?"border-blue-700 bg-blue-50 text-blue-800"
+                                                    :"border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                             }`}
                                         >
                                             {MOVEMENT_ICON[t]}
@@ -204,7 +228,7 @@ export const Movements = () => {
                                 </div>
                             </Field>
 
-                            <Field label="Miktar" required>
+                            <Field label={t('common.quantity')} required>
                                 <Input
                                     type="number"
                                     step="1"
@@ -214,13 +238,29 @@ export const Movements = () => {
                                 />
                             </Field>
 
+                            {INBOUND_MOVEMENT_TYPES.includes(form.movementType) && (
+                                <Field
+                                    label={t('auto.birim_maliyet_chf')}
+                                    hint={t('auto.bu_partinin_alis_birim_maliyeti_agirlikli_ortala')}
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min={0}
+                                        value={form.unitCost}
+                                        onChange={(e) => setForm({ ...form, unitCost: e.target.value })}
+                                        placeholder={resolvedArticle ? t('auto.current_average_cost', { amount: fmtMoney(articleAvgCost(resolvedArticle)) }) :t('auto.orn_12_50')}
+                                    />
+                                </Field>
+                            )}
+
                             {(form.movementType === 'OUT' || form.movementType === 'TRANSFER') && (
-                                <Field label="Kaynak Lokasyon (Nereden)" required>
+                                <Field label={t('auto.kaynak_lokasyon_nereden')} required>
                                     <Select
                                         value={form.sourceLocationId}
                                         onChange={(e) => setForm({ ...form, sourceLocationId: e.target.value })}
                                     >
-                                        <option value="">— Seçin —</option>
+                                        <option value="">{t('auto.secin')}</option>
                                         {locations.map((l) => (
                                             <option key={l.id} value={l.id}>{l.locationName}</option>
                                         ))}
@@ -228,12 +268,12 @@ export const Movements = () => {
                                 </Field>
                             )}
                             {form.movementType === 'ADJUSTMENT' && (
-                                <Field label="Kaynak Lokasyon (Düşüş için — opsiyonel)" hint="Stok düşüşü ise doldurun">
+                                <Field label={t('auto.kaynak_lokasyon_dusus_icin_opsiyonel')} hint={t('auto.stok_dususu_ise_doldurun')}>
                                     <Select
                                         value={form.sourceLocationId}
                                         onChange={(e) => setForm({ ...form, sourceLocationId: e.target.value })}
                                     >
-                                        <option value="">— Seçilmedi —</option>
+                                        <option value="">{t('auto.secilmedi')}</option>
                                         {locations.map((l) => (
                                             <option key={l.id} value={l.id}>{l.locationName}</option>
                                         ))}
@@ -242,12 +282,12 @@ export const Movements = () => {
                             )}
 
                             {(form.movementType === 'IN' || form.movementType === 'TRANSFER' || form.movementType === 'RETURN') && (
-                                <Field label="Hedef Lokasyon (Nereye)" required>
+                                <Field label={t('auto.hedef_lokasyon_nereye')} required>
                                     <Select
                                         value={form.destLocationId}
                                         onChange={(e) => setForm({ ...form, destLocationId: e.target.value })}
                                     >
-                                        <option value="">— Seçin —</option>
+                                        <option value="">{t('auto.secin')}</option>
                                         {locations.map((l) => (
                                             <option key={l.id} value={l.id}>{l.locationName}</option>
                                         ))}
@@ -255,12 +295,12 @@ export const Movements = () => {
                                 </Field>
                             )}
                             {form.movementType === 'ADJUSTMENT' && (
-                                <Field label="Hedef Lokasyon (Artış için — opsiyonel)" hint="Stok artışı ise doldurun">
+                                <Field label={t('auto.hedef_lokasyon_artis_icin_opsiyonel')} hint={t('auto.stok_artisi_ise_doldurun')}>
                                     <Select
                                         value={form.destLocationId}
                                         onChange={(e) => setForm({ ...form, destLocationId: e.target.value })}
                                     >
-                                        <option value="">— Seçilmedi —</option>
+                                        <option value="">{t('auto.secilmedi')}</option>
                                         {locations.map((l) => (
                                             <option key={l.id} value={l.id}>{l.locationName}</option>
                                         ))}
@@ -268,12 +308,12 @@ export const Movements = () => {
                                 </Field>
                             )}
 
-                            <Field label="Not / Açıklama">
+                            <Field label={t('auto.not_aciklama')}>
                                 <Textarea
                                     rows={2}
                                     value={form.description}
                                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                    placeholder="Opsiyonel — neden, atıf, vb."
+                                    placeholder={t('auto.opsiyonel_neden_atif_vb')}
                                 />
                             </Field>
 
@@ -283,9 +323,7 @@ export const Movements = () => {
                                 loading={submitting}
                                 onClick={handleSubmit}
                                 className="w-full"
-                            >
-                                Hareketi Kaydet
-                            </Button>
+                            >{t('auto.hareketi_kaydet')}</Button>
                         </div>
                     </Card>
                 </div>
@@ -293,41 +331,42 @@ export const Movements = () => {
                 {/* History */}
                 <div className="lg:col-span-7">
                     <Card
-                        title={resolvedArticle ? `Hareket Geçmişi — ${resolvedArticle.name}` : 'Hareket Geçmişi'}
-                        description={resolvedArticle ? 'Bu ürünün tüm hareketleri ve denetim izi' : 'Soldaki formdan bir ürün seçin'}
+                        title={resolvedArticle ? t('auto.movement_history_for', { name: resolvedArticle.name }) :t('auto.hareket_gecmisi')}
+                        description={resolvedArticle ?t('auto.bu_urunun_tum_hareketleri_ve_denetim_izi') :t('auto.soldaki_formdan_bir_urun_secin')}
                         icon={<History size={13} />}
                         noPadding
                     >
                         {!resolvedArticle ? (
                             <EmptyState
                                 icon={<History size={28} />}
-                                title="Önce bir ürün seçin"
-                                description="Barkod veya stok kodunu girip Tab'a basın; geçmiş otomatik yüklenir."
+                                title={t('auto.once_bir_urun_secin')}
+                                description={t('auto.barkod_veya_stok_kodunu_girip_tab_a_basin_gecmis')}
                             />
                         ) : movements.length === 0 ? (
                             <EmptyState
                                 icon={<History size={28} />}
-                                title="Henüz hareket yok"
-                                description="Yeni hareket kaydedince burada görünecek."
+                                title={t('auto.henuz_hareket_yok')}
+                                description={t('auto.yeni_hareket_kaydedince_burada_gorunecek')}
                             />
                         ) : (
                             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                                 <table className="w-full text-[12.5px]">
                                     <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider sticky top-0">
                                         <tr>
-                                            <th className="px-3 py-2 text-left font-semibold">Tarih</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Tip</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Miktar</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Kullanıcı</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Atıf</th>
-                                            <th className="px-3 py-2 text-left font-semibold">Açıklama</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('common.date')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('auto.tip')}</th>
+                                            <th className="px-3 py-2 text-right font-semibold">{t('common.quantity')}</th>
+                                            <th className="px-3 py-2 text-right font-semibold">{t('auto.birim_maliyet')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('iam.roles.colUsers')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('auto.atif')}</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('common.description')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {movements.map((m) => (
                                             <tr key={m.id}>
                                                 <td className="px-3 py-2 text-slate-500 text-[11.5px] whitespace-nowrap">
-                                                    {dayjs(m.transactionDate).format('DD.MM.YYYY HH:mm')}
+                                                    {dayjs(m.transactionDate).format("DD.MM.YYYY HH:mm")}
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <StatusChip variant={MOVEMENT_VARIANT[m.movementType]}>
@@ -339,6 +378,9 @@ export const Movements = () => {
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800">
                                                     {fmtNumber(m.quantity)}
+                                                </td>
+                                                <td className="px-3 py-2 text-right font-mono text-[11.5px] text-slate-600">
+                                                    {m.unitCost != null && m.unitCost > 0 ? fmtMoney(m.unitCost) : '—'}
                                                 </td>
                                                 <td className="px-3 py-2 text-slate-700 text-[11.5px]">
                                                     {m.employee ? `${m.employee.firstName} ${m.employee.lastName}` : m.employeeId}

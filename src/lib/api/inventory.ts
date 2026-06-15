@@ -8,6 +8,8 @@ import type {
     PurchaseProposalRow,
     InventoryDashboard,
     MovementType,
+    SupplierRow,
+    ArticleSupplierRow,
 } from '../../types/inventory';
 
 export const inventoryApi = {
@@ -37,14 +39,20 @@ export const inventoryApi = {
     },
 
     articlesSummary: async (): Promise<ArticleStockSummary[]> => {
-        const res = await apiClient.get('/inventory/articles/summary');
-        return res.data;
+        try {
+            const res = await apiClient.get('/inventory/articles/summary');
+            return res.data;
+        } catch {
+            const res = await apiClient.get('/articles?includeStock=true');
+            return res.data;
+        }
     },
 
     scanMovement: async (input: {
         codeOrBarcode: string;
         movementType: MovementType;
         quantity: number;
+        unitCost?: number | null;
         sourceLocationId?: string | null;
         destLocationId?: string | null;
         referenceId?: string | null;
@@ -66,6 +74,45 @@ export const inventoryApi = {
 
     resolveProposal: async (id: string, isApproved: boolean): Promise<void> => {
         await apiClient.patch(`/inventory/proposals/${id}/resolve`, { isApproved });
+    },
+
+    listSuppliers: async (): Promise<SupplierRow[]> => {
+        const res = await apiClient.get('/inventory/suppliers');
+        return res.data;
+    },
+
+    getSupplier: async (id: string): Promise<SupplierRow> => {
+        const res = await apiClient.get(`/inventory/suppliers/${id}`);
+        return res.data;
+    },
+
+    createSupplier: async (input: Partial<SupplierRow>): Promise<SupplierRow> => {
+        const res = await apiClient.post('/inventory/suppliers', input);
+        return res.data;
+    },
+
+    updateSupplier: async (id: string, patch: Partial<SupplierRow>): Promise<SupplierRow> => {
+        const res = await apiClient.patch(`/inventory/suppliers/${id}`, patch);
+        return res.data;
+    },
+
+    listArticleSuppliers: async (articleId: string): Promise<ArticleSupplierRow[]> => {
+        const res = await apiClient.get(`/inventory/articles/${articleId}/suppliers`);
+        return res.data;
+    },
+
+    saveArticleSupplier: async (articleId: string, input: Partial<ArticleSupplierRow> & Partial<SupplierRow>): Promise<ArticleSupplierRow> => {
+        const res = await apiClient.post(`/inventory/articles/${articleId}/suppliers`, input);
+        return res.data;
+    },
+
+    updateArticleSupplier: async (articleId: string, linkId: string, input: Partial<ArticleSupplierRow>): Promise<ArticleSupplierRow> => {
+        const res = await apiClient.patch(`/inventory/articles/${articleId}/suppliers/${linkId}`, input);
+        return res.data;
+    },
+
+    deleteArticleSupplier: async (articleId: string, linkId: string): Promise<void> => {
+        await apiClient.delete(`/inventory/articles/${articleId}/suppliers/${linkId}`);
     },
 };
 

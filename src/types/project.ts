@@ -16,6 +16,7 @@ export interface ProjectMaterial {
     name: string;
     stockQuantity: number;
     unitCost: number;
+    imageUrl?: string | null;
     isActive: boolean;
 }
 
@@ -23,11 +24,44 @@ export interface AppointmentDto {
     id: string;
     tenantId: string;
     projectId?: string | null;
+    salesOrderId?: string | null;
+    assignedTechId?: string | null;
     customerId?: string | null;
     startTime: string;
     endTime: string;
     status: AppointmentStatus;
     notes?: string | null;
+    installationReminderSentAt?: string | null;
+    assignedTechnician?: { id: string; firstName: string; lastName: string; email?: string | null; phone?: string | null; roleName?: string | null } | null;
+    technicianAssignments?: Array<{
+        id: string;
+        appointmentId: string;
+        technicianId: string;
+        assignedAt?: string;
+        technician?: { id: string; firstName: string; lastName: string; email?: string | null; phone?: string | null; roleName?: string | null } | null;
+    }>;
+}
+
+export interface ProjectSalesOrder {
+    id: string;
+    tenantId: string;
+    customerId?: string | null;
+    tenderId?: string | null;
+    projectId?: string | null;
+    parentSalesOrderId?: string | null;
+    revisionNumber?: number | null;
+    orderNumber: string;
+    orderType: string;
+    status: string;
+    totalAmount: number;
+    createdByEmployeeId?: string;
+    createdAt: string;
+    updatedAt?: string;
+    customer?: ProjectCustomer | null;
+    tender?: ProjectDto['tender'];
+    parentSalesOrder?: { id: string; orderNumber: string } | null;
+    addonSalesOrders?: Array<{ id: string; orderNumber: string; revisionNumber?: number | null; totalAmount: number; createdAt: string }>;
+    createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
 }
 
 export interface ProjectDto {
@@ -76,11 +110,12 @@ export interface ProjectDto {
         }>;
     } | null;
     appointments?: AppointmentDto[];
+    salesOrders?: ProjectSalesOrder[];
     reports?: any[];
     expenses?: any[];
     projectVariations?: any[];
     extraMaterials?: any[];
-    _count?: { reports: number; expenses: number; projectVariations: number };
+    _count?: { reports: number; expenses: number; projectVariations: number; salesOrders?: number };
 }
 
 export interface MailSettingDto {

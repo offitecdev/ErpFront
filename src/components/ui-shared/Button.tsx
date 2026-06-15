@@ -1,62 +1,80 @@
-import React, { cloneElement, isValidElement } from 'react';
-import { Button as UntitledButton } from '../base/buttons/button';
+import React from 'react';
+import { Button as AntButton } from 'antd';
+import type { ButtonType } from 'antd/es/button';
+import { cx } from '../../lib/utils/cx';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle';
-type Size = React.ComponentProps<typeof UntitledButton>['size'];
-type Color = React.ComponentProps<typeof UntitledButton>['color'];
-type IconProp = React.ComponentProps<typeof UntitledButton>['iconLeading'];
+type Size = 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
-interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color'> {
+interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color' | 'type'> {
     variant?: Variant;
-    color?: Color;
+    color?: string;
     size?: Size;
     icon?: React.ReactNode;
-    iconLeading?: IconProp;
-    iconTrailing?: IconProp;
+    iconLeading?: React.ReactNode;
+    iconTrailing?: React.ReactNode;
     loading?: boolean;
     isLoading?: boolean;
     isDisabled?: boolean;
+    showTextWhileLoading?: boolean;
+    type?: 'button' | 'submit' | 'reset';
+    htmlType?: 'button' | 'submit' | 'reset';
 }
 
-const colorMap: Record<Variant, Color> = {
-    primary: 'primary',
-    secondary: 'secondary',
-    ghost: 'tertiary',
-    danger: 'primary-destructive',
-    subtle: 'secondary',
+const typeMap: Record<Variant, { type: ButtonType; danger?: boolean }> = {
+    primary: { type: 'primary' },
+    secondary: { type: 'default' },
+    ghost: { type: 'text' },
+    danger: { type: 'primary', danger: true },
+    subtle: { type: 'default' },
 };
 
-const withDataIcon = (icon: IconProp | React.ReactNode, position: 'leading' | 'trailing'): IconProp | React.ReactNode => {
-    if (!isValidElement(icon)) return icon;
-
-    return cloneElement(icon as React.ReactElement<{ 'data-icon'?: string }>, {
-        'data-icon': position,
-    });
+const sizeMap: Record<Size, 'small' | 'middle' | 'large'> = {
+    sm: 'small',
+    md: 'middle',
+    lg: 'large',
+    xl: 'large',
+    '2xl': 'large',
 };
 
 export const Button: React.FC<ButtonProps> = ({
     variant = 'primary',
-    color,
     size = 'md',
     icon,
     iconLeading,
     iconTrailing,
     loading,
     isLoading,
+    showTextWhileLoading: _showTextWhileLoading,
     children,
     disabled,
     isDisabled,
+    type: legacyType,
+    htmlType,
+    color: _color,
+    className,
+    style,
     ...rest
-}) => (
-    <UntitledButton
-        {...rest}
-        color={color ?? colorMap[variant]}
-        size={size}
-        iconLeading={withDataIcon(iconLeading ?? icon, 'leading') as IconProp}
-        iconTrailing={withDataIcon(iconTrailing, 'trailing') as IconProp}
-        isDisabled={isDisabled ?? disabled}
-        isLoading={isLoading ?? loading}
-    >
-        {children}
-    </UntitledButton>
-);
+}) => {
+    const { type, danger } = typeMap[variant];
+    const antSize = sizeMap[size] || 'middle';
+    const leadingIcon = iconLeading ?? icon;
+
+    return (
+        <AntButton
+            {...rest}
+            type={type}
+            danger={danger}
+            size={antSize}
+            icon={leadingIcon}
+            loading={isLoading ?? loading}
+            disabled={isDisabled ?? disabled}
+            htmlType={htmlType ?? legacyType ?? 'button'}
+            className={cx('transition-all duration-150 active:translate-y-px', className)}
+            style={style}
+        >
+            {children}
+            {iconTrailing && <span className="ant-btn-icon" style={{ marginInlineStart: children ? 8 : 0 }}>{iconTrailing}</span>}
+        </AntButton>
+    );
+};

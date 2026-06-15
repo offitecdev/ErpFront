@@ -1,17 +1,25 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowRight, Mail01 } from '@untitledui/icons';
+import { useTranslation } from 'react-i18next';
+import { ArrowRight, Mail01 } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
-import { Button } from '@/components/base/buttons/button';
-import { Input } from '@/components/base/input/input';
+import { Input as AntInput } from 'antd';
+import { Button } from '@/components/ui-shared/Button';
+import { LanguageSwitcher } from '@/components/ui-shared/LanguageSwitcher';
 import offitecLogo from '../assets/images/offitec.png';
 import { apiClient } from '../lib/axios';
 import { useAuthStore } from '../store/authStore';
 
-const DemoNotice = () => (
-    <p className="mt-6 text-center text-xs leading-5 text-tertiary">
-        Bu Offitec ERP web uygulamasının demo sürümüdür. İzinsiz çoğaltılması veya kullanılması yasaktır.
-    </p>
-);
+import { t as i18nT } from '@/i18n/translate';
+
+const DemoNotice = () => {
+    const { t } = useTranslation();
+
+    return (
+        <p className="mt-6 text-center text-xs leading-5 text-tertiary">
+            {t('auth.demoNotice')}
+        </p>
+    );
+};
 
 const ArtworkPanel = () => (
     <aside className="hidden min-h-screen items-stretch justify-end bg-white lg:flex">
@@ -64,6 +72,7 @@ const ArtworkPanel = () => (
 );
 
 export const Login = () => {
+    const { t } = useTranslation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -74,7 +83,7 @@ export const Login = () => {
         e.preventDefault();
 
         if (!email || !password) {
-            toast.error('Please enter your email and password.');
+            toast.error(t('auth.errorEmpty'));
             return;
         }
 
@@ -84,14 +93,14 @@ export const Login = () => {
             const { token, employee } = response.data;
 
             if (!token || !employee) {
-                throw new Error(response.data?.error || response.data?.message || 'Sign in response is missing required data.');
+                throw new Error(response.data?.error || response.data?.message || t('auth.errorMissingData'));
             }
 
             login(token, employee);
             await fetchProfile();
-            toast.success('Signed in successfully.');
+            toast.success(t('auth.successLogin'));
         } catch (error: any) {
-            toast.error(error.response?.data?.error || error.response?.data?.message || error.message || 'Invalid sign in details.');
+            toast.error(error.response?.data?.error || error.response?.data?.message || error.message || t('auth.errorInvalid'));
         } finally {
             setLoading(false);
         }
@@ -100,49 +109,53 @@ export const Login = () => {
     return (
         <main className="grid min-h-screen bg-white text-primary lg:grid-cols-[minmax(0,1fr)_minmax(540px,50vw)]">
             <section className="flex min-h-screen flex-col px-6 py-6 sm:px-10 lg:px-12 xl:px-16">
-                <header className="flex items-center">
+                <header className="flex items-center justify-between">
                     <img src={offitecLogo} alt="Offitec ERP" className="h-10 w-auto object-contain" />
+                    <LanguageSwitcher />
                 </header>
 
                 <div className="flex flex-1 items-center justify-center py-12">
                     <div className="w-full max-w-[360px]">
                         <div className="mb-8">
-                            <h1 className="text-display-xs font-semibold tracking-tight text-primary">Sign in</h1>
-                            <p className="mt-2 text-sm text-tertiary">Welcome back to your workspace.</p>
+                            <h1 className="text-display-xs font-semibold tracking-tight text-primary">{t('auth.signIn')}</h1>
+                            <p className="mt-2 text-sm text-tertiary">{t('auth.welcome')}</p>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5">
-                            <Input
-                                label="Email"
-                                type="email"
-                                value={email}
-                                onChange={setEmail}
-                                placeholder="name@offitec.ch"
-                                size="lg"
-                                icon={Mail01}
-                                isRequired
-                            />
+                            <label className="flex flex-col gap-1.5">
+                                <span className="text-sm font-medium text-secondary">{t('auth.email')}</span>
+                                <AntInput
+                                    type="email"
+                                    value={email}
+                                    onChange={(event) => setEmail(event.target.value)}
+                                    placeholder={t('auth.emailPlaceholder')}
+                                    size="large"
+                                    prefix={<Mail01 size={16} />}
+                                    required
+                                />
+                            </label>
 
-                            <Input
-                                label="Password"
-                                type="password"
-                                value={password}
-                                onChange={setPassword}
-                                placeholder="Enter your password"
-                                size="lg"
-                                isRequired
-                            />
+                            <label className="flex flex-col gap-1.5">
+                                <span className="text-sm font-medium text-secondary">{t('auth.password')}</span>
+                                <AntInput.Password
+                                    value={password}
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    placeholder={t('auth.passwordPlaceholder')}
+                                    size="large"
+                                    required
+                                />
+                            </label>
 
                             <Button
                                 type="submit"
                                 size="lg"
                                 color="primary"
                                 className="w-full bg-[#1a2361] shadow-[0_8px_18px_rgba(26,35,97,0.18)] hover:bg-[#272f67]"
-                                iconTrailing={ArrowRight}
+                                iconTrailing={<ArrowRight size={16} />}
                                 isLoading={loading}
                                 showTextWhileLoading
                             >
-                                Sign in
+                                {t('auth.signIn')}
                             </Button>
                         </form>
 
@@ -151,8 +164,8 @@ export const Login = () => {
                 </div>
 
                 <footer className="flex flex-col gap-2 text-xs text-quaternary sm:flex-row sm:items-center sm:justify-between">
-                    <span>Offitec ERP {new Date().getFullYear()}</span>
-                    <span>help@offitec.ch</span>
+                    <span>{i18nT('auto.offitec_erp')}{new Date().getFullYear()}</span>
+                    <span>{t('auth.helpEmail')}</span>
                 </footer>
             </section>
 

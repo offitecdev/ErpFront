@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Container, HelpCircle, LayersTwo01, LogOut01, Moon01, Settings01, User01 } from "@untitledui/icons";
+import { Container, HelpCircle, LayersTwo01, LogOut01, Moon01, Settings01, User01 } from "@/components/icons/antIconCompat";
 import type { Selection } from "react-aria-components";
 import { Button as AriaButton, SubmenuTrigger } from "react-aria-components";
 import { Avatar } from "@/components/base/avatar/avatar";

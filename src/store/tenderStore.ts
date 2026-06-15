@@ -48,8 +48,9 @@ interface TenderState {
     logs: TenderChangeLog[];
     fetchLogs: (tenderId: string) => Promise<void>;
 
-    createTender: (input: { customerId: string; tenderNumber: string; format: TenderFormat; validUntil?: string | null }) => Promise<TenderListItem>;
+    createTender: (input: { customerId?: string | null; tenderNumber: string; format: TenderFormat; validUntil?: string | null }) => Promise<TenderListItem>;
     importTender: (input: { customerId: string; xmlContent: string; format: TenderFormat }) => Promise<TenderListItem>;
+    importSalesOrderCsv: (input: { csvContent: string; fileName?: string | null }) => Promise<TenderListItem | null>;
     deleteTender: (id: string) => Promise<void>;
     addPosition: (tenderId: string, p: Partial<PositionDto>) => Promise<void>;
     updatePosition: (tenderId: string, positionId: string, patch: {
@@ -62,6 +63,9 @@ interface TenderState {
         taxRate?: number | null;
         imageUrl?: string | null;
         npkCode?: string | null;
+        rowType?: string;
+        sourceArticleId?: string | null;
+        displayOrder?: number;
     }) => Promise<void>;
     saveCalculation: (tenderId: string, positionId: string, cost: CostInput) => Promise<void>;
     approveTender: (id: string) => Promise<void>;
@@ -122,7 +126,7 @@ export const useTenderStore = create<TenderState>((set, get) => ({
     fetchDetail: async (id, silent = false) => {
         if (!silent) set({ loadingDetail: true });
         try {
-            const detail = await tenderApi.getById(id);
+            const detail = await tenderApi.getById(id, { includeImages: true });
             set({ detail });
         } finally {
             if (!silent) set({ loadingDetail: false });
@@ -197,6 +201,12 @@ export const useTenderStore = create<TenderState>((set, get) => ({
 
     importTender: async (input) => {
         const res = await tenderApi.importXml(input);
+        await get().fetchList();
+        return res.tender;
+    },
+
+    importSalesOrderCsv: async (input) => {
+        const res = await tenderApi.importSalesOrderCsv(input);
         await get().fetchList();
         return res.tender;
     },

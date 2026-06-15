@@ -1,13 +1,13 @@
 import type { FC, HTMLAttributes, MouseEventHandler, ReactNode } from "react";
-import { ChevronDown, Share04 } from "@untitledui/icons";
+import { ChevronDown, Share04 } from "@/components/icons/antIconCompat";
 import { Link as AriaLink } from "react-aria-components";
 import { Badge } from "@/components/base/badges/badges";
 import { cx, sortCx } from "@/lib/utils/cx";
 
 const styles = sortCx({
-    root: "group/item relative flex min-h-9 w-full cursor-pointer items-center rounded-lg bg-primary outline-focus-ring transition duration-100 ease-linear select-none hover:bg-brand-primary_alt hover:text-brand-secondary focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2",
+    root: "group/item relative flex min-h-9 w-full cursor-pointer items-center rounded-r-full rounded-l-xl bg-transparent outline-focus-ring transition duration-100 ease-linear select-none hover:bg-slate-200/70 hover:text-[#1f2654] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-2",
     rootSelected:
-        "bg-utility-brand-100 text-brand-secondary shadow-none ring-0 outline-0 outline-none hover:bg-utility-brand-100 focus:outline-none focus-visible:outline-0 focus-visible:outline-none focus-visible:ring-0",
+        "bg-[#d3e3fd] text-[#1f2654] shadow-none ring-0 outline-0 outline-none hover:bg-[#d3e3fd] focus:outline-none focus-visible:outline-0 focus-visible:outline-none focus-visible:ring-0",
 });
 
 interface NavItemBaseProps {
@@ -31,15 +31,18 @@ interface NavItemBaseProps {
     onClick?: MouseEventHandler;
     /** Content to display. */
     children?: ReactNode;
+    /** Whether the desktop sidebar is pinned open. */
+    sidebarExpanded?: boolean;
 }
 
-export const NavItemBase = ({ current, type, badge, href, icon: Icon, children, truncate = true, onClick, open }: NavItemBaseProps) => {
+export const NavItemBase = ({ current, type, badge, href, icon: Icon, children, truncate = true, onClick, open, sidebarExpanded = false }: NavItemBaseProps) => {
     const iconElement = Icon && (
         <Icon
             aria-hidden="true"
             className={cx(
-                "mr-2 size-5 shrink-0 text-fg-quaternary transition-inherit-all group-hover/item:text-fg-quaternary_hover",
-                current && "text-fg-brand-primary",
+                "mr-2 size-5 shrink-0 text-slate-600 transition-inherit-all group-hover/item:text-[#1f2654]",
+                !sidebarExpanded && "lg:mr-0 lg:group-hover/sidebar:mr-2",
+                current && "text-[#1f2654]",
             )}
         />
     );
@@ -56,9 +59,10 @@ export const NavItemBase = ({ current, type, badge, href, icon: Icon, children, 
     const labelElement = (
         <span
             className={cx(
-                "flex-1 text-sm font-semibold text-secondary transition-inherit-all group-hover/item:text-secondary_hover",
+                "flex-1 text-sm font-semibold text-slate-700 transition-inherit-all group-hover/item:text-[#1f2654]",
+                !sidebarExpanded && "lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:group-hover/sidebar:max-w-48 lg:group-hover/sidebar:opacity-100",
                 truncate && "truncate",
-                current && "text-brand-secondary",
+                current && "text-[#1f2654]",
             )}
         >
             {children}
@@ -84,7 +88,11 @@ export const NavItemBase = ({ current, type, badge, href, icon: Icon, children, 
 
                 <ChevronDown
                     aria-hidden="true"
-                    className={cx("ml-3 size-4 shrink-0 stroke-[2.5px] text-fg-quaternary transition-transform", open && "rotate-180")}
+                    className={cx(
+                        "ml-3 size-4 shrink-0 stroke-[2.5px] text-slate-500 transition-all",
+                        !sidebarExpanded && "lg:ml-0 lg:w-0 lg:opacity-0 lg:group-hover/sidebar:ml-3 lg:group-hover/sidebar:w-4 lg:group-hover/sidebar:opacity-100",
+                        open && "rotate-180",
+                    )}
                 />
             </button>
         );
@@ -96,7 +104,12 @@ export const NavItemBase = ({ current, type, badge, href, icon: Icon, children, 
                 href={href!}
                 target={isExternal ? "_blank" : "_self"}
                 rel="noopener noreferrer"
-                className={cx("py-2 pr-3 pl-9", styles.root, current && styles.rootSelected)}
+                className={cx(
+                    "py-2 pr-3 pl-9",
+                    styles.root,
+                    current && styles.rootSelected,
+                    href?.startsWith('#regie') && "opacity-40 pointer-events-none cursor-not-allowed"
+                )}
                 onClick={onClick}
                 aria-current={current ? "page" : undefined}
             >
@@ -112,7 +125,7 @@ export const NavItemBase = ({ current, type, badge, href, icon: Icon, children, 
             href={href!}
             target={isExternal ? "_blank" : "_self"}
             rel="noopener noreferrer"
-            className={cx("group/item p-2", styles.root, current && styles.rootSelected)}
+            className={cx("group/item p-2", styles.root, current && styles.rootSelected, href?.startsWith('#regie') && "opacity-40 pointer-events-none cursor-not-allowed")}
             onClick={onClick}
             aria-current={current ? "page" : undefined}
         >

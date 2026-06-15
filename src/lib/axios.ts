@@ -6,10 +6,9 @@ const defaultApiUrl = import.meta.env.DEV
     : 'https://demo.offitec.ch/backend/api/v1';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
-const isLocalApiUrl = configuredApiUrl && /(^https?:\/\/)?(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(configuredApiUrl);
 
 export const apiClient = axios.create({
-    baseURL: import.meta.env.DEV || !isLocalApiUrl ? configuredApiUrl || defaultApiUrl : defaultApiUrl,
+    baseURL: configuredApiUrl || defaultApiUrl,
 });
 
 // Request Interceptor: Token'ı ekle

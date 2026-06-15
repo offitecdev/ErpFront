@@ -19,16 +19,18 @@ export interface TenderPdfData {
     createdByName?: string | null;
     activities?: Array<{ activityType: string; description?: string | null; activityDate: string; employeeName?: string | null }>;
     positions: Array<{
-        positionNumber: string;
+        rowKey?: string;
         shortDescription: string;
         longDescription?: string | null;
-        quantity: number;
+        rowType?: string;
+        quantity?: number;
         unit?: string | null;
         npkCode?: string | null;
         imageUrl?: string | null;
         unitPrice?: number;
         discount?: number;
         taxRate?: number;
+        lineTotal?: number;
         total?: number;
         isParent?: boolean;
         isTopLevel?: boolean;
@@ -65,7 +67,7 @@ const COL = {
 const ROW_PADDING = 2.4;      // İçerik ile ayırıcılar arasında daha ferah boşluk
 const ROW_MIN_HEIGHT = 7;     // Satırların minimum yüksekliği modern görünüm için genişletildi
 const TEXT_LINE_HEIGHT = 4.2; // Satır arası yüksekliği okunabilir tutuldu
-const ROW_GAP = 2.8;          // Ürünler/pozisyonlar arasında net boşluk
+const ROW_GAP = 2.8;          // Ürünler/satırlar arasında net boşluk
 const IMG_SIZE = 20;          // İmaj boyutu optimize edildi
 const TITLE_IMAGE_GAP = 2.6;
 const IMAGE_DESCRIPTION_GAP = 4.0;
@@ -268,23 +270,67 @@ function drawTableHeader(doc: jsPDF, y: number) {
     doc.line(20, y + 2, 195, y + 2); // Alt çizgi
 }
 
+function rowVisualMeta(pos: TenderPdfData['positions'][number]) {
+    const rowType = (pos.rowType || 'SECTION').toUpperCase();
+    const rawLevel = pos.hierarchyLevel ?? (pos.isTopLevel ? 1 : 2);
+    const level = Math.max(0, rawLevel - 1);
+    const indent = Math.min(level * 4, 18);
+
+    if (rowType === 'TITLE') {
+        const topTitle = pos.isTopLevel || level === 0;
+        return {
+            rowType,
+            indent,
+            titleFontSize: topTitle ? 10.5 : 9.4,
+            titleLineHeight: topTitle ? 4.8 : 4.3,
+            titleStyle: 'bold' as const,
+            longFontSize: 8.5,
+        };
+    }
+
+    if (rowType === 'DESCRIPTION') {
+        return {
+            rowType,
+            indent,
+            titleFontSize: 8.7,
+            titleLineHeight: 4,
+            titleStyle: 'normal' as const,
+            longFontSize: 8.3,
+        };
+    }
+
+    return {
+        rowType,
+        indent,
+        titleFontSize: 9,
+        titleLineHeight: TEXT_LINE_HEIGHT,
+        titleStyle: 'bold' as const,
+        longFontSize: 8.5,
+    };
+}
+
 function measureRow(doc: jsPDF, pos: TenderPdfData['positions'][number]): number {
     if (pos.isSectionSubtotal) return 10;
 
-    const descW = COL.descRight - COL.descLeft;
+    const meta = rowVisualMeta(pos);
+    const descX = COL.descLeft + meta.indent;
+    const descW = COL.descRight - descX;
     
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFont('helvetica', meta.titleStyle);
+    doc.setFontSize(meta.titleFontSize);
     const shortLines = doc.splitTextToSize(normalizePdfText(pos.shortDescription || ''), descW);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     const plainLong = pos.longDescription
-        ? normalizePdfText(pos.longDescription).replace(/\*\*(.+?)\*\*/g, '$1').replace(/_(.+?)_/g, '$1')
+        ? normalizePdfText(pos.longDescription)
+            .split(/\r?\n/)
+            .map(plainMarkdownLine)
+            .join('\n')
         : '';
     const longLines = plainLong ? doc.splitTextToSize(plainLong, descW) : [];
 
-    const titleHeight = shortLines.length * TEXT_LINE_HEIGHT;
+    const titleHeight = shortLines.length * meta.titleLineHeight;
     const imageBlockHeight = pos.imageUrl ? TITLE_IMAGE_GAP + IMG_SIZE : 0;
     const descriptionGap = longLines.length > 0 ? (pos.imageUrl ? IMAGE_DESCRIPTION_GAP : TITLE_DESCRIPTION_GAP) : 0;
     const descriptionHeight = longLines.length > 0 ? longLines.length * 3.9 : 0;
@@ -332,6 +378,15 @@ function normalizePdfText(text: string): string {
         .trim();
 }
 
+function plainMarkdownLine(line: string): string {
+    return line
+        .trimStart()
+        .replace(/^#{1,2}\s+/, '')
+        .replace(/^- /, '')
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/_(.+?)_/g, '$1');
+}
+
 function drawMarkdownText(
     doc: jsPDF,
     rawText: string,
@@ -350,18 +405,20 @@ function drawMarkdownText(
         if (!rawLine.trim()) { cy += lineHeight * 0.5; continue; } // Boş satırlarda sadece yarım boşluk
 
         const trimmed = rawLine.trimStart();
+        const heading = trimmed.match(/^(#{1,2})\s+(.*)$/);
+        const headingLevel = heading ? (heading[1]?.length === 1 ? 1 : 2) : 0;
         const isBullet = trimmed.startsWith('- ');
-        const style = /\*\*(.+?)\*\*/.test(rawLine) ? 'bold' : /_(.+?)_/.test(rawLine) ? 'italic' : 'normal';
-        
-        const cleaned = trimmed.replace(/^- /, '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/_(.+?)_/g, '$1');
+        const cleaned = heading ? plainMarkdownLine(heading[2] ?? '') : plainMarkdownLine(trimmed);
         const text = `${isBullet ? '• ' : ''}${cleaned}`;
-        
-        doc.setFont('helvetica', style);
+
+        doc.setFont('helvetica', headingLevel > 0 ? 'bold' : 'normal');
+        doc.setFontSize(headingLevel === 1 ? fontSize + 1.4 : headingLevel === 2 ? fontSize + 0.8 : fontSize);
         const lines = doc.splitTextToSize(text, maxW - (isBullet ? 2 : 0));
         doc.text(lines, x + (isBullet ? 2 : 0), cy);
-        cy += Math.max(1, lines.length) * lineHeight;
+        cy += Math.max(1, lines.length) * (headingLevel > 0 ? lineHeight + 0.5 : lineHeight);
     }
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
     return cy;
 }
 
@@ -379,17 +436,18 @@ function drawRow(
     const rowEnd = y + rowH;
     let textY = y + ROW_PADDING + 2.5;
 
-    const descX = COL.descLeft;
+    const meta = rowVisualMeta(pos);
+    const descX = COL.descLeft + meta.indent;
     const descW = COL.descRight - descX;
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFont('helvetica', meta.titleStyle);
+    doc.setFontSize(meta.titleFontSize);
     doc.setTextColor(...COLOR_TEXT);
     const shortText = normalizePdfText(pos.shortDescription || '');
     const shortLines = doc.splitTextToSize(shortText, descW);
     doc.text(shortLines, descX, textY);
 
-    let descCursor = textY + (shortLines.length * TEXT_LINE_HEIGHT);
+    let descCursor = textY + (shortLines.length * meta.titleLineHeight);
 
     if (pos.imageUrl) {
         descCursor += TITLE_IMAGE_GAP;
@@ -402,7 +460,7 @@ function drawRow(
     
     if (pos.longDescription) {
         descCursor += pos.imageUrl ? IMAGE_DESCRIPTION_GAP : TITLE_DESCRIPTION_GAP;
-        descCursor = drawMarkdownText(doc, pos.longDescription, descX, descCursor, descW, 8.5, 3.9, COLOR_TEXT);
+        descCursor = drawMarkdownText(doc, pos.longDescription, descX, descCursor, descW, meta.longFontSize, 3.9, COLOR_TEXT);
     }
 
     // Rakamların Hizalaması (Açıklamanın ilk satırı ile hizalı)
@@ -417,25 +475,27 @@ function drawRow(
     const unitPrice = pos.unitPrice ?? 0;
     const discount = pos.discount ?? 0;
     const taxRate = pos.taxRate ?? 0;
-    const total = pos.total ?? qty * unitPrice * (1 - discount / 100);
+    const fallbackLineTotal = qty * unitPrice * (1 - discount / 100) * (1 + (taxRate || 8.1) / 100);
+    const hasOwnAmount = (pos.lineTotal ?? 0) > 0 || (qty > 0 && unitPrice > 0);
+    const total = pos.lineTotal ?? (!pos.isParent ? (pos.total ?? fallbackLineTotal) : 0);
 
-    const qtyText = pos.isParent ? '' : (qty > 0 ? `${String(Math.round(qty))}${unit ? ' ' + unit : ''}` : '—');
-    const unitPriceText = pos.isParent ? '' : (unitPrice > 0 ? fmt(unitPrice) : '—');
-    const discountText = pos.isParent ? '' : (discount > 0 ? `${fmtNumber(discount, 1)}%` : '');
-    const taxRateText = pos.isParent ? '' : fmtVatRate(taxRate || 8.1);
+    const qtyText = hasOwnAmount ? (qty > 0 ? `${String(Math.round(qty))}${unit ? ' ' + unit : ''}` : '—') : '';
+    const unitPriceText = hasOwnAmount ? (unitPrice > 0 ? fmt(unitPrice) : '—') : '';
+    const discountText = hasOwnAmount && discount > 0 ? `${fmtNumber(discount, 1)}%` : '';
+    const taxRateText = hasOwnAmount ? fmtVatRate(taxRate || 8.1) : '';
 
     doc.text(qtyText, COL.menge, numericY, { align: 'right' });
     doc.text(unitPriceText, COL.stueck, numericY, { align: 'right' });
     doc.text(discountText, COL.rabatt, numericY, { align: 'right' });
     doc.text(taxRateText, COL.steuern, numericY, { align: 'right' });
 
-    if (!pos.isParent && total > 0) {
+    if (total > 0) {
         doc.setFont('helvetica', 'bold');
         doc.text(fmt(total), COL.preis, numericY, { align: 'right' });
     }
     
     // Satır ayracı: Modern görünüm için ekstra ince ve açık renk (neredeyse görünmez)
-    if (!pos.isParent) {
+    if (!pos.isParent || hasOwnAmount) {
         doc.setDrawColor(...COLOR_BORDER);
         doc.setLineWidth(0.1);
         doc.line(20, rowEnd, 195, rowEnd);

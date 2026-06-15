@@ -1,5 +1,5 @@
 import { type ImgHTMLAttributes, type PropsWithChildren, type RefAttributes, createContext, useContext, useState } from "react";
-import { User01 } from "@untitledui/icons";
+import { User01 } from "@/components/icons/antIconCompat";
 import {
     Tag as AriaTag,
     TagGroup as AriaTagGroup,

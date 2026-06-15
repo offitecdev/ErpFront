@@ -1,5 +1,6 @@
 export type MaintenancePeriod = 'MONTHLY' | 'QUARTERLY' | 'BIANNUAL' | 'YEARLY';
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type MaintenanceAppointmentOptionStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'EXPIRED';
 
 export interface PersonLite {
     id: string;
@@ -59,7 +60,42 @@ export interface MaintenanceReportDto {
     createdAt: string;
     technician?: PersonLite;
     usedMaterials?: MaintenanceMaterialDto[];
+    expenses?: MaintenanceExpenseDto[];
     task?: MaintenanceTaskDto;
+}
+
+export interface MaintenanceTaskAssignmentDto {
+    id: string;
+    taskId: string;
+    technicianId: string;
+    assignedAt?: string;
+    createdById?: string | null;
+    technician?: PersonLite;
+}
+
+export interface MaintenanceAppointmentOptionDto {
+    id: string;
+    taskId: string;
+    token: string;
+    startTime: string;
+    endTime: string;
+    status: MaintenanceAppointmentOptionStatus;
+    sentAt?: string | null;
+    respondedAt?: string | null;
+    emailLogJson?: unknown;
+    createdAt?: string;
+    isAvailable?: boolean;
+    unavailableReason?: string | null;
+}
+
+export interface MaintenanceExpenseDto {
+    id: string;
+    taskId: string;
+    reportId?: string | null;
+    expenseType: string;
+    amount: number;
+    description?: string | null;
+    createdAt: string;
 }
 
 export interface MaintenanceTaskDto {
@@ -69,12 +105,21 @@ export interface MaintenanceTaskDto {
     alternativeTechId?: string | null;
     siteName?: string | null;
     plannedDate: string;
+    scheduledStartTime?: string | null;
+    scheduledEndTime?: string | null;
+    bookingToken?: string | null;
+    reminderSentAt?: string | null;
+    managerApprovedAt?: string | null;
+    managerApprovedById?: string | null;
     status: TaskStatus;
     assignmentHistoryJson?: unknown;
     createdAt?: string;
     updatedAt?: string;
     technician?: PersonLite | null;
     alternativeTechnician?: PersonLite | null;
+    assignments?: MaintenanceTaskAssignmentDto[];
+    appointmentOptions?: MaintenanceAppointmentOptionDto[];
+    expenses?: MaintenanceExpenseDto[];
     report?: MaintenanceReportDto | null;
     contract?: MaintenanceContractDto;
 }
@@ -83,6 +128,7 @@ export interface MaintenanceContractDto {
     id: string;
     tenantId: string;
     customerId: string;
+    contractCode?: string | null;
     title: string;
     period: MaintenancePeriod;
     startDate: string;
@@ -92,7 +138,9 @@ export interface MaintenanceContractDto {
     siteName?: string | null;
     reminderDaysBefore: number;
     notificationChannels?: unknown;
+    overtimeHourlyRate?: number;
     isActive: boolean;
+    deletedAt?: string | null;
     createdAt: string;
     updatedAt?: string;
     customer?: CustomerLite;

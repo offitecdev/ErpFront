@@ -1,11 +1,9 @@
 import React from 'react';
-import { parseDate } from '@internationalized/date';
-import type { DateValue } from 'react-aria-components';
-import { DatePicker } from '../application/date-picker/date-picker';
-import { InputBase } from '../base/input/input';
-import { Select as BaseSelect, type SelectItemType } from '../base/select/select';
-import { TextAreaBase } from '../base/textarea/textarea';
-import { cx } from '../../lib/utils/cx';
+import { Input as AntInput, Select as AntSelect, DatePicker as AntDatePicker } from 'antd';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
+
+import { t } from '@/i18n/translate';
 
 interface FieldProps {
     label: string;
@@ -17,7 +15,7 @@ interface FieldProps {
 }
 
 export const Field: React.FC<FieldProps> = ({ label, error, hint, required, children, className = '' }) => (
-    <label className={cx('flex flex-col gap-1.5', className)}>
+    <label className={`flex flex-col gap-1.5 ${className}`}>
         <span className="text-sm font-medium text-secondary">
             {label}
             {required && <span className="ml-0.5 text-error-primary">*</span>}
@@ -32,36 +30,22 @@ export const Field: React.FC<FieldProps> = ({ label, error, hint, required, chil
     </label>
 );
 
-export const inputClass =
-    'w-full rounded-lg bg-primary text-primary shadow-xs ring-1 ring-primary transition duration-100 ease-linear ring-inset placeholder:text-placeholder focus:outline-hidden focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-50';
+export const inputClass = "w-full rounded-lg bg-primary text-primary shadow-xs ring-1 ring-primary transition duration-100 ease-linear ring-inset placeholder:text-placeholder focus:outline-hidden focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-50";
 
 type SharedInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> & {
-    size?: React.ComponentProps<typeof InputBase>['size'];
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 };
 
 type SharedTextareaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'> & {
-    size?: React.ComponentProps<typeof TextAreaBase>['size'];
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 };
 
-const toDateValue = (value: SharedInputProps['value']): DateValue | null => {
-    if (typeof value !== 'string' || !value) return null;
-
-    try {
-        return parseDate(value);
-    } catch {
-        return null;
-    }
-};
-
-const emitDateChange = (
-    onChange: SharedInputProps['onChange'],
-    value: string,
-    name?: string,
-) => {
-    onChange?.({
-        target: { value, name },
-        currentTarget: { value, name },
-    } as React.ChangeEvent<HTMLInputElement>);
+const antSizeMap: Record<string, 'small' | 'middle' | 'large'> = {
+    sm: 'small',
+    md: 'middle',
+    lg: 'large',
+    xl: 'large',
+    '2xl': 'large',
 };
 
 export const Input: React.FC<SharedInputProps> = ({
@@ -76,49 +60,102 @@ export const Input: React.FC<SharedInputProps> = ({
     placeholder,
     name,
     id,
+    min,
+    max,
     ...rest
 }) => {
     if (type === 'date') {
+        const dateValue = value && typeof value === 'string' ? dayjs(value) : undefined;
+        const dateDefaultValue = defaultValue && typeof defaultValue === 'string' ? dayjs(defaultValue as string) : undefined;
+
         return (
-            <DatePicker
+            <AntDatePicker
                 id={id}
-                aria-label={rest['aria-label'] ?? placeholder ?? name ?? 'Date picker'}
-                value={toDateValue(value ?? defaultValue)}
-                onChange={(date) => emitDateChange(onChange, date?.toString() ?? '', name)}
-                placeholder={placeholder ?? 'Select date'}
-                isDisabled={disabled}
-                isRequired={required}
-                size={size}
-                className={cx('w-full [&_button]:w-full [&_button]:justify-start', className)}
+                value={dateValue}
+                defaultValue={dateDefaultValue}
+                onChange={(_date: Dayjs | null, dateString: string | null) => {
+                    const strVal = dateString ?? '';
+                    onChange?.({
+                        target: { value: strVal, name },
+                        currentTarget: { value: strVal, name },
+                    } as React.ChangeEvent<HTMLInputElement>);
+                }}
+                placeholder={placeholder ??t('auto.tarih_secin')}
+                disabled={disabled}
+                size={antSizeMap[size] || 'middle'}
+                className={className}
+                style={{ width: '100%' }}
+                minDate={min ? dayjs(min as string) : undefined}
+                maxDate={max ? dayjs(max as string) : undefined}
+                format="YYYY-MM-DD"
+            />
+        );
+    }
+
+    if (type === 'password') {
+        return (
+            <AntInput.Password
+                {...(rest as any)}
+                id={id}
+                name={name}
+                value={value as string}
+                defaultValue={defaultValue as string}
+                onChange={onChange}
+                placeholder={placeholder}
+                disabled={disabled}
+                required={required}
+                size={antSizeMap[size] || 'middle'}
+                className={className}
             />
         );
     }
 
     return (
-        <InputBase
-            {...rest}
+        <AntInput
+            {...(rest as any)}
             id={id}
             name={name}
             type={type}
-            value={value}
-            defaultValue={defaultValue}
+            value={value as string}
+            defaultValue={defaultValue as string}
             onChange={onChange}
             placeholder={placeholder}
             disabled={disabled}
-            isDisabled={disabled}
-            isRequired={required}
-            size={size}
-            inputClassName={className}
+            required={required}
+            size={antSizeMap[size] || 'middle'}
+            className={className}
+            min={min}
+            max={max}
         />
     );
 };
 
-export const Textarea: React.FC<SharedTextareaProps> = ({ className = '', disabled, required, size = 'md', ...rest }) => (
-    <TextAreaBase
-        {...rest}
+export const Textarea: React.FC<SharedTextareaProps> = ({
+    className = '',
+    disabled,
+    required,
+    size = 'md',
+    rows,
+    value,
+    defaultValue,
+    onChange,
+    placeholder,
+    name,
+    id,
+    ...rest
+}) => (
+    <AntInput.TextArea
+        {...(rest as any)}
+        id={id}
+        name={name}
+        value={value as string}
+        defaultValue={defaultValue as string}
+        onChange={onChange as any}
+        placeholder={placeholder}
         disabled={disabled}
         required={required}
-        size={size}
+        rows={rows ?? 4}
+        size={antSizeMap[size] || 'middle'}
         className={className}
     />
 );
@@ -127,7 +164,7 @@ type SharedSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'si
     value?: string | number | null;
     defaultValue?: string | number | null;
     onChange?: React.ChangeEventHandler<HTMLSelectElement>;
-    size?: React.ComponentProps<typeof BaseSelect>['size'];
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 };
 
 const optionText = (children: React.ReactNode): string => {
@@ -135,7 +172,7 @@ const optionText = (children: React.ReactNode): string => {
     return React.Children.toArray(children).map((child) => optionText(child)).join('');
 };
 
-const optionChildrenToItems = (children: React.ReactNode): SelectItemType[] =>
+const optionChildrenToItems = (children: React.ReactNode) =>
     React.Children.toArray(children)
         .filter(React.isValidElement)
         .filter((child) => child.type === 'option')
@@ -143,22 +180,11 @@ const optionChildrenToItems = (children: React.ReactNode): SelectItemType[] =>
             const props = child.props as React.OptionHTMLAttributes<HTMLOptionElement>;
             const label = optionText(props.children);
             return {
-                id: String(props.value ?? label),
+                value: String(props.value ?? label),
                 label,
-                isDisabled: Boolean(props.disabled),
+                disabled: Boolean(props.disabled),
             };
         });
-
-const emitSelectChange = (
-    onChange: SharedSelectProps['onChange'],
-    value: string,
-    name?: string,
-) => {
-    onChange?.({
-        target: { value, name },
-        currentTarget: { value, name },
-    } as React.ChangeEvent<HTMLSelectElement>);
-};
 
 export const Select: React.FC<SharedSelectProps> = ({
     className = '',
@@ -175,30 +201,30 @@ export const Select: React.FC<SharedSelectProps> = ({
     'aria-label': ariaLabel,
 }) => {
     const items = optionChildrenToItems(children);
-    const placeholder = items.find((item) => item.id === '')?.label || 'Seçiniz';
-    const selectedKey = value === undefined || value === null ? undefined : String(value);
-    const defaultSelectedKey = defaultValue === undefined || defaultValue === null ? undefined : String(defaultValue);
+    const placeholder = items.find((item) => item.value === '')?.label ||t('common.select');
+    const selectedValue = value === undefined || value === null || value === '' ? undefined : String(value);
+    const defaultSelectedValue = defaultValue === undefined || defaultValue === null || defaultValue === '' ? undefined : String(defaultValue);
 
     return (
-        <BaseSelect
+        <AntSelect
             id={id}
             aria-label={ariaLabel ?? title ?? name ?? placeholder}
-            name={name}
-            size={size}
-            className={cx(className || 'w-full')}
-            items={items}
+            value={selectedValue}
+            defaultValue={defaultSelectedValue}
+            onChange={(val: string) => {
+                onChange?.({
+                    target: { value: val ?? '', name },
+                    currentTarget: { value: val ?? '', name },
+                } as React.ChangeEvent<HTMLSelectElement>);
+            }}
             placeholder={placeholder}
-            selectedKey={selectedKey}
-            defaultSelectedKey={defaultSelectedKey}
-            isDisabled={disabled}
-            isRequired={required}
-            onSelectionChange={(key) => emitSelectChange(onChange, String(key ?? ''), name)}
-        >
-            {(item) => (
-                <BaseSelect.Item id={item.id} isDisabled={item.isDisabled}>
-                    {item.label}
-                </BaseSelect.Item>
-            )}
-        </BaseSelect>
+            disabled={disabled}
+            aria-required={required}
+            size={antSizeMap[size] || 'middle'}
+            className={className || 'w-full'}
+            style={{ width: '100%' }}
+            options={items.filter((item) => item.value !== '')}
+            allowClear
+        />
     );
 };

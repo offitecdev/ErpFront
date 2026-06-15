@@ -22,6 +22,8 @@ export interface InventoryArticle {
     name: string;
     description?: string | null;
     baseCost: number;
+    salePrice?: number;
+    defaultSupplierId?: string | null;
     unit: string;
     systemBarcode?: string | null;
     supplierBarcode?: string | null;
@@ -33,6 +35,14 @@ export interface InventoryArticle {
     criticalStockLevel: number;
     maxStockLevel?: number | null;
     lastPurchaseDate?: string | null;
+    weightedAverageCost?: number;
+    costBasisQuantity?: number;
+    costBasisValue?: number;
+    supplierCostQuantity?: number;
+    supplierCostValue?: number;
+    manualCostQuantity?: number;
+    manualCostValue?: number;
+    suppliers?: ArticleSupplierRow[];
 }
 
 export interface ArticleStockSummary extends InventoryArticle {
@@ -78,6 +88,7 @@ export interface StockMovementRow {
     articleId: string;
     movementType: MovementType;
     quantity: number;
+    unitCost?: number | null;
     sourceLocationId?: string | null;
     destinationLocationId?: string | null;
     transactionDate: string;
@@ -98,6 +109,48 @@ export interface PurchaseProposalRow {
     resolvedAt?: string | null;
     resolvedByEmpId?: string | null;
     article?: { articleCode: string; name: string; imageUrl?: string | null };
+}
+
+export interface SupplierRow {
+    id: string;
+    tenantId: string;
+    companyName: string;
+    contactName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    notes?: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+    articleSuppliers?: ArticleSupplierRow[];
+    articleCount?: number;
+    purchaseCount?: number;
+    totalPurchaseQuantity?: number;
+    totalPurchaseAmount?: number;
+    latestPurchaseDate?: string | null;
+}
+
+export interface ArticleSupplierRow {
+    id: string;
+    tenantId: string;
+    articleId: string;
+    supplierId: string;
+    locationId?: string | null;
+    supplierSku?: string | null;
+    purchasePrice: number;
+    quantity: number;
+    remainingQuantity: number;
+    currency: string;
+    lastPurchaseDate?: string | null;
+    stockMovementId?: string | null;
+    notes?: string | null;
+    isPreferred: boolean;
+    createdAt: string;
+    updatedAt: string;
+    supplier?: SupplierRow;
+    location?: Pick<InventoryLocation, 'id' | 'locationName' | 'locationType'>;
+    article?: Pick<InventoryArticle, 'id' | 'articleCode' | 'name' | 'unit' | 'baseCost' | 'imageUrl'>;
 }
 
 export interface InventoryDashboard {

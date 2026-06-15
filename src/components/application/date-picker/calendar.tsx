@@ -1,7 +1,7 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import { Fragment, useState } from "react";
 import { getLocalTimeZone, today } from "@internationalized/date";
-import { ChevronLeft, ChevronRight } from "@untitledui/icons";
+import { ChevronLeft, ChevronRight } from "@/components/icons/antIconCompat";
 import type { CalendarProps as AriaCalendarProps, DateValue } from "react-aria-components";
 import {
     Calendar as AriaCalendar,

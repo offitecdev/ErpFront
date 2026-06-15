@@ -1,5 +1,5 @@
 import { type ReactNode, type Ref, createContext, useContext } from "react";
-import { ChevronDown, ChevronUp, Minus, Plus } from "@untitledui/icons";
+import { ChevronDown, ChevronUp, Minus, Plus } from "@/components/icons/antIconCompat";
 import {
     Button as AriaButton,
     type DateFieldProps as AriaDateFieldProps,

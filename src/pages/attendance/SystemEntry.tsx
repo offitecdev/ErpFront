@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { LogOut01 as LogOut } from '@untitledui/icons';
+import { LogOut01 as LogOut } from '@/components/icons/antIconCompat';
 import { QRScanner } from '../../components/QRScanner';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../../components/ui-shared/Button';
-import { LoadingIndicator } from '@/components/application/loading-indicator/loading-indicator';
+import { Spin } from 'antd';
 
 export const SystemEntry: React.FC = () => {
+    const { t } = useTranslation();
     const { processCheckIn } = useAttendanceStore();
     const { user, logout } = useAuthStore();
     const [loading, setLoading] = useState(false);
@@ -17,9 +19,9 @@ export const SystemEntry: React.FC = () => {
         try {
             setLoading(true);
             await processCheckIn(data.trim());
-            toast.success('Giriş QR onaylandı. Mesai sayacı başladı.');
+            toast.success(t('attendance.systemEntry.successCheckin'));
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Giriş işlemi başarısız. Lütfen tekrar deneyin.');
+            toast.error(error.response?.data?.error || t('attendance.systemEntry.errorCheckin'));
         } finally {
             setLoading(false);
         }
@@ -28,9 +30,9 @@ export const SystemEntry: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center px-4">
             <div className="text-center mb-8 max-w-2xl">
-                <h1 className="text-[28px] font-bold tracking-wide">OFFITEC ERP</h1>
+                <h1 className="text-[28px] font-bold tracking-wide">{t('attendance.systemEntry.title')}</h1>
                 <p className="text-slate-400 text-[14px] mt-2">
-                    Hoş geldin, <strong className="text-white">{user?.firstName}</strong>. Mesaiye başlamak için giriş QR kodunu okutun.
+                    {t('attendance.systemEntry.greeting', { firstName: user?.firstName ?? '' })}
                 </p>
             </div>
 
@@ -40,13 +42,13 @@ export const SystemEntry: React.FC = () => {
 
             {loading && (
                 <div className="mt-5 text-[13px] font-medium text-blue-300 flex items-center gap-2">
-                    <LoadingIndicator type="line-simple" size="sm" />
-                    Sistem doğrulanıyor...
+                    <Spin size="small" />
+                    {t('attendance.systemEntry.verifying')}
                 </div>
             )}
 
             <Button variant="ghost" icon={<LogOut size={13} />} onClick={logout} className="mt-8 text-slate-400 hover:text-white hover:bg-slate-900">
-                Farklı bir hesapla giriş yap
+                {t('attendance.systemEntry.switchAccount')}
             </Button>
         </div>
     );

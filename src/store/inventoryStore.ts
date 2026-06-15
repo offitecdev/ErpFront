@@ -45,6 +45,7 @@ interface InventoryState {
         codeOrBarcode: string;
         movementType: MovementType;
         quantity: number;
+        unitCost?: number | null;
         sourceLocationId?: string | null;
         destLocationId?: string | null;
         referenceId?: string | null;

@@ -236,7 +236,7 @@
         font-size: 0.875rem;
         line-height: 1.25rem;
         font-weight: 700;
-        border-radius: 6px;
+        border-radius: 10px;
         padding: calc(var(--spacing) * 0.5) calc(var(--spacing) * 1.5);
         margin: calc(var(--spacing) * -0.5) 0px;
         background: var(--color-bg-secondary);
@@ -412,7 +412,7 @@
             font-size: 0.875rem;
             line-height: 1.25rem;
             font-weight: 700;
-            border-radius: 6px;
+            border-radius: 10px;
             padding: calc(var(--spacing) * 0.5) calc(var(--spacing) * 1.5);
             margin: calc(var(--spacing) * -0.5) 0px;
             background: var(--color-bg-secondary);

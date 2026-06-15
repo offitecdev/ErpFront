@@ -12,13 +12,15 @@ import {
     Scan as ScanLine,
     ShoppingCart01 as ShoppingCart,
     TrendDown01 as TrendingDown,
-} from '@untitledui/icons';
+} from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { useInventoryStore } from '../../store/inventoryStore';
+
+import { t } from '@/i18n/translate';
 
 const fmtMoney = (v: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);
@@ -51,17 +53,13 @@ export const InventoryDashboard = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb="Stok › Genel Bakış"
-                title="Stok Yönetim Panosu"
-                description="Tüm depo, lokasyon ve istasyon bazlı stok bakiyelerinizi tek ekrandan takip edin."
+                breadcrumb={t('inventory.dashboard.breadcrumb')}
+                title={t('inventory.dashboard.title')}
+                description={t('inventory.dashboard.description')}
                 actions={
                     <>
-                        <Button variant="secondary" icon={<ScanLine size={13} />} onClick={() => navigate('/inventory/movements')}>
-                            Hareket Tara
-                        </Button>
-                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles')}>
-                            Ürün Yönet
-                        </Button>
+                        <Button variant="secondary" icon={<ScanLine size={13} />} onClick={() => navigate('/inventory/movements')}>{t('inventory.dashboard.scanMovement')}</Button>
+                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles')}>{t('inventory.dashboard.manageProducts')}</Button>
                     </>
                 }
             />
@@ -69,29 +67,29 @@ export const InventoryDashboard = () => {
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <KpiCard
-                    label="Toplam Ürün"
+                    label={t('inventory.dashboard.totalProducts')}
                     value={dashboard.kpis.totalArticles}
-                    sub={`${dashboard.kpis.activeArticles} aktif`}
+                    sub={t('auto.active_count', { count: dashboard.kpis.activeArticles })}
                     icon={<Package size={14} />}
                 />
                 <KpiCard
-                    label="Stok Değeri"
+                    label={t('inventory.dashboard.stockValue')}
                     value={fmtMoney(dashboard.kpis.inventoryValue)}
-                    sub="CHF bazında"
+                    sub={t('inventory.dashboard.stockValueSub')}
                     icon={<Boxes size={14} />}
                     small
                 />
                 <KpiCard
-                    label="Kritik Stok"
+                    label={t('inventory.dashboard.criticalStock')}
                     value={dashboard.kpis.criticalCount}
-                    sub={`${dashboard.kpis.belowMinCount} min. altı`}
+                    sub={t('auto.below_min_count', { count: dashboard.kpis.belowMinCount })}
                     icon={<AlertTriangle size={14} />}
                     accent={dashboard.kpis.criticalCount > 0 ? 'critical' : undefined}
                 />
                 <KpiCard
-                    label="Satın Alma Önerisi"
+                    label={t('inventory.dashboard.purchaseProposal')}
                     value={dashboard.kpis.pendingProposals}
-                    sub={`${dashboard.kpis.totalLocations} lokasyon`}
+                    sub={t('auto.location_count', { count: dashboard.kpis.totalLocations })}
                     icon={<ShoppingCart size={14} />}
                     accent={dashboard.kpis.pendingProposals > 0 ? 'warning' : undefined}
                 />
@@ -101,32 +99,31 @@ export const InventoryDashboard = () => {
                 {/* Critical Stock List */}
                 <div className="lg:col-span-7">
                     <Card
-                        title="Kritik Stok Seviyesindeki Ürünler"
-                        description="Kritik eşiğin altına düşen ürünler için otomatik satın alma önerisi oluşturulur."
+                        title={t('inventory.dashboard.criticalTitle')}
+                        description={t('inventory.dashboard.criticalDesc')}
                         icon={<TrendingDown size={13} />}
                         noPadding
                         actions={
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/articles')}>
-                                Tüm ürünler <ArrowRight size={11} />
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/articles')}>{t('inventory.dashboard.allProducts')}<ArrowRight size={11} />
                             </Button>
                         }
                     >
                         {dashboard.criticalArticles.length === 0 ? (
                             <EmptyState
                                 icon={<Package size={28} />}
-                                title="Kritik seviyede ürün yok"
-                                description="Tüm ürünler güvenli stok aralığında. Tebrikler!"
+                                title={t('inventory.dashboard.noCritical')}
+                                description={t('inventory.dashboard.allSafe')}
                             />
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-[12.5px]">
                                     <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                                         <tr>
-                                            <th className="px-3 py-2 text-left font-semibold">Ürün</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Mevcut</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Kritik</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Min.</th>
-                                            <th className="px-3 py-2 text-right font-semibold">Durum</th>
+                                            <th className="px-3 py-2 text-left font-semibold">{t('auto.urun')}</th>
+                                            <th className="px-3 py-2 text-right font-semibold">{t('auto.mevcut')}</th>
+                                            <th className="px-3 py-2 text-right font-semibold">{t('auto.kritik')}</th>
+                                            <th className="px-3 py-2 text-right font-semibold">{t('auto.min')}</th>
+                                            <th className="px-3 py-2 text-right font-semibold">{t('common.status')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -150,7 +147,7 @@ export const InventoryDashboard = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-2 text-right font-mono">
-                                                        <span className={isBelowMin ? 'text-rose-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                                                        <span className={isBelowMin ?"text-rose-700 font-semibold" :"text-amber-700 font-semibold"}>
                                                             {fmtNumber(a.totalQuantity)} {a.unit}
                                                         </span>
                                                     </td>
@@ -164,12 +161,12 @@ export const InventoryDashboard = () => {
                                                         <span
                                                             className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border ${
                                                                 isBelowMin
-                                                                    ? 'bg-rose-50 text-rose-700 border-rose-200/70'
-                                                                    : 'bg-amber-50 text-amber-700 border-amber-200/70'
+                                                                    ?"bg-rose-50 text-rose-700 border-rose-200/70"
+                                                                    :"bg-amber-50 text-amber-700 border-amber-200/70"
                                                             }`}
                                                         >
                                                             <AlertTriangle size={10} />
-                                                            {isBelowMin ? 'Min. altı' : 'Kritik'}
+                                                            {isBelowMin ?t('auto.min_alti') :t('auto.kritik')}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -185,21 +182,20 @@ export const InventoryDashboard = () => {
                 {/* Right column: Proposals + Locations */}
                 <div className="lg:col-span-5 flex flex-col gap-4">
                     <Card
-                        title="Satın Alma Önerileri"
-                        description="Sistemin kritik stok yüzünden otomatik oluşturduğu öneriler."
+                        title={t('nav.purchaseProposals')}
+                        description={t('auto.sistemin_kritik_stok_yuzunden_otomatik_olusturdu')}
                         icon={<ShoppingCart size={13} />}
                         noPadding
                         actions={
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/proposals')}>
-                                Tümü <ArrowRight size={11} />
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/proposals')}>{t('common.all')}<ArrowRight size={11} />
                             </Button>
                         }
                     >
                         {dashboard.proposals.length === 0 ? (
                             <EmptyState
                                 icon={<ShoppingCart size={28} />}
-                                title="Bekleyen öneri yok"
-                                description="Otomatik öneri sistemi aktif. Kritik seviye düştükçe burada listelenir."
+                                title={t('auto.bekleyen_oneri_yok')}
+                                description={t('auto.otomatik_oneri_sistemi_aktif_kritik_seviye_dustu')}
                             />
                         ) : (
                             <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
@@ -213,8 +209,7 @@ export const InventoryDashboard = () => {
                                                 <div className="text-[10.5px] font-mono text-slate-500 mt-0.5">
                                                     {p.article?.articleCode}
                                                 </div>
-                                                <div className="text-[11px] text-slate-500 mt-1">
-                                                    Önerilen: <span className="font-mono text-slate-700">{fmtNumber(p.proposedQuantity)}</span>
+                                                <div className="text-[11px] text-slate-500 mt-1">{t('auto.onerilen')}<span className="font-mono text-slate-700">{fmtNumber(p.proposedQuantity)}</span>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col gap-1">
@@ -222,20 +217,16 @@ export const InventoryDashboard = () => {
                                                     size="sm"
                                                     variant="primary"
                                                     onClick={() => resolveProposal(p.id, true)}
-                                                >
-                                                    Onayla
-                                                </Button>
+                                                >{t('common.confirm')}</Button>
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
                                                     onClick={() => resolveProposal(p.id, false)}
-                                                >
-                                                    Reddet
-                                                </Button>
+                                                >{t('auto.reddet')}</Button>
                                             </div>
                                         </div>
                                         <div className="text-[10.5px] text-slate-400 mt-1">
-                                            {dayjs(p.createdAt).format('DD.MM.YYYY HH:mm')}
+                                            {dayjs(p.createdAt).format("DD.MM.YYYY HH:mm")}
                                         </div>
                                     </div>
                                 ))}
@@ -244,23 +235,20 @@ export const InventoryDashboard = () => {
                     </Card>
 
                     <Card
-                        title="Lokasyonlar"
+                        title={t('nav.locations')}
                         icon={<MapPin size={13} />}
                         actions={
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/locations')}>
-                                Yönet <ArrowRight size={11} />
+                            <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/locations')}>{t('auto.yonet')}<ArrowRight size={11} />
                             </Button>
                         }
                     >
                         {dashboard.locations.length === 0 ? (
                             <EmptyState
                                 icon={<Layers size={28} />}
-                                title="Lokasyon yok"
-                                description="Ana depo ekleyerek başlayın."
+                                title={t('auto.lokasyon_yok')}
+                                description={t('auto.ana_depo_ekleyerek_baslayin')}
                                 action={
-                                    <Button variant="primary" size="sm" onClick={() => navigate('/inventory/locations')}>
-                                        Lokasyon Ekle
-                                    </Button>
+                                    <Button variant="primary" size="sm" onClick={() => navigate('/inventory/locations')}>{t('auto.lokasyon_ekle')}</Button>
                                 }
                             />
                         ) : (
@@ -291,10 +279,10 @@ const KpiCard: React.FC<{
     small?: boolean;
 }> = ({ label, value, sub, icon, accent, small }) => {
     const bg = accent === 'critical'
-        ? 'bg-rose-50/60 border-rose-200/60 text-rose-900'
+        ?"bg-rose-50/60 border-rose-200/60 text-rose-900"
         : accent === 'warning'
-            ? 'bg-amber-50/60 border-amber-200/60 text-amber-900'
-            : 'bg-white border-slate-200/70 text-slate-900';
+            ?"bg-amber-50/60 border-amber-200/60 text-amber-900"
+            :"bg-white border-slate-200/70 text-slate-900";
     return (
         <div className={`border rounded-md px-4 py-3 ${bg}`}>
             <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider opacity-80">

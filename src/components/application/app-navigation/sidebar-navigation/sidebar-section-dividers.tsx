@@ -1,7 +1,6 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import { SearchLg } from "@untitledui/icons";
+import { SearchLg } from "@/components/icons/antIconCompat";
 import { Input } from "@/components/base/input/input";
-import { UntitledLogo } from "@/components/foundations/logo/untitledui-logo";
 import { MobileNavigationHeader } from "../base-components/mobile-header";
 import { NavAccountCard } from "../base-components/nav-account-card";
 import { NavList } from "../base-components/nav-list";
@@ -22,6 +21,8 @@ interface SidebarNavigationSectionDividersProps {
     searchPlaceholder?: string;
     /** Called before navigation so apps can route without a full page reload. */
     onNavigate?: (href: string, event: MouseEvent) => void;
+    /** Whether the desktop sidebar is pinned open. */
+    pinnedOpen?: boolean;
 }
 
 export const SidebarNavigationSectionDividers = ({
@@ -32,31 +33,31 @@ export const SidebarNavigationSectionDividers = ({
     footer,
     searchPlaceholder = "Search",
     onNavigate,
+    pinnedOpen = false,
 }: SidebarNavigationSectionDividersProps) => {
     const MAIN_SIDEBAR_WIDTH = 276;
+    const COLLAPSED_SIDEBAR_WIDTH = 72;
+    const visibleWidth = pinnedOpen ? MAIN_SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH;
 
     const content = (
         <aside
             style={
                 {
                     "--width": `${MAIN_SIDEBAR_WIDTH}px`,
+                    "--collapsed-width": `${COLLAPSED_SIDEBAR_WIDTH}px`,
                 } as CSSProperties
             }
-            className="flex h-full w-full max-w-full flex-col justify-between overflow-auto bg-primary pt-4 shadow-xs ring-secondary ring-inset lg:w-(--width) lg:rounded-xl lg:pt-5 lg:ring-1"
+            data-expanded={pinnedOpen ? "true" : undefined}
+            className="group/sidebar flex h-full w-full max-w-full flex-col justify-between overflow-auto bg-[#f8fafd] pt-4 transition-[width] duration-200 ease-out lg:w-(--collapsed-width) lg:pt-4 lg:hover:w-(--width) data-[expanded=true]:lg:w-(--width)"
         >
-            <div className="flex flex-col gap-5 px-4 lg:px-5">
-                {logo ?? <UntitledLogo className="h-6" />}
-
+            <div className="flex flex-col gap-4 px-4 transition-[padding] duration-200 ease-out lg:hidden">
                 {/* Mobile search input */}
                 <Input size="md" aria-label={searchPlaceholder} placeholder={searchPlaceholder} icon={SearchLg} className="md:hidden" />
-
-                {/* Desktop search input */}
-                <Input shortcut size="sm" aria-label={searchPlaceholder} placeholder={searchPlaceholder} icon={SearchLg} className="max-md:hidden" />
             </div>
 
-            <NavList activeUrl={activeUrl} items={items} onNavigate={onNavigate} />
+            <NavList activeUrl={activeUrl} items={items} onNavigate={onNavigate} expanded={pinnedOpen} />
 
-            <div className="mt-auto flex flex-col gap-5 px-2 py-4 lg:gap-6 lg:px-4 lg:py-4">
+            <div className="mt-auto flex flex-col gap-5 px-2 py-4 transition-[padding] duration-200 ease-out lg:gap-6 lg:px-3 lg:py-4 lg:group-hover/sidebar:px-4 lg:group-data-[expanded=true]/sidebar:px-4">
                 {footer ?? <NavAccountCard />}
             </div>
         </aside>
@@ -68,12 +69,12 @@ export const SidebarNavigationSectionDividers = ({
             <MobileNavigationHeader logo={mobileLogo ?? logo}>{content}</MobileNavigationHeader>
 
             {/* Desktop sidebar navigation */}
-            <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:py-1 lg:pl-1">{content}</div>
+            <div className="hidden lg:fixed lg:top-16 lg:bottom-0 lg:left-0 lg:z-40 lg:flex">{content}</div>
 
             {/* Placeholder to take up physical space because the real sidebar has `fixed` position. */}
             <div
                 style={{
-                    paddingLeft: MAIN_SIDEBAR_WIDTH + 4, // Add 4px to account for the padding in the sidebar wrapper
+                    paddingLeft: visibleWidth,
                 }}
                 className="invisible hidden lg:sticky lg:top-0 lg:bottom-0 lg:left-0 lg:block"
             />

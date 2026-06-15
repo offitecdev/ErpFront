@@ -1,6 +1,5 @@
 import React from 'react';
-import { BadgeWithDot } from '../base/badges/badges';
-import { cx } from '../../lib/utils/cx';
+import { Tag } from 'antd';
 
 type Variant = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger' | 'neutral' | 'order';
 
@@ -10,47 +9,45 @@ interface StatusBadgeProps {
     dot?: boolean;
 }
 
-const colorMap: Record<Variant, React.ComponentProps<typeof BadgeWithDot>['color']> = {
+const tagColorMap: Record<Variant, string> = {
     active: 'success',
-    approved: 'blue',
-    passive: 'gray',
-    info: 'brand',
+    approved: 'processing',
+    passive: 'default',
+    info: 'blue',
     warning: 'warning',
     danger: 'error',
-    neutral: 'gray',
+    neutral: 'default',
     order: 'success',
 };
 
 const chipClassMap: Record<Variant, string> = {
-    active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    approved: 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700',
-    passive: 'border-gray-200 bg-gray-50 text-gray-700',
-    info: 'border-sky-200 bg-sky-50 text-sky-700',
-    warning: 'border-yellow-200 bg-yellow-50 text-yellow-700',
-    danger: 'border-red-200 bg-red-50 text-red-700',
-    neutral: 'border-gray-200 bg-gray-50 text-gray-700',
-    order: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    active: 'bg-[#059669] text-white border-transparent',
+    approved: 'bg-[#272f67] text-white border-transparent',
+    passive: 'bg-[#64748b] text-white border-transparent',
+    info: 'bg-[#3b82f6] text-white border-transparent',
+    warning: 'bg-[#f59e0b] text-white border-transparent',
+    danger: 'bg-[#dc2626] text-white border-transparent',
+    neutral: 'bg-[#64748b] text-white border-transparent',
+    order: 'bg-[#059669] text-white border-transparent',
 };
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
     variant = 'neutral',
     children,
-    dot = true,
 }) => (
-    dot ? (
-        <BadgeWithDot type="modern" color={colorMap[variant]} size="sm">
-            {children}
-        </BadgeWithDot>
-    ) : (
-        <span className="text-sm font-medium text-secondary">{children}</span>
-    )
+    <Tag
+        color={tagColorMap[variant]}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 13 }}
+    >
+        {children}
+    </Tag>
 );
 
 export const StatusChip: React.FC<StatusBadgeProps> = ({
     variant = 'neutral',
     children,
 }) => (
-    <span className={cx('inline-flex size-max items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium shadow-xs', chipClassMap[variant])}>
+    <span className={`inline-flex size-max items-center whitespace-nowrap rounded-[13px] border px-2.5 py-0.5 text-[11px] font-semibold ${chipClassMap[variant]}`}>
         {children}
     </span>
 );

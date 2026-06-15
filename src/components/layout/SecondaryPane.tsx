@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
-import { SwitchHorizontal01 as ArrowLeftRight, X } from '@untitledui/icons';
+import { useTranslation } from 'react-i18next';
+import { SwitchHorizontal01 as ArrowLeftRight, X } from '@/components/icons/antIconCompat';
 import { useNavigate } from 'react-router-dom';
 import { useSplitView, SPLITABLE_ROUTES, type SplitablePath } from './SplitViewContext';
 import { useAuthStore } from '../../store/authStore';
@@ -33,6 +34,7 @@ const PaneFallback = () => (
 );
 
 export const SecondaryPane: React.FC = () => {
+    const { t } = useTranslation();
     const { secondaryPath, openSplit, closeSplit } = useSplitView();
     const navigate = useNavigate();
     const permissions = useAuthStore(s => s.permissions);
@@ -64,7 +66,7 @@ export const SecondaryPane: React.FC = () => {
                         {SPLITABLE_ROUTES
                             .filter(r => !r.permission || permissions.includes(r.permission))
                             .map(r => (
-                                <option key={r.path} value={r.path}>{r.label}</option>
+                                <option key={r.path} value={r.path}>{t(r.label)}</option>
                             ))}
                     </SharedSelect>
                 </div>
@@ -73,14 +75,16 @@ export const SecondaryPane: React.FC = () => {
                     <button
                         onClick={handleSwap}
                         className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-700 transition-colors"
-                        title="Pencereleri değiştir"
+                        title={t('nav.swapPanes')}
+                        aria-label={t('nav.swapPanes')}
                     >
                         <ArrowLeftRight size={14} />
                     </button>
                     <button
                         onClick={closeSplit}
                         className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-700 transition-colors"
-                        title="Bölünmüş görünümü kapat"
+                        title={t('nav.closeSplitView')}
+                        aria-label={t('nav.closeSplitView')}
                     >
                         <X size={14} />
                     </button>
@@ -100,7 +104,7 @@ export const SecondaryPane: React.FC = () => {
                             onClick={() => navigate(secondaryPath)}
                             className="hover:text-sky-600 transition-colors"
                         >
-                            Tam sayfada aç →
+                            {t('nav.openFullPage')}
                         </button>
                     </div>
                 )}

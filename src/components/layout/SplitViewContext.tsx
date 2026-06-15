@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
+import { t } from '@/i18n/translate';
+
 export type SplitablePath =
     | '/'
     | '/employees'
@@ -15,12 +17,12 @@ export interface SplitableRoute {
 }
 
 export const SPLITABLE_ROUTES: SplitableRoute[] = [
-    { path: '/', label: 'Mesai' },
-    { path: '/employees', label: 'Personel Listesi' },
-    { path: '/attendance-records', label: 'Mesai Kayıtları', permission: 'attendance.read' },
-    { path: '/attendance-settings', label: 'Mesai & QR Ayarları', permission: 'tenants.update' },
-    { path: '/roles', label: 'Rol Yönetimi' },
-    { path: '/crm/customers', label: 'Müşteri Listesi', permission: 'crm.customers.view' },
+    { path: '/', label: 'nav.attendance' },
+    { path: '/employees', label: 'nav.employeeList' },
+    { path: '/attendance-records', label: 'nav.attendanceRecords', permission: 'attendance.read' },
+    { path: '/attendance-settings', label: 'nav.attendanceQR', permission: 'tenants.update' },
+    { path: '/roles', label: 'nav.roleManagement' },
+    { path: '/crm/customers', label: 'nav.customerList', permission: 'crm.customers.view' },
 ];
 
 interface SplitViewContextValue {
@@ -63,6 +65,6 @@ export const SplitViewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
 export const useSplitView = () => {
     const ctx = useContext(SplitViewContext);
-    if (!ctx) throw new Error('useSplitView must be used within SplitViewProvider');
+    if (!ctx) throw new Error(t('auto.usesplitview_must_be_used_within_splitviewprovid'));
     return ctx;
 };

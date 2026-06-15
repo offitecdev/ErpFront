@@ -1,10 +1,11 @@
 export type TenderFormat = 'SIA451' | 'CRBX';
 export type TenderStatus = 'Draft' | 'Approved' | 'Exported';
+export type TenderRowType = 'SECTION' | 'TITLE' | 'DESCRIPTION' | 'PRODUCT' | 'CUSTOM';
 
 export interface TenderListItem {
     id: string;
     tenantId: string;
-    customerId: string;
+    customerId?: string | null;
     customerName?: string | null;
     customerAddress?: string | null;
     customerEmail?: string | null;
@@ -16,6 +17,7 @@ export interface TenderListItem {
     format: TenderFormat;
     status: TenderStatus;
     validUntil?: string | null;
+    sourceStatus?: string | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;
     offerMailRecipient?: string | null;
@@ -44,7 +46,7 @@ export interface OfferScheduleSlotDto {
     id: string;
     tenantId: string;
     tenderId: string;
-    customerId: string;
+    customerId?: string | null;
     startTime: string;
     endTime: string;
     notes?: string | null;
@@ -67,6 +69,24 @@ export interface TenderChangeLog {
     newValue?: string | null;
     description?: string | null;
     createdAt: string;
+}
+
+export interface TenderDocumentDto {
+    id: string;
+    tenantId: string;
+    relatedEntityId: string;
+    entityType: string;
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    uploadedByEmployeeId: string;
+    category?: string | null;
+}
+
+export interface TenderChatterSummary {
+    noteCount: number;
+    documentCount: number;
+    logCount: number;
 }
 
 export interface CalculationItemDto {
@@ -93,6 +113,7 @@ export interface PositionArticleMappingDto {
         name: string;
         description?: string | null;
         baseCost: number;
+        salePrice?: number | null;
         unit: string;
         imageUrl?: string | null;
     } | null;
@@ -137,6 +158,9 @@ export interface PositionDto {
     tenantId: string;
     tenderId: string;
     parentPositionId?: string | null;
+    rowType?: TenderRowType | string;
+    sourceArticleId?: string | null;
+    displayOrder?: number;
     npkCode?: string | null;
     positionNumber: string;
     shortDescription: string;
@@ -195,6 +219,7 @@ export interface ArticleDto {
     name: string;
     description?: string | null;
     baseCost: number;
+    salePrice?: number | null;
     unit: string;
 }
 

@@ -1,6 +1,6 @@
 import type { ReactNode, RefAttributes } from "react";
 import { useCallback, useRef, useState } from "react";
-import { ChevronDown, SearchLg } from "@untitledui/icons";
+import { ChevronDown, SearchLg } from "@/components/icons/antIconCompat";
 import { useFilter } from "react-aria";
 import type { Selection } from "react-aria-components";
 import {

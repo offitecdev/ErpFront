@@ -1,0 +1,1866 @@
+﻿[
+    {
+        "key":  "crm.actions",
+        "slug":  "islemler"
+    },
+    {
+        "key":  "crm.active_tenders",
+        "slug":  "aktif_teklifler"
+    },
+    {
+        "key":  "crm.additional",
+        "slug":  "ek"
+    },
+    {
+        "key":  "crm.additional_materials",
+        "slug":  "ek_malzemeler"
+    },
+    {
+        "key":  "crm.additional_order",
+        "slug":  "ek_siparis"
+    },
+    {
+        "key":  "crm.additional_order_not_found",
+        "slug":  "ek_siparis_yok"
+    },
+    {
+        "key":  "crm.additional_orders",
+        "slug":  "ek_siparisler"
+    },
+    {
+        "key":  "crm.additional_siparisleri_goster",
+        "slug":  "ek_siparisleri_goster"
+    },
+    {
+        "key":  "crm.approved_export_exported",
+        "slug":  "onayli_disa_aktarilan"
+    },
+    {
+        "key":  "crm.approved_tekliflerden_project_olusturuldugunda_burad",
+        "slug":  "onayli_tekliflerden_proje_olusturuldugunda_burad"
+    },
+    {
+        "key":  "crm.billed",
+        "slug":  "faturalandi"
+    },
+    {
+        "key":  "crm.billed",
+        "slug":  "faturalandirilan"
+    },
+    {
+        "key":  "crm.billing_durumu",
+        "slug":  "faturalandirma_durumu"
+    },
+    {
+        "key":  "crm.bu_customer_icin_no_hazirlanmis_bir_tender_bul",
+        "slug":  "bu_musteri_icin_henuz_hazirlanmis_bir_teklif_bul"
+    },
+    {
+        "key":  "crm.bu_order_icin_additional_order_bulunmuyor",
+        "slug":  "bu_siparis_icin_ek_siparis_bulunmuyor"
+    },
+    {
+        "key":  "crm.cost_info_not_found",
+        "slug":  "maliyet_bilgisi_yok"
+    },
+    {
+        "key":  "crm.cost_summary",
+        "slug":  "maliyet_ozeti"
+    },
+    {
+        "key":  "crm.crb_sia_451_standardinda_prepared_tender_data",
+        "slug":  "crb_sia_451_standardinda_hazirlanan_ihale_verile"
+    },
+    {
+        "key":  "crm.critical",
+        "slug":  "kritik"
+    },
+    {
+        "key":  "crm.customer_ait_projects",
+        "slug":  "musteriye_ait_projeler"
+    },
+    {
+        "key":  "crm.customer_ait_tenders",
+        "slug":  "musteriye_ait_teklifler"
+    },
+    {
+        "key":  "crm.customer_not_found",
+        "slug":  "musteri_yok"
+    },
+    {
+        "key":  "crm.customer_profili",
+        "slug":  "musteri_profili"
+    },
+    {
+        "key":  "crm.customer_sections",
+        "slug":  "musteri_bolumleri"
+    },
+    {
+        "key":  "crm.customer_timeline_description",
+        "slug":  "musteri_ile_gerceklestirilen_tum_temaslar_ve_ope"
+    },
+    {
+        "key":  "crm.enter_short_description",
+        "slug":  "kisa_aciklama_girin"
+    },
+    {
+        "key":  "crm.external_expenses",
+        "slug":  "harici_giderler"
+    },
+    {
+        "key":  "crm.faturalanmadi",
+        "slug":  "faturalanmadi"
+    },
+    {
+        "key":  "crm.field_reports_installation_history",
+        "slug":  "saha_raporlari_montaj_gecmisi"
+    },
+    {
+        "key":  "crm.general_total",
+        "slug":  "genel_toplam"
+    },
+    {
+        "key":  "crm.imzalandi",
+        "slug":  "imzalandi"
+    },
+    {
+        "key":  "crm.installation_steps",
+        "slug":  "montaj_asamalari"
+    },
+    {
+        "key":  "crm.internal",
+        "slug":  "ic"
+    },
+    {
+        "key":  "crm.internal_notes",
+        "slug":  "dahili_notlar"
+    },
+    {
+        "key":  "crm.internal_notes_hint",
+        "slug":  "sadece_firmaniz_icerisinde_paylasilan_notlar"
+    },
+    {
+        "key":  "crm.internal_yorum",
+        "slug":  "ic_yorum"
+    },
+    {
+        "key":  "crm.list_back",
+        "slug":  "listeye_don"
+    },
+    {
+        "key":  "crm.meeting",
+        "slug":  "meeting"
+    },
+    {
+        "key":  "crm.no_activities_yet",
+        "slug":  "henuz_aktivite_yok"
+    },
+    {
+        "key":  "crm.no_field_report_for_order",
+        "slug":  "bu_siparis_icin_henuz_saha_raporu_girilmemis"
+    },
+    {
+        "key":  "crm.no_goruntulenecek_bir_order_yet",
+        "slug":  "henuz_goruntulenecek_bir_siparis_yok"
+    },
+    {
+        "key":  "crm.no_notes_yet",
+        "slug":  "henuz_not_yok"
+    },
+    {
+        "key":  "crm.note_content",
+        "slug":  "not_icerigi"
+    },
+    {
+        "key":  "crm.note_turu",
+        "slug":  "not_turu"
+    },
+    {
+        "key":  "crm.note_yazin",
+        "slug":  "not_yazin"
+    },
+    {
+        "key":  "crm.notu_kaydet",
+        "slug":  "notu_kaydet"
+    },
+    {
+        "key":  "crm.onem",
+        "slug":  "onem"
+    },
+    {
+        "key":  "crm.order_amount",
+        "slug":  "siparis_tutari"
+    },
+    {
+        "key":  "crm.order_customer_search",
+        "slug":  "siparis_musteri_ara"
+    },
+    {
+        "key":  "crm.order_missing_or_no_access",
+        "slug":  "bu_siparis_mevcut_degil_veya_erisiminiz_yok"
+    },
+    {
+        "key":  "crm.order_no",
+        "slug":  "siparis_no"
+    },
+    {
+        "key":  "crm.order_not_found",
+        "slug":  "siparis_bulunamadi"
+    },
+    {
+        "key":  "crm.order_not_linked_to_project",
+        "slug":  "bu_siparis_bir_projeye_bagli_degil"
+    },
+    {
+        "key":  "crm.orders_yuklenemedi",
+        "slug":  "siparisler_yuklenemedi"
+    },
+    {
+        "key":  "crm.planned_budget",
+        "slug":  "planlanan_butce"
+    },
+    {
+        "key":  "crm.pozisyon",
+        "slug":  "pozisyon"
+    },
+    {
+        "key":  "crm.profil",
+        "slug":  "profil"
+    },
+    {
+        "key":  "crm.project_faz",
+        "slug":  "proje_faz"
+    },
+    {
+        "key":  "crm.project_info",
+        "slug":  "proje_bilgisi"
+    },
+    {
+        "key":  "crm.project_management_ile_ayni_detail_sayfasina_gider",
+        "slug":  "proje_yonetimi_ile_ayni_detay_sayfasina_gider"
+    },
+    {
+        "key":  "crm.project_not_found",
+        "slug":  "proje_yok"
+    },
+    {
+        "key":  "crm.record",
+        "slug":  "kayit"
+    },
+    {
+        "key":  "crm.report_not_found",
+        "slug":  "rapor_yok"
+    },
+    {
+        "key":  "crm.siparislerinizin_durumunu_izleyin_additional_siparisleri",
+        "slug":  "siparislerinizin_durumunu_izleyin_ek_siparisleri"
+    },
+    {
+        "key":  "crm.technical",
+        "slug":  "teknik"
+    },
+    {
+        "key":  "crm.technical_note",
+        "slug":  "teknik_not"
+    },
+    {
+        "key":  "crm.tender_not_found",
+        "slug":  "teklif_yok"
+    },
+    {
+        "key":  "crm.total_hacim",
+        "slug":  "toplam_hacim"
+    },
+    {
+        "key":  "crm.total_order_amount",
+        "slug":  "toplam_siparis_tutari"
+    },
+    {
+        "key":  "crm.zaman_cizelgesi",
+        "slug":  "zaman_cizelgesi"
+    },
+    {
+        "key":  "tenders.15_uzeri_fazla_work_saat_ucreti_chf",
+        "slug":  "15_uzeri_fazla_calisma_saat_ucreti_chf"
+    },
+    {
+        "key":  "tenders.action_kaydedildi",
+        "slug":  "islem_kaydedildi"
+    },
+    {
+        "key":  "tenders.action_loglari",
+        "slug":  "islem_loglari"
+    },
+    {
+        "key":  "tenders.action_tamamlanamadi",
+        "slug":  "islem_tamamlanamadi"
+    },
+    {
+        "key":  "tenders.add_istediginiz_projeyi_select",
+        "slug":  "eklemek_istediginiz_projeyi_secin"
+    },
+    {
+        "key":  "tenders.add_product_to_stock",
+        "slug":  "urunu_stoga_ekle"
+    },
+    {
+        "key":  "tenders.add_record_to_erp_product_material_catalog",
+        "slug":  "erp_urun_malzeme_kataloguna_kayit_ekleyin"
+    },
+    {
+        "key":  "tenders.add_to_existing_project",
+        "slug":  "zaten_olan_bir_projeye_eklemek_istiyorum"
+    },
+    {
+        "key":  "tenders.additional_cost",
+        "slug":  "ek_maliyet"
+    },
+    {
+        "key":  "tenders.additional_cost_opsiyonel",
+        "slug":  "ek_maliyet_opsiyonel"
+    },
+    {
+        "key":  "tenders.additional_fee",
+        "slug":  "ek_ucret"
+    },
+    {
+        "key":  "tenders.additional_file",
+        "slug":  "ek_dosya"
+    },
+    {
+        "key":  "tenders.additional_file_added",
+        "slug":  "ek_dosya_eklendi"
+    },
+    {
+        "key":  "tenders.additional_file_eklenemedi",
+        "slug":  "ek_dosya_eklenemedi"
+    },
+    {
+        "key":  "tenders.additional_mesaj",
+        "slug":  "ek_mesaj"
+    },
+    {
+        "key":  "tenders.address_info_not_found",
+        "slug":  "adres_bilgisi_yok"
+    },
+    {
+        "key":  "tenders.adet",
+        "slug":  "adet"
+    },
+    {
+        "key":  "tenders.agirlikli_average_supply_kayitlari",
+        "slug":  "agirlikli_ortalama_tedarik_kayitlari"
+    },
+    {
+        "key":  "tenders.agirlikli_average_supply_manual_stock",
+        "slug":  "agirlikli_ortalama_tedarik_manuel_stok"
+    },
+    {
+        "key":  "tenders.aksiyon",
+        "slug":  "aksiyon"
+    },
+    {
+        "key":  "tenders.alici",
+        "slug":  "alici"
+    },
+    {
+        "key":  "tenders.all_satirlari_select",
+        "slug":  "tum_satirlari_sec"
+    },
+    {
+        "key":  "tenders.all_statuler",
+        "slug":  "tum_statuler"
+    },
+    {
+        "key":  "tenders.antetli_kagit_arka_plani_yuklenmemis_pdf_varsayi",
+        "slug":  "antetli_kagit_arka_plani_yuklenmemis_pdf_varsayi"
+    },
+    {
+        "key":  "tenders.appointment",
+        "slug":  "randevu"
+    },
+    {
+        "key":  "tenders.appointment_add",
+        "slug":  "randevu_ekle"
+    },
+    {
+        "key":  "tenders.appointment_added",
+        "slug":  "randevu_eklendi"
+    },
+    {
+        "key":  "tenders.appointment_kaydedilemedi",
+        "slug":  "randevu_kaydedilemedi"
+    },
+    {
+        "key":  "tenders.appointment_not_found",
+        "slug":  "randevu_yok"
+    },
+    {
+        "key":  "tenders.appointment_saatleri",
+        "slug":  "randevu_saatleri"
+    },
+    {
+        "key":  "tenders.appointment_updated",
+        "slug":  "randevu_guncellendi"
+    },
+    {
+        "key":  "tenders.auftragsdatum",
+        "slug":  "auftragsdatum"
+    },
+    {
+        "key":  "tenders.average_margin",
+        "slug":  "ortalama_marj"
+    },
+    {
+        "key":  "tenders.barcode_info",
+        "slug":  "barkod_bilgileri"
+    },
+    {
+        "key":  "tenders.barcode_okutun_veya_yazin",
+        "slug":  "barkod_okutun_veya_yazin"
+    },
+    {
+        "key":  "tenders.baslik",
+        "slug":  "baslik"
+    },
+    {
+        "key":  "tenders.baslik_add",
+        "slug":  "baslik_ekle"
+    },
+    {
+        "key":  "tenders.baslik_veya_description_yazin",
+        "slug":  "baslik_veya_aciklama_yazin"
+    },
+    {
+        "key":  "tenders.bg_1f2654_text_white_hover_bg_1f2654_hover_text",
+        "slug":  "bg_1f2654_text_white_hover_bg_1f2654_hover_text_"
+    },
+    {
+        "key":  "tenders.bg_amber_500_text_white",
+        "slug":  "bg_amber_500_text_white"
+    },
+    {
+        "key":  "tenders.bg_blue_700_text_white",
+        "slug":  "bg_blue_700_text_white"
+    },
+    {
+        "key":  "tenders.bg_cyan_600_text_white",
+        "slug":  "bg_cyan_600_text_white"
+    },
+    {
+        "key":  "tenders.bg_emerald_50_text_emerald_900",
+        "slug":  "bg_emerald_50_text_emerald_900"
+    },
+    {
+        "key":  "tenders.bg_emerald_600_text_white",
+        "slug":  "bg_emerald_600_text_white"
+    },
+    {
+        "key":  "tenders.bg_transparent_px_0_py_0_5",
+        "slug":  "bg_transparent_px_0_py_0_5"
+    },
+    {
+        "key":  "tenders.bg_violet_600_text_white",
+        "slug":  "bg_violet_600_text_white"
+    },
+    {
+        "key":  "tenders.bilinmiyor",
+        "slug":  "bilinmiyor"
+    },
+    {
+        "key":  "tenders.bir_file_select",
+        "slug":  "bir_dosya_secin"
+    },
+    {
+        "key":  "tenders.bitis_saati_baslangictan_sonra_olmalidir",
+        "slug":  "bitis_saati_baslangictan_sonra_olmalidir"
+    },
+    {
+        "key":  "tenders.border_1f2654_25_svg_text_1f2654_60_hover_svg_te",
+        "slug":  "border_1f2654_25_svg_text_1f2654_60_hover_svg_te"
+    },
+    {
+        "key":  "tenders.border_1f2654_svg_text_1f2654",
+        "slug":  "border_1f2654_svg_text_1f2654"
+    },
+    {
+        "key":  "tenders.border_emerald_200_bg_emerald_50",
+        "slug":  "border_emerald_200_bg_emerald_50"
+    },
+    {
+        "key":  "tenders.border_emerald_300_bg_emerald_50_text_emerald_90",
+        "slug":  "border_emerald_300_bg_emerald_50_text_emerald_90"
+    },
+    {
+        "key":  "tenders.border_rose_200_bg_rose_50",
+        "slug":  "border_rose_200_bg_rose_50"
+    },
+    {
+        "key":  "tenders.border_slate_200_bg_white_text_slate_700_hover_b",
+        "slug":  "border_slate_200_bg_white_text_slate_700_hover_b"
+    },
+    {
+        "key":  "tenders.border_slate_300_bg_white_text_slate_700_transit",
+        "slug":  "border_slate_300_bg_white_text_slate_700_transit"
+    },
+    {
+        "key":  "tenders.brut",
+        "slug":  "brut"
+    },
+    {
+        "key":  "tenders.bu_action_icin_yetkiniz_not_found",
+        "slug":  "bu_islem_icin_yetkiniz_yok"
+    },
+    {
+        "key":  "tenders.bu_aktarim_csv_dosyasiyla_calisir_lutfen_csv_dos",
+        "slug":  "bu_aktarim_csv_dosyasiyla_calisir_lutfen_csv_dos"
+    },
+    {
+        "key":  "tenders.bu_field_empty_when_empty_ya_da_0_girilirse_15_uze",
+        "slug":  "bu_alan_bos_birakilirsa_ya_da_0_girilirse_15_uze"
+    },
+    {
+        "key":  "tenders.bu_fiyatlar_gorunur_ancak_tender_toplamina_dahil",
+        "slug":  "bu_fiyatlar_gorunur_ancak_teklif_toplamina_dahil"
+    },
+    {
+        "key":  "tenders.bu_product_only_bu_tender_icin_yazabilir_veya",
+        "slug":  "bu_urunu_yalnizca_bu_teklif_icin_yazabilir_veya_"
+    },
+    {
+        "key":  "tenders.bu_product_stock_card_yazilmaz_only_bu_tender",
+        "slug":  "bu_urun_stok_kartina_yazilmaz_yalnizca_bu_teklif"
+    },
+    {
+        "key":  "tenders.bu_tender_approved_prices_change_icin",
+        "slug":  "bu_teklif_onaylanmis_fiyatlari_degistirmek_icin_"
+    },
+    {
+        "key":  "tenders.bugun",
+        "slug":  "bugun"
+    },
+    {
+        "key":  "tenders.bulk_discount",
+        "slug":  "toplu_indirim"
+    },
+    {
+        "key":  "tenders.bulk_discount_applied_to_product_lines",
+        "slug":  "toplu_indirim_urun_satirlarina_islendi"
+    },
+    {
+        "key":  "tenders.bulk_discount_could_not_apply",
+        "slug":  "toplu_indirim_uygulanamadi"
+    },
+    {
+        "key":  "tenders.bulk_discount_guncellenemedi",
+        "slug":  "toplu_indirim_guncellenemedi"
+    },
+    {
+        "key":  "tenders.bulk_discount_uygulandi",
+        "slug":  "toplu_indirim_uygulandi"
+    },
+    {
+        "key":  "tenders.bulk_discount_yap",
+        "slug":  "toplu_indirim_yap"
+    },
+    {
+        "key":  "tenders.bulk_indirimi_uygula",
+        "slug":  "toplu_indirimi_uygula"
+    },
+    {
+        "key":  "tenders.bulk_silme",
+        "slug":  "toplu_silme"
+    },
+    {
+        "key":  "tenders.bullet_could_not_apply",
+        "slug":  "madde_isareti_uygulanamadi"
+    },
+    {
+        "key":  "tenders.bullet_ctrl_q_or_space",
+        "slug":  "madde_isareti_ctrl_q_veya_bosluk"
+    },
+    {
+        "key":  "tenders.cannot_import_without_csv_file",
+        "slug":  "csv_dosyasi_secilmeden_ice_aktarma_baslatilamaz"
+    },
+    {
+        "key":  "tenders.chf",
+        "slug":  "chf_chf"
+    },
+    {
+        "key":  "tenders.code_ad_ve_unit_zorunludur",
+        "slug":  "kod_ad_ve_birim_zorunludur"
+    },
+    {
+        "key":  "tenders.cost",
+        "slug":  "maliyet"
+    },
+    {
+        "key":  "tenders.cost_bilesenleri",
+        "slug":  "maliyet_bilesenleri"
+    },
+    {
+        "key":  "tenders.cost_grubu_dagilimi",
+        "slug":  "maliyet_grubu_dagilimi"
+    },
+    {
+        "key":  "tenders.cost_info_not_found",
+        "slug":  "maliyet_bilgisi_yok"
+    },
+    {
+        "key":  "tenders.cost_total_without_margin",
+        "slug":  "maliyet_toplami_marjsiz"
+    },
+    {
+        "key":  "tenders.crb_sia_451_dosyasini_import_aktarin_veya_sifirdan",
+        "slug":  "crb_sia_451_dosyasini_ice_aktarin_veya_sifirdan_"
+    },
+    {
+        "key":  "tenders.crb_sia_451_standardina_uyumlu_xml_dosyasini_sis",
+        "slug":  "crb_sia_451_standardina_uyumlu_xml_dosyasini_sis"
+    },
+    {
+        "key":  "tenders.create_new_product",
+        "slug":  "yeni_urun_olustur"
+    },
+    {
+        "key":  "tenders.create_project_or_link_existing",
+        "slug":  "yeni_proje_ac_veya_var_olan_projeye_bagla"
+    },
+    {
+        "key":  "tenders.create_tender_only_product",
+        "slug":  "yalnizca_bu_teklif_icin_urun_olustur"
+    },
+    {
+        "key":  "tenders.critical_stock",
+        "slug":  "kritik_stok"
+    },
+    {
+        "key":  "tenders.critical_threshold",
+        "slug":  "kritik_esik"
+    },
+    {
+        "key":  "tenders.csv_export",
+        "slug":  "csv_aktar"
+    },
+    {
+        "key":  "tenders.csv_file",
+        "slug":  "csv_dosyasi"
+    },
+    {
+        "key":  "tenders.csv_file_zorunludur",
+        "slug":  "csv_dosyasi_zorunludur"
+    },
+    {
+        "key":  "tenders.csv_import_aktariliyor",
+        "slug":  "csv_ice_aktariliyor"
+    },
+    {
+        "key":  "tenders.csv_import_aktarimi_basarisiz",
+        "slug":  "csv_ice_aktarimi_basarisiz"
+    },
+    {
+        "key":  "tenders.csv_uzantili_sales_order_dosyasini_select",
+        "slug":  "csv_uzantili_satis_siparisi_dosyasini_secin"
+    },
+    {
+        "key":  "tenders.ctrl_q_bosluk",
+        "slug":  "ctrl_q_bosluk"
+    },
+    {
+        "key":  "tenders.customer_adi_yazin",
+        "slug":  "musteri_adi_yazin"
+    },
+    {
+        "key":  "tenders.customer_backend_tarafindan_guncellenmedi_backend",
+        "slug":  "musteri_backend_tarafindan_guncellenmedi_backend"
+    },
+    {
+        "key":  "tenders.customer_not_found",
+        "slug":  "musteri_yok"
+    },
+    {
+        "key":  "tenders.customer_secimi_zorunludur",
+        "slug":  "musteri_secimi_zorunludur"
+    },
+    {
+        "key":  "tenders.customer_select",
+        "slug":  "musteri_secin"
+    },
+    {
+        "key":  "tenders.customer_ve_xml_content_zorunludur",
+        "slug":  "musteri_ve_xml_icerigi_zorunludur"
+    },
+    {
+        "key":  "tenders.customer_ve_xml_icerik_alanlari_doldurulmadan_import",
+        "slug":  "musteri_ve_xml_icerik_alanlari_doldurulmadan_ice"
+    },
+    {
+        "key":  "tenders.dahil_not",
+        "slug":  "dahil_degil"
+    },
+    {
+        "key":  "tenders.degisiklikleri_kaydet",
+        "slug":  "degisiklikleri_kaydet"
+    },
+    {
+        "key":  "tenders.degistir",
+        "slug":  "degistir"
+    },
+    {
+        "key":  "tenders.description",
+        "slug":  "aciklama"
+    },
+    {
+        "key":  "tenders.description_add",
+        "slug":  "aciklama_ekle"
+    },
+    {
+        "key":  "tenders.description_not_entered",
+        "slug":  "aciklama_girilmemis"
+    },
+    {
+        "key":  "tenders.description_yazin",
+        "slug":  "aciklama_yazin"
+    },
+    {
+        "key":  "tenders.discount",
+        "slug":  "indirim"
+    },
+    {
+        "key":  "tenders.discount_applies_to_selected_product_lines",
+        "slug":  "indirim_sadece_secili_urun_satirlarina_uygulanir"
+    },
+    {
+        "key":  "tenders.discount_guncellenemedi",
+        "slug":  "indirim_guncellenemedi"
+    },
+    {
+        "key":  "tenders.dun",
+        "slug":  "dun"
+    },
+    {
+        "key":  "tenders.edit_line_content",
+        "slug":  "satir_icerigini_duzenle"
+    },
+    {
+        "key":  "tenders.edit_product",
+        "slug":  "urunu_duzenle"
+    },
+    {
+        "key":  "tenders.eklenecek",
+        "slug":  "eklenecek"
+    },
+    {
+        "key":  "tenders.ekler",
+        "slug":  "ekler"
+    },
+    {
+        "key":  "tenders.empty",
+        "slug":  "bos"
+    },
+    {
+        "key":  "tenders.empty_taslak_hazirlaniyor",
+        "slug":  "bos_taslak_hazirlaniyor"
+    },
+    {
+        "key":  "tenders.export_aktarim_basarisiz",
+        "slug":  "disa_aktarim_basarisiz"
+    },
+    {
+        "key":  "tenders.export_exported",
+        "slug":  "disa_aktarilan"
+    },
+    {
+        "key":  "tenders.fazla_work_saat_ucreti_hazir",
+        "slug":  "fazla_calisma_saat_ucreti_hazir"
+    },
+    {
+        "key":  "tenders.file_okunamadi",
+        "slug":  "dosya_okunamadi"
+    },
+    {
+        "key":  "tenders.file_select",
+        "slug":  "dosya_sec"
+    },
+    {
+        "key":  "tenders.fixed_kdv_orani",
+        "slug":  "sabit_kdv_orani"
+    },
+    {
+        "key":  "tenders.fixed_rate_applies_to_each_product",
+        "slug":  "sabit_oran_her_urune_uygulanir"
+    },
+    {
+        "key":  "tenders.format",
+        "slug":  "format"
+    },
+    {
+        "key":  "tenders.gecerlilik",
+        "slug":  "gecerlilik"
+    },
+    {
+        "key":  "tenders.gecerlilik_tarihi",
+        "slug":  "gecerlilik_tarihi"
+    },
+    {
+        "key":  "tenders.general_gider",
+        "slug":  "genel_gider"
+    },
+    {
+        "key":  "tenders.general_product_code",
+        "slug":  "genel_urun_kodu"
+    },
+    {
+        "key":  "tenders.general_total",
+        "slug":  "genel_toplam"
+    },
+    {
+        "key":  "tenders.girinti",
+        "slug":  "girinti"
+    },
+    {
+        "key":  "tenders.gorsel",
+        "slug":  "gorsel"
+    },
+    {
+        "key":  "tenders.gorsel_2_mb_sinirini_asiyor",
+        "slug":  "gorsel_2_mb_sinirini_asiyor"
+    },
+    {
+        "key":  "tenders.gorsel_2mb_sinirini_asiyor",
+        "slug":  "gorsel_2mb_sinirini_asiyor"
+    },
+    {
+        "key":  "tenders.gorsel_2mb_tan_buyuk_olamaz",
+        "slug":  "gorsel_2mb_tan_buyuk_olamaz"
+    },
+    {
+        "key":  "tenders.gorsel_add",
+        "slug":  "gorsel_ekle"
+    },
+    {
+        "key":  "tenders.gorsel_kaydedilemedi",
+        "slug":  "gorsel_kaydedilemedi"
+    },
+    {
+        "key":  "tenders.gorsel_okunamadi",
+        "slug":  "gorsel_okunamadi"
+    },
+    {
+        "key":  "tenders.gorsel_select",
+        "slug":  "gorsel_sec"
+    },
+    {
+        "key":  "tenders.gorsel_yukle",
+        "slug":  "gorsel_yukle"
+    },
+    {
+        "key":  "tenders.gorseli_degistir",
+        "slug":  "gorseli_degistir"
+    },
+    {
+        "key":  "tenders.gorseli_kaldir",
+        "slug":  "gorseli_kaldir"
+    },
+    {
+        "key":  "tenders.group_data_not_found",
+        "slug":  "grup_verisi_yok"
+    },
+    {
+        "key":  "tenders.guncellenemedi",
+        "slug":  "guncellenemedi"
+    },
+    {
+        "key":  "tenders.hangi_cost_kalemine_ne_kadar_pay_gidiyor",
+        "slug":  "hangi_maliyet_kalemine_ne_kadar_pay_gidiyor"
+    },
+    {
+        "key":  "tenders.hesaplanan_total_price_net",
+        "slug":  "hesaplanan_toplam_fiyat_net"
+    },
+    {
+        "key":  "tenders.hydraulic_service",
+        "slug":  "hidrolik_servis"
+    },
+    {
+        "key":  "tenders.import_aktarim_basarisiz",
+        "slug":  "ice_aktarim_basarisiz"
+    },
+    {
+        "key":  "tenders.import_export",
+        "slug":  "ice_aktar"
+    },
+    {
+        "key":  "tenders.ind",
+        "slug":  "ind"
+    },
+    {
+        "key":  "tenders.inline_flex_h_7_items_center_gap_1_rounded_borde",
+        "slug":  "inline_flex_h_7_items_center_gap_1_rounded_borde"
+    },
+    {
+        "key":  "tenders.invoice_icin_order_create",
+        "slug":  "fatura_icin_siparis_olustur"
+    },
+    {
+        "key":  "tenders.iptal",
+        "slug":  "iptal"
+    },
+    {
+        "key":  "tenders.iscilik",
+        "slug":  "iscilik"
+    },
+    {
+        "key":  "tenders.isvicre_standartlarinda_pdf_veya_makine_okunur_c",
+        "slug":  "isvicre_standartlarinda_pdf_veya_makine_okunur_c"
+    },
+    {
+        "key":  "tenders.kaydedilemedi",
+        "slug":  "kaydedilemedi"
+    },
+    {
+        "key":  "tenders.kdv",
+        "slug":  "kdv"
+    },
+    {
+        "key":  "tenders.kdv_fixed",
+        "slug":  "kdv_sabit"
+    },
+    {
+        "key":  "tenders.kdv_haric",
+        "slug":  "kdv_haric"
+    },
+    {
+        "key":  "tenders.kommission_nr",
+        "slug":  "kommission_nr"
+    },
+    {
+        "key":  "tenders.konu",
+        "slug":  "konu"
+    },
+    {
+        "key":  "tenders.kunde",
+        "slug":  "kunde"
+    },
+    {
+        "key":  "tenders.lieferdatum_intern",
+        "slug":  "lieferdatum_intern"
+    },
+    {
+        "key":  "tenders.lieferungsadresse",
+        "slug":  "lieferungsadresse"
+    },
+    {
+        "key":  "tenders.line",
+        "slug":  "satir"
+    },
+    {
+        "key":  "tenders.line_add",
+        "slug":  "satir_ekle"
+    },
+    {
+        "key":  "tenders.line_bazli_cost_margin_ve_karlilik_analizi",
+        "slug":  "satir_bazli_maliyet_marj_ve_karlilik_analizi"
+    },
+    {
+        "key":  "tenders.line_content",
+        "slug":  "satir_icerigi"
+    },
+    {
+        "key":  "tenders.line_content_not_found",
+        "slug":  "satir_icerigi_yok"
+    },
+    {
+        "key":  "tenders.line_content_yaz",
+        "slug":  "satir_icerigi_yaz"
+    },
+    {
+        "key":  "tenders.line_content_yazin",
+        "slug":  "satir_icerigi_yazin"
+    },
+    {
+        "key":  "tenders.line_daha",
+        "slug":  "satir_daha"
+    },
+    {
+        "key":  "tenders.line_detayi",
+        "slug":  "satir_detayi"
+    },
+    {
+        "key":  "tenders.line_eklenemedi",
+        "slug":  "satir_eklenemedi"
+    },
+    {
+        "key":  "tenders.line_gorseli",
+        "slug":  "satir_gorseli"
+    },
+    {
+        "key":  "tenders.line_guncellenemedi",
+        "slug":  "satir_guncellenemedi"
+    },
+    {
+        "key":  "tenders.line_loglari",
+        "slug":  "satir_loglari"
+    },
+    {
+        "key":  "tenders.line_price",
+        "slug":  "satir_fiyati"
+    },
+    {
+        "key":  "tenders.line_select",
+        "slug":  "satiri_sec"
+    },
+    {
+        "key":  "tenders.line_sil",
+        "slug":  "satiri_sil"
+    },
+    {
+        "key":  "tenders.line_silindi",
+        "slug":  "satir_silindi"
+    },
+    {
+        "key":  "tenders.linked_products",
+        "slug":  "bagli_urunler"
+    },
+    {
+        "key":  "tenders.list_back",
+        "slug":  "listeye_don"
+    },
+    {
+        "key":  "tenders.loglar_loading",
+        "slug":  "loglar_yukleniyor"
+    },
+    {
+        "key":  "tenders.loglar_yuklenemedi",
+        "slug":  "loglar_yuklenemedi"
+    },
+    {
+        "key":  "tenders.lutfen_bir_customer_select",
+        "slug":  "lutfen_bir_musteri_secin"
+    },
+    {
+        "key":  "tenders.lutfen_bir_gorsel_file_select",
+        "slug":  "lutfen_bir_gorsel_dosyasi_secin"
+    },
+    {
+        "key":  "tenders.m_kg",
+        "slug":  "m_kg"
+    },
+    {
+        "key":  "tenders.mail",
+        "slug":  "mail"
+    },
+    {
+        "key":  "tenders.mail_additional_fee_ve_appointment_ayarlarini_tek_place_y",
+        "slug":  "mail_ek_ucret_ve_randevu_ayarlarini_tek_yerden_y"
+    },
+    {
+        "key":  "tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i",
+        "slug":  "mail_gondermek_opsiyoneldir_siparis_olusturmak_i"
+    },
+    {
+        "key":  "tenders.maksimum",
+        "slug":  "maksimum"
+    },
+    {
+        "key":  "tenders.maksimum_stock",
+        "slug":  "maksimum_stok"
+    },
+    {
+        "key":  "tenders.manual_stock_cost",
+        "slug":  "manuel_stok_maliyeti"
+    },
+    {
+        "key":  "tenders.material",
+        "slug":  "malzeme"
+    },
+    {
+        "key":  "tenders.material_add",
+        "slug":  "malzeme_ekle"
+    },
+    {
+        "key":  "tenders.material_added_fiyata_dahil_edilmedi",
+        "slug":  "malzeme_eklendi_fiyata_dahil_edilmedi"
+    },
+    {
+        "key":  "tenders.material_eklenemedi",
+        "slug":  "malzeme_eklenemedi"
+    },
+    {
+        "key":  "tenders.material_kaldirilamadi",
+        "slug":  "malzeme_kaldirilamadi"
+    },
+    {
+        "key":  "tenders.material_kaldirildi",
+        "slug":  "malzeme_kaldirildi"
+    },
+    {
+        "key":  "tenders.material_select",
+        "slug":  "malzeme_secin"
+    },
+    {
+        "key":  "tenders.material_stock_duser_price_only_info_amacli",
+        "slug":  "malzeme_stoktan_duser_fiyat_sadece_bilgi_amacli_"
+    },
+    {
+        "key":  "tenders.materials_yuklenemedi",
+        "slug":  "malzemeler_yuklenemedi"
+    },
+    {
+        "key":  "tenders.merhaba_teklifimizi_pdf_olarak_ekte_iletiyoruz_p",
+        "slug":  "merhaba_teklifimizi_pdf_olarak_ekte_iletiyoruz_p"
+    },
+    {
+        "key":  "tenders.mevcut",
+        "slug":  "mevcut"
+    },
+    {
+        "key":  "tenders.minimum_seviye",
+        "slug":  "minimum_seviye"
+    },
+    {
+        "key":  "tenders.minimum_stock",
+        "slug":  "minimum_stok"
+    },
+    {
+        "key":  "tenders.musteriler_loading",
+        "slug":  "musteriler_yukleniyor"
+    },
+    {
+        "key":  "tenders.net",
+        "slug":  "net"
+    },
+    {
+        "key":  "tenders.net_amount",
+        "slug":  "net_tutar"
+    },
+    {
+        "key":  "tenders.new_product_material",
+        "slug":  "yeni_urun_malzeme"
+    },
+    {
+        "key":  "tenders.new_tender",
+        "slug":  "yeni_teklif"
+    },
+    {
+        "key":  "tenders.new_versiyon",
+        "slug":  "yeni_versiyon"
+    },
+    {
+        "key":  "tenders.no_log_records_yet",
+        "slug":  "henuz_log_kaydi_yok"
+    },
+    {
+        "key":  "tenders.no_product_line_for_profit_loss",
+        "slug":  "kar_zarar_hesaplanacak_urun_satiri_yok"
+    },
+    {
+        "key":  "tenders.no_tenders_yet",
+        "slug":  "henuz_teklif_yok"
+    },
+    {
+        "key":  "tenders.note",
+        "slug":  "not"
+    },
+    {
+        "key":  "tenders.note_birak",
+        "slug":  "not_birak"
+    },
+    {
+        "key":  "tenders.note_birakildi",
+        "slug":  "not_birakildi"
+    },
+    {
+        "key":  "tenders.odoo_sales_order_csv_dosyasindaki_customer_uru",
+        "slug":  "odoo_satis_siparisi_csv_dosyasindaki_musteri_uru"
+    },
+    {
+        "key":  "tenders.offitec_erp",
+        "slug":  "offitec_erp"
+    },
+    {
+        "key":  "tenders.old_baglanti_record",
+        "slug":  "eski_baglanti_kaydi"
+    },
+    {
+        "key":  "tenders.old_log_basligi",
+        "slug":  "eski_log_basligi"
+    },
+    {
+        "key":  "tenders.old_log_description",
+        "slug":  "eski_log_aciklamasi"
+    },
+    {
+        "key":  "tenders.olusturan",
+        "slug":  "olusturan"
+    },
+    {
+        "key":  "tenders.olusturma",
+        "slug":  "olusturma"
+    },
+    {
+        "key":  "tenders.only_gorsel_dosyalar_yuklenebilir",
+        "slug":  "sadece_gorsel_dosyalar_yuklenebilir"
+    },
+    {
+        "key":  "tenders.optional_category_barcode",
+        "slug":  "kategori_barkodu_istege_bagli"
+    },
+    {
+        "key":  "tenders.optional_category_barcode_manual_or_camera",
+        "slug":  "kategori_barkodu_istege_bagli_manuel_veya_kamera"
+    },
+    {
+        "key":  "tenders.order_create",
+        "slug":  "siparisi_olustur"
+    },
+    {
+        "key":  "tenders.order_created",
+        "slug":  "siparis_olusturuldu"
+    },
+    {
+        "key":  "tenders.order_olusturulamadi",
+        "slug":  "siparis_olusturulamadi"
+    },
+    {
+        "key":  "tenders.order_turunu_select",
+        "slug":  "siparis_turunu_secin"
+    },
+    {
+        "key":  "tenders.orn_10_bakim_seti_10_lecksuchspray_10_reinigungs",
+        "slug":  "orn_10_bakim_seti_10_lecksuchspray_10_reinigungs"
+    },
+    {
+        "key":  "tenders.otomatik_kaydedilecek",
+        "slug":  "otomatik_kaydedilecek"
+    },
+    {
+        "key":  "tenders.output_formati",
+        "slug":  "cikti_formati"
+    },
+    {
+        "key":  "tenders.pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor",
+        "slug":  "pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor"
+    },
+    {
+        "key":  "tenders.pdf_export",
+        "slug":  "pdf_disa_aktar"
+    },
+    {
+        "key":  "tenders.pdf_gorsel_add",
+        "slug":  "pdf_gorsel_ekle"
+    },
+    {
+        "key":  "tenders.pdf_ile_tender_maili_gonder",
+        "slug":  "pdf_ile_teklif_maili_gonder"
+    },
+    {
+        "key":  "tenders.pdf_indirildi",
+        "slug":  "pdf_indirildi"
+    },
+    {
+        "key":  "tenders.pointer_events_auto_translate_y_0_scale_100_opac",
+        "slug":  "pointer_events_auto_translate_y_0_scale_100_opac"
+    },
+    {
+        "key":  "tenders.pointer_events_none_translate_y_1_scale_95_opaci",
+        "slug":  "pointer_events_none_translate_y_1_scale_95_opaci"
+    },
+    {
+        "key":  "tenders.preisliste",
+        "slug":  "preisliste"
+    },
+    {
+        "key":  "tenders.price_approval_record_not_found",
+        "slug":  "gosterilecek_fiyat_onay_kaydi_yok"
+    },
+    {
+        "key":  "tenders.price_degisikligi",
+        "slug":  "fiyat_degisikligi"
+    },
+    {
+        "key":  "tenders.price_degisiklikleri_approval_olusturma_ve_tender_no",
+        "slug":  "fiyat_degisiklikleri_onay_olusturma_ve_teklif_no"
+    },
+    {
+        "key":  "tenders.product",
+        "slug":  "urun"
+    },
+    {
+        "key":  "tenders.product_add",
+        "slug":  "urun_ekle"
+    },
+    {
+        "key":  "tenders.product_added_to_stock_and_copied_to_tender",
+        "slug":  "urun_stoga_eklendi_ve_teklife_kopyalandi"
+    },
+    {
+        "key":  "tenders.product_adi",
+        "slug":  "urun_adi"
+    },
+    {
+        "key":  "tenders.product_adi_zorunludur",
+        "slug":  "urun_adi_zorunludur"
+    },
+    {
+        "key":  "tenders.product_code",
+        "slug":  "urun_kodu"
+    },
+    {
+        "key":  "tenders.product_content",
+        "slug":  "urun_icerigi"
+    },
+    {
+        "key":  "tenders.product_detayi",
+        "slug":  "urun_detayi"
+    },
+    {
+        "key":  "tenders.product_gorseli",
+        "slug":  "urun_gorseli"
+    },
+    {
+        "key":  "tenders.product_islemi",
+        "slug":  "urun_islemi"
+    },
+    {
+        "key":  "tenders.product_karti_cost",
+        "slug":  "urun_karti_maliyeti"
+    },
+    {
+        "key":  "tenders.product_name_stock_code_barcode_or_category",
+        "slug":  "urun_adi_stok_kodu_barkod_veya_kategori"
+    },
+    {
+        "key":  "tenders.product_not_found",
+        "slug":  "urun_bulunamadi"
+    },
+    {
+        "key":  "tenders.product_removed_from_tender",
+        "slug":  "urun_tekliften_kaldirildi"
+    },
+    {
+        "key":  "tenders.product_select",
+        "slug":  "urun_secin"
+    },
+    {
+        "key":  "tenders.product_serial_code",
+        "slug":  "urun_seri_kodu"
+    },
+    {
+        "key":  "tenders.product_to_apply",
+        "slug":  "uygulanacak_urun"
+    },
+    {
+        "key":  "tenders.products_ekranindaki_stock_karti_form_ile_new_ur",
+        "slug":  "urunler_ekranindaki_stok_karti_formu_ile_yeni_ur"
+    },
+    {
+        "key":  "tenders.products_loading",
+        "slug":  "urunler_yukleniyor"
+    },
+    {
+        "key":  "tenders.profit",
+        "slug":  "kar"
+    },
+    {
+        "key":  "tenders.profit_loss",
+        "slug":  "kar_zarar"
+    },
+    {
+        "key":  "tenders.profit_loss_akisi",
+        "slug":  "kar_zarar_akisi"
+    },
+    {
+        "key":  "tenders.profit_loss_semasi",
+        "slug":  "kar_zarar_semasi"
+    },
+    {
+        "key":  "tenders.profit_loss_semasini_kapat",
+        "slug":  "kar_zarar_semasini_kapat"
+    },
+    {
+        "key":  "tenders.profit_loss_semasini_open",
+        "slug":  "kar_zarar_semasini_ac"
+    },
+    {
+        "key":  "tenders.profit_margin",
+        "slug":  "kar_marji"
+    },
+    {
+        "key":  "tenders.profit_margin_amount",
+        "slug":  "kar_marji_tutar"
+    },
+    {
+        "key":  "tenders.project_adi_customer_veya_tender_no",
+        "slug":  "proje_adi_musteri_veya_teklif_no"
+    },
+    {
+        "key":  "tenders.project_icin_order_create",
+        "slug":  "proje_icin_siparis_olustur"
+    },
+    {
+        "key":  "tenders.project_ismi",
+        "slug":  "proje_ismi"
+    },
+    {
+        "key":  "tenders.project_ismi_zorunludur",
+        "slug":  "proje_ismi_zorunludur"
+    },
+    {
+        "key":  "tenders.project_not_found",
+        "slug":  "proje_bulunamadi"
+    },
+    {
+        "key":  "tenders.project_olusturulmaz_crm_order_listesine_duser",
+        "slug":  "proje_olusturulmaz_crm_siparis_listesine_duser"
+    },
+    {
+        "key":  "tenders.project_search",
+        "slug":  "proje_ara"
+    },
+    {
+        "key":  "tenders.projects_araniyor",
+        "slug":  "projeler_araniyor"
+    },
+    {
+        "key":  "tenders.qr_bill_reference_skipped_when_empty",
+        "slug":  "bos_birakilirsa_qr_bill_referans_bolumu_atlanir"
+    },
+    {
+        "key":  "tenders.quantity_0dan_buyuk_olmali",
+        "slug":  "miktar_0dan_buyuk_olmali"
+    },
+    {
+        "key":  "tenders.quantity_kullanilacak",
+        "slug":  "miktar_kullanilacak"
+    },
+    {
+        "key":  "tenders.randevuyu_update",
+        "slug":  "randevuyu_guncelle"
+    },
+    {
+        "key":  "tenders.rechnungsadresse",
+        "slug":  "rechnungsadresse"
+    },
+    {
+        "key":  "tenders.record",
+        "slug":  "kayit"
+    },
+    {
+        "key":  "tenders.reference_numarasi",
+        "slug":  "referans_numarasi"
+    },
+    {
+        "key":  "tenders.registered_product_not_found",
+        "slug":  "kayitli_urun_bulunamadi"
+    },
+    {
+        "key":  "tenders.report",
+        "slug":  "rapor"
+    },
+    {
+        "key":  "tenders.report_loading",
+        "slug":  "rapor_yukleniyor"
+    },
+    {
+        "key":  "tenders.required_unique_for_each_product",
+        "slug":  "zorunlu_her_urune_ozgu"
+    },
+    {
+        "key":  "tenders.required_unique_for_each_product_manual_or_camera",
+        "slug":  "zorunlu_her_urune_ozgu_manuel_veya_kamera"
+    },
+    {
+        "key":  "tenders.rf18_5390_0754_7034",
+        "slug":  "rf18_5390_0754_7034"
+    },
+    {
+        "key":  "tenders.risk",
+        "slug":  "risk"
+    },
+    {
+        "key":  "tenders.sales",
+        "slug":  "satis"
+    },
+    {
+        "key":  "tenders.sales_order_csv_export",
+        "slug":  "satis_siparisi_csv_aktar"
+    },
+    {
+        "key":  "tenders.sales_order_csv_import_aktarildi",
+        "slug":  "satis_siparisi_csv_ice_aktarildi"
+    },
+    {
+        "key":  "tenders.sales_order_satirlari_okunuyor_customer_product_v",
+        "slug":  "satis_siparisi_satirlari_okunuyor_musteri_urun_v"
+    },
+    {
+        "key":  "tenders.sata_r_ga_ncellenemedi",
+        "slug":  "sata_r_ga_ncellenemedi"
+    },
+    {
+        "key":  "tenders.sata_r_id_info_ala_namada",
+        "slug":  "sata_r_id_bilgisi_ala_namada"
+    },
+    {
+        "key":  "tenders.satirlari_hesaplayin_report_otomatik_dolacak",
+        "slug":  "satirlari_hesaplayin_rapor_otomatik_dolacak"
+    },
+    {
+        "key":  "tenders.satirlari_hesaplayinca_dagilim_burada_gorunecek",
+        "slug":  "satirlari_hesaplayinca_dagilim_burada_gorunecek"
+    },
+    {
+        "key":  "tenders.sayfanin_altina_isvicre_qr_bill_empfangsschein_z",
+        "slug":  "sayfanin_altina_isvicre_qr_bill_empfangsschein_z"
+    },
+    {
+        "key":  "tenders.scan_general_code_with_camera",
+        "slug":  "kamera_ile_genel_kod_tara"
+    },
+    {
+        "key":  "tenders.scan_serial_code_with_camera",
+        "slug":  "kamera_ile_seri_kod_tara"
+    },
+    {
+        "key":  "tenders.section_total",
+        "slug":  "bolum_toplami"
+    },
+    {
+        "key":  "tenders.select_product_from_stock",
+        "slug":  "stoktan_urun_secin"
+    },
+    {
+        "key":  "tenders.selected",
+        "slug":  "secili"
+    },
+    {
+        "key":  "tenders.selected_line",
+        "slug":  "secili_satir"
+    },
+    {
+        "key":  "tenders.selected_satirlar_silindi",
+        "slug":  "secili_satirlar_silindi"
+    },
+    {
+        "key":  "tenders.serial_code_okutun_veya_yazin",
+        "slug":  "seri_kodu_okutun_veya_yazin"
+    },
+    {
+        "key":  "tenders.sia_451",
+        "slug":  "sia_451"
+    },
+    {
+        "key":  "tenders.silinecek_satirlar",
+        "slug":  "silinecek_satirlar"
+    },
+    {
+        "key":  "tenders.silinemedi",
+        "slug":  "silinemedi"
+    },
+    {
+        "key":  "tenders.silmek_istediginizden_emin_misiniz",
+        "slug":  "silmek_istediginizden_emin_misiniz"
+    },
+    {
+        "key":  "tenders.simdi_add",
+        "slug":  "simdi_ekle"
+    },
+    {
+        "key":  "tenders.siparise_git",
+        "slug":  "siparise_git"
+    },
+    {
+        "key":  "tenders.sistem",
+        "slug":  "sistem"
+    },
+    {
+        "key":  "tenders.stk",
+        "slug":  "stk"
+    },
+    {
+        "key":  "tenders.stk_m_kg",
+        "slug":  "stk_m_kg"
+    },
+    {
+        "key":  "tenders.stock",
+        "slug":  "stok"
+    },
+    {
+        "key":  "tenders.stock_code",
+        "slug":  "stok_kodu"
+    },
+    {
+        "key":  "tenders.stock_product_select_info_tender_kopyalanir",
+        "slug":  "stoktaki_urunu_secin_bilgiler_teklife_kopyalanir"
+    },
+    {
+        "key":  "tenders.stock_urunden_tender_line_create_burada",
+        "slug":  "stoktaki_urunden_teklif_satiri_olusturun_burada_"
+    },
+    {
+        "key":  "tenders.subsection",
+        "slug":  "alt_bolum"
+    },
+    {
+        "key":  "tenders.tabloya_yansir",
+        "slug":  "tabloya_yansir"
+    },
+    {
+        "key":  "tenders.tahmini_hacim",
+        "slug":  "tahmini_hacim"
+    },
+    {
+        "key":  "tenders.taslak_aciliyor",
+        "slug":  "taslak_aciliyor"
+    },
+    {
+        "key":  "tenders.technician_ata",
+        "slug":  "teknisyen_ata"
+    },
+    {
+        "key":  "tenders.tekrar_edit",
+        "slug":  "tekrar_duzenle"
+    },
+    {
+        "key":  "tenders.tender",
+        "slug":  "tender_tender"
+    },
+    {
+        "key":  "tenders.tender_add",
+        "slug":  "teklife_ekle"
+    },
+    {
+        "key":  "tenders.tender_created",
+        "slug":  "teklif_olusturuldu"
+    },
+    {
+        "key":  "tenders.tender_export",
+        "slug":  "teklifi_disa_aktar"
+    },
+    {
+        "key":  "tenders.tender_import_aktarildi",
+        "slug":  "ihale_ice_aktarildi"
+    },
+    {
+        "key":  "tenders.tender_import_aktariliyor",
+        "slug":  "teklif_ice_aktariliyor"
+    },
+    {
+        "key":  "tenders.tender_info_guncellenemedi",
+        "slug":  "teklif_bilgileri_guncellenemedi"
+    },
+    {
+        "key":  "tenders.tender_info_updated",
+        "slug":  "teklif_bilgileri_guncellendi"
+    },
+    {
+        "key":  "tenders.tender_kaldir",
+        "slug":  "tekliften_kaldir"
+    },
+    {
+        "key":  "tenders.tender_line_not_found",
+        "slug":  "teklif_satiri_yok"
+    },
+    {
+        "key":  "tenders.tender_maili",
+        "slug":  "teklif_maili"
+    },
+    {
+        "key":  "tenders.tender_maili_gonderildi",
+        "slug":  "teklif_maili_gonderildi"
+    },
+    {
+        "key":  "tenders.tender_maili_gonderilemedi",
+        "slug":  "teklif_maili_gonderilemedi"
+    },
+    {
+        "key":  "tenders.tender_no",
+        "slug":  "teklif_no"
+    },
+    {
+        "key":  "tenders.tender_numarasi_zorunludur",
+        "slug":  "teklif_numarasi_zorunludur"
+    },
+    {
+        "key":  "tenders.tender_olusturulamadi",
+        "slug":  "teklif_olusturulamadi"
+    },
+    {
+        "key":  "tenders.tender_olusturuluyor",
+        "slug":  "teklif_olusturuluyor"
+    },
+    {
+        "key":  "tenders.tender_onaylandi",
+        "slug":  "teklif_onaylandi"
+    },
+    {
+        "key":  "tenders.tender_onaylandiktan_sonra_order_record_create",
+        "slug":  "teklif_onaylandiktan_sonra_siparis_kaydi_olustur"
+    },
+    {
+        "key":  "tenders.tender_only_product",
+        "slug":  "yalnizca_bu_teklif_icin_urun"
+    },
+    {
+        "key":  "tenders.tender_satirlari",
+        "slug":  "teklif_satirlari"
+    },
+    {
+        "key":  "tenders.tender_settings",
+        "slug":  "teklif_ayarlari"
+    },
+    {
+        "key":  "tenders.tender_silindi",
+        "slug":  "teklif_silindi"
+    },
+    {
+        "key":  "tenders.tender_taslagi_created",
+        "slug":  "teklif_taslagi_olusturuldu"
+    },
+    {
+        "key":  "tenders.tender_ve_tender_listesi",
+        "slug":  "teklif_ve_ihale_listesi"
+    },
+    {
+        "key":  "tenders.tender_yapilan_product_line_price_ve_stock_hareke",
+        "slug":  "teklifte_yapilan_urun_satir_fiyat_ve_stok_hareke"
+    },
+    {
+        "key":  "tenders.tenders_import_aktarin_esnek_satirlarla_maliyetl",
+        "slug":  "teklifleri_ice_aktarin_esnek_satirlarla_maliyetl"
+    },
+    {
+        "key":  "tenders.text_slate_700_hover_bg_1f2654_hover_text_white",
+        "slug":  "text_slate_700_hover_bg_1f2654_hover_text_white_"
+    },
+    {
+        "key":  "tenders.total_cost",
+        "slug":  "toplam_maliyet"
+    },
+    {
+        "key":  "tenders.total_kdv_dahil",
+        "slug":  "toplam_kdv_dahil"
+    },
+    {
+        "key":  "tenders.total_tender_tutarinin_bilesen_dagilimi",
+        "slug":  "toplam_teklif_tutarinin_bilesen_dagilimi"
+    },
+    {
+        "key":  "tenders.ucreti_uygula",
+        "slug":  "ucreti_uygula"
+    },
+    {
+        "key":  "tenders.unit",
+        "slug":  "birim"
+    },
+    {
+        "key":  "tenders.unit_cost",
+        "slug":  "birim_maliyet"
+    },
+    {
+        "key":  "tenders.unit_cost_chf",
+        "slug":  "birim_maliyet_chf"
+    },
+    {
+        "key":  "tenders.unit_price",
+        "slug":  "birim_fiyat"
+    },
+    {
+        "key":  "tenders.unit_price_chf",
+        "slug":  "birim_fiyat_chf"
+    },
+    {
+        "key":  "tenders.unit_sales_price_chf",
+        "slug":  "birim_satis_fiyati_chf"
+    },
+    {
+        "key":  "tenders.update_product_card_for_stock_management",
+        "slug":  "stok_yonetimi_icin_urun_kartini_guncelleyin"
+    },
+    {
+        "key":  "tenders.updated",
+        "slug":  "guncellendi"
+    },
+    {
+        "key":  "tenders.uretimde",
+        "slug":  "uretimde"
+    },
+    {
+        "key":  "tenders.used_material_not_found",
+        "slug":  "kullanilan_malzeme_yok"
+    },
+    {
+        "key":  "tenders.used_materials",
+        "slug":  "kullanilan_malzemeler"
+    },
+    {
+        "key":  "tenders.uygula",
+        "slug":  "uygula"
+    },
+    {
+        "key":  "tenders.v1",
+        "slug":  "v1"
+    },
+    {
+        "key":  "tenders.vazgec",
+        "slug":  "vazgec"
+    },
+    {
+        "key":  "tenders.versiyon",
+        "slug":  "versiyon"
+    },
+    {
+        "key":  "tenders.versiyon_olusturulamadi",
+        "slug":  "versiyon_olusturulamadi"
+    },
+    {
+        "key":  "tenders.xml_crbx_veya_sia451_uzantili_file_secebilirsin",
+        "slug":  "xml_crbx_veya_sia451_uzantili_dosya_secebilirsin"
+    },
+    {
+        "key":  "tenders.xml_data_okunuyor_ve_tender_satirlari_hazirlan",
+        "slug":  "xml_verisi_okunuyor_ve_teklif_satirlari_hazirlan"
+    },
+    {
+        "key":  "tenders.xml_file",
+        "slug":  "xml_dosyasi"
+    },
+    {
+        "key":  "tenders.xml_icerik",
+        "slug":  "xml_icerik"
+    },
+    {
+        "key":  "tenders.xml_icerik_zorunludur",
+        "slug":  "xml_icerik_zorunludur"
+    },
+    {
+        "key":  "tenders.xml_import_export",
+        "slug":  "xml_ice_aktar"
+    },
+    {
+        "key":  "tenders.xml_tender_import",
+        "slug":  "xml_ihale_ice_aktarma"
+    },
+    {
+        "key":  "tenders.yazi_yazin",
+        "slug":  "yazi_yazin"
+    },
+    {
+        "key":  "tenders.yazilar_gorseller",
+        "slug":  "yazilar_gorseller"
+    },
+    {
+        "key":  "tenders.yaziyi_edit",
+        "slug":  "yaziyi_duzenle"
+    },
+    {
+        "key":  "tenders.yuzde",
+        "slug":  "yuzde"
+    },
+    {
+        "key":  "tenders.zahlungsbedingung",
+        "slug":  "zahlungsbedingung"
+    }
+]

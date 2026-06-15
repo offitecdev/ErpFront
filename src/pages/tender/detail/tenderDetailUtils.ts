@@ -1,6 +1,8 @@
 import { useTenderStore } from '../../../store/tenderStore';
 import type { CalculationItemDto, PositionArticleMappingDto, PositionMaterialMappingDto, PositionDto } from '../../../types/tender';
 
+import { t } from '@/i18n/translate';
+
 export const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info'> = {
     Draft: 'warning',
     Approved: 'approved',
@@ -8,9 +10,9 @@ export const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info'> = {
 };
 
 export const STATUS_LABEL: Record<string, string> = {
-    Draft: 'Taslak',
-    Approved: 'Onaylı',
-    Exported: 'Dışa Aktarıldı',
+    Draft:t('crm.tenders.statusDraft'),
+    Approved:t('crm.tenders.statusApproved'),
+    Exported:t('crm.tenders.statusExported'),
 };
 
 export const fmtMoney = (v: number) =>
@@ -31,6 +33,8 @@ export interface TreeNode extends PositionDto {
     totalWithChildren: number;
 }
 
+const rowTypeOf = (value?: string | null) => (value || 'SECTION').toUpperCase();
+
 export const FIXED_VAT = 8.1;
 
 export const lineTotalWithTax = (amount: number, taxRate?: number | null) =>
@@ -39,21 +43,30 @@ export const lineTotalWithTax = (amount: number, taxRate?: number | null) =>
 export const buildTree = (positions: PositionDto[], fallbackTaxRate = 8.1): TreeNode[] => {
     const map = new Map<string, TreeNode>();
     positions.forEach((p) => {
-        const node: TreeNode = { ...p, taxRate: (p.taxRate != null && p.taxRate > 0) ? p.taxRate : fallbackTaxRate, children: [], totalWithChildren: 0 };
+        const node: TreeNode = {
+            ...p,
+            rowType: rowTypeOf(p.rowType),
+            taxRate: (p.taxRate != null && p.taxRate > 0) ? p.taxRate : fallbackTaxRate,
+            children: [],
+            totalWithChildren: 0
+        };
         if (p.articleMappings && p.articleMappings.length > 0) {
             p.articleMappings.forEach((m, i) => {
                 const articleNode: TreeNode = {
                     ...p,
                     id: m.id,
+                    rowType: 'PRODUCT',
+                    sourceArticleId: m.articleId,
+                    displayOrder: (p.displayOrder ?? 0) + i + 1,
                     isArticleMapping: true,
                     mappingId: m.id,
                     articleId: m.articleId,
                     positionNumber: `${p.positionNumber}.M${i + 1}`,
-                    shortDescription: m.article?.name || 'Ürün',
+                    shortDescription: m.article?.name ||t('tenders.product'),
                     longDescription: m.article?.description || null,
                     quantity: m.quantityMultiplier,
                     unit: m.article?.unit || 'adet',
-                    unitPrice: m.article?.baseCost || 0,
+                    unitPrice: m.article?.salePrice || m.article?.baseCost || 0,
                     discount: m.discount || 0,
                     taxRate: (p.taxRate != null && p.taxRate > 0) ? p.taxRate : fallbackTaxRate,
                     imageUrl: m.article?.imageUrl || null,
@@ -84,14 +97,11 @@ export const buildTree = (positions: PositionDto[], fallbackTaxRate = 8.1): Tree
         const qty = n.quantity || 0;
         const price = n.unitPrice ?? null;
         const disc = n.discount ?? 0;
-        const structuralChildren = n.children.filter((child) => !child.isArticleMapping);
 
         let self = 0;
         if (n.isArticleMapping) {
             const net = qty * (price || 0) * (1 - disc / 100);
             self = lineTotalWithTax(net, n.taxRate);
-        } else if (structuralChildren.length > 0) {
-            self = 0;
         } else {
             const additionalCost = n.calculation?.additionalCost ?? 0;
             const billableCalculationTotal = n.calculation
@@ -105,13 +115,18 @@ export const buildTree = (positions: PositionDto[], fallbackTaxRate = 8.1): Tree
 
         n.children.forEach(compute);
         const childSum = n.children.reduce((s, c) => s + c.totalWithChildren, 0);
-        n.totalWithChildren = n.children.length > 0 ? childSum : self;
+        n.totalWithChildren = self + childSum;
         return n.totalWithChildren;
     };
     roots.forEach(compute);
 
     const sortRec = (nodes: TreeNode[]) => {
-        nodes.sort((a, b) => a.positionNumber.localeCompare(b.positionNumber, undefined, { numeric: true }));
+        nodes.sort((a, b) => {
+            const orderA = a.displayOrder ?? Number.MAX_SAFE_INTEGER;
+            const orderB = b.displayOrder ?? Number.MAX_SAFE_INTEGER;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.positionNumber.localeCompare(b.positionNumber, undefined, { numeric: true });
+        });
         nodes.forEach((n) => sortRec(n.children));
     };
     sortRec(roots);
@@ -271,30 +286,70 @@ export const bytesToBase64 = (bytes: Uint8Array) => {
     return btoa(binary);
 };
 
+const ownLineNet = (n: TreeNode) => {
+    const rowType = (n.rowType || '').toUpperCase();
+    if (rowType === 'SECTION' || rowType === 'TITLE' || rowType === 'DESCRIPTION') return 0;
+
+    const qty = Number(n.quantity || 0);
+    const price = n.unitPrice ?? null;
+    const disc = n.discount ?? 0;
+    if (price != null && price > 0 && qty > 0) {
+        return qty * price * (1 - disc / 100) + (n.calculation?.additionalCost ?? 0);
+    }
+    return Math.max(0, n.calculation?.totalCalculatedPrice ?? 0);
+};
+
 export const flattenTenderTreeForPdf = (tree: TreeNode[]) => {
     const flatTree: any[] = [];
+    let rootIndex = 0;
+    let activeTitleIndex: number | null = null;
+    let childIndex = 0;
+
+    const nextDisplayLabel = (n: TreeNode) => {
+        const rowType = (n.rowType || '').toUpperCase();
+        if (rowType === 'DESCRIPTION') return '';
+        if (rowType === 'SECTION' || rowType === 'TITLE') {
+            rootIndex += 1;
+            activeTitleIndex = rootIndex;
+            childIndex = 0;
+            return String(rootIndex);
+        }
+        if (activeTitleIndex == null) {
+            rootIndex += 1;
+            return String(rootIndex);
+        }
+        childIndex += 1;
+        return `${activeTitleIndex}.${childIndex}`;
+    };
+
     const flatten = (nodes: TreeNode[], isRootLevel = false) => {
         nodes.forEach((n) => {
+            const ownNet = ownLineNet(n);
+            const hasOwnAmount = ownNet > 0;
+            const effectiveTaxRate = n.taxRate ?? FIXED_VAT;
+            const displayLabel = nextDisplayLabel(n);
             flatTree.push({
-                positionNumber: n.positionNumber,
-                shortDescription: n.shortDescription,
+                rowKey: n.id,
+                shortDescription: displayLabel ? `${displayLabel} ${n.shortDescription}` : n.shortDescription,
                 longDescription: n.longDescription,
-                quantity: n.children.length > 0 ? undefined : n.quantity,
-                unit: n.children.length > 0 ? undefined : n.unit,
+                rowType: n.rowType,
+                quantity: hasOwnAmount ? n.quantity : undefined,
+                unit: hasOwnAmount ? n.unit : undefined,
                 npkCode: n.npkCode,
                 imageUrl: n.imageUrl,
-                discount: n.children.length > 0 ? undefined : (n.discount ?? 0),
-                taxRate: n.children.length > 0 ? undefined : FIXED_VAT,
-                unitPrice: n.children.length > 0 ? undefined : n.unitPrice,
+                discount: hasOwnAmount ? (n.discount ?? 0) : undefined,
+                taxRate: hasOwnAmount ? effectiveTaxRate : undefined,
+                unitPrice: hasOwnAmount ? n.unitPrice : undefined,
+                lineTotal: hasOwnAmount ? lineTotalWithTax(ownNet, effectiveTaxRate) : undefined,
                 total: n.totalWithChildren,
                 isParent: n.children.length > 0,
                 isTopLevel: isRootLevel,
                 hierarchyLevel: n.hierarchyLevel,
             });
             flatten(n.children, false);
-            if (isRootLevel) {
+            if (isRootLevel && (n.rowType || '').toUpperCase() === 'SECTION' && n.children.length > 0) {
                 flatTree.push({
-                    positionNumber: `${n.positionNumber}-subtotal`,
+                    rowKey: `${n.id}-subtotal`,
                     shortDescription: '',
                     quantity: 0,
                     total: n.totalWithChildren,

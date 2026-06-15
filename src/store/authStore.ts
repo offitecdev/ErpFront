@@ -7,6 +7,8 @@ interface User {
     lastName: string;
     email: string;
     tenantId: string;
+    employeeRoles?: any[];
+    roleName?: string;
 }
 
 export interface TenantOption {

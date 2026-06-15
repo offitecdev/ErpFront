@@ -1,41 +1,58 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { ArrowLeft, ArrowRight, Calendar, Edit01 as Edit, File02 as FileText, FilterLines, Save01 as Save, User01 as UserIcon } from '@untitledui/icons';
+import { DatePicker, Select as AntSelect } from 'antd';
+import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
-import { parseDate } from '@internationalized/date';
-import type { DateValue } from 'react-aria-components';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui-shared/Button';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
-import { Modal } from '../../components/ui-shared/Modal';
-import { DateRangePicker } from '../../components/application/date-picker/date-range-picker';
-import { articleApi, inventoryApi } from '../../lib/api/inventory';
 import { maintenanceApi } from '../../lib/api/maintenance';
-import type { InventoryArticle, InventoryLocation } from '../../types/inventory';
-import type { MaintenanceTaskDto, MaterialInput, PersonLite, TaskStatus } from '../../types/maintenance';
-import { fmtDate, MaterialsEditor, personName, splitLines, StatusPill, STATUS_LABEL } from './MaintenanceShared';
+import type { MaintenanceTaskDto, PersonLite } from '../../types/maintenance';
+import { ensureMaintenanceLocale, fmtDate, personName, StatusPill, STATUS_LABEL } from './MaintenanceShared';
+
+import { t } from '@/i18n/translate';
 
 type ScheduleView = 'list' | 'calendar';
-type MaintenanceDateRange = { start: DateValue; end: DateValue };
-
-const emptyReport = {
-    operationsDone: '',
-    observations: '',
-    recommendations: '',
-    riskNotes: '',
-    beforePhotoUrls: '',
-    afterPhotoUrls: '',
-    fileUrls: '',
+type DetailTab = 'overview' | 'appointment' | 'mail' | 'approval';
+type MaintenanceDateRange = { start: dayjs.Dayjs; end: dayjs.Dayjs };
+type AppointmentOptionInput = { date: string; time: string; durationMinutes: number };
+type AssignmentFormState = {
+    plannedDate: string;
+    responsibleTechId: string;
+    technicianIds: string[];
+};
+type MailFormState = {
+    to: string;
+    fromName: string;
+    fromEmail: string;
+    subject: string;
+    message: string;
+};
+type TaskWarning = {
+    id: string;
+    taskId: string;
+    tab: DetailTab;
+    title: string;
+    message: string;
+    tone: 'danger' | 'warning';
+};
+type SideAlert = {
+    id: number;
+    title: string;
+    message: string;
+    detail?: string;
+    tone: 'danger' | 'warning' | 'success';
 };
 
 const normalizeRows = <T,>(value: any): T[] => Array.isArray(value) ? value : Array.isArray(value?.items) ? value.items : [];
 
 const toDateRange = (start: dayjs.Dayjs, end: dayjs.Dayjs): MaintenanceDateRange => ({
-    start: parseDate(start.format('YYYY-MM-DD')),
-    end: parseDate(end.format('YYYY-MM-DD')),
+    start,
+    end,
 });
 
 const initialRange = () => {
@@ -43,53 +60,232 @@ const initialRange = () => {
     return toDateRange(start, start.add(6, 'day'));
 };
 
+const taskTechnicianIds = (task: MaintenanceTaskDto) => {
+    const ids = new Set<string>();
+    if (task.assignedTechId) ids.add(task.assignedTechId);
+    if (task.alternativeTechId) ids.add(task.alternativeTechId);
+    (task.assignments || []).forEach((assignment) => ids.add(assignment.technicianId));
+    return [...ids];
+};
+
+const taskTechnicianNames = (task: MaintenanceTaskDto) => {
+    const people = new Map<string, PersonLite>();
+    if (task.technician) people.set(task.technician.id, task.technician);
+    if (task.alternativeTechnician) people.set(task.alternativeTechnician.id, task.alternativeTechnician);
+    (task.assignments || []).forEach((assignment) => {
+        if (assignment.technician) people.set(assignment.technician.id, assignment.technician);
+    });
+    return [...people.values()].map(personName).join(', ') ||t('auto.atanmamis');
+};
+
+const approvedOptions = (tasks: MaintenanceTaskDto[]) =>
+    tasks.flatMap((task) => (task.appointmentOptions || [])
+        .filter((option) => option.status === 'APPROVED')
+        .map((option) => ({ task, option })));
+
+const isExpiredMaintenance = (task: MaintenanceTaskDto) =>
+    task.status !== 'COMPLETED'
+    && task.status !== 'CANCELLED'
+    && dayjs(task.plannedDate).startOf('day').isBefore(dayjs().startOf('day'));
+
+const optionToTimes = (option: AppointmentOptionInput) => {
+    const start = dayjs(`${option.date}T${option.time}`);
+    return {
+        startTime: start.toISOString(),
+        endTime: start.add(option.durationMinutes, 'minute').toISOString(),
+    };
+};
+
+const optionInterval = (option: AppointmentOptionInput) => {
+    const start = dayjs(`${option.date}T${option.time}`);
+    return { start, end: start.add(option.durationMinutes, 'minute') };
+};
+
+const taskInterval = (task: MaintenanceTaskDto) => {
+    if (!task.scheduledStartTime || !task.scheduledEndTime) return null;
+    return { start: dayjs(task.scheduledStartTime), end: dayjs(task.scheduledEndTime) };
+};
+
+const intervalsOverlap = (a: { start: dayjs.Dayjs; end: dayjs.Dayjs }, b: { start: dayjs.Dayjs; end: dayjs.Dayjs }) =>
+    a.start.isBefore(b.end) && a.end.isAfter(b.start);
+
+const taskCustomerId = (task: MaintenanceTaskDto) => task.contract?.customerId || task.contract?.customer?.id || '';
+
+const optionLabel = (interval: { start: dayjs.Dayjs; end: dayjs.Dayjs }) =>
+    `${interval.start.format("DD.MM.YYYY HH:mm")} - ${interval.end.format('HH:mm')}`;
+
+const buildTaskWarnings = (
+    task: MaintenanceTaskDto | null,
+    allTasks: MaintenanceTaskDto[],
+    options: AppointmentOptionInput[] = [],
+): TaskWarning[] => {
+    if (!task) return [];
+    const warnings: TaskWarning[] = [];
+    const technicianIds = taskTechnicianIds(task);
+    const customerId = taskCustomerId(task);
+
+    options.forEach((option, index) => {
+        const current = optionInterval(option);
+        const duplicateOption = options.find((other, otherIndex) => otherIndex !== index && intervalsOverlap(current, optionInterval(other)));
+        if (duplicateOption) {
+            warnings.push({
+                id: `option-overlap-${index}`,
+                taskId: task.id,
+                tab: 'appointment',
+                title: t('auto.option_conflicts_with_another_option', { number: index + 1 }),
+                message: t('auto.option_conflicts_with_plan', { range: optionLabel(current) }),
+                tone: 'danger',
+            });
+        }
+
+        allTasks.filter((row) => row.id !== task.id && row.status !== 'CANCELLED').forEach((row) => {
+            const hasTechnicianConflict = taskTechnicianIds(row).some((id) => technicianIds.includes(id));
+            const hasCustomerConflict = customerId && taskCustomerId(row) === customerId;
+            const rowInterval = taskInterval(row);
+            const approvedOptions = (row.appointmentOptions || []).filter((rowOption) => rowOption.status === 'PENDING' || rowOption.status === 'APPROVED');
+            const hasOptionConflict = approvedOptions.some((rowOption) => intervalsOverlap(current, { start: dayjs(rowOption.startTime), end: dayjs(rowOption.endTime) }));
+            const hasTaskConflict = rowInterval ? intervalsOverlap(current, rowInterval) : false;
+            if ((hasTechnicianConflict || hasCustomerConflict) && (hasTaskConflict || hasOptionConflict)) {
+                warnings.push({
+                    id: `task-conflict-${index}-${row.id}`,
+                    taskId: row.id,
+                    tab: 'appointment',
+                    title: hasTechnicianConflict ?t('auto.teknisyen_cakismasi') :t('auto.musteri_cakismasi'),
+                    message: t('auto.appointment_conflict_message', {
+                        range: optionLabel(current),
+                        target: row.contract?.customer?.companyName || row.contract?.title ||t('auto.baska_plan'),
+                    }),
+                    tone: 'danger',
+                });
+            }
+        });
+    });
+
+    return warnings;
+};
+
+const TechnicianRoster = ({
+    employees,
+    selectedIds,
+    responsibleId,
+    onChange,
+    onResponsibleChange,
+}: {
+    employees: PersonLite[];
+    selectedIds: string[];
+    responsibleId: string;
+    onChange: (ids: string[]) => void;
+    onResponsibleChange: (id: string) => void;
+}) => {
+    const available = employees.filter((employee) => !selectedIds.includes(employee.id));
+
+    const addTechnician = (id: string) => {
+        if (!id) return;
+        const nextIds = [...selectedIds, id];
+        onChange(nextIds);
+        if (!responsibleId) onResponsibleChange(id);
+    };
+
+    const removeTechnician = (id: string) => {
+        const nextIds = selectedIds.filter((selectedId) => selectedId !== id);
+        onChange(nextIds);
+        if (responsibleId === id) onResponsibleChange(nextIds[0] || '');
+    };
+
+    return (
+        <div className="rounded-lg border border-slate-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+                <span className="text-[12px] font-semibold text-slate-700">{t('auto.teknisyen_ekibi')}</span>
+                <div className="flex items-center gap-2">
+                    <AntSelect
+                        showSearch
+                        value={undefined}
+                        className="h-8 min-w-[190px] text-[12px]"
+                        placeholder={t('auto.teknisyen_ara')}
+                        options={available.map((employee) => ({ value: employee.id, label: personName(employee) }))}
+                        onChange={(value) => addTechnician(String(value || ''))}
+                        optionFilterProp="label"
+                    />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-500" title={t('auto.teknisyen_ekle')}>
+                        <Plus size={13} />
+                    </span>
+                </div>
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+                {employees.length === 0 ? (
+                    <div className="px-3 py-3 text-[12px] text-slate-500">{t('auto.teknisyen_rolunde_personel_yok')}</div>
+                ) : selectedIds.length === 0 ? (
+                    <div className="px-3 py-3 text-[12px] text-slate-500">{t('auto.henuz_teknisyen_eklenmedi')}</div>
+                ) : selectedIds.map((id) => {
+                    const employee = employees.find((row) => row.id === id);
+                    if (!employee) return null;
+                    const isResponsible = responsibleId === id;
+                    return (
+                        <div key={id} className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] ring-1 ${isResponsible ?t('auto.bg_amber_50_ring_amber_300') :t('auto.bg_sky_50_ring_sky_200')}`} aria-hidden="true">
+                                        <UserIcon size={14} />
+                                    </span>
+                                <div className="min-w-0">
+                                    <div className="truncate text-[12.5px] font-semibold text-slate-800">{personName(employee)}</div>
+                                    <div className="truncate text-[11px] text-slate-400">{employee.email ||t('maintenance.dashboard.colTechnician')}</div>
+                                </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => onResponsibleChange(id)}
+                                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors ${isResponsible ?"border-emerald-200 bg-emerald-50 text-emerald-700" :t('auto.border_slate_200_bg_white_text_slate_500_hover_b')}`}
+                                >
+                                    {isResponsible ?t('auto.sorumlu') :t('auto.sorumlu_yap')}
+                                </button>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => removeTechnician(id)}>-</Button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 export const MaintenanceTasks = () => {
+    const { taskId } = useParams();
+    if (taskId) return <MaintenanceTaskDetail taskId={taskId} />;
+    return <MaintenanceTaskList />;
+};
+
+const MaintenanceTaskList = () => {
+    ensureMaintenanceLocale();
+    const navigate = useNavigate();
     const [scheduleView, setScheduleView] = useState<ScheduleView>('list');
     const [anchorDate, setAnchorDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [appliedRange, setAppliedRange] = useState<MaintenanceDateRange>(() => initialRange());
     const [pickerRange, setPickerRange] = useState<MaintenanceDateRange | null>(() => initialRange());
     const [tasks, setTasks] = useState<MaintenanceTaskDto[]>([]);
-    const [employees, setEmployees] = useState<PersonLite[]>([]);
-    const [articles, setArticles] = useState<InventoryArticle[]>([]);
-    const [locations, setLocations] = useState<InventoryLocation[]>([]);
     const [loading, setLoading] = useState(true);
-    const [editTask, setEditTask] = useState<MaintenanceTaskDto | null>(null);
-    const [reportTask, setReportTask] = useState<MaintenanceTaskDto | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [editForm, setEditForm] = useState({ plannedDate: '', assignedTechId: '', alternativeTechId: '', siteName: '', status: 'PENDING' as TaskStatus });
-    const [reportForm, setReportForm] = useState(emptyReport);
-    const [materials, setMaterials] = useState<MaterialInput[]>([]);
-    const [checklist, setChecklist] = useState([
-        { label: 'Ekipman genel kontrol', checked: false, required: true },
-        { label: 'Filtre / temizlik kontrolü', checked: false, required: true },
-        { label: 'Elektrik ve güvenlik kontrolü', checked: false, required: true },
-    ]);
+    const [selectedTask, setSelectedTask] = useState<MaintenanceTaskDto | null>(null);
+    const [approvalNoticeClosed, setApprovalNoticeClosed] = useState(() => localStorage.getItem('approvalNoticeClosed') === 'true');
+    const [page, setPage] = useState(1);
+    const pageSize = 15;
 
     const range = useMemo(() => ({
-        start: dayjs(appliedRange.start.toString()).startOf('day'),
-        end: dayjs(appliedRange.end.toString()).endOf('day'),
+        start: appliedRange.start.startOf('day'),
+        end: appliedRange.end.endOf('day'),
     }), [appliedRange]);
 
     const load = async () => {
         setLoading(true);
-        const [taskRows, employeeRes, articleRows, locationRows] = await Promise.allSettled([
-            maintenanceApi.listTasks(range.start.format('YYYY-MM-DD'), range.end.format('YYYY-MM-DD')),
-            maintenanceApi.listTechnicians(),
-            articleApi.list({ onlyActive: true }) as Promise<InventoryArticle[]>,
-            inventoryApi.listLocations(),
-        ]);
-
-        if (taskRows.status === 'fulfilled') {
-            setTasks(taskRows.value);
-        } else {
-            toast.error(taskRows.reason?.response?.data?.error || 'Bakım takvimi yüklenemedi.');
+        try {
+            const rows = await maintenanceApi.listTasks(range.start.format('YYYY-MM-DD'), range.end.format('YYYY-MM-DD'));
+            setTasks(rows);
+            setSelectedTask((current) => current ? rows.find((task) => task.id === current.id) || current : current);
+        } catch (error: any) {
+            toast.error(error.response?.data?.error ||t('auto.bakim_takvimi_yuklenemedi'));
             setTasks([]);
+        } finally {
+            setLoading(false);
         }
-
-        setEmployees(employeeRes.status === 'fulfilled' ? normalizeRows<PersonLite>(employeeRes.value) : []);
-        setArticles(articleRows.status === 'fulfilled' ? articleRows.value : []);
-        setLocations(locationRows.status === 'fulfilled' ? locationRows.value : []);
-        setLoading(false);
     };
 
     useEffect(() => {
@@ -98,372 +294,675 @@ export const MaintenanceTasks = () => {
 
     const applyRange = (nextRange: MaintenanceDateRange | null = pickerRange) => {
         if (!nextRange?.start || !nextRange?.end) return;
-        const start = dayjs(nextRange.start.toString());
-        const end = dayjs(nextRange.end.toString());
-        const normalized = start.isAfter(end)
-            ? toDateRange(end, start)
-            : toDateRange(start, end);
+        const normalized = nextRange.start.isAfter(nextRange.end)
+            ? toDateRange(nextRange.end, nextRange.start)
+            : toDateRange(nextRange.start, nextRange.end);
         setAppliedRange(normalized);
         setPickerRange(normalized);
-        setAnchorDate(normalized.start.toString());
+        setAnchorDate(normalized.start.format('YYYY-MM-DD'));
     };
 
     const applyMonthRange = (month: dayjs.Dayjs) => {
         const next = toDateRange(month.startOf('month'), month.endOf('month'));
         setAppliedRange(next);
         setPickerRange(next);
-        setAnchorDate(next.start.toString());
+        setAnchorDate(next.start.format('YYYY-MM-DD'));
     };
 
-    const openEdit = (task: MaintenanceTaskDto) => {
-        setEditTask(task);
-        setEditForm({
-            plannedDate: dayjs(task.plannedDate).format('YYYY-MM-DD'),
-            assignedTechId: task.assignedTechId || '',
-            alternativeTechId: task.alternativeTechId || '',
-            siteName: task.siteName || task.contract?.siteName || '',
-            status: task.status,
-        });
-    };
-
-    const saveTask = async () => {
-        if (!editTask) return;
-        setSaving(true);
-        try {
-            const alternativeTechId = editForm.alternativeTechId && editForm.alternativeTechId !== editForm.assignedTechId
-                ? editForm.alternativeTechId
-                : null;
-
-            await maintenanceApi.updateTask(editTask.id, {
-                plannedDate: editForm.plannedDate,
-                assignedTechId: editForm.assignedTechId || null,
-                alternativeTechId,
-                siteName: editForm.siteName || null,
-                status: editForm.status,
-            });
-            toast.success('Görev güncellendi.');
-            setEditTask(null);
-            await load();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Görev güncellenemedi.');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const openReport = (task: MaintenanceTaskDto) => {
-        setReportTask(task);
-        setReportForm(emptyReport);
-        setMaterials([]);
-        setChecklist(checklist.map((item) => ({ ...item, checked: false })));
-    };
-
-    const submitReport = async () => {
-        if (!reportTask) return;
-        if (!reportForm.operationsDone.trim()) {
-            toast.error('Yapılan işlemler zorunludur.');
+    const openTaskWorkspace = (task: MaintenanceTaskDto, tab: DetailTab = 'appointment') => {
+        if (isExpiredMaintenance(task)) {
+            toast.error(t('auto.suresi_dolmus_bakim_uzerinde_islem_yapilamaz'));
             return;
         }
-        const missingMaterial = materials.some((row) => !row.articleId || !row.sourceLocationId || row.quantity <= 0);
-        if (missingMaterial) {
-            toast.error('Malzeme satırlarında ürün, depo ve miktar zorunludur.');
-            return;
-        }
-
-        setSaving(true);
-        try {
-            await maintenanceApi.submitReport({
-                taskId: reportTask.id,
-                operationsDone: reportForm.operationsDone,
-                observations: reportForm.observations,
-                recommendations: reportForm.recommendations,
-                riskNotes: reportForm.riskNotes,
-                checklistJson: checklist,
-                beforePhotoUrls: splitLines(reportForm.beforePhotoUrls),
-                afterPhotoUrls: splitLines(reportForm.afterPhotoUrls),
-                fileUrls: splitLines(reportForm.fileUrls),
-                extraMaterials: materials,
-            });
-            toast.success('Bakım raporu kaydedildi. İmza bekleniyor.');
-            setReportTask(null);
-            await load();
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Rapor kaydedilemedi.');
-        } finally {
-            setSaving(false);
-        }
+        navigate(`/maintenance/tasks/${task.id}?tab=${tab}`);
     };
+
+    const sortedTasks = useMemo(() => {
+        return [...tasks].sort((a, b) => dayjs(a.plannedDate).valueOf() - dayjs(b.plannedDate).valueOf());
+    }, [tasks]);
+
+    const paginatedTasks = useMemo(() => {
+        if (scheduleView === 'calendar') return sortedTasks; // takvimde hepsi görünsün
+        const start = (page - 1) * pageSize;
+        return sortedTasks.slice(start, start + pageSize);
+    }, [sortedTasks, page, scheduleView]);
 
     const grouped = useMemo(() => {
         const map = new Map<string, MaintenanceTaskDto[]>();
-        tasks.forEach((task) => {
+        paginatedTasks.forEach((task) => {
             const key = dayjs(task.plannedDate).format('YYYY-MM-DD');
             map.set(key, [...(map.get(key) || []), task]);
         });
         return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-    }, [tasks]);
+    }, [paginatedTasks]);
 
-    const taskMeta = (task: MaintenanceTaskDto) =>
-        [task.contract?.title, task.siteName || task.contract?.siteName]
-            .filter(Boolean)
-            .join(' · ') || 'Saha bilgisi yok';
+    const approvals = approvedOptions(tasks);
 
     return (
         <div>
             <PageHeader
-                breadcrumb="Bakım"
-                title="Teknisyen takvimi"
-                description="Günlük, haftalık ve aylık bakım planını saha teknisyenlerine göre yönetin."
+                breadcrumb={t('nav.maintenance')}
+                title={t('nav.maintenanceTasks')}
+                description={t('auto.bakim_gorevleri_icin_sorumlu_teknisyenleri_atayi')}
                 actions={
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-                            <button
-                                type="button"
-                                onClick={() => setScheduleView('list')}
-                                title="Liste görünümü"
-                                className={`flex h-8 w-8 items-center justify-center rounded-md ${scheduleView === 'list' ? 'bg-brand-solid text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                            >
+                            <button type="button" onClick={() => setScheduleView('list')} title={t('auto.liste_gorunumu')} className={`flex h-8 w-8 items-center justify-center rounded-md ${scheduleView === 'list' ?"bg-brand-solid text-white" :"text-slate-600 hover:bg-slate-50"}`}>
                                 <FilterLines size={13} />
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setScheduleView('calendar')}
-                                title="Takvim görünümü"
-                                className={`flex h-8 w-8 items-center justify-center rounded-md ${scheduleView === 'calendar' ? 'bg-brand-solid text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                            >
+                            <button type="button" onClick={() => setScheduleView('calendar')} title={t('auto.takvim_gorunumu')} className={`flex h-8 w-8 items-center justify-center rounded-md ${scheduleView === 'calendar' ?"bg-brand-solid text-white" :"text-slate-600 hover:bg-slate-50"}`}>
                                 <Calendar size={13} />
                             </button>
                         </div>
-                        <DateRangePicker
-                            value={pickerRange}
-                            onChange={setPickerRange}
-                            onApply={() => applyRange()}
-                            onCancel={() => setPickerRange(appliedRange)}
-                            size="md"
+                        <DatePicker.RangePicker
+                            value={pickerRange ? [pickerRange.start, pickerRange.end] : null}
+                            onChange={(dates) => {
+                                if (!dates?.[0] || !dates[1]) {
+                                    setPickerRange(null);
+                                    return;
+                                }
+
+                                applyRange({ start: dates[0], end: dates[1] });
+                            }}
+                            format="DD.MM.YYYY"
+                            allowClear={false}
+                            size="middle"
                         />
                     </div>
                 }
             />
 
-            <Card
-                title={`${fmtDate(range.start.toISOString())} - ${fmtDate(range.end.toISOString())}`}
-                description={`${tasks.length} görev · seçili plan aralığı`}
-                icon={<FilterLines size={13} />}
-                noPadding
-            >
+            {approvals.length > 0 && !approvalNoticeClosed && (
+                <div className={t('auto.mb_4_rounded_lg_px_4_py_3_text_white_shadow_sm_b')}>
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-white text-lg font-black text-orange-500">!</span>
+                        <div className="min-w-0">
+                            <div className="text-[13px] font-semibold">{t('auto.onay_noktasi')}</div>
+                            <div className="text-[12px] text-white/90">
+                                {approvals.length}{t('auto.musteri_randevu_yaniti_alindi')}</div>
+                        </div>
+                        <button
+                            type="button"
+                            className="ml-auto flex h-7 w-7 items-center justify-center rounded text-white hover:bg-white/15"
+                            onClick={() => { setApprovalNoticeClosed(true); localStorage.setItem('approvalNoticeClosed', 'true'); }}
+                            title={t('common.close')}
+                        >
+                            <XClose size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <Card title={`${fmtDate(range.start.toISOString())} - ${fmtDate(range.end.toISOString())}`} description={t('auto.selected_plan_range_count', { count: tasks.length })} icon={<FilterLines size={13} />} noPadding>
                 {loading ? (
                     <div className="space-y-2 p-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />)}</div>
                 ) : grouped.length === 0 ? (
-                    <EmptyState icon={<Calendar size={32} />} title="Bu aralıkta görev yok" description="Sözleşme oluşturunca periyodik bakım görevleri burada görünür." />
+                    <EmptyState icon={<Calendar size={32} />} title={t('auto.bu_aralikta_gorev_yok')} description={t('auto.sozlesme_olusturunca_periyodik_bakim_gorevleri_b')} />
                 ) : scheduleView === 'calendar' ? (
-                    <MaintenanceCalendarView
-                        anchorDate={anchorDate}
-                        tasks={tasks}
-                        onAnchorDateChange={setAnchorDate}
-                        onMonthRangeChange={applyMonthRange}
-                        onOpenEdit={openEdit}
-                        onOpenReport={openReport}
-                    />
+                    <MaintenanceCalendarView anchorDate={anchorDate} tasks={tasks} selectedTaskId={selectedTask?.id} onAnchorDateChange={setAnchorDate} onMonthRangeChange={applyMonthRange} onOpenTask={openTaskWorkspace} />
                 ) : (
                     <div className="overflow-x-auto">
                         <div className="min-w-[980px]">
-                            <div className="grid grid-cols-[150px_minmax(260px,1.4fr)_210px_140px_150px_140px] border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] font-semibold text-slate-500">
-                                <div>Tarih</div>
-                                <div>Müşteri ve iş</div>
-                                <div>Teknisyen</div>
-                                <div>Durum</div>
-                                <div>Rapor</div>
-                                <div className="text-right">İşlem</div>
+                            <div className="grid grid-cols-[150px_minmax(260px,1.4fr)_240px_160px_140px_150px] border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-[11px] font-semibold text-slate-500">
+                                <div>{t('common.date')}</div>
+                                <div>{t('auto.musteri_ve_is')}</div>
+                                <div>{t('maintenance.dashboard.colTechnician')}</div>
+                                <div>{t('common.status')}</div>
+                                <div>{t('auto.saat')}</div>
+                                <div className="text-right">{t('common.actions')}</div>
                             </div>
                             <div className="divide-y divide-slate-100">
-                                {grouped.flatMap(([day, rows]) =>
-                                    rows.map((task) => {
-                                        const canCreateReport = !task.report && task.status !== 'CANCELLED';
-
-                                        return (
-                                            <div
-                                                key={task.id}
-                                                className="grid grid-cols-[150px_minmax(260px,1.4fr)_210px_140px_150px_140px] items-center px-4 py-3 text-[13px] transition-colors hover:bg-slate-50/70"
-                                            >
-                                                <div className="min-w-0">
-                                                    <div className="font-semibold text-slate-900">{dayjs(day).format('DD.MM.YYYY')}</div>
-                                                    <div className="mt-0.5 text-[11px] capitalize text-slate-500">{dayjs(day).format('dddd')}</div>
+                                {grouped.flatMap(([day, rows]) => rows.map((task) => {
+                                    const approved = task.appointmentOptions?.some((option) => option.status === 'APPROVED');
+                                    const managerApproved = Boolean(task.managerApprovedAt);
+                                    const expired = isExpiredMaintenance(task);
+                                    const selected = selectedTask?.id === task.id;
+                                    return (
+                                        <div
+                                            key={task.id}
+                                            onClick={() => !expired && openTaskWorkspace(task, 'overview')}
+                                            className={`grid grid-cols-[150px_minmax(260px,1.4fr)_240px_160px_140px_150px] items-center px-4 py-3 text-[13px] transition-colors ${expired ?t('auto.bg_slate_50_text_slate_400') : selected ?t('auto.cursor_pointer_bg_brand_primary_alt_40') :"cursor-pointer hover:bg-slate-50/70"}`}
+                                        >
+                                            <div>
+                                                <div className={`font-semibold ${expired ? 'text-slate-500' : 'text-slate-900'}`}>{dayjs(day).format('DD.MM.YYYY')}</div>
+                                                <div className="mt-0.5 text-[11px] capitalize text-slate-500">{dayjs(day).format('dddd')}</div>
+                                            </div>
+                                            <div className="min-w-0 pr-4">
+                                                <div className="block max-w-full text-left">
+                                                    <span className={`block truncate font-semibold ${expired ? 'text-slate-500' : 'text-slate-900'}`}>{task.contract?.customer?.companyName || task.contract?.title ||t('auto.musteri_bilgisi_yok')}</span>
                                                 </div>
-                                                <div className="min-w-0 pr-4">
-                                                    <div className="truncate font-semibold text-slate-900">{task.contract?.customer?.companyName || task.contract?.title || 'Müşteri bilgisi yok'}</div>
-                                                    <div className="mt-0.5 truncate text-[12px] text-slate-500">{taskMeta(task)}</div>
-                                                </div>
-                                                <div className="min-w-0 pr-3 text-slate-600">
-                                                    <div className="flex min-w-0 items-center gap-1.5">
-                                                        <UserIcon size={12} className="shrink-0 text-slate-400" />
-                                                        <span className="truncate">{personName(task.technician) === '-' ? 'Atanmamış' : personName(task.technician)}</span>
+                                                <div className="mt-0.5 truncate text-[12px] text-slate-500">{task.contract?.contractCode} · {task.contract?.title}</div>
+                                                {approved && (
+                                                    <div className={`mt-1 inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-semibold ${managerApproved ?t('auto.bg_emerald_50_text_emerald_700') :t('auto.bg_red_50_text_red_700')}`}>
+                                                        {managerApproved ? <CheckCircle size={11} /> : <AlertTriangle size={11} />}
+                                                        {managerApproved ?t('auto.onaylandi') :t('auto.secim_isleniyor')}
                                                     </div>
-                                                    {task.alternativeTechnician && (
-                                                        <div className="mt-0.5 truncate pl-5 text-[11px] text-slate-400">
-                                                            Alternatif: {personName(task.alternativeTechnician)}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div><StatusPill status={task.status} /></div>
-                                                <div className="text-[12px] text-slate-600">
-                                                    {task.report ? (task.report.isSigned ? 'İmzalı rapor' : 'İmza bekliyor') : 'Rapor oluşturulmadı'}
-                                                </div>
-                                                <div className="grid grid-cols-[32px_82px] items-center justify-end gap-1">
-                                                    <div className="flex justify-center">
-                                                        <Button variant="ghost" size="sm" icon={<Edit size={12} />} onClick={() => openEdit(task)} />
-                                                    </div>
-                                                    <div className="flex justify-end">
-                                                        {canCreateReport ? (
-                                                            <Button className="w-[82px]" variant="secondary" size="sm" icon={<FileText size={12} />} onClick={() => openReport(task)}>
-                                                                Rapor
-                                                            </Button>
-                                                        ) : (
-                                                            <span className="block h-8 w-[82px]" />
-                                                        )}
-                                                    </div>
+                                                )}
+                                                {expired && <div className="mt-1 inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600"><AlertTriangle size={11} />{t('auto.suresi_dolmus_bakim')}</div>}
+                                            </div>
+                                            <div className="min-w-0 pr-3 text-slate-600">
+                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                    <UserIcon size={12} className="shrink-0 text-slate-400" />
+                                                    <span className="truncate">{taskTechnicianNames(task)}</span>
                                                 </div>
                                             </div>
-                                        );
-                                    })
-                                )}
+                                            <div>{expired ? <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{t('auto.suresi_dolmus')}</span> : <StatusPill status={task.status} />}</div>
+                                            <div className="text-[12px] text-slate-600">
+                                                {task.scheduledStartTime && task.scheduledEndTime
+                                                    ? `${dayjs(task.scheduledStartTime).format('HH:mm')} - ${dayjs(task.scheduledEndTime).format('HH:mm')}`
+                                                    :t('auto.saat_yok')}
+                                            </div>
+                                            <div className="flex justify-end gap-1">
+                                                {!expired && <span className="text-[12px] font-semibold text-slate-500">{t('auto.ac')}</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                }))}
+                            </div>
+                            <div className="flex items-center justify-between border-t border-slate-100 p-4">
+                                <span className="text-[12px] text-slate-500">
+                                    {sortedTasks.length}{t('auto.kayittan')}{(page - 1) * pageSize + 1} - {Math.min(page * pageSize, sortedTasks.length)}{t('auto.arasi_gosteriliyor')}</span>
+                                <div className="flex items-center gap-1">
+                                    <Button type="button" variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>{t('auto.onceki')}</Button>
+                                    <Button type="button" variant="secondary" size="sm" disabled={page * pageSize >= sortedTasks.length} onClick={() => setPage(p => p + 1)}>{t('auto.sonraki')}</Button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
             </Card>
+        </div>
+    );
+};
 
-            <Modal
-                open={!!editTask}
-                title="Görev ataması"
-                description="Tarih veya teknisyen değişirse sistem otomatik çakışma kontrolü yapar."
-                onClose={() => setEditTask(null)}
-                width="lg"
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => setEditTask(null)}>İptal</Button>
-                        <Button loading={saving} icon={<Save size={13} />} onClick={saveTask}>Kaydet</Button>
-                    </>
-                }
-            >
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <Field label="Plan tarihi"><Input type="date" value={editForm.plannedDate} onChange={(e) => setEditForm({ ...editForm, plannedDate: e.target.value })} /></Field>
-                    <Field label="Durum">
-                        <Select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as TaskStatus })}>
-                            {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                        </Select>
-                    </Field>
-                    <Field label="Teknisyen">
-                        <Select value={editForm.assignedTechId} onChange={(e) => setEditForm({ ...editForm, assignedTechId: e.target.value })}>
-                            <option value="">Seçiniz</option>
-                            {!employees.length && <option value="__no_technicians" disabled>Teknisyen rolünde personel yok</option>}
-                            {employees.map((employee) => <option key={employee.id} value={employee.id}>{personName(employee)}</option>)}
-                        </Select>
-                    </Field>
-                    <Field label="Alternatif teknisyen">
-                        <Select value={editForm.alternativeTechId} onChange={(e) => setEditForm({ ...editForm, alternativeTechId: e.target.value })}>
-                            <option value="">Seçiniz</option>
-                            {!employees.length && <option value="__no_technicians" disabled>Teknisyen rolünde personel yok</option>}
-                            {employees.map((employee) => <option key={employee.id} value={employee.id}>{personName(employee)}</option>)}
-                        </Select>
-                    </Field>
-                    <Field label="Saha / lokasyon" className="md:col-span-2">
-                        <Input value={editForm.siteName} onChange={(e) => setEditForm({ ...editForm, siteName: e.target.value })} />
-                    </Field>
-                </div>
-            </Modal>
+const detailTabs: Array<{ key: DetailTab; label: string }> = [
+    { key: 'appointment', label:t('auto.randevu') },
+    { key: 'mail', label:t('auto.mail') },
+    { key: 'approval', label:t('auto.manuel_onay') },
+];
 
-            <Modal
-                open={!!reportTask}
-                title="Bakım raporu"
-                description={reportTask ? `${reportTask.contract?.customer?.companyName || ''} - ${fmtDate(reportTask.plannedDate)}` : undefined}
-                onClose={() => setReportTask(null)}
-                width="full"
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => setReportTask(null)}>İptal</Button>
-                        <Button loading={saving} icon={<Save size={13} />} onClick={submitReport}>Raporu kaydet</Button>
-                    </>
-                }
-            >
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-                    <div className="space-y-3 xl:col-span-7">
-                        <Field label="Yapılan işlemler" required>
-                            <Textarea rows={4} value={reportForm.operationsDone} onChange={(e) => setReportForm({ ...reportForm, operationsDone: e.target.value })} />
-                        </Field>
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                            <Field label="Teknik gözlemler"><Textarea rows={3} value={reportForm.observations} onChange={(e) => setReportForm({ ...reportForm, observations: e.target.value })} /></Field>
-                            <Field label="Öneriler"><Textarea rows={3} value={reportForm.recommendations} onChange={(e) => setReportForm({ ...reportForm, recommendations: e.target.value })} /></Field>
-                            <Field label="Risk notları"><Textarea rows={3} value={reportForm.riskNotes} onChange={(e) => setReportForm({ ...reportForm, riskNotes: e.target.value })} /></Field>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                            <Field label="Servis öncesi URL" hint="Her satıra bir dosya/fotoğraf URL'si"><Textarea rows={2} value={reportForm.beforePhotoUrls} onChange={(e) => setReportForm({ ...reportForm, beforePhotoUrls: e.target.value })} /></Field>
-                            <Field label="Servis sonrası URL"><Textarea rows={2} value={reportForm.afterPhotoUrls} onChange={(e) => setReportForm({ ...reportForm, afterPhotoUrls: e.target.value })} /></Field>
-                            <Field label="Ek dosya URL"><Textarea rows={2} value={reportForm.fileUrls} onChange={(e) => setReportForm({ ...reportForm, fileUrls: e.target.value })} /></Field>
+const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as DetailTab) || 'appointment';
+    const [activeTab, setActiveTab] = useState<DetailTab>(detailTabs.some((tab) => tab.key === initialTab) ? initialTab : 'appointment');
+    const [task, setTask] = useState<MaintenanceTaskDto | null>(null);
+    const [allTasks, setAllTasks] = useState<MaintenanceTaskDto[]>([]);
+    const [employees, setEmployees] = useState<PersonLite[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const [editForm, setEditForm] = useState<AssignmentFormState>({
+        plannedDate: '',
+        responsibleTechId: '',
+        technicianIds: [],
+    });
+    const [mailForm, setMailForm] = useState<MailFormState>({
+        to: '',
+        fromName:t('auto.offitec_erp'),
+        fromEmail: '',
+        subject: '',
+        message:t('auto.lutfen_size_uygun_bakim_randevusunu_secin'),
+    });
+    const [options, setOptions] = useState<AppointmentOptionInput[]>([]);
+
+    const loadDetail = async () => {
+        setLoading(true);
+        try {
+            const [taskRow, techRows] = await Promise.all([
+                maintenanceApi.getTask(taskId),
+                maintenanceApi.listTechnicians(),
+            ]);
+            setTask(taskRow);
+            setEmployees(normalizeRows<PersonLite>(techRows));
+            const technicianIds = taskTechnicianIds(taskRow);
+            const responsibleTechId = taskRow.assignedTechId || technicianIds[0] || '';
+            const activeOptions = (taskRow.appointmentOptions || []).filter((option) => option.status === 'PENDING' || option.status === 'APPROVED');
+            setEditForm({
+                plannedDate: dayjs(taskRow.plannedDate).format('YYYY-MM-DD'),
+                responsibleTechId,
+                technicianIds,
+            });
+            setMailForm({
+                to: taskRow.contract?.customer?.mainEmail || '',
+                fromName:t('auto.offitec_erp'),
+                fromEmail: '',
+                subject: `${taskRow.contract?.contractCode || ''} Bakım randevusu`,
+                message:t('auto.lutfen_size_uygun_bakim_randevusunu_secin'),
+            });
+            setOptions(activeOptions.length
+                ? activeOptions.map((option) => ({
+                    date: dayjs(option.startTime).format('YYYY-MM-DD'),
+                    time: dayjs(option.startTime).format('HH:mm'),
+                    durationMinutes: Math.max(30, dayjs(option.endTime).diff(dayjs(option.startTime), 'minute')),
+                }))
+                : []);
+            const start = dayjs(taskRow.plannedDate).subtract(7, 'day').format('YYYY-MM-DD');
+            const end = dayjs(taskRow.plannedDate).add(14, 'day').format('YYYY-MM-DD');
+            setAllTasks(await maintenanceApi.listTasks(start, end));
+        } catch (error: any) {
+            toast.error(error.response?.data?.error ||t('auto.bakim_detayi_yuklenemedi'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadDetail();
+    }, [taskId]);
+
+    const filledOptions = useMemo(() => options.map((opt) => ({ ...opt, date: opt.date || editForm.plannedDate })), [options, editForm.plannedDate]);
+    const warnings = useMemo(() => buildTaskWarnings(task, allTasks, filledOptions), [task, allTasks, filledOptions]);
+    const hasBlockingWarnings = warnings.some((warning) => warning.tone === 'danger');
+
+    const showSideAlert = (input: Omit<SideAlert, 'id'>) => {
+        toast.error(input.message, { description: input.detail, className: 'custom-toast' });
+    };
+
+    const fillOptionDate = (opt: AppointmentOptionInput) => ({
+        ...opt,
+        date: editForm.plannedDate,
+    });
+
+    const changeTab = (tab: DetailTab) => {
+        setActiveTab(tab);
+        setSearchParams({ tab });
+    };
+
+    const saveTask = async () => {
+        if (!task) return;
+        if (isExpiredMaintenance(task)) return toast.error(t('auto.suresi_dolmus_bakim_uzerinde_islem_yapilamaz'));
+        if (hasBlockingWarnings) {
+            const warning = warnings.find((row) => row.tone === 'danger')!;
+            showSideAlert({ title: warning.title, message: warning.message, detail: `İlgili bakım: ${task.contract?.contractCode || task.id}`, tone: 'danger' });
+            return;
+        }
+        const technicianIds = [
+            editForm.responsibleTechId,
+            ...editForm.technicianIds.filter((id) => id !== editForm.responsibleTechId),
+        ].filter(Boolean);
+        const filledOpts = options.map(fillOptionDate);
+        const validOptions = filledOpts.filter((opt) => opt.date && opt.time);
+        if (validOptions.length === 0) {
+            toast.error(t('auto.en_az_bir_randevu_opsiyonu_ekleyin'), { className: 'custom-toast' });
+            return;
+        }
+        setSaving(true);
+        try {
+            await maintenanceApi.updateTask(task.id, {
+                plannedDate: editForm.plannedDate,
+                technicianIds,
+                assignedTechId: editForm.responsibleTechId || null,
+            });
+            await maintenanceApi.saveAppointmentOptionsDraft(task.id, validOptions.map(optionToTimes));
+            toast.success(t('auto.randevu_opsiyonlari_basariyla_kaydedildi'));
+            await loadDetail();
+        } catch (error: any) {
+            const message = error.response?.data?.error ||t('auto.gorev_guncellenemedi');
+            showSideAlert({ title:t('auto.kaydetme_hatasi'), message, detail: `İlgili bakım: ${task.contract?.contractCode || task.id}`, tone: 'danger' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const sendProposal = async () => {
+        if (!task) return;
+        if (isExpiredMaintenance(task)) return toast.error(t('auto.suresi_dolmus_bakim_uzerinde_islem_yapilamaz'));
+        if (!mailForm.to.trim()) return toast.error(t('auto.alici_e_posta_zorunludur'));
+        if (hasBlockingWarnings) {
+            const warning = warnings.find((row) => row.tone === 'danger')!;
+            showSideAlert({ title: warning.title, message: warning.message, detail: `İlgili bakım: ${task.contract?.contractCode || task.id}`, tone: 'danger' });
+            return;
+        }
+        setSaving(true);
+        try {
+            await maintenanceApi.sendAppointmentOptions(task.id, {
+                ...mailForm,
+                options: options.map(fillOptionDate).map(optionToTimes),
+            });
+            toast.success(t('auto.randevu_onerileri_gonderildi'));
+            await loadDetail();
+            changeTab('approval');
+        } catch (error: any) {
+            const message = error.response?.data?.error ||t('auto.randevu_onerileri_gonderilemedi');
+            showSideAlert({ title:t('auto.sunucu_cakisma_uyarisi'), message, detail: `İlgili bakım: ${task.contract?.contractCode || task.id}`, tone: 'danger' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const approveOption = async (optionId: string) => {
+        if (!task) return;
+        setSaving(true);
+        try {
+            const res = await maintenanceApi.approveAppointmentOption(task.id, optionId);
+            setTask(res.task);
+            toast.success(t('auto.yonetici_onayi_verildi'));
+            await loadDetail();
+            changeTab('approval');
+        } catch (error: any) {
+            const message = error.response?.data?.error ||t('auto.yonetici_onayi_verilemedi');
+            showSideAlert({ title:t('auto.onay_cakismasi'), message, detail: `İlgili bakım: ${task.contract?.contractCode || task.id}`, tone: 'danger' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div>
+            <PageHeader
+                breadcrumb="Bakım / Randevu"
+                title={task ? `${task.contract?.contractCode || ''} ${task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}` :t('auto.bakim_randevusu')}
+                description={t('auto.randevu_opsiyonlari_mail_musteri_secimi_ve_manue')}
+                actions={<Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/maintenance/tasks')}>{t('auto.listeye_don')}</Button>}
+            />
+
+            {loading || !task ? (
+                <Card><div className="h-64 animate-pulse rounded bg-slate-100" /></Card>
+            ) : (
+                <>
+                    <TaskWorkspace
+                        task={task}
+                        allTasks={allTasks}
+                        activeTab={activeTab}
+                        employees={employees}
+                        editForm={editForm}
+                        mailForm={mailForm}
+                        options={options}
+                        saving={saving}
+                        onTabChange={changeTab}
+                        onEditFormChange={setEditForm}
+                        onMailFormChange={setMailForm}
+                        onOptionsChange={(next) => {
+                            const filled = next.map(fillOptionDate);
+                            const nextWarnings = buildTaskWarnings(task, allTasks, filled).filter((warning) => warning.tone === 'danger');
+                            if (nextWarnings.length) {
+                                showSideAlert({
+                                    title: nextWarnings[0].title,
+                                    message: nextWarnings[0].message,
+                                    detail: `İlgili bakım: ${task.contract?.contractCode || task.id}`,
+                                    tone: 'danger',
+                                });
+                                return;
+                            }
+                            setOptions(next);
+                        }}
+                        onSaveTask={saveTask}
+                        onSendProposal={sendProposal}
+                        onApproveOption={approveOption}
+                    />
+                </>
+            )}
+        </div>
+    );
+};
+
+const TaskWorkspace = ({
+    task,
+    allTasks,
+    activeTab,
+    employees,
+    editForm,
+    mailForm,
+    options,
+    saving,
+    onTabChange,
+    onEditFormChange,
+    onMailFormChange,
+    onOptionsChange,
+    onSaveTask,
+    onSendProposal,
+    onApproveOption,
+}: {
+    task: MaintenanceTaskDto | null;
+    allTasks: MaintenanceTaskDto[];
+    activeTab: DetailTab;
+    employees: PersonLite[];
+    editForm: AssignmentFormState;
+    mailForm: MailFormState;
+    options: AppointmentOptionInput[];
+    saving: boolean;
+    onTabChange: (tab: DetailTab) => void;
+    onEditFormChange: (form: AssignmentFormState) => void;
+    onMailFormChange: (form: MailFormState) => void;
+    onOptionsChange: (options: AppointmentOptionInput[]) => void;
+    onSaveTask: () => void;
+    onSendProposal: () => void;
+    onApproveOption: (optionId: string) => void;
+}) => {
+    const disabled = !task || isExpiredMaintenance(task);
+    const updateOption = (index: number, next: Partial<AppointmentOptionInput>) =>
+        onOptionsChange(options.map((row, rowIndex) => rowIndex === index ? { ...row, ...next } : row));
+    const selectedIds = editForm.technicianIds;
+    const activeOptions = (task?.appointmentOptions || []).filter((option) => option.status === 'PENDING' || option.status === 'APPROVED');
+    const approvedOption = activeOptions.find((option) => option.status === 'APPROVED');
+
+    return (
+        <Card title={t('auto.bakim_randevu_detayi')} icon={<Calendar size={13} />}>
+            {!task ? (
+                <EmptyState icon={<Calendar size={28} />} title={t('auto.bakim_secin')} description={t('auto.listeden_bir_bakim_secildiginde_randevu_ve_mail_')} />
+            ) : (
+                <div className="space-y-4">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="font-mono text-[11px] font-semibold text-slate-500">{task.contract?.contractCode}</div>
+                                <div className="truncate text-[15px] font-semibold text-slate-950">{task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}</div>
+                                <div className="mt-1 truncate text-[12px] text-slate-500">{fmtDate(task.plannedDate)} · {task.contract?.title}</div>
+                            </div>
+                            {disabled ? (
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{t('auto.suresi_dolmus')}</span>
+                            ) : <StatusPill status={task.status} />}
                         </div>
                     </div>
-                    <div className="space-y-4 xl:col-span-5">
-                        <div className="rounded-lg border border-slate-200/80">
-                            <div className="border-b border-slate-100 px-3 py-2 text-[12px] font-semibold text-slate-700">Standart kontrol listesi</div>
-                            <div className="divide-y divide-slate-100">
-                                {checklist.map((item, index) => (
-                                    <label key={item.label} className="flex items-center justify-between gap-3 px-3 py-2 text-[12px] text-slate-700">
-                                        <span>{item.label}{item.required && <span className="ml-1 text-rose-600">*</span>}</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={item.checked}
-                                            onChange={(e) => setChecklist(checklist.map((row, i) => i === index ? { ...row, checked: e.target.checked } : row))}
-                                        />
-                                    </label>
-                                ))}
+
+                    <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1 md:grid-cols-4">
+                        {detailTabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => onTabChange(tab.key)}
+                                className={`rounded-md px-3 py-2 text-[12.5px] font-semibold transition-colors ${activeTab === tab.key ?t('auto.bg_white_text_slate_950_shadow_xs') :t('auto.text_slate_600_hover_text_slate_950')}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {disabled && (
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-semibold text-slate-600">{t('auto.suresi_dolmus_bakim_uzerinde_islem_yapilamaz')}</div>
+                    )}
+
+                    {activeTab === 'overview' && (
+                        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                                    <div className="text-[11px] font-semibold uppercase text-slate-500">{t('auto.bakim_plani')}</div>
+                                    <div className="mt-2 text-[16px] font-semibold text-slate-950">{task.contract?.contractCode || task.id}</div>
+                                    <div className="mt-1 text-[12px] text-slate-500">{task.contract?.title || '-'}</div>
+                                </div>
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                                    <div className="text-[11px] font-semibold uppercase text-emerald-700">{t('auto.onay')}</div>
+                                    <div className="mt-2 text-[16px] font-semibold text-emerald-900">{task.managerApprovedAt ?t('auto.onaylandi') : approvedOption ?t('auto.secim_alindi') :t('auto.secim_bekliyor')}</div>
+                                    <div className="mt-1 text-[12px] text-emerald-700">{approvedOption ? optionLabel({ start: dayjs(approvedOption.startTime), end: dayjs(approvedOption.endTime) }) :t('auto.uygun_opsiyon_bekleniyor')}</div>
+                                </div>
+                                <div className="rounded-lg border border-sky-200 bg-sky-50 p-4">
+                                    <div className="text-[11px] font-semibold uppercase text-sky-700">{t('maintenance.dashboard.colTechnician')}</div>
+                                    <div className="mt-2 text-[16px] font-semibold text-sky-950">{taskTechnicianNames(task)}</div>
+                                    <div className="mt-1 text-[12px] text-sky-700">{task.assignedTechId ?t('auto.sorumlu_atandi') :t('auto.sorumlu_secilmedi')}</div>
+                                </div>
+                            </div>
+                            <aside className="rounded-lg border border-slate-200 bg-white p-4">
+                                <div className="text-[11px] font-semibold uppercase text-slate-500">{t('nav.quickActionsGroup.customers')}</div>
+                                <div className="mt-2 text-[14px] font-semibold text-slate-900">{task.contract?.customer?.companyName || '-'}</div>
+                                <div className="mt-1 text-[12px] text-slate-500">{task.contract?.customer?.mainEmail ||t('auto.e_posta_yok')}</div>
+                            </aside>
+                        </div>
+                    )}
+
+                    {activeTab === 'appointment' && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Field label={t('auto.plan_tarihi')}>
+                                    <Input type="date" value={editForm.plannedDate} disabled={disabled} onChange={(event) => onEditFormChange({ ...editForm, plannedDate: event.target.value })} />
+                                </Field>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-sm font-medium text-secondary">{t('common.status')}</span>
+                                    <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-3">
+                                        <StatusPill status={task.status} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <TechnicianRoster
+                                employees={employees}
+                                selectedIds={selectedIds}
+                                responsibleId={editForm.responsibleTechId}
+                                onChange={(ids) => onEditFormChange({
+                                    ...editForm,
+                                    technicianIds: ids,
+                                    responsibleTechId: ids.includes(editForm.responsibleTechId) ? editForm.responsibleTechId : ids[0] || '',
+                                })}
+                                onResponsibleChange={(id) => onEditFormChange({
+                                    ...editForm,
+                                    responsibleTechId: id,
+                                    technicianIds: editForm.technicianIds.includes(id) ? editForm.technicianIds : [id, ...editForm.technicianIds].filter(Boolean),
+                                })}
+                            />
+
+                            <div className="rounded-lg border border-slate-200">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+                                    <span className="text-[12px] font-semibold text-slate-700">{t('auto.randevu_opsiyonlari')}</span>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            icon={<Plus size={12} />}
+                                            disabled={disabled}
+                                            onClick={() => {
+                                                onOptionsChange([...options, { date: editForm.plannedDate, time: '', durationMinutes: 60 }]);
+                                            }}
+                                        >{t('auto.opsiyon_ekle')}</Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2 p-3">
+                                    {options.map((option, index) => (
+                                        <div key={index} className="grid grid-cols-1 gap-2 rounded-md border border-slate-100 bg-slate-50/60 p-2 sm:grid-cols-[130px_110px_1fr_40px] sm:items-center">
+                                            <Input type="time" value={option.time} disabled={disabled} onChange={(event) => updateOption(index, { time: event.target.value })} />
+                                            <Select value={String(option.durationMinutes)} disabled={disabled} onChange={(event) => updateOption(index, { durationMinutes: Number(event.target.value) })}>
+                                                <option value="30">{t('auto.30_dk')}</option>
+                                                <option value="60">{t('auto.60_dk')}</option>
+                                                <option value="90">{t('auto.90_dk')}</option>
+                                                <option value="120">{t('auto.120_dk')}</option>
+                                            </Select>
+                                            <div className="text-right text-[12.5px] font-semibold text-slate-500 sm:pr-2">
+                                                {option.time ? `${option.time} - ${dayjs(`2020-01-01T${option.time}`).add(option.durationMinutes, 'minute').format('HH:mm')}` : ''}
+                                            </div>
+                                            <Button type="button" variant="ghost" size="sm" icon={<Trash size={12} />} disabled={disabled} onClick={() => onOptionsChange(options.filter((_, rowIndex) => rowIndex !== index))} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <Button className="w-fit" loading={saving} icon={<Save size={13} />} disabled={disabled} onClick={onSaveTask}>{t('auto.opsiyonlari_kaydet')}</Button>
                             </div>
                         </div>
-                        <MaterialsEditor rows={materials} setRows={setMaterials} articles={articles} locations={locations} />
-                    </div>
+                    )}
+
+                    {activeTab === 'mail' && (
+                        <div className="space-y-3">
+                            <Field label={t('auto.alici')}><Input value={mailForm.to} disabled={disabled} onChange={(event) => onMailFormChange({ ...mailForm, to: event.target.value })} /></Field>
+                            <Field label={t('auto.konu')}><Input value={mailForm.subject} disabled={disabled} onChange={(event) => onMailFormChange({ ...mailForm, subject: event.target.value })} /></Field>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Field label={t('settings.mail.senderName')}><Input value={mailForm.fromName} disabled={disabled} onChange={(event) => onMailFormChange({ ...mailForm, fromName: event.target.value })} /></Field>
+                                <Field label={t('settings.mail.senderEmail')}><Input value={mailForm.fromEmail} disabled={disabled} onChange={(event) => onMailFormChange({ ...mailForm, fromEmail: event.target.value })} /></Field>
+                            </div>
+                            <Field label={t('auto.mesaj')}><Textarea rows={4} value={mailForm.message} disabled={disabled} onChange={(event) => onMailFormChange({ ...mailForm, message: event.target.value })} /></Field>
+                            <div className="flex justify-end">
+                                <Button className="w-fit" loading={saving} icon={<Send size={13} />} disabled={disabled} onClick={onSendProposal}>{t('auto.mail_gonder')}</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'approval' && (
+                        <div className="space-y-3">
+                            {task.managerApprovedAt ? (
+                                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] font-semibold text-emerald-700">
+                                    <CheckCircle size={14} />{t('auto.randevu_onaylandi')}{fmtDate(task.managerApprovedAt,"DD.MM.YYYY HH:mm")}
+                                </div>
+                            ) : approvedOption ? (
+                                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-800">{t('auto.secim_alinmis_gorunuyor_otomatik_onay_bilgisi_ta')}</div>
+                            ) : (
+                                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-semibold text-slate-600">{t('auto.musteri_henuz_secim_yapmadi_gerekirse_musteri_ye')}</div>
+                            )}
+
+                            <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                                {activeOptions.length === 0 ? (
+                                    <div className="px-3 py-4 text-[12px] text-slate-500">{t('auto.onaylanabilecek_randevu_opsiyonu_yok')}</div>
+                                ) : activeOptions.map((option, index) => {
+                                    const interval = { start: dayjs(option.startTime), end: dayjs(option.endTime) };
+                                    const optionWarnings = task ? buildTaskWarnings(task, allTasks, [{
+                                        date: interval.start.format('YYYY-MM-DD'),
+                                        time: interval.start.format('HH:mm'),
+                                        durationMinutes: interval.end.diff(interval.start, 'minute'),
+                                    }]).filter((warning) => warning.tone === 'danger') : [];
+                                    const canApprove = !disabled && !optionWarnings.length && !task.managerApprovedAt;
+                                    return (
+                                        <div key={option.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
+                                            <div className="min-w-0">
+                                                <div className="text-[12px] font-semibold text-slate-900">{t('auto.option_number_with_range', { number: index + 1, range: optionLabel(interval) })}</div>
+                                                <div className="mt-0.5 text-[11px] text-slate-500">{option.status === 'APPROVED' ?t('auto.secilmis_opsiyon') :t('auto.musteri_icin_secilebilir')}</div>
+                                                {optionWarnings[0] && <div className="mt-1 text-[11px] font-semibold text-red-600">{optionWarnings[0].message}</div>}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant={option.status === 'APPROVED' ? 'primary' : 'secondary'}
+                                                icon={<CheckCircle size={12} />}
+                                                disabled={!canApprove}
+                                                loading={saving}
+                                                onClick={() => onApproveOption(option.id)}
+                                            >{t('auto.musteri_adina_onayla')}</Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                 </div>
-            </Modal>
-        </div>
+            )}
+        </Card>
     );
 };
 
 const calendarDayKey = (value: dayjs.Dayjs | string) => dayjs(value).format('YYYY-MM-DD');
 
-const calendarEventTone = (status: TaskStatus) => {
-    if (status === 'COMPLETED') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-    if (status === 'IN_PROGRESS') return 'border-blue-200 bg-blue-50 text-blue-800';
-    if (status === 'CANCELLED') return 'border-slate-200 bg-slate-50 text-slate-500';
-    return 'border-amber-200 bg-amber-50 text-amber-800';
-};
-
-const calendarTaskTitle = (task: MaintenanceTaskDto) =>
-    task.contract?.customer?.companyName || task.contract?.title || 'Müşteri bilgisi yok';
-
-const calendarTaskSubtitle = (task: MaintenanceTaskDto) =>
-    [task.contract?.title, task.siteName || task.contract?.siteName]
-        .filter(Boolean)
-        .join(' · ') || 'Saha bilgisi yok';
-
 const MaintenanceCalendarView = ({
     anchorDate,
     tasks,
+    selectedTaskId,
     onAnchorDateChange,
     onMonthRangeChange,
-    onOpenEdit,
-    onOpenReport,
+    onOpenTask,
 }: {
     anchorDate: string;
     tasks: MaintenanceTaskDto[];
+    selectedTaskId?: string;
     onAnchorDateChange: (date: string) => void;
     onMonthRangeChange: (month: dayjs.Dayjs) => void;
-    onOpenEdit: (task: MaintenanceTaskDto) => void;
-    onOpenReport: (task: MaintenanceTaskDto) => void;
+    onOpenTask: (task: MaintenanceTaskDto, tab?: DetailTab) => void;
 }) => {
+    ensureMaintenanceLocale();
     const selected = dayjs(anchorDate || dayjs().format('YYYY-MM-DD'));
     const monthStart = selected.startOf('month');
     const monthEnd = selected.endOf('month');
     const startOffset = (monthStart.day() + 6) % 7;
     const gridStart = monthStart.subtract(startOffset, 'day');
     const days = Array.from({ length: 42 }, (_, index) => gridStart.add(index, 'day'));
-    const weekDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+    const weekDays = [t('auto.pzt'),t('auto.sal'),t('auto.car'),t('auto.per'),t('auto.cum'),t('auto.cmt'),t('auto.paz')];
 
     const tasksByDay = useMemo(() => {
         const map = new Map<string, MaintenanceTaskDto[]>();
@@ -473,7 +972,6 @@ const MaintenanceCalendarView = ({
         });
         return map;
     }, [tasks]);
-
     const selectedTasks = tasksByDay.get(calendarDayKey(selected)) || [];
     const goMonth = (amount: number) => onMonthRangeChange(selected.add(amount, 'month').startOf('month'));
 
@@ -481,115 +979,65 @@ const MaintenanceCalendarView = ({
         <div className="grid grid-cols-1 gap-4 bg-slate-50/40 p-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-center">
-                            <span className="text-[10px] font-semibold uppercase text-slate-500">{selected.format('MMM')}</span>
-                            <span className="text-lg font-semibold text-brand-secondary">{selected.format('D')}</span>
-                        </div>
-                        <div>
-                            <h3 className="text-[16px] font-semibold text-slate-900">{monthStart.format('MMMM YYYY')}</h3>
-                            <p className="mt-0.5 text-[12px] text-slate-500">
-                                {fmtDate(monthStart.toISOString())} - {fmtDate(monthEnd.toISOString())}
-                            </p>
-                        </div>
+                    <div>
+                        <h3 className="text-[16px] font-semibold text-slate-900">{monthStart.format("MMMM YYYY")}</h3>
+                        <p className="mt-0.5 text-[12px] text-slate-500">{fmtDate(monthStart.toISOString())} - {fmtDate(monthEnd.toISOString())}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white">
-                            <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => goMonth(-1)}>
-                                <ArrowLeft size={13} />
-                            </button>
-                            <button type="button" className="h-8 border-x border-slate-200 px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onMonthRangeChange(dayjs().startOf('month'))}>
-                                Bugün
-                            </button>
-                            <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => goMonth(1)}>
-                                <ArrowRight size={13} />
-                            </button>
-                        </div>
-                        <span className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700">
-                            Ay görünümü
-                        </span>
+                    <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => goMonth(-1)}><ArrowLeft size={13} /></button>
+                        <button type="button" className="h-8 border-x border-slate-200 px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onMonthRangeChange(dayjs().startOf('month'))}>{t('auto.bugun')}</button>
+                        <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => goMonth(1)}><ArrowRight size={13} /></button>
                     </div>
                 </div>
-
                 <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70 text-center text-[11px] font-semibold text-slate-500">
-                    {weekDays.map((day) => (
-                        <div key={day} className="border-r border-slate-200 py-2 last:border-r-0">{day}</div>
-                    ))}
+                    {weekDays.map((day) => <div key={day} className="border-r border-slate-200 py-2 last:border-r-0">{day}</div>)}
                 </div>
                 <div className="grid grid-cols-7">
                     {days.map((day) => {
                         const key = calendarDayKey(day);
                         const rows = tasksByDay.get(key) || [];
-                        const isCurrentMonth = day.month() === selected.month();
                         const isSelected = key === calendarDayKey(selected);
                         const isToday = key === dayjs().format('YYYY-MM-DD');
-
                         return (
-                            <button
-                                key={key}
-                                type="button"
-                                onClick={() => onAnchorDateChange(key)}
-                                className={`min-h-[128px] border-r border-b border-slate-200 p-2 text-left transition-colors last:border-r-0 hover:bg-slate-50 ${isSelected ? 'bg-brand-primary_alt/40' : 'bg-white'} ${!isCurrentMonth ? 'text-slate-300' : 'text-slate-700'}`}
-                            >
+                            <button key={key} type="button" onClick={() => onAnchorDateChange(key)} className={`min-h-[126px] border-r border-b border-slate-200 p-2 text-left transition-colors last:border-r-0 hover:bg-slate-50 ${isSelected ? 'bg-brand-primary_alt/40' : 'bg-white'} ${day.month() !== selected.month() ? 'text-slate-300' : 'text-slate-700'}`}>
                                 <div className="mb-1 flex items-center justify-between">
-                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold ${isToday ? 'bg-brand-solid text-white' : isSelected ? 'bg-brand-primary text-brand-secondary' : ''}`}>
-                                        {day.date()}
-                                    </span>
+                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold ${isToday ?"bg-brand-solid text-white" : ''}`}>{day.date()}</span>
                                     {rows.length > 0 && <span className="text-[10px] font-medium text-slate-400">{rows.length}</span>}
                                 </div>
                                 <div className="space-y-1">
-                                    {rows.slice(0, 3).map((task) => (
-                                        <div key={task.id} className={`rounded border px-1.5 py-1 text-[11px] leading-tight ${calendarEventTone(task.status)}`}>
-                                            <div className="truncate font-semibold">{calendarTaskTitle(task)}</div>
-                                            <div className="truncate opacity-80">{STATUS_LABEL[task.status]}</div>
+                                    {rows.slice(0, 3).map((task) => {
+                                        const expired = isExpiredMaintenance(task);
+                                        const managerApproved = Boolean(task.managerApprovedAt);
+                                        return (
+                                        <div key={task.id} className={`rounded border px-1.5 py-1 text-[11px] leading-tight ${expired ?t('auto.border_slate_200_bg_slate_100_text_slate_500') : managerApproved ?"border-emerald-200 bg-emerald-50 text-emerald-900" :t('auto.border_amber_200_bg_amber_50_text_amber_900')}`}>
+                                            <div className="truncate font-semibold">{task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}</div>
+                                            <div className="truncate opacity-80">{expired ?t('auto.suresi_dolmus') : managerApproved ?t('auto.onaylandi') : task.scheduledStartTime ? dayjs(task.scheduledStartTime).format('HH:mm') : STATUS_LABEL[task.status]}</div>
                                         </div>
-                                    ))}
-                                    {rows.length > 3 && (
-                                        <div className="px-1.5 text-[11px] font-medium text-slate-500">{rows.length - 3} görev daha</div>
-                                    )}
+                                    );})}
                                 </div>
                             </button>
                         );
                     })}
                 </div>
             </div>
-
             <aside className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
                 <div className="border-b border-slate-200 px-4 py-3">
-                    <h3 className="text-[15px] font-semibold text-slate-900">{selected.format('D MMMM YYYY')}</h3>
+                    <h3 className="text-[15px] font-semibold text-slate-900">{selected.format("D MMMM YYYY")}</h3>
                     <p className="mt-0.5 text-[12px] capitalize text-slate-500">{selected.format('dddd')}</p>
                 </div>
                 <div className="max-h-[560px] divide-y divide-slate-100 overflow-y-auto">
                     {selectedTasks.length === 0 ? (
-                        <div className="px-4 py-6 text-[13px] text-slate-500">Bu gün için bakım görevi yok.</div>
+                        <div className="px-4 py-6 text-[13px] text-slate-500">{t('auto.bu_gun_icin_bakim_gorevi_yok')}</div>
                     ) : selectedTasks.map((task) => {
-                        const canCreateReport = !task.report && task.status !== 'CANCELLED';
+                        const expired = isExpiredMaintenance(task);
+                        const selected = selectedTaskId === task.id;
                         return (
-                            <div key={task.id} className="px-4 py-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="truncate text-[13px] font-semibold text-slate-900">{calendarTaskTitle(task)}</div>
-                                        <div className="mt-0.5 truncate text-[12px] text-slate-500">{calendarTaskSubtitle(task)}</div>
-                                    </div>
-                                    <StatusPill status={task.status} />
-                                </div>
-                                <div className="mt-2 flex items-center gap-1.5 text-[12px] text-slate-600">
-                                    <UserIcon size={12} className="text-slate-400" />
-                                    {personName(task.technician) === '-' ? 'Atanmamış' : personName(task.technician)}
-                                </div>
-                                <div className="mt-3 grid grid-cols-[32px_1fr] items-center gap-2">
-                                    <Button variant="ghost" size="sm" icon={<Edit size={12} />} onClick={() => onOpenEdit(task)} />
-                                    {canCreateReport ? (
-                                        <Button variant="secondary" size="sm" icon={<FileText size={12} />} onClick={() => onOpenReport(task)}>
-                                            Rapor oluştur
-                                        </Button>
-                                    ) : (
-                                        <span className="text-[12px] text-slate-400">{task.report ? 'Rapor mevcut' : 'Rapor kapalı'}</span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
+                        <button key={task.id} type="button" disabled={expired} onClick={() => onOpenTask(task, 'overview')} className={`block w-full px-4 py-3 text-left disabled:cursor-not-allowed ${selected ? 'bg-brand-primary_alt/40' : 'hover:bg-slate-50'}`}>
+                            <div className="font-semibold text-slate-900">{task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}</div>
+                            <div className="mt-0.5 text-[12px] text-slate-500">{t('auto.contract_and_technicians', { contract: task.contract?.contractCode || '-', technicians: taskTechnicianNames(task) })}</div>
+                            {expired && <div className="mt-2 inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600"><AlertTriangle size={11} />{t('auto.suresi_dolmus_bakim')}</div>}
+                        </button>
+                    );})}
                 </div>
             </aside>
         </div>

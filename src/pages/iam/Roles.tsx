@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Edit01 as Edit, Plus, Trash01 as Trash2 } from '@untitledui/icons';
+import { Edit01 as Edit, Plus, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
 import { apiClient } from '../../lib/axios';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -8,7 +8,9 @@ import { Button } from '../../components/ui-shared/Button';
 import { Field, Input } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { Checkbox } from '../../components/base/checkbox/checkbox';
+import { Checkbox } from '../../components/ui-shared/Checkbox';
+
+import { t } from '@/i18n/translate';
 
 type RoleRow = {
     id: string;
@@ -39,7 +41,7 @@ export const Roles: React.FC = () => {
             setRoles(rolesRes.data || []);
             setPermissions(permsRes.data || []);
         } catch {
-            toast.error('Veriler yüklenemedi.');
+            toast.error(t('iam.employees.errorLoad'));
         } finally {
             setLoading(false);
         }
@@ -66,7 +68,7 @@ export const Roles: React.FC = () => {
 
     const submit = async () => {
         if (!roleName.trim()) {
-            toast.error('Rol adı zorunludur.');
+            toast.error(t('iam.roles.errorNameRequired'));
             return;
         }
         setSaving(true);
@@ -74,28 +76,28 @@ export const Roles: React.FC = () => {
             const payload = { roleName: roleName.trim(), permissionIds };
             if (editingRoleId) {
                 await apiClient.patch(`/roles/${editingRoleId}`, payload);
-                toast.success('Rol güncellendi.');
+                toast.success(t('iam.roles.successUpdate'));
             } else {
                 await apiClient.post('/roles', payload);
-                toast.success('Rol eklendi.');
+                toast.success(t('iam.roles.successCreate'));
             }
             setModalOpen(false);
             await fetchData();
         } catch (error: any) {
-            toast.error(error.response?.data?.error || 'Kayıt işlemi başarısız.');
+            toast.error(error.response?.data?.error ||t('iam.employees.errorSave'));
         } finally {
             setSaving(false);
         }
     };
 
     const deleteRole = async (id: string) => {
-        if (!confirm('Bu rol silinsin mi?')) return;
+        if (!confirm(t('iam.roles.deleteConfirm'))) return;
         try {
             await apiClient.delete(`/roles/${id}`);
             setRoles((prev) => prev.filter((r) => r.id !== id));
-            toast.success('Rol silindi.');
+            toast.success(t('iam.roles.successDelete'));
         } catch {
-            toast.error('Bu rol kullanıldığı için silinemiyor.');
+            toast.error(t('iam.roles.errorDelete'));
         }
     };
 
@@ -107,29 +109,29 @@ export const Roles: React.FC = () => {
         <div>
             <PageHeader
                 breadcrumb="Personel"
-                title="Rol Yönetimi"
-                description="Sistem rollerini ve atanmış yetkileri tanımlayın."
-                actions={<Button variant="primary" icon={<Plus size={13} />} onClick={() => openModal()}>Yeni rol</Button>}
+                title={t('nav.roleManagement')}
+                description={t('iam.roles.description')}
+                actions={<Button variant="primary" icon={<Plus size={13} />} onClick={() => openModal()}>{t('iam.roles.newRole')}</Button>}
             />
 
-            <Card title="Roller" noPadding>
+            <Card title={t('iam.roles.tableTitle')} noPadding>
                 <div className="overflow-x-auto">
                     <table className="w-full text-[12.5px]">
                         <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                             <tr>
-                                <th className="px-4 py-2.5 text-left font-semibold">Rol adı</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Kullanıcı</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Yetkiler</th>
-                                <th className="px-4 py-2.5 text-right font-semibold">İşlem</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('iam.roles.colRoleName')}</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('iam.roles.colUsers')}</th>
+                                <th className="px-4 py-2.5 text-left font-semibold">{t('iam.roles.colPermissions')}</th>
+                                <th className="px-4 py-2.5 text-right font-semibold">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading && <tr><td colSpan={4} className="px-4 py-10"><div className="h-3 bg-slate-100 rounded animate-pulse" /></td></tr>}
-                            {!loading && roles.length === 0 && <tr><td colSpan={4}><EmptyState title="Rol yok" description="Henüz rol oluşturulmamış." /></td></tr>}
+                            {!loading && roles.length === 0 && <tr><td colSpan={4}><EmptyState title={t('iam.roles.noRoles')} description={t('iam.roles.noRolesDesc')} /></td></tr>}
                             {!loading && roles.map((r) => (
                                 <tr key={r.id} className="hover:bg-slate-50/60">
                                     <td className="px-4 py-2.5 font-semibold text-slate-900">{r.roleName}</td>
-                                    <td className="px-4 py-2.5 text-slate-600">{r.userCount ?? 0} kullanıcı</td>
+                                    <td className="px-4 py-2.5 text-slate-600">{r.userCount ?? 0}{t('auto.kullanici')}</td>
                                     <td className="px-4 py-2.5 text-slate-500">{r.permissions?.length ? `${r.permissions.length} yetki` : '—'}</td>
                                     <td className="px-4 py-2.5 text-right">
                                         <div className="inline-flex gap-1">
@@ -146,21 +148,21 @@ export const Roles: React.FC = () => {
 
             <Modal
                 open={modalOpen}
-                title={editingRoleId ? 'Rolü düzenle' : 'Yeni rol ekle'}
+                title={editingRoleId ?t('iam.roles.modalEditTitle') :t('iam.roles.modalCreateTitle')}
                 onClose={() => setModalOpen(false)}
                 width="lg"
                 footer={
                     <>
-                        <Button variant="secondary" onClick={() => setModalOpen(false)}>İptal</Button>
-                        <Button variant="primary" loading={saving} onClick={submit}>Kaydet</Button>
+                        <Button variant="secondary" onClick={() => setModalOpen(false)}>{t('common.cancel')}</Button>
+                        <Button variant="primary" loading={saving} onClick={submit}>{t('common.save')}</Button>
                     </>
                 }
             >
                 <div className="space-y-4">
-                    <Field label="Rol adı" required>
-                        <Input value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder="Örn: Sistem Yöneticisi" />
+                    <Field label={t('iam.roles.colRoleName')} required>
+                        <Input value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder={t('iam.roles.roleNamePlaceholder')} />
                     </Field>
-                    <Field label="Yetki atamaları">
+                    <Field label={t('iam.roles.permissions')}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto border border-slate-200 rounded-md p-2">
                             {permissions.map((perm) => (
                                 <Checkbox

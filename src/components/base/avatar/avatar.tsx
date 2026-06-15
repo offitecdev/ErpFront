@@ -1,5 +1,5 @@
 import { type FC, type ReactNode, useState } from "react";
-import { User01 } from "@untitledui/icons";
+import { User01 } from "@/components/icons/antIconCompat";
 import { cx } from "@/lib/utils/cx";
 import { AvatarOnlineIndicator, VerifiedTick } from "./base-components";
 import { AvatarCount } from "./base-components/avatar-count";
