@@ -1,39 +1,40 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, File02 as FileText, Mail01 as Mail, SearchLg as Search } from '@/components/icons/antIconCompat';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle, Edit01, File02 as FileText, Mail01 as Mail, Save01 as Save, SearchLg as Search } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
-import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { Input } from '../../components/ui-shared/Field';
+import { Field, Input, Textarea } from '../../components/ui-shared/Field';
 import { Button } from '../../components/ui-shared/Button';
+import { Modal } from '../../components/ui-shared/Modal';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import type { MaintenanceReportDto } from '../../types/maintenance';
 import { arrayFromUnknown, fmtDate, money, personName, StatCard } from './MaintenanceShared';
 
 import { t } from '@/i18n/translate';
 
-export const MaintenanceReports = () => {
-    const [reports, setReports] = useState<MaintenanceReportDto[]>([]);
-    const [loading, setLoading] = useState(true);
+type ReportEditForm = {
+    operationsDone: string;
+    observations: string;
+    recommendations: string;
+    riskNotes: string;
+};
+
+export const MaintenanceReportsPanel = ({
+    reports,
+    loading,
+    onReload,
+}: {
+    reports: MaintenanceReportDto[];
+    loading: boolean;
+    onReload: () => Promise<void> | void;
+}) => {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [editing, setEditing] = useState<MaintenanceReportDto | null>(null);
+    const [editForm, setEditForm] = useState<ReportEditForm>({ operationsDone: '', observations: '', recommendations: '', riskNotes: '' });
+    const [saving, setSaving] = useState(false);
     const pageSize = 15;
-
-    const load = async () => {
-        setLoading(true);
-        try {
-            setReports(await maintenanceApi.listReports());
-        } catch (error: any) {
-            toast.error(error.response?.data?.error ||t('auto.bakim_raporlari_yuklenemedi'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        void load();
-    }, []);
 
     const filtered = useMemo(() => {
         return reports.filter((report) => {
@@ -62,19 +63,45 @@ export const MaintenanceReports = () => {
         return { signed, unsigned, materials, cost };
     }, [reports]);
 
+    const openEdit = (report: MaintenanceReportDto) => {
+        setEditForm({
+            operationsDone: report.operationsDone || '',
+            observations: report.observations || '',
+            recommendations: report.recommendations || '',
+            riskNotes: report.riskNotes || '',
+        });
+        setEditing(report);
+    };
+
+    const saveEdit = async () => {
+        if (!editing) return;
+        if (!editForm.operationsDone.trim()) return toast.error(t('auto.yapilan_islemler_zorunludur'));
+        setSaving(true);
+        try {
+            await maintenanceApi.updateReport(editing.id, {
+                operationsDone: editForm.operationsDone,
+                observations: editForm.observations,
+                recommendations: editForm.recommendations,
+                riskNotes: editForm.riskNotes,
+            });
+            toast.success(t('auto.bakim_raporu_guncellendi'));
+            setEditing(null);
+            await onReload();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error ||t('auto.bakim_raporu_guncellenemedi'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="pb-8">
-            <PageHeader
-                breadcrumb={t('nav.maintenance')}
-                title={t('nav.maintenanceReports')}
-                description={t('auto.saha_raporlarini_kullanilan_malzemeleri_risk_not')}
-                actions={
-                    <div className="relative">
-                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t('auto.rapor_ara')} className="w-[240px] pl-8" />
-                    </div>
-                }
-            />
+            <div className="mb-4 flex items-center justify-end">
+                <div className="relative">
+                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t('auto.rapor_ara')} className="ofi-light-search-input w-[240px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
+                </div>
+            </div>
 
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard
@@ -128,6 +155,9 @@ export const MaintenanceReports = () => {
                                             <span className={`rounded border px-2 py-0.5 text-[11px] font-semibold ${report.isSigned ?"border-emerald-200 bg-emerald-50 text-emerald-800" :"border-amber-200 bg-amber-50 text-amber-800"}`}>
                                                 {report.isSigned ?t('auto.imzali') :t('auto.imza_bekliyor')}
                                             </span>
+                                            {!report.isSigned && (
+                                                <Button type="button" variant="ghost" size="sm" icon={<Edit01 size={12} />} className="ml-auto" onClick={() => openEdit(report)}>{t('auto.duzenle')}</Button>
+                                            )}
                                         </div>
                                         <div className="mt-1 text-[12px] text-slate-500">
                                             {report.task?.contract?.title} - {fmtDate(report.createdAt,"DD.MM.YYYY HH:mm")} - {personName(report.technician)}
@@ -189,6 +219,34 @@ export const MaintenanceReports = () => {
                 )}
             </Card>
 
+            <Modal
+                open={Boolean(editing)}
+                title={t('auto.rapor_duzenle')}
+                description={editing?.task?.contract?.customer?.companyName || editing?.taskId}
+                onClose={() => setEditing(null)}
+                width="lg"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setEditing(null)}>{t('common.cancel')}</Button>
+                        <Button loading={saving} icon={<Save size={13} />} onClick={saveEdit}>{t('common.save')}</Button>
+                    </>
+                }
+            >
+                <div className="space-y-3">
+                    <Field label={t('auto.yapilan_islemler')}>
+                        <Textarea rows={4} value={editForm.operationsDone} onChange={(e) => setEditForm((form) => ({ ...form, operationsDone: e.target.value }))} />
+                    </Field>
+                    <Field label={t('auto.gozlemler')}>
+                        <Textarea rows={3} value={editForm.observations} onChange={(e) => setEditForm((form) => ({ ...form, observations: e.target.value }))} />
+                    </Field>
+                    <Field label={t('auto.oneriler')}>
+                        <Textarea rows={3} value={editForm.recommendations} onChange={(e) => setEditForm((form) => ({ ...form, recommendations: e.target.value }))} />
+                    </Field>
+                    <Field label={t('auto.risk_notlari')}>
+                        <Textarea rows={2} value={editForm.riskNotes} onChange={(e) => setEditForm((form) => ({ ...form, riskNotes: e.target.value }))} />
+                    </Field>
+                </div>
+            </Modal>
         </div>
     );
 };

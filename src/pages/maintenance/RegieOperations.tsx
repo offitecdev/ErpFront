@@ -13,9 +13,20 @@ import { articleApi, inventoryApi } from '../../lib/api/inventory';
 import { maintenanceApi, regieApi } from '../../lib/api/maintenance';
 import type { InventoryArticle, InventoryLocation } from '../../types/inventory';
 import type { CustomerLite, MaterialInput, PersonLite, ServiceCallDto, ServiceReportDto, TaskStatus } from '../../types/maintenance';
-import { fmtDate, MaterialsEditor, money, personName, SignatureModal, splitLines, StatCard, StatusPill, STATUS_LABEL } from './MaintenanceShared';
+import { fmtDate, MaterialsEditor, money, personName, SignatureModal, splitLines, StatCard, StatusPill, getStatusLabel } from './MaintenanceShared';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((tick) => tick + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
 
 const normalizeRows = <T,>(value: any): T[] => {
     if (Array.isArray(value)) return value;
@@ -46,6 +57,7 @@ const emptyReport = {
 };
 
 export const RegieOperations = () => {
+    useLanguageRefresh();
     const [calls, setCalls] = useState<ServiceCallDto[]>([]);
     const [reports, setReports] = useState<ServiceReportDto[]>([]);
     const [customers, setCustomers] = useState<CustomerLite[]>([]);
@@ -232,11 +244,11 @@ export const RegieOperations = () => {
                     <>
                         <div className="relative">
                             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('auto.cagri_ara')} className="w-[220px] pl-8" />
+                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('auto.cagri_ara')} className="ofi-light-search-input w-[220px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
                         </div>
                         <Select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus | '')} className="w-[150px]">
                             <option value="">{t('auto.tum_durumlar')}</option>
-                            {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                            {Object.entries(getStatusLabel()).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                         </Select>
                         <Button variant={showForm ? 'secondary' : 'primary'} icon={<Plus size={13} />} onClick={() => setShowForm(!showForm)}>{t('auto.yeni_cagri')}</Button>
                     </>

@@ -1,0 +1,188 @@
+/* =========================================================
+   Offitec — Login redesign
+   Palette derived from the logo:
+     navy   #1a2361 / deep #0b1340
+     ice    #9fc7f5 / #dce8fb
+     red    #E63329 (accent)
+     white  #ffffff
+   Drop this in (e.g. src/styles/login.css) and import it once
+   in your Login file:  import '../styles/login.css';
+   ========================================================= */
+
+.ofi-login2 {
+    --l2-navy-1: #0b1340;
+    --l2-navy-2: #141d52;
+    --l2-ice: #9fc7f5;
+    --l2-red: #e63329;
+    --l2-red-strong: #c8261d;
+
+    /* light defaults */
+    --l2-bg: #f5f8ff;
+    --l2-text: #0f1c45;
+    --l2-sub: #5b6b95;
+    --l2-field-bg: #ffffff;
+    --l2-field-border: rgba(26, 35, 97, 0.14);
+    --l2-field-border-focus: var(--l2-red);
+
+    position: relative;
+    overflow: hidden;
+    background: var(--l2-bg);
+    color: var(--l2-text);
+    isolation: isolate;
+}
+
+/* dark mode pulls the full navy treatment from the preview */
+.dark .ofi-login2 {
+    --l2-bg: #0b1340;
+    --l2-text: #ffffff;
+    --l2-sub: #9fb2dd;
+    --l2-field-bg: rgba(255, 255, 255, 0.06);
+    --l2-field-border: rgba(159, 199, 245, 0.22);
+}
+
+/* ---- Ambient light: warm-blue glow + red accent corner ---- */
+.ofi-login2::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background:
+        radial-gradient(135% 95% at 8% 2%, rgba(56, 138, 221, 0.32), transparent 58%),
+        radial-gradient(125% 85% at 99% 102%, rgba(230, 51, 41, 0.24), transparent 56%),
+        radial-gradient(80% 60% at 50% 120%, rgba(26, 35, 97, 0.10), transparent 60%);
+    animation: ofi-breathe 9s ease-in-out infinite;
+}
+
+.dark .ofi-login2::before {
+    background:
+        radial-gradient(135% 95% at 8% 2%, rgba(56, 138, 221, 0.42), transparent 58%),
+        radial-gradient(125% 85% at 99% 102%, rgba(230, 51, 41, 0.34), transparent 56%),
+        radial-gradient(80% 60% at 50% 120%, rgba(159, 199, 245, 0.12), transparent 60%);
+}
+
+@keyframes ofi-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.82; }
+    50% { transform: scale(1.15); opacity: 1; }
+}
+
+/* ---- Big background snowflake (the Snowflake component) ---- */
+.ofi-login2__flake {
+    position: absolute;
+    right: -120px;
+    top: -110px;
+    width: clamp(360px, 48vw, 680px);
+    height: auto;
+    z-index: -1;
+    color: var(--l2-ice);
+    transform-origin: center;
+    pointer-events: none;
+    /* starts tiny + invisible, grows to full size once, then drifts slowly */
+    animation:
+        ofi-flake-grow 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both,
+        ofi-flake-drift 22s ease-in-out 1.5s infinite;
+}
+
+@keyframes ofi-flake-drift {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(9deg) scale(1.06); }
+}
+
+.dark .ofi-login2__flake { color: var(--l2-ice); }
+
+@keyframes ofi-flake-grow {
+    from { transform: scale(0.15); opacity: 0; }
+    to { transform: scale(1); opacity: 0.18; }
+}
+
+.dark .ofi-login2__flake {
+    animation-name: ofi-flake-grow-dark, ofi-flake-drift;
+}
+
+@keyframes ofi-flake-grow-dark {
+    from { transform: scale(0.15); opacity: 0; }
+    to { transform: scale(1); opacity: 0.24; }
+}
+
+/* ---- Entrance for the whole column ---- */
+.ofi-login2__enter {
+    animation: ofi-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ofi-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Inputs (Ant Design overrides) ---- */
+.ofi-login2 .ofi-login2__input.ant-input-affix-wrapper,
+.ofi-login2 .ofi-login2__input.ant-input {
+    height: 52px;
+    border-radius: 12px;
+    background: var(--l2-field-bg);
+    border: 1px solid var(--l2-field-border);
+    box-shadow: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.ofi-login2 .ofi-login2__input .ant-input {
+    background: transparent;
+    font-size: 15px;
+    color: var(--l2-text);
+}
+
+.ofi-login2 .ofi-login2__input input::placeholder { color: var(--l2-sub); opacity: 0.8; }
+
+.ofi-login2 .ofi-login2__input.ant-input-affix-wrapper:hover,
+.ofi-login2 .ofi-login2__input.ant-input:hover {
+    border-color: rgba(230, 51, 41, 0.45);
+}
+
+.ofi-login2 .ofi-login2__input.ant-input-affix-wrapper-focused,
+.ofi-login2 .ofi-login2__input.ant-input:focus {
+    border-color: var(--l2-field-border-focus);
+    box-shadow: 0 0 0 4px rgba(230, 51, 41, 0.12);
+}
+
+.dark .ofi-login2 .ofi-login2__input .ant-input-password-icon { color: var(--l2-sub); }
+
+/* ---- Primary button: red accent from the logo ---- */
+.ofi-login2 .ofi-login2__btn {
+    border-radius: 12px;
+    background: var(--l2-red);
+    border: none;
+    color: #fff;
+    font-weight: 500;
+    transition: transform 0.12s ease, background 0.18s ease, box-shadow 0.18s ease;
+    box-shadow: 0 8px 20px rgba(230, 51, 41, 0.28);
+}
+
+.ofi-login2 .ofi-login2__btn:hover:not(:disabled) {
+    background: var(--l2-red-strong);
+    box-shadow: 0 10px 26px rgba(230, 51, 41, 0.34);
+}
+
+.ofi-login2 .ofi-login2__btn:active:not(:disabled) { transform: scale(0.985); }
+
+.ofi-login2 .ofi-login2__btn:disabled {
+    background: rgba(26, 35, 97, 0.12);
+    color: rgba(15, 28, 69, 0.4);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.dark .ofi-login2 .ofi-login2__btn:disabled {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* The trailing arrow nudges on hover */
+.ofi-login2 .ofi-login2__btn:hover:not(:disabled) svg { transform: translateX(2px); }
+.ofi-login2 .ofi-login2__btn svg { transition: transform 0.18s ease; }
+
+/* ---- Respect reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+    .ofi-login2::before,
+    .ofi-login2__enter { animation: none; }
+    .ofi-login2__flake { animation: none; opacity: 0.18; transform: scale(1); }
+    .dark .ofi-login2__flake { opacity: 0.24; }
+}

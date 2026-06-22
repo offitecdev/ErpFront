@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@300;400;500;600;700&display=swap');
-/* Google Sans is imported from Google Fonts. */
-@import 'framework7-icons/css/framework7-icons.css';
 @import "./styles/globals.css";
+/* Dark-mode retrofit overrides — imported after globals/theme so its
+   rules come later in the cascade and win against the light defaults. */
+@import "./styles/dark.css";
 
 
 @custom-variant dark (&:is(.dark *));
@@ -22,6 +22,8 @@ body {
   font-size: 14px;
   color: #1d1d1f;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ── Scrollbar ── */
@@ -371,6 +373,11 @@ main input[type="checkbox"],
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+@keyframes ofi-signature-pop {
+  0% { opacity: 0; transform: translateY(16px) scale(0.96) rotateX(7deg); filter: blur(2px); }
+  65% { opacity: 1; transform: translateY(-2px) scale(1.01) rotateX(0); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); filter: blur(0); }
+}
 .animate-in {
   animation-fill-mode: both;
   animation-duration: 160ms;
@@ -386,6 +393,10 @@ main input[type="checkbox"],
 .duration-200 { animation-duration: 200ms; }
 .duration-300 { animation-duration: 300ms; }
 .duration-500 { animation-duration: 500ms; }
+.ofi-signature-pop {
+  animation: ofi-signature-pop 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: 50% 46%;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    ANT DESIGN SADELEŞTİRMELERİ
@@ -422,7 +433,7 @@ h6,
 .ant-typography h4,
 .ant-typography h5,
 .ant-typography h6 {
-  font-family: var(--font-body);
+  font-family: var(--font-display);
 }
 
 button,
@@ -875,7 +886,7 @@ select option:checked {
 }
 
 @theme inline {
-  --font-heading: var(--font-body);
+  --font-heading: var(--font-display);
   --font-sans: var(--font-body);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -991,6 +1002,35 @@ select option:checked {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Dark mode only: use the gold brand (#e6cf9e) in place of navy (#272f67).
+   The brand ramp (used by accents such as active tabs) is remapped to gold,
+   and hardcoded navy utility classes are overridden to gold.
+   ────────────────────────────────────────────────────────────────────────── */
+.dark {
+  --color-brand-50: #faf4e6;
+  --color-brand-100: #f5ead0;
+  --color-brand-200: #efdfb9;
+  --color-brand-300: #ead7a8;
+  --color-brand-400: #e6cf9e;
+  --color-brand-500: #e6cf9e;
+  --color-brand-600: #e6cf9e;
+  --color-brand-700: #dcbf86;
+  --color-brand-800: #c9a96a;
+  --color-brand-900: #b5934f;
+  --color-brand-950: #8a6f3a;
+}
+
+/* Solid navy utilities → gold; subtle navy tints → soft gold. */
+.dark [class~="bg-[#272f67]"] { background-color: #e6cf9e !important; }
+.dark [class~="text-[#272f67]"] { color: #e6cf9e !important; }
+.dark [class~="border-[#272f67]"] { border-color: #e6cf9e !important; }
+.dark [class~="hover:bg-[#272f67]"]:hover { background-color: #e6cf9e !important; }
+.dark [class~="hover:text-[#272f67]"]:hover { color: #e6cf9e !important; }
+.dark [class*="bg-[#272f67]/"] { background-color: rgba(230, 207, 158, 0.16) !important; }
+.dark [class*="border-[#272f67]/"] { border-color: rgba(230, 207, 158, 0.30) !important; }
+.dark [class*="ring-[#272f67]/"] { --tw-ring-color: rgba(230, 207, 158, 0.22) !important; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -1043,6 +1083,92 @@ select option:checked {
   .text-slate-300 {
     color: var(--app-text-muted-4) !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOGIN SCREEN v2 — minimal, Linear-style, dark-first
+═══════════════════════════════════════════════════════════════ */
+.ofi-login2 {
+  --l2-bg: #ffffff;
+  --l2-text: #0f172a;
+  --l2-sub: #64748b;
+  --l2-flake: rgba(39, 47, 103, 0.26);
+  --l2-glow: rgba(39, 47, 103, 0.12);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 75% at 50% -8%, var(--l2-glow), transparent 55%),
+    var(--l2-bg);
+  color: var(--l2-text);
+}
+.dark .ofi-login2 {
+  --l2-bg: #08090a;
+  --l2-text: #f2f3f5;
+  --l2-sub: #8b8f99;
+  --l2-flake: rgba(230, 207, 158, 0.78);
+  --l2-glow: rgba(230, 207, 158, 0.16);
+}
+
+/* Detailed, static snowflake — tucked into the bottom-right corner,
+   partly cut off and almost invisible. */
+.ofi-login2__flake {
+  position: absolute;
+  right: -96px;
+  bottom: -104px;
+  width: clamp(260px, 34vw, 460px);
+  height: auto;
+  color: var(--l2-flake);
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Login primary action — white button, black label (matches dark_dashboard) */
+.ofi-login2__btn.ant-btn-primary {
+  background: #1a2361 !important;
+  border-color: #1a2361 !important;
+  color: #ffffff !important;
+}
+.ofi-login2__btn.ant-btn-primary:hover {
+  background: #272f67 !important;
+  border-color: #272f67 !important;
+  color: #ffffff !important;
+}
+.dark .ofi-login2__btn.ant-btn-primary {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #0a0b0d !important;
+}
+.dark .ofi-login2__btn.ant-btn-primary:hover {
+  background: #e6e7ea !important;
+  border-color: #e6e7ea !important;
+  color: #0a0b0d !important;
+}
+.dark .ofi-login2__btn.ant-btn-primary:disabled,
+.dark .ofi-login2__btn.ant-btn-primary[disabled] {
+  background: #1c1f26 !important;
+  border-color: transparent !important;
+  color: #6b7079 !important;
+}
+
+.ofi-login2__input .ant-input,
+.ofi-login2__input.ant-input,
+.ofi-login2__input .ant-input-affix-wrapper {
+  height: 54px;
+  font-size: 15px;
+}
+.ofi-login2__input.ant-input-affix-wrapper { padding-block: 0; }
+
+@keyframes ofi-login2-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ofi-login2__enter { animation: ofi-login2-up 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ofi-login2__flake,
+  .ofi-login2__enter { animation: none !important; }
 }
 
 /* Custom Toast Reverse Loading Animation */

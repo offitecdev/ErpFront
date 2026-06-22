@@ -1,141 +1,205 @@
-import type { HTMLAttributes } from 'react';
+import {
+    LuZap as Activity,
+    LuCircleAlert as AlertCircle,
+    LuTriangleAlert as AlertTriangle,
+    LuArrowDown as ArrowDown,
+    LuArrowLeft as ArrowLeft,
+    LuArrowRight as ArrowRight,
+    LuArrowUp as ArrowUp,
+    LuChartBar as BarChart03,
+    LuBell as Bell01,
+    LuBookOpen as BookOpen01,
+    LuBox as Box,
+    LuBriefcase as Briefcase01,
+    LuBuilding2 as Building02,
+    LuBuilding as Building03,
+    LuHardHat as Building05,
+    LuCalculator as Calculator,
+    LuCalendar as Calendar,
+    LuCalendarCheck as CalendarCheck01,
+    LuCalendarDays as CalendarDate,
+    LuCalendarPlus as CalendarPlus01,
+    LuCamera as Camera01,
+    LuCheck as Check,
+    LuCircleCheck as CheckCircle,
+    LuChevronDown as ChevronDown,
+    LuChevronLeft as ChevronLeft,
+    LuChevronsLeft as ChevronLeftDouble,
+    LuChevronRight as ChevronRight,
+    LuChevronsRight as ChevronRightDouble,
+    LuChevronsUpDown as ChevronSelectorVertical,
+    LuChevronUp as ChevronUp,
+    LuClipboard as Clipboard,
+    LuClock as Clock,
+    LuHistory as ClockRewind,
+    LuAlarmClock as ClockSnooze,
+    LuCoins as Coins01,
+    LuArchive as Container,
+    LuCopy as Copy01,
+    LuDollarSign as CurrencyDollar,
+    LuBanknote as CurrencyDollarCircle,
+    LuEllipsisVertical as DotsVertical,
+    LuCloudDownload as DownloadCloud02,
+    LuPencil as Edit01,
+    LuEye as Eye,
+    LuEyeOff as EyeOff,
+    LuFile as File02,
+    LuFileText as File05,
+    LuFileCheck as FileCheck02,
+    LuFileDown as FileDownload02,
+    LuFilter as FilterLines,
+    LuGitBranch as GitBranch01,
+    LuHash as Hash01,
+    LuCircleHelp as HelpCircle,
+    LuImage as Image01,
+    LuInfo as InfoCircle,
+    LuLayers as LayersThree01,
+    LuLayers as LayersTwo01,
+    LuLifeBuoy as LifeBuoy01,
+    LuList as List,
+    LuLogOut as LogOut01,
+    LuMail as Mail01,
+    LuMapPin as MarkerPin01,
+    LuMenu as Menu02,
+    LuMinus as Minus,
+    LuMoon as Moon01,
+    LuPackage as Package,
+    LuPackagePlus as PackagePlus,
+    LuPackageX as PackageX,
+    LuPercent as Percent01,
+    LuPhone as Phone,
+    LuChartPie as PieChart03,
+    LuPlus as Plus,
+    LuQrCode as QrCode01,
+    LuReceipt as Receipt,
+    LuRefreshCcw as RefreshCcw01,
+    LuSave as Save01,
+    LuScan as Scan,
+    LuSearch as SearchLg,
+    LuSend as Send01,
+    LuSettings as Settings01,
+    LuShare2 as Share04,
+    LuShoppingCart as ShoppingCart01,
+    LuShoppingBag as ShoppingOutlined,
+    LuSlidersHorizontal as Sliders02,
+    LuArrowLeftRight as SwitchHorizontal01,
+    LuTag as Tag01,
+    LuTrash2 as Trash01,
+    LuTrendingDown as TrendDown01,
+    LuTrendingUp as TrendUp01,
+    LuTruck as Truck01,
+    LuCloudUpload as UploadCloud02,
+    LuUser as User01,
+    LuUserX as UserX01,
+    LuX as X,
+    LuCircleX as XCircle,
+    LuX as XClose,
+    LuArrowRight as ArrowRightIcon,
+    LuChartLine as LineChart,
+    LuShoppingBag as ShoppingBag,
+    LuHouse as Home01,
+    LuCircleAlert as Alert
+} from 'react-icons/lu';
 
-export type IconProps = HTMLAttributes<HTMLOrSVGElement> & {
-    size?: number | string;
-    strokeWidth?: number | string;
-    color?: string;
+export {
+    Activity,
+    AlertCircle,
+    AlertTriangle,
+    ArrowDown,
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    BarChart03,
+    Bell01,
+    BookOpen01,
+    Box,
+    Briefcase01,
+    Building02,
+    Building03,
+    Building05,
+    Calculator,
+    Calendar,
+    CalendarCheck01,
+    CalendarDate,
+    CalendarPlus01,
+    Camera01,
+    Check,
+    CheckCircle,
+    ChevronDown,
+    ChevronLeft,
+    ChevronLeftDouble,
+    ChevronRight,
+    ChevronRightDouble,
+    ChevronSelectorVertical,
+    ChevronUp,
+    Clipboard,
+    Clock,
+    ClockRewind,
+    ClockSnooze,
+    Coins01,
+    Container,
+    Copy01,
+    CurrencyDollar,
+    CurrencyDollarCircle,
+    DotsVertical,
+    DownloadCloud02,
+    Edit01,
+    Eye,
+    EyeOff,
+    File02,
+    File05,
+    FileCheck02,
+    FileDownload02,
+    FilterLines,
+    GitBranch01,
+    Hash01,
+    HelpCircle,
+    Image01,
+    InfoCircle,
+    LayersThree01,
+    LayersTwo01,
+    LifeBuoy01,
+    List,
+    LogOut01,
+    Mail01,
+    MarkerPin01,
+    Menu02,
+    Minus,
+    Moon01,
+    Package,
+    PackagePlus,
+    PackageX,
+    Percent01,
+    Phone,
+    PieChart03,
+    Plus,
+    QrCode01,
+    Receipt,
+    RefreshCcw01,
+    Save01,
+    Scan,
+    SearchLg,
+    Send01,
+    Settings01,
+    Share04,
+    ShoppingCart01,
+    ShoppingOutlined,
+    Sliders02,
+    SwitchHorizontal01,
+    Tag01,
+    Trash01,
+    TrendDown01,
+    TrendUp01,
+    Truck01,
+    UploadCloud02,
+    User01,
+    UserX01,
+    X,
+    XCircle,
+    XClose,
+    ArrowRightIcon,
+    LineChart,
+    ShoppingBag,
+    Home01,
+    Alert
 };
-
-const makeIcon = (iconName: string) => {
-    const WrappedIcon = ({ size, strokeWidth: _strokeWidth, color, style, className, ...props }: IconProps) => (
-        <i 
-            className={`f7-icons ${className || ''}`} 
-            style={{ fontSize: size || 16, color, ...style }} 
-            {...props}
-        >
-            {iconName}
-        </i>
-    );
-
-    WrappedIcon.displayName = `F7Icon(${iconName})`;
-    return WrappedIcon;
-};
-
-export const Activity = makeIcon('bolt');
-export const AlertCircle = makeIcon('exclamationmark_circle');
-export const AlertTriangle = makeIcon('exclamationmark_triangle');
-export const ArrowDown = makeIcon('arrow_down');
-export const ArrowLeft = makeIcon('arrow_left');
-export const ArrowRight = makeIcon('arrow_right');
-export const ArrowUp = makeIcon('arrow_up');
-export const BarChart03 = makeIcon('chart_bar');
-export const Bell01 = makeIcon('bell');
-export const BookOpen01 = makeIcon('book');
-export const Box = makeIcon('cube');
-export const Briefcase01 = makeIcon('briefcase');
-export const Building02 = makeIcon('building_2_fill');
-export const Building05 = makeIcon('person_2');
-export const Calculator = makeIcon('keyboard');
-export const Calendar = makeIcon('calendar');
-export const CalendarCheck01 = makeIcon('calendar_badge_plus');
-export const CalendarDate = makeIcon('calendar');
-export const CalendarPlus01 = makeIcon('calendar_badge_plus');
-export const Camera01 = makeIcon('camera');
-export const Check = makeIcon('checkmark');
-export const CheckCircle = makeIcon('checkmark_circle');
-export const ChevronDown = makeIcon('chevron_down');
-export const ChevronLeft = makeIcon('chevron_left');
-export const ChevronLeftDouble = makeIcon('chevron_left_2');
-export const ChevronRight = makeIcon('chevron_right');
-export const ChevronRightDouble = makeIcon('chevron_right_2');
-export const ChevronSelectorVertical = makeIcon('chevron_up_chevron_down');
-export const ChevronUp = makeIcon('chevron_up');
-export const Clipboard = makeIcon('doc_text');
-export const Clock = makeIcon('clock');
-export const ClockRewind = makeIcon('arrow_counterclockwise');
-export const ClockSnooze = makeIcon('clock');
-export const Coins01 = makeIcon('money_dollar_circle');
-export const Container = makeIcon('archivebox');
-export const Copy01 = makeIcon('doc_on_doc');
-export const CurrencyDollar = makeIcon('money_dollar');
-export const CurrencyDollarCircle = makeIcon('money_dollar_circle');
-export const DotsVertical = makeIcon('ellipsis_vertical');
-export const DownloadCloud02 = makeIcon('cloud_download');
-export const Edit01 = makeIcon('pencil');
-export const Eye = makeIcon('eye');
-export const EyeOff = makeIcon('eye_slash');
-export const File02 = makeIcon('doc_text');
-export const File05 = makeIcon('doc');
-export const FileCheck02 = makeIcon('doc_checkmark');
-export const FileDownload02 = makeIcon('arrow_down_doc');
-export const FilterLines = makeIcon('line_horizontal_3_decrease');
-export const GitBranch01 = makeIcon('tuningfork');
-export const Hash01 = makeIcon('number');
-export const HelpCircle = makeIcon('questionmark_circle');
-export const Image01 = makeIcon('photo');
-export const InfoCircle = makeIcon('info_circle');
-export const LayersThree01 = makeIcon('layers_alt');
-export const LayersTwo01 = makeIcon('layers');
-export const LifeBuoy01 = makeIcon('lifepreserver');
-export const List = makeIcon('list_bullet');
-export const LogOut01 = makeIcon('square_arrow_right');
-export const Mail01 = makeIcon('envelope');
-export const MarkerPin01 = makeIcon('placemark');
-export const Menu02 = makeIcon('bars');
-export const Minus = makeIcon('minus');
-export const Moon01 = makeIcon('moon');
-export const Package = makeIcon('archivebox');
-export const PackagePlus = makeIcon('plus_rectangle');
-export const PackageX = makeIcon('xmark_rectangle');
-export const Percent01 = makeIcon('percent');
-export const Phone = makeIcon('phone');
-export const PieChart03 = makeIcon('chart_pie');
-export const Plus = makeIcon('plus');
-export const QrCode01 = makeIcon('qrcode');
-export const Receipt = makeIcon('doc_text');
-export const RefreshCcw01 = makeIcon('arrow_2_circlepath');
-export const Save01 = makeIcon('square_and_arrow_down');
-export const Scan = makeIcon('viewfinder');
-export const SearchLg = makeIcon('search');
-export const Send01 = makeIcon('paperplane');
-export const Settings01 = makeIcon('gear');
-export const Share04 = makeIcon('square_arrow_up');
-export const ShoppingCart01 = makeIcon('cart');
-export const ShoppingOutlined = makeIcon('bag');
-export const Sliders02 = makeIcon('slider_horizontal_3');
-export const SwitchHorizontal01 = makeIcon('arrow_right_arrow_left');
-export const Tag01 = makeIcon('tag');
-export const Trash01 = makeIcon('trash');
-export const TrendDown01 = makeIcon('arrow_down_right');
-export const TrendUp01 = makeIcon('arrow_up_right');
-export const Truck01 = ({ size, color, className, style, ...props }: IconProps) => (
-    <svg 
-        width={size || 16} 
-        height={size || 16} 
-        viewBox="0 0 24 24" 
-        fill="none" 
-        stroke={color || "currentColor"} 
-        strokeWidth="1.5" 
-        strokeLinecap="round" 
-        strokeLinejoin="round"
-        className={className}
-        style={{ ...style, display: 'inline-block', verticalAlign: 'middle' }}
-        {...props as any}
-    >
-        <rect x="1" y="3" width="15" height="13" rx="1" ry="1" />
-        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-        <circle cx="5.5" cy="18.5" r="2.5" />
-        <circle cx="18.5" cy="18.5" r="2.5" />
-    </svg>
-);
-export const UploadCloud02 = makeIcon('cloud_upload');
-export const User01 = makeIcon('person');
-export const UserX01 = makeIcon('person_badge_minus');
-export const X = makeIcon('xmark');
-export const XCircle = makeIcon('xmark_circle');
-export const XClose = makeIcon('xmark');
-
-export const ArrowRightIcon = ArrowRight;
-export const LineChart = makeIcon('chart_bar');
-export const ShoppingBag = makeIcon('bag');
-export const Alert = makeIcon('exclamationmark');

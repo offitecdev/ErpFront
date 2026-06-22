@@ -13,8 +13,6 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { StatusBadge } from '../components/ui-shared/StatusBadge';
 import type { BreakPeriodDto } from '../store/attendanceStore';
 
-
-/* ── Yardımcılar ── */
 function netMs(checkIn: number, periods: BreakPeriodDto[], now: number) {
     let brk = 0;
     let openStart: number | null = null;
@@ -29,11 +27,11 @@ function netMs(checkIn: number, periods: BreakPeriodDto[], now: number) {
 function fHMS(ms: number) {
     const t = Math.floor(ms / 1000);
     return [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60]
-        .map(n => String(n).padStart(2, '0')).join(':');
+        .map((n) => String(n).padStart(2, '0')).join(':');
 }
 
 function fDt(iso?: string | null) {
-    return iso ? dayjs(iso).format("DD.MM.YYYY HH:mm") : '—';
+    return iso ? dayjs(iso).format('DD.MM.YYYY HH:mm') : '-';
 }
 
 export const Dashboard = () => {
@@ -44,9 +42,14 @@ export const Dashboard = () => {
     const { user, permissions } = useAuthStore();
 
     const {
-        isCheckedIn, checkInTime, breakPeriods,
-        stationQrPayload, recentLogs,
-        processCheckIn, startBreak, endBreak,
+        isCheckedIn,
+        checkInTime,
+        breakPeriods,
+        stationQrPayload,
+        recentLogs,
+        processCheckIn,
+        startBreak,
+        endBreak,
     } = useAttendanceStore();
 
     useEffect(() => {
@@ -54,7 +57,7 @@ export const Dashboard = () => {
         return () => clearInterval(id);
     }, []);
 
-    const isOnBreak = breakPeriods.some(p => !p.end);
+    const isOnBreak = breakPeriods.some((p) => !p.end);
     const liveMs = checkInTime ? netMs(checkInTime, breakPeriods, now) : 0;
     const isTechnician = user?.roleName?.toLowerCase().includes('teknisyen')
         || user?.employeeRoles?.some((r: any) => r.role?.roleName?.toLowerCase().includes('teknisyen'));
@@ -111,7 +114,7 @@ export const Dashboard = () => {
         <div>
             <PageHeader
                 title={t('dashboard.title')}
-                description={t('dashboard.greeting', { firstName: user?.firstName ?? '', date: dayjs().format("DD MMMM YYYY") })}
+                description={t('dashboard.greeting', { firstName: user?.firstName ?? '', date: dayjs().format('DD MMMM YYYY') })}
                 actions={statusBadge}
             />
 
@@ -119,7 +122,7 @@ export const Dashboard = () => {
                 <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <button
                         type="button"
-                        onClick={() => navigate('/projects/installation/calendar')}
+                        onClick={() => navigate('/calendar')}
                         className="flex items-center justify-between rounded-md border border-slate-200/70 bg-white px-4 py-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
                     >
                         <span>
@@ -143,11 +146,7 @@ export const Dashboard = () => {
             )}
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-
-                {/* Sol + Orta */}
                 <div className="xl:col-span-2 flex flex-col gap-4 min-w-0">
-
-                    {/* Timer Card */}
                     <div className="bg-white border border-slate-200/70 rounded-md">
                         <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -164,9 +163,7 @@ export const Dashboard = () => {
                                         <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
                                             {t('dashboard.netWorkTime')}
                                         </div>
-                                        <div className={`text-[40px] font-bold font-mono tracking-tight leading-none ${
-                                            isOnBreak ? 'text-amber-600' : 'text-slate-900'
-                                        }`}>
+                                        <div className={`text-[40px] font-bold font-mono tracking-tight leading-none ${isOnBreak ? 'text-amber-600' : 'text-slate-900'}`}>
                                             {fHMS(liveMs)}
                                         </div>
                                         {isOnBreak && (
@@ -202,7 +199,6 @@ export const Dashboard = () => {
                         </div>
                     </div>
 
-                    {/* Recent Records */}
                     <div className="bg-white border border-slate-200/70 rounded-md overflow-hidden">
                         <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -232,15 +228,9 @@ export const Dashboard = () => {
                                     )}
                                     {recentLogs.slice(0, 12).map((r) => (
                                         <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
-                                            <td className="px-4 py-2.5 text-slate-600">
-                                                {dayjs(r.logDate).format('DD.MM.YYYY')}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-slate-700">
-                                                {fDt(r.checkInTime)}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-slate-700">
-                                                {fDt(r.checkOutTime)}
-                                            </td>
+                                            <td className="px-4 py-2.5 text-slate-600">{dayjs(r.logDate).format('DD.MM.YYYY')}</td>
+                                            <td className="px-4 py-2.5 text-slate-700">{fDt(r.checkInTime)}</td>
+                                            <td className="px-4 py-2.5 text-slate-700">{fDt(r.checkOutTime)}</td>
                                             <td className="px-4 py-2.5 text-slate-900 font-medium">
                                                 {formatDuration(typeof r.netWorkSeconds === 'number' ? r.netWorkSeconds : null)}
                                             </td>
@@ -252,7 +242,6 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Sağ Sütun */}
                 <div className="xl:col-span-1">
                     <div className="bg-white border border-slate-200/70 rounded-md">
                         <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
@@ -280,7 +269,7 @@ export const Dashboard = () => {
                                         type="text"
                                         value={code}
                                         onChange={(e) => setCode(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && scan(code)}
+                                        onKeyDown={(e) => e.key === 'Enter' && scan(code)}
                                         placeholder={t('dashboard.codePlaceholder')}
                                         className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded text-[12.5px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-700/10 focus:border-blue-400 transition-colors placeholder:text-slate-400"
                                         maxLength={64}

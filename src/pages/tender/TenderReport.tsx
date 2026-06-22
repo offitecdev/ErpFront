@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BarChart03 as BarChart3, Coins01 as Coins, Percent01 as Percent, PieChart03 as PieChart, TrendUp01 as TrendingUp } from '@/components/icons/antIconCompat';
 
@@ -10,6 +10,19 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { useTenderStore } from '../../store/tenderStore';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
+
+
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick(t => t + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
 
 const fmtMoney = (v: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);
@@ -19,13 +32,14 @@ const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info'> = {
     Approved: 'approved',
     Exported: 'info',
 };
-const STATUS_LABEL: Record<string, string> = {
+const getStatusLabel = (): Record<string, string> => ({
     Draft:t('crm.tenders.statusDraft'),
     Approved:t('crm.tenders.statusApproved'),
     Exported:t('crm.tenders.statusExported'),
-};
+});
 
 export const TenderReport = () => {
+    useLanguageRefresh();
     const { id } = useParams();
     const navigate = useNavigate();
     const { summary, loadingSummary, fetchSummary } = useTenderStore();
@@ -72,13 +86,13 @@ export const TenderReport = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb={`CRM › Teklif › ${summary.tenderInfo.tenderNumber} › Rapor`}
+                breadcrumb={t('tenders.crm_teklif_rapor', { number: summary.tenderInfo.tenderNumber })}
                 title={
                     <span className="flex items-center gap-3">
                         <span>{t('tenders.report')}{summary.tenderInfo.tenderNumber}</span>
                         <span className="text-[12px] font-mono text-slate-400">v{summary.tenderInfo.version}</span>
                         <StatusChip variant={STATUS_VARIANT[summary.tenderInfo.status]}>
-                            {STATUS_LABEL[summary.tenderInfo.status]}
+                            {getStatusLabel()[summary.tenderInfo.status]}
                         </StatusChip>
                     </span>
                 }

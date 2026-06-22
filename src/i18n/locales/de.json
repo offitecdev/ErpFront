@@ -1,5 +1,7 @@
 {
     "nav": {
+        "home": "Startseite",
+        "calendar": "Kalender",
         "attendance": "Zeiterfassung",
         "personnel": "Personal",
         "employeeList": "Mitarbeiterliste",

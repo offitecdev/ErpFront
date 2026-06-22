@@ -1276,11 +1276,11 @@ const AUTO_KEYS = [
     'zorunlu_kontrol_maddelerini_tamamlayin',
 ] as const;
 
-const buildAutoTranslations = (): Record<string, string> =>
-    Object.fromEntries(AUTO_KEYS.map((key) => [key, formatMissingTranslationKey(`auto.${key}`)]));
+const buildAutoTranslations = (language: 'tr' | 'en' | 'de'): Record<string, string> =>
+    Object.fromEntries(AUTO_KEYS.map((key) => [key, formatMissingTranslationKey(`auto.${key}`, language)]));
 
 export const autoTranslations = {
-    tr: buildAutoTranslations(),
-    en: buildAutoTranslations(),
-    de: buildAutoTranslations(),
+    tr: buildAutoTranslations('tr'),
+    en: buildAutoTranslations('en'),
+    de: buildAutoTranslations('de'),
 };

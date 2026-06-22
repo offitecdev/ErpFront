@@ -3,27 +3,61 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
+  "productName": "Offitec ERP",
   "scripts": {
     "dev": "npm run build && npm run preview:perf",
     "dev:vite": "vite",
     "dev:prod": "npm run build && npm run preview:perf",
     "dev:hmr": "set VITE_ENABLE_HMR=true&& vite",
     "build": "tsc -b && vite build",
+    "desktop": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --win --dir",
+    "desktop:dist": "npm run build && electron-builder --win nsis",
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:perf": "vite preview --host 0.0.0.0 --port 5173 --strictPort",
     "perf": "npm run build && npm run preview:perf"
   },
+  "build": {
+    "appId": "com.offitec.erp",
+    "productName": "Offitec ERP",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
   "dependencies": {
-    "@ant-design/icons": "^6.2.2",
     "@fontsource-variable/dm-sans": "^5.2.8",
+    "@phosphor-icons/react": "^2.1.10",
     "@tailwindcss/typography": "^0.5.19",
     "antd": "^6.3.7",
     "axios": "^1.16.0",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
     "embla-carousel-react": "^8.6.0",
-    "framework7-icons": "^5.0.5",
     "html5-qrcode": "^2.3.8",
     "i18next": "^26.3.1",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -37,6 +71,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-i18next": "^17.0.8",
+    "react-icons": "^5.6.0",
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
     "sonner": "^2.0.7",
@@ -54,6 +89,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

@@ -24,19 +24,19 @@ export const ensureMaintenanceLocale = () => {
     dayjs.locale(dayjsLocale());
 };
 
-export const PERIOD_LABEL: Record<MaintenancePeriod, string> = {
+export const getPeriodLabel = (): Record<MaintenancePeriod, string> => ({
     MONTHLY:t('maintenance.shared.periodMonthly'),
     QUARTERLY:t('auto.3_aylik'),
     BIANNUAL:t('auto.6_aylik'),
     YEARLY:t('maintenance.shared.periodAnnual'),
-};
+});
 
-export const STATUS_LABEL: Record<TaskStatus, string> = {
+export const getStatusLabel = (): Record<TaskStatus, string> => ({
     PENDING:t('maintenance.shared.statusPlanned'),
     IN_PROGRESS:t('auto.imza_bekliyor'),
     COMPLETED:t('common.completed'),
     CANCELLED:t('common.cancel'),
-};
+});
 
 export const STATUS_VARIANT: Record<TaskStatus, 'warning' | 'active' | 'passive' | 'info'> = {
     PENDING: 'warning',
@@ -64,7 +64,7 @@ export const splitLines = (value: string) =>
     value.split(/\r?\n/g).map((line) => line.trim()).filter(Boolean);
 
 export const StatusPill = ({ status }: { status: TaskStatus }) => (
-    <StatusChip variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</StatusChip>
+    <StatusChip variant={STATUS_VARIANT[status]}>{getStatusLabel()[status]}</StatusChip>
 );
 
 export const StatCard = ({
@@ -89,7 +89,7 @@ export const StatCard = ({
     }[tone];
 
     return (
-        <div className={`rounded-lg border px-4 py-3 shadow-xs ${styles}`}>
+        <div className={`offitec-stat-card rounded-lg border px-4 py-3 shadow-xs ${styles}`}>
             <div className="flex min-w-0 items-center gap-1.5 text-[12px] font-medium opacity-85">
                 {icon}
                 <span className="truncate">{label}</span>

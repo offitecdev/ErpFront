@@ -11,9 +11,20 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import type { CustomerLite, MaintenanceContractDto, MaintenancePeriod, PersonLite } from '../../types/maintenance';
-import { fmtDate, PERIOD_LABEL, personName, StatCard } from './MaintenanceShared';
+import { fmtDate, getPeriodLabel, personName, StatCard } from './MaintenanceShared';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((tick) => tick + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
 
 const emptyForm = {
     customerId: '',
@@ -142,7 +153,7 @@ const ContractFormFields = ({
         </Field>
         <Field label={t('auto.periyot')} className="md:col-span-3">
             <Select value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value as MaintenancePeriod })}>
-                {Object.entries(PERIOD_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                {Object.entries(getPeriodLabel()).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </Select>
         </Field>
         <Field label={t('common.start')} required className="md:col-span-3">
@@ -191,6 +202,7 @@ const ContractFormFields = ({
 );
 
 export const MaintenanceContracts = () => {
+    useLanguageRefresh();
     const navigate = useNavigate();
     const [contracts, setContracts] = useState<MaintenanceContractDto[]>([]);
     const [employees, setEmployees] = useState<PersonLite[]>([]);
@@ -305,7 +317,7 @@ export const MaintenanceContracts = () => {
                     <>
                         <div className="relative">
                             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('auto.sozlesme_ara')} className="w-[220px] pl-8" />
+                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('auto.sozlesme_ara')} className="ofi-light-search-input w-[220px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
                         </div>
                         <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/maintenance/contracts/new')}>{t('auto.yeni_sozlesme_olustur')}</Button>
                     </>
@@ -356,7 +368,7 @@ export const MaintenanceContracts = () => {
                                                 <div className="text-[11px] text-slate-500">{contract.siteName || '-'}</div>
                                             </td>
                                             <td className="px-3 py-2 text-slate-700">{contract.customer?.companyName || contract.customerId}</td>
-                                            <td className="px-3 py-2 text-slate-600">{PERIOD_LABEL[contract.period]}</td>
+                                            <td className="px-3 py-2 text-slate-600">{getPeriodLabel()[contract.period]}</td>
                                             <td className="px-3 py-2">
                                                 <div className="font-mono text-[11.5px]">{fmtDate(contract.startDate)} - {fmtDate(contract.endDate)}</div>
                                                 {isExpired && <div className="mt-0.5 text-[11px] font-medium text-slate-500">{t('auto.suresi_doldu')}</div>}

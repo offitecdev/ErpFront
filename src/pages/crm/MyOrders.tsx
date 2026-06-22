@@ -97,7 +97,7 @@ const OrderRow: React.FC<{ order: MyOrderDto; onBilled: () => void; showAddons: 
                                     <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">{t('common.detail')}</span>
                                 )}
                                 {addons.length > 0 && (
-                                    <span className="text-[11px] text-tertiary">+{addons.length}{t('crm.additional')}</span>
+                                    <span className="text-[11px] text-tertiary">+{addons.length} {t('crm.additional')}</span>
                                 )}
                             </div>
                             <div className="mt-1 h-1.5 w-28 overflow-hidden rounded-full bg-slate-100">

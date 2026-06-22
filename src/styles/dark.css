@@ -1,0 +1,507 @@
+/* ═══════════════════════════════════════════════════════════════
+   DARK MODE RETROFIT — single flat palette
+   page #08090a · cards/tables #151616 · hover #232326
+   No blue. Accent = wheat. Primary buttons white with black text.
+   Scoped under `.dark`; light mode untouched.
+═══════════════════════════════════════════════════════════════ */
+
+.dark {
+  --ofi-d-bg: #08090a;          /* page background */
+  --ofi-d-surface: #151616;     /* cards / tables / charts / structures */
+  --ofi-d-surface-2: #151616;   /* table headers */
+  --ofi-d-surface-3: #1b1c1c;   /* wells / subtle raised */
+  --ofi-d-hover: #232326;       /* every hover (incl. loading rows) */
+  --ofi-d-glass: rgba(21, 22, 22, 0.72); /* frosted overlays only */
+  --ofi-d-border: rgba(255, 255, 255, 0.12);
+  --ofi-d-border-strong: rgba(255, 255, 255, 0.22);
+  --ofi-d-text: #ffffff;        /* primary text */
+  --ofi-d-text-2: #e9ebf0;      /* secondary */
+  --ofi-d-text-3: #c4c9d2;      /* tertiary */
+  --ofi-d-text-4: #aab0bb;      /* muted */
+  --ofi-d-wheat: #e6cf9e;       /* accent (replaces all blue) */
+  --ofi-d-wheat-strong: #f0dcae;
+  --ofi-d-wheat-soft: rgba(230, 207, 158, 0.14);
+  --ofi-d-wheat-softer: rgba(230, 207, 158, 0.08);
+  --ofi-d-wheat-border: rgba(230, 207, 158, 0.34);
+  /* muted profit / loss — not exaggerated */
+  --ofi-d-pos: #9ad3b4;
+  --ofi-d-neg: #e2a0a8;
+}
+
+/*
+ * Flip the variables index.css's `@layer utilities` rules read from
+ * (`.text-slate-900 { color: var(--app-text-color) }`). MUST use
+ * `html.dark` specificity (0,1,1) to beat the later `:root` defaults.
+ */
+html.dark {
+  --app-text-color: var(--ofi-d-text);
+  --app-text-muted-1: #e2e5ec;
+  --app-text-muted-2: #c4c9d2;
+  --app-text-muted-3: #aab0bb;
+  --app-text-muted-4: #8f95a1;
+  --background: var(--ofi-d-bg);
+  --foreground: var(--ofi-d-text);
+}
+
+/* ── Base surface ── */
+html.dark,
+html.dark body,
+.dark main,
+.dark .bg-\[\#f8fafd\],
+.dark .bg-\[\#f8fafc\] {
+  background: var(--ofi-d-bg) !important;
+  color: var(--ofi-d-text);
+}
+.dark ::selection {
+  background: var(--ofi-d-wheat);
+  color: #08090a;
+}
+.dark ::-webkit-scrollbar-thumb { background: #2a2b2e; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #36373b; }
+
+/* ── Cards / structures → solid #151616 ── */
+.dark .bg-white,
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/60,
+.dark .bg-slate-50\/70,
+.dark .bg-slate-50\/80,
+.dark .bg-slate-100,
+.dark .bg-violet-50,
+.dark .bg-violet-100,
+.dark .bg-emerald-50,
+.dark .bg-emerald-100,
+.dark .bg-amber-50,
+.dark .bg-amber-100,
+.dark .bg-yellow-50,
+.dark .bg-yellow-100,
+.dark .bg-rose-50,
+.dark .bg-rose-100 {
+  background-color: var(--ofi-d-surface) !important;
+  border-color: var(--ofi-d-border) !important;
+  box-shadow: none !important;
+}
+.dark .bg-slate-200,
+.dark .bg-slate-200\/60 { background-color: var(--ofi-d-surface-3) !important; }
+.dark .bg-slate-950\/15 { background-color: rgba(0, 0, 0, 0.4) !important; }
+/* selected / light-blue backgrounds → subtle neutral */
+.dark .bg-\[\#eef4ff\],
+.dark .bg-\[\#d3e3fd\],
+.dark .bg-\[\#eaf1fb\],
+.dark .bg-\[\#eef2f6\] { background-color: var(--ofi-d-surface-3) !important; }
+
+/* ── Brand-navy surfaces & primary buttons → white with black text ── */
+.dark .bg-\[\#272f67\],
+.dark .bg-\[\#1f2654\],
+.dark .bg-\[\#1a2361\],
+.dark .bg-brand-solid,
+.dark .ant-btn-primary {
+  background: var(--ofi-d-wheat) !important;
+  border-color: var(--ofi-d-wheat) !important;
+  color: #08090a !important;
+  -webkit-text-fill-color: #08090a !important;
+  box-shadow: 0 0 0 1px rgba(230, 207, 158, 0.18) !important;
+}
+.dark .bg-\[\#272f67\] *,
+.dark .bg-\[\#1f2654\] *,
+.dark .bg-\[\#1a2361\] *,
+.dark .bg-brand-solid *,
+.dark .ant-btn-primary * {
+  color: #08090a !important;
+  -webkit-text-fill-color: #08090a !important;
+}
+.dark .ant-btn-primary:hover {
+  background: var(--ofi-d-wheat-strong) !important;
+  border-color: var(--ofi-d-wheat-strong) !important;
+  color: #08090a !important;
+}
+.dark .ant-btn-primary:disabled,
+.dark .ant-btn-primary[disabled] {
+  background: #2a2b2e !important;
+  border-color: transparent !important;
+  color: #7c818c !important;
+}
+
+/* ── Borders ── */
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-200\/60,
+.dark .border-slate-200\/70,
+.dark .border-slate-200\/90,
+.dark .border-violet-200,
+.dark .border-emerald-200,
+.dark .border-amber-200,
+.dark .border-yellow-200,
+.dark .border-rose-200 { border-color: var(--ofi-d-border) !important; }
+.dark .border-slate-300,
+.dark .border-slate-400 { border-color: var(--ofi-d-border-strong) !important; }
+.dark .border-\[\#d3e3fd\] { border-color: var(--ofi-d-border) !important; }
+.dark .border-\[\#272f67\],
+.dark .border-\[\#1f2654\],
+.dark .border-\[\#1a2361\],
+.dark .border-\[\#8ea2ff\] { border-color: var(--ofi-d-wheat-border) !important; }
+/* Coloured card borders (profit/loss panels) → subtle, not exaggerated */
+.dark .border-emerald-300,
+.dark .border-green-300,
+.dark .border-rose-300,
+.dark .border-red-300,
+.dark .border-amber-300,
+.dark .border-yellow-300 { border-color: var(--ofi-d-border) !important; }
+
+/* ── Text → light; nothing invisible ── */
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-white,
+.dark .text-black { color: var(--ofi-d-text) !important; }
+.dark .text-slate-600 { color: var(--ofi-d-text-2) !important; }
+.dark .text-slate-500 { color: var(--ofi-d-text-3) !important; }
+.dark .text-slate-400 { color: var(--ofi-d-text-4) !important; }
+.dark .text-slate-300 { color: #9097a2 !important; }
+.dark .text-primary,
+.dark .text-foreground,
+.dark .text-card-foreground { color: var(--ofi-d-text) !important; }
+.dark .text-secondary { color: var(--ofi-d-text-2) !important; }
+.dark .text-tertiary,
+.dark .text-muted-foreground { color: var(--ofi-d-text-3) !important; }
+.dark .text-quaternary { color: var(--ofi-d-text-4) !important; }
+/* hardcoded near-black → white; navy → wheat accent */
+.dark .text-\[\#0f172a\],
+.dark .text-\[\#1d1d1f\],
+.dark .text-\[\#1D1D1F\],
+.dark .text-\[\#151a3b\] { color: var(--ofi-d-text) !important; }
+.dark .text-\[\#272f67\],
+.dark .text-\[\#1f2654\],
+.dark .text-\[\#1a2361\] { color: var(--ofi-d-wheat) !important; }
+.dark .text-\[\#64748b\],
+.dark .text-\[\#86868B\] { color: var(--ofi-d-text-3) !important; }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--ofi-d-border) !important; }
+
+/* Coloured accent text (profit/loss, tags) — muted, not exaggerated */
+.dark .text-emerald-950, .dark .text-emerald-900, .dark .text-emerald-800,
+.dark .text-emerald-700, .dark .text-emerald-600,
+.dark .text-green-700, .dark .text-green-600, .dark .text-green-500 { color: var(--ofi-d-pos) !important; }
+.dark .text-rose-950, .dark .text-rose-900, .dark .text-rose-800,
+.dark .text-rose-700, .dark .text-rose-600,
+.dark .text-red-700, .dark .text-red-600, .dark .text-red-500 { color: var(--ofi-d-neg) !important; }
+.dark .text-amber-900, .dark .text-amber-800, .dark .text-amber-700, .dark .text-amber-600,
+.dark .text-yellow-900, .dark .text-yellow-800, .dark .text-yellow-700 { color: var(--ofi-d-wheat) !important; }
+.dark .text-violet-900, .dark .text-violet-800, .dark .text-violet-700, .dark .text-violet-600 { color: #cfc4e6 !important; }
+
+/* Soft shadows read as black halos on dark — calm them. */
+.dark .shadow-sm, .dark .shadow, .dark .shadow-md,
+.dark .shadow-lg, .dark .shadow-xl { --tw-shadow-color: rgba(0, 0, 0, 0.5); }
+
+/* ── Hover — everything resolves to #232326 ── */
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50\/80:hover,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-\[\#eef4ff\]:hover,
+.dark .hover\:bg-\[\#d3e3fd\]:hover,
+.dark .hover\:bg-white:hover {
+  background: var(--ofi-d-hover) !important;
+}
+.dark .hover\:text-slate-950:hover,
+.dark .hover\:text-slate-900:hover,
+.dark .hover\:text-slate-700:hover,
+.dark .hover\:text-\[\#1f2654\]:hover,
+.dark .hover\:text-\[\#272f67\]:hover { color: var(--ofi-d-wheat-strong) !important; }
+
+/* Wheat-tinted focus and selected states for Tailwind-heavy screens. */
+.dark .focus\:border-\[\#272f67\]:focus,
+.dark .focus\:border-\[\#1f2654\]:focus,
+.dark .focus-within\:border-\[\#1f2654\]:focus-within {
+  border-color: var(--ofi-d-wheat) !important;
+}
+.dark .focus\:ring-\[\#272f67\]\/10:focus,
+.dark .focus\:ring-\[\#1f2654\]\/10:focus,
+.dark .focus-within\:ring-\[\#1f2654\]\/10:focus-within,
+.dark .ring-\[\#1f2654\]\/10,
+.dark .ring-\[\#1f2654\]\/\[0\.04\] {
+  --tw-ring-color: var(--ofi-d-wheat-soft) !important;
+}
+.dark .bg-\[\#272f67\]\/8,
+.dark .bg-\[\#272f67\]\/10,
+.dark .bg-\[\#272f67\]\/\[0\.04\],
+.dark .bg-\[\#1f2654\]\/10,
+.dark .bg-\[\#1f2654\]\/\[0\.04\],
+.dark .bg-\[\#1f2654\]\/\[0\.045\] {
+  background-color: var(--ofi-d-wheat-soft) !important;
+}
+.dark .hover\:bg-\[\#272f67\]\/15:hover,
+.dark .hover\:bg-\[\#eef4ff\]:hover,
+.dark .hover\:bg-\[\#d3e3fd\]:hover {
+  background-color: var(--ofi-d-wheat-softer) !important;
+}
+.dark .file\:bg-\[\#272f67\]\/10::file-selector-button {
+  background-color: var(--ofi-d-wheat-soft) !important;
+}
+.dark .file\:text-\[\#272f67\]::file-selector-button {
+  color: var(--ofi-d-wheat) !important;
+}
+.dark .hover\:file\:bg-\[\#272f67\]\/15:hover::file-selector-button {
+  background-color: var(--ofi-d-wheat-border) !important;
+}
+
+/* ── AntD: inputs / selects / pickers ── */
+.dark .ant-input,
+.dark .ant-input-affix-wrapper,
+.dark .ant-input-password,
+.dark .ant-picker,
+.dark .ant-select .ant-select-selector,
+.dark .ant-select-single .ant-select-selector {
+  background: var(--ofi-d-surface) !important;
+  border-color: var(--ofi-d-border) !important;
+  color: var(--ofi-d-text) !important;
+}
+.dark .ant-input::placeholder,
+.dark .ant-input-affix-wrapper input::placeholder,
+.dark .ant-select-selection-placeholder { color: var(--ofi-d-text-4) !important; }
+.dark .ant-input:hover,
+.dark .ant-input-affix-wrapper:hover,
+.dark .ant-picker:hover,
+.dark .ant-select:hover .ant-select-selector { border-color: var(--ofi-d-border-strong) !important; }
+.dark .ant-input:focus,
+.dark .ant-input-focused,
+.dark .ant-input-affix-wrapper-focused,
+.dark .ant-input-affix-wrapper:focus-within,
+.dark .ant-picker-focused,
+.dark .ant-select-focused .ant-select-selector {
+  background: var(--ofi-d-surface) !important;
+  border-color: var(--ofi-d-wheat) !important;
+  box-shadow: none !important;
+}
+.dark .ant-input-affix-wrapper .ant-input,
+.dark .ant-input-affix-wrapper input,
+.dark .ant-input-password .ant-input {
+  background: transparent !important;
+  color: var(--ofi-d-text) !important;
+}
+.dark .ant-input:-webkit-autofill,
+.dark .ant-input-affix-wrapper input:-webkit-autofill,
+.dark .ant-input-password input:-webkit-autofill {
+  -webkit-text-fill-color: var(--ofi-d-text) !important;
+  caret-color: var(--ofi-d-text) !important;
+  box-shadow: 0 0 0 1000px var(--ofi-d-surface) inset !important;
+}
+/* Search bars stay white with dark text inside */
+.dark .ofi-light-search-input,
+.dark input.ofi-light-search-input,
+.dark .ant-input.ofi-light-search-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+}
+.dark .ofi-light-search-input::placeholder,
+.dark input.ofi-light-search-input::placeholder,
+.dark .ant-input.ofi-light-search-input::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+}
+
+/* ── AntD: secondary / text buttons ── */
+.dark .ant-btn-default {
+  background: var(--ofi-d-surface) !important;
+  border-color: var(--ofi-d-border) !important;
+  color: var(--ofi-d-text-2) !important;
+}
+.dark .ant-btn-default:hover {
+  background: var(--ofi-d-hover) !important;
+  border-color: var(--ofi-d-border-strong) !important;
+  color: var(--ofi-d-text) !important;
+}
+.dark .ant-btn-text { color: var(--ofi-d-text-2) !important; }
+.dark .ant-btn-text:hover {
+  background: var(--ofi-d-hover) !important;
+  color: var(--ofi-d-text) !important;
+}
+.dark .ant-btn-dangerous.ant-btn-text:hover { background: rgba(211, 15, 21, 0.16) !important; }
+/* Links / wheat accent (no blue) */
+.dark .ant-btn-link { color: var(--ofi-d-wheat) !important; }
+.dark .ant-btn-link:hover { color: var(--ofi-d-wheat-strong) !important; }
+
+/* Links, tabs and compact controls pick up the same accent. */
+.dark a:not(.ant-btn):not([class*="text-"]) {
+  color: var(--ofi-d-wheat);
+}
+.dark a:not(.ant-btn):not([class*="text-"]):hover {
+  color: var(--ofi-d-wheat-strong);
+}
+.dark .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn,
+.dark .ant-tabs .ant-tabs-tab:hover,
+.dark .ant-menu-light .ant-menu-item-selected,
+.dark .ant-menu-light .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  color: var(--ofi-d-wheat) !important;
+}
+.dark .ant-tabs .ant-tabs-ink-bar,
+.dark .ant-slider .ant-slider-track,
+.dark .ant-slider .ant-slider-handle::after,
+.dark .ant-progress .ant-progress-bg {
+  background: var(--ofi-d-wheat) !important;
+  border-color: var(--ofi-d-wheat) !important;
+}
+
+/* ── AntD: tables ── */
+.dark .ant-table-wrapper .ant-table {
+  background: var(--ofi-d-surface) !important;
+  color: var(--ofi-d-text-2);
+}
+.dark .ant-table-wrapper .ant-table-container table > thead > tr > th {
+  background: var(--ofi-d-surface-2) !important;
+  color: var(--ofi-d-text-3) !important;
+  border-bottom: 1px solid var(--ofi-d-border) !important;
+}
+.dark .ant-table-wrapper .ant-table-container table > tbody > tr > td {
+  background: transparent !important;
+  border-bottom: 1px solid var(--ofi-d-border) !important;
+  color: var(--ofi-d-text-2);
+}
+.dark .ant-table-wrapper .ant-table-container table > tbody > tr:hover > td,
+.dark .ant-table-wrapper .ant-table-tbody .ant-table-cell-row-hover,
+.dark tbody tr:hover > td { background: var(--ofi-d-hover) !important; }
+
+/* ── AntD: pagination (wheat active) ── */
+.dark .ant-pagination { border-top-color: var(--ofi-d-border); }
+.dark .ant-pagination .ant-pagination-item {
+  background: var(--ofi-d-surface) !important;
+  border-color: var(--ofi-d-border) !important;
+}
+.dark .ant-pagination .ant-pagination-item a { color: var(--ofi-d-text-2) !important; }
+.dark .ant-pagination .ant-pagination-item-active {
+  background: var(--ofi-d-wheat) !important;
+  border-color: var(--ofi-d-wheat) !important;
+}
+.dark .ant-pagination .ant-pagination-item-active a { color: #08090a !important; }
+
+/* ── AntD: navy remnants → wheat / neutral (kill the blue) ── */
+.dark .ant-spin-dot-item { background-color: var(--ofi-d-wheat) !important; }
+.dark .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: var(--ofi-d-wheat) !important;
+  border-color: var(--ofi-d-wheat) !important;
+}
+.dark .ant-checkbox-checked .ant-checkbox-inner::after { border-color: #08090a !important; }
+.dark .ant-radio-checked .ant-radio-inner { border-color: var(--ofi-d-wheat) !important; }
+.dark .ant-radio-checked .ant-radio-inner::after { background-color: var(--ofi-d-wheat) !important; }
+.dark .ant-switch.ant-switch-checked { background: var(--ofi-d-wheat) !important; }
+.dark .ant-segmented .ant-segmented-item-selected {
+  background: var(--ofi-d-wheat) !important;
+  color: #08090a !important;
+}
+.dark .ant-segmented .ant-segmented-item-selected * {
+  color: #08090a !important;
+}
+.dark .ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled),
+.dark .ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-selected,
+.dark .ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner {
+  background: var(--ofi-d-wheat) !important;
+  color: #08090a !important;
+}
+.dark .ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before {
+  border-color: var(--ofi-d-wheat) !important;
+}
+.dark .ant-tag-processing {
+  background: var(--ofi-d-surface-3) !important;
+  color: var(--ofi-d-wheat) !important;
+}
+/* Loading overlays / skeleton resolve to #232326, never blue */
+.dark .ant-spin-container::after { background: rgba(8, 9, 10, 0.6) !important; }
+.dark .ant-skeleton-content .ant-skeleton-title,
+.dark .ant-skeleton-content .ant-skeleton-paragraph > li,
+.dark .ant-skeleton-button,
+.dark .ant-skeleton-input { background: var(--ofi-d-hover) !important; }
+
+/* ── AntD: modal / drawer / popover — frosted glass ── */
+.dark .ant-modal-content,
+.dark .ant-drawer-content,
+.dark .ant-popover-inner {
+  background: var(--ofi-d-glass) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid var(--ofi-d-border) !important;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.7) !important;
+}
+.dark .ant-modal-header,
+.dark .ant-drawer-header {
+  background: transparent !important;
+  border-bottom-color: var(--ofi-d-border) !important;
+}
+.dark .ant-modal-title,
+.dark .ant-drawer-title { color: var(--ofi-d-text) !important; }
+.dark .ant-modal-close:hover,
+.dark .ant-drawer-close:hover {
+  background: var(--ofi-d-hover) !important;
+  color: var(--ofi-d-text) !important;
+}
+
+/* ── AntD: misc surfaces ── */
+.dark .ant-card,
+.dark .ant-collapse,
+.dark .ant-collapse-content,
+.dark .ant-segmented {
+  background: var(--ofi-d-surface) !important;
+  color: var(--ofi-d-text-2) !important;
+}
+.dark .ant-empty-description { color: var(--ofi-d-text-3) !important; }
+.dark .ant-divider { border-color: var(--ofi-d-border) !important; }
+
+/* ── Sidebar menu ── */
+.dark .offitec-sidebar-menu .ant-menu-item,
+.dark .offitec-sidebar-menu .ant-menu-submenu-title,
+.dark .offitec-sidebar-menu .ant-menu-title-content,
+.dark .offitec-sidebar-menu .ant-menu-submenu-arrow,
+.dark .offitec-sidebar-menu-popup .ant-menu-item { color: var(--ofi-d-text-2) !important; }
+.dark .offitec-sidebar-menu .ant-menu-item:hover,
+.dark .offitec-sidebar-menu .ant-menu-submenu-title:hover,
+.dark .offitec-sidebar-menu-popup .ant-menu-item:hover {
+  background: var(--ofi-d-hover) !important;
+  color: var(--ofi-d-text) !important;
+}
+.dark .offitec-sidebar-menu .ant-menu-item:not(.ant-menu-item-selected):hover .ant-menu-item-icon,
+.dark .offitec-sidebar-menu .ant-menu-item:not(.ant-menu-item-selected):hover .ant-menu-title-content,
+.dark .offitec-sidebar-menu .ant-menu-item:not(.ant-menu-item-selected):hover .ant-menu-title-content *,
+.dark .offitec-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-item-icon,
+.dark .offitec-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-title-content,
+.dark .offitec-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-submenu-arrow { color: var(--ofi-d-text) !important; }
+/* Active item — white pill, black text */
+.dark .offitec-sidebar-menu .ant-menu-item-selected,
+.dark .offitec-sidebar-menu-popup .ant-menu-item-selected {
+  background: var(--ofi-d-wheat) !important;
+  color: #08090a !important;
+}
+.dark .offitec-sidebar-menu .ant-menu-item-selected .ant-menu-item-icon,
+.dark .offitec-sidebar-menu .ant-menu-item-selected .ant-menu-title-content,
+.dark .offitec-sidebar-menu .ant-menu-item-selected .ant-menu-title-content *,
+.dark .offitec-sidebar-menu-popup .ant-menu-item-selected .ant-menu-title-content { color: #08090a !important; }
+.dark .offitec-sidebar-menu-popup .ant-menu { background: var(--ofi-d-surface-2) !important; }
+
+/* Tenant select prefix icon */
+.dark .offitec-tenant-select .ant-select-prefix { color: var(--ofi-d-wheat) !important; }
+
+/* Status cards and warning callouts get a quiet wheat tint in dark mode. */
+.dark .bg-amber-400\/10,
+.dark .bg-yellow-400\/10 {
+  background-color: var(--ofi-d-wheat-soft) !important;
+}
+.dark .border-amber-400\/30,
+.dark .border-yellow-400\/30 {
+  border-color: var(--ofi-d-wheat-border) !important;
+}
+.dark .text-amber-100,
+.dark .text-yellow-100 {
+  color: var(--ofi-d-wheat-strong) !important;
+}
+
+/* ── Toasts ── */
+.dark .offitec-toaster [data-sonner-toast],
+.dark .offitec-toast {
+  background: var(--ofi-d-surface-2) !important;
+  border-color: var(--ofi-d-border) !important;
+  color: var(--ofi-d-text) !important;
+}
+.dark .offitec-toaster [data-title],
+.dark .offitec-toast-title { color: var(--ofi-d-text) !important; }
+.dark .offitec-toaster [data-description],
+.dark .offitec-toast-description { color: var(--ofi-d-text-3) !important; }

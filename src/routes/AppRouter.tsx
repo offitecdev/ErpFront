@@ -39,6 +39,7 @@ const Login = lazyNamed(() => import('../pages/Login'), 'Login');
 const Roles = lazyNamed(() => import('../pages/iam/Roles'), 'Roles');
 const Employees = lazyNamed(() => import('../pages/iam/Employees'), 'Employees');
 const Dashboard = lazyNamed(() => import('../pages/Dashboard'), 'Dashboard');
+const Home = lazyNamed(() => import('../pages/Home'), 'Home');
 const AttendanceSettings = lazyNamed(() => import('../pages/attendance/AttendanceSettings'), 'AttendanceSettings');
 const AttendanceRecords = lazyNamed(() => import('../pages/attendance/AttendanceRecords'), 'AttendanceRecords');
 const CustomerDashboard = lazyNamed(() => import('../pages/crm/CustomerDashboard'), 'CustomerDashboard');
@@ -67,16 +68,21 @@ const MaintenanceDashboard = lazyNamed(() => import('../pages/maintenance/Mainte
 const MaintenanceContracts = lazyNamed(() => import('../pages/maintenance/MaintenanceContracts'), 'MaintenanceContracts');
 const MaintenanceContractCreate = lazyNamed(() => import('../pages/maintenance/MaintenanceContracts'), 'MaintenanceContractCreate');
 const MaintenanceTasks = lazyNamed(() => import('../pages/maintenance/MaintenanceTasks'), 'MaintenanceTasks');
-const MaintenanceReports = lazyNamed(() => import('../pages/maintenance/MaintenanceReports'), 'MaintenanceReports');
 const RegieOperations = lazyNamed(() => import('../pages/maintenance/RegieOperations'), 'RegieOperations');
 const MaintenanceTechnician = lazyNamed(() => import('../pages/maintenance/MaintenanceTechnician'), 'MaintenanceTechnician');
 const PdfSettings = lazyNamed(() => import('../pages/settings/PdfSettings'), 'PdfSettings');
 const MailSettings = lazyNamed(() => import('../pages/settings/MailSettings'), 'MailSettings');
+const ChecklistSettings = lazyNamed(() => import('../pages/settings/ChecklistSettings'), 'ChecklistSettings');
 const Projects = lazyNamed(() => import('../pages/project/Projects'), 'Projects');
+const ProjectFlow = lazyNamed(() => import('../pages/project/ProjectFlow'), 'ProjectFlow');
 const ProjectDetail = lazyNamed(() => import('../pages/project/ProjectDetail'), 'ProjectDetail');
 const ProjectInstallation = lazyNamed(() => import('../pages/project/ProjectInstallation'), 'ProjectInstallation');
 const BookingPage = lazyNamed(() => import('../pages/project/BookingPage'), 'BookingPage');
+const ServiceReports = lazyNamed(() => import('../pages/services/ServiceReports'), 'ServiceReports');
+const ServiceReportAdd = lazyNamed(() => import('../pages/services/ServiceReportAdd'), 'ServiceReportAdd');
+const ReportSigningPage = lazyNamed(() => import('../pages/services/ReportSigningPage'), 'ReportSigningPage');
 const MaintenanceBookingPage = lazyNamed(() => import('../pages/maintenance/MaintenanceBookingPage'), 'MaintenanceBookingPage');
+const UnifiedCalendar = lazyNamed(() => import('../pages/calendar/UnifiedCalendar'), 'UnifiedCalendar');
 
 const RouteFallback = () => (
     <div className="animate-pulse space-y-5">
@@ -129,10 +135,12 @@ export const AppRouter = () => {
 
             <Route path="/booking/:token" element={page(BookingPage)} />
             <Route path="/maintenance-booking/:token" element={page(MaintenanceBookingPage)} />
+            <Route path="/report-sign/:token" element={page(ReportSigningPage)} />
 
             <Route element={<ProtectedRoute />}>
                 <Route element={<MainLayout />}>
-                    <Route path="/" element={page(Dashboard)} />
+                    <Route path="/" element={page(Home)} />
+                    <Route path="/attendance" element={page(Dashboard)} />
                     <Route path="/roles" element={page(Roles)} />
                     <Route path="/employees" element={page(Employees)} />
                     <Route path="/attendance-settings" element={<AttendanceAdminRoute />} />
@@ -164,22 +172,25 @@ export const AppRouter = () => {
                     <Route path="/maintenance/contracts/new" element={page(MaintenanceContractCreate)} />
                     <Route path="/maintenance/tasks" element={page(MaintenanceTasks)} />
                     <Route path="/maintenance/tasks/:taskId" element={page(MaintenanceTasks)} />
-                    <Route path="/maintenance/technician" element={<Navigate to="/maintenance/technician/calendar" replace />} />
-                    <Route path="maintenance/technician/calendar" element={page(MaintenanceTechnician)} />
-                    <Route path="maintenance/technician/calendar/:taskId" element={page(MaintenanceTechnician)} />
+                    <Route path="/maintenance/technician" element={<Navigate to="/maintenance/technician/tasks" replace />} />
+                    <Route path="maintenance/technician/calendar" element={<Navigate to="/calendar" replace />} />
                     <Route path="maintenance/technician/tasks" element={page(MaintenanceTechnician)} />
                     <Route path="maintenance/technician/tasks/:taskId" element={page(MaintenanceTechnician)} />
-                    <Route path="/maintenance/reports" element={page(MaintenanceReports)} />
+                    <Route path="/maintenance/reports" element={<Navigate to="/maintenance/tasks?view=reports" replace />} />
                     <Route path="/maintenance/regie" element={page(RegieOperations)} />
+                    <Route path="/calendar" element={page(UnifiedCalendar)} />
                     <Route path="/projects" element={<ProjectModuleRoute component={Projects} />} />
-                    <Route path="/projects/installation" element={<Navigate to="/projects/installation/calendar" replace />} />
-                    <Route path="/projects/installation/calendar" element={<ProjectModuleRoute component={ProjectInstallation} />} />
-                    <Route path="/projects/installation/calendar/:appointmentId" element={<ProjectModuleRoute component={ProjectInstallation} />} />
+                    <Route path="/projects/flow" element={<ProjectModuleRoute component={ProjectFlow} />} />
+                    <Route path="/projects/installation" element={<Navigate to="/projects/installation/tasks" replace />} />
+                    <Route path="/projects/installation/calendar" element={<Navigate to="/calendar" replace />} />
                     <Route path="/projects/installation/tasks" element={<ProjectModuleRoute component={ProjectInstallation} />} />
                     <Route path="/projects/installation/tasks/:appointmentId" element={<ProjectModuleRoute component={ProjectInstallation} />} />
                     <Route path="/projects/:id" element={<ProjectModuleRoute component={ProjectDetail} />} />
+                    <Route path="/services/reports" element={<ProjectModuleRoute component={ServiceReports} />} />
+                    <Route path="/services/reports/new" element={<ProjectModuleRoute component={ServiceReportAdd} />} />
                     <Route path="/settings/pdf" element={page(PdfSettings)} />
                     <Route path="/settings/mail" element={<ProjectModuleRoute component={MailSettings} />} />
+                    <Route path="/settings/checklists" element={<ProjectModuleRoute component={ChecklistSettings} />} />
                 </Route>
             </Route>
 

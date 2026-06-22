@@ -25,8 +25,35 @@ export interface SalesOrderDto {
     createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
 }
 
+// One row of the global field-report registry (Services > Reports).
+export interface ServiceReportDto {
+    id: string;
+    projectId: string;
+    salesOrderId?: string | null;
+    appointmentId?: string | null;
+    reportDate: string;
+    workDate: string;
+    startedAt?: string | null;
+    endedAt?: string | null;
+    workedMinutes: number;
+    plannedMinutesForDay: number;
+    overtimeMinutes: number;
+    overtimeHourlyRate: number;
+    overtimeCost: number;
+    operationsDone: string;
+    technicalNotes?: string | null;
+    isSigned: boolean;
+    hoursApprovedAt?: string | null;
+    autoApproved?: boolean;
+    project?: { id: string; projectName: string; customer?: { id: string; companyName: string } | null } | null;
+    salesOrder?: { id: string; orderNumber: string } | null;
+    appointment?: { id: string; startTime: string; endTime: string } | null;
+    employee?: { id: string; firstName: string; lastName: string; email: string } | null;
+    images?: { id: string }[];
+}
+
 export type CompleteInstallationInput = {
-    operationsDoneItems: string[];
+    operationsDoneItems?: string[];
     technicalNotes?: string;
     startedAt?: string;
     endedAt?: string;
@@ -34,6 +61,8 @@ export type CompleteInstallationInput = {
     expenses?: { expenseType: string; amount: number; description?: string }[];
     materials?: { materialId: string; quantity: number; description?: string }[];
     usedMaterials?: { materialId: string; quantity: number; description?: string }[];
+    // Optional field-report photos as base64 data URLs.
+    images?: string[];
 };
 
 export const projectApi = {
@@ -92,12 +121,12 @@ export const projectApi = {
         return res.data;
     },
 
-    addReport: async (id: string, input: { salesOrderId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string }) => {
+    addReport: async (id: string, input: { salesOrderId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string; images?: string[] }) => {
         const res = await apiClient.post(`/projects/${id}/reports`, input);
         return res.data;
     },
 
-    updateReport: async (reportId: string, input: { salesOrderId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string }) => {
+    updateReport: async (reportId: string, input: { salesOrderId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string; images?: string[] }) => {
         const res = await apiClient.patch(`/projects/reports/${reportId}`, input);
         return res.data;
     },
@@ -107,8 +136,23 @@ export const projectApi = {
         return res.data;
     },
 
+    addReportMaterials: async (reportId: string, materials: Array<{ materialId: string; quantity: number }>) => {
+        const res = await apiClient.post(`/projects/reports/${reportId}/materials`, { materials });
+        return res.data;
+    },
+
     requestReportSignature: async (reportId: string, input: { channel: 'technician' | 'mail' | 'both'; to?: string; subject?: string; message?: string; fromEmail?: string; fromName?: string }) => {
         const res = await apiClient.post(`/projects/reports/${reportId}/signature-request`, input);
+        return res.data;
+    },
+
+    // Flat list of every field report in the tenant (Services > Reports module).
+    listAllReports: async (filter: { search?: string; start?: string; end?: string } = {}): Promise<ServiceReportDto[]> => {
+        const params = new URLSearchParams();
+        if (filter.search) params.set('search', filter.search);
+        if (filter.start) params.set('start', filter.start);
+        if (filter.end) params.set('end', filter.end);
+        const res = await apiClient.get(`/projects/reports${params.toString() ? '?' + params : ''}`);
         return res.data;
     },
 
@@ -119,6 +163,12 @@ export const projectApi = {
 
     listMyInstallations: async (start: string, end: string): Promise<AppointmentDto[]> => {
         const res = await apiClient.get('/projects/technician/installations', { params: { start, end } });
+        return res.data;
+    },
+
+    // Manager-facing: every order appointment in the tenant for the range.
+    listAppointments: async (start: string, end: string): Promise<AppointmentDto[]> => {
+        const res = await apiClient.get('/projects/appointments', { params: { start, end } });
         return res.data;
     },
 
@@ -151,7 +201,7 @@ export const projectApi = {
         await apiClient.delete(`/projects/appointments/${appointmentId}`);
     },
 
-    requestVariation: async (id: string, input: { salesOrderId?: string | null; materialId: string; quantity: number; description?: string }) => {
+    requestVariation: async (id: string, input: { salesOrderId?: string | null; appointmentId?: string | null; materialId: string; quantity: number; description?: string }) => {
         const res = await apiClient.post(`/projects/${id}/variations`, input);
         return res.data;
     },
@@ -170,7 +220,7 @@ export const projectApi = {
         return res.data;
     },
 
-    addExpense: async (id: string, input: { salesOrderId?: string | null; expenseType: string; amount: number; description?: string }) => {
+    addExpense: async (id: string, input: { salesOrderId?: string | null; appointmentId?: string | null; expenseType: string; amount: number; description?: string }) => {
         const res = await apiClient.post(`/projects/${id}/expenses`, input);
         return res.data;
     },
@@ -244,6 +294,205 @@ export const mailApi = {
 
     send: async (input: { fromEmail?: string; fromName?: string; to: string; subject: string; text?: string; html?: string; attachments?: Array<{ filename: string; contentType: string; contentBase64: string }> }) => {
         const res = await apiClient.post('/mail/send', input);
+        return res.data;
+    },
+};
+
+export interface ChecklistItemDto {
+    id: string;
+    category: string;
+    label: string;
+    measurement: boolean;
+}
+
+export interface ChecklistTemplateDto {
+    id: string;
+    tenantId: string;
+    name: string;
+    description: string | null;
+    items: ChecklistItemDto[];
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type ChecklistTemplateInput = {
+    name: string;
+    description?: string | null;
+    items: Array<Partial<ChecklistItemDto> & { label: string }>;
+    isActive?: boolean;
+};
+
+export const checklistApi = {
+    list: async (): Promise<ChecklistTemplateDto[]> => {
+        const res = await apiClient.get('/settings/checklists');
+        return res.data;
+    },
+    getOne: async (id: string): Promise<ChecklistTemplateDto> => {
+        const res = await apiClient.get(`/settings/checklists/${id}`);
+        return res.data;
+    },
+    create: async (input: ChecklistTemplateInput): Promise<ChecklistTemplateDto> => {
+        const res = await apiClient.post('/settings/checklists', input);
+        return res.data;
+    },
+    update: async (id: string, input: Partial<ChecklistTemplateInput>): Promise<ChecklistTemplateDto> => {
+        const res = await apiClient.put(`/settings/checklists/${id}`, input);
+        return res.data;
+    },
+    remove: async (id: string): Promise<void> => {
+        await apiClient.delete(`/settings/checklists/${id}`);
+    },
+};
+
+export type DeliveryStatus = 'YES' | 'NO' | 'NA' | null;
+
+export interface DeliveryResponseItem {
+    id: string;
+    category: string;
+    label: string;
+    status: DeliveryStatus;
+    measurement: string;
+    measurementEnabled: boolean;
+}
+
+export interface DeliveryReportDto {
+    id: string;
+    tenantId: string;
+    projectId: string | null;
+    salesOrderId: string | null;
+    appointmentId: string | null;
+    employeeId: string | null;
+    checklistTemplateId: string | null;
+    checklistName: string | null;
+    responses: DeliveryResponseItem[];
+    notes: string | null;
+    customerSignature: string | null;
+    isSigned: boolean;
+    signedAt: string | null;
+    sentAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    // Optional enriched labels added by the list endpoint.
+    projectName?: string | null;
+    customerName?: string | null;
+    orderNumber?: string | null;
+}
+
+export type DeliveryReportInput = {
+    projectId?: string | null;
+    salesOrderId?: string | null;
+    appointmentId?: string | null;
+    checklistTemplateId?: string | null;
+    checklistName?: string | null;
+    responses: Array<Partial<DeliveryResponseItem> & { label: string }>;
+    notes?: string | null;
+    signatureBase64?: string | null;
+};
+
+export const deliveryReportApi = {
+    list: async (params?: { appointmentId?: string; projectId?: string; salesOrderId?: string }): Promise<DeliveryReportDto[]> => {
+        const res = await apiClient.get('/delivery-reports', { params });
+        return res.data;
+    },
+    getOne: async (id: string): Promise<DeliveryReportDto> => {
+        const res = await apiClient.get(`/delivery-reports/${id}`);
+        return res.data;
+    },
+    getByAppointment: async (appointmentId: string): Promise<DeliveryReportDto | null> => {
+        const res = await apiClient.get(`/delivery-reports/by-appointment/${appointmentId}`);
+        return res.data;
+    },
+    create: async (input: DeliveryReportInput): Promise<DeliveryReportDto> => {
+        const res = await apiClient.post('/delivery-reports', input);
+        return res.data;
+    },
+    sign: async (id: string, signatureBase64: string): Promise<DeliveryReportDto> => {
+        const res = await apiClient.patch(`/delivery-reports/${id}/sign`, { signatureBase64 });
+        return res.data;
+    },
+    update: async (id: string, input: { responses?: DeliveryReportInput['responses']; notes?: string | null; checklistName?: string | null }): Promise<DeliveryReportDto> => {
+        const res = await apiClient.patch(`/delivery-reports/${id}`, input);
+        return res.data;
+    },
+};
+
+export type SignatureReportType = 'FIELD' | 'DELIVERY' | 'GENERAL';
+
+export interface SignatureSnapshotRow {
+    label: string;
+    status?: 'YES' | 'NO' | 'NA' | null;
+    value?: string;
+}
+export interface SignatureSnapshotSection {
+    heading?: string;
+    rows: SignatureSnapshotRow[];
+}
+export interface SignatureSnapshot {
+    title?: string;
+    customerName?: string;
+    projectName?: string;
+    meta?: Array<{ label: string; value: string }>;
+    sections?: SignatureSnapshotSection[];
+    images?: string[];
+    notes?: string;
+}
+
+export interface SignatureRequestDto {
+    id: string;
+    reportType: SignatureReportType;
+    reportId: string | null;
+    projectId: string | null;
+    token: string;
+    customerEmail: string | null;
+    title: string | null;
+    status: 'PENDING' | 'SIGNED' | 'SUBMITTED';
+    signedAt: string | null;
+    createdAt: string;
+    link: string;
+}
+
+export type SignatureRequestInput = {
+    reportType: SignatureReportType;
+    reportId?: string | null;
+    projectId?: string | null;
+    title?: string;
+    customerEmail?: string | null;
+    snapshot: SignatureSnapshot;
+    sendEmail?: boolean;
+    notifyTechnician?: boolean;
+    subject?: string;
+    message?: string;
+    /** When present, the request is stored as already SIGNED (in-app signing). */
+    signatureBase64?: string | null;
+};
+
+export interface PublicSignatureView {
+    reportType: SignatureReportType;
+    title: string | null;
+    snapshot: SignatureSnapshot;
+    status: 'PENDING' | 'SIGNED' | 'SUBMITTED';
+    signedAt: string | null;
+}
+
+export const signatureApi = {
+    list: async (reportType?: SignatureReportType): Promise<SignatureRequestDto[]> => {
+        const res = await apiClient.get('/signature-requests', { params: reportType ? { reportType } : undefined });
+        return res.data;
+    },
+    create: async (input: SignatureRequestInput): Promise<SignatureRequestDto & { emailed: boolean; notified: boolean }> => {
+        const res = await apiClient.post('/signature-requests', input);
+        return res.data;
+    },
+    remove: async (id: string): Promise<void> => {
+        await apiClient.delete(`/signature-requests/${id}`);
+    },
+    publicGet: async (token: string): Promise<PublicSignatureView> => {
+        const res = await apiClient.get(`/signature-requests/public/${token}`);
+        return res.data;
+    },
+    publicSign: async (token: string, signatureBase64?: string | null): Promise<{ message: string; signed: boolean }> => {
+        const res = await apiClient.post(`/signature-requests/public/${token}/sign`, { signatureBase64: signatureBase64 || null });
         return res.data;
     },
 };

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle as WarningOutlined, Camera01 as CameraOutlined, Hash01 as NumberOutlined, Scan as ScanOutlined, XClose as CloseOutlined } from '../icons/antIconCompat';
+import { LuKeyRound as MdVpnKey } from 'react-icons/lu';
 import { toast } from 'sonner';
 import { Button } from './Button';
 import { Input } from './Field';
@@ -264,7 +265,7 @@ export const BarcodeScannerModal: React.FC<{
 
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <i className="f7-icons absolute left-3 top-1/2 z-10 -translate-y-1/2 text-fg-quaternary" style={{ fontSize: 14 }}>key</i>
+                            <MdVpnKey className="absolute left-3 top-1/2 z-10 -translate-y-1/2 text-fg-quaternary" size={14} />
                             <Input
                                 value={manualCode}
                                 onChange={(e) => setManualCode(e.target.value)}

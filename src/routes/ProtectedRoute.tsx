@@ -5,7 +5,7 @@ import { LoadingScreen } from '../components/layout/LoadingScreen';
 export const ProtectedRoute = () => {
     const { isAuthenticated, isLoading } = useAuthStore();
 
-    if (isLoading && !isAuthenticated) {
+    if (isLoading) {
         return <LoadingScreen />;
     }
 

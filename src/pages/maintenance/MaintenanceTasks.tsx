@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { DatePicker, Select as AntSelect } from 'antd';
-import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
+import { AlertTriangle, ArrowLeft, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -11,13 +11,27 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { maintenanceApi } from '../../lib/api/maintenance';
-import type { MaintenanceTaskDto, PersonLite } from '../../types/maintenance';
-import { ensureMaintenanceLocale, fmtDate, personName, StatusPill, STATUS_LABEL } from './MaintenanceShared';
+import type { MaintenanceReportDto, MaintenanceTaskDto, PersonLite } from '../../types/maintenance';
+import { ensureMaintenanceLocale, fmtDate, personName, StatusPill } from './MaintenanceShared';
+import { MaintenanceReportsPanel } from './MaintenanceReports';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
 
-type ScheduleView = 'list' | 'calendar';
-type DetailTab = 'overview' | 'appointment' | 'mail' | 'approval';
+type WorkspaceView = 'tasks' | 'reports';
+type DetailTab = 'overview' | 'appointment' | 'mail' | 'signature' | 'approval';
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((tick) => tick + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
+
+const REPORTS_SEEN_KEY = 'maintenance:reportsSeenAt';
 type MaintenanceDateRange = { start: dayjs.Dayjs; end: dayjs.Dayjs };
 type AppointmentOptionInput = { date: string; time: string; durationMinutes: number };
 type AssignmentFormState = {
@@ -250,16 +264,109 @@ const TechnicianRoster = ({
 };
 
 export const MaintenanceTasks = () => {
+    useLanguageRefresh();
     const { taskId } = useParams();
     if (taskId) return <MaintenanceTaskDetail taskId={taskId} />;
-    return <MaintenanceTaskList />;
+    return <MaintenanceWorkspace />;
+};
+
+const MaintenanceWorkspace = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const view: WorkspaceView = searchParams.get('view') === 'reports' ? 'reports' : 'tasks';
+
+    const [reports, setReports] = useState<MaintenanceReportDto[]>([]);
+    const [reportsLoaded, setReportsLoaded] = useState(false);
+    const [seenAt, setSeenAt] = useState<number>(() => Number(localStorage.getItem(REPORTS_SEEN_KEY) || 0));
+
+    const loadReports = useCallback(async () => {
+        try {
+            const rows = await maintenanceApi.listReports();
+            setReports(rows);
+        } catch (error: any) {
+            toast.error(error.response?.data?.error ||t('auto.bakim_raporlari_yuklenemedi'));
+        } finally {
+            setReportsLoaded(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadReports();
+    }, [loadReports]);
+
+    const newestReportAt = useMemo(
+        () => reports.reduce((max, report) => Math.max(max, new Date(report.createdAt).getTime() || 0), 0),
+        [reports],
+    );
+    const hasNewReports = reportsLoaded && newestReportAt > seenAt;
+
+    const markReportsSeen = () => {
+        if (newestReportAt > seenAt) {
+            localStorage.setItem(REPORTS_SEEN_KEY, String(newestReportAt));
+            setSeenAt(newestReportAt);
+        }
+    };
+
+    // Clear the badge when the reports tab is open and new reports have loaded.
+    useEffect(() => {
+        if (view === 'reports' && reportsLoaded) markReportsSeen();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view, reportsLoaded, newestReportAt]);
+
+    const changeView = (next: WorkspaceView) => {
+        const params = new URLSearchParams(searchParams);
+        if (next === 'reports') params.set('view', 'reports');
+        else params.delete('view');
+        setSearchParams(params, { replace: true });
+        if (next === 'reports') markReportsSeen();
+    };
+
+    const tabs: Array<{ key: WorkspaceView; label: string; showDot?: boolean }> = [
+        { key: 'tasks', label:t('nav.maintenanceTasks') },
+        { key: 'reports', label:t('nav.maintenanceReports'), showDot: hasNewReports },
+    ];
+
+    return (
+        <div>
+            <PageHeader
+                breadcrumb={t('nav.maintenance')}
+                title={view === 'reports' ?t('nav.maintenanceReports') :t('nav.maintenanceTasks')}
+                description={view === 'reports'
+                    ?t('auto.saha_raporlarini_kullanilan_malzemeleri_risk_not')
+                    :t('auto.bakim_gorevleri_icin_sorumlu_teknisyenleri_atayi')}
+            />
+
+            <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-white/15 dark:bg-white/5">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => changeView(tab.key)}
+                        className={`relative rounded-md px-4 py-2 text-[12.5px] font-semibold transition-colors ${view === tab.key ?"bg-white text-slate-950 shadow-xs" :"text-slate-600 hover:text-slate-950 dark:text-white dark:hover:text-white"}`}
+                    >
+                        {tab.label}
+                        {tab.showDot && (
+                            <span
+                                title={t('auto.yeni_rapor_var')}
+                                className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5 items-center justify-center"
+                            >
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {view === 'reports'
+                ? <MaintenanceReportsPanel reports={reports} loading={!reportsLoaded} onReload={loadReports} />
+                : <MaintenanceTaskList />}
+        </div>
+    );
 };
 
 const MaintenanceTaskList = () => {
     ensureMaintenanceLocale();
     const navigate = useNavigate();
-    const [scheduleView, setScheduleView] = useState<ScheduleView>('list');
-    const [anchorDate, setAnchorDate] = useState(dayjs().format('YYYY-MM-DD'));
     const [appliedRange, setAppliedRange] = useState<MaintenanceDateRange>(() => initialRange());
     const [pickerRange, setPickerRange] = useState<MaintenanceDateRange | null>(() => initialRange());
     const [tasks, setTasks] = useState<MaintenanceTaskDto[]>([]);
@@ -299,14 +406,6 @@ const MaintenanceTaskList = () => {
             : toDateRange(nextRange.start, nextRange.end);
         setAppliedRange(normalized);
         setPickerRange(normalized);
-        setAnchorDate(normalized.start.format('YYYY-MM-DD'));
-    };
-
-    const applyMonthRange = (month: dayjs.Dayjs) => {
-        const next = toDateRange(month.startOf('month'), month.endOf('month'));
-        setAppliedRange(next);
-        setPickerRange(next);
-        setAnchorDate(next.start.format('YYYY-MM-DD'));
     };
 
     const openTaskWorkspace = (task: MaintenanceTaskDto, tab: DetailTab = 'appointment') => {
@@ -322,10 +421,9 @@ const MaintenanceTaskList = () => {
     }, [tasks]);
 
     const paginatedTasks = useMemo(() => {
-        if (scheduleView === 'calendar') return sortedTasks; // takvimde hepsi görünsün
         const start = (page - 1) * pageSize;
         return sortedTasks.slice(start, start + pageSize);
-    }, [sortedTasks, page, scheduleView]);
+    }, [sortedTasks, page]);
 
     const grouped = useMemo(() => {
         const map = new Map<string, MaintenanceTaskDto[]>();
@@ -340,37 +438,22 @@ const MaintenanceTaskList = () => {
 
     return (
         <div>
-            <PageHeader
-                breadcrumb={t('nav.maintenance')}
-                title={t('nav.maintenanceTasks')}
-                description={t('auto.bakim_gorevleri_icin_sorumlu_teknisyenleri_atayi')}
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-                            <button type="button" onClick={() => setScheduleView('list')} title={t('auto.liste_gorunumu')} className={`flex h-8 w-8 items-center justify-center rounded-md ${scheduleView === 'list' ?"bg-brand-solid text-white" :"text-slate-600 hover:bg-slate-50"}`}>
-                                <FilterLines size={13} />
-                            </button>
-                            <button type="button" onClick={() => setScheduleView('calendar')} title={t('auto.takvim_gorunumu')} className={`flex h-8 w-8 items-center justify-center rounded-md ${scheduleView === 'calendar' ?"bg-brand-solid text-white" :"text-slate-600 hover:bg-slate-50"}`}>
-                                <Calendar size={13} />
-                            </button>
-                        </div>
-                        <DatePicker.RangePicker
-                            value={pickerRange ? [pickerRange.start, pickerRange.end] : null}
-                            onChange={(dates) => {
-                                if (!dates?.[0] || !dates[1]) {
-                                    setPickerRange(null);
-                                    return;
-                                }
+            <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+                <DatePicker.RangePicker
+                    value={pickerRange ? [pickerRange.start, pickerRange.end] : null}
+                    onChange={(dates) => {
+                        if (!dates?.[0] || !dates[1]) {
+                            setPickerRange(null);
+                            return;
+                        }
 
-                                applyRange({ start: dates[0], end: dates[1] });
-                            }}
-                            format="DD.MM.YYYY"
-                            allowClear={false}
-                            size="middle"
-                        />
-                    </div>
-                }
-            />
+                        applyRange({ start: dates[0], end: dates[1] });
+                    }}
+                    format="DD.MM.YYYY"
+                    allowClear={false}
+                    size="middle"
+                />
+            </div>
 
             {approvals.length > 0 && !approvalNoticeClosed && (
                 <div className={t('auto.mb_4_rounded_lg_px_4_py_3_text_white_shadow_sm_b')}>
@@ -398,8 +481,6 @@ const MaintenanceTaskList = () => {
                     <div className="space-y-2 p-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />)}</div>
                 ) : grouped.length === 0 ? (
                     <EmptyState icon={<Calendar size={32} />} title={t('auto.bu_aralikta_gorev_yok')} description={t('auto.sozlesme_olusturunca_periyodik_bakim_gorevleri_b')} />
-                ) : scheduleView === 'calendar' ? (
-                    <MaintenanceCalendarView anchorDate={anchorDate} tasks={tasks} selectedTaskId={selectedTask?.id} onAnchorDateChange={setAnchorDate} onMonthRangeChange={applyMonthRange} onOpenTask={openTaskWorkspace} />
                 ) : (
                     <div className="overflow-x-auto">
                         <div className="min-w-[980px]">
@@ -475,9 +556,10 @@ const MaintenanceTaskList = () => {
     );
 };
 
-const detailTabs: Array<{ key: DetailTab; label: string }> = [
+const getDetailTabs = (): Array<{ key: DetailTab; label: string }> => [
     { key: 'appointment', label:t('auto.randevu') },
     { key: 'mail', label:t('auto.mail') },
+    { key: 'signature', label:t('auto.imzalar') },
     { key: 'approval', label:t('auto.manuel_onay') },
 ];
 
@@ -485,7 +567,7 @@ const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const initialTab = (searchParams.get('tab') as DetailTab) || 'appointment';
-    const [activeTab, setActiveTab] = useState<DetailTab>(detailTabs.some((tab) => tab.key === initialTab) ? initialTab : 'appointment');
+    const [activeTab, setActiveTab] = useState<DetailTab>(getDetailTabs().some((tab) => tab.key === initialTab) ? initialTab : 'appointment');
     const [task, setTask] = useState<MaintenanceTaskDto | null>(null);
     const [allTasks, setAllTasks] = useState<MaintenanceTaskDto[]>([]);
     const [employees, setEmployees] = useState<PersonLite[]>([]);
@@ -505,6 +587,7 @@ const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
         message:t('auto.lutfen_size_uygun_bakim_randevusunu_secin'),
     });
     const [options, setOptions] = useState<AppointmentOptionInput[]>([]);
+    const [signatureLoading, setSignatureLoading] = useState<string | null>(null);
 
     const loadDetail = async () => {
         setLoading(true);
@@ -648,6 +731,29 @@ const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
         }
     };
 
+    const requestReportSignature = async (channel: 'technician' | 'mail' | 'both') => {
+        if (!task?.report) return;
+        setSignatureLoading(channel);
+        try {
+            await maintenanceApi.requestReportSignature(task.report.id, {
+                channel,
+                to: task.contract?.customer?.mainEmail || undefined,
+                fromEmail: mailForm.fromEmail || undefined,
+                fromName: mailForm.fromName || undefined,
+                subject: `${task.contract?.contractCode || ''} Bakım raporu imzası`,
+            });
+            toast.success(channel === 'technician'
+                ?t('auto.teknisyene_imza_bildirimi_gonderildi')
+                : channel === 'mail'
+                    ?t('auto.musteriye_imza_maili_gonderildi')
+                    :t('auto.imza_istegi_gonderildi'));
+        } catch (error: any) {
+            toast.error(error.response?.data?.error ||t('auto.imza_istegi_gonderilemedi'));
+        } finally {
+            setSignatureLoading(null);
+        }
+    };
+
     return (
         <div>
             <PageHeader
@@ -670,6 +776,8 @@ const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
                         mailForm={mailForm}
                         options={options}
                         saving={saving}
+                        signatureLoading={signatureLoading}
+                        onRequestReportSignature={requestReportSignature}
                         onTabChange={changeTab}
                         onEditFormChange={setEditForm}
                         onMailFormChange={setMailForm}
@@ -706,6 +814,8 @@ const TaskWorkspace = ({
     mailForm,
     options,
     saving,
+    signatureLoading,
+    onRequestReportSignature,
     onTabChange,
     onEditFormChange,
     onMailFormChange,
@@ -722,6 +832,8 @@ const TaskWorkspace = ({
     mailForm: MailFormState;
     options: AppointmentOptionInput[];
     saving: boolean;
+    signatureLoading: string | null;
+    onRequestReportSignature: (channel: 'technician' | 'mail' | 'both') => void;
     onTabChange: (tab: DetailTab) => void;
     onEditFormChange: (form: AssignmentFormState) => void;
     onMailFormChange: (form: MailFormState) => void;
@@ -757,7 +869,7 @@ const TaskWorkspace = ({
                     </div>
 
                     <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1 md:grid-cols-4">
-                        {detailTabs.map((tab) => (
+                        {getDetailTabs().map((tab) => (
                             <button
                                 key={tab.key}
                                 type="button"
@@ -886,6 +998,38 @@ const TaskWorkspace = ({
                         </div>
                     )}
 
+                    {activeTab === 'signature' && (
+                        <div className="space-y-3">
+                            {!task.report ? (
+                                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-[12px] font-medium text-amber-800">{t('auto.imza_istegi_icin_once_rapor_gerekir')}</div>
+                            ) : (
+                                <div className="rounded-lg border border-slate-200">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
+                                        <div className="min-w-0">
+                                            <div className="text-[12.5px] font-semibold text-slate-900">{fmtDate(task.report.createdAt,"DD.MM.YYYY HH:mm")} · {t('auto.bakim_raporu')}</div>
+                                            <div className="mt-0.5 text-[11px] text-slate-500">
+                                                {task.report.isSigned
+                                                    ? `${t('auto.imzali')} · ${fmtDate(task.report.signedAt,"DD.MM.YYYY HH:mm")}`
+                                                    :t('auto.imza_bekliyor')}
+                                            </div>
+                                        </div>
+                                        {task.report.isSigned ? (
+                                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                                <CheckCircle size={11} />{t('auto.imzali')}
+                                            </span>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-2">
+                                                <Button type="button" size="sm" variant="secondary" loading={signatureLoading === 'technician'} disabled={disabled} onClick={() => onRequestReportSignature('technician')}>{t('auto.teknisyene_gonder')}</Button>
+                                                <Button type="button" size="sm" variant="secondary" loading={signatureLoading === 'mail'} disabled={disabled} icon={<Send size={12} />} onClick={() => onRequestReportSignature('mail')}>{t('auto.musteriye_mail_gonder')}</Button>
+                                                <Button type="button" size="sm" loading={signatureLoading === 'both'} disabled={disabled} onClick={() => onRequestReportSignature('both')}>{t('auto.ikisine_gonder')}</Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {activeTab === 'approval' && (
                         <div className="space-y-3">
                             {task.managerApprovedAt ? (
@@ -935,111 +1079,5 @@ const TaskWorkspace = ({
                 </div>
             )}
         </Card>
-    );
-};
-
-const calendarDayKey = (value: dayjs.Dayjs | string) => dayjs(value).format('YYYY-MM-DD');
-
-const MaintenanceCalendarView = ({
-    anchorDate,
-    tasks,
-    selectedTaskId,
-    onAnchorDateChange,
-    onMonthRangeChange,
-    onOpenTask,
-}: {
-    anchorDate: string;
-    tasks: MaintenanceTaskDto[];
-    selectedTaskId?: string;
-    onAnchorDateChange: (date: string) => void;
-    onMonthRangeChange: (month: dayjs.Dayjs) => void;
-    onOpenTask: (task: MaintenanceTaskDto, tab?: DetailTab) => void;
-}) => {
-    ensureMaintenanceLocale();
-    const selected = dayjs(anchorDate || dayjs().format('YYYY-MM-DD'));
-    const monthStart = selected.startOf('month');
-    const monthEnd = selected.endOf('month');
-    const startOffset = (monthStart.day() + 6) % 7;
-    const gridStart = monthStart.subtract(startOffset, 'day');
-    const days = Array.from({ length: 42 }, (_, index) => gridStart.add(index, 'day'));
-    const weekDays = [t('auto.pzt'),t('auto.sal'),t('auto.car'),t('auto.per'),t('auto.cum'),t('auto.cmt'),t('auto.paz')];
-
-    const tasksByDay = useMemo(() => {
-        const map = new Map<string, MaintenanceTaskDto[]>();
-        tasks.forEach((task) => {
-            const key = calendarDayKey(task.plannedDate);
-            map.set(key, [...(map.get(key) || []), task]);
-        });
-        return map;
-    }, [tasks]);
-    const selectedTasks = tasksByDay.get(calendarDayKey(selected)) || [];
-    const goMonth = (amount: number) => onMonthRangeChange(selected.add(amount, 'month').startOf('month'));
-
-    return (
-        <div className="grid grid-cols-1 gap-4 bg-slate-50/40 p-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                    <div>
-                        <h3 className="text-[16px] font-semibold text-slate-900">{monthStart.format("MMMM YYYY")}</h3>
-                        <p className="mt-0.5 text-[12px] text-slate-500">{fmtDate(monthStart.toISOString())} - {fmtDate(monthEnd.toISOString())}</p>
-                    </div>
-                    <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white">
-                        <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => goMonth(-1)}><ArrowLeft size={13} /></button>
-                        <button type="button" className="h-8 border-x border-slate-200 px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onMonthRangeChange(dayjs().startOf('month'))}>{t('auto.bugun')}</button>
-                        <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => goMonth(1)}><ArrowRight size={13} /></button>
-                    </div>
-                </div>
-                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70 text-center text-[11px] font-semibold text-slate-500">
-                    {weekDays.map((day) => <div key={day} className="border-r border-slate-200 py-2 last:border-r-0">{day}</div>)}
-                </div>
-                <div className="grid grid-cols-7">
-                    {days.map((day) => {
-                        const key = calendarDayKey(day);
-                        const rows = tasksByDay.get(key) || [];
-                        const isSelected = key === calendarDayKey(selected);
-                        const isToday = key === dayjs().format('YYYY-MM-DD');
-                        return (
-                            <button key={key} type="button" onClick={() => onAnchorDateChange(key)} className={`min-h-[126px] border-r border-b border-slate-200 p-2 text-left transition-colors last:border-r-0 hover:bg-slate-50 ${isSelected ? 'bg-brand-primary_alt/40' : 'bg-white'} ${day.month() !== selected.month() ? 'text-slate-300' : 'text-slate-700'}`}>
-                                <div className="mb-1 flex items-center justify-between">
-                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold ${isToday ?"bg-brand-solid text-white" : ''}`}>{day.date()}</span>
-                                    {rows.length > 0 && <span className="text-[10px] font-medium text-slate-400">{rows.length}</span>}
-                                </div>
-                                <div className="space-y-1">
-                                    {rows.slice(0, 3).map((task) => {
-                                        const expired = isExpiredMaintenance(task);
-                                        const managerApproved = Boolean(task.managerApprovedAt);
-                                        return (
-                                        <div key={task.id} className={`rounded border px-1.5 py-1 text-[11px] leading-tight ${expired ?t('auto.border_slate_200_bg_slate_100_text_slate_500') : managerApproved ?"border-emerald-200 bg-emerald-50 text-emerald-900" :t('auto.border_amber_200_bg_amber_50_text_amber_900')}`}>
-                                            <div className="truncate font-semibold">{task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}</div>
-                                            <div className="truncate opacity-80">{expired ?t('auto.suresi_dolmus') : managerApproved ?t('auto.onaylandi') : task.scheduledStartTime ? dayjs(task.scheduledStartTime).format('HH:mm') : STATUS_LABEL[task.status]}</div>
-                                        </div>
-                                    );})}
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-            <aside className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
-                <div className="border-b border-slate-200 px-4 py-3">
-                    <h3 className="text-[15px] font-semibold text-slate-900">{selected.format("D MMMM YYYY")}</h3>
-                    <p className="mt-0.5 text-[12px] capitalize text-slate-500">{selected.format('dddd')}</p>
-                </div>
-                <div className="max-h-[560px] divide-y divide-slate-100 overflow-y-auto">
-                    {selectedTasks.length === 0 ? (
-                        <div className="px-4 py-6 text-[13px] text-slate-500">{t('auto.bu_gun_icin_bakim_gorevi_yok')}</div>
-                    ) : selectedTasks.map((task) => {
-                        const expired = isExpiredMaintenance(task);
-                        const selected = selectedTaskId === task.id;
-                        return (
-                        <button key={task.id} type="button" disabled={expired} onClick={() => onOpenTask(task, 'overview')} className={`block w-full px-4 py-3 text-left disabled:cursor-not-allowed ${selected ? 'bg-brand-primary_alt/40' : 'hover:bg-slate-50'}`}>
-                            <div className="font-semibold text-slate-900">{task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}</div>
-                            <div className="mt-0.5 text-[12px] text-slate-500">{t('auto.contract_and_technicians', { contract: task.contract?.contractCode || '-', technicians: taskTechnicianNames(task) })}</div>
-                            {expired && <div className="mt-2 inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600"><AlertTriangle size={11} />{t('auto.suresi_dolmus_bakim')}</div>}
-                        </button>
-                    );})}
-                </div>
-            </aside>
-        </div>
     );
 };
