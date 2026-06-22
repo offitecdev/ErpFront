@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { ArrowLeft, ArrowRight, Calendar, CheckCircle, Clock, File02 as FileText, Package, Plus, Save01 as Save, Trash01 as Trash, User01 as UserIcon } from '@/components/icons/antIconCompat';
+import { ArrowLeft, Calendar, CheckCircle, Clock, File02 as FileText, Package, Plus, Save01 as Save, Trash01 as Trash, User01 as UserIcon } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -16,10 +16,21 @@ import type { MaintenanceExpenseDto, MaintenanceTaskDto, MaterialInput } from '.
 import { ensureMaintenanceLocale, fmtDate, MaterialsEditor, personName, SignatureModal, splitLines, StatusPill } from './MaintenanceShared';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
 
 type TechTab = 'checklist' | 'costs' | 'signature';
 
-const tabs: Array<{ key: TechTab; label: string }> = [
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((tick) => tick + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
+
+const getTabs = (): Array<{ key: TechTab; label: string }> => [
     { key: 'checklist', label:t('auto.kontrol_listesi') },
     { key: 'costs', label:t('auto.malzeme_ve_gider') },
     { key: 'signature', label:t('auto.imza') },
@@ -57,12 +68,11 @@ const expenseTotal = (expenses?: MaintenanceExpenseDto[]) =>
     (expenses || []).reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
 
 export const MaintenanceTechnician = () => {
+    useLanguageRefresh();
     ensureMaintenanceLocale();
     const navigate = useNavigate();
-    const { pathname } = useLocation();
     const { taskId } = useParams();
-    const isCalendarView = pathname.includes('/calendar');
-    const [weekAnchor, setWeekAnchor] = useState(dayjs().format('YYYY-MM-DD'));
+    const [weekAnchor] = useState(dayjs().format('YYYY-MM-DD'));
     const [tasks, setTasks] = useState<MaintenanceTaskDto[]>([]);
     const [articles, setArticles] = useState<InventoryArticle[]>([]);
     const [locations, setLocations] = useState<InventoryLocation[]>([]);
@@ -80,8 +90,6 @@ export const MaintenanceTechnician = () => {
     const [signingReportId, setSigningReportId] = useState<string | null>(null);
 
     const weekStart = useMemo(() => dayjs(weekAnchor).startOf('week').add(1, 'day'), [weekAnchor]);
-    const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => weekStart.add(index, 'day')), [weekStart]);
-    const hours = Array.from({ length: 12 }, (_, index) => 7 + index);
 
     const load = async () => {
         setLoading(true);
@@ -202,26 +210,35 @@ export const MaintenanceTechnician = () => {
         }
         setSaving(true);
         try {
-            await maintenanceApi.signReport(signingReportId, signatureBase64);
-            toast.success(t('auto.musteri_imzasi_alindi'));
+            await maintenanceApi.sendReportToManager(signingReportId, signatureBase64);
+            toast.success(t('auto.rapor_imzalandi_ve_gonderildi'));
             setSigningReportId(null);
             await load();
         } catch (error: any) {
-            toast.error(error.response?.data?.error ||t('auto.imza_kaydedilemedi'));
+            toast.error(error.response?.data?.error ||t('auto.rapor_yoneticiye_gonderilemedi'));
         } finally {
             setSaving(false);
         }
     };
 
-    const tasksByDayHour = useMemo(() => {
-        const map = new Map<string, MaintenanceTaskDto[]>();
-        tasks.forEach((task) => {
-            const start = eventStart(task);
-            const key = `${start.format('YYYY-MM-DD')}-${start.hour()}`;
-            map.set(key, [...(map.get(key) || []), task]);
-        });
-        return map;
-    }, [tasks]);
+    const sendWithoutSignature = async () => {
+        if (!selectedTask?.report) return;
+        if (isExpiredMaintenance(selectedTask)) {
+            toast.error(t('auto.suresi_dolmus_bakim_uzerinde_islem_yapilamaz'));
+            return;
+        }
+        setSaving(true);
+        try {
+            await maintenanceApi.sendReportToManager(selectedTask.report.id);
+            toast.success(t('auto.rapor_imzasiz_gonderildi'));
+            await load();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error ||t('auto.rapor_yoneticiye_gonderilemedi'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const selectedTaskExpired = selectedTask ? isExpiredMaintenance(selectedTask) : false;
 
     return (
@@ -232,87 +249,12 @@ export const MaintenanceTechnician = () => {
                 description={taskId ?t('auto.bakim_detayini_kontrol_listesini_giderleri_ve_mu') :t('auto.atanmis_bakim_gorevlerinizi_takvimden_secin')}
                 actions={
                     taskId ? (
-                        <Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/maintenance/technician/calendar')}>{t('auto.takvime_don')}</Button>
-                    ) : isCalendarView ? (
-                        <div className="flex items-center gap-2">
-                        <input
-                            type="month"
-                            value={dayjs(weekAnchor).format('YYYY-MM')}
-                            onChange={(e) => {
-                                if (e.target.value) setWeekAnchor(dayjs(e.target.value).startOf('month').format('YYYY-MM-DD'));
-                            }}
-                            className="h-8 rounded-lg border border-slate-200 px-3 text-[12px] font-semibold text-slate-700 outline-none"
-                        />
-                        <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white">
-                            <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => setWeekAnchor(dayjs(weekAnchor).subtract(1, 'week').format('YYYY-MM-DD'))}>
-                                <ArrowLeft size={13} />
-                            </button>
-                            <input
-                                type="date"
-                                value={weekAnchor}
-                                onChange={(e) => {
-                                    if (e.target.value) setWeekAnchor(e.target.value);
-                                }}
-                                className="h-8 border-x border-slate-200 px-2 text-[12px] font-semibold text-slate-700 outline-none"
-                            />
-                            <button type="button" className="h-8 border-r border-slate-200 px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setWeekAnchor(dayjs().format('YYYY-MM-DD'))}>{t('auto.bugun')}</button>
-                            <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => setWeekAnchor(dayjs(weekAnchor).add(1, 'week').format('YYYY-MM-DD'))}>
-                                <ArrowRight size={13} />
-                            </button>
-                        </div>
-                        </div>
+                        <Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/maintenance/technician/tasks')}>{t('auto.listeye_don')}</Button>
                     ) : null
                 }
             />
 
-            <div className={`grid grid-cols-1 gap-4 ${isCalendarView ?t('auto.xl_grid_cols_minmax_0_1_2fr_420px') : ''}`}>
-                {isCalendarView && <Card title={t('auto.teknisyen_takvimi')} icon={<Calendar size={13} />} noPadding>
-                    {loading ? (
-                        <div className="m-4 h-72 animate-pulse rounded bg-slate-100" />
-                    ) : tasks.length === 0 ? (
-                        <EmptyState icon={<Calendar size={32} />} title={t('auto.atanmis_bakim_yok')} description={t('auto.size_atanmis_bakim_gorevleri_burada_gorunur')} />
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <div className="min-w-[900px]">
-                                <div className="grid grid-cols-[70px_repeat(7,minmax(110px,1fr))] border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500">
-                                    <div className="px-2 py-2">{t('auto.saat')}</div>
-                                    {weekDays.map((day) => (
-                                        <div key={day.format('YYYY-MM-DD')} className="border-l border-slate-200 px-2 py-2">
-                                            <div>{day.format('ddd')}</div>
-                                            <div className="text-slate-900">{day.format('DD.MM')}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                                {hours.map((hour) => (
-                                    <div key={hour} className="grid min-h-[72px] grid-cols-[70px_repeat(7,minmax(110px,1fr))] border-b border-slate-100">
-                                        <div className="px-2 py-2 font-mono text-[11px] text-slate-400">{String(hour).padStart(2, '0')}:00</div>
-                                        {weekDays.map((day) => {
-                                            const key = `${day.format('YYYY-MM-DD')}-${hour}`;
-                                            const rows = tasksByDayHour.get(key) || [];
-                                            return (
-                                                <div key={key} className="border-l border-slate-100 p-1">
-                                                    {rows.map((task) => (
-                                                        <button
-                                                            key={task.id}
-                                                            type="button"
-                                                            disabled={isExpiredMaintenance(task)}
-                                                            onClick={() => navigate(`/maintenance/technician/tasks/${task.id}`)}
-                                                            className={`mb-1 w-full rounded border px-2 py-1 text-left text-[11px] transition-colors disabled:cursor-not-allowed ${isExpiredMaintenance(task) ?t('auto.border_slate_200_bg_slate_100_text_slate_500') : selectedTask?.id === task.id ?t('auto.border_amber_400_bg_amber_100_text_amber_950') :t('auto.border_amber_200_bg_amber_50_text_amber_900_hove')}`}
-                                                        >
-                                                            <div className="truncate font-semibold">{task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}</div>
-                                                            <div className="truncate opacity-80">{isExpiredMaintenance(task) ?t('auto.suresi_dolmus_bakim') : `${eventStart(task).format('HH:mm')} - ${eventEnd(task).format('HH:mm')}`}</div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </Card>}
-
+            <div className="grid grid-cols-1 gap-4">
                 {!taskId && <Card title={t('auto.haftanin_gorevleri')} icon={<FileText size={13} />} noPadding>
                     {loading ? (
                         <div className="m-4 h-72 animate-pulse rounded bg-slate-100" />
@@ -321,7 +263,7 @@ export const MaintenanceTechnician = () => {
                     ) : (
                         <div className="max-h-[800px] overflow-y-auto divide-y divide-slate-100">
                             {tasks.map(task => (
-                                <button key={task.id} type="button" onClick={() => navigate(isCalendarView ? `/maintenance/technician/calendar/${task.id}` : `/maintenance/technician/tasks/${task.id}`)} className="w-full text-left p-4 hover:bg-slate-50 transition-colors">
+                                <button key={task.id} type="button" onClick={() => navigate(`/maintenance/technician/tasks/${task.id}`)} className="w-full text-left p-4 hover:bg-slate-50 transition-colors">
                                     <div className="flex flex-col gap-2">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="font-semibold text-[13.5px] text-slate-900 leading-tight">
@@ -383,7 +325,7 @@ export const MaintenanceTechnician = () => {
                             </div>
 
                             <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-                                {tabs.map((tab) => (
+                                {getTabs().map((tab) => (
                                     <button
                                         key={tab.key}
                                         type="button"
@@ -462,8 +404,9 @@ export const MaintenanceTechnician = () => {
                                         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">{t('auto.imza_alindi')}{fmtDate(selectedTask.report.signedAt,"DD.MM.YYYY HH:mm")}
                                         </div>
                                     ) : (
-                                        <div className="flex justify-end">
-                                            <Button className="w-fit" icon={<CheckCircle size={13} />} disabled={selectedTaskExpired} onClick={() => setSigningReportId(selectedTask.report!.id)}>{t('auto.musteri_imzasi_al')}</Button>
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                            <Button variant="secondary" className="w-fit" loading={saving} disabled={selectedTaskExpired} onClick={sendWithoutSignature}>{t('auto.imzasiz_yoneticiye_gonder')}</Button>
+                                            <Button className="w-fit" icon={<CheckCircle size={13} />} loading={saving} disabled={selectedTaskExpired} onClick={() => setSigningReportId(selectedTask.report!.id)}>{t('auto.musteri_imzasi_al')}</Button>
                                         </div>
                                     )}
                                 </div>

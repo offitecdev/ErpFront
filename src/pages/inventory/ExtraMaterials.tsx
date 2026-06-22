@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Image01 as ImageIcon, PackagePlus, Save01 as Save, Trash01 as Trash2, UploadCloud02 as Upload, X } from '@/components/icons/antIconCompat';
+import { ArrowLeft, Coins01 as Coins, Hash01 as Hash, Image01 as ImageIcon, Package, PackagePlus, Save01 as Save, SearchLg as Search, Trash01 as Trash2, UploadCloud02 as Upload, X } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -46,6 +46,7 @@ export const ExtraMaterials = () => {
 
     const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
     const [loading, setLoading] = useState(false);
+    const [search, setSearch] = useState('');
 
     const load = async () => {
         setLoading(true);
@@ -62,6 +63,18 @@ export const ExtraMaterials = () => {
         void load();
     }, []);
 
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return materials;
+        return materials.filter((m) => m.name.toLowerCase().includes(q) || (m.serialId || '').toLowerCase().includes(q));
+    }, [materials, search]);
+
+    const stats = useMemo(() => {
+        const totalQty = materials.reduce((s, m) => s + Number(m.stockQuantity || 0), 0);
+        const totalValue = materials.reduce((s, m) => s + Number(m.stockQuantity || 0) * Number(m.unitCost || 0), 0);
+        return { total: materials.length, totalQty, totalValue };
+    }, [materials]);
+
     return (
         <div>
             <PageHeader
@@ -75,53 +88,77 @@ export const ExtraMaterials = () => {
                 }
             />
 
-            <Card title={t('auto.malzeme_listesi')} icon={<PackagePlus size={14} />} noPadding>
+            {/* KPI summary */}
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <MaterialStat icon={<Package size={16} />} accent="indigo" label={t('auto.malzeme_listesi')} value={fmtNumber(stats.total)} />
+                <MaterialStat icon={<Hash size={16} />} accent="sky" label={t('auto.mevcut_miktar')} value={fmtNumber(stats.totalQty)} />
+                <MaterialStat icon={<Coins size={16} />} accent="emerald" label={t('inventory.dashboard.stockValue')} value={fmtMoney(stats.totalValue)} />
+            </div>
+
+            <Card
+                title={t('auto.malzeme_listesi')}
+                icon={<PackagePlus size={14} />}
+                noPadding
+                actions={
+                    <div className="relative">
+                        <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder={t('auto.ara_kod_ad_barkod')}
+                            className="w-[180px] rounded-lg border border-slate-200 bg-slate-50/80 py-1.5 pl-7 pr-2.5 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10 md:w-[240px]"
+                        />
+                    </div>
+                }
+            >
                 <div className="overflow-x-auto">
                     <table className="w-full text-[12.5px]">
                         <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
                             <tr>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.gorsel')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.malzeme')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.kod')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.mevcut_miktar')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.birim_fiyat')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.gorsel')}</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.malzeme')}</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.kod')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('auto.mevcut_miktar')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('auto.birim_fiyat')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('inventory.dashboard.stockValue')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {loading && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">{t('common.loading')}</td></tr>}
-                            {!loading && materials.length === 0 && (
+                            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">{t('common.loading')}</td></tr>}
+                            {!loading && filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={6}>
+                                    <td colSpan={7}>
                                         <div className="flex min-h-[150px] flex-col items-center justify-center px-4 py-6 text-center">
                                             <div className="mb-2 flex size-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
                                                 <PackagePlus size={22} />
                                             </div>
-                                            <div className="text-[13px] font-semibold text-slate-900">{t('auto.malzeme_yok')}</div>
-                                            <div className="mt-1 text-[12px] text-slate-500">{t('auto.ilk_malzemeyi_ekleyerek_baslayin')}</div>
-                                            {canManage && (
+                                            <div className="text-[13px] font-semibold text-slate-900">{search ? t('auto.arama_sonucu_yok') : t('auto.malzeme_yok')}</div>
+                                            {!search && <div className="mt-1 text-[12px] text-slate-500">{t('auto.ilk_malzemeyi_ekleyerek_baslayin')}</div>}
+                                            {!search && canManage && (
                                                 <Button className="mt-3" variant="primary" size="sm" icon={<PackagePlus size={13} />} onClick={() => navigate('/inventory/extra-materials/new')}>{t('auto.yeni_malzeme')}</Button>
                                             )}
                                         </div>
                                     </td>
                                 </tr>
                             )}
-                            {!loading && materials.map((material) => (
-                                <tr key={material.id} className="cursor-pointer hover:bg-slate-50/60" onClick={() => navigate(`/inventory/extra-materials/${material.id}/edit`)}>
-                                    <td className="px-3 py-2 w-[60px]">
+                            {!loading && filtered.map((material) => (
+                                <tr key={material.id} className="group cursor-pointer transition-colors hover:bg-slate-50/60" onClick={() => navigate(`/inventory/extra-materials/${material.id}/edit`)}>
+                                    <td className="px-3 py-2.5 w-[60px]">
                                         {material.imageUrl ? (
-                                            <img src={material.imageUrl} alt={material.name} className="h-9 w-9 rounded object-cover border border-slate-200" />
+                                            <img src={material.imageUrl} alt={material.name} className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
                                         ) : (
-                                            <div className="flex h-9 w-9 items-center justify-center rounded border border-slate-200 bg-slate-100 text-slate-400">
-                                                <ImageIcon size={14} />
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400">
+                                                <ImageIcon size={15} />
                                             </div>
                                         )}
                                     </td>
-                                    <td className="px-3 py-2 font-medium text-slate-800">{material.name}</td>
-                                    <td className="px-3 py-2 font-mono text-[11.5px] text-slate-500">{material.serialId}</td>
-                                    <td className="px-3 py-2 text-right font-mono">{fmtNumber(material.stockQuantity)}</td>
-                                    <td className="px-3 py-2 text-right font-mono">{fmtMoney(material.unitCost)}</td>
-                                    <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                    <td className="px-3 py-2.5 font-medium text-slate-800 group-hover:text-[#272f67]">{material.name}</td>
+                                    <td className="px-3 py-2.5 font-mono text-[11.5px] text-slate-500">{material.serialId}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono">{fmtNumber(material.stockQuantity)}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono text-slate-600">{fmtMoney(material.unitCost)}</td>
+                                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-800">{fmtMoney(Number(material.stockQuantity || 0) * Number(material.unitCost || 0))}</td>
+                                    <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="inline-flex items-center gap-1">
                                             <button
                                                 className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
@@ -151,6 +188,22 @@ export const ExtraMaterials = () => {
         </div>
     );
 };
+
+const STAT_ACCENT: Record<'indigo' | 'sky' | 'emerald', string> = {
+    indigo: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100',
+    sky: 'bg-sky-50 text-sky-600 ring-1 ring-sky-100',
+    emerald: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+};
+
+const MaterialStat = ({ icon, label, value, accent }: { icon: ReactNode; label: string; value: string; accent: 'indigo' | 'sky' | 'emerald' }) => (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm">
+        <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${STAT_ACCENT[accent]}`}>{icon}</span>
+        <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</div>
+            <div className="mt-0.5 truncate text-[18px] font-semibold text-slate-800">{value}</div>
+        </div>
+    </div>
+);
 
 export const ExtraMaterialCreate = () => <ExtraMaterialFormPage mode="create" />;
 

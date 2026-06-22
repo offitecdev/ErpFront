@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -53,6 +54,16 @@ import {
 } from './tenderDetailUtils';
 
 import { t } from '@/i18n/translate';
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((t: number) => t + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
 
 const getArticlePrice = (article?: { salePrice?: number | null; baseCost?: number | null } | null) => {
     const salePrice = Number(article?.salePrice ?? 0);
@@ -429,10 +440,10 @@ const logSubject = (log: TenderChangeLog) => {
 const logTitle = (log: TenderChangeLog) => {
     const subject = logSubject(log);
     if (log.actionType === 'ARTICLE_MAPPED') return `${subject} satıra eklendi`;
-    if (log.actionType === 'ARTICLE_MAPPING_REMOVED') return `${subject} tekliften kaldırıldı`;
+    if (log.actionType === 'ARTICLE_MAPPING_REMOVED') return t('tenders.tekliften_kaldirildi', { subject });
     if (log.actionType === 'ARTICLE_PRICE_UPDATED') return `${subject} ürün fiyatı güncellendi`;
     if (log.actionType === 'ARTICLE_UPDATED') return `${subject} ürün bilgisi güncellendi`;
-    if (log.actionType === 'ARTICLE_MAPPING_PRICE_UPDATED') return `${subject} teklif ürünü güncellendi`;
+    if (log.actionType === 'ARTICLE_MAPPING_PRICE_UPDATED') return t('tenders.teklif_urunu_guncellendi', { subject });
     if (log.actionType === 'POSITION_PRICE_UPDATED') return `${subject} fiyatlandırması güncellendi`;
     if (log.actionType === 'POSITION_CREATED') return `${subject} eklendi`;
     if (log.actionType === 'POSITION_DELETED') return `${subject} silindi`;
@@ -822,7 +833,7 @@ export const TreeRow: React.FC<{
                                                 const label = hasChildren
                                                     ? `"${node.shortDescription}" ve tüm alt satırları`
                                                     : `"${node.shortDescription}"`;
-                                                if (!confirm(`${label} silinsin mi?`)) return;
+                                                if (!confirm(t('tenders.silinsin_mi', { label }))) return;
                                                 try {
                                                     await deletePosition(tenderId, node.id);
                                                     toast.success(t('tenders.line_silindi'));
@@ -894,7 +905,7 @@ export const TreeRow: React.FC<{
                                                 const label = hasChildren
                                                     ? `"${node.shortDescription}" ve tüm alt satırları`
                                                     : `"${node.shortDescription}"`;
-                                                if (!confirm(`${label} silinsin mi?`)) return;
+                                                if (!confirm(t('tenders.silinsin_mi', { label }))) return;
                                                 try {
                                                     await deletePosition(tenderId, node.id);
                                                     toast.success(t('tenders.line_silindi'));
@@ -1730,7 +1741,7 @@ export const PositionDetailPanel: React.FC<{
                                     loading={saving}
                                     onClick={async () => {
                                         if (!position.mappingId) return;
-                                        if (!confirm(`"${position.shortDescription}" ürünü tekliften kaldırılsın mı?`)) return;
+                                        if (!confirm(t('tenders.urunu_tekliften_kaldirilsin_mi', { name: position.shortDescription }))) return;
                                         setSaving(true);
                                         try {
                                             await onRemoveArticleMapping(position.mappingId);
@@ -2198,7 +2209,7 @@ const TabBtn: React.FC<{ active: boolean; onClick: () => void; icon: React.React
 
 
 
-export const SummaryStat: React.FC<{ label: string; value: string; icon: React.ReactNode; primary?: boolean }> = ({ label, value, icon, primary }) => (
+export const SummaryStat: React.FC<{ label: string; value: string; icon: React.ReactNode; primary?: boolean }> = ({ label, value, icon, primary }) => { useLanguageRefresh(); return (
     <div className={`border rounded-md px-4 py-3 ${primary ?"bg-blue-50/60 border-blue-200/60" :"bg-white border-slate-200/70"}`}>
         <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">
             {icon}
@@ -2208,7 +2219,8 @@ export const SummaryStat: React.FC<{ label: string; value: string; icon: React.R
             {value}
         </div>
     </div>
-);
+  );
+}
 
 type TenderArticleFormData = Partial<InventoryArticle> & {
     adjustQty?: number;
@@ -3005,6 +3017,7 @@ export const ExportModal: React.FC<{
     const [loading, setLoading] = useState(false);
     const [includeQrBill, setIncludeQrBill] = useState(false);
     const [reference, setReference] = useState('');
+    const [pdfLang, setPdfLang] = useState<'tr' | 'de' | 'en'>('de');
     const { detail, activities } = useTenderStore();
     const { settings } = usePdfSettingsStore();
     const navigate = useNavigate();
@@ -3032,6 +3045,7 @@ export const ExportModal: React.FC<{
                         grandTotal,
                         referenceNumber: reference || undefined,
                         qrBillEnabled: includeQrBill,
+                        lang: pdfLang,
                     },
                     settings
                 );
@@ -3046,7 +3060,7 @@ export const ExportModal: React.FC<{
                 a.download = `${tenderNumber}-${format}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
-                toast.success(`${format} verisi indirildi.`);
+                toast.success(t('tenders.verisi_indirildi', { format }));
                 onClose();
             }
         } catch (e: any) {
@@ -3092,6 +3106,27 @@ export const ExportModal: React.FC<{
 
                 {format === 'PDF' && (
                     <>
+                        <Field label="PDF Dili / Sprache / Language">
+                            <div className="grid grid-cols-3 gap-2">
+                                {([
+                                    { code: 'tr' as const, label: 'Türkçe' },
+                                    { code: 'de' as const, label: 'Deutsch' },
+                                    { code: 'en' as const, label: 'English' },
+                                ]).map((l) => (
+                                    <button
+                                        key={l.code}
+                                        type="button"
+                                        onClick={() => setPdfLang(l.code)}
+                                        className={`px-3 py-2 border rounded text-[12.5px] font-medium transition-colors ${pdfLang === l.code
+                                                ? "border-blue-700 bg-blue-50 text-blue-800"
+                                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                            }`}
+                                    >
+                                        {l.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </Field>
                         <Field label={t('tenders.reference_numarasi')} hint={t('tenders.qr_bill_reference_skipped_when_empty')}>
                             <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t('tenders.rf18_5390_0754_7034')} />
                         </Field>

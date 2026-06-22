@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { LuMoon, LuSun } from 'react-icons/lu';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
+import { useThemeStore } from '../../store/themeStore';
 import {
     Bell01 as BellOutlined,
     Box as AppstoreOutlined,
     Briefcase01 as FundProjectionScreenOutlined,
     Building02 as BankOutlined,
-    Building05 as ContactsOutlined,
+    Building03 as ContactsOutlined,
     Calendar as CalendarOutlined,
     Check as CheckOutlined,
+    FileCheck02 as ServiceReportsOutlined,
     Clock as ClockCircleOutlined,
     SwitchHorizontal01 as SplitCellsOutlined,
     LogOut01 as LogoutOutlined,
@@ -22,8 +25,10 @@ import {
     Truck01 as CarOutlined,
     User01 as UserOutlined,
     Building05 as TeamOutlined,
+    Home01 as HomeOutlined,
     XClose as CloseOutlined,
 } from '../icons/antIconCompat';
+import { getRoleProfile, isKeyAllowedForProfile, type RoleProfile } from '../../lib/access';
 import { Badge, Button as AntButton, Select as AntSelect, Menu } from 'antd';
 import { SlidePanel } from './SlidePanel';
 import { SplitViewProvider, useSplitView, SPLITABLE_ROUTES, type SplitablePath } from './SplitViewContext';
@@ -31,6 +36,7 @@ import { SecondaryPane } from './SecondaryPane';
 import { notificationApi, type NotificationDto } from '../../lib/api/notifications';
 import { LanguageSwitcher } from '../ui-shared/LanguageSwitcher';
 import offitecLogo from '../../assets/images/offitec.png';
+import offitecLogoDark from '../../assets/images/darkmode.png';
 
 import { t as i18nT } from '@/i18n/translate';
 
@@ -66,8 +72,22 @@ const MENU_SECTIONS: MenuSection[] = [
         type: 'single',
         key: '/',
         path: '/',
+        label: 'nav.home',
+        icon: HomeOutlined,
+    },
+    {
+        type: 'single',
+        key: '/attendance',
+        path: '/attendance',
         label: 'nav.attendance',
         icon: ClockCircleOutlined,
+    },
+    {
+        type: 'single',
+        key: '/calendar',
+        path: '/calendar',
+        label: 'nav.calendar',
+        icon: CalendarOutlined,
     },
     {
         type: 'group',
@@ -89,7 +109,6 @@ const MENU_SECTIONS: MenuSection[] = [
         items: [
             { key: '/crm/customers', label: 'nav.customerList', permission: 'crm.customers.view' },
             { key: '/crm/tenders', label: 'nav.tenderManagement', permission: 'tenders.view' },
-            { key: '/crm/my-orders', label: 'nav.myOrders', permission: 'crm.customers.view' },
         ],
     },
     {
@@ -117,6 +136,7 @@ const MENU_SECTIONS: MenuSection[] = [
             { key: '/logistics/shipments/new', label: 'nav.newShipment', permission: 'logistics.manage' },
         ],
     },
+
     {
         type: 'group',
         key: 'maintenance',
@@ -126,12 +146,12 @@ const MENU_SECTIONS: MenuSection[] = [
             { key: '/maintenance', label: 'nav.maintenanceDashboard', permission: 'maintenance.contracts.manage', hideForTechnician: true },
             { key: '/maintenance/contracts', label: 'nav.contracts', permission: 'maintenance.contracts.manage', hideForTechnician: true },
             { key: '/maintenance/tasks', label: 'nav.maintenanceTasks', permission: 'maintenance.contracts.manage', hideForTechnician: true },
-            { key: '/maintenance/technician/calendar', label: 'nav.technicianCalendar', permission: 'maintenance.tasks.manage', technicianOnly: true },
             { key: '/maintenance/technician/tasks', label: 'nav.technicianTasks', permission: 'maintenance.tasks.manage', technicianOnly: true },
-            { key: '/maintenance/reports', label: 'nav.maintenanceReports', permission: 'maintenance.reports.manage', hideForTechnician: true },
+            { key: '/maintenance/tasks?view=reports', label: 'nav.maintenanceReports', permission: 'maintenance.reports.manage', hideForTechnician: true },
             { key: '/maintenance/regie', label: 'nav.regie', permission: 'regie.calls.manage', hideForTechnician: true },
         ],
     },
+
     {
         type: 'group',
         key: 'projects',
@@ -140,10 +160,21 @@ const MENU_SECTIONS: MenuSection[] = [
         icon: FundProjectionScreenOutlined,
         items: [
             { key: '/projects', label: 'nav.projectManagement', permission: 'projects.view', hideForTechnician: true },
+            { key: '/projects/flow', label: 'nav.projectFlow', permission: 'projects.view', hideForTechnician: true },
             { key: '/crm/my-orders', label: 'nav.myOrders', permission: 'crm.customers.view', hideForTechnician: true },
-            { key: '/projects/installation/calendar', label: 'nav.installationCalendar', permission: 'projects.report', technicianOnly: true },
             { key: '/projects/installation/tasks', label: 'nav.installationTasks', permission: 'projects.report', technicianOnly: true },
             { key: '/settings/mail', label: 'nav.mailSettings', permission: 'mail.manage', hideForTechnician: true },
+        ],
+    },
+    {
+        type: 'group',
+        key: 'services',
+        label: 'nav.services',
+        feature: 'projects',
+        icon: ServiceReportsOutlined,
+        items: [
+            { key: '/services/reports', label: 'nav.serviceReports', permission: 'projects.view', hideForTechnician: true },
+            { key: '/services/reports', label: 'nav.serviceReports', permission: 'projects.report', technicianOnly: true },
         ],
     },
     {
@@ -153,6 +184,7 @@ const MENU_SECTIONS: MenuSection[] = [
         icon: SettingOutlined,
         items: [
             { key: '/settings/pdf', label: 'nav.pdfSettings' },
+            { key: '/settings/checklists', label: 'nav.checklistSettings', hideForTechnician: true },
         ],
     },
 ];
@@ -161,9 +193,10 @@ const QUICK_ACTION_STORAGE_KEY = 'offitec:header-quick-actions';
 MENU_SECTIONS.forEach((section) => {
     if (section.type !== 'group' || section.key !== 'projects') return;
     section.items.forEach((item) => {
-        if (item.key === '/projects/installation/calendar' || item.key === '/projects/installation/tasks') item.permission = undefined;
-        if (item.key === '/projects/installation/calendar') item.label = 'nav.technicianInstallationCalendar';
-        if (item.key === '/projects/installation/tasks') item.label = 'nav.technicianInstallations';
+        if (item.key === '/projects/installation/tasks') {
+            item.permission = undefined;
+            item.label = 'nav.technicianInstallations';
+        }
     });
 });
 
@@ -189,7 +222,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.quickAction',
         cardClassName: 'border-sky-200/60 bg-sky-50/70 text-sky-950 shadow-sky-900/5 hover:bg-sky-100/80',
         iconClassName: 'text-sky-600',
-        keywords:i18nT('auto.yeni_teklif_teklif_olustur_crm_new_tender_offer'),
+        keywords: i18nT('auto.yeni_teklif_teklif_olustur_crm_new_tender_offer'),
         permission: 'tenders.manage',
     },
     {
@@ -200,7 +233,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.quickAction',
         cardClassName: 'border-violet-200/60 bg-violet-50/70 text-violet-950 shadow-violet-900/5 hover:bg-violet-100/80',
         iconClassName: 'text-violet-600',
-        keywords:i18nT('auto.yeni_proje_proje_ekle_proje_yonetimi_project_man'),
+        keywords: i18nT('auto.yeni_proje_proje_ekle_proje_yonetimi_project_man'),
         permission: 'projects.view',
         feature: 'projects',
     },
@@ -212,7 +245,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.crm',
         cardClassName: 'border-indigo-200/60 bg-indigo-50/70 text-indigo-950 shadow-indigo-900/5 hover:bg-indigo-100/80',
         iconClassName: 'text-indigo-600',
-        keywords:i18nT('auto.satis_siparisi_siparis_order_my_orders'),
+        keywords: i18nT('auto.satis_siparisi_siparis_order_my_orders'),
         permission: 'crm.customers.view',
     },
     {
@@ -223,7 +256,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.crm',
         cardClassName: 'border-emerald-200/60 bg-emerald-50/70 text-emerald-950 shadow-emerald-900/5 hover:bg-emerald-100/80',
         iconClassName: 'text-emerald-600',
-        keywords:i18nT('auto.musteri_musteri_listesi_crm_customers'),
+        keywords: i18nT('auto.musteri_musteri_listesi_crm_customers'),
         permission: 'crm.customers.view',
     },
     {
@@ -234,7 +267,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.crm',
         cardClassName: 'border-amber-200/60 bg-amber-50/70 text-amber-950 shadow-amber-900/5 hover:bg-amber-100/80',
         iconClassName: 'text-amber-600',
-        keywords:i18nT('auto.teklifler_teklif_yonetimi_crm_tenders_offers'),
+        keywords: i18nT('auto.teklifler_teklif_yonetimi_crm_tenders_offers'),
         permission: 'tenders.view',
     },
     {
@@ -245,7 +278,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.inventory',
         cardClassName: 'border-cyan-200/60 bg-cyan-50/70 text-cyan-950 shadow-cyan-900/5 hover:bg-cyan-100/80',
         iconClassName: 'text-cyan-600',
-        keywords:i18nT('auto.stok_urunler_malzeme_depo_inventory_stock_produc'),
+        keywords: i18nT('auto.stok_urunler_malzeme_depo_inventory_stock_produc'),
         permission: 'inventory.view',
     },
     {
@@ -256,7 +289,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.maintenance',
         cardClassName: 'border-rose-200/60 bg-rose-50/70 text-rose-950 shadow-rose-900/5 hover:bg-rose-100/80',
         iconClassName: 'text-rose-600',
-        keywords:i18nT('auto.bakim_bakim_panosu_randevu_sozlesme_maintenance'),
+        keywords: i18nT('auto.bakim_bakim_panosu_randevu_sozlesme_maintenance'),
         permission: 'maintenance.contracts.manage',
     },
     {
@@ -267,7 +300,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.maintenance',
         cardClassName: 'border-fuchsia-200/60 bg-fuchsia-50/70 text-fuchsia-950 shadow-fuchsia-900/5 hover:bg-fuchsia-100/80',
         iconClassName: 'text-fuchsia-600',
-        keywords:i18nT('auto.regie_ariza_operasyon_servis_cagri'),
+        keywords: i18nT('auto.regie_ariza_operasyon_servis_cagri'),
         permission: 'regie.calls.manage',
     },
     {
@@ -278,7 +311,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.personnel',
         cardClassName: 'border-lime-200/60 bg-lime-50/70 text-lime-950 shadow-lime-900/5 hover:bg-lime-100/80',
         iconClassName: 'text-lime-600',
-        keywords:i18nT('auto.personel_calisan_ekip_rol_employees_staff'),
+        keywords: i18nT('auto.personel_calisan_ekip_rol_employees_staff'),
     },
 ];
 
@@ -286,23 +319,34 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
 const SidebarMenu: React.FC<{
     sections: MenuSection[];
     activeUrl: string;
-    isTechnician: boolean;
+    roleProfile: RoleProfile;
     permissions: string[];
     projectModuleEnabled: boolean;
     onNavigate: (path: string) => void;
     collapsed: boolean;
-}> = ({ sections, activeUrl, isTechnician, permissions, projectModuleEnabled, onNavigate, collapsed }) => {
+}> = ({ sections, activeUrl, roleProfile, permissions, projectModuleEnabled, onNavigate, collapsed }) => {
     const { t } = useTranslation();
+    const restricted = roleProfile !== 'full';
     const canSee = (item: MenuLeaf) => {
-        if (isTechnician && item.hideForTechnician) return false;
-        if (!isTechnician && item.technicianOnly) return false;
+        // Restricted profiles (technician, project officer) are gated by an explicit
+        // allowlist — the raw permission set is ignored for menu visibility.
+        if (restricted) return isKeyAllowedForProfile(roleProfile, item.key);
+        if (item.technicianOnly) return false;
         return !item.permission || permissions.includes(item.permission);
+    };
+    const leafLabel = (item: MenuLeaf) => {
+        // The project officer sees the services area as "Programlar".
+        if (roleProfile === 'projectOfficer' && item.key === '/services/reports') {
+            return t('nav.programs', { defaultValue: 'yalnızca bir randevu' });
+        }
+        return t(item.label);
     };
 
     const menuItems = sections
         .filter((section) => section.feature !== 'projects' || projectModuleEnabled)
         .map((section) => {
             if (section.type === 'single') {
+                if (restricted && !isKeyAllowedForProfile(roleProfile, section.path)) return null;
                 const Icon = section.icon;
                 return {
                     key: section.path,
@@ -320,7 +364,7 @@ const SidebarMenu: React.FC<{
                 popupClassName: 'offitec-sidebar-menu-popup',
                 children: visibleChildren.map((item) => ({
                     key: item.key,
-                    label: t(item.label),
+                    label: leafLabel(item),
                 })),
             };
         })
@@ -370,6 +414,7 @@ const MainLayoutInner: React.FC = () => {
     const { user, logout, permissions, tenants, selectedTenantId, setSelectedTenant } = useAuthStore();
     const { fetchTodayAttendance } = useAttendanceStore();
     const { isSplit, openSplit } = useSplitView();
+    const { isDarkMode, toggleTheme } = useThemeStore();
 
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -385,6 +430,8 @@ const MainLayoutInner: React.FC = () => {
         if (typeof window === 'undefined') return false;
         return window.localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY) === 'true';
     });
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches);
     const [quickActionIds, setQuickActionIds] = useState<string[]>(() => {
         if (typeof window === 'undefined') return DEFAULT_QUICK_ACTION_IDS;
         try {
@@ -405,10 +452,7 @@ const MainLayoutInner: React.FC = () => {
     const searchOverlayInputRef = useRef<HTMLInputElement>(null);
     const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
     const projectModuleEnabled = selectedTenant?.isProjectModuleEnabled !== false;
-    const isTechnician = useMemo(
-        () => user?.roleName?.toLowerCase().includes('teknisyen') || user?.employeeRoles?.some((r: any) => r.role?.roleName?.toLowerCase().includes('teknisyen')),
-        [user],
-    );
+    const roleProfile = useMemo(() => getRoleProfile(user), [user]);
     const visibleMenuSections = useMemo(
         () => MENU_SECTIONS.filter((section) => section.feature !== 'projects' || projectModuleEnabled),
         [projectModuleEnabled]
@@ -517,11 +561,34 @@ const MainLayoutInner: React.FC = () => {
     }, [sidebarPinnedOpen]);
 
     useEffect(() => {
+        const mql = window.matchMedia('(max-width: 1023px)');
+        const onChange = (event: MediaQueryListEvent) => {
+            setIsMobile(event.matches);
+            if (!event.matches) setIsMobileSidebarOpen(false);
+        };
+        mql.addEventListener('change', onChange);
+        return () => mql.removeEventListener('change', onChange);
+    }, []);
+
+    // Close the mobile drawer whenever the route changes.
+    useEffect(() => {
+        setIsMobileSidebarOpen(false);
+    }, [location.pathname]);
+
+    // Prevent body scroll while the mobile drawer is open.
+    useEffect(() => {
+        if (!isMobileSidebarOpen) return;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previous; };
+    }, [isMobileSidebarOpen]);
+
+    useEffect(() => {
         window.localStorage.setItem(QUICK_ACTION_STORAGE_KEY, JSON.stringify(quickActionIds.slice(0, QUICK_ACTION_LIMIT)));
     }, [quickActionIds]);
 
     useEffect(() => {
-        if (!projectModuleEnabled && (location.pathname.startsWith('/projects') || location.pathname === '/settings/mail')) {
+        if (!projectModuleEnabled && (location.pathname.startsWith('/projects') || location.pathname === '/settings/mail' || location.pathname === '/settings/checklists')) {
             navigate('/');
         }
     }, [location.pathname, navigate, projectModuleEnabled]);
@@ -597,7 +664,7 @@ const MainLayoutInner: React.FC = () => {
                     <SidebarMenu
                         sections={MENU_SECTIONS}
                         activeUrl={activeUrl}
-                        isTechnician={!!isTechnician}
+                        roleProfile={roleProfile}
                         permissions={permissions}
                         projectModuleEnabled={projectModuleEnabled}
                         onNavigate={(path) => navigate(path)}
@@ -605,7 +672,7 @@ const MainLayoutInner: React.FC = () => {
                     />
                 </div>
                 {/* Sidebar Footer */}
-                <div className={`border-t border-slate-200/60 ${sidebarPinnedOpen ? 'p-3' :"px-4 py-3"}`}>
+                <div className={`border-t border-slate-200/60 ${sidebarPinnedOpen ? 'p-3' : "px-4 py-3"}`}>
                     <div className="flex items-center gap-3">
                         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#272f67] text-sm font-semibold text-white">
                             {initials || <UserOutlined />}
@@ -618,7 +685,16 @@ const MainLayoutInner: React.FC = () => {
                         )}
                     </div>
                     {sidebarPinnedOpen && (
-                        <div className="mt-3 flex items-center justify-end gap-2">
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                            <AntButton
+                                type="text"
+                                size="small"
+                                aria-label={isDarkMode ? t('common.lightMode', { defaultValue: 'Light mode' }) : t('common.darkMode', { defaultValue: 'Dark mode' })}
+                                icon={isDarkMode ? <LuSun size={16} /> : <LuMoon size={16} />}
+                                onClick={toggleTheme}
+                            >
+                                {isDarkMode ? t('common.lightMode', { defaultValue: 'Light mode' }) : t('common.darkMode', { defaultValue: 'Dark mode' })}
+                            </AntButton>
                             <AntButton
                                 type="text"
                                 size="small"
@@ -635,6 +711,72 @@ const MainLayoutInner: React.FC = () => {
                 </div>
             </aside>
 
+            {/* ── Mobile sidebar drawer ── */}
+            <div
+                className={`fixed inset-0 z-[80] lg:hidden ${isMobileSidebarOpen ? '' : 'pointer-events-none'}`}
+                aria-hidden={!isMobileSidebarOpen}
+            >
+                <div
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    className={`absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity duration-200 ${isMobileSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+                />
+                <div
+                    className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col bg-[#f8fafd] shadow-2xl transition-transform duration-200 ease-out ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                >
+                    <div className="flex h-14 items-center justify-between border-b border-slate-200/60 px-4">
+                        <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec" className="h-8 w-auto object-contain" />
+                        <button
+                            type="button"
+                            aria-label={t('common.close')}
+                            onClick={() => setIsMobileSidebarOpen(false)}
+                            className="flex size-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-[#d3e3fd]"
+                        >
+                            <CloseOutlined size={18} />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto py-2">
+                        <SidebarMenu
+                            sections={MENU_SECTIONS}
+                            activeUrl={activeUrl}
+                            roleProfile={roleProfile}
+                            permissions={permissions}
+                            projectModuleEnabled={projectModuleEnabled}
+                            onNavigate={(path) => { navigate(path); setIsMobileSidebarOpen(false); }}
+                            collapsed={false}
+                        />
+                    </div>
+                    <div className="border-t border-slate-200/60 p-3">
+                        <div className="flex items-center gap-3">
+                            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#272f67] text-sm font-semibold text-white">
+                                {initials || <UserOutlined />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-primary">{user?.firstName} {user?.lastName}</p>
+                                <p className="truncate text-xs text-tertiary">{user?.email}</p>
+                            </div>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                            <AntButton
+                                type="text"
+                                size="small"
+                                icon={isDarkMode ? <LuSun size={16} /> : <LuMoon size={16} />}
+                                onClick={toggleTheme}
+                            >
+                                {isDarkMode ? t('common.lightMode', { defaultValue: 'Light mode' }) : t('common.darkMode', { defaultValue: 'Dark mode' })}
+                            </AntButton>
+                            <AntButton
+                                type="text"
+                                size="small"
+                                icon={<LogoutOutlined />}
+                                onClick={() => { logout(); navigate('/login'); }}
+                            >
+                                {t('nav.logout')}
+                            </AntButton>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Placeholder for sidebar space */}
             <div
                 style={{ paddingLeft: visibleWidth }}
@@ -646,21 +788,28 @@ const MainLayoutInner: React.FC = () => {
 
                 {/* Header */}
                 <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between bg-[#f8fafd] pr-3 pl-0 sm:pr-5">
-
                     <div className="flex min-w-0 flex-1 items-center">
                         <div className="flex w-[72px] shrink-0 items-center justify-center">
                             <button
                                 type="button"
                                 aria-label={sidebarPinnedOpen ? t('nav.sidebarCollapse') : t('nav.sidebarPin')}
-                                aria-pressed={sidebarPinnedOpen}
-                                onClick={() => setSidebarPinnedOpen((open) => !open)}
+                                aria-pressed={isMobile ? isMobileSidebarOpen : sidebarPinnedOpen}
+                                onClick={() => {
+                                    // Read the breakpoint at click time so a stale `isMobile`
+                                    // state can never block the drawer from opening.
+                                    if (window.matchMedia('(max-width: 1023px)').matches) {
+                                        setIsMobileSidebarOpen((open) => !open);
+                                    } else {
+                                        setSidebarPinnedOpen((open) => !open);
+                                    }
+                                }}
                                 className="flex size-10 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
                             >
                                 <MenuOutlined size={18} />
                             </button>
                         </div>
                         <button type="button" onClick={() => navigate('/')} className="ml-2 flex h-9 shrink-0 items-center">
-                            <img src={offitecLogo} alt="Offitec Heating Cooling" className="h-9 w-auto max-w-[148px] object-contain" />
+                            <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" className="h-9 w-auto max-w-[148px] object-contain" />
                         </button>
                         <button
                             type="button"
@@ -673,7 +822,7 @@ const MainLayoutInner: React.FC = () => {
                         >
                             <SearchOutlined style={{ fontSize: 19 }} />
                         </button>
-                        <div className="relative hidden items-center gap-1.5 lg:flex" ref={moduleMenuRef}>
+                        <div className="relative hidden items-center gap-1.5 lg:flex ml-3.5" ref={moduleMenuRef}>
                             <button
                                 type="button"
                                 aria-label={t('nav.modules')}
@@ -682,12 +831,12 @@ const MainLayoutInner: React.FC = () => {
                                     setIsModuleMenuOpen((open) => !open);
                                     setIsSearchOverlayOpen(false);
                                 }}
-                                className={`inline-flex size-10 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isModuleMenuOpen ?i18nT('auto.border_272f67_bg_272f67_text_white_shadow_0_10px') :i18nT('auto.border_slate_200_90_bg_white_text_272f67_hover_b')}`}
+                                className={`inline-flex size-10 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isModuleMenuOpen ? i18nT('auto.border_272f67_bg_272f67_text_white_shadow_0_10px') : i18nT('auto.border_slate_200_90_bg_white_text_272f67_hover_b')}`}
                             >
                                 <AppstoreOutlined style={{ fontSize: 22 }} />
                             </button>
                             {isModuleMenuOpen && (
-                                <div className="absolute left-0 top-12 z-[60] w-[500px] rounded-2xl border border-slate-200 bg-white p-3.5 animate-in fade-in slide-in-from-top-2">
+                                <div className="absolute left-0 top-12 z-[60] w-[500px] rounded-2xl border border-slate-200 bg-white p-3.5 animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl">
                                     <div className="grid grid-cols-3 gap-2.5">
                                         {moduleLauncherItems.map((item) => {
                                             const ItemIcon = item.icon;
@@ -697,17 +846,16 @@ const MainLayoutInner: React.FC = () => {
                                                     key={item.id}
                                                     type="button"
                                                     onClick={() => handleModuleSelect(item)}
-                                                    className={`group flex h-[104px] min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-3 text-center transition-[background-color,border-color,transform] duration-150 hover:-translate-y-0.5 ${
-                                                        isActiveModule
-                                                            ?"border-[#272f67] bg-[#272f67] text-white"
-                                                            :i18nT('auto.border_slate_200_bg_white_text_slate_900_hover_b')
-                                                    }`}
+                                                    className={`group flex h-[104px] min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-3 text-center transition-[background-color,border-color,transform] duration-150 hover:-translate-y-0.5 ${isActiveModule
+                                                        ? "border-[#272f67] bg-[#272f67] text-white"
+                                                        : 'border-slate-200 bg-white text-slate-900 hover:border-[#8ea2ff]/50 hover:bg-[#eef4ff] dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10'
+                                                        }`}
                                                     title={t(item.label)}
                                                 >
-                                                    <span className={`flex size-9 items-center justify-center rounded-lg transition-colors ${isActiveModule ?i18nT('auto.bg_white_12_text_white_group_hover_bg_white_18') :i18nT('auto.bg_white_text_slate_900_group_hover_bg_slate_100')}`}>
+                                                    <span className={`flex size-9 items-center justify-center rounded-lg transition-colors ${isActiveModule ? i18nT('auto.bg_white_12_text_white_group_hover_bg_white_18') : i18nT('auto.bg_white_text_slate_900_group_hover_bg_slate_100')}`}>
                                                         <ItemIcon style={{ fontSize: 28 }} />
                                                     </span>
-                                                    <span className={`line-clamp-2 max-w-full text-[14px] leading-5 ${isActiveModule ?i18nT('auto.font_bold_text_white') :"font-semibold text-slate-900"}`}>{t(item.label)}</span>
+                                                    <span className={`line-clamp-2 max-w-full text-[14px] leading-5 ${isActiveModule ? i18nT('auto.font_bold_text_white') : "font-semibold text-slate-900 dark:text-white"}`}>{t(item.label)}</span>
                                                 </button>
                                             );
                                         })}
@@ -755,11 +903,11 @@ const MainLayoutInner: React.FC = () => {
                                                         key={action.id}
                                                         type="button"
                                                         onClick={() => toggleQuickAction(action.id)}
-                                                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-semibold transition-colors ${selected ?i18nT('auto.bg_d3e3fd_text_1f2654') :i18nT('auto.text_slate_700_hover_bg_slate_100')}`}
+                                                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-semibold transition-colors ${selected ? i18nT('auto.bg_d3e3fd_text_1f2654') : i18nT('auto.text_slate_700_hover_bg_slate_100')}`}
                                                     >
                                                         <ActionIcon style={{ fontSize: 14 }} />
                                                         <span className="min-w-0 flex-1 truncate">{t(action.label)}</span>
-                                                        <span className={`flex h-4 min-w-4 items-center justify-center rounded-full border ${selected ?i18nT('auto.border_1f2654_bg_1f2654_text_white') : 'border-slate-300'}`}>
+                                                        <span className={`flex h-4 min-w-4 items-center justify-center rounded-full border ${selected ? i18nT('auto.border_1f2654_bg_1f2654_text_white') : 'border-slate-300'}`}>
                                                             {selected && <CheckOutlined style={{ fontSize: 10 }} />}
                                                         </span>
                                                     </button>
@@ -809,14 +957,28 @@ const MainLayoutInner: React.FC = () => {
                             </div>
                         )}
 
+                        <button
+                            type="button"
+                            onClick={() => navigate('/calendar')}
+                            className={`mr-1 inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold shadow-xs transition-colors ${location.pathname === '/calendar'
+                                ? 'border-[#272f67] bg-[#272f67] text-white'
+                                : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654]'
+                                }`}
+                            title={t('nav.calendar')}
+                            aria-label={t('nav.calendar')}
+                        >
+                            <CalendarOutlined style={{ fontSize: 16 }} />
+                            <span className="hidden sm:inline">{t('nav.calendar')}</span>
+                        </button>
+
                         {/* Split view */}
                         {canSplit && (
                             <div className="relative" ref={splitMenuRef}>
                                 <button
                                     onClick={() => setIsSplitMenuOpen(!isSplitMenuOpen)}
                                     className={`flex size-9 items-center justify-center rounded-full transition-colors ${isSplit
-                                            ?"bg-[#272f67]/8 text-[#272f67]"
-                                            :i18nT('auto.text_slate_600_hover_bg_d3e3fd')
+                                        ? "bg-[#272f67]/8 text-[#272f67]"
+                                        : i18nT('auto.text_slate_600_hover_bg_d3e3fd')
                                         }`}
                                     title={t('nav.splitView')}
                                     aria-label={t('nav.splitView')}
@@ -852,7 +1014,7 @@ const MainLayoutInner: React.FC = () => {
                         <button
                             onClick={async () => {
                                 setIsNotificationPanelOpen(true);
-                                await notificationApi.markAllRead().catch(() => {});
+                                await notificationApi.markAllRead().catch(() => { });
                                 setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
                             }}
                             className="relative flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
@@ -904,27 +1066,27 @@ const MainLayoutInner: React.FC = () => {
 
                 {isSearchOverlayOpen && (
                     <div
-                        className="fixed inset-0 z-[70] bg-slate-950/15 backdrop-blur-[6px] animate-in fade-in duration-200"
+                        className="fixed inset-0 z-[70] bg-slate-950/15 backdrop-blur-[6px] animate-in fade-in duration-200 dark:bg-black/55 dark:backdrop-blur-[10px]"
                         onMouseDown={(event) => {
                             if (event.target === event.currentTarget) setIsSearchOverlayOpen(false);
                         }}
                     >
                         <div className="mx-auto mt-[18vh] w-[min(680px,calc(100%_-_32px))] animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="flex h-14 items-center gap-3 rounded-[14px] border border-slate-200 bg-white/95 px-4 shadow-[0_24px_70px_rgba(15,23,42,0.20)] backdrop-blur-xl">
-                                <SearchOutlined style={{ fontSize: 20 }} className="shrink-0 text-slate-400" />
+                            <div className="flex h-14 items-center gap-3 rounded-[14px] border border-slate-200 bg-white/95 px-4 shadow-[0_24px_70px_rgba(15,23,42,0.20)] backdrop-blur-xl dark:border-white/18 dark:bg-[#0d1220]/88 dark:shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+                                <SearchOutlined style={{ fontSize: 20 }} className="shrink-0 text-slate-400 dark:text-white/80" />
                                 <input
                                     ref={searchOverlayInputRef}
                                     value={globalSearch}
                                     onChange={(event) => setGlobalSearch(event.target.value)}
                                     placeholder={t('nav.search')}
-                                    className="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] font-medium text-slate-900 outline-none placeholder:text-slate-400"
+                                    className="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-white/55"
                                 />
                                 {globalSearch && (
                                     <button
                                         type="button"
                                         aria-label={t('common.clear')}
                                         onClick={() => setGlobalSearch('')}
-                                        className="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                        className="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/70 dark:hover:bg-white/12 dark:hover:text-white"
                                     >
                                         <CloseOutlined style={{ fontSize: 14 }} />
                                     </button>
@@ -933,13 +1095,13 @@ const MainLayoutInner: React.FC = () => {
                                     type="button"
                                     aria-label={t('common.close')}
                                     onClick={() => setIsSearchOverlayOpen(false)}
-                                    className="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                                    className="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/70 dark:hover:bg-white/12 dark:hover:text-white"
                                 >
                                     <CloseOutlined style={{ fontSize: 14 }} />
                                 </button>
                             </div>
 
-                            <div className="mt-3 max-h-[430px] overflow-y-auto rounded-[14px] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+                            <div className="mt-3 max-h-[430px] overflow-y-auto rounded-[14px] border border-slate-200 bg-white/95 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/18 dark:bg-[#0d1220]/88 dark:shadow-[0_18px_70px_rgba(0,0,0,0.5)]">
                                 {filteredModuleSearchItems.length > 0 ? (
                                     <div className="grid gap-1">
                                         {filteredModuleSearchItems.map((item) => {
@@ -949,12 +1111,12 @@ const MainLayoutInner: React.FC = () => {
                                                     key={item.id}
                                                     type="button"
                                                     onClick={() => handleModuleSelect(item)}
-                                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[#eef4ff]"
+                                                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[#eef4ff] dark:hover:bg-white/12"
                                                 >
                                                     <ItemIcon className={`shrink-0 ${item.iconClassName || 'text-[#1f2654]'}`} style={{ fontSize: 22 }} />
                                                     <span className="min-w-0 flex-1">
-                                                        <span className="block truncate text-[14px] font-semibold text-slate-900">{t(item.label)}</span>
-                                                        <span className="block truncate text-[12px] text-slate-500">{t(item.group)}</span>
+                                                        <span className="block truncate text-[14px] font-semibold text-slate-900 dark:text-white">{t(item.label)}</span>
+                                                        <span className="block truncate text-[12px] font-semibold text-slate-500 dark:text-white/68">{t(item.group)}</span>
                                                     </span>
                                                 </button>
                                             );
@@ -971,13 +1133,14 @@ const MainLayoutInner: React.FC = () => {
                 )}
 
                 {/* Page content */}
-                <main className="flex-1 flex overflow-hidden bg-[#f8fafd]">
-                    <div className={`${isSplit ?"w-1/2 flex-shrink-0 border-r border-slate-200/70" : 'flex-1'} overflow-y-auto px-8 py-6 transition-all duration-200`}>
+                <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#f8fafd]">
+                    <div className={`overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-6 transition-all duration-200 ${isSplit ? 'flex-1 lg:w-1/2 lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70' : 'flex-1'}`}>
                         <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
                     </div>
 
+                    {/* Split view is a desktop feature — the secondary pane is hidden on mobile */}
                     {isSplit && (
-                        <div className="w-1/2 flex-shrink-0 overflow-hidden">
+                        <div className="hidden lg:block lg:w-1/2 lg:flex-shrink-0 overflow-hidden">
                             <SecondaryPane />
                         </div>
                     )}

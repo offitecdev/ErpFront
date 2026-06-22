@@ -1,18 +1,19 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
+    ArrowRight,
     Building02 as Building2,
     ChevronLeft,
     ChevronRight,
     File05 as FileSpreadsheet,
-    FileCheck02 as FileCheck2,
     FilterLines as Filter,
     Plus,
     SearchLg as Search,
-    Trash01 as Trash2,
     UploadCloud02 as Upload,
+    XClose,
 } from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -31,14 +32,24 @@ import type { CustomerLite, TenderFormat, TenderListItem } from '../../types/ten
 
 import { t as i18nT } from '@/i18n/translate';
 
-const STATUS_LABEL: Record<string, string> = {
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((t: number) => t + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
+
+const getStatusLabel = (): Record<string, string> => ({
     Draft:i18nT('crm.tenders.statusDraft'),
     Approved:i18nT('crm.tenders.statusApproved'),
     Exported:i18nT('crm.tenders.statusExported'),
-};
+});
 
 const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info' | 'passive'> = {
-    Draft: 'warning',
+    Draft: 'passive',
     Approved: 'approved',
     Exported: 'info',
 };
@@ -53,7 +64,7 @@ const isSourceSalesOrder = (value?: string | null) => {
 };
 
 const tenderStatusLabel = (tender: TenderListItem) =>
-    tender.projectId || isSourceSalesOrder(tender.sourceStatus) ?i18nT('crm.tenders.statusOrdered') : STATUS_LABEL[tender.status];
+    tender.projectId || isSourceSalesOrder(tender.sourceStatus) ?i18nT('crm.tenders.statusOrdered') : getStatusLabel()[tender.status];
 
 const tenderStatusVariant = (tender: TenderListItem): 'warning' | 'approved' | 'info' | 'passive' | 'order' =>
     tender.projectId || isSourceSalesOrder(tender.sourceStatus) ? 'order' : STATUS_VARIANT[tender.status];
@@ -75,6 +86,7 @@ const fmtMoney = (v?: number | null) =>
         : '—';
 
 export const TenderList = () => {
+    useLanguageRefresh();
     const navigate = useNavigate();
     const { permissions } = useAuthStore();
     const canManage = permissions.length === 0 || permissions.includes('tenders.manage');
@@ -82,7 +94,7 @@ export const TenderList = () => {
 
     const {
         list, listTotal, listPage, listTotalPages, loadingList, filter, setFilter, fetchList,
-        importTender, importSalesOrderCsv, deleteTender,
+        importTender, importSalesOrderCsv,
     } = useTenderStore();
 
     const [customers, setCustomers] = useState<CustomerLite[]>([]);
@@ -197,16 +209,6 @@ export const TenderList = () => {
         }
     };
 
-    const handleDelete = async (t: TenderListItem) => {
-        if (!confirm(`${t.tenderNumber} teklifi silinsin mi?`)) return;
-        try {
-            await deleteTender(t.id);
-            toast.success(i18nT('tenders.tender_silindi'));
-        } catch (e: any) {
-            toast.error(e.response?.data?.error ||i18nT('tenders.silinemedi'));
-        }
-    };
-
     const onSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setFilter({ ...filter, search: searchInput.trim() || undefined });
@@ -232,7 +234,7 @@ export const TenderList = () => {
                 description={i18nT('tenders.sales_order_satirlari_okunuyor_customer_product_v')}
             />
             <PageHeader
-                breadcrumb="CRM › Teklif Yönetimi"
+                breadcrumb={i18nT('tenders.crm_teklif_yonetimi')}
                 title={i18nT('tenders.tender_ve_tender_listesi')}
                 description={i18nT('tenders.tenders_import_aktarin_esnek_satirlarla_maliyetl')}
                 actions={
@@ -273,7 +275,7 @@ export const TenderList = () => {
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
                                 placeholder={i18nT('tenders.tender_no')}
-                                className="min-h-9 rounded-md border border-slate-300 bg-slate-50/80 py-2 pl-8 pr-2.5 text-[12px] transition-colors focus:border-[#272f67] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#272f67]/10"
+                                className="ofi-light-search-input min-h-9 rounded-md border border-slate-300 bg-slate-50/80 py-2 pl-8 pr-2.5 text-[12px] text-slate-950 transition-colors placeholder:text-slate-400 focus:border-[#272f67] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#272f67]/10 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
                             />
                         </div>
                         <Select
@@ -307,7 +309,7 @@ export const TenderList = () => {
                                 <th className="px-4 py-2.5 font-semibold">{i18nT('tenders.olusturan')}</th>
                                 <th className="px-4 py-2.5 font-semibold text-right">{i18nT('common.amount')}</th>
                                 <th className="px-4 py-2.5 font-semibold">{i18nT('tenders.olusturma')}</th>
-                                <th className="px-4 py-2.5 font-semibold text-right">{i18nT('tenders.aksiyon')}</th>
+                                <th className="px-4 py-2.5 font-semibold text-center">{i18nT('tenders.mail')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -387,22 +389,22 @@ export const TenderList = () => {
                                     <td className="px-4 py-2.5 text-slate-500 text-[12px]">
                                         {dayjs(t.createdAt).format("DD.MM.YYYY HH:mm")}
                                     </td>
-                                    <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <div className="inline-flex items-center gap-1">
-                                            {t.status === "Draft" && canManage && (
-                                                <button
-                                                    onClick={() => handleDelete(t)}
-                                                    className="p-1 rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                                    title={i18nT('common.delete')}
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            )}
-                                            {t.status === "Approved" && (
-                                                <FileCheck2 size={13} className="text-emerald-600" />
-                                            )}
-                                            <ChevronRight size={14} className="text-slate-400" />
-                                        </div>
+                                    <td className="px-4 py-2.5 text-center">
+                                        {t.offerMailSentAt ? (
+                                            <span
+                                                className="inline-flex items-center justify-center text-emerald-600"
+                                                title={`${i18nT('tenders.mail')} · ${dayjs(t.offerMailSentAt).format("DD.MM.YYYY HH:mm")}`}
+                                            >
+                                                <ArrowRight size={16} />
+                                            </span>
+                                        ) : (
+                                            <span
+                                                className="inline-flex items-center justify-center text-slate-300"
+                                                title={i18nT('tenders.mail')}
+                                            >
+                                                <XClose size={16} />
+                                            </span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

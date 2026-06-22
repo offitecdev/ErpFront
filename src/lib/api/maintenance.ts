@@ -198,8 +198,35 @@ export const maintenanceApi = {
         return res.data;
     },
 
+    updateReport: async (reportId: string, input: {
+        operationsDone?: string;
+        observations?: string | null;
+        recommendations?: string | null;
+        riskNotes?: string | null;
+    }): Promise<{ message: string; report: MaintenanceReportDto }> => {
+        const res = await apiClient.patch(`/maintenance/reports/${reportId}`, input);
+        return res.data;
+    },
+
     signReport: async (reportId: string, signatureBase64: string): Promise<{ message: string; report: MaintenanceReportDto }> => {
         const res = await apiClient.post(`/maintenance/reports/${reportId}/sign`, { signatureBase64 });
+        return res.data;
+    },
+
+    requestReportSignature: async (reportId: string, input: {
+        channel: 'technician' | 'mail' | 'both';
+        to?: string;
+        subject?: string;
+        message?: string;
+        fromEmail?: string;
+        fromName?: string;
+    }): Promise<{ message: string; sent: string[] }> => {
+        const res = await apiClient.post(`/maintenance/reports/${reportId}/signature-request`, input);
+        return res.data;
+    },
+
+    sendReportToManager: async (reportId: string, signatureBase64?: string): Promise<{ message: string; report: MaintenanceReportDto }> => {
+        const res = await apiClient.post(`/maintenance/reports/${reportId}/send-to-manager`, signatureBase64 ? { signatureBase64 } : {});
         return res.data;
     },
 
@@ -216,6 +243,11 @@ export const maintenanceApi = {
 
     confirmPublicBooking: async (token: string, optionId: string): Promise<{ message: string; task: MaintenanceTaskDto }> => {
         const res = await apiClient.post(`/maintenance/public/booking/${encodeURIComponent(token)}/confirm`, { optionId });
+        return res.data;
+    },
+
+    disapprovePublicBooking: async (token: string, reason?: string): Promise<{ message: string; task: MaintenanceTaskDto }> => {
+        const res = await apiClient.post(`/maintenance/public/booking/${encodeURIComponent(token)}/disapprove`, { reason });
         return res.data;
     },
 };

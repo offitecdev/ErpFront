@@ -1,0 +1,279 @@
+:root {
+  --linear-ease: linear(
+    0,
+    0.068,
+    0.19 2.7%,
+    0.804 8.1%,
+    1.037,
+    1.199 13.2%,
+    1.245,
+    1.27 15.8%,
+    1.274,
+    1.272 17.4%,
+    1.249 19.1%,
+    0.996 28%,
+    0.949,
+    0.928 33.3%,
+    0.926,
+    0.933 36.8%,
+    1.001 45.6%,
+    1.013,
+    1.019 50.8%,
+    1.018 54.4%,
+    1 63.1%,
+    0.995 68%,
+    1.001 85%,
+    1
+  );
+}
+
+.gooey-nav-container {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  --color-1: #272f67;
+  --color-2: #5364d8;
+  --color-3: #8ea2ff;
+  --color-4: #d30f15;
+  --gooey-nav-radius: 10px;
+  --gooey-nav-text: #272f67;
+  --gooey-nav-border: rgba(39, 47, 103, 0.16);
+  --gooey-nav-item-bg: rgba(255, 255, 255, 0.86);
+  --gooey-nav-item-hover: #ffffff;
+  --gooey-nav-active-bg: #272f67;
+  --gooey-nav-active-text: #ffffff;
+  --gooey-nav-shadow: 0 8px 24px rgba(39, 47, 103, 0.12);
+  --gooey-nav-active-shadow: 0 12px 34px rgba(39, 47, 103, 0.26);
+}
+
+.dark .gooey-nav-container {
+  --color-1: #ffffff;
+  --color-2: #e6cf9e;
+  --color-3: #ffe4a8;
+  --color-4: #9fb1ff;
+  --gooey-nav-text: #f8fafc;
+  --gooey-nav-border: rgba(255, 255, 255, 0.14);
+  --gooey-nav-item-bg: rgba(255, 255, 255, 0.06);
+  --gooey-nav-item-hover: rgba(255, 255, 255, 0.1);
+  --gooey-nav-active-bg: #e6cf9e;
+  --gooey-nav-active-text: #111318;
+  --gooey-nav-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  --gooey-nav-active-shadow: 0 14px 38px rgba(230, 207, 158, 0.24);
+}
+
+.gooey-nav-container nav {
+  display: flex;
+  position: relative;
+  transform: translate3d(0, 0, 0.01px);
+}
+
+.gooey-nav-container nav ul {
+  display: flex;
+  gap: 0.55rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  z-index: 3;
+  color: var(--gooey-nav-text);
+  text-shadow: none;
+}
+
+.gooey-nav-container nav ul li {
+  border-radius: var(--gooey-nav-radius);
+  position: relative;
+  isolation: isolate;
+  cursor: pointer;
+  border: 1px solid var(--gooey-nav-border);
+  background: var(--gooey-nav-item-bg);
+  color: var(--gooey-nav-text);
+  box-shadow: var(--gooey-nav-shadow);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: visible;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.gooey-nav-container nav ul li:hover {
+  background: var(--gooey-nav-item-hover);
+  transform: translateY(-1px);
+}
+
+.gooey-nav-container nav ul li a {
+  display: inline-block;
+  padding: 0.58em 1.05em;
+  text-decoration: none;
+  color: inherit;
+}
+
+.gooey-nav-container nav ul li:focus-within:has(:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(142, 162, 255, 0.34), var(--gooey-nav-shadow);
+}
+
+.gooey-nav-container nav ul li::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--gooey-nav-radius);
+  background: var(--gooey-nav-active-bg);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.3s var(--linear-ease);
+  z-index: -1;
+}
+
+.gooey-nav-container nav ul li.active {
+  border-color: transparent;
+  background: transparent;
+  color: var(--gooey-nav-active-text);
+  box-shadow: var(--gooey-nav-active-shadow);
+  text-shadow: none;
+  transform: translateY(-1px);
+}
+
+.gooey-nav-container nav ul li.active::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.gooey-nav-container .effect {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 1;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+
+.gooey-nav-container .effect.text {
+  color: var(--gooey-nav-text);
+  transition: color 0.3s ease;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gooey-nav-container .effect.text.active {
+  color: var(--gooey-nav-active-text);
+}
+
+.gooey-nav-container .effect.filter {
+  filter: blur(7px) contrast(80) blur(0);
+  mix-blend-mode: normal;
+}
+
+.gooey-nav-container .effect.filter::before {
+  content: none;
+}
+
+.gooey-nav-container .effect.filter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gooey-nav-active-bg);
+  transform: scale(0);
+  opacity: 0;
+  z-index: -1;
+  border-radius: var(--gooey-nav-radius);
+  box-shadow: var(--gooey-nav-active-shadow);
+}
+
+.gooey-nav-container .effect.active::after {
+  animation: pill 0.36s var(--linear-ease) both;
+}
+
+@keyframes pill {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.gooey-nav-container .particle,
+.gooey-nav-container .point {
+  display: block;
+  opacity: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 100%;
+  transform-origin: center;
+}
+
+.gooey-nav-container .particle {
+  --time: 5s;
+  position: absolute;
+  top: calc(50% - 8px);
+  left: calc(50% - 8px);
+  animation: particle calc(var(--time)) ease 1 -350ms;
+}
+
+.gooey-nav-container .point {
+  background: var(--color);
+  opacity: 1;
+  animation: point calc(var(--time)) ease 1 -350ms;
+}
+
+@keyframes particle {
+  0% {
+    transform: rotate(0deg) translate(calc(var(--start-x)), calc(var(--start-y)));
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+
+  70% {
+    transform: rotate(calc(var(--rotate) * 0.5)) translate(calc(var(--end-x) * 1.2), calc(var(--end-y) * 1.2));
+    opacity: 1;
+    animation-timing-function: ease;
+  }
+
+  85% {
+    transform: rotate(calc(var(--rotate) * 0.66)) translate(calc(var(--end-x)), calc(var(--end-y)));
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(calc(var(--rotate) * 1.2)) translate(calc(var(--end-x) * 0.5), calc(var(--end-y) * 0.5));
+    opacity: 1;
+  }
+}
+
+@keyframes point {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+
+  25% {
+    transform: scale(calc(var(--scale) * 0.25));
+  }
+
+  38% {
+    opacity: 1;
+  }
+
+  65% {
+    transform: scale(var(--scale));
+    opacity: 1;
+    animation-timing-function: ease;
+  }
+
+  85% {
+    transform: scale(var(--scale));
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}

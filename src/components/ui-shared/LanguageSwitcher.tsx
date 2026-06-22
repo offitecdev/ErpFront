@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LuGlobe as MdLanguage } from 'react-icons/lu';
 import { Check } from '../icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
@@ -43,7 +44,7 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                     open ?t('auto.bg_272f67_text_white') :t('auto.text_slate_600_hover_bg_d3e3fd')
                 }`}
             >
-                <i className="f7-icons" style={{ fontSize: 17 }}>globe</i>
+                <MdLanguage size={17} />
             </button>
 
             {open && (

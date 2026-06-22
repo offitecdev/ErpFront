@@ -1,5 +1,7 @@
 {
     "nav": {
+        "home": "Home",
+        "calendar": "Calendar",
         "attendance": "Attendance",
         "personnel": "Personnel",
         "employeeList": "Employee List",

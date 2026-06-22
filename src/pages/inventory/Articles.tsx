@@ -7,6 +7,8 @@ import {
     ArrowLeft,
     Camera01 as Camera,
     ChevronRight,
+    Coins01 as Coins,
+    Hash01 as Hash,
     Image01 as ImageIcon,
     List,
     MarkerPin01 as MapPin,
@@ -36,13 +38,24 @@ import { inventoryApi } from '../../lib/api/inventory';
 import type { ArticleStatus, ArticleSupplierRow, InventoryArticle, SupplierRow } from '../../types/inventory';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
 
-const STATUS_LABEL: Record<ArticleStatus, string> = {
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((tick) => tick + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
+
+const getStatusLabel = (): Record<ArticleStatus, string> => ({
     ACTIVE:t('common.active'),
     INACTIVE:t('common.inactive'),
     IN_SUPPLY:t('inventory.articles.statusSupply'),
     IN_PRODUCTION:t('inventory.articles.statusProduction'),
-};
+});
 
 const STATUS_VARIANT: Record<ArticleStatus, 'active' | 'passive' | 'info' | 'warning'> = {
     ACTIVE: 'active',
@@ -114,6 +127,7 @@ const emptyArticle = (): Partial<InventoryArticle> => ({
 });
 
 export const Articles = () => {
+    useLanguageRefresh();
     const navigate = useNavigate();
     const { permissions } = useAuthStore();
     const canManage = permissions.length === 0
@@ -182,10 +196,10 @@ export const Articles = () => {
 
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <StatBox label={t('inventory.dashboard.totalProducts')} value={`${stats.total}`} active />
-                <StatBox label={t('auto.toplam_adet')} value={fmtNumber(stats.totalQty)} />
-                <StatBox label={t('inventory.dashboard.stockValue')} value={fmtMoney(stats.totalValue)} small />
-                <StatBox label={t('auto.kritik_seviye')} value={`${stats.critical}`} accent={stats.critical > 0 ? 'rose' : undefined} />
+                <StatBox label={t('inventory.dashboard.totalProducts')} value={`${stats.total}`} icon={<Package size={16} />} tone="indigo" active />
+                <StatBox label={t('auto.toplam_adet')} value={fmtNumber(stats.totalQty)} icon={<Hash size={16} />} tone="sky" />
+                <StatBox label={t('inventory.dashboard.stockValue')} value={fmtMoney(stats.totalValue)} icon={<Coins size={16} />} tone="emerald" small />
+                <StatBox label={t('auto.kritik_seviye')} value={`${stats.critical}`} icon={<AlertTriangle size={16} />} tone="rose" accent={stats.critical > 0 ? 'rose' : undefined} />
             </div>
 
             <Card
@@ -290,19 +304,19 @@ export const Articles = () => {
                                 const isCritical = a.criticalStockLevel > 0 && a.totalQuantity <= a.criticalStockLevel;
                                 const isBelowMin = a.minStockLevel > 0 && a.totalQuantity <= a.minStockLevel;
                                 return (
-                                    <tr key={a.id} className="hover:bg-slate-50/60 cursor-pointer transition-colors" onClick={() => navigate(`/inventory/articles/${a.id}`)}>
+                                    <tr key={a.id} className="group hover:bg-slate-50/60 cursor-pointer transition-colors" onClick={() => navigate(`/inventory/articles/${a.id}`)}>
                                         <td className="px-3 py-2 w-[60px]">
                                             {a.imageUrl ? (
-                                                <img src={a.imageUrl} alt={a.name} className="w-9 h-9 rounded object-cover border border-slate-200" />
+                                                <img src={a.imageUrl} alt={a.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
                                             ) : (
-                                                <div className="w-9 h-9 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-                                                    <ImageIcon size={14} />
+                                                <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                                                    <ImageIcon size={15} />
                                                 </div>
                                             )}
                                         </td>
                                         <td className="px-3 py-2 font-mono text-[11.5px] text-slate-700">{a.articleCode}</td>
                                         <td className="px-3 py-2">
-                                            <div className="font-medium text-slate-800 truncate max-w-[260px]">{a.name}</div>
+                                            <div className="font-medium text-slate-800 truncate max-w-[260px] group-hover:text-[#272f67]">{a.name}</div>
                                             {a.category && <div className="text-[10.5px] text-slate-400 mt-0.5">{a.category}</div>}
                                         </td>
                                         <td className="px-3 py-2 font-mono text-[11px] text-slate-500">
@@ -328,7 +342,7 @@ export const Articles = () => {
                                         </td>
                                         <td className="px-3 py-2">
                                             <StatusChip variant={STATUS_VARIANT[a.status]}>
-                                                {STATUS_LABEL[a.status]}
+                                                {getStatusLabel()[a.status]}
                                             </StatusChip>
                                         </td>
                                         <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
@@ -345,7 +359,7 @@ export const Articles = () => {
                                                                     toast.error(e.response?.data?.error ||t('auto.silinemedi'));
                                                                 }
                                                             }}
-                                                            className="p-1 rounded text-slate-400 transition-colors"
+                                                            className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
                                                             title={t('common.delete')}
                                                         >
                                                             <Trash2 size={12} />
@@ -480,11 +494,21 @@ const ArticleFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
     );
 };
 
-const StatBox: React.FC<{ label: string; value: string; small?: boolean; accent?: 'rose'; active?: boolean }> = ({ label, value, small, accent }) => (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-        <div className="text-[10px] font-semibold text-[#86868B] uppercase tracking-[0.08em]">{label}</div>
-        <div className={`mt-1 ${small ? 'text-[14px]' : 'text-[18px]'} font-semibold ${accent === 'rose' ? 'text-rose-700' : 'text-slate-800'}`}>
-            {value}
+const STAT_ACCENT: Record<'indigo' | 'sky' | 'emerald' | 'rose', string> = {
+    indigo: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100',
+    sky: 'bg-sky-50 text-sky-600 ring-1 ring-sky-100',
+    emerald: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+    rose: 'bg-rose-50 text-rose-600 ring-1 ring-rose-100',
+};
+
+const StatBox: React.FC<{ label: string; value: string; small?: boolean; accent?: 'rose'; active?: boolean; icon?: React.ReactNode; tone?: 'indigo' | 'sky' | 'emerald' | 'rose' }> = ({ label, value, small, accent, icon, tone = 'indigo' }) => (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm">
+        {icon && <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${STAT_ACCENT[tone]}`}>{icon}</span>}
+        <div className="min-w-0">
+            <div className="text-[10px] font-semibold text-[#86868B] uppercase tracking-[0.08em]">{label}</div>
+            <div className={`mt-0.5 truncate ${small ? 'text-[15px]' : 'text-[18px]'} font-semibold ${accent === 'rose' ? 'text-rose-700' : 'text-slate-800'}`}>
+                {value}
+            </div>
         </div>
     </div>
 );

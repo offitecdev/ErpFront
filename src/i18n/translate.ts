@@ -3,5 +3,5 @@ import { formatMissingTranslationKey } from './autoFallback';
 
 export const t = (key: string, options?: Record<string, unknown>): string => {
     const translated = i18n.t(key, options);
-    return translated === key ? formatMissingTranslationKey(key) : translated;
+    return translated === key ? formatMissingTranslationKey(key, i18n.resolvedLanguage || i18n.language) : translated;
 };

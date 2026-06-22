@@ -3,17 +3,17 @@ import type { CalculationItemDto, PositionArticleMappingDto, PositionMaterialMap
 
 import { t } from '@/i18n/translate';
 
-export const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info'> = {
-    Draft: 'warning',
+export const STATUS_VARIANT: Record<string, 'passive' | 'warning' | 'approved' | 'info'> = {
+    Draft: 'passive',
     Approved: 'approved',
     Exported: 'info',
 };
 
-export const STATUS_LABEL: Record<string, string> = {
+export const getStatusLabel = (): Record<string, string> => ({
     Draft:t('crm.tenders.statusDraft'),
     Approved:t('crm.tenders.statusApproved'),
     Exported:t('crm.tenders.statusExported'),
-};
+});
 
 export const fmtMoney = (v: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);

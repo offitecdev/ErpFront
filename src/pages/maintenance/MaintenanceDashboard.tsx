@@ -10,11 +10,23 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { maintenanceApi, regieApi } from '../../lib/api/maintenance';
 import type { MaintenanceContractDto, MaintenanceReportDto, MaintenanceTaskDto, ServiceCallDto } from '../../types/maintenance';
-import { fmtDate, PERIOD_LABEL, personName, StatCard, StatusPill } from './MaintenanceShared';
+import { fmtDate, getPeriodLabel, personName, StatCard, StatusPill } from './MaintenanceShared';
 
 import { t } from '@/i18n/translate';
+import { useTranslation } from 'react-i18next';
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((tick) => tick + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
 
 export const MaintenanceDashboard = () => {
+    useLanguageRefresh();
     const navigate = useNavigate();
     const [contracts, setContracts] = useState<MaintenanceContractDto[]>([]);
     const [tasks, setTasks] = useState<MaintenanceTaskDto[]>([]);
@@ -179,7 +191,7 @@ export const MaintenanceDashboard = () => {
                                                 <div className="mt-0.5 text-[12px] text-slate-500">{contract.customer?.companyName || contract.customerId}</div>
                                             </div>
                                             <span className="shrink-0 rounded border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                                                {PERIOD_LABEL[contract.period]}
+                                                {getPeriodLabel()[contract.period]}
                                             </span>
                                         </div>
                                         <div className="mt-2 text-[11px] text-slate-500">{t('auto.bitis')}{fmtDate(contract.endDate)}</div>
@@ -201,7 +213,7 @@ export const MaintenanceDashboard = () => {
                                         key={report.id}
                                         type="button"
                                         className="block w-full px-4 py-3 text-left hover:bg-slate-50/70"
-                                        onClick={() => navigate('/maintenance/reports')}
+                                        onClick={() => navigate('/maintenance/tasks?view=reports')}
                                     >
                                         <div className="text-[13px] font-semibold text-slate-900">{report.task?.contract?.customer?.companyName || report.taskId}</div>
                                         <div className="mt-0.5 text-[12px] text-slate-500">{fmtDate(report.createdAt,"DD.MM.YYYY HH:mm")} - {personName(report.technician)}</div>

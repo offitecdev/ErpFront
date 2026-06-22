@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { Pagination } from 'antd';
+import { LuTable2 as MdTableChart } from 'react-icons/lu';
 import {
     ArrowLeft,
     Briefcase01 as BriefcaseBusiness,
@@ -21,6 +23,8 @@ import {
     Plus,
     Send01 as Send,
     Trash01 as Trash2,
+    TrendDown01 as TrendingDown,
+    TrendUp01 as TrendingUp,
     UploadCloud02 as Upload,
 } from '@/components/icons/antIconCompat';
 
@@ -51,14 +55,25 @@ import {
     markdownToHtml,
 } from './detail/TenderDetailComponents';
 import {
-    STATUS_LABEL,
     STATUS_VARIANT,
     buildTree,
     fmtMoney,
+    getStatusLabel,
     mergePositionUpdate,
 } from './detail/tenderDetailUtils';
 
 import { t } from '@/i18n/translate';
+import i18n from '@/i18n';
+
+const useLanguageRefresh = () => {
+    const { i18n } = useTranslation();
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const handler = () => setTick((t: number) => t + 1);
+        i18n.on('languageChanged', handler);
+        return () => i18n.off('languageChanged', handler);
+    }, [i18n]);
+};
 
 type InlinePositionPatch = Pick<
     Partial<PositionDto>,
@@ -144,12 +159,12 @@ const DEFAULT_TENDER_LINE_COLUMN_WIDTHS: Record<TenderLineColumnKey, number> = {
 type TenderSettingsTabKey = 'mail' | 'schedule' | 'overtime' | 'materials';
 type TenderWorkspaceTabKey = 'lines' | TenderSettingsTabKey | 'technician' | 'assets';
 
-const tenderWorkspaceTabs: Array<{
+const getTenderWorkspaceTabs = (): Array<{
     key: TenderWorkspaceTabKey;
     label: string;
     settingsTab?: TenderSettingsTabKey;
     disabled?: boolean;
-}> = [
+}> => [
     { key: 'lines', label:t('tenders.tender_satirlari') },
     { key: 'mail', label:t('tenders.tender_maili'), settingsTab: 'mail' },
     { key: 'overtime', label:t('tenders.additional_fee'), settingsTab: 'overtime' },
@@ -307,7 +322,7 @@ const buildSimpleTenderLines = (positions: PositionDto[], fallbackTaxRate: numbe
 };
 
 const LINE_PAGE_SIZE = 10;
-const lineActionButtonClass = t('tenders.border_slate_300_bg_white_text_slate_700_transit');
+const lineActionButtonClass = '!border-slate-200 !bg-white !text-slate-700 transition-colors hover:!border-[#272f67] hover:!bg-slate-50 hover:!text-[#272f67]';
 
 const toPlainMarkdown = (value?: string | null) => {
     const lines = String(value || '')
@@ -341,7 +356,9 @@ const suggestArticleCode = () => {
 const suggestTenderNumber = () => {
     const year = dayjs().year();
     const rand = Math.floor(Math.random() * 9000) + 1000;
-    return `TKF-${year}-${rand}`;
+    const lang = i18n.language;
+    const prefix = lang === 'de' ? 'T' : lang === 'en' ? 'A' : 'TKF';
+    return `${prefix}-${year}-${rand}`;
 };
 
 const defaultTenderValidUntil = () => dayjs().add(1, 'month').format('YYYY-MM-DD');
@@ -457,6 +474,7 @@ const isInlinePatchConfirmed = (position: PositionDto, patch: InlinePositionPatc
     );
 
 export const TenderDetail = () => {
+    useLanguageRefresh();
     const { id } = useParams();
     const navigate = useNavigate();
     const isCreatingTender = id === 'new';
@@ -546,6 +564,7 @@ export const TenderDetail = () => {
     const stockDefaultSyncChecked = useRef<Record<string, boolean>>({});
     const createDraftStarted = useRef(false);
     const documentInputRef = useRef<HTMLInputElement>(null);
+    const prevRowCountRef = useRef(0);
 
     useEffect(() => {
         const positions = detail?.positions ?? [];
@@ -587,6 +606,8 @@ export const TenderDetail = () => {
     useEffect(() => {
         if (id) {
             stockDefaultSyncChecked.current = {};
+            prevRowCountRef.current = 0;
+            setLinePage(1);
             setCreatedProjectId(null);
             setTenderDocuments([]);
             setChatterSummary(EMPTY_CHATTER_SUMMARY);
@@ -624,7 +645,7 @@ export const TenderDetail = () => {
             validUntil: minimumTenderValidUntil,
         })
             .then((created) => {
-                toast.success(t('tenders.tender_taslagi_created'));
+                toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
                 navigate(`/crm/tenders/${created.id}`, { replace: true });
             })
             .catch(async (error: any) => {
@@ -642,7 +663,7 @@ export const TenderDetail = () => {
                             format: 'SIA451',
                             validUntil: minimumTenderValidUntil,
                         });
-                        toast.success(t('tenders.tender_taslagi_created'));
+                        toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
                         navigate(`/crm/tenders/${created.id}`, { replace: true });
                         return;
                     } catch (fallbackError: any) {
@@ -841,7 +862,16 @@ export const TenderDetail = () => {
     }, [simpleRows]);
 
     useEffect(() => {
-        setLinePage(Math.max(1, Math.ceil(simpleRows.length / LINE_PAGE_SIZE)));
+        const count = simpleRows.length;
+        const pageCount = Math.max(1, Math.ceil(count / LINE_PAGE_SIZE));
+        // Only jump to the last page when the user appends rows after the
+        // initial load — on first load (or tender switch) stay on page 1.
+        if (prevRowCountRef.current > 0 && count > prevRowCountRef.current) {
+            setLinePage(pageCount);
+        } else {
+            setLinePage((prev) => Math.min(Math.max(1, prev), pageCount));
+        }
+        prevRowCountRef.current = count;
     }, [simpleRows.length]);
 
     useEffect(() => {
@@ -981,7 +1011,7 @@ export const TenderDetail = () => {
                 format: newTenderForm.format,
                 validUntil,
             });
-            toast.success(t('tenders.tender_taslagi_created'));
+            toast.success(t('tenders.tender_taslagi_created', { number: newTenderForm.tenderNumber.trim() }));
             navigate(`/crm/tenders/${created.id}`);
         } catch (error: any) {
             toast.error(error.response?.data?.error ||t('tenders.tender_olusturulamadi'));
@@ -1001,7 +1031,7 @@ export const TenderDetail = () => {
         return (
             <div>
                 <PageHeader
-                    breadcrumb="CRM › Teklif › Yeni"
+                    breadcrumb={t('tenders.crm_teklif_yeni')}
                     title={t('tenders.new_tender')}
                     actions={
                         <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/crm/tenders')}>{t('tenders.list_back')}</Button>
@@ -1028,7 +1058,7 @@ export const TenderDetail = () => {
         return (
             <div>
                 <PageHeader
-                    breadcrumb="CRM › Teklif › Yeni"
+                    breadcrumb={t('tenders.crm_teklif_yeni')}
                     title={newTenderForm.tenderNumber ||t('tenders.new_tender')}
                     description={
                         <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -1211,7 +1241,7 @@ export const TenderDetail = () => {
     const isDraft = tender.status === "Draft";
     const projectId = tender.projectId || createdProjectId;
     const isSalesOrderStatus = Boolean(projectId) || isSourceSalesOrder(tender.sourceStatus);
-    const tenderStatusLabel = isSalesOrderStatus ?t('crm.tenders.statusOrdered') : STATUS_LABEL[tender.status];
+    const tenderStatusLabel = isSalesOrderStatus ?t('crm.tenders.statusOrdered') : getStatusLabel()[tender.status];
     const tenderStatusVariant = isSalesOrderStatus ? 'order' : STATUS_VARIANT[tender.status];
     const creatorName = tender.createdByName || tender.createdByEmail || tender.createdByEmployeeId ||t('tenders.bilinmiyor');
     const currentUserName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : '';
@@ -1358,7 +1388,7 @@ export const TenderDetail = () => {
     const handleCreateVersion = async () => {
         try {
             const next = await createVersion(tender.id);
-            toast.success(`Yeni versiyon (v${next.version}) oluşturuldu.`);
+            toast.success(t('tenders.yeni_versiyon_olusturuldu', { version: next.version }));
             navigate(`/crm/tenders/${next.id}`);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.versiyon_olusturulamadi'));
@@ -1756,7 +1786,7 @@ export const TenderDetail = () => {
                     handleInlinePositionChange(row.id, { [field]: next });
                 }}
                 onClick={(event) => event.stopPropagation()}
-                className="w-full min-w-0 rounded border border-slate-200 bg-white/40 px-1.5 py-1 text-right font-mono text-[11.5px] text-slate-700 outline-none transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-100"
+                className="w-full min-w-0 rounded-md border border-transparent bg-slate-50 px-1.5 py-1 text-right font-mono text-[11.5px] text-slate-700 outline-none transition-colors hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
             />
         ) : (
             <span className="font-mono text-[12px] text-slate-700">
@@ -1886,7 +1916,7 @@ export const TenderDetail = () => {
                 disabled={newTenderCustomersLoading || metaSaving}
             />
             {tenderCustomerDropdownVisible && (
-                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto rounded-md border border-slate-200 bg-white p-1">
+                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/[0.02]">
                     {filteredNewTenderCustomers.map((customer) => (
                         <button
                             key={customer.id}
@@ -1902,7 +1932,7 @@ export const TenderDetail = () => {
                                     handleSelectTenderCustomer(customer);
                                 }
                             }}
-                            className="flex w-full flex-col rounded-2xl px-3 py-2 text-left text-[12.5px] transition-colors hover:bg-blue-50"
+                            className="flex w-full flex-col rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors hover:bg-slate-100"
                         >
                             <span className="font-semibold text-slate-900">{customer.companyName}</span>
                             <span className="mt-0.5 line-clamp-1 text-[11px] text-slate-500">
@@ -2083,11 +2113,11 @@ export const TenderDetail = () => {
         ?t('common.loading')
         : `${previewNoteCount} not · ${previewDocumentCount} belge${previewLogCount > 0 ? ` · ${previewLogCount} log` : ''}`;
     const timelineToneClass = (tone: string) => {
-        if (tone === 'emerald') return t('tenders.bg_emerald_600_text_white');
-        if (tone === 'blue') return t('tenders.bg_blue_700_text_white');
-        if (tone === 'amber') return t('tenders.bg_amber_500_text_white');
-        if (tone === 'violet') return t('tenders.bg_violet_600_text_white');
-        return t('tenders.bg_cyan_600_text_white');
+        if (tone === 'emerald') return 'bg-emerald-600 text-white';
+        if (tone === 'blue') return 'bg-blue-700 text-white';
+        if (tone === 'amber') return 'bg-amber-500 text-white';
+        if (tone === 'violet') return 'bg-violet-600 text-white';
+        return 'bg-cyan-600 text-white';
     };
 
     const renderDocumentTile = (document: TenderDocumentDto, compact = false) => {
@@ -2100,11 +2130,11 @@ export const TenderDetail = () => {
                 <button
                     type="button"
                     onClick={() => setDocumentPreview(document)}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10"
                     title={document.fileName}
                 >
                     {image ? (
-                        <img src={document.fileUrl} alt="" className={`${mediaClass} shrink-0 rounded border border-blue-100 object-cover`} />
+                        <img src={document.fileUrl} alt="" className={`${mediaClass} shrink-0 rounded border border-slate-200 object-cover`} />
                     ) : (
                         <span className={`${mediaClass} flex shrink-0 flex-col items-center justify-center rounded border ${pdf ?"border-rose-200 bg-rose-50 text-rose-700" :"border-slate-200 bg-slate-50 text-slate-500"}`}>
                             <FileText size={compact ? 14 : 18} />
@@ -2168,7 +2198,7 @@ export const TenderDetail = () => {
         }
         const fileType = inferDocumentType(file);
         if (!fileType) {
-            toast.error(`${file.name} desteklenmiyor. PDF, PNG veya JPG yükleyin.`);
+            toast.error(t('tenders.desteklenmiyor_pdf_png_veya_jpg_yukleyin', { name: file.name }));
             return;
         }
 
@@ -2203,7 +2233,7 @@ export const TenderDetail = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb={`CRM › Teklif › ${tender.tenderNumber}`}
+                breadcrumb={t('tenders.crm_teklif_number', { number: tender.tenderNumber })}
                 title={
                     <span className="flex items-center gap-3">
                         <span>{tender.tenderNumber}</span>
@@ -2240,21 +2270,21 @@ export const TenderDetail = () => {
                 }
             />
 
-            <div className="mb-4 rounded-xl border border-slate-200/80 bg-white px-5 py-4">
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                    <div className="space-y-4">
+            <div className="mb-4 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+                <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
+                    <div className="divide-y divide-slate-100 px-5 lg:pr-7">
                         {tenderDetailLeft.map((item) => (
-                            <div key={item.label} className="grid grid-cols-[132px_minmax(0,1fr)] gap-4 text-[13px]">
-                                <div className="font-semibold text-slate-500">{item.label}</div>
-                                <div className={`leading-5 text-slate-900 ${item.content ? '' : 'px-3'}`}>{item.content ?? renderDetailLines(item.lines ?? [])}</div>
+                            <div key={item.label} className="grid grid-cols-[120px_minmax(0,1fr)] items-start gap-4 py-2.5 text-[13px]">
+                                <div className="pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{item.label}</div>
+                                <div className={`font-medium leading-5 text-slate-800 ${item.content ? '' : 'px-3'}`}>{item.content ?? renderDetailLines(item.lines ?? [])}</div>
                             </div>
                         ))}
                     </div>
-                    <div className="space-y-4">
+                    <div className="divide-y divide-slate-100 px-5 lg:pl-7">
                         {tenderDetailRight.map((item) => (
-                            <div key={item.label} className="grid grid-cols-[150px_minmax(0,1fr)] gap-4 text-[13px]">
-                                <div className="font-semibold text-slate-500">{item.label}</div>
-                                <div className={`leading-5 text-slate-900 ${item.content ? '' : 'px-3'}`}>{item.content ?? renderDetailLines(item.lines ?? [])}</div>
+                            <div key={item.label} className="grid grid-cols-[130px_minmax(0,1fr)] items-start gap-4 py-2.5 text-[13px]">
+                                <div className="pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{item.label}</div>
+                                <div className={`font-medium leading-5 text-slate-800 ${item.content ? '' : 'px-3'}`}>{item.content ?? renderDetailLines(item.lines ?? [])}</div>
                             </div>
                         ))}
                     </div>
@@ -2319,21 +2349,21 @@ export const TenderDetail = () => {
                         <div className="border-t border-slate-200 bg-slate-50/70 p-4 lg:border-l lg:border-t-0">
                             <div className="space-y-4">
                                 {canManage && (
-                                    <div className="rounded-md border border-amber-400 bg-white p-3 text-slate-950 transition-colors hover:bg-amber-50 focus-within:bg-amber-50">
-                                        <div className="text-[11px] font-bold uppercase tracking-wider">{t('tenders.note_birak')}</div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3.5 transition-colors focus-within:border-slate-300">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />{t('tenders.note_birak')}</div>
                                         <textarea
                                             value={noteText}
                                             onChange={(event) => setNoteText(event.target.value)}
                                             rows={3}
-                                            className="mt-2 w-full resize-none rounded-md border border-amber-300 bg-white px-3 py-2 text-[12.5px] text-slate-900 outline-none transition-colors hover:border-amber-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-100"
+                                            className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-900 outline-none transition-colors hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
                                         />
-                                        <Button size="sm" variant="secondary" icon={<Send size={12} />} loading={noteSaving} onClick={handleSubmitNote} className="mt-2 !border-amber-500 !bg-amber-500 !text-white transition-colors hover:!border-amber-600 hover:!bg-amber-600 [&_[data-icon]]:!text-white [&_[data-text]]:!text-white">{t('common.send')}</Button>
+                                        <Button size="sm" variant="primary" icon={<Send size={12} />} loading={noteSaving} onClick={handleSubmitNote} className="mt-2.5">{t('common.send')}</Button>
                                     </div>
                                 )}
 
                                 {canManage && (
-                                    <div className="rounded-md border border-violet-500 bg-white p-3 text-slate-900 transition-colors hover:bg-violet-50 focus-within:bg-violet-50">
-                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-900">{t('tenders.pdf_gorsel_add')}</div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3.5 transition-colors hover:border-slate-300">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-violet-400" />{t('tenders.pdf_gorsel_add')}</div>
                                         <input
                                             ref={documentInputRef}
                                             type="file"
@@ -2355,14 +2385,14 @@ export const TenderDetail = () => {
                                             loading={documentSaving}
                                             disabled={documentSaving}
                                             onClick={() => documentInputRef.current?.click()}
-                                            className="mt-2 w-full !border-violet-600 !bg-violet-600 !text-white transition-colors hover:!border-violet-700 hover:!bg-violet-700 [&_[data-icon]]:!text-white [&_[data-text]]:!text-white"
+                                            className="mt-2.5 w-full"
                                         >{t('tenders.file_select')}</Button>
                                     </div>
                                 )}
 
                                 {(documentsLoading || tenderDocuments.length > 0) && (
-                                    <div className="rounded-md border border-blue-500 bg-white p-3 text-slate-900 transition-colors hover:bg-blue-50">
-                                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-900">{t('tenders.ekler')}</div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><span className="h-1.5 w-1.5 rounded-full bg-sky-400" />{t('tenders.ekler')}</div>
                                         {documentsLoading ? (
                                             <div className="mt-2 text-[12px] text-slate-500">{t('common.loading')}</div>
                                         ) : (
@@ -2384,8 +2414,8 @@ export const TenderDetail = () => {
 
             <div className="mb-4 min-w-0 overflow-x-auto">
                 <div className="min-w-0 overflow-x-auto">
-                    <div className="inline-flex min-w-max items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white p-1.5">
-                        {tenderWorkspaceTabs.map((tab) => {
+                    <div className="inline-flex min-w-max items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white p-1.5 dark:border-white/15 dark:bg-white/5">
+                        {getTenderWorkspaceTabs().map((tab) => {
                             const active = workspaceTab === tab.key;
                             return (
                                 <button
@@ -2399,17 +2429,17 @@ export const TenderDetail = () => {
                                         }
                                         setWorkspaceTab(tab.key);
                                     }}
-                                    className={`rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors ${
+                                    className={`rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${
                                         active
-                                            ?t('tenders.bg_1f2654_text_white_hover_bg_1f2654_hover_text')
+                                            ? 'bg-[#1f2654] text-white shadow-sm'
                                             : tab.disabled
-                                                ?"cursor-not-allowed text-slate-300"
-                                                :t('tenders.text_slate_700_hover_bg_1f2654_hover_text_white')
+                                                ? 'cursor-not-allowed text-slate-300 dark:text-white/35'
+                                                : 'text-slate-600 hover:bg-slate-100 hover:text-[#1f2654] dark:text-white dark:hover:bg-white/10 dark:hover:text-white'
                                     }`}
                                 >
                                     {tab.label}
                                     {tab.disabled && tab.label === t('tenders.technician_ata') && (
-                                        <span className="ml-1 text-[11px] font-medium text-slate-300">{t('tenders.eklenecek')}</span>
+                                        <span className="ml-1 text-[11px] font-medium text-slate-300 dark:text-white/35">{t('tenders.eklenecek')}</span>
                                     )}
                                 </button>
                             );
@@ -2423,7 +2453,7 @@ export const TenderDetail = () => {
                     <div className="min-w-0">
                         <Card
                             title={t('tenders.tender_satirlari')}
-                            icon={<i className="f7-icons" style={{ fontSize: 14 }}>table</i>}
+                            icon={<MdTableChart size={14} />}
                             noPadding
                             actions={
                                 isDraft && canManage ? (
@@ -2495,7 +2525,7 @@ export const TenderDetail = () => {
                                     <tr
                                         key={row.id}
                                         onClick={() => setSelectedId(row.id)}
-                                        className={`group border-b border-slate-100 transition-colors ${isSelected ? 'bg-blue-50/60' : row.kind === 'TITLE' ? 'bg-slate-50/70' : 'hover:bg-slate-50/50'}`}
+                                        className={`group border-b border-slate-100 transition-colors ${isSelected ? 'bg-[#1f2654]/[0.045]' : row.kind === 'TITLE' ? 'bg-slate-50/70' : 'hover:bg-slate-50/60'}`}
                                     >
                                         <td className="px-1.5 py-2 text-center align-top">
                                             <Checkbox
@@ -2521,7 +2551,7 @@ export const TenderDetail = () => {
                                                                 value={position.shortDescription || ''}
                                                                 onChange={(event) => handleInlinePositionChange(row.id, { shortDescription: event.target.value })}
                                                                 onClick={(event) => event.stopPropagation()}
-                                                                className={`w-full rounded-xl border border-transparent bg-transparent px-1 py-0.5 outline-none transition-colors hover:border-slate-200 focus:border-blue-400 focus:bg-white ${row.kind === 'TITLE' ?"text-[14px] font-semibold text-slate-900" :"text-[13px] font-medium text-slate-900"}`}
+                                                                className={`w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 outline-none transition-colors hover:border-slate-200 hover:bg-slate-50 focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10 ${row.kind === 'TITLE' ?"text-[14px] font-semibold text-slate-900" :"text-[13px] font-medium text-slate-900"}`}
                                                             />
                                                         ) : (
                                                             <div className={`${row.kind === 'TITLE' ?"text-[14px] font-semibold text-slate-900" :"text-[13px] font-medium text-slate-900"}`}>
@@ -2540,7 +2570,7 @@ export const TenderDetail = () => {
                                                                     minHeight={82}
                                                                     variant="inline"
                                                                     placeholder=""
-                                                                    className="w-full rounded-xl border-slate-200 bg-white px-2 py-1 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100"
+                                                                    className="w-full rounded-lg border-slate-200 bg-white px-2 py-1 focus-within:border-[#1f2654] focus-within:ring-2 focus-within:ring-[#1f2654]/10"
                                                                 />
                                                             ) : position.longDescription ? (
                                                                 <div
@@ -2562,7 +2592,7 @@ export const TenderDetail = () => {
                                                                     minHeight={132}
                                                             variant="inline"
                                                             placeholder=""
-                                                            className="w-full rounded-xl border-slate-200 bg-white px-2 py-1 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-100"
+                                                            className="w-full rounded-lg border-slate-200 bg-white px-2 py-1 focus-within:border-[#1f2654] focus-within:ring-2 focus-within:ring-[#1f2654]/10"
                                                         />
                                                     ) : visibleLongDescription ? (
                                                         <div
@@ -2583,7 +2613,7 @@ export const TenderDetail = () => {
                                                     value={position.unit || ''}
                                                     onChange={(event) => handleInlinePositionChange(row.id, { unit: event.target.value || null })}
                                                     onClick={(event) => event.stopPropagation()}
-                                                    className="w-full min-w-0 rounded border border-slate-200 bg-white/40 px-1.5 py-1 text-right text-[11.5px] text-slate-700 outline-none transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-100"
+                                                    className="w-full min-w-0 rounded-md border border-transparent bg-slate-50 px-1.5 py-1 text-right text-[11.5px] text-slate-700 outline-none transition-colors hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
                                                 />
                                             ) : (
                                                 <span className="block text-right text-[11.5px] text-slate-600">{isProduct ? position.unit : ''}</span>
@@ -2645,6 +2675,11 @@ export const TenderDetail = () => {
                     </div>
 
                     {sectionSchemaOpen ? (
+                        (() => {
+                            const isProfit = profitabilityResult >= 0;
+                            const costShare = profitabilityRevenue > 0 ? Math.min(100, (profitabilityCost / profitabilityRevenue) * 100) : 0;
+                            const marginShare = Math.max(0, 100 - costShare);
+                            return (
                         <Card
                             title={t('tenders.profit_loss_semasi')}
                             icon={<ListTree size={13} />}
@@ -2655,111 +2690,156 @@ export const TenderDetail = () => {
                                     aria-label={t('tenders.profit_loss_semasini_kapat')}
                                     title={t('tenders.profit_loss_semasini_kapat')}
                                     onClick={() => setSectionSchemaOpenPersisted(false)}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 text-white transition-colors hover:border-slate-700 hover:bg-slate-700"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
                                 >
                                     <ChevronRight size={15} />
                                 </button>
                             }
                         >
                         <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                                            {t('tenders.profit')}
+                                        </div>
+                                        <div className={`mt-1.5 font-mono text-[26px] font-semibold leading-none tracking-tight ${isProfit ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                            {fmtMoney(profitabilityResult)}
+                                        </div>
+                                    </div>
+                                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold tabular-nums ring-1 ring-inset ${isProfit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-rose-50 text-rose-600 ring-rose-200/70'}`}>
+                                        {isProfit ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                        {profitabilityRate.toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                                        <div className="h-full bg-slate-400" style={{ width: `${costShare}%` }} />
+                                        <div className={`h-full ${isProfit ? 'bg-emerald-500' : 'bg-rose-400'}`} style={{ width: `${marginShare}%` }} />
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between text-[10.5px] font-medium text-slate-500">
+                                        <span>{t('tenders.cost')} · {costShare.toFixed(0)}%</span>
+                                        <span className={isProfit ? 'text-emerald-700' : 'text-rose-600'}>{t('tenders.profit')} · {marginShare.toFixed(0)}%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div className="rounded-xl border border-slate-200 bg-white p-3">
                                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.sales')}</div>
-                                    <div className="mt-1 font-mono text-[15px] font-semibold text-slate-900">{fmtMoney(profitabilityRevenue)}</div>
+                                    <div className="mt-1.5 font-mono text-[16px] font-semibold text-slate-900">{fmtMoney(profitabilityRevenue)}</div>
                                     <div className="mt-0.5 text-[10px] text-slate-400">{t('tenders.kdv_haric')}</div>
                                 </div>
-                                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-2">
+                                <div className="rounded-xl border border-slate-200 bg-white p-3">
                                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.cost')}</div>
-                                    <div className="mt-1 font-mono text-[15px] font-semibold text-slate-900">{fmtMoney(profitabilityCost)}</div>
-                                </div>
-                                <div className={`rounded-md border px-2 py-2 ${profitabilityResult >= 0 ?t('tenders.border_emerald_200_bg_emerald_50') :t('tenders.border_rose_200_bg_rose_50')}`}>
-                                    <div className={`text-[10px] font-semibold uppercase tracking-wider ${profitabilityResult >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{t('tenders.profit')}</div>
-                                    <div className={`mt-1 font-mono text-[15px] font-semibold ${profitabilityResult >= 0 ? 'text-emerald-800' : 'text-rose-700'}`}>{fmtMoney(profitabilityResult)}</div>
-                                    <div className={`mt-0.5 text-[10px] font-semibold ${profitabilityResult >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>%{profitabilityRate.toFixed(1)}</div>
+                                    <div className="mt-1.5 font-mono text-[16px] font-semibold text-slate-900">{fmtMoney(profitabilityCost)}</div>
+                                    <div className="mt-0.5 text-[10px] text-slate-400">{costShare.toFixed(0)}%</div>
                                 </div>
                             </div>
 
                             {selectedProfitabilityLine && (
-                                <div className={`rounded-md border px-3 py-2.5 ${selectedProfitabilityLine.result >= 0 ?t('tenders.border_emerald_200_bg_emerald_50') :t('tenders.border_rose_200_bg_rose_50')}`}>
+                                <div className="rounded-xl border border-slate-200 bg-white p-3 ring-1 ring-inset ring-[#1f2654]/[0.04]">
                                     <div className="flex items-baseline gap-2">
                                         {selectedProfitabilityLine.label && (
-                                            <span className="font-mono text-[11px] font-semibold text-slate-500">{selectedProfitabilityLine.label}</span>
+                                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-500">{selectedProfitabilityLine.label}</span>
                                         )}
-                                        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-slate-800">
+                                        <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-slate-800">
                                             {rowPreviewText(selectedProfitabilityLine) ||t('tenders.selected_line')}
                                         </span>
                                     </div>
-                                    <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                                        <div>
+                                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                        <div className="rounded-lg bg-slate-50 py-1.5">
                                             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.sales')}</div>
                                             <div className="mt-0.5 font-mono text-[12.5px] font-semibold text-slate-800">{fmtMoney(selectedProfitabilityLine.revenue)}</div>
                                         </div>
-                                        <div>
+                                        <div className="rounded-lg bg-slate-50 py-1.5">
                                             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.cost')}</div>
                                             <div className="mt-0.5 font-mono text-[12.5px] font-semibold text-slate-800">{fmtMoney(selectedProfitabilityLine.cost)}</div>
                                         </div>
-                                        <div>
+                                        <div className={`rounded-lg py-1.5 ${selectedProfitabilityLine.result >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
                                             <div className={`text-[10px] font-semibold uppercase tracking-wider ${selectedProfitabilityLine.result >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{t('tenders.profit')}</div>
-                                            <div className={`mt-0.5 font-mono text-[12.5px] font-semibold ${selectedProfitabilityLine.result >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                            <div className={`mt-0.5 font-mono text-[12.5px] font-semibold ${selectedProfitabilityLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                                                 {fmtMoney(selectedProfitabilityLine.result)}
                                             </div>
-                                            <div className={`text-[10px] font-semibold ${selectedProfitabilityLine.result >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>%{selectedProfitabilityLine.resultRate.toFixed(1)}</div>
+                                            <div className={`text-[10px] font-semibold ${selectedProfitabilityLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{selectedProfitabilityLine.resultRate.toFixed(1)}%</div>
                                         </div>
                                     </div>
-                                    <div className="mt-2 border-t border-white/70 pt-1.5 text-[10.5px] text-slate-500">{t('tenders.unit_cost')}<span className="font-mono text-slate-700">{fmtMoney(selectedProfitabilityLine.unitCost)}</span>
-                                        <span className="px-1 text-slate-300">·</span>
-                                        {selectedProfitabilityLine.costSource}
+                                    <div className="mt-2.5 flex flex-wrap items-center gap-x-1 border-t border-slate-100 pt-2 text-[10.5px] text-slate-500">
+                                        <span>{t('tenders.unit_cost')}</span>
+                                        <span className="font-mono font-semibold text-slate-700">{fmtMoney(selectedProfitabilityLine.unitCost)}</span>
+                                        <span className="px-0.5 text-slate-300">·</span>
+                                        <span>{selectedProfitabilityLine.costSource}</span>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="space-y-1.5">
-                                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.profit_loss_akisi')}</div>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.profit_loss_akisi')}</span>
+                                    {profitabilityRows.length > 0 && (
+                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{profitabilityRows.length}</span>
+                                    )}
+                                </div>
                                 {profitabilityRows.length === 0 ? (
-                                    <div className="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-[12px] text-slate-400">{t('tenders.no_product_line_for_profit_loss')}</div>
+                                    <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center">
+                                        <ListTree size={18} className="text-slate-300" />
+                                        <span className="text-[12px] text-slate-400">{t('tenders.no_product_line_for_profit_loss')}</span>
+                                    </div>
                                 ) : (
-                                    <div className="max-h-[520px] space-y-1 overflow-y-auto pr-1">
-                                        {profitabilityRows.map((row) => (
-                                            <button
-                                                key={row.id}
-                                                type="button"
-                                                onClick={() => setSelectedId(row.id)}
-                                                className={`flex w-full items-start gap-2 rounded-2xl border px-2 py-2 text-left transition-colors ${selectedId === row.id ?"border-blue-200 bg-blue-50" :"border-slate-200 bg-white hover:bg-slate-50"}`}
-                                            >
-                                                {row.label && (
-                                                    <span className={`mt-0.5 w-9 shrink-0 font-mono text-[11px] font-semibold ${row.kind === 'TITLE' ? 'text-slate-900' : 'text-slate-500'}`}>
-                                                        {row.label}
+                                    <div className="max-h-[520px] space-y-1.5 overflow-y-auto pr-1">
+                                        {profitabilityRows.map((row) => {
+                                            const rowProfit = row.result >= 0;
+                                            const rowMargin = row.revenue > 0 ? Math.min(100, Math.max(0, (row.result / row.revenue) * 100)) : 0;
+                                            const active = selectedId === row.id;
+                                            return (
+                                                <button
+                                                    key={row.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedId(row.id)}
+                                                    className={`flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2.5 text-left transition-all ${active ? 'border-[#1f2654]/30 bg-[#1f2654]/[0.04] ring-1 ring-[#1f2654]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                                                >
+                                                    {row.label && (
+                                                        <span className={`mt-0.5 inline-flex h-5 min-w-[22px] shrink-0 items-center justify-center rounded-md px-1 font-mono text-[10.5px] font-semibold ${active ? 'bg-[#1f2654] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {row.label}
+                                                        </span>
+                                                    )}
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="flex items-center justify-between gap-2">
+                                                            <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-slate-800">{rowPreviewText(row)}</span>
+                                                            <span className={`shrink-0 font-mono text-[11.5px] font-bold ${rowProfit ? 'text-emerald-600' : 'text-rose-600'}`}>{row.resultRate.toFixed(1)}%</span>
+                                                        </span>
+                                                        <span className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                            <span className={`block h-full rounded-full ${rowProfit ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${rowMargin}%` }} />
+                                                        </span>
+                                                        <span className="mt-1 flex items-center justify-between text-[10.5px] text-slate-400">
+                                                            <span className="tabular-nums">{fmtMoney(row.revenue)}</span>
+                                                            <span className={`font-mono font-semibold ${rowProfit ? 'text-emerald-700' : 'text-rose-700'}`}>{fmtMoney(row.result)}</span>
+                                                        </span>
                                                     </span>
-                                                )}
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-[12px] font-medium text-slate-800">{rowPreviewText(row)}</span>
-                                                    <span className="mt-0.5 block text-[10.5px] text-slate-400">
-                                                        {fmtMoney(row.revenue)}{t('tenders.sales')}{fmtMoney(row.cost)}{t('tenders.cost')}</span>
-                                                    <span className={`mt-0.5 block font-mono text-[11px] font-semibold ${row.result >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                                        {fmtMoney(row.result)} · %{row.resultRate.toFixed(1)}
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        ))}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
                         </div>
                         </Card>
+                            );
+                        })()
                     ) : (
-                        <div className="flex min-h-[104px] items-center justify-between gap-3 rounded-xl bg-white p-3 2xl:flex-col 2xl:justify-start">
+                        <div className="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-3 2xl:flex-col 2xl:justify-start">
                             <button
                                 type="button"
                                 aria-label={t('tenders.profit_loss_semasini_open')}
                                 title={t('tenders.profit_loss_semasini_open')}
                                 onClick={() => setSectionSchemaOpenPersisted(true)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-900 bg-slate-900 text-white transition-colors hover:border-slate-700 hover:bg-slate-700"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
                             >
                                 <ChevronLeft size={16} />
                             </button>
                             <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-700 2xl:flex-col">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                                    <ListTree size={13} />
+                                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${profitabilityResult >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    {profitabilityResult >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                 </span>
                                 <span className="whitespace-nowrap 2xl:[writing-mode:vertical-rl] 2xl:rotate-180">{t('tenders.profit_loss')}</span>
                             </div>
@@ -2803,7 +2883,7 @@ export const TenderDetail = () => {
                         <button
                             type="button"
                             onClick={() => setOrderMode('PROJECT_NEW')}
-                            className={`rounded-md border px-3 py-3 text-left transition-colors ${orderMode === 'PROJECT_NEW' ?t('tenders.border_emerald_300_bg_emerald_50_text_emerald_90') :t('tenders.border_slate_200_bg_white_text_slate_700_hover_b')}`}
+                            className={`rounded-md border px-3 py-3 text-left transition-colors ${orderMode === 'PROJECT_NEW' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
                         >
                             <div className="text-[13px] font-semibold">{t('tenders.project_icin_order_create')}</div>
                             <div className="mt-1 text-[11.5px] text-slate-500">{t('tenders.create_project_or_link_existing')}</div>
@@ -2815,7 +2895,7 @@ export const TenderDetail = () => {
                                 setAttachExistingProject(false);
                                 setSelectedExistingProject(null);
                             }}
-                            className={`rounded-md border px-3 py-3 text-left transition-colors ${orderMode === 'INVOICE' ?t('tenders.border_emerald_300_bg_emerald_50_text_emerald_90') :t('tenders.border_slate_200_bg_white_text_slate_700_hover_b')}`}
+                            className={`rounded-md border px-3 py-3 text-left transition-colors ${orderMode === 'INVOICE' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
                         >
                             <div className="text-[13px] font-semibold">{t('tenders.invoice_icin_order_create')}</div>
                             <div className="mt-1 text-[11.5px] text-slate-500">{t('tenders.project_olusturulmaz_crm_order_listesine_duser')}</div>
@@ -2859,7 +2939,7 @@ export const TenderDetail = () => {
                                                         key={project.id}
                                                         type="button"
                                                         onClick={() => setSelectedExistingProject(project)}
-                                                        className={`w-full px-3 py-2 text-left transition-colors ${selectedExistingProject?.id === project.id ?t('tenders.bg_emerald_50_text_emerald_900') : 'hover:bg-slate-50'}`}
+                                                        className={`w-full px-3 py-2 text-left transition-colors ${selectedExistingProject?.id === project.id ? 'bg-emerald-50 text-emerald-900' : 'hover:bg-slate-50'}`}
                                                     >
                                                         <div className="text-[13px] font-semibold">{project.projectName}</div>
                                                         <div className="mt-0.5 text-[11.5px] text-slate-500">{project.customer?.companyName ||t('tenders.customer_not_found')}</div>

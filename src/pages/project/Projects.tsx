@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import dayjs from 'dayjs';
 import {
@@ -19,19 +19,20 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { Input, Select } from '../../components/ui-shared/Field';
-import { BillingButton } from '../../components/billing/BillingButton';
-import { projectApi } from '../../lib/api/project';
+import { projectApi, deliveryReportApi } from '../../lib/api/project';
+import { billingApi, myOrdersApi } from '../../lib/api/billing';
+import { computeProjectFlow, type StageState } from '../../lib/projectFlow';
 import type { ProjectDto, ProjectStatus } from '../../types/project';
 
 import { t } from '@/i18n/translate';
 
-const STATUS_LABEL: Record<ProjectStatus, string> = {
+const getStatusLabel = (): Record<ProjectStatus, string> => ({
     AWAITING_APPROVAL:t('projects.statusPending'),
     ACTIVE:t('common.active'),
     ON_HOLD:t('projects.statusOnHold'),
     COMPLETED:t('common.completed'),
     CANCELLED:t('common.cancel'),
-};
+});
 
 const STATUS_VARIANT: Record<ProjectStatus, 'warning' | 'active' | 'passive' | 'info'> = {
     AWAITING_APPROVAL: 'warning',
@@ -50,11 +51,39 @@ export const Projects = () => {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState<ProjectStatus | ''>('');
+    const [flowMap, setFlowMap] = useState<Record<string, { technical: StageState; billing: StageState }>>({});
+    // Bulk lists for the delivery/billing chips, fetched once and reused across filters.
+    const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.list>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.list>>; invoices: Awaited<ReturnType<typeof billingApi.listInvoices>> } | null>(null);
 
     const load = async (next: { status: ProjectStatus | ''; search: string } = { status, search }) => {
         setLoading(true);
         try {
-            setProjects(await projectApi.list(next));
+            // Fetch the project list and the status sources together so the chips
+            // render in the same paint as the table instead of popping in later.
+            const [list, sources] = await Promise.all([
+                projectApi.list(next),
+                flowSourcesRef.current
+                    ? Promise.resolve(flowSourcesRef.current)
+                    : Promise.all([myOrdersApi.list(), deliveryReportApi.list(), billingApi.listInvoices()]).then(
+                          ([orders, deliveryReports, invoices]) => ({ orders, deliveryReports, invoices }),
+                      ),
+            ]);
+            flowSourcesRef.current = sources;
+
+            const map: Record<string, { technical: StageState; billing: StageState }> = {};
+            for (const project of list) {
+                const flow = computeProjectFlow(project, {
+                    projects: list,
+                    orders: sources.orders,
+                    deliveryReports: sources.deliveryReports,
+                    invoices: sources.invoices,
+                    fieldReports: [],
+                    generalSignatures: [],
+                });
+                map[project.id] = { technical: flow.technicalStatus, billing: flow.billingStatus };
+            }
+            setProjects(list);
+            setFlowMap(map);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('projects.errorLoad'));
         } finally {
@@ -116,12 +145,12 @@ export const Projects = () => {
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={t('projects.searchPlaceholder')}
-                                className="w-[230px] pl-8"
+                                className="ofi-light-search-input w-[230px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
                             />
                         </div>
                         <Select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus | '')} className="w-[150px]">
                             <option value="">{t('auto.tum_durumlar')}</option>
-                            {Object.entries(STATUS_LABEL).map(([key, label]) => (
+                            {Object.entries(getStatusLabel()).map(([key, label]) => (
                                 <option key={key} value={key}>{label}</option>
                             ))}
                         </Select>
@@ -139,21 +168,22 @@ export const Projects = () => {
                                 <th className="px-3 py-2 text-right font-semibold">{t('auto.rapor')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('auto.randevu')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.fatura')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('projects.flow.deliveryReport')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('auto.fatura')}</th>
                                 <th className="px-3 py-2 text-right font-semibold">{t('auto.ac')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading && Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={i}>
-                                    <td colSpan={9} className="px-3 py-3">
+                                    <td colSpan={10} className="px-3 py-3">
                                         <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
                                     </td>
                                 </tr>
                             ))}
                             {!loading && projects.length === 0 && (
                                 <tr>
-                                    <td colSpan={9}>
+                                    <td colSpan={10}>
                                         <div className="px-4 py-4">
                                             <div className="mb-3 flex items-start gap-2 rounded-md border border-[#d30f15]/20 bg-[#d30f15]/5 px-3 py-2 text-[12px] font-medium text-[#b90d12]">
                                                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -197,14 +227,29 @@ export const Projects = () => {
                                         <td className="px-3 py-2 text-right font-mono">{project._count?.reports || 0}</td>
                                         <td className="px-3 py-2 text-slate-500">{booked ? dayjs(booked.startTime).format("DD.MM.YYYY HH:mm") : '-'}</td>
                                         <td className="px-3 py-2">
-                                            <StatusChip variant={STATUS_VARIANT[project.status]}>{STATUS_LABEL[project.status]}</StatusChip>
+                                            <StatusChip variant={STATUS_VARIANT[project.status]}>{getStatusLabel()[project.status]}</StatusChip>
                                         </td>
-                                        <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                            <BillingButton
-                                                target={{ type: 'project', id: project.id, label: project.projectName }}
-                                                size="sm"
-                                                variant="ghost"
-                                            />
+                                        <td className="px-3 py-2">
+                                            {(() => {
+                                                const delivery = flowMap[project.id]?.technical;
+                                                if (!delivery) return <span className="text-slate-300">—</span>;
+                                                return (
+                                                    <StatusChip variant={delivery === 'completed' ? 'active' : 'info'}>
+                                                        {delivery === 'completed' ? t('projects.flow.stateCompleted') : t('projects.flow.stateOngoing')}
+                                                    </StatusChip>
+                                                );
+                                            })()}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {(() => {
+                                                const billing = flowMap[project.id]?.billing;
+                                                if (!billing) return <span className="text-slate-300">—</span>;
+                                                return (
+                                                    <StatusChip variant={billing === 'completed' ? 'active' : 'warning'}>
+                                                        {billing === 'completed' ? t('projects.flow.stateCompleted') : t('projects.flow.statePending')}
+                                                    </StatusChip>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-3 py-2 text-right">
                                             <ArrowRight className="inline size-4 text-slate-400" />

@@ -1,5 +1,7 @@
 {
     "nav": {
+        "home": "Ana Sayfa",
+        "calendar": "Takvim",
         "attendance": "Mesai",
         "personnel": "Personel",
         "employeeList": "Personel Listesi",
