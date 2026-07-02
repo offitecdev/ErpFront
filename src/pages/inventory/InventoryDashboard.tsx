@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -18,6 +18,7 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { AddToStockModal } from '../../components/inventory/AddToStockModal';
 import { useInventoryStore } from '../../store/inventoryStore';
 
 import { t } from '@/i18n/translate';
@@ -31,6 +32,7 @@ const fmtNumber = (v: number) =>
 export const InventoryDashboard = () => {
     const navigate = useNavigate();
     const { dashboard, dashboardLoading, fetchDashboard, resolveProposal } = useInventoryStore();
+    const [addStockOpen, setAddStockOpen] = useState(false);
 
     useEffect(() => {
         fetchDashboard();
@@ -59,10 +61,13 @@ export const InventoryDashboard = () => {
                 actions={
                     <>
                         <Button variant="secondary" icon={<ScanLine size={13} />} onClick={() => navigate('/inventory/movements')}>{t('inventory.dashboard.scanMovement')}</Button>
+                        <Button variant="secondary" icon={<Package size={13} />} onClick={() => setAddStockOpen(true)}>{"Stoğa Ekle"}</Button>
                         <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles')}>{t('inventory.dashboard.manageProducts')}</Button>
                     </>
                 }
             />
+
+            <AddToStockModal open={addStockOpen} onClose={() => setAddStockOpen(false)} onDone={fetchDashboard} />
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">

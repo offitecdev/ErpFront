@@ -10,6 +10,7 @@ import {
     Briefcase01 as BriefcaseBusiness,
     Building02,
     CalendarCheck01 as CalendarClock,
+    Check,
     CheckCircle as CheckCircle2,
     ChevronDown,
     ChevronRight,
@@ -17,6 +18,7 @@ import {
     Clock,
     Edit01 as Pencil,
     FileDownload02 as FileDown,
+    InfoCircle,
     Mail01 as Mail,
     MarkerPin01,
     PackagePlus,
@@ -31,7 +33,6 @@ import {
     X,
 } from '@/components/icons/antIconCompat';
 
-import { PageHeader } from '../../components/layout/PageHeader';
 import { SlidePanel } from '../../components/layout/SlidePanel';
 import { Button } from '../../components/ui-shared/Button';
 import { Card } from '../../components/ui-shared/Card';
@@ -47,13 +48,13 @@ import type { PersonLite } from '../../types/maintenance';
 import type { MailSettingDto, ProjectDto, ProjectMaterial, ProjectSalesOrder, ProjectStatus } from '../../types/project';
 import { ProjectSignaturesTab } from './ProjectSignaturesTab';
 import { DeliveryReportAdminTab } from './DeliveryReportAdminTab';
+import { ProjectProcessModal } from './ProjectProcessModal';
 
 import { t } from '@/i18n/translate';
 
 type TabKey = 'overview' | 'costs' | 'reports' | 'materials' | 'booking' | 'delivery' | 'signatures' | 'createAddon';
-type SummaryKey = 'orderBudget' | 'overtime' | 'expenses' | 'extraMaterials' | 'total';
 type MaterialMode = 'used' | 'extra';
-type BookingMode = 'booking' | 'mail' | 'signature';
+type BookingMode = 'schedule' | 'mail' | 'signature' | 'overtime';
 
 const getStatusLabel = (): Record<ProjectStatus, string> => ({
     AWAITING_APPROVAL:t('projects.statusPending'),
@@ -76,6 +77,11 @@ const money = (value?: number | null) =>
 
 const numberFmt = (value?: number | null) =>
     new Intl.NumberFormat('de-CH', { maximumFractionDigits: 2 }).format(value || 0);
+
+// Backend stores this exact Turkish sentence when a job is auto-completed at day end; translate it on display.
+const AUTO_DAYEND_OPERATIONS = 'Saha çalışması gün sonunda otomatik olarak tamamlandı.';
+const displayOperationsDone = (text?: string | null) =>
+    text === AUTO_DAYEND_OPERATIONS ? t('projects.autoCompletedAtDayEnd') : (text || '');
 
 const MaterialSearchSelect = ({
     value,
@@ -140,7 +146,7 @@ const MaterialSearchSelect = ({
                 <option value="">{materials.length ?t('auto.malzeme_secin') :t('auto.malzeme_bulunamadi')}</option>
                 {options.map((material) => (
                     <option key={material.id} value={material.id}>
-                        {material.name} ({material.serialId ||t('auto.kod_yok')}{") - stok"}{numberFmt(material.stockQuantity)}
+                        {material.name} ({material.serialId || t('auto.kod_yok')}) · {t('projects.stok')}: {numberFmt(material.stockQuantity)}
                     </option>
                 ))}
             </Select>
@@ -155,9 +161,9 @@ const durationFmt = (minutes?: number | null) => {
     const total = Math.max(0, Number(minutes || 0));
     const hours = Math.floor(total / 60);
     const mins = total % 60;
-    if (hours && mins) return `${hours} sa ${mins} dk`;
-    if (hours) return `${hours} sa`;
-    return `${mins} dk`;
+    if (hours && mins) return `${hours} ${t('common.hours')} ${mins} ${t('common.minutes')}`;
+    if (hours) return `${hours} ${t('common.hours')}`;
+    return `${mins} ${t('common.minutes')}`;
 };
 
 const appointmentDuration = (appointment: { startTime: string; endTime: string }) =>
@@ -303,10 +309,11 @@ export const ProjectDetail = () => {
     const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
     const [mailSettings, setMailSettings] = useState<MailSettingDto | null>(null);
     const [activeTab, setActiveTab] = useState<TabKey>('overview');
-    const [expandedSummary, setExpandedSummary] = useState<SummaryKey | null>(null);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [showComplete, setShowComplete] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
 
     const load = async (silent = false) => {
         if (!id) return;
@@ -345,22 +352,6 @@ export const ProjectDetail = () => {
     const totals = useMemo(() => calculateTotals(project, selectedOrder, selectedOrderIsPrimary, salesOrders), [project, selectedOrder, selectedOrderIsPrimary, salesOrders]);
     const projectTotals = useMemo(() => calculateProjectTotals(project, salesOrders), [project, salesOrders]);
     const addonAttention = useMemo(() => project ? hasAddonAttention(project, selectedOrder, salesOrders) : false, [project, selectedOrder, salesOrders]);
-    const summaryCards: Array<{ key: SummaryKey; label: string; value: number; tone: MetricTone; strong?: boolean }> = [
-        { key: 'orderBudget', label:t('auto.siparis_tutari'), value: projectTotals.orderBudget, tone: 'brand' },
-        { key: 'overtime', label:t('auto.ek_iscilik'), value: projectTotals.overtime, tone: 'success' },
-        { key: 'expenses', label:t('auto.harici_gider'), value: projectTotals.expenses, tone: 'warning' },
-        { key: 'extraMaterials', label:t('auto.malzeme'), value: projectTotals.extraMaterials, tone: 'purple' },
-        { key: 'total', label:t('common.total'), value: projectTotals.total, tone: 'total', strong: true },
-    ];
-    const expandedSummaryRows = useMemo(() => (
-        expandedSummary
-            ? salesOrders.map((order, index) => ({
-                id: order.id,
-                orderNumber: order.orderNumber,
-                value: calculateTotals(project, order, index <= 0, salesOrders)[expandedSummary],
-            }))
-            : []
-    ), [expandedSummary, project, salesOrders]);
     const booked = scopedRecords(project?.appointments, selectedOrder, selectedOrderIsPrimary, salesOrders).find((a) => a.status === 'BOOKED');
     const awaitingTechnicianAppointments = useMemo(
         () => project ? getAwaitingTechnicianAppointments(project, selectedOrder, selectedOrderIsPrimary, salesOrders) : [],
@@ -395,88 +386,65 @@ export const ProjectDetail = () => {
 
     return (
         <div>
-            <PageHeader
-                breadcrumb="Proje Yönetimi"
-                title={
-                    <span className="flex flex-wrap items-center gap-3">
-                        <span>{project.projectName}</span>
+            <div className="mb-5 flex flex-col gap-4 border-b border-slate-200/60 pb-4 lg:flex-row lg:items-stretch lg:justify-between">
+                {/* Left: project identity + quick info (top + bottom lines) */}
+                <div className="flex min-w-0 flex-col justify-between gap-2">
+                    <h1 className="flex flex-wrap items-center gap-3 text-[20px] font-semibold tracking-tight text-slate-900">
+                        <span className="truncate">{project.projectName}</span>
                         <StatusChip variant={STATUS_VARIANT[project.status]}>{getStatusLabel()[project.status]}</StatusChip>
-                    </span>
-                }
-                description={
-                    <span className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px]">
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px] text-slate-500">
                         <span className="inline-flex items-center gap-1"><UserRound size={11} /> {project.customer?.companyName || project.customerId}</span>
                         {project.manager && (
                             <span className="inline-flex items-center gap-1"><BriefcaseBusiness size={11} /> {project.manager.firstName} {project.manager.lastName}</span>
                         )}
                         <span className="inline-flex items-center gap-1"><CalendarClock size={11} /> {dayjs(project.createdAt).format('DD.MM.YYYY')}</span>
-                        <span className="inline-flex items-center gap-1 font-semibold text-slate-600"><ReceiptText size={11} /> {money(projectTotals.total)}</span>
-                    </span>
-                }
-                actions={
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/projects')}>{t('projects.backToList')}</Button>
                     </div>
-                }
-            />
+                </div>
 
-            <div className="mb-4 space-y-2">
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-                    {summaryCards.map((card) => (
-                        <div key={card.key} className="relative">
-                            <Metric
-                                label={card.label}
-                                value={money(card.value)}
-                                tone={card.tone}
-                                strong={card.strong}
-                                expanded={expandedSummary === card.key}
-                                onClick={() => setExpandedSummary((current) => current === card.key ? null : card.key)}
-                            />
-                            {expandedSummary === card.key && (
-                                <div className="absolute left-0 top-full z-30 mt-2 w-full min-w-[260px] rounded-md border border-slate-200 bg-white p-2 shadow-lg">
-                                    <div className="mb-1 flex items-center justify-between px-2 py-1 text-[12px] font-semibold text-slate-700">
-                                        <span>{card.label}</span>
-                                        <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-50" onClick={() => setExpandedSummary(null)}>
-                                            <ChevronDown size={14} className="rotate-180" />
-                                        </button>
-                                    </div>
-                                    <div className="divide-y divide-slate-100">
-                                        {expandedSummaryRows.map((row) => (
-                                            <button
-                                                key={row.id}
-                                                type="button"
-                                                className="flex w-full items-center justify-between gap-3 rounded px-2 py-2 text-left text-[12.5px] hover:bg-slate-50"
-                                                onClick={() => {
-                                                    setSelectedOrderId(row.id);
-                                                    setExpandedSummary(null);
-                                                }}
-                                            >
-                                                <span className="truncate font-medium text-slate-700">{row.orderNumber}</span>
-                                                <span className="font-mono font-semibold text-slate-950">{money(row.value)}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                {/* Center: medium order selector, vertically centered between the info block and actions */}
+                <div className="flex items-center justify-center lg:flex-1">
+                    <OrderDropdown
+                        orders={salesOrders}
+                        project={project}
+                        selectedOrderId={selectedOrder?.id || null}
+                        addonAttention={addonAttention}
+                        onSelectOrder={(orderId) => {
+                            setSelectedOrderId(orderId);
+                            setActiveTab('overview');
+                        }}
+                        onCreateAddon={(parentOrderId) => {
+                            setSelectedOrderId(parentOrderId);
+                            setActiveTab('createAddon');
+                        }}
+                    />
+                </div>
+
+                {/* Right: actions */}
+                <div className="flex items-center gap-2 self-start lg:self-center">
+                    <Button
+                        variant="secondary"
+                        icon={<InfoCircle size={16} />}
+                        aria-label="Details"
+                        title="Details"
+                        className="!h-8 !w-8 !px-0"
+                        onClick={() => setShowDetails(true)}
+                    />
+                    {project.status === 'COMPLETED' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 text-[13px] font-semibold text-[#059669]">
+                            <Check size={26} strokeWidth={3} />
+                            {t('projects.complete.projectCompleted')}
+                        </span>
+                    ) : (
+                        <Button
+                            variant="primary"
+                            icon={<CheckCircle2 size={13} />}
+                            onClick={() => setShowComplete(true)}
+                        >{t('projects.complete.completeProject')}</Button>
+                    )}
+                    <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/projects')}>{t('projects.backToList')}</Button>
                 </div>
             </div>
-
-            <OrderDropdown
-                orders={salesOrders}
-                project={project}
-                selectedOrderId={selectedOrder?.id || null}
-                addonAttention={addonAttention}
-                onSelectOrder={(orderId) => {
-                    setSelectedOrderId(orderId);
-                    setActiveTab('overview');
-                }}
-                onCreateAddon={(parentOrderId) => {
-                    setSelectedOrderId(parentOrderId);
-                    setActiveTab('createAddon');
-                }}
-            />
 
             <div className="min-w-0">
                 {!selectedOrderIsAddon && <ProjectTopTabs activeTab={activeTab} onSelectTab={setActiveTab} addonAttention={addonAttention} completionAttention={awaitingTechnicianAppointments.length > 0} />}
@@ -491,7 +459,6 @@ export const ProjectDetail = () => {
                         project={project}
                         order={selectedOrder}
                         isPrimary={selectedOrderIsPrimary}
-                        totals={totals}
                         booked={booked?.startTime}
                         awaitingAppointments={awaitingTechnicianAppointments}
                         onGoBooking={() => setActiveTab('booking')}
@@ -508,7 +475,7 @@ export const ProjectDetail = () => {
                     <MaterialsTab project={project} order={selectedOrder} isPrimary={selectedOrderIsPrimary} materials={materials} onSaved={() => load(true)} />
                 )}
                 {activeTab === 'booking' && (
-                    <BookingTab project={project} order={selectedOrder} isPrimary={selectedOrderIsPrimary} materials={materials} settings={mailSettings} userEmail={user?.email || ''} onSaved={() => load(true)} />
+                    <BookingSection project={project} order={selectedOrder} isPrimary={selectedOrderIsPrimary} materials={materials} settings={mailSettings} userEmail={user?.email || ''} onSaved={() => load(true)} />
                 )}
                 {activeTab === 'delivery' && (
                     <DeliveryReportAdminTab project={project} order={selectedOrder} />
@@ -525,6 +492,68 @@ export const ProjectDetail = () => {
                     </>
                 )}
                 </div>
+            </div>
+
+            {showComplete && (
+                <ProjectProcessModal
+                    project={project}
+                    mode="complete"
+                    onClose={() => setShowComplete(false)}
+                    onCompleted={() => {
+                        setShowComplete(false);
+                        void load(true);
+                    }}
+                />
+            )}
+
+            {showDetails && (
+                <ProjectDetailsModal project={project} totals={projectTotals} onClose={() => setShowDetails(false)} />
+            )}
+        </div>
+    );
+};
+
+const ProjectDetailsModal = ({
+    project,
+    totals,
+    onClose,
+}: {
+    project: ProjectDto;
+    totals: ReturnType<typeof calculateProjectTotals>;
+    onClose: () => void;
+}) => {
+    const rows: Array<{ label: string; value: number; total?: boolean }> = [
+        { label: t('auto.siparis_tutari'), value: totals.orderBudget },
+        { label: t('auto.ek_iscilik'), value: totals.overtime },
+        { label: t('auto.harici_gider'), value: totals.expenses },
+        { label: t('auto.malzeme'), value: totals.extraMaterials },
+        { label: t('common.total'), value: totals.total, total: true },
+    ];
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose} role="presentation">
+            <div className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+                    <div className="min-w-0">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Details</p>
+                        <h2 className="mt-0.5 truncate text-[18px] font-semibold tracking-tight text-slate-900">{project.projectName}</h2>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        aria-label="Close"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+                <dl className="divide-y divide-slate-100 px-6 py-2">
+                    {rows.map((row) => (
+                        <div key={row.label} className={`flex items-center justify-between gap-4 py-2.5 text-[13px] ${row.total ? 'font-semibold text-slate-950' : ''}`}>
+                            <dt className={`shrink-0 ${row.total ? 'text-slate-900' : 'font-medium text-slate-500'}`}>{row.label}</dt>
+                            <dd className={`min-w-0 truncate text-right font-mono ${row.total ? 'text-[15px] text-slate-950' : 'font-semibold text-slate-900'}`}>{money(row.value)}</dd>
+                        </div>
+                    ))}
+                </dl>
             </div>
         </div>
     );
@@ -702,75 +731,6 @@ const getProjectUsedMaterials = (project: ProjectDto, order?: ProjectSalesOrder 
     );
 };
 
-type MetricTone = 'brand' | 'success' | 'warning' | 'purple' | 'total' | 'danger';
-
-const metricToneClass: Record<MetricTone, { card: string; label: string; value: string }> = {
-    brand: {
-        card:t('auto.border_slate_200_bg_white_80'),
-        label: 'text-slate-600',
-        value: 'text-slate-950',
-    },
-    success: {
-        card:t('auto.border_emerald_200_bg_emerald_50_55'),
-        label: 'text-emerald-700',
-        value: 'text-emerald-900',
-    },
-    warning: {
-        card:t('auto.border_amber_200_bg_amber_50_55'),
-        label: 'text-amber-700',
-        value: 'text-slate-950',
-    },
-    purple: {
-        card:t('auto.border_violet_200_bg_violet_50_50'),
-        label: 'text-violet-700',
-        value: 'text-violet-950',
-    },
-    total: {
-        card:t('auto.border_yellow_200_bg_yellow_50_70'),
-        label: 'text-yellow-800',
-        value: 'text-slate-950',
-    },
-    danger: {
-        card:"border-rose-200 bg-rose-50/70",
-        label: 'text-rose-700',
-        value: 'text-rose-900',
-    },
-};
-
-const Metric = ({
-    label,
-    value,
-    tone = 'brand',
-    strong,
-    expanded,
-    onClick,
-}: {
-    label: string;
-    value: string;
-    tone?: MetricTone;
-    strong?: boolean;
-    expanded?: boolean;
-    onClick?: () => void;
-}) => {
-    const styles = metricToneClass[tone];
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`w-full rounded-md border px-3 py-1.5 text-left shadow-xs transition-all ${styles.card} ${expanded ?t('auto.ring_2_ring_slate_300_ring_offset_1') : ''}`}
-        >
-            <div className="flex items-start justify-between gap-2">
-                <div>
-                    <div className={`text-[9.5px] font-semibold uppercase tracking-normal ${styles.label}`}>{label}</div>
-                    <div className={`mt-0.5 font-semibold ${strong ? 'text-[16px]' : 'text-[14px]'} ${styles.value}`}>{value}</div>
-                </div>
-                <ChevronDown size={12} className={`mt-1 shrink-0 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            </div>
-        </button>
-    );
-};
-
 const OrderRow = ({
     order,
     total,
@@ -841,47 +801,48 @@ const OrderDropdown = ({
         calculateTotals(project, order, orders.findIndex((o) => o.id === order.id) <= 0, orders).total;
 
     return (
-        <div className="relative mb-4">
-            <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{t('projects.orders')}</div>
+        <div className="relative w-full max-w-md">
+            <div className="flex items-stretch gap-2">
                 <button
                     type="button"
-                    onClick={() => navigate('/crm/my-orders')}
-                    className="text-[11.5px] font-medium text-slate-400 transition-colors hover:text-[#272f67]"
-                >{t('projects.myOrdersCrm')}</button>
+                    onClick={() => setOpen((value) => !value)}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-xs transition-colors hover:border-slate-300"
+                >
+                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-[#272f67] text-white'}`}>
+                        {selectedIsAddon ? <Plus size={14} /> : <ReceiptText size={14} />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                            <span className="truncate text-[13px] font-bold text-slate-900">{selectedOrder?.orderNumber || '-'}</span>
+                            <span className={`shrink-0 rounded px-1.5 py-px text-[8.5px] font-semibold uppercase tracking-wide ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                {selectedIsAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
+                            </span>
+                            {addonAttention && !selectedIsAddon && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />}
+                        </div>
+                        <div className="mt-0.5 truncate text-[10.5px] text-slate-400">
+                            {selectedOrder ? dayjs(selectedOrder.createdAt).format('DD.MM.YYYY') : ''} · {orders.length} {t('projects.orders')}
+                        </div>
+                    </div>
+                    <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                <div className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
+                    <div className="font-mono text-[13px] font-bold text-[#272f67]">{selectedOrder ? money(orderTotal(selectedOrder)) : '-'}</div>
+                    <div className="text-[8.5px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.orderTotal')}</div>
+                </div>
             </div>
-
-            <button
-                type="button"
-                onClick={() => setOpen((value) => !value)}
-                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-xs transition-colors hover:border-slate-300"
-            >
-                <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-[#272f67] text-white'}`}>
-                    {selectedIsAddon ? <Plus size={16} /> : <ReceiptText size={16} />}
-                </span>
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className="truncate text-[14px] font-bold text-slate-900">{selectedOrder?.orderNumber || '-'}</span>
-                        <span className={`shrink-0 rounded px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                            {selectedIsAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
-                        </span>
-                        {addonAttention && !selectedIsAddon && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />}
-                    </div>
-                    <div className="mt-0.5 text-[11.5px] text-slate-400">
-                        {selectedOrder ? dayjs(selectedOrder.createdAt).format('DD.MM.YYYY') : ''} · {orders.length} {t('projects.orders')}
-                    </div>
-                </div>
-                <div className="shrink-0 text-right">
-                    <div className="font-mono text-[13px] font-bold text-[#272f67]">{selectedOrder ? money(orderTotal(selectedOrder)) : ''}</div>
-                    <div className="text-[9.5px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.orderTotal')}</div>
-                </div>
-                <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
 
             {open && (
                 <>
                     <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
                     <div className="absolute inset-x-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2">
+                            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">{t('projects.orders')}</span>
+                            <button
+                                type="button"
+                                onClick={() => { setOpen(false); navigate('/crm/my-orders'); }}
+                                className="text-[11px] font-medium text-slate-400 transition-colors hover:text-[#272f67]"
+                            >{t('projects.myOrdersCrm')}</button>
+                        </div>
                         <div className="max-h-[360px] overflow-y-auto py-1">
                             {baseOrders.map((order) => (
                                 <div key={order.id}>
@@ -924,7 +885,6 @@ const OverviewTab = ({
     project,
     order,
     isPrimary,
-    totals,
     booked,
     awaitingAppointments,
     onGoBooking,
@@ -933,7 +893,6 @@ const OverviewTab = ({
     project: ProjectDto;
     order: ProjectSalesOrder | null;
     isPrimary: boolean;
-    totals: ReturnType<typeof calculateTotals>;
     booked?: string;
     awaitingAppointments: any[];
     onGoBooking: () => void;
@@ -968,7 +927,7 @@ const OverviewTab = ({
                             <span>{t('projects.technicianNotFinished')}</span>
                         </div>
                         <div className="mt-1 text-[12px] text-red-700/80">
-                            {awaitingAppointments.length}{t('auto.montaj_kaydi_raporsuz_bekliyor')}{finishableAppointments.length > 0 ?t('auto.yonetici_bitirme_icin_randevu_sekmesinde_ilgili_') :t('auto.randevu_suresi_dolmadan_yonetici_bitirme_pasif_k')}
+                            {awaitingAppointments.length} {t('auto.montaj_kaydi_raporsuz_bekliyor')} {finishableAppointments.length > 0 ? t('auto.yonetici_bitirme_icin_randevu_sekmesinde_ilgili_') : t('auto.randevu_suresi_dolmadan_yonetici_bitirme_pasif_k')}
                         </div>
                     </div>
                     <Button type="button" size="sm" variant="secondary" disabled={finishableAppointments.length === 0} onClick={onGoBooking}>{t('projects.managerFinish')}</Button>
@@ -988,7 +947,7 @@ const OverviewTab = ({
             ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <InfoCard title={t('projects.projectInfo')} rows={[
                 [t('projects.order'), order?.orderNumber || '-'],
                 [t('projects.tender'), order?.tender?.tenderNumber || order?.tenderId || project.tender?.tenderNumber || project.tenderId || '-'],
@@ -1006,21 +965,6 @@ const OverviewTab = ({
                     <ContactRow icon={<Mail size={13} />} value={project.customer?.mainEmail} href={project.customer?.mainEmail ? `mailto:${project.customer.mainEmail}` : undefined} />
                     <ContactRow icon={<Phone size={13} />} value={project.customer?.mainPhone} href={project.customer?.mainPhone ? `tel:${project.customer.mainPhone}` : undefined} />
                     <ContactRow icon={<MarkerPin01 size={13} />} value={project.customer?.address} />
-                </div>
-            </div>
-            <div className="rounded-md border border-slate-200/70 bg-slate-50/50 p-4">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="text-[12px] font-semibold text-slate-700">{t('projects.feeSummary')}</div>
-                    {order && !order.id.startsWith('project-main-') && (
-                        <BillingStatusChip salesOrderId={order.id} />
-                    )}
-                </div>
-                <div className="mt-3 space-y-2 text-[12.5px]">
-                    <TotalRow label={t('projects.orderTotal')} value={totals.orderBudget} />
-                    <TotalRow label={t('projects.material')} value={totals.extraMaterials} />
-                    <TotalRow label={t('projects.externalExpense')} value={totals.expenses} />
-                    <TotalRow label={t('projects.overtime')} value={totals.overtime} />
-                    <TotalRow label={t('common.total')} value={totals.total} total />
                 </div>
             </div>
         </div>
@@ -1045,7 +989,7 @@ const OverviewTab = ({
                                     <span>{dayjs(report.workDate || report.reportDate).format('DD.MM.YYYY')}</span>
                                     <span className="inline-flex items-center gap-1 text-[11px] font-normal text-slate-400"><Clock size={11} />{dayjs(report.startedAt).format('HH:mm')}-{dayjs(report.endedAt).format('HH:mm')}</span>
                                 </div>
-                                {report.operationsDone && <div className="mt-1 line-clamp-2 text-[12px] text-slate-500">{report.operationsDone}</div>}
+                                {report.operationsDone && <div className="mt-1 line-clamp-2 text-[12px] text-slate-500">{displayOperationsDone(report.operationsDone)}</div>}
                             </div>
                             {Number(report.overtimeCost) > 0 && (
                                 <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-700">+{money(Number(report.overtimeCost))}</span>
@@ -1649,7 +1593,7 @@ const MaterialsTab = ({ project, order, isPrimary, onSaved }: { project: Project
                                             <div>
                                                 <div className="font-medium text-slate-800">{item.material?.name ||t('auto.malzeme')}</div>
                                                 <div className="text-[11.5px] text-slate-900">
-                                                    {item.material?.serialId || '-'} · {numberFmt(item.quantity)}{t('auto.adet_x')}{money(item.unitCost)} · {item.positionNumber}
+                                                    {item.material?.serialId || '-'} · {numberFmt(item.quantity)} {t('auto.adet_x')} {money(item.unitCost)} · {item.positionNumber}
                                                 </div>
                                                 <div className="mt-1 text-[12px] text-slate-900">{t('auto.kullanilan_malzeme_fiyat_toplamina_eklenmez')}</div>
                                             </div>
@@ -1690,7 +1634,7 @@ const MaterialsTab = ({ project, order, isPrimary, onSaved }: { project: Project
                                         <div key={v.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                                             <div>
                                                 <div className="font-medium text-slate-800">{v.material?.name ||t('auto.malzeme')}</div>
-                                                <div className="text-[11.5px] text-slate-900">{numberFmt(v.quantity)}{t('auto.adet_x')}{money(v.unitPrice)}</div>
+                                                <div className="text-[11.5px] text-slate-900">{numberFmt(v.quantity)} {t('auto.adet_x')} {money(v.unitPrice)}</div>
                                                 {v.description && <div className="mt-1 text-[12px] text-slate-900">{v.description}</div>}
                                             </div>
                                             <div className="flex items-center gap-3">
@@ -1709,12 +1653,13 @@ const MaterialsTab = ({ project, order, isPrimary, onSaved }: { project: Project
 };
 
 const getBookingSubTabs = (): Array<{ key: BookingMode; label: string }> => [
-    { key: 'booking', label:t('auto.randevu_saat_planlari') },
-    { key: 'mail', label:t('auto.randevu_mail') },
+    { key: 'schedule', label:t('auto.randevu_saat_planlari') },
+    { key: 'mail', label:t('auto.randevu_maili') },
     { key: 'signature', label:t('auto.imzaya_gonder') },
+    { key: 'overtime', label:t('auto.15_uzeri_fazla_calisma') },
 ];
 
-const BookingTab = ({
+const BookingSection = ({
     project,
     order,
     isPrimary,
@@ -1731,33 +1676,35 @@ const BookingTab = ({
     userEmail: string;
     onSaved: () => Promise<void>;
 }) => {
-    const [mode, setMode] = useState<BookingMode>('booking');
-
+    const [mode, setMode] = useState<BookingMode>('schedule');
     return (
         <div>
             <SubTabs tabs={getBookingSubTabs()} activeTab={mode} onSelectTab={setMode} />
-            {mode === 'booking' && (
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                    <div className="xl:col-span-2 space-y-4">
-                        <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} onSaved={onSaved} />
-                    </div>
-                    <div className="space-y-4">
-                        <OvertimeRateCard project={project} onSaved={onSaved} />
-                        <InfoCard title={t('auto.musteri_iletisim')} rows={[
-                            [t('nav.quickActionsGroup.customers'), project.customer?.companyName || '-'],
-                            [t('common.email'), project.customer?.mainEmail || '-'],
-                            [t('common.phone'), project.customer?.mainPhone || '-'],
-                            [t('common.address'), project.customer?.address || '-'],
-                        ]} />
-                    </div>
+            {mode === 'schedule' && <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} onSaved={onSaved} />}
+            {mode === 'mail' && <MailTab project={project} order={order} settings={settings} userEmail={userEmail} />}
+            {mode === 'signature' && <SignatureRequestTab project={project} order={order} isPrimary={isPrimary} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
+            {mode === 'overtime' && <OvertimeTab project={project} order={order} isPrimary={isPrimary} />}
+        </div>
+    );
+};
+
+const OvertimeTab = ({ project, order, isPrimary }: { project: ProjectDto; order: ProjectSalesOrder | null; isPrimary: boolean }) => {
+    const overtimeReports = scopedRecords(project.reports, order, isPrimary, project.salesOrders).filter((report: any) => Number(report.overtimeCost) > 0);
+    const total = overtimeReports.reduce((sum: number, report: any) => sum + (Number(report.overtimeCost) || 0), 0);
+    return (
+        <div className="space-y-4">
+            <div className="max-w-xl rounded-md border border-slate-200/70 bg-slate-50/50 p-4">
+                <div className="space-y-3 text-[13px]">
+                    <TotalRow label={t('auto.15_uzeri_fazla_calisma')} value={total} total />
                 </div>
-            )}
-            {mode === 'mail' && (
-                <MailTab project={project} order={order} settings={settings} userEmail={userEmail} />
-            )}
-            {mode === 'signature' && (
-                <SignatureRequestTab project={project} order={order} isPrimary={isPrimary} settings={settings} userEmail={userEmail} onSaved={onSaved} />
-            )}
+            </div>
+            <CostList title={t('auto.15_uzeri_fazla_calisma')} empty="Fazla çalışma yok" rows={overtimeReports.map((report: any) => ({
+                id: report.id,
+                title: dayjs(report.workDate || report.reportDate).format('DD.MM.YYYY'),
+                meta: `${durationFmt(Number(report.overtimeMinutes || 0))} x ${money(report.overtimeHourlyRate)}`,
+                amount: Number(report.overtimeCost) || 0,
+                note: report.operationsDone ? displayOperationsDone(report.operationsDone) : undefined,
+            }))} />
         </div>
     );
 };
@@ -1793,7 +1740,7 @@ const SignatureRequestTab = ({ project, order, isPrimary, settings, userEmail }:
                     {reports.map((report: any) => (
                         <div key={report.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                             <div className="min-w-0">
-                                <div className="text-[13px] font-semibold text-slate-900">{dayjs(report.workDate || report.reportDate).format('DD.MM.YYYY')}{t('auto.saha_raporu')}</div>
+                                <div className="text-[13px] font-semibold text-slate-900">{dayjs(report.workDate || report.reportDate).format('DD.MM.YYYY')} · {t('auto.saha_raporu')}</div>
                                 <div className="mt-0.5 text-[12px] text-slate-500">{dayjs(report.startedAt).format('HH:mm')} - {dayjs(report.endedAt).format('HH:mm')} · {report.isSigned ?t('auto.imzali') :t('auto.imza_bekliyor')}</div>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -1969,7 +1916,8 @@ const AppointmentList = ({ project, order, isPrimary, materials, onSaved }: { pr
     };
 
     return (
-        <div className="space-y-4">
+        <>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
         <Card title={t('auto.randevu_saat_planlari')} icon={<CalendarClock size={13} />} noPadding>
             <div className="divide-y divide-slate-100">
                 {appointments.length === 0 && <div className="px-4 py-8 text-center text-[12px] text-slate-900">{t('auto.saat_plani_yok')}</div>}
@@ -1983,9 +1931,9 @@ const AppointmentList = ({ project, order, isPrimary, materials, onSaved }: { pr
                         <div>
                             <div className="font-medium text-slate-800">{dayjs(appointment.startTime).format('DD.MM.YYYY')}</div>
                             <div className="text-slate-900">
-                                {dayjs(appointment.startTime).format('HH:mm')} - {dayjs(appointment.endTime).format('HH:mm')}{t('auto.plan')}{durationFmt(appointmentDuration(appointment))}{t('auto.azami')}{durationFmt(Math.ceil(appointmentDuration(appointment) * 1.15))}
+                                {dayjs(appointment.startTime).format('HH:mm')} - {dayjs(appointment.endTime).format('HH:mm')} · {t('auto.plan')}: {durationFmt(appointmentDuration(appointment))} · {t('auto.azami')}: {durationFmt(Math.ceil(appointmentDuration(appointment) * 1.15))}
                             </div>
-                            <div className="mt-1 text-[11.5px] font-semibold text-slate-600">{t('auto.teknisyen')}{technicianName}
+                            <div className="mt-1 text-[11.5px] font-semibold text-slate-600">{t('auto.teknisyen')}: {technicianName}
                             </div>
                             {appointmentReport && (
                                 <div className="mt-1 inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
@@ -2054,7 +2002,7 @@ const AppointmentList = ({ project, order, isPrimary, materials, onSaved }: { pr
                 })}
             </div>
         </Card>
-        <Card title={editing ?t('auto.saat_planini_duzenle') :t('auto.saat_plani_ekle')} icon={<CalendarClock size={13} />}>
+        <Card title={editing ?t('auto.saat_planini_duzenle') :t('auto.saat_plani_ekle')} icon={<CalendarClock size={13} />} className="xl:sticky xl:top-4">
             <div>
                 <div className="mb-3 flex items-center justify-between">
                     <div className="text-[12px] font-semibold text-slate-900">{editing ?t('auto.saat_planini_duzenle') :t('auto.saat_plani_ekle')}</div>
@@ -2064,7 +2012,7 @@ const AppointmentList = ({ project, order, isPrimary, materials, onSaved }: { pr
                         </button>
                     )}
                 </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+                <div className="grid grid-cols-1 gap-3">
                     <Field label={t('common.date')}><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
                     <Field label={t('common.start')}><Input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></Field>
                     <Field label={t('common.end')}><Input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></Field>
@@ -2113,6 +2061,7 @@ const AppointmentList = ({ project, order, isPrimary, materials, onSaved }: { pr
                 </Button>
             </div>
         </Card>
+        </div>
         <Modal
             open={!!confirmFinishAppointment}
             title="Montajı bitir"
@@ -2136,7 +2085,7 @@ const AppointmentList = ({ project, order, isPrimary, materials, onSaved }: { pr
                 Bu işlem montajı yönetici tarafından tamamlanmış olarak işaretler ve çalışılan saatleri onaylar. Herhangi bir alan doldurmanıza gerek yoktur.
             </p>
         </Modal>
-        </div>
+        </>
     );
 };
 
@@ -2312,41 +2261,6 @@ const ManagerCompletionPanel = ({
     );
 };
 
-const OvertimeRateCard = ({ project, onSaved }: { project: ProjectDto; onSaved: () => Promise<void> }) => {
-    const [rate, setRate] = useState(Number(project.overtimeHourlyRate || 0));
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        setRate(Number(project.overtimeHourlyRate || 0));
-    }, [project.id, project.overtimeHourlyRate]);
-
-    return (
-        <Card title={t('auto.fazla_calisma_ucreti')} icon={<ReceiptText size={13} />}>
-            <Field label={t('auto.15_uzeri_saat_ucreti_chf')}>
-                <Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value) || 0)} />
-            </Field>
-            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">{t('auto.raporlarda_planlanan_surenin_15_fazlasi_azami_su')}</div>
-            <Button
-                className="mt-3"
-                loading={loading}
-                icon={<Save size={13} />}
-                onClick={async () => {
-                    setLoading(true);
-                    try {
-                        await projectApi.update(project.id, { overtimeHourlyRate: Math.max(0, Number(rate || 0)) });
-                        toast.success(t('auto.chf_saat_ucreti_guncellendi'));
-                        await onSaved();
-                    } catch (e: any) {
-                        toast.error(e.response?.data?.error ||t('auto.chf_saat_ucreti_kaydedilemedi'));
-                    } finally {
-                        setLoading(false);
-                    }
-                }}
-            >{t('common.save')}</Button>
-        </Card>
-    );
-};
-
 const MailTab = ({ project, order, settings, userEmail }: { project: ProjectDto; order: ProjectSalesOrder | null; settings: MailSettingDto | null; userEmail: string }) => {
     const [form, setForm] = useState({
         fromName: settings?.fromName ||t('auto.offitec_erp'),
@@ -2369,13 +2283,9 @@ const MailTab = ({ project, order, settings, userEmail }: { project: ProjectDto;
         });
     }, [project.id, order?.id, settings, userEmail]);
 
-    // Surface overtime (fazla çalışma / ek ücret) alongside the appointment email.
-    const overtimeReports = (project.reports || []).filter((r: any) => Number(r.overtimeMinutes) > 0);
-    const overtimeTotal = overtimeReports.reduce((sum: number, r: any) => sum + (Number(r.overtimeCost) || 0), 0);
-
     return (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Card title={t('auto.randevu_maili')} icon={<Mail size={13} />} className="xl:col-span-2">
+        <div>
+            <Card title={t('auto.randevu_maili')} icon={<Mail size={13} />}>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Field label={t('settings.mail.senderName')}><Input value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} /></Field>
                     <Field label={t('settings.mail.senderEmail')}><Input value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></Field>
@@ -2404,24 +2314,6 @@ const MailTab = ({ project, order, settings, userEmail }: { project: ProjectDto;
                 >
                     {sent ?t('auto.gonderildi') :t('common.send')}
                 </Button>
-            </Card>
-            <Card title="Fazla Çalışma / Ek Ücret" icon={<AlertTriangle size={13} />}>
-                {overtimeReports.length === 0 ? (
-                    <p className="text-[12.5px] text-slate-500">Bu proje için ek ücret oluşturan fazla çalışma yok.</p>
-                ) : (
-                    <div className="space-y-2">
-                        {overtimeReports.map((r: any) => (
-                            <div key={r.id} className="flex items-center justify-between gap-2 text-[12px]">
-                                <span className="text-slate-600">{dayjs(r.workDate || r.reportDate).format('DD.MM.YYYY')} · {durationFmt(Number(r.overtimeMinutes))}</span>
-                                <span className="font-mono font-semibold text-slate-800">{money(Number(r.overtimeCost) || 0)}</span>
-                            </div>
-                        ))}
-                        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-[12.5px] font-semibold">
-                            <span>Toplam</span>
-                            <span className="font-mono">{money(overtimeTotal)}</span>
-                        </div>
-                    </div>
-                )}
             </Card>
         </div>
     );

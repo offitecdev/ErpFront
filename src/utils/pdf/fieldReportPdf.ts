@@ -9,7 +9,7 @@ import { usePdfSettingsStore, type PdfCompanySettings } from '../../store/pdfSet
 import type { ProjectDto } from '../../types/project';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SAHA RAPORU (Feldbericht) — kullanıcı görsellerine birebir uyan, PARASIZ çıktı.
+// SAHA RAPORU (Montage-Rapport) — kullanıcı görsellerine birebir uyan, PARASIZ çıktı.
 // Genel rapordan tamamen ayrı, kendi içinde bağımsız bir üreticidir.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -378,7 +378,7 @@ const drawCoverHeader = (
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_TITLE);
     doc.setTextColor(...COLOR_TEXT);
-    doc.text(`Feldbericht ${reportNo}`, LEFT, yTitle);
+    doc.text(`Montage-Rapport ${reportNo}`, LEFT, yTitle);
 
     return { reportNo, y: yTitle + 8 };
 };

@@ -6,7 +6,7 @@ import { QRScanner } from '../../components/QRScanner';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../../components/ui-shared/Button';
-import { Spin } from 'antd';
+import Spin from 'antd/es/spin';
 
 export const SystemEntry: React.FC = () => {
     const { t } = useTranslation();

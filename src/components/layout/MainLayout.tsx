@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LuMoon, LuSun } from 'react-icons/lu';
+import { LuMoon, LuSun } from '@/components/icons/lucideLocal';
 import { useAuthStore } from '../../store/authStore';
 import { useAttendanceStore } from '../../store/attendanceStore';
 import { useThemeStore } from '../../store/themeStore';
@@ -29,7 +29,10 @@ import {
     XClose as CloseOutlined,
 } from '../icons/antIconCompat';
 import { getRoleProfile, isKeyAllowedForProfile, type RoleProfile } from '../../lib/access';
-import { Badge, Button as AntButton, Select as AntSelect, Menu } from 'antd';
+import Badge from 'antd/es/badge';
+import AntButton from 'antd/es/button';
+import Menu from 'antd/es/menu';
+import AntSelect from 'antd/es/select';
 import { SlidePanel } from './SlidePanel';
 import { SplitViewProvider, useSplitView, SPLITABLE_ROUTES, type SplitablePath } from './SplitViewContext';
 import { SecondaryPane } from './SecondaryPane';
@@ -37,8 +40,6 @@ import { notificationApi, type NotificationDto } from '../../lib/api/notificatio
 import { LanguageSwitcher } from '../ui-shared/LanguageSwitcher';
 import offitecLogo from '../../assets/images/offitec.png';
 import offitecLogoDark from '../../assets/images/darkmode.png';
-
-import { t as i18nT } from '@/i18n/translate';
 
 /* ── Menü Tipleri ── */
 type MenuLeaf = { key: string; label: string; permission?: string; hideForTechnician?: boolean; technicianOnly?: boolean };
@@ -117,13 +118,11 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.inventory',
         icon: InboxOutlined,
         items: [
-            { key: '/inventory', label: 'nav.inventoryDashboard', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory/articles', label: 'nav.articles', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory/suppliers', label: 'nav.suppliers', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory/extra-materials', label: 'nav.materials', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory/locations', label: 'nav.locations', permission: 'inventory.view', hideForTechnician: true },
             { key: '/inventory/movements', label: 'nav.movements', permission: 'inventory.transfer', hideForTechnician: true },
-            { key: '/inventory/proposals', label: 'nav.purchaseProposals', permission: 'inventory.proposals.manage', hideForTechnician: true },
+            { key: '/inventory/articles', label: 'nav.articles', permission: 'inventory.view', hideForTechnician: true },
+            { key: '/inventory/extra-materials', label: 'nav.materials', permission: 'inventory.view', hideForTechnician: true },
+            { key: '/inventory/suppliers', label: 'nav.suppliers', permission: 'inventory.view', hideForTechnician: true },
+            { key: '/inventory', label: 'nav.inventoryDashboard', permission: 'inventory.view', hideForTechnician: true },
         ],
     },
     {
@@ -222,7 +221,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.quickAction',
         cardClassName: 'border-sky-200/60 bg-sky-50/70 text-sky-950 shadow-sky-900/5 hover:bg-sky-100/80',
         iconClassName: 'text-sky-600',
-        keywords: i18nT('auto.yeni_teklif_teklif_olustur_crm_new_tender_offer'),
+        keywords: 'yeni teklif teklif olustur crm new tender offer',
         permission: 'tenders.manage',
     },
     {
@@ -233,7 +232,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.quickAction',
         cardClassName: 'border-violet-200/60 bg-violet-50/70 text-violet-950 shadow-violet-900/5 hover:bg-violet-100/80',
         iconClassName: 'text-violet-600',
-        keywords: i18nT('auto.yeni_proje_proje_ekle_proje_yonetimi_project_man'),
+        keywords: 'yeni proje proje ekle proje yonetimi project management',
         permission: 'projects.view',
         feature: 'projects',
     },
@@ -245,7 +244,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.crm',
         cardClassName: 'border-indigo-200/60 bg-indigo-50/70 text-indigo-950 shadow-indigo-900/5 hover:bg-indigo-100/80',
         iconClassName: 'text-indigo-600',
-        keywords: i18nT('auto.satis_siparisi_siparis_order_my_orders'),
+        keywords: 'satis siparisi siparis order my orders',
         permission: 'crm.customers.view',
     },
     {
@@ -256,7 +255,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.crm',
         cardClassName: 'border-emerald-200/60 bg-emerald-50/70 text-emerald-950 shadow-emerald-900/5 hover:bg-emerald-100/80',
         iconClassName: 'text-emerald-600',
-        keywords: i18nT('auto.musteri_musteri_listesi_crm_customers'),
+        keywords: 'musteri musteri listesi crm customers',
         permission: 'crm.customers.view',
     },
     {
@@ -267,7 +266,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.crm',
         cardClassName: 'border-amber-200/60 bg-amber-50/70 text-amber-950 shadow-amber-900/5 hover:bg-amber-100/80',
         iconClassName: 'text-amber-600',
-        keywords: i18nT('auto.teklifler_teklif_yonetimi_crm_tenders_offers'),
+        keywords: 'teklifler teklif yonetimi crm tenders offers',
         permission: 'tenders.view',
     },
     {
@@ -278,7 +277,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.inventory',
         cardClassName: 'border-cyan-200/60 bg-cyan-50/70 text-cyan-950 shadow-cyan-900/5 hover:bg-cyan-100/80',
         iconClassName: 'text-cyan-600',
-        keywords: i18nT('auto.stok_urunler_malzeme_depo_inventory_stock_produc'),
+        keywords: 'stok urunler malzeme depo inventory stock products',
         permission: 'inventory.view',
     },
     {
@@ -289,7 +288,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.maintenance',
         cardClassName: 'border-rose-200/60 bg-rose-50/70 text-rose-950 shadow-rose-900/5 hover:bg-rose-100/80',
         iconClassName: 'text-rose-600',
-        keywords: i18nT('auto.bakim_bakim_panosu_randevu_sozlesme_maintenance'),
+        keywords: 'bakim bakim panosu randevu sozlesme maintenance',
         permission: 'maintenance.contracts.manage',
     },
     {
@@ -300,7 +299,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.maintenance',
         cardClassName: 'border-fuchsia-200/60 bg-fuchsia-50/70 text-fuchsia-950 shadow-fuchsia-900/5 hover:bg-fuchsia-100/80',
         iconClassName: 'text-fuchsia-600',
-        keywords: i18nT('auto.regie_ariza_operasyon_servis_cagri'),
+        keywords: 'regie ariza operasyon servis cagri',
         permission: 'regie.calls.manage',
     },
     {
@@ -311,7 +310,7 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         group: 'nav.moduleGroups.personnel',
         cardClassName: 'border-lime-200/60 bg-lime-50/70 text-lime-950 shadow-lime-900/5 hover:bg-lime-100/80',
         iconClassName: 'text-lime-600',
-        keywords: i18nT('auto.personel_calisan_ekip_rol_employees_staff'),
+        keywords: 'personel calisan ekip rol employees staff',
     },
 ];
 
@@ -329,18 +328,19 @@ const SidebarMenu: React.FC<{
     const restricted = roleProfile !== 'full';
     const canSee = (item: MenuLeaf) => {
         // Restricted profiles (technician, project officer) are gated by an explicit
-        // allowlist — the raw permission set is ignored for menu visibility.
-        if (restricted) return isKeyAllowedForProfile(roleProfile, item.key);
+        // allowlist — the raw permission set is ignored for menu visibility. We still
+        // honour the technician / non-technician flags so duplicate entries that point
+        // to the same route (e.g. the technician vs. office variant of /services/reports)
+        // collapse to a single visible item instead of showing twice.
+        if (restricted) {
+            if (item.technicianOnly && roleProfile !== 'technician') return false;
+            if (item.hideForTechnician && roleProfile === 'technician') return false;
+            return isKeyAllowedForProfile(roleProfile, item.key);
+        }
         if (item.technicianOnly) return false;
         return !item.permission || permissions.includes(item.permission);
     };
-    const leafLabel = (item: MenuLeaf) => {
-        // The project officer sees the services area as "Programlar".
-        if (roleProfile === 'projectOfficer' && item.key === '/services/reports') {
-            return t('nav.programs', { defaultValue: 'yalnızca bir randevu' });
-        }
-        return t(item.label);
-    };
+    const leafLabel = (item: MenuLeaf) => t(item.label);
 
     const menuItems = sections
         .filter((section) => section.feature !== 'projects' || projectModuleEnabled)
@@ -724,7 +724,7 @@ const MainLayoutInner: React.FC = () => {
                     className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col bg-[#f8fafd] shadow-2xl transition-transform duration-200 ease-out ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 >
                     <div className="flex h-14 items-center justify-between border-b border-slate-200/60 px-4">
-                        <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec" className="h-8 w-auto object-contain" />
+                        <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec" width={360} height={143} decoding="async" fetchPriority="high" className="h-8 w-auto object-contain" />
                         <button
                             type="button"
                             aria-label={t('common.close')}
@@ -809,7 +809,7 @@ const MainLayoutInner: React.FC = () => {
                             </button>
                         </div>
                         <button type="button" onClick={() => navigate('/')} className="ml-2 flex h-9 shrink-0 items-center">
-                            <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" className="h-9 w-auto max-w-[148px] object-contain" />
+                            <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" width={360} height={143} decoding="async" fetchPriority="high" className="h-9 w-auto max-w-[148px] object-contain" />
                         </button>
                         <button
                             type="button"
@@ -831,7 +831,7 @@ const MainLayoutInner: React.FC = () => {
                                     setIsModuleMenuOpen((open) => !open);
                                     setIsSearchOverlayOpen(false);
                                 }}
-                                className={`inline-flex size-10 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isModuleMenuOpen ? i18nT('auto.border_272f67_bg_272f67_text_white_shadow_0_10px') : i18nT('auto.border_slate_200_90_bg_white_text_272f67_hover_b')}`}
+                                className={`inline-flex size-10 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isModuleMenuOpen ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg' : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654]'}`}
                             >
                                 <AppstoreOutlined style={{ fontSize: 22 }} />
                             </button>
@@ -852,10 +852,10 @@ const MainLayoutInner: React.FC = () => {
                                                         }`}
                                                     title={t(item.label)}
                                                 >
-                                                    <span className={`flex size-9 items-center justify-center rounded-lg transition-colors ${isActiveModule ? i18nT('auto.bg_white_12_text_white_group_hover_bg_white_18') : i18nT('auto.bg_white_text_slate_900_group_hover_bg_slate_100')}`}>
+                                                    <span className={`flex size-9 items-center justify-center rounded-lg transition-colors ${isActiveModule ? 'bg-white/12 text-white group-hover:bg-white/18' : 'bg-white text-slate-900 group-hover:bg-slate-100'}`}>
                                                         <ItemIcon style={{ fontSize: 28 }} />
                                                     </span>
-                                                    <span className={`line-clamp-2 max-w-full text-[14px] leading-5 ${isActiveModule ? i18nT('auto.font_bold_text_white') : "font-semibold text-slate-900 dark:text-white"}`}>{t(item.label)}</span>
+                                                    <span className={`line-clamp-2 max-w-full text-[14px] leading-5 ${isActiveModule ? 'font-bold text-white' : "font-semibold text-slate-900 dark:text-white"}`}>{t(item.label)}</span>
                                                 </button>
                                             );
                                         })}
@@ -903,11 +903,11 @@ const MainLayoutInner: React.FC = () => {
                                                         key={action.id}
                                                         type="button"
                                                         onClick={() => toggleQuickAction(action.id)}
-                                                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-semibold transition-colors ${selected ? i18nT('auto.bg_d3e3fd_text_1f2654') : i18nT('auto.text_slate_700_hover_bg_slate_100')}`}
+                                                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-semibold transition-colors ${selected ? 'bg-[#d3e3fd] text-[#1f2654]' : 'text-slate-700 hover:bg-slate-100'}`}
                                                     >
                                                         <ActionIcon style={{ fontSize: 14 }} />
                                                         <span className="min-w-0 flex-1 truncate">{t(action.label)}</span>
-                                                        <span className={`flex h-4 min-w-4 items-center justify-center rounded-full border ${selected ? i18nT('auto.border_1f2654_bg_1f2654_text_white') : 'border-slate-300'}`}>
+                                                        <span className={`flex h-4 min-w-4 items-center justify-center rounded-full border ${selected ? 'border-[#1f2654] bg-[#1f2654] text-white' : 'border-slate-300'}`}>
                                                             {selected && <CheckOutlined style={{ fontSize: 10 }} />}
                                                         </span>
                                                     </button>
@@ -978,7 +978,7 @@ const MainLayoutInner: React.FC = () => {
                                     onClick={() => setIsSplitMenuOpen(!isSplitMenuOpen)}
                                     className={`flex size-9 items-center justify-center rounded-full transition-colors ${isSplit
                                         ? "bg-[#272f67]/8 text-[#272f67]"
-                                        : i18nT('auto.text_slate_600_hover_bg_d3e3fd')
+                                        : 'text-slate-600 hover:bg-[#d3e3fd]'
                                         }`}
                                     title={t('nav.splitView')}
                                     aria-label={t('nav.splitView')}

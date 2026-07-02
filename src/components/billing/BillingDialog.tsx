@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Radio } from 'antd';
+import Radio from 'antd/es/radio';
 import { toast } from 'sonner';
 import { Modal } from '../ui-shared/Modal';
 import { Button } from '../ui-shared/Button';

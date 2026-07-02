@@ -8,6 +8,7 @@ import {
     CalendarCheck01 as CalendarClock,
     CurrencyDollarCircle as CircleDollarSign,
     FilterLines,
+    Plus,
     SearchLg as Search,
     X as XIcon,
 } from '@/components/icons/antIconCompat';
@@ -21,8 +22,9 @@ import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { Input, Select } from '../../components/ui-shared/Field';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
-import { computeProjectFlow, type StageState } from '../../lib/projectFlow';
+import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
 import type { ProjectDto, ProjectStatus } from '../../types/project';
+import { ProjectProcessModal } from './ProjectProcessModal';
 
 import { t } from '@/i18n/translate';
 
@@ -51,7 +53,9 @@ export const Projects = () => {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState<ProjectStatus | ''>('');
-    const [flowMap, setFlowMap] = useState<Record<string, { technical: StageState; billing: StageState }>>({});
+    const [flowMap, setFlowMap] = useState<Record<string, ProjectFlow>>({});
+    const [addonMap, setAddonMap] = useState<Record<string, number>>({});
+    const [processTarget, setProcessTarget] = useState<ProjectDto | null>(null);
     // Bulk lists for the delivery/billing chips, fetched once and reused across filters.
     const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.list>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.list>>; invoices: Awaited<ReturnType<typeof billingApi.listInvoices>> } | null>(null);
 
@@ -70,7 +74,8 @@ export const Projects = () => {
             ]);
             flowSourcesRef.current = sources;
 
-            const map: Record<string, { technical: StageState; billing: StageState }> = {};
+            const map: Record<string, ProjectFlow> = {};
+            const addons: Record<string, number> = {};
             for (const project of list) {
                 const flow = computeProjectFlow(project, {
                     projects: list,
@@ -80,10 +85,14 @@ export const Projects = () => {
                     fieldReports: [],
                     generalSignatures: [],
                 });
-                map[project.id] = { technical: flow.technicalStatus, billing: flow.billingStatus };
+                map[project.id] = flow;
+                addons[project.id] = sources.orders
+                    .filter((o) => o.projectId === project.id)
+                    .reduce((n, o) => n + (o.addonSalesOrders?.length || 0), 0);
             }
             setProjects(list);
             setFlowMap(map);
+            setAddonMap(addons);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('projects.errorLoad'));
         } finally {
@@ -107,6 +116,11 @@ export const Projects = () => {
         setSearch('');
         setStatus('');
         void load({ status: '', search: '' });
+    };
+
+    const openProcess = (project: ProjectDto, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setProcessTarget(project);
     };
 
     return (
@@ -168,9 +182,9 @@ export const Projects = () => {
                                 <th className="px-3 py-2 text-right font-semibold">{t('auto.rapor')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('auto.randevu')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('projects.flow.deliveryReport')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.fatura')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.ac')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('projects.flow.colTechnical')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('projects.flow.colBilling')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('projects.complete.processButton')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -218,7 +232,14 @@ export const Projects = () => {
                                         onClick={() => navigate(`/projects/${project.id}`)}
                                     >
                                         <td className="px-3 py-2">
-                                            <div className="font-medium text-slate-800">{project.projectName}</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-slate-800">{project.projectName}</span>
+                                                {addonMap[project.id] > 0 && (
+                                                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
+                                                        <Plus size={9} />{t('projects.complete.addonCount', { count: addonMap[project.id] })}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-[11px] text-slate-400">{dayjs(project.createdAt).format('DD.MM.YYYY')}</div>
                                         </td>
                                         <td className="px-3 py-2 text-slate-600">{project.customer?.companyName || project.customerId}</td>
@@ -231,28 +252,37 @@ export const Projects = () => {
                                         </td>
                                         <td className="px-3 py-2">
                                             {(() => {
-                                                const delivery = flowMap[project.id]?.technical;
-                                                if (!delivery) return <span className="text-slate-300">—</span>;
+                                                const flow = flowMap[project.id];
+                                                if (!flow) return <span className="text-slate-300">—</span>;
+                                                const done = flow.technicalStatus === 'completed';
                                                 return (
-                                                    <StatusChip variant={delivery === 'completed' ? 'active' : 'info'}>
-                                                        {delivery === 'completed' ? t('projects.flow.stateCompleted') : t('projects.flow.stateOngoing')}
+                                                    <StatusChip variant={done ? 'active' : 'info'}>
+                                                        {done ? t('projects.flow.stateCompleted') : t('projects.flow.stateOngoing')}
                                                     </StatusChip>
                                                 );
                                             })()}
                                         </td>
                                         <td className="px-3 py-2">
                                             {(() => {
-                                                const billing = flowMap[project.id]?.billing;
-                                                if (!billing) return <span className="text-slate-300">—</span>;
+                                                const flow = flowMap[project.id];
+                                                if (!flow) return <span className="text-slate-300">—</span>;
+                                                const done = flow.billingStatus === 'completed';
                                                 return (
-                                                    <StatusChip variant={billing === 'completed' ? 'active' : 'warning'}>
-                                                        {billing === 'completed' ? t('projects.flow.stateCompleted') : t('projects.flow.statePending')}
+                                                    <StatusChip variant={done ? 'active' : 'warning'}>
+                                                        {done ? t('projects.flow.stateCompleted') : t('projects.flow.statePending')}
                                                     </StatusChip>
                                                 );
                                             })()}
                                         </td>
                                         <td className="px-3 py-2 text-right">
-                                            <ArrowRight className="inline size-4 text-slate-400" />
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                icon={<ArrowRight size={13} />}
+                                                onClick={(e) => openProcess(project, e)}
+                                            >
+                                                {t('projects.complete.processButton')}
+                                            </Button>
                                         </td>
                                     </tr>
                                 );
@@ -261,6 +291,14 @@ export const Projects = () => {
                     </table>
                 </div>
             </Card>
+
+            {processTarget && (
+                <ProjectProcessModal
+                    project={processTarget}
+                    mode="progress"
+                    onClose={() => setProcessTarget(null)}
+                />
+            )}
         </div>
     );
 };

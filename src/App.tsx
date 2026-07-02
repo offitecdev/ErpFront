@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, HashRouter } from 'react-router-dom';
-import { ConfigProvider, theme as antdTheme } from 'antd';
-import { Toaster } from 'sonner';
+import ConfigProvider from 'antd/es/config-provider';
+import antdTheme from 'antd/es/theme';
 import { AlertCircle, CheckCircle, XClose as CloseOutlined } from './components/icons/antIconCompat';
 import { AppRouter } from './routes/AppRouter';
 import { useAuthStore } from './store/authStore';
@@ -9,6 +9,7 @@ import { useThemeStore } from './store/themeStore';
 import i18n from './i18n';
 
 const Router = window.location.protocol === 'file:' ? HashRouter : BrowserRouter;
+const LazyToaster = lazy(() => import('sonner').then((mod) => ({ default: mod.Toaster })));
 
 const ToastIcon = ({ tone }: { tone: 'info' | 'success' | 'warning' | 'error' }) => {
     const toneClass = {
@@ -27,38 +28,54 @@ const ToastIcon = ({ tone }: { tone: 'info' | 'success' | 'warning' | 'error' })
 };
 
 const ToastProvider = () => {
+    const [shouldMount, setShouldMount] = useState(false);
+
+    useEffect(() => {
+        if ('requestIdleCallback' in window) {
+            const id = window.requestIdleCallback(() => setShouldMount(true), { timeout: 1500 });
+            return () => window.cancelIdleCallback(id);
+        }
+
+        const id = globalThis.setTimeout(() => setShouldMount(true), 250);
+        return () => globalThis.clearTimeout(id);
+    }, []);
+
+    if (!shouldMount) return null;
+
     return (
-        <Toaster 
-            position="top-right"
-            duration={2000}
-            closeButton
-            richColors={false}
-            className="offitec-toaster"
-            icons={{
-                info: <ToastIcon tone="info" />,
-                success: <ToastIcon tone="success" />,
-                warning: <ToastIcon tone="warning" />,
-                error: <ToastIcon tone="error" />,
-                close: (
-                    <span className="offitec-toast-close-icon">
-                        <CloseOutlined size={16} />
-                    </span>
-                ),
-            }}
-            toastOptions={{
-                duration: 2000,
-                classNames: {
-                    toast: 'offitec-toast',
-                    title: 'offitec-toast-title',
-                    description: 'offitec-toast-description',
-                    closeButton: 'offitec-toast-close',
-                    actionButton: 'offitec-toast-action',
-                    cancelButton: 'offitec-toast-cancel',
-                    icon: 'offitec-toast-icon',
-                    content: 'offitec-toast-content',
-                },
-            }}
-        />
+        <Suspense fallback={null}>
+            <LazyToaster 
+                position="top-right"
+                duration={2000}
+                closeButton
+                richColors={false}
+                className="offitec-toaster"
+                icons={{
+                    info: <ToastIcon tone="info" />,
+                    success: <ToastIcon tone="success" />,
+                    warning: <ToastIcon tone="warning" />,
+                    error: <ToastIcon tone="error" />,
+                    close: (
+                        <span className="offitec-toast-close-icon">
+                            <CloseOutlined size={16} />
+                        </span>
+                    ),
+                }}
+                toastOptions={{
+                    duration: 2000,
+                    classNames: {
+                        toast: 'offitec-toast',
+                        title: 'offitec-toast-title',
+                        description: 'offitec-toast-description',
+                        closeButton: 'offitec-toast-close',
+                        actionButton: 'offitec-toast-action',
+                        cancelButton: 'offitec-toast-cancel',
+                        icon: 'offitec-toast-icon',
+                        content: 'offitec-toast-content',
+                    },
+                }}
+            />
+        </Suspense>
     );
 };
 

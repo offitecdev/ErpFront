@@ -1,29 +1,33 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import dayjs from 'dayjs';
 import {
     AlertTriangle,
     ArrowLeft,
+    BarChart03,
     Camera01 as Camera,
+    ChevronLeft,
     ChevronRight,
+    ChevronSelectorVertical,
     Coins01 as Coins,
     Hash01 as Hash,
     Image01 as ImageIcon,
     List,
-    MarkerPin01 as MapPin,
     Package,
     Plus,
     Save01 as Save,
     Scan as ScanBarcode,
-    Scan as ScanLine,
     SearchLg as Search,
+    Tag01 as Tag,
     Trash01 as Trash2,
     UploadCloud02 as Upload,
     X,
 } from '@/components/icons/antIconCompat';
 
-import { PageHeader } from '../../components/layout/PageHeader';
+import { ProductQuickViewModal } from '../../components/product/ProductQuickViewModal';
+
+import { StockModuleHeader } from '../../components/layout/PageHeader';
+import { BulletHint, useBulletHint } from '../../components/ui-shared/BulletHint';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
@@ -33,9 +37,13 @@ import { Skeleton } from '../../components/ui-shared/Skeleton';
 import { BarcodeScannerModal } from '../../components/ui-shared/BarcodeScannerModal';
 
 import { useInventoryStore } from '../../store/inventoryStore';
+import { articleApi } from '../../lib/api/inventory';
 import { useAuthStore } from '../../store/authStore';
-import { inventoryApi } from '../../lib/api/inventory';
-import type { ArticleStatus, ArticleSupplierRow, InventoryArticle, SupplierRow } from '../../types/inventory';
+import type { ArticleStatus, InventoryArticle, ItemType } from '../../types/inventory';
+
+const BRAND = '#272f67';
+// Matches the tender line editors so the "writing" surfaces share one typeface.
+const INLINE_INPUT_FONT_FAMILY = "'Google Sans', 'Product Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 
 import { t } from '@/i18n/translate';
 import { useTranslation } from 'react-i18next';
@@ -75,31 +83,11 @@ const articleUnitCost = (article: { baseCost?: number | null; weightedAverageCos
     return weightedAverageCost > 0 ? weightedAverageCost : Number(article.baseCost || 0);
 };
 
-type ArticleCostFields = {
-    baseCost?: number | null;
-    weightedAverageCost?: number | null;
-    costBasisQuantity?: number | null;
-    costBasisValue?: number | null;
-    supplierCostQuantity?: number | null;
-    supplierCostValue?: number | null;
-    manualCostQuantity?: number | null;
-    manualCostValue?: number | null;
-};
-
-// Ağırlıklı ortalama birim maliyetin hesap dökümü: tedarik + manuel stok girişlerinin
-// (adet × birim maliyet) toplamı, toplam adede bölünerek birim maliyeti verir.
-const articleCostBreakdown = (a: ArticleCostFields) => {
-    const supplierQty = Number(a.supplierCostQuantity || 0);
-    const supplierValue = Number(a.supplierCostValue || 0);
-    const manualQty = Number(a.manualCostQuantity || 0);
-    const manualValue = Number(a.manualCostValue || 0);
-    const basisQty = Number(a.costBasisQuantity || 0) || supplierQty + manualQty;
-    const basisValue = Number(a.costBasisValue || 0) || supplierValue + manualValue;
-    return { supplierQty, supplierValue, manualQty, manualValue, basisQty, basisValue, unitCost: articleUnitCost(a) };
-};
-
-// Stok girişi yapan (maliyet taşıyabilen) hareket tipleri — birim maliyet yalnızca bunlarda istenir.
-const COST_BEARING_MOVEMENTS = ['IN', 'ADJUSTMENT'];
+// Ürün / malzeme tip etiketleri — envanter kalemleri bu ikiye ayrılır, süreçler ortaktır.
+const ITEM_TYPE_LABEL = (): Record<ItemType, string> => ({
+    PRODUCT: t('auto.urun'),
+    MATERIAL: t('auto.malzeme'),
+});
 
 const suggestCode = () => {
     const year = new Date().getFullYear();
@@ -114,10 +102,10 @@ const emptyArticle = (): Partial<InventoryArticle> => ({
     baseCost: 0,
     salePrice: 0,
     unit:t('auto.stk'),
-    systemBarcode: '',
     supplierBarcode: '',
     imageUrl: '',
     category: '',
+    itemType: 'PRODUCT',
     status: 'ACTIVE',
     isActive: true,
     minStockLevel: 10,
@@ -134,161 +122,270 @@ export const Articles = () => {
         || permissions.includes('inventory.articles.create')
         || permissions.includes('inventory.articles.update');
 
-    const { articles, articlesLoading, fetchArticlesSummary, deleteArticle } = useInventoryStore();
+    const {
+        articles,
+        articlesLoading,
+        fetchArticlesSummary,
+        articlesPageItems,
+        articlesTotal,
+        articlesPageLoading,
+        fetchArticlesPage,
+        deleteArticle,
+    } = useInventoryStore();
 
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [statsLoaded, setStatsLoaded] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
-    const [scannerMode, setScannerMode] = useState<'serial' | 'general'>('serial');
+    const [quickViewId, setQuickViewId] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 15;
 
+    // Server-side search — debounce keystrokes so we don't hit the API per letter.
     useEffect(() => {
-        fetchArticlesSummary();
-    }, [fetchArticlesSummary]);
+        const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+        return () => clearTimeout(id);
+    }, [search]);
 
-    const openBarcodeScanner = (mode: 'serial' | 'general') => {
-        setScannerMode(mode);
-        setScannerOpen(true);
-    };
+    // Arama/filtre değişince ilk sayfaya dön.
+    useEffect(() => {
+        setPage(1);
+    }, [debouncedSearch, statusFilter]);
+
+    // Ürünler sayfa sayfa (15) sunucudan çekilir — tüm katalog tek seferde yüklenmez.
+    useEffect(() => {
+        void fetchArticlesPage({
+            page,
+            pageSize: PAGE_SIZE,
+            search: debouncedSearch || undefined,
+            status: statusFilter || undefined,
+            itemType: 'PRODUCT',
+        });
+    }, [page, debouncedSearch, statusFilter, fetchArticlesPage]);
 
     const handleScanResult = (code: string) => {
         setScannerOpen(false);
         setSearch(code);
-        if (scannerMode === 'serial') {
-            toast.success(t('inventory.articles.serialScanned', { code }));
-        } else {
-            toast.success(t('inventory.articles.generalScanned', { code }));
+        toast.success(t('inventory.articles.serialScanned', { code }));
+    };
+
+    const reloadCurrentPage = () => {
+        void fetchArticlesPage({
+            page,
+            pageSize: PAGE_SIZE,
+            search: debouncedSearch || undefined,
+            status: statusFilter || undefined,
+            itemType: 'PRODUCT',
+        });
+    };
+
+    // İstatistik kartları ("Details") tüm ürünleri ister; yalnızca modal açılınca yüklenir.
+    const openDetails = () => {
+        setDetailsOpen(true);
+        if (!statsLoaded) {
+            void fetchArticlesSummary().then(() => setStatsLoaded(true));
         }
     };
 
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        return articles.filter((a) => {
-            if (statusFilter && a.status !== statusFilter) return false;
-            if (!q) return true;
-            return (
-                a.articleCode.toLowerCase().includes(q) ||
-                a.name.toLowerCase().includes(q) ||
-                (a.systemBarcode || '').toLowerCase().includes(q) ||
-                (a.supplierBarcode || '').toLowerCase().includes(q)
-            );
-        });
-    }, [articles, search, statusFilter]);
+    const paged = articlesPageItems;
+    const totalPages = Math.max(1, Math.ceil(articlesTotal / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const rangeFrom = articlesTotal === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+    const rangeTo = Math.min(pageSafe * PAGE_SIZE, articlesTotal);
+
+    // Liste, ekranın altına kadar uzasın: kabın tepe konumunu ölçüp yüksekliği viewport'a göre sabitle.
+    // Böylece kolon başlıkları sabit kalırken veri en alta dek akar (AntCard/flex zincirine bağımlı değil).
+    const listRef = useRef<HTMLDivElement>(null);
+    const [listHeight, setListHeight] = useState(0);
+    useLayoutEffect(() => {
+        const el = listRef.current;
+        if (!el) return;
+        const recompute = () => {
+            const top = el.getBoundingClientRect().top;
+            // Alt boşluk: sayfa kabının kendi alt padding'i (~24px) kadar pay bırak ki dış kaydırma oluşmasın.
+            setListHeight(Math.max(240, window.innerHeight - top - 24));
+        };
+        recompute();
+        window.addEventListener('resize', recompute);
+        return () => window.removeEventListener('resize', recompute);
+    }, []);
 
     const stats = useMemo(() => {
-        const totalQty = articles.reduce((s, a) => s + a.totalQuantity, 0);
-        const totalValue = articles.reduce((s, a) => s + a.totalQuantity * articleUnitCost(a), 0);
-        const critical = articles.filter((a) => a.criticalStockLevel > 0 && a.totalQuantity <= a.criticalStockLevel).length;
-        return { total: articles.length, totalQty, totalValue, critical };
+        // Full catalogue (products only) — loaded lazily when the stats modal opens.
+        const products = articles.filter((a) => (a.itemType ?? 'PRODUCT') === 'PRODUCT');
+        const totalQty = products.reduce((s, a) => s + a.totalQuantity, 0);
+        const totalValue = products.reduce((s, a) => s + a.totalQuantity * articleUnitCost(a), 0);
+        const critical = products.filter((a) => a.criticalStockLevel > 0 && a.totalQuantity <= a.criticalStockLevel).length;
+        return { total: products.length, totalQty, totalValue, critical };
     }, [articles]);
 
     return (
         <div>
-            <PageHeader
-                breadcrumb={t('inventory.articles.breadcrumb')}
-                title={t('auto.stok_kartlari')}
-                description={t('auto.tum_urunleri_barkodlari_gorselleri_ve_minimum_kr')}
+            <StockModuleHeader
+                label="Stock › Products"
                 actions={
-                    canManage && (
-                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles/new')}>{t('auto.yeni_urun')}</Button>
-                    )
+                    <>
+                        <Button
+                            variant="secondary"
+                            icon={<BarChart03 size={14} />}
+                            onClick={openDetails}
+                            aria-label="Details"
+                            title="Details"
+                            className="!h-8 !w-8 !px-0"
+                        />
+                        {canManage && (
+                            <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles/new')}>{t('auto.yeni_urun')}</Button>
+                        )}
+                    </>
                 }
             />
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <StatBox label={t('inventory.dashboard.totalProducts')} value={`${stats.total}`} icon={<Package size={16} />} tone="indigo" active />
-                <StatBox label={t('auto.toplam_adet')} value={fmtNumber(stats.totalQty)} icon={<Hash size={16} />} tone="sky" />
-                <StatBox label={t('inventory.dashboard.stockValue')} value={fmtMoney(stats.totalValue)} icon={<Coins size={16} />} tone="emerald" small />
-                <StatBox label={t('auto.kritik_seviye')} value={`${stats.critical}`} icon={<AlertTriangle size={16} />} tone="rose" accent={stats.critical > 0 ? 'rose' : undefined} />
-            </div>
+            {detailsOpen && (
+                <ProductStatsModal
+                    loading={!statsLoaded && articlesLoading}
+                    total={stats.total}
+                    totalQty={stats.totalQty}
+                    totalValue={stats.totalValue}
+                    critical={stats.critical}
+                    onClose={() => setDetailsOpen(false)}
+                />
+            )}
+
+            <ProductQuickViewModal articleId={quickViewId} onClose={() => setQuickViewId(null)} />
 
             <Card
-                title={t('auto.urun_listesi')}
-                icon={<Package size={13} />}
                 className="border-0 rounded-none"
                 noPadding
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative">
+            >
+                {/* Üst çubuk: filtreler solda (arama + tarama + tüm durumlar), sayfalama sağda — tek satır. */}
+                <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/60">
+                    <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
+                        <div className="flex shrink-0 items-center gap-2 pr-1">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
+                                <Package size={13} />
+                            </span>
+                            <h3 className="whitespace-nowrap text-[14px] font-semibold text-slate-900">{t('auto.urun_listesi')}</h3>
+                        </div>
+                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+                        {/* Tek satır arama: kod / barkod / seri kodu / genel kod — hepsi aynı alandan. */}
+                        <div className="relative shrink-0">
                             <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={t('auto.ara_kod_ad_barkod')}
-                                className="pl-6 pr-2.5 py-1.5 text-[12px] border border-slate-200 rounded-lg bg-slate-50/80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10 focus:border-blue-400 transition-colors w-[180px] md:w-[220px]"
+                                className="h-8 w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-7 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
                             />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch('')}
+                                    aria-label={t('common.clear')}
+                                    title={t('common.clear')}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
                         </div>
                         <button
-                            onClick={() => openBarcodeScanner('serial')}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-blue-700 bg-white border border-blue-300 rounded-lg transition-colors"
+                            onClick={() => setScannerOpen(true)}
+                            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-300 bg-white px-2.5 text-[11px] font-medium text-blue-700 transition-colors"
                             title={t('auto.seri_kodu_ile_urun_bul')}
                         >
                             <Camera size={12} />
-                            <span className="hidden sm:inline">{t('auto.seri_kod_tara')}</span>
+                            <span>{t('auto.seri_kod_tara')}</span>
                         </button>
-                        <button
-                            onClick={() => openBarcodeScanner('general')}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-blue-700 bg-white border border-blue-300 rounded-lg transition-colors"
-                            title={t('auto.genel_kod_ile_kategori_filtrele')}
-                        >
-                            <ScanLine size={12} />
-                            <span className="hidden sm:inline">{t('auto.genel_kod_tara')}</span>
-                        </button>
-                        <Select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-2 py-1.5 text-[12px] border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                        >
-                            <option value="">{t('auto.tum_durumlar')}</option>
-                            <option value="ACTIVE">{t('common.active')}</option>
-                            <option value="INACTIVE">{t('common.inactive')}</option>
-                            <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
-                            <option value="IN_PRODUCTION">{t('inventory.articles.statusProduction')}</option>
-                        </Select>
-                        {search && (
-                            <button
-                                onClick={() => setSearch('')}
-                                className="inline-flex items-center gap-1 px-2 py-1.5 text-[11px] text-slate-500 border border-slate-200 rounded-lg transition-colors"
+                        <div className="relative w-[148px] shrink-0">
+                            <Select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-700/10"
                             >
-                                <X size={11} />{t('auto.filtreyi_temizle')}</button>
-                        )}
+                                <option value="">{t('auto.tum_durumlar')}</option>
+                                <option value="ACTIVE">{t('common.active')}</option>
+                                <option value="INACTIVE">{t('common.inactive')}</option>
+                                <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
+                                <option value="IN_PRODUCTION">{t('inventory.articles.statusProduction')}</option>
+                            </Select>
+                        </div>
                     </div>
-                }
-            >
-                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                    <table className="w-full text-[12.5px]">
-                        <thead className="text-[10.5px] text-[#86868B] bg-slate-50/70 border-b border-slate-100 uppercase tracking-[0.08em]">
+
+                    {/* Sayfalama sağda: yatay kaydırırken sayılar hep sağda görünür kalır. */}
+                    <div className="ml-auto flex shrink-0 items-center gap-3">
+                        <span className="font-mono text-[11.5px] text-slate-500">
+                            {rangeFrom}-{rangeTo} / {articlesTotal}
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                disabled={pageSafe <= 1}
+                                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={t('common.back')}
+                            >
+                                <ChevronLeft size={14} />
+                            </button>
+                            <span className="px-1 font-mono text-[11.5px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                            <button
+                                type="button"
+                                disabled={pageSafe >= totalPages}
+                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={t('common.next')}
+                            >
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <div
+                    ref={listRef}
+                    style={{ height: listHeight || undefined }}
+                    className="overflow-auto bg-white"
+                >
+                    <table className="min-w-[1240px] w-full table-fixed text-[12.5px]">
+                        <colgroup>
+                            <col style={{ width: 132 }} />
+                            <col style={{ width: 300 }} />
+                            <col style={{ width: 190 }} />
+                            <col style={{ width: 156 }} />
+                            <col style={{ width: 112 }} />
+                            <col style={{ width: 122 }} />
+                            <col style={{ width: 70 }} />
+                            <col style={{ width: 116 }} />
+                            <col style={{ width: 90 }} />
+                        </colgroup>
+                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[10.5px] text-[#86868B] bg-slate-50 border-b border-slate-200 uppercase tracking-[0.08em] shadow-[0_1px_0_0_rgb(226_232_240)]">
                             <tr>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.gorsel')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('auto.stok_kodu')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('auto.urun_adi')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('auto.barkod_seri_no')}</th>
                                 <th className="px-3 py-2 text-right font-semibold">{t('auto.satis_fiyati')}</th>
                                 <th className="px-3 py-2 text-right font-semibold">{t('auto.mevcut')}</th>
                                 <th className="px-3 py-2 text-right font-semibold">{t('auto.min_kritik')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.siparis_tarihi')}</th>
+                                <th className="px-3 py-2 text-center font-semibold">{'Stock'}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                                <th className="px-3 py-2 text-right font-semibold w-[110px]">{t('common.actions')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {articlesLoading && Array.from({ length: 6 }).map((_, i) => (
+                            {articlesPageLoading && Array.from({ length: 6 }).map((_, i) => (
                                 <tr key={`article-skeleton-${i}`}>
-                                    {Array.from({ length: 10 }).map((__, j) => (
+                                    {Array.from({ length: 9 }).map((__, j) => (
                                         <td key={j} className="px-3 py-2">
-                                            <Skeleton className={`${j === 0 ?"h-9 w-9 rounded" : j === 8 ?"h-5 w-16 rounded-full" :"h-4 w-full max-w-[120px]"} ${j >= 4 && j <= 6 ? 'ml-auto' : ''} bg-slate-100`} />
+                                            <Skeleton className={`${j === 7 ?"h-5 w-16 rounded-full" :"h-4 w-full max-w-[120px]"} ${j >= 3 && j <= 5 ? 'ml-auto' : ''} bg-slate-100`} />
                                         </td>
                                     ))}
                                 </tr>
                             ))}
-                            {false && articlesLoading && (
+                            {!articlesPageLoading && articlesTotal === 0 && (
                                 <tr>
-                                    <td colSpan={10} className="px-4 py-8 text-center text-slate-400">{t('common.loading')}</td>
-                                </tr>
-                            )}
-                            {!articlesLoading && filtered.length === 0 && (
-                                <tr>
-                                    <td colSpan={10}>
+                                    <td colSpan={9}>
                                         <EmptyState
                                             icon={<Package size={32} />}
                                             title={t('auto.urun_yok')}
@@ -300,33 +397,39 @@ export const Articles = () => {
                                     </td>
                                 </tr>
                             )}
-                            {!articlesLoading && filtered.map((a) => {
+                            {!articlesPageLoading && paged.map((a) => {
                                 const isCritical = a.criticalStockLevel > 0 && a.totalQuantity <= a.criticalStockLevel;
                                 const isBelowMin = a.minStockLevel > 0 && a.totalQuantity <= a.minStockLevel;
                                 return (
                                     <tr key={a.id} className="group hover:bg-slate-50/60 cursor-pointer transition-colors" onClick={() => navigate(`/inventory/articles/${a.id}`)}>
-                                        <td className="px-3 py-2 w-[60px]">
-                                            {a.imageUrl ? (
-                                                <img src={a.imageUrl} alt={a.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-                                                    <ImageIcon size={15} />
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2 font-mono text-[11.5px] text-slate-700">{a.articleCode}</td>
+                                        <td className="truncate px-3 py-2 font-mono text-[11.5px] text-slate-700">{a.articleCode}</td>
                                         <td className="px-3 py-2">
-                                            <div className="font-medium text-slate-800 truncate max-w-[260px] group-hover:text-[#272f67]">{a.name}</div>
-                                            {a.category && <div className="text-[10.5px] text-slate-400 mt-0.5">{a.category}</div>}
+                                            <div className="flex min-w-0 items-center gap-1.5">
+                                                {/* Tag icon between the row start and the title — opens the product quick view. */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setQuickViewId(a.id); }}
+                                                    className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#272f67] hover:text-[#272f67]"
+                                                    title={t('common.detail')}
+                                                    aria-label={t('common.detail')}
+                                                >
+                                                    <Tag size={13} />
+                                                </button>
+                                                <span className="truncate font-medium text-slate-800 group-hover:text-[#272f67]">{a.name}</span>
+                                                {(a.itemType ?? 'PRODUCT') === 'MATERIAL' && (
+                                                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-100">{t('auto.malzeme')}</span>
+                                                )}
+                                            </div>
+                                            {a.category && <div className="mt-0.5 truncate text-[10.5px] text-slate-400">{a.category}</div>}
                                         </td>
-                                        <td className="px-3 py-2 font-mono text-[11px] text-slate-500">
+                                        <td className="truncate px-3 py-2 font-mono text-[11px] text-slate-500">
                                             {a.systemBarcode || a.supplierBarcode || '—'}
                                         </td>
                                         <td className="px-3 py-2 text-right text-slate-700">
-                                            <div className="font-mono">{fmtMoney(Number(a.salePrice || 0))}/{a.unit}</div>
-                                            <div className="mt-0.5 text-[10.5px] text-slate-400">{t('auto.ort_maliyet')}{fmtMoney(articleUnitCost(a))}</div>
+                                            <div className="truncate font-mono">{fmtMoney(Number(a.salePrice || 0))}/{a.unit}</div>
+                                            <div className="mt-0.5 truncate text-[10.5px] text-slate-400">{t('auto.ort_maliyet')}{fmtMoney(articleUnitCost(a))}</div>
                                         </td>
-                                        <td className="px-3 py-2 text-right font-mono">
+                                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
                                             <span className={isBelowMin ?"text-rose-700 font-semibold" : isCritical ?"text-amber-700 font-semibold" : 'text-slate-800'}>
                                                 {fmtNumber(a.totalQuantity)} {a.unit}
                                             </span>
@@ -334,13 +437,21 @@ export const Articles = () => {
                                                 <AlertTriangle size={11} className="inline ml-1 text-amber-600" />
                                             )}
                                         </td>
-                                        <td className="px-3 py-2 text-right font-mono text-[11.5px] text-slate-500">
+                                        <td className="px-3 py-2 text-right font-mono text-[11.5px] text-slate-500 whitespace-nowrap">
                                             {fmtNumber(a.minStockLevel)} / {fmtNumber(a.criticalStockLevel)}
                                         </td>
-                                        <td className="px-3 py-2 text-[12px] text-slate-500">
-                                            {a.lastPurchaseDate ? dayjs(a.lastPurchaseDate).format('DD.MM.YYYY') : '—'}
+                                        <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                type="button"
+                                                onClick={() => navigate(`/inventory/movements?item=${a.id}`)}
+                                                className="inline-flex items-center justify-center rounded p-1 transition-colors hover:bg-slate-100"
+                                                style={{ color: BRAND }}
+                                                title="Open in Stock Movements"
+                                            >
+                                                <ChevronSelectorVertical size={16} />
+                                            </button>
                                         </td>
-                                        <td className="px-3 py-2">
+                                        <td className="px-3 py-2 whitespace-nowrap">
                                             <StatusChip variant={STATUS_VARIANT[a.status]}>
                                                 {getStatusLabel()[a.status]}
                                             </StatusChip>
@@ -354,6 +465,8 @@ export const Articles = () => {
                                                                 if (!confirm(t('auto.delete_article_confirm', { name: a.name }))) return;
                                                                 try {
                                                                     await deleteArticle(a.id);
+                                                                    setStatsLoaded(false);
+                                                                    reloadCurrentPage();
                                                                     toast.success(t('auto.urun_silindi'));
                                                                 } catch (e: any) {
                                                                     toast.error(e.response?.data?.error ||t('auto.silinemedi'));
@@ -380,7 +493,7 @@ export const Articles = () => {
             {/* Barcode Scanner Modal */}
             {scannerOpen && (
                 <BarcodeScannerModal
-                    mode={scannerMode}
+                    mode="serial"
                     onClose={() => setScannerOpen(false)}
                     onScan={handleScanResult}
                 />
@@ -398,78 +511,50 @@ export const ArticleDetail = () => <ArticleFormPage mode="edit" />;
 const ArticleFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { articles, articlesLoading, fetchArticlesSummary, createArticle, updateArticle } = useInventoryStore();
+    const { createArticle, updateArticle } = useInventoryStore();
+    const [editing, setEditing] = useState<InventoryArticle | null>(null);
     const [loaded, setLoaded] = useState(mode === 'create');
 
+    // With the list now server-paginated, the full catalogue isn't in memory —
+    // fetch just this product by id for the detail/edit screen.
     useEffect(() => {
-        if (mode !== 'edit') return;
+        if (mode !== 'edit' || !id) return;
         let cancelled = false;
-        const load = async () => {
-            if (!articles.length) await fetchArticlesSummary();
-            if (!cancelled) setLoaded(true);
-        };
-        void load();
+        setLoaded(false);
+        articleApi
+            .getById(id)
+            .then((data) => {
+                if (!cancelled) setEditing(data);
+            })
+            .catch(() => {
+                if (!cancelled) setEditing(null);
+            })
+            .finally(() => {
+                if (!cancelled) setLoaded(true);
+            });
         return () => {
             cancelled = true;
         };
-    }, [articles.length, fetchArticlesSummary, mode]);
-
-    const editing = mode === 'edit' ? articles.find((item) => item.id === id) : null;
+    }, [id, mode]);
 
     const submit = async (data: FormData) => {
         try {
+            // Ürün kartı yalnızca tanım + satış fiyatı + ayarları taşır. Stok ve alış maliyeti
+            // "Envanter > Stoğa Ekle" akışından girilir; burada stok hareketi oluşturulmaz.
             if (mode === 'edit' && editing?.id) {
                 await updateArticle(editing.id, data);
-                if (data.adjustQty && data.adjustQty > 0 && data.adjustLocationId) {
-                    const movType = data.adjustMovementType ?? 'IN';
-                    const unitCost = COST_BEARING_MOVEMENTS.includes(movType) && data.adjustUnitCost && data.adjustUnitCost > 0
-                        ? data.adjustUnitCost
-                        : null;
-                    try {
-                        await inventoryApi.scanMovement({
-                            codeOrBarcode: data.articleCode!,
-                            movementType: movType,
-                            quantity: data.adjustQty,
-                            unitCost,
-                            destLocationId: (movType === 'IN' || movType === 'ADJUSTMENT') ? data.adjustLocationId : null,
-                            sourceLocationId: movType === 'OUT' ? data.adjustLocationId : null,
-                            description: `Manuel düzeltme - ${movType}`,
-                        });
-                        toast.success(t('auto.article_updated_with_stock_movement', { count: data.adjustQty }));
-                    } catch (e: any) {
-                        toast.warning(`Ürün güncellendi ancak stok hareketi başarısız: ${e.response?.data?.error || e.message}`);
-                    }
-                } else {
-                    toast.success(t('auto.urun_guncellendi'));
-                }
+                toast.success(t('auto.urun_guncellendi'));
             } else {
-                const created = await createArticle(data);
-                if (data.initialStock && data.initialStock > 0 && data.initialStockLocationId && created) {
-                    try {
-                        await inventoryApi.scanMovement({
-                            codeOrBarcode: created.articleCode,
-                            movementType: 'IN',
-                            quantity: data.initialStock,
-                            unitCost: data.initialStockUnitCost && data.initialStockUnitCost > 0 ? data.initialStockUnitCost : null,
-                            destLocationId: data.initialStockLocationId,
-                            description:t('auto.baslangic_stogu'),
-                        });
-                        toast.success(t('auto.article_created_with_initial_stock', { count: data.initialStock }));
-                    } catch (e: any) {
-                        toast.error(`Ürün oluşturuldu ancak stok eklenemedi: ${e.response?.data?.error || e.message}`);
-                    }
-                } else {
-                    toast.success(t('auto.urun_olusturuldu'));
-                }
+                await createArticle(data);
+                toast.success(t('auto.urun_olusturuldu'));
             }
-            await fetchArticlesSummary();
             navigate('/inventory/articles');
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('auto.kaydedilemedi'));
         }
     };
 
-    if (mode === 'edit' && !editing && (!loaded || articlesLoading)) {
+    if (mode === 'edit' && !editing && !loaded) {
         return <div className="h-96 animate-pulse rounded-md border border-slate-100 bg-slate-50" />;
     }
 
@@ -513,17 +598,32 @@ const StatBox: React.FC<{ label: string; value: string; small?: boolean; accent?
     </div>
 );
 
-type FormData = Partial<InventoryArticle> & {
-    initialStock?: number;
-    initialStockLocationId?: string;
-    initialStockUnitCost?: number;
-    adjustQty?: number;
-    adjustMovementType?: 'IN' | 'OUT' | 'ADJUSTMENT';
-    adjustLocationId?: string;
-    adjustUnitCost?: number;
-};
+// "Details" düğmesiyle açılan genel istatistik kartları (eskiden liste üstündeydi).
+const ProductStatsModal: React.FC<{ loading?: boolean; total: number; totalQty: number; totalValue: number; critical: number; onClose: () => void }> = ({ loading, total, totalQty, totalValue, critical, onClose }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose} role="presentation">
+        <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+                <h2 className="text-[20px] font-semibold tracking-tight" style={{ color: BRAND }}>{t('inventory.articles.title')}</h2>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    aria-label="Close"
+                >
+                    <X size={26} />
+                </button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 px-6 py-6 sm:grid-cols-2">
+                <StatBox label={t('inventory.dashboard.totalProducts')} value={loading ? '…' : `${total}`} icon={<Package size={16} />} tone="indigo" active />
+                <StatBox label={t('auto.toplam_adet')} value={loading ? '…' : fmtNumber(totalQty)} icon={<Hash size={16} />} tone="sky" />
+                <StatBox label={t('inventory.dashboard.stockValue')} value={loading ? '…' : fmtMoney(totalValue)} icon={<Coins size={16} />} tone="emerald" small />
+                <StatBox label={t('auto.kritik_seviye')} value={loading ? '…' : `${critical}`} icon={<AlertTriangle size={16} />} tone="rose" accent={critical > 0 ? 'rose' : undefined} />
+            </div>
+        </div>
+    </div>
+);
 
-type ArticleFormTab = 'details' | 'stock' | 'suppliers';
+type FormData = Partial<InventoryArticle>;
 
 const articleInputClass = t('auto.h_8_px_2_5_py_1_text_12_5px');
 
@@ -542,83 +642,30 @@ const ArticleFormCard: React.FC<{
     initial: FormData;
     onClose: () => void;
     onSubmit: (data: FormData) => Promise<void>;
-}> = ({ mode, initial, onClose, onSubmit }) => {
+}> = ({ initial, onClose, onSubmit }) => {
     const [form, setForm] = useState<FormData>({ ...initial });
     const [submitting, setSubmitting] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerMode, setScannerMode] = useState<'serial' | 'general'>('serial');
-    const [activeTab, setActiveTab] = useState<ArticleFormTab>('details');
-    const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
-    const [articleSuppliers, setArticleSuppliers] = useState<ArticleSupplierRow[]>([]);
-    const [supplierSaving, setSupplierSaving] = useState(false);
-    const [editingSupplierLinkId, setEditingSupplierLinkId] = useState<string | null>(null);
-    const [supplierForm, setSupplierForm] = useState({
-        supplierId: '',
-        companyName: '',
-        contactName: '',
-        phone: '',
-        address: '',
-        supplierSku: '',
-        purchasePrice: Number(initial.baseCost || 0),
-        quantity: 0,
-        locationId: '',
-        lastPurchaseDate: initial.lastPurchaseDate ? dayjs(initial.lastPurchaseDate).format('YYYY-MM-DD') : '',
-        notes: '',
-    });
+    const [descFocused, setDescFocused] = useState(false);
+    const { dismissed: bulletHintDismissed, dismiss: dismissBulletHint } = useBulletHint();
     const fileRef = useRef<HTMLInputElement>(null);
     const descRef = useRef<HTMLTextAreaElement>(null);
-    const { locations, fetchLocations } = useInventoryStore();
 
-    useEffect(() => {
-        fetchLocations();
-    }, [fetchLocations]);
-
-    const isEdit = !!initial.id;
-    const currentQty = (initial as any).totalQuantity as number | undefined;
-    const loadSupplierData = async () => {
-        const list = await inventoryApi.listSuppliers();
-        setSuppliers(list);
-        if (isEdit && initial.id) {
-            const rows = await inventoryApi.listArticleSuppliers(initial.id);
-            setArticleSuppliers(rows);
-        }
-    };
-
-    useEffect(() => {
-        void loadSupplierData().catch(() => undefined);
-    }, [initial.id]);
-
-    useEffect(() => {
-        setSupplierForm((current) => ({
-            ...current,
-            purchasePrice: Number(form.baseCost || 0),
-            lastPurchaseDate: form.lastPurchaseDate ? dayjs(form.lastPurchaseDate).format('YYYY-MM-DD') : current.lastPurchaseDate,
-        }));
-    }, [form.baseCost, form.lastPurchaseDate]);
     const normalizeForm = (value: FormData) => JSON.stringify({
         articleCode: value.articleCode || '',
         name: value.name || '',
         description: value.description || '',
-        baseCost: Number(value.baseCost || 0),
         salePrice: Number(value.salePrice || 0),
-        defaultSupplierId: value.defaultSupplierId || '',
         unit: value.unit || '',
-        systemBarcode: value.systemBarcode || '',
         supplierBarcode: value.supplierBarcode || '',
         imageUrl: value.imageUrl || '',
         category: value.category || '',
+        itemType: value.itemType || 'PRODUCT',
         status: value.status || 'ACTIVE',
         minStockLevel: Number(value.minStockLevel || 0),
         criticalStockLevel: Number(value.criticalStockLevel || 0),
         maxStockLevel: value.maxStockLevel == null ? '' : Number(value.maxStockLevel),
-        lastPurchaseDate: value.lastPurchaseDate || '',
-        initialStock: Number(value.initialStock || 0),
-        initialStockLocationId: value.initialStockLocationId || '',
-        initialStockUnitCost: Number(value.initialStockUnitCost || 0),
-        adjustQty: Number(value.adjustQty || 0),
-        adjustMovementType: value.adjustMovementType || '',
-        adjustLocationId: value.adjustLocationId || '',
-        adjustUnitCost: Number(value.adjustUnitCost || 0),
     });
     const isDirty = useMemo(() => normalizeForm(initial) !== normalizeForm(form), [form, initial]);
 
@@ -634,26 +681,56 @@ const ArticleFormCard: React.FC<{
         reader.readAsDataURL(file);
     };
 
-    const insertDescriptionBullet = () => {
-        const current = form.description ?? '';
-        const el = descRef.current;
-        const start = el?.selectionStart ?? current.length;
-        const end = el?.selectionEnd ?? start;
-        const blockStart = current.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
-        const nextLineBreak = current.indexOf('\n', end);
-        const blockEnd = nextLineBreak === -1 ? current.length : nextLineBreak;
-        const block = current.slice(blockStart, blockEnd);
-        const nextBlock = block
-            .split('\n')
-            .map((line) => (/^\s*[-*]\s+/.test(line) ? line : `- ${line}`))
-            .join('\n');
-        const next = `${current.slice(0, blockStart)}${nextBlock}${current.slice(blockEnd)}`;
+    // Madde işareti: satır başında "-" veya "*" + boşluk ile oluşur, Enter ile otomatik devam, boş maddede çıkış.
+    const BULLET = '• ';
 
-        setForm((p) => ({ ...p, description: next }));
-        requestAnimationFrame(() => {
-            descRef.current?.focus();
-            descRef.current?.setSelectionRange(blockStart, blockStart + nextBlock.length);
-        });
+    const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        const el = e.currentTarget;
+        const value = form.description ?? '';
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        if (start !== end) return;
+
+        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+        const line = value.slice(lineStart, start);
+
+        // Satır başında yalnızca "-" veya "*" varken boşluğa basılırsa madde işaretine dönüştür.
+        if (e.key === ' ' && (line === '-' || line === '*')) {
+            e.preventDefault();
+            const next = `${value.slice(0, lineStart)}${BULLET}${value.slice(start)}`;
+            const pos = lineStart + BULLET.length;
+            setForm((p) => ({ ...p, description: next }));
+            // First bullet created → retire the one-time hint.
+            dismissBulletHint();
+            requestAnimationFrame(() => {
+                descRef.current?.focus();
+                descRef.current?.setSelectionRange(pos, pos);
+            });
+            return;
+        }
+
+        if (e.key !== 'Enter') return;
+        if (!line.startsWith(BULLET)) return;
+
+        e.preventDefault();
+        if (line.trim() === BULLET.trim()) {
+            // Boş madde: işareti kaldır ve listeden çık.
+            const next = `${value.slice(0, lineStart)}${value.slice(start)}`;
+            setForm((p) => ({ ...p, description: next }));
+            requestAnimationFrame(() => {
+                descRef.current?.focus();
+                descRef.current?.setSelectionRange(lineStart, lineStart);
+            });
+        } else {
+            const insert = `\n${BULLET}`;
+            const next = `${value.slice(0, start)}${insert}${value.slice(end)}`;
+            const pos = start + insert.length;
+            setForm((p) => ({ ...p, description: next }));
+            requestAnimationFrame(() => {
+                descRef.current?.focus();
+                descRef.current?.setSelectionRange(pos, pos);
+            });
+        }
     };
 
     const submit = async () => {
@@ -661,18 +738,9 @@ const ArticleFormCard: React.FC<{
             toast.error(t('auto.kod_ad_ve_birim_zorunludur'));
             return;
         }
-        if (!isEdit && (form.initialStock ?? 0) > 0 && locations.length > 0 && !form.initialStockLocationId) {
-            toast.error(t('auto.baslangic_stogu_girildiginde_lokasyon_secimi_zor'));
-            return;
-        }
-        if (isEdit && (form.adjustQty ?? 0) > 0 && !form.adjustLocationId) {
-            toast.error(t('auto.stok_hareketi_icin_lokasyon_secimi_zorunludur'));
-            return;
-        }
         setSubmitting(true);
         try {
             const payload = { ...form };
-            if (payload.systemBarcode === '') payload.systemBarcode = undefined;
             if (payload.supplierBarcode === '') payload.supplierBarcode = undefined;
             if (payload.description === '') payload.description = undefined;
             if (payload.category === '') payload.category = undefined;
@@ -683,124 +751,12 @@ const ArticleFormCard: React.FC<{
         }
     };
 
-    const saveSupplier = async () => {
-        if (!isEdit || !initial.id) {
-            toast.error(t('auto.tedarikci_bilgisi_eklemek_icin_once_urunu_kayded'));
-            return;
-        }
-        if (!editingSupplierLinkId && !supplierForm.supplierId && !supplierForm.companyName.trim()) {
-            toast.error(t('auto.tedarikci_secin_veya_yeni_tedarikci_adi_girin'));
-            return;
-        }
-        if (!supplierForm.locationId) {
-            toast.error(t('auto.stoga_eklenecek_depoyu_secin'));
-            return;
-        }
-        if (Number(supplierForm.quantity || 0) <= 0) {
-            toast.error(t('auto.eklenecek_miktar_0_dan_buyuk_olmalidir'));
-            return;
-        }
-        setSupplierSaving(true);
-        try {
-            const payload = {
-                supplierSku: supplierForm.supplierSku || undefined,
-                purchasePrice: Number(supplierForm.purchasePrice || 0),
-                quantity: Number(supplierForm.quantity || 0),
-                locationId: supplierForm.locationId,
-                lastPurchaseDate: supplierForm.lastPurchaseDate || undefined,
-                notes: supplierForm.notes || undefined,
-                isPreferred: true,
-            };
-            const saved = editingSupplierLinkId
-                ? await inventoryApi.updateArticleSupplier(initial.id, editingSupplierLinkId, payload)
-                : await inventoryApi.saveArticleSupplier(initial.id, {
-                    ...payload,
-                    supplierId: supplierForm.supplierId || undefined,
-                    companyName: supplierForm.companyName || undefined,
-                    contactName: supplierForm.contactName || undefined,
-                    phone: supplierForm.phone || undefined,
-                    address: supplierForm.address || undefined,
-                });
-            setForm((current) => ({
-                ...current,
-                baseCost: saved.purchasePrice,
-                defaultSupplierId: saved.supplierId,
-                lastPurchaseDate: saved.lastPurchaseDate || current.lastPurchaseDate,
-            }));
-            setSupplierForm({
-                supplierId: '',
-                companyName: '',
-                contactName: '',
-                phone: '',
-                address: '',
-                supplierSku: '',
-                purchasePrice: saved.purchasePrice,
-                quantity: 0,
-                locationId: '',
-                lastPurchaseDate: saved.lastPurchaseDate ? dayjs(saved.lastPurchaseDate).format('YYYY-MM-DD') : '',
-                notes: '',
-            });
-            setEditingSupplierLinkId(null);
-            await loadSupplierData();
-            toast.success(editingSupplierLinkId ?t('auto.tedarik_kaydi_guncellendi') :t('auto.tedarik_kaydi_eklendi'));
-        } catch (e: any) {
-            toast.error(e.response?.data?.error ||t('auto.tedarikci_bilgisi_kaydedilemedi'));
-        } finally {
-            setSupplierSaving(false);
-        }
-    };
-
-    const removeSupplierLink = async (linkId: string) => {
-        if (!initial.id) return;
-        await inventoryApi.deleteArticleSupplier(initial.id, linkId);
-        await loadSupplierData();
-        toast.success(t('auto.tedarikci_kaydi_kaldirildi'));
-    };
-
-    const latestSupply = articleSuppliers.find((row) => row.isPreferred) || articleSuppliers[0];
-    const totalSupplyQuantity = articleSuppliers.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
-    const totalSupplyValue = articleSuppliers.reduce((sum, row) => sum + (Number(row.quantity || 0) * Number(row.purchasePrice || 0)), 0);
-    const startEditSupplierLink = (row: ArticleSupplierRow) => {
-        setEditingSupplierLinkId(row.id);
-        setSupplierForm({
-            supplierId: row.supplierId,
-            companyName: '',
-            contactName: '',
-            phone: '',
-            address: '',
-            supplierSku: row.supplierSku || '',
-            purchasePrice: Number(row.purchasePrice || 0),
-            quantity: Number(row.quantity || 0),
-            locationId: row.locationId || '',
-            lastPurchaseDate: row.lastPurchaseDate ? dayjs(row.lastPurchaseDate).format('YYYY-MM-DD') : '',
-            notes: row.notes || '',
-        });
-    };
-    const resetSupplierForm = () => {
-        setEditingSupplierLinkId(null);
-        setSupplierForm({
-            supplierId: '',
-            companyName: '',
-            contactName: '',
-            phone: '',
-            address: '',
-            supplierSku: '',
-            purchasePrice: Number(form.baseCost || 0),
-            quantity: 0,
-            locationId: '',
-            lastPurchaseDate: form.lastPurchaseDate ? dayjs(form.lastPurchaseDate).format('YYYY-MM-DD') : '',
-            notes: '',
-        });
-    };
-
    return (
         <>
-            <PageHeader
-                breadcrumb={t('inventory.articles.breadcrumb')}
-                title={mode === 'edit' ?t('auto.urun_bilgileri') :t('auto.yeni_urun')}
-                description={mode === 'edit' ? initial.name :t('auto.yeni_stok_karti_olusturun')}
+            <StockModuleHeader
+                label="Stock › Products"
                 actions={
-                    <div className="flex items-center gap-2">
+                    <>
                         <button
                             type="button"
                             onClick={onClose}
@@ -815,33 +771,11 @@ const ArticleFormCard: React.FC<{
                             icon={<Save size={13} />}
                             onClick={submit}
                         >{t('common.save')}</Button>
-                    </div>
+                    </>
                 }
             />
 
-            <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-slate-200">
-                {[
-                    ['details',t('')],
-                    ['stock',t('auto.stok_ayarlari')],
-                    ['suppliers',t('auto.urun_tedarik_bilgisi')],
-                ].map(([key, label]) => (
-                    <button
-                        key={key}
-                        type="button"
-                        onClick={() => setActiveTab(key as ArticleFormTab)}
-                        className={`relative px-1 pb-2 text-[13px] font-semibold transition-colors ${
-                            activeTab === key
-                                ?t('auto.text_1f2654_after_absolute_after_inset_x_0_after')
-                                :t('auto.text_slate_500_hover_text_slate_900')
-                        }`}
-                    >
-                        {label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Form Yapısı */}
-            {activeTab === 'details' && (
+            {/* Form Yapısı — Ürün Bilgileri (Stok ayarları "Stok Hareketleri" bölümüne taşındı) */}
             <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] xl:items-start">
                 <div className="min-w-0 space-y-3">
                     <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
@@ -860,6 +794,12 @@ const ArticleFormCard: React.FC<{
                             <ArticleInfoRow label={t('auto.birim_satis_fiyati')}>
                                 <Input size="sm" className={articleInputClass} type="number" step="1" min={0} value={form.salePrice ?? 0} onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) || 0 })} />
                             </ArticleInfoRow>
+                            <ArticleInfoRow label={t('auto.kalem_tipi')}>
+                                <Select size="sm" className="w-full" value={form.itemType ?? 'PRODUCT'} onChange={(e) => setForm({ ...form, itemType: e.target.value as ItemType })}>
+                                    <option value="PRODUCT">{ITEM_TYPE_LABEL().PRODUCT}</option>
+                                    <option value="MATERIAL">{ITEM_TYPE_LABEL().MATERIAL}</option>
+                                </Select>
+                            </ArticleInfoRow>
                             <ArticleInfoRow label={t('common.category')}>
                                 <Input size="sm" className={articleInputClass} value={form.category ?? ''} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t('auto.hidrolik_servis')} />
                             </ArticleInfoRow>
@@ -870,20 +810,28 @@ const ArticleFormCard: React.FC<{
                         <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
                                 <List size={13} />{t('common.description')}</div>
-                            <div className="overflow-hidden rounded-md border border-slate-200 bg-white flex flex-col">
-                                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-100 bg-slate-50/70">
-                                    <button type="button" title={t('auto.madde_isareti')} onClick={insertDescriptionBullet} className="w-7 h-6 rounded flex items-center justify-center border border-transparent hover:bg-slate-200 transition-colors">
-                                        <List size={12} />
-                                    </button>
+                            <div className="relative">
+                                {/* First-time-only tip; bullets are made by typing a hyphen + space. */}
+                                {descFocused && !bulletHintDismissed && (
+                                    <BulletHint
+                                        onDismiss={dismissBulletHint}
+                                        className="absolute right-2 -top-1.5 z-30 -translate-y-full"
+                                    />
+                                )}
+                                <div className="overflow-hidden rounded-md border border-slate-200 bg-white flex flex-col">
+                                    <textarea
+                                        ref={descRef}
+                                        rows={8}
+                                        value={form.description ?? ''}
+                                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                        onKeyDown={handleDescriptionKeyDown}
+                                        onFocus={() => setDescFocused(true)}
+                                        onBlur={() => setDescFocused(false)}
+                                        className="w-full p-3 text-[12.5px] bg-white focus:outline-none resize-y min-h-[260px]"
+                                        style={{ fontFamily: INLINE_INPUT_FONT_FAMILY }}
+                                        placeholder={t('auto.urun_ile_ilgili_detayli_aciklamalari_buraya_yaza')}
+                                    />
                                 </div>
-                                <textarea
-                                    ref={descRef}
-                                    rows={8}
-                                    value={form.description ?? ''}
-                                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                    className="w-full p-3 text-[12.5px] bg-white focus:outline-none resize-y min-h-[260px]"
-                                    placeholder={t('auto.urun_ile_ilgili_detayli_aciklamalari_buraya_yaza')}
-                                />
                             </div>
                         </section>
 
@@ -892,19 +840,6 @@ const ArticleFormCard: React.FC<{
                                 <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
                                     <ScanBarcode size={13} />{t('auto.barkod_bilgileri')}</div>
                                 <div className="flex flex-col gap-4">
-                                    <Field label={t('auto.genel_urun_kodu')} hint={t('auto.kategori_barkodu_istege_bagli')}>
-                                        <div className="flex items-center gap-2">
-                                            <Input size="sm" value={form.systemBarcode ?? ''} onChange={(e) => setForm({ ...form, systemBarcode: e.target.value })} placeholder={t('auto.okutun_veya_yazin')} className={`${articleInputClass} flex-1`} />
-                                            <button
-                                                type="button"
-                                                onClick={() => { setScannerMode('general'); setScannerOpen(true); }}
-                                                className="flex h-8 w-8 items-center justify-center shrink-0 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                                                title={t('auto.kamera_ile_genel_kod_tara')}
-                                            >
-                                                <Camera size={14} />
-                                            </button>
-                                        </div>
-                                    </Field>
                                     <Field label={t('auto.urun_seri_kodu')} hint={t('auto.zorunlu_her_urune_ozgu')} required>
                                         <div className="flex items-center gap-2">
                                             <Input size="sm" value={form.supplierBarcode ?? ''} onChange={(e) => setForm({ ...form, supplierBarcode: e.target.value })} placeholder={t('auto.okutun_veya_yazin')} className={`${articleInputClass} flex-1`} />
@@ -971,308 +906,13 @@ const ArticleFormCard: React.FC<{
 
                 </div>
             </div>
-            )}
-
-            {activeTab === 'stock' && (
-                <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
-                    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
-                        <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
-                            <AlertTriangle size={13} />{t('auto.stok_ayarlari')}</div>
-                        <div className="flex flex-col gap-3">
-                            <ArticleInfoRow label={t('auto.minimum')}>
-                                <Input className={articleInputClass} size="sm" type="number" step="1" min={0} value={form.minStockLevel ?? 0} onChange={(e) => setForm({ ...form, minStockLevel: Number(e.target.value) || 0 })} />
-                            </ArticleInfoRow>
-                            <ArticleInfoRow label={t('auto.kritik_esik')}>
-                                <Input className={articleInputClass} size="sm" type="number" step="1" min={0} value={form.criticalStockLevel ?? 0} onChange={(e) => setForm({ ...form, criticalStockLevel: Number(e.target.value) || 0 })} />
-                            </ArticleInfoRow>
-                            <ArticleInfoRow label={t('auto.maksimum')}>
-                                <Input className={articleInputClass} size="sm" type="number" step="1" min={0} value={form.maxStockLevel ?? ''} onChange={(e) => setForm({ ...form, maxStockLevel: e.target.value === '' ? null : Number(e.target.value) })} />
-                            </ArticleInfoRow>
-                            <ArticleInfoRow label={t('common.status')}>
-                                <Select className="w-full" size="sm" value={form.status ?? 'ACTIVE'} onChange={(e) => setForm({ ...form, status: e.target.value as ArticleStatus })}>
-                                    <option value="ACTIVE">{t('common.active')}</option>
-                                    <option value="INACTIVE">{t('common.inactive')}</option>
-                                    <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
-                                    <option value="IN_PRODUCTION">{t('inventory.articles.statusProduction')}</option>
-                                </Select>
-                            </ArticleInfoRow>
-                            <ArticleInfoRow label={t('auto.son_alim')}>
-                                <Input className={articleInputClass} size="sm" type="date" value={form.lastPurchaseDate ? dayjs(form.lastPurchaseDate).format('YYYY-MM-DD') : ''} onChange={(e) => setForm({ ...form, lastPurchaseDate: e.target.value || null })} />
-                            </ArticleInfoRow>
-                        </div>
-                    </section>
-
-                    {isEdit ? (
-                        <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
-                            <div className="mb-3 flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Package size={13} />{t('auto.stok_hareketi_ekle')}</span>
-                            </div>
-                            {currentQty !== undefined && (
-                                <div className="mb-3 rounded-md bg-slate-50 border border-slate-200 p-2 text-center text-[11.5px] text-slate-600">{"Mevcut Stok:"}<span className="font-semibold text-slate-900 text-[13px]">{new Intl.NumberFormat('de-CH').format(currentQty)} {form.unit}</span>
-                                </div>
-                            )}
-                            <div className="flex flex-col gap-3">
-                                <Field label={t('auto.hareket_tipi')}>
-                                    <Select size="sm" value={form.adjustMovementType ?? 'IN'} onChange={(e) => setForm({ ...form, adjustMovementType: e.target.value as 'IN' | 'OUT' | 'ADJUSTMENT' })}>
-                                        <option value="IN">{t('auto.giris_stok_artisi')}</option>
-                                        <option value="OUT">{t('auto.cikis_stok_azalisi')}</option>
-                                        <option value="ADJUSTMENT">{t('auto.duzeltme')}</option>
-                                    </Select>
-                                </Field>
-                                <Field label={t('common.quantity')} hint={t('auto.0_ise_hareket_yok')}>
-                                    <Input className={articleInputClass} size="sm" type="number" step="0.01" min={0} value={form.adjustQty ?? 0} onChange={(e) => setForm({ ...form, adjustQty: Number(e.target.value) || 0 })} />
-                                </Field>
-                                {COST_BEARING_MOVEMENTS.includes(form.adjustMovementType ?? 'IN') && (
-                                    <Field
-                                        label={t('auto.birim_maliyet_chf')}
-                                        hint={t('auto.bu_partinin_alis_birim_maliyeti_agirlikli_ortala')}
-                                    >
-                                        <Input
-                                            className={articleInputClass}
-                                            size="sm"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.adjustUnitCost ?? ''}
-                                            onChange={(e) => setForm({ ...form, adjustUnitCost: e.target.value === '' ? undefined : Number(e.target.value) || 0 })}
-                                            placeholder={t('auto.current_average_cost', { amount: fmtMoney(articleUnitCost(form)) })}
-                                        />
-                                    </Field>
-                                )}
-                                <Field label={t('common.location')} hint={(form.adjustQty ?? 0) > 0 ?t('auto.zorunlu') :t('auto.opsiyonel')}>
-                                    {locations.length > 0 ? (
-                                        <Select size="sm" value={form.adjustLocationId ?? ''} onChange={(e) => setForm({ ...form, adjustLocationId: e.target.value })}>
-                                            <option value="">{t('auto.secin')}</option>
-                                            {locations.map((l) => <option key={l.id} value={l.id}>{l.locationName}</option>)}
-                                        </Select>
-                                    ) : (
-                                        <div className="flex items-center gap-1.5 text-[11.5px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
-                                            <MapPin size={11} className="shrink-0" />
-                                            <Link to="/inventory/locations" className="underline hover:text-amber-900">{t('auto.once_lokasyon_olusturun')}</Link>
-                                        </div>
-                                    )}
-                                </Field>
-                            </div>
-                        </section>
-                    ) : (
-                        <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
-                            <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
-                                <Plus size={13} />{t('auto.baslangic_stoku')}</div>
-                            <div className="flex flex-col gap-3">
-                                <Field label={t('auto.baslangic_stogu')}>
-                                    <Input className={articleInputClass} size="sm" type="number" step="0.01" min={0} value={form.initialStock ?? 0} onChange={(e) => setForm({ ...form, initialStock: Number(e.target.value) || 0 })} />
-                                </Field>
-                                {(form.initialStock ?? 0) > 0 && (
-                                    <Field
-                                        label={t('auto.birim_maliyet_chf')}
-                                        hint={t('auto.baslangic_stogunun_alis_birim_maliyeti_agirlikli')}
-                                    >
-                                        <Input
-                                            className={articleInputClass}
-                                            size="sm"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.initialStockUnitCost ?? ''}
-                                            onChange={(e) => setForm({ ...form, initialStockUnitCost: e.target.value === '' ? undefined : Number(e.target.value) || 0 })}
-                                            placeholder={t('auto.orn_12_50')}
-                                        />
-                                    </Field>
-                                )}
-                                {(form.initialStock ?? 0) > 0 && (
-                                    locations.length > 0 ? (
-                                        <Field label={t('common.location')} hint={t('auto.urun_hangi_depoya_girecek')}>
-                                            <Select size="sm" value={form.initialStockLocationId ?? ''} onChange={(e) => setForm({ ...form, initialStockLocationId: e.target.value })}>
-                                                <option value="">{t('auto.lokasyon_secin')}</option>
-                                                {locations.map((l) => <option key={l.id} value={l.id}>{l.locationName}</option>)}
-                                            </Select>
-                                        </Field>
-                                    ) : (
-                                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800">
-                                            <MapPin size={13} className="mt-0.5 shrink-0 text-amber-600" />
-                                            <span>{t('auto.baslangic_stogu_icin_once_depo_lokasyon_olusturu')}<Link to="/inventory/locations" className="font-semibold underline hover:text-amber-900">{t('auto.lokasyon_olustur')}</Link></span>
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        </section>
-                    )}
-
-                    {isEdit && (() => {
-                        const breakdown = articleCostBreakdown(initial);
-                        const stockQty = Number(currentQty ?? breakdown.basisQty);
-                        return (
-                            <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs xl:col-span-2">
-                                <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
-                                    <Package size={13} />{t('auto.agirlikli_ortalama_birim_maliyet')}</div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-[12.5px]">
-                                        <thead className="border-b border-slate-100 text-[10.5px] uppercase text-slate-500">
-                                            <tr>
-                                                <th className="py-2 pr-3 text-left font-semibold">{t('auto.kaynak')}</th>
-                                                <th className="px-3 py-2 text-right font-semibold">{t('auto.adet')}</th>
-                                                <th className="px-3 py-2 text-right font-semibold">{t('auto.toplam_deger')}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            <tr>
-                                                <td className="py-2 pr-3 text-slate-600">{t('auto.tedarikten_gelen')}</td>
-                                                <td className="px-3 py-2 text-right font-mono">{fmtNumber(breakdown.supplierQty)} {form.unit}</td>
-                                                <td className="px-3 py-2 text-right font-mono">{fmtMoney(breakdown.supplierValue)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="py-2 pr-3 text-slate-600">{t('auto.manuel_stok_girisi')}</td>
-                                                <td className="px-3 py-2 text-right font-mono">{fmtNumber(breakdown.manualQty)} {form.unit}</td>
-                                                <td className="px-3 py-2 text-right font-mono">{fmtMoney(breakdown.manualValue)}</td>
-                                            </tr>
-                                            <tr className="bg-slate-50/70 font-semibold text-slate-800">
-                                                <td className="py-2 pr-3">{t('common.total')}</td>
-                                                <td className="px-3 py-2 text-right font-mono">{fmtNumber(breakdown.basisQty)} {form.unit}</td>
-                                                <td className="px-3 py-2 text-right font-mono">{fmtMoney(breakdown.basisValue)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-600">
-                                    <div className="font-mono text-slate-700">
-                                        {fmtMoney(breakdown.basisValue)} ÷ {fmtNumber(breakdown.basisQty)} {form.unit} ={' '}
-                                        <span className="font-semibold text-slate-900">{fmtMoney(breakdown.unitCost)}</span> / {form.unit}
-                                    </div>
-                                    <div className="mt-1.5 flex items-baseline justify-between gap-2">
-                                        <span className="text-[11px] uppercase tracking-wider text-slate-400">{t('auto.birim_maliyet')}</span>
-                                        <span className="font-mono text-[15px] font-semibold text-slate-900">{fmtMoney(breakdown.unitCost)}</span>
-                                    </div>
-                                    <div className="mt-1 text-[11px] text-slate-400">{t('auto.mevcut_stok')}{fmtNumber(stockQty)} {form.unit}{t('auto.bu_birim_maliyet_teklif_ekranindaki_kar_zarar_he')}</div>
-                                </div>
-                            </section>
-                        );
-                    })()}
-                </div>
-            )}
-
-            {activeTab === 'suppliers' && (
-                <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
-                    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
-                        <div className="mb-3 flex items-center justify-between">
-                            <span className="text-[11px] font-semibold uppercase text-slate-500">
-                                {editingSupplierLinkId ?t('auto.tedarik_kaydini_duzenle') :t('auto.manuel_tedarik_ekle')}
-                            </span>
-                            {editingSupplierLinkId && (
-                                <button type="button" className="text-[11px] font-semibold text-slate-500 hover:text-slate-900" onClick={resetSupplierForm}>{t('auto.yeni_kayit')}</button>
-                            )}
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-[12px]">
-                            <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
-                                <div className="text-slate-500">{t('auto.guncel_alis')}</div>
-                                <div className="mt-1 font-semibold text-slate-900">{fmtMoney(Number(latestSupply?.purchasePrice || form.baseCost || 0))}</div>
-                            </div>
-                            <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
-                                <div className="text-slate-500">{t('auto.toplam_adet')}</div>
-                                <div className="mt-1 font-semibold text-slate-900">{fmtNumber(totalSupplyQuantity)} {form.unit}</div>
-                            </div>
-                            <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
-                                <div className="text-slate-500">{t('auto.toplam_alis')}</div>
-                                <div className="mt-1 font-semibold text-slate-900">{fmtMoney(totalSupplyValue)}</div>
-                            </div>
-                        </div>
-                        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[12px] text-slate-600">{t('auto.agirlikli_ortalama_maliyet')}<span className="font-mono font-semibold text-slate-900">{fmtMoney(articleUnitCost(form))}</span>
-                        </div>
-                        <div className="mt-4 space-y-3">
-                            <Field label={t('auto.tedarikci')}>
-                                <Select size="sm" value={supplierForm.supplierId} disabled={!!editingSupplierLinkId} onChange={(e) => setSupplierForm({ ...supplierForm, supplierId: e.target.value })}>
-                                    <option value="">{t('auto.yeni_tedarikci')}</option>
-                                    {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.companyName}</option>)}
-                                </Select>
-                            </Field>
-                            {!supplierForm.supplierId && !editingSupplierLinkId && (
-                                <>
-                                    <Field label={t('auto.sirket_adi')}><Input size="sm" value={supplierForm.companyName} onChange={(e) => setSupplierForm({ ...supplierForm, companyName: e.target.value })} /></Field>
-                                    <Field label={t('common.phone')}><Input size="sm" value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} /></Field>
-                                    <Field label={t('common.address')}><Input size="sm" value={supplierForm.address} onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })} /></Field>
-                                </>
-                            )}
-                            <Field label={t('auto.tedarikci_kodu')}><Input size="sm" value={supplierForm.supplierSku} onChange={(e) => setSupplierForm({ ...supplierForm, supplierSku: e.target.value })} /></Field>
-                            <Field label={t('auto.depo')} required>
-                                {locations.length > 0 ? (
-                                    <Select size="sm" value={supplierForm.locationId} onChange={(e) => setSupplierForm({ ...supplierForm, locationId: e.target.value })}>
-                                        <option value="">{t('auto.depo_secin')}</option>
-                                        {locations.map((location) => <option key={location.id} value={location.id}>{location.locationName}</option>)}
-                                    </Select>
-                                ) : (
-                                    <div className="flex items-center gap-1.5 text-[11.5px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5">
-                                        <MapPin size={11} className="shrink-0" />
-                                        <Link to="/inventory/locations" className="underline hover:text-amber-900">{t('auto.once_depo_lokasyon_olusturun')}</Link>
-                                    </div>
-                                )}
-                            </Field>
-                            <Field label={t('auto.eklenecek_adet')} required><Input size="sm" type="number" min={0} step="0.01" value={supplierForm.quantity} onChange={(e) => setSupplierForm({ ...supplierForm, quantity: Number(e.target.value) || 0 })} /></Field>
-                            <Field label={t('auto.birim_alis_fiyati')}><Input size="sm" type="number" min={0} step="0.01" value={supplierForm.purchasePrice} onChange={(e) => setSupplierForm({ ...supplierForm, purchasePrice: Number(e.target.value) || 0 })} /></Field>
-                            <Field label={t('auto.son_alim')}><Input size="sm" type="date" value={supplierForm.lastPurchaseDate} onChange={(e) => setSupplierForm({ ...supplierForm, lastPurchaseDate: e.target.value })} /></Field>
-                            <Field label={t('auto.not')}><Input size="sm" value={supplierForm.notes} onChange={(e) => setSupplierForm({ ...supplierForm, notes: e.target.value })} /></Field>
-                            <Button className="w-full" size="sm" loading={supplierSaving} disabled={!isEdit} onClick={saveSupplier}>
-                                {editingSupplierLinkId ?t('auto.tedarik_kaydini_guncelle') :t('auto.tedarik_kaydini_kaydet')}
-                            </Button>
-                            {!isEdit && <div className="text-[12px] text-slate-500">{t('auto.tedarikci_eklemek_icin_once_urunu_kaydedin')}</div>}
-                        </div>
-                    </section>
-
-                    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
-                        <div className="mb-3 text-[11px] font-semibold uppercase text-slate-500">{t('auto.urun_tedarik_kayitlari')}</div>
-                        {articleSuppliers.length === 0 ? (
-                            <div className="rounded-md border border-dashed border-slate-200 p-6 text-center text-[12px] text-slate-500">{t('auto.tedarik_bilgisi_yok_soldaki_formdan_manuel_ekley')}</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-[12.5px]">
-                                    <thead className="border-b border-slate-100 text-[10.5px] uppercase text-slate-500">
-                                        <tr>
-                                            <th className="py-2 pr-3 text-left">{t('auto.tedarikci')}</th>
-                                            <th className="px-3 py-2 text-left">{t('auto.depo')}</th>
-                                            <th className="px-3 py-2 text-right">{t('auto.adet')}</th>
-                                            <th className="px-3 py-2 text-right">{t('auto.birim_alis')}</th>
-                                            <th className="px-3 py-2 text-right">{t('common.total')}</th>
-                                            <th className="px-3 py-2 text-left">{t('auto.son_alim')}</th>
-                                            <th className="py-2 pl-3 text-right">{t('common.actions')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {articleSuppliers.map((row) => (
-                                            <tr key={row.id} className={editingSupplierLinkId === row.id ? 'bg-blue-50/40' : ''}>
-                                                <td className="py-3 pr-3">
-                                                    <div className="truncate font-semibold text-slate-900">{row.supplier?.companyName || row.supplierId}</div>
-                                                    <div className="text-[11px] text-slate-500">{row.supplierSku || '-'} {row.isPreferred ?t('auto.guncel_alis') : ''}</div>
-                                                </td>
-                                                <td className="px-3 py-3 text-slate-600">{row.location?.locationName || '-'}</td>
-                                                <td className="px-3 py-3 text-right font-mono">{fmtNumber(Number(row.quantity || 0))} {form.unit}</td>
-                                                <td className="px-3 py-3 text-right font-mono">{fmtMoney(row.purchasePrice)}</td>
-                                                <td className="px-3 py-3 text-right font-mono">{fmtMoney(Number(row.quantity || 0) * Number(row.purchasePrice || 0))}</td>
-                                                <td className="px-3 py-3 text-slate-600">{row.lastPurchaseDate ? dayjs(row.lastPurchaseDate).format('DD.MM.YYYY') : '-'}</td>
-                                                <td className="py-3 pl-3 text-right">
-                                                    <button type="button" className="mr-1 rounded px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => startEditSupplierLink(row)}>{t('common.edit')}</button>
-                                                    <button type="button" className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => void removeSupplierLink(row.id)}>
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </section>
-                </div>
-            )}
 
             {scannerOpen && (
                 <BarcodeScannerModal
                     mode={scannerMode}
                     onClose={() => setScannerOpen(false)}
                     onScan={(code) => {
-                        if (scannerMode === 'serial') {
-                            setForm((prev) => ({ ...prev, supplierBarcode: code }));
-                        } else {
-                            setForm((prev) => ({ ...prev, systemBarcode: code }));
-                        }
+                        setForm((prev) => ({ ...prev, supplierBarcode: code }));
                         setScannerOpen(false);
                     }}
                 />

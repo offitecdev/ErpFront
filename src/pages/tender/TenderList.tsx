@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -31,16 +30,8 @@ import { apiClient } from '../../lib/axios';
 import type { CustomerLite, TenderFormat, TenderListItem } from '../../types/tender';
 
 import { t as i18nT } from '@/i18n/translate';
-
-const useLanguageRefresh = () => {
-    const { i18n } = useTranslation();
-    const [, setTick] = useState(0);
-    useEffect(() => {
-        const handler = () => setTick((t: number) => t + 1);
-        i18n.on('languageChanged', handler);
-        return () => i18n.off('languageChanged', handler);
-    }, [i18n]);
-};
+import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
+import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 
 const getStatusLabel = (): Record<string, string> => ({
     Draft:i18nT('crm.tenders.statusDraft'),
@@ -52,15 +43,6 @@ const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info' | 'passive'
     Draft: 'passive',
     Approved: 'approved',
     Exported: 'info',
-};
-
-const isSourceSalesOrder = (value?: string | null) => {
-    const normalized = String(value || '')
-        .trim()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
-    return ['verkaufsauftrag','sales_order','sale_order', 'sipariste', 'siparis', 'auftrag'].includes(normalized);
 };
 
 const tenderStatusLabel = (tender: TenderListItem) =>

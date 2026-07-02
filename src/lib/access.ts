@@ -17,11 +17,24 @@ const collectRoleNames = (user: AnyUser): string[] =>
 
 export const getRoleProfile = (user: AnyUser): RoleProfile => {
     const roles = collectRoleNames(user);
-    const email = (user?.email || '').toLowerCase();
     if (roles.some((r) => r.includes('teknisyen') || r.includes('techniker') || r.includes('technician'))) {
         return 'technician';
     }
-    if (email === 'engin.sahin@offitec.ch' || roles.some((r) => r.includes('proje sorumlusu') || r.includes('project officer'))) {
+
+    // Purely role-based: anyone assigned a project-manager / Proje Sorumlusu role
+    // gets the restricted projectOfficer profile (same menus & permissions),
+    // not just a specific person.
+    if (
+        roles.some((r) =>
+            r.includes('proje yöneticisi') ||
+            r.includes('proje yoneticisi') ||
+            r.includes('project manager') ||
+            r.includes('projektleiter') ||
+            r.includes('projektmanager') ||
+            r.includes('proje sorumlusu') ||
+            r.includes('project officer'),
+        )
+    ) {
         return 'projectOfficer';
     }
     return 'full';
@@ -31,7 +44,7 @@ export const getRoleProfile = (user: AnyUser): RoleProfile => {
 // of the raw permission list. Keys match the MENU leaf keys / single-section paths
 // in MainLayout (and the Home quick-access tiles).
 //   technician   → home, calendar, device assembly (montaj görevleri)
-//   projectOfficer (Engin) → home, calendar, CRM, stock (products + materials +
+//   projectOfficer (project manager role) → home, calendar, CRM, stock (products + materials +
 //      locations + suppliers), projects + orders, service programs
 export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]> = {
     technician: ['/', '/calendar', '/projects/installation/tasks'],
@@ -50,8 +63,7 @@ export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]
     ],
 };
 
-// Whether a given nav/route key is visible for the user's role profile.
-// `full` profiles fall back to the caller's own permission check (returns true here).
+
 export const isKeyAllowedForProfile = (profile: RoleProfile, key: string): boolean => {
     if (profile === 'full') return true;
     return PROFILE_ALLOWED_KEYS[profile].includes(key);

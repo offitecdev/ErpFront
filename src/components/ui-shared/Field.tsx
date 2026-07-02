@@ -1,5 +1,7 @@
 import React from 'react';
-import { Input as AntInput, Select as AntSelect, DatePicker as AntDatePicker } from 'antd';
+import AntDatePicker from 'antd/es/date-picker';
+import AntInput from 'antd/es/input';
+import AntSelect from 'antd/es/select';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 

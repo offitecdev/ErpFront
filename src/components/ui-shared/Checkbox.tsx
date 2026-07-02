@@ -1,5 +1,5 @@
 import React from 'react';
-import { Checkbox as AntCheckbox } from 'antd';
+import AntCheckbox from 'antd/es/checkbox';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { cx } from '../../lib/utils/cx';
 

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { Modal as AntModal, Drawer } from 'antd';
+import AntModal from 'antd/es/modal';
+import Drawer from 'antd/es/drawer';
 
 interface ModalProps {
     open: boolean;
@@ -63,8 +64,8 @@ export const Modal: React.FC<ModalProps> = ({
                         {description && <p className="mt-1 text-sm text-tertiary font-normal">{description}</p>}
                     </div>
                 }
-                width={drawerWidthMap[drawerWidth]}
-                maskClosable={closeOnBackdrop}
+                size={drawerWidthMap[drawerWidth]}
+                mask={{ closable: closeOnBackdrop }}
                 keyboard={closeOnEscape}
                 footer={footer ? (
                     <div className="flex items-center justify-end gap-2">
@@ -98,10 +99,10 @@ export const Modal: React.FC<ModalProps> = ({
                 </div>
             ) : null}
             width={widthMap[width]}
-            maskClosable={closeOnBackdrop}
+            mask={{ closable: closeOnBackdrop }}
             keyboard={closeOnEscape}
             centered
-            destroyOnClose
+            destroyOnHidden
         >
             {children}
         </AntModal>

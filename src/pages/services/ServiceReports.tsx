@@ -133,7 +133,7 @@ export const ServiceReports = () => {
                 preparedBy: project ? deliveryTechnicianName(project, row) : '',
             });
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'PDF oluşturulamadı.');
+            toast.error(e.response?.data?.error || t('services.toastPdfError'));
         } finally {
             setDelBusyId(null);
         }
@@ -148,7 +148,7 @@ export const ServiceReports = () => {
             const { exportFieldReportPdf } = await import('../../utils/pdf/fieldReportPdf');
             await exportFieldReportPdf(project, fullReport, { appointment });
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'PDF oluşturulamadı.');
+            toast.error(e.response?.data?.error || t('services.toastPdfError'));
         } finally {
             setPdfBusyId(null);
         }
@@ -183,7 +183,7 @@ export const ServiceReports = () => {
     const generateGeneralReport = async (p: ProjectDto) => {
         const range = ranges[p.id];
         if (!range?.start || !range?.end) {
-            toast.error('Tarih aralığı seçin.');
+            toast.error(t('projects.tarih_araligi_secin'));
             return;
         }
         setGenBusyId(p.id);
@@ -192,7 +192,7 @@ export const ServiceReports = () => {
             const { exportProjectGeneralReportPdf } = await import('../../utils/pdf/projectReportPdf');
             await exportProjectGeneralReportPdf(project, { startDate: range.start, endDate: range.end });
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Genel rapor oluşturulamadı.');
+            toast.error(e.response?.data?.error || t('projects.genel_rapor_olusturulamadi'));
         } finally {
             setGenBusyId(null);
         }
@@ -222,26 +222,26 @@ export const ServiceReports = () => {
             <PageHeader
                 breadcrumb={t('nav.services')}
                 title={t('nav.serviceReports')}
-                description="Saha raporları ve genel raporlar. Filtreden rapor türünü seçin."
+                description={t('services.reportsDescription')}
             />
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-white/15 dark:bg-white/5">
-                    <TabButton id="field" label="Saha Raporları" />
-                    <TabButton id="general" label="Genel Raporlar" />
+                    <TabButton id="field" label={t('services.tabField')} />
+                    <TabButton id="general" label={t('services.tabGeneral')} />
                     <TabButton id="delivery" label={t('projects.delivery.adminTab')} />
                 </div>
                 {view === 'field' && (
                     <div className="flex flex-wrap gap-3 text-[12px] text-slate-600 dark:text-white">
-                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">Toplam: <b>{stats.total}</b></span>
-                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">Onay bekleyen: <b>{stats.pending}</b></span>
-                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">Ek çalışma: <b>{money(stats.overtime)}</b></span>
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">{t('services.statsTotal')}: <b>{stats.total}</b></span>
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">{t('services.statsPending')}: <b>{stats.pending}</b></span>
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1">{t('services.statsOvertime')}: <b>{money(stats.overtime)}</b></span>
                     </div>
                 )}
             </div>
 
             {view === 'field' && (
-                <Card title="Saha Raporları" icon={<FileCheck size={14} />} noPadding>
+                <Card title={t('services.tabField')} icon={<FileCheck size={14} />} noPadding>
                     <form
                         className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-slate-100 px-3 py-3 [scrollbar-width:thin]"
                         onSubmit={(event) => {
@@ -251,7 +251,7 @@ export const ServiceReports = () => {
                     >
                         <div className="relative shrink-0">
                             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Proje / müşteri / iş ara…" className="ofi-light-search-input w-[260px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
+                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('projects.flow.searchPlaceholder')} className="ofi-light-search-input w-[260px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
                         </div>
                         <Button type="submit" variant="secondary" size="sm" className="shrink-0">{t('auto.uygula')}</Button>
                         <Button type="button" variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => { setSearch(''); void load(''); }} className="shrink-0">{t('common.clear')}</Button>
@@ -261,15 +261,15 @@ export const ServiceReports = () => {
                         <table className="w-full text-[12.5px]">
                             <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th className="px-3 py-2 text-left font-semibold">Oluşturma Tarihi</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Randevu Tarihi</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Müşteri / Proje</th>
-                                    <th className="px-3 py-2 text-right font-semibold w-[92px]">Randevu Saati</th>
-                                    <th className="px-3 py-2 text-right font-semibold">Çalışılan Saat</th>
-                                    <th className="px-3 py-2 text-right font-semibold">Fazla Çalışma</th>
-                                    <th className="px-3 py-2 text-right font-semibold">Saat Ücreti</th>
-                                    <th className="px-3 py-2 text-right font-semibold">Ek Ücret</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Durum</th>
+                                    <th className="px-3 py-2 text-left font-semibold">{t('services.colCreatedAt')}</th>
+                                    <th className="px-3 py-2 text-left font-semibold">{t('services.colWorkDate')}</th>
+                                    <th className="px-3 py-2 text-left font-semibold">{t('services.colCustomerProject')}</th>
+                                    <th className="px-3 py-2 text-right font-semibold w-[92px]">{t('services.colAppointmentTime')}</th>
+                                    <th className="px-3 py-2 text-right font-semibold">{t('services.colWorkedHours')}</th>
+                                    <th className="px-3 py-2 text-right font-semibold">{t('services.colOvertime')}</th>
+                                    <th className="px-3 py-2 text-right font-semibold">{t('services.colHourlyRate')}</th>
+                                    <th className="px-3 py-2 text-right font-semibold">{t('services.colExtraFee')}</th>
+                                    <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
                                     <th className="px-3 py-2 text-right font-semibold">PDF</th>
                                 </tr>
                             </thead>
@@ -287,8 +287,8 @@ export const ServiceReports = () => {
                                             <div className="px-4 py-6">
                                                 <EmptyState
                                                     icon={<FileCheck size={32} />}
-                                                    title="Saha raporu yok"
-                                                    description="Saha raporları proje üzerindeki randevulardan oluşturulur."
+                                                    title={t('services.noFieldReports')}
+                                                    description={t('services.noFieldReportsDesc')}
                                                 />
                                             </div>
                                         </td>
@@ -309,8 +309,8 @@ export const ServiceReports = () => {
                                         <td className="px-3 py-2 text-right font-medium text-slate-800">{money(r.overtimeCost)}</td>
                                         <td className="px-3 py-2">
                                             {r.hoursApprovedAt
-                                                ? <StatusChip variant={r.autoApproved ? 'info' : 'active'}>{r.autoApproved ? 'Otomatik onay' : 'Onaylandı'}</StatusChip>
-                                                : <StatusChip variant="warning">Bekliyor</StatusChip>}
+                                                ? <StatusChip variant={r.autoApproved ? 'info' : 'active'}>{r.autoApproved ? t('services.autoApproved') : t('services.approved')}</StatusChip>
+                                                : <StatusChip variant="warning">{t('services.statusPending')}</StatusChip>}
                                         </td>
                                         <td className="px-3 py-2 text-right">
                                             <Button variant="ghost" size="sm" icon={<DownloadIcon size={13} />} disabled={pdfBusyId === r.id} onClick={() => void downloadReportPdf(r)}>
@@ -326,15 +326,15 @@ export const ServiceReports = () => {
             )}
 
             {view === 'general' && (
-                <Card title="Genel Raporlar" icon={<FileCheck size={14} />} noPadding>
+                <Card title={t('services.tabGeneral')} icon={<FileCheck size={14} />} noPadding>
                     <div className="overflow-x-auto">
                         <table className="w-full text-[12.5px]">
                             <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th className="px-3 py-2 text-left font-semibold">Proje</th>
-                                    <th className="px-3 py-2 text-left font-semibold">Müşteri</th>
-                                    <th className="px-3 py-2 text-left font-semibold w-[160px]">Başlangıç</th>
-                                    <th className="px-3 py-2 text-left font-semibold w-[160px]">Bitiş</th>
+                                    <th className="px-3 py-2 text-left font-semibold">{t('services.colProject')}</th>
+                                    <th className="px-3 py-2 text-left font-semibold">{t('services.colCustomer')}</th>
+                                    <th className="px-3 py-2 text-left font-semibold w-[160px]">{t('services.colStart')}</th>
+                                    <th className="px-3 py-2 text-left font-semibold w-[160px]">{t('services.colEnd')}</th>
                                     <th className="px-3 py-2 text-right font-semibold">PDF</th>
                                 </tr>
                             </thead>
@@ -343,7 +343,7 @@ export const ServiceReports = () => {
                                     <tr><td colSpan={5} className="px-3 py-3"><div className="h-4 w-full animate-pulse rounded bg-slate-100" /></td></tr>
                                 )}
                                 {projectsLoaded && projects.length === 0 && (
-                                    <tr><td colSpan={5}><div className="px-4 py-6"><EmptyState icon={<FileCheck size={32} />} title="Proje yok" description="Genel rapor alınacak proje bulunamadı." /></div></td></tr>
+                                    <tr><td colSpan={5}><div className="px-4 py-6"><EmptyState icon={<FileCheck size={32} />} title={t('services.noProjects')} description={t('services.noProjectsDesc')} /></div></td></tr>
                                 )}
                                 {projects.map((p) => (
                                     <tr key={p.id} className="hover:bg-slate-50/60">
@@ -361,7 +361,7 @@ export const ServiceReports = () => {
                                                     {previewBusyId === p.id ? '…' : t('projects.general.preview')}
                                                 </Button>
                                                 <Button variant="secondary" size="sm" icon={<DownloadIcon size={13} />} disabled={genBusyId === p.id} onClick={() => void generateGeneralReport(p)}>
-                                                    {genBusyId === p.id ? '…' : 'Genel Rapor'}
+                                                    {genBusyId === p.id ? '…' : t('services.generalReportBtn')}
                                                 </Button>
                                             </div>
                                         </td>

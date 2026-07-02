@@ -50,9 +50,9 @@ const durationFmt = (minutes?: number | null) => {
     const total = Math.max(0, Math.round(Number(minutes || 0)));
     const hours = Math.floor(total / 60);
     const mins = total % 60;
-    if (hours && mins) return `${hours} sa ${mins} dk`;
-    if (hours) return `${hours} sa`;
-    return `${mins} dk`;
+    if (hours && mins) return `${hours} ${t('common.hours')} ${mins} ${t('common.minutes')}`;
+    if (hours) return `${hours} ${t('common.hours')}`;
+    return `${mins} ${t('common.minutes')}`;
 };
 const personName = (person?: { firstName?: string | null; lastName?: string | null; email?: string | null } | null) =>
     cleanText([person?.firstName, person?.lastName].filter(Boolean).join(' ')) || cleanText(person?.email) || '-';
@@ -593,7 +593,7 @@ const InstallationDetailCard = ({
                             <div key={item.id} className="flex items-start justify-between gap-3 px-3 py-2 text-[12.5px]">
                                 <div className="min-w-0">
                                     <div className="font-semibold text-slate-800">{item.material?.name ||t('projects.malzeme')}</div>
-                                    <div className="mt-0.5 text-slate-500">{item.material?.serialId || '-'} · {numberFmt(item.quantity)}{t('projects.adet')}{item.source}</div>
+                                    <div className="mt-0.5 text-slate-500">{item.material?.serialId || '-'} · {numberFmt(item.quantity)} {t('projects.adet')} · {item.source}</div>
                                     {item.note && <div className="mt-0.5 text-slate-500">{item.note}</div>}
                                 </div>
                                 <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600">{t('projects.dahil')}</span>
@@ -609,7 +609,7 @@ const InstallationDetailCard = ({
                             <div key={item.id} className="flex items-start justify-between gap-3 px-3 py-2 text-[12.5px]">
                                 <div className="min-w-0">
                                     <div className="font-semibold text-slate-800">{item.material?.name ||t('projects.malzeme')}</div>
-                                    <div className="mt-0.5 text-slate-500">{numberFmt(item.quantity)}{t('projects.adet_x')}{money(item.unitPrice)}</div>
+                                    <div className="mt-0.5 text-slate-500">{numberFmt(item.quantity)} {t('projects.adet_x')} {money(item.unitPrice)}</div>
                                     {item.description && <div className="mt-0.5 text-slate-500">{item.description}</div>}
                                 </div>
                                 <span className="shrink-0 font-mono font-semibold text-slate-900">{money(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</span>

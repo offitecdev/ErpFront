@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer } from 'antd';
+import Drawer from 'antd/es/drawer';
 
 interface SlidePanelProps {
     open: boolean;
@@ -32,8 +32,8 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
                     {subtitle && <p className="mt-1 text-sm text-tertiary font-normal">{subtitle}</p>}
                 </div>
             }
-            width={numericWidth}
-            maskClosable
+            size={numericWidth}
+            mask={{ closable: true }}
             keyboard
             styles={{
                 header: { borderBottom: '1px solid #f1f5f9', padding: '20px 24px' },

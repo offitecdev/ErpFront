@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { DatePicker, Select as AntSelect } from 'antd';
+import DatePicker from 'antd/es/date-picker';
+import AntSelect from 'antd/es/select';
 import { AlertTriangle, ArrowLeft, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 

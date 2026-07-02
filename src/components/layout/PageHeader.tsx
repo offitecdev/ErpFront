@@ -1,5 +1,16 @@
 import React from 'react';
 
+// Tüm "Stok" alt modüllerinde ortak, küçük ve sade başlık: marka renginde,
+// altı çizili değil, tıklanamaz. Aynı biçim ve konumlandırma her sayfada kullanılır.
+export const StockModuleHeader: React.FC<{ label: string; actions?: React.ReactNode }> = ({ label, actions }) => (
+    <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200/60 pb-2.5">
+        <span className="text-[12px] font-semibold tracking-tight" style={{ color: '#272f67' }}>
+            {label}
+        </span>
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </div>
+);
+
 interface PageHeaderProps {
     title: React.ReactNode;
     description?: React.ReactNode;

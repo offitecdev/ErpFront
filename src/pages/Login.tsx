@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
-import { LuArrowLeft, LuArrowRight, LuCheck, LuMoon, LuSun } from 'react-icons/lu';
+import { LuArrowLeft, LuArrowRight, LuCheck, LuMoon, LuSun } from '@/components/icons/lucideLocal';
 import { toast } from 'sonner';
-import { Input as AntInput, type InputRef } from 'antd';
+import AntInput, { type InputRef } from 'antd/es/input';
 import { Button } from '@/components/ui-shared/Button';
 import { LanguageSwitcher } from '@/components/ui-shared/LanguageSwitcher';
 import { Snowflake } from '@/components/ui-shared/Snowflake';

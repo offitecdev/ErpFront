@@ -1,0 +1,33 @@
+import { createPortal } from 'react-dom';
+import { File05 as FileText } from '@/components/icons/antIconCompat';
+import { t } from '@/i18n/translate';
+
+// Full-screen "Generating PDF…" indicator shown while a tender PDF is being
+// assembled — including the stage where product image URLs are fetched (images
+// are no longer kept in the tender detail; they load only at this point).
+// Standalone component so any export flow can drop it in.
+type PdfGeneratingOverlayProps = {
+    open: boolean;
+    /** Optional sub-line, e.g. "Loading product images…" for the image stage. */
+    detail?: string | null;
+};
+
+export const PdfGeneratingOverlay = ({ open, detail }: PdfGeneratingOverlayProps) => {
+    if (!open || typeof document === 'undefined') return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 rounded-2xl bg-white px-10 py-8 shadow-2xl">
+                <div className="relative flex h-14 w-14 items-center justify-center">
+                    <span className="absolute inset-0 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#1f2654]" />
+                    <FileText size={22} className="text-[#1f2654]" />
+                </div>
+                <div className="text-center">
+                    <div className="text-[14px] font-semibold text-slate-800">{t('tenders.pdf_olusturuluyor')}</div>
+                    {detail && <div className="mt-1 text-[12px] text-slate-500">{detail}</div>}
+                </div>
+            </div>
+        </div>,
+        document.body,
+    );
+};

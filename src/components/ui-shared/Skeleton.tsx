@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Skeleton as AntSkeleton } from 'antd';
+import AntSkeleton from 'antd/es/skeleton';
 import { cx } from '../../lib/utils/cx';
 
 function Skeleton({ className, style, ...props }: React.ComponentProps<'div'>) {

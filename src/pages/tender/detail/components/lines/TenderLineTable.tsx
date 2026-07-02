@@ -1,0 +1,275 @@
+import {
+    File05 as FileText,
+    Package,
+    Plus,
+} from '@/components/icons/antIconCompat';
+import { Button } from '@/components/ui-shared/Button';
+import { Checkbox } from '@/components/ui-shared/Checkbox';
+import { t } from '@/i18n/translate';
+
+import { markdownToHtml } from '../../TenderRichText';
+import { fmtMoney } from '../../tenderDetailUtils';
+import type {
+    ManualProductForm,
+    NumberField,
+    ProductSource,
+    SimpleTenderLine,
+    TenderLineColumnKey,
+    TextField,
+} from '../../types/tenderDetail.types';
+import {
+    DEFAULT_TENDER_LINE_COLUMN_WIDTHS,
+    INLINE_NAME_INPUT_CLASS,
+    INLINE_TITLE_INPUT_CLASS,
+    lineActionButtonClass,
+} from '../../utils/tenderDetail.constants';
+import { cleanImportedProductDescription } from '../../utils/tenderLine.utils';
+import { BufferedTextInput, InlineDescriptionEditor } from '../TenderLineInputs';
+import { TenderLineHeaderCell } from './TenderLineTableHeader';
+import { TenderLinePriceInput } from './TenderLinePriceInput';
+
+type TenderLineTableProps = {
+    pagedRows: SimpleTenderLine[];
+    isEmpty: boolean;
+    isDraft: boolean;
+    canManage: boolean;
+    sectionSchemaOpen: boolean;
+    fallbackTaxRate: number;
+    grandTotal: number;
+    selectedId: string | null;
+    selectedRowIds: Record<string, boolean>;
+    allRowsSelected: boolean;
+    someRowsSelected: boolean;
+    stableRowKeys: Map<string, string>;
+    lastRowId?: string;
+    onSelectRow: (rowId: string) => void;
+    onToggleAllRows: (checked: boolean) => void;
+    onToggleRow: (rowId: string, checked: boolean) => void;
+    commitTextField: (positionId: string, field: TextField, value: string) => void;
+    commitNumberField: (positionId: string, field: NumberField, value: number) => void;
+    commitLongDescription: (positionId: string, value: string) => void;
+    registerCell: (key: string, handle: { focus: () => void } | null) => void;
+    onArrowNav: (col: string, rowIndex: number, dir: 1 | -1) => boolean;
+    onAddRow: (rowType: 'TITLE' | 'DESCRIPTION' | 'PRODUCT', article?: ProductSource, options?: Partial<ManualProductForm>, afterRowId?: string) => void;
+    onOpenProductPicker: (afterRowId?: string) => void;
+};
+
+export const TenderLineTable = ({
+    pagedRows,
+    isEmpty,
+    isDraft,
+    canManage,
+    sectionSchemaOpen,
+    fallbackTaxRate,
+    grandTotal,
+    selectedId,
+    selectedRowIds,
+    allRowsSelected,
+    someRowsSelected,
+    stableRowKeys,
+    lastRowId,
+    onSelectRow,
+    onToggleAllRows,
+    onToggleRow,
+    commitTextField,
+    commitNumberField,
+    commitLongDescription,
+    registerCell,
+    onArrowNav,
+    onAddRow,
+    onOpenProductPicker,
+}: TenderLineTableProps) => {
+    const fixedLineColumnStyle = (key: TenderLineColumnKey) => ({ width: DEFAULT_TENDER_LINE_COLUMN_WIDTHS[key] });
+
+    return (
+        <table data-tender-detail-table className="min-w-[1160px] w-full table-fixed text-[12px]">
+            <colgroup>
+                <col style={fixedLineColumnStyle('select')} />
+                <col />
+                <col style={fixedLineColumnStyle('quantity')} />
+                <col style={fixedLineColumnStyle('unit')} />
+                <col style={fixedLineColumnStyle('unitPrice')} />
+                <col style={fixedLineColumnStyle('discount')} />
+                <col style={fixedLineColumnStyle('taxRate')} />
+                <col style={fixedLineColumnStyle('total')} />
+            </colgroup>
+            <thead className="border-b border-slate-200 bg-slate-50 text-[10.5px] uppercase tracking-wider text-slate-500">
+                <tr>
+                    <th className="px-1.5 py-2 text-center font-semibold">
+                        <Checkbox
+                            aria-label={t('tenders.all_satirlari_select')}
+                            size="sm"
+                            isSelected={allRowsSelected}
+                            isIndeterminate={someRowsSelected && !allRowsSelected}
+                            onChange={onToggleAllRows}
+                            onClick={(event) => event.stopPropagation()}
+                        />
+                    </th>
+                    <TenderLineHeaderCell label={t('nav.articles')} align="left" className="!border-l-0 px-3" />
+                    <TenderLineHeaderCell label={t('common.quantity')} noTruncate />
+                    <TenderLineHeaderCell label={t('tenders.unit')} />
+                    <TenderLineHeaderCell label={sectionSchemaOpen ?t('tenders.unit_price') :t('tenders.unit_price')} />
+                    <TenderLineHeaderCell label={sectionSchemaOpen ?t('tenders.ind') :t('common.discount')} />
+                    <TenderLineHeaderCell label="KDV" />
+                    <TenderLineHeaderCell label={t('common.amount')} />
+                </tr>
+            </thead>
+            <tbody>
+                {isEmpty && (
+                    <tr>
+                        <td colSpan={8} className="px-3 py-10 text-center text-[12px] text-slate-400">{t('tenders.tender_line_not_found')}</td>
+                    </tr>
+                )}
+                {pagedRows.map((row, rowIndex) => {
+                    const position = row.position;
+                    const isSelected = selectedId === row.id;
+                    const isProduct = row.kind === 'PRODUCT';
+                    const isDescription = row.kind === 'DESCRIPTION';
+                    const taxRate = Number(position.taxRate || fallbackTaxRate);
+                    const visibleLongDescription = isProduct
+                        ? cleanImportedProductDescription(position.longDescription)
+                        : position.longDescription || '';
+
+                    return (
+                        <tr
+                            key={stableRowKeys.get(row.id) ?? row.id}
+                            onClick={() => onSelectRow(row.id)}
+                            className={`group border-b border-slate-100 transition-colors ${isSelected ? 'bg-[#1f2654]/[0.045]' : row.kind === 'TITLE' ? 'bg-slate-50/70' : 'hover:bg-slate-50/60'}`}
+                        >
+                            <td className="px-1.5 py-1.5 text-center align-top">
+                                <Checkbox
+                                    aria-label={t('tenders.line_select')}
+                                    size="sm"
+                                    isSelected={!!selectedRowIds[row.id]}
+                                    onChange={(checked) => onToggleRow(row.id, checked)}
+                                    onClick={(event) => event.stopPropagation()}
+                                />
+                            </td>
+                            <td className="px-3 py-1.5 align-top">
+                                <div className={`flex min-w-0 ${row.label ? 'gap-2' : ''}`}>
+                                    {row.label && (
+                                        <span className={`mt-0.5 w-10 shrink-0 font-mono ${row.kind === 'TITLE' ?"text-[13px] font-semibold text-slate-900" :"text-[12px] text-slate-700"}`}>
+                                            {row.label}
+                                        </span>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        {!isDescription && (
+                                            isDraft ? (
+                                                <BufferedTextInput
+                                                    ariaLabel={row.kind === 'TITLE' ?t('tenders.baslik') :t('tenders.product_adi')}
+                                                    value={position.shortDescription || ''}
+                                                    field="shortDescription"
+                                                    commit={commitTextField}
+                                                    positionId={row.id}
+                                                    rowIndex={rowIndex}
+                                                    navCol="shortDescription"
+                                                    registerCell={registerCell}
+                                                    onArrowNav={onArrowNav}
+                                                    className={row.kind === 'TITLE' ? INLINE_TITLE_INPUT_CLASS : INLINE_NAME_INPUT_CLASS}
+                                                />
+                                            ) : (
+                                                <div className={`${row.kind === 'TITLE' ?"text-[14px] font-semibold text-slate-900" :"text-[13px] font-medium text-slate-900"}`}>
+                                                    {position.shortDescription}
+                                                </div>
+                                            )
+                                        )}
+
+                                        {isDescription && (
+                                            <div className="flex min-w-0 flex-col gap-2">
+                                                {isDraft ? (
+                                                    <InlineDescriptionEditor
+                                                        positionId={row.id}
+                                                        value={position.longDescription || ''}
+                                                        minHeight={82}
+                                                        commit={commitLongDescription}
+                                                    />
+                                                ) : position.longDescription ? (
+                                                    <div
+                                                        className="rich-text-preview text-[12.5px] leading-5 text-slate-700 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_li]:pl-0.5"
+                                                        dangerouslySetInnerHTML={{ __html: markdownToHtml(position.longDescription) }}
+                                                    />
+                                                ) : null}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {isProduct && (
+                                    <div className="mt-2 flex min-w-0 flex-col gap-2">
+                                        {isDraft ? (
+                                            <InlineDescriptionEditor
+                                                positionId={row.id}
+                                                value={visibleLongDescription}
+                                                minHeight={132}
+                                                commit={commitLongDescription}
+                                            />
+                                        ) : visibleLongDescription ? (
+                                            <div
+                                                className="rich-text-preview text-[12.5px] leading-5 text-slate-700 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_li]:pl-0.5"
+                                                dangerouslySetInnerHTML={{ __html: markdownToHtml(visibleLongDescription) }}
+                                            />
+                                        ) : null}
+                                    </div>
+                                )}
+                            </td>
+                            <td className="border-l border-slate-100 px-1.5 py-1.5 text-right align-top">
+                                <TenderLinePriceInput row={row} field="quantity" value={position.quantity} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} />
+                            </td>
+                            <td className="border-l border-slate-100 px-1.5 py-1.5 text-right align-top">
+                                {isProduct && isDraft ? (
+                                    <BufferedTextInput
+                                        ariaLabel={t('tenders.unit')}
+                                        value={position.unit || ''}
+                                        field="unit"
+                                        commit={commitTextField}
+                                        positionId={row.id}
+                                        rowIndex={rowIndex}
+                                        navCol="unit"
+                                        registerCell={registerCell}
+                                        onArrowNav={onArrowNav}
+                                        className="w-full min-w-0 rounded-md border border-transparent bg-transparent text-right text-[11.5px] text-slate-700 transition-colors hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
+                                    />
+                                ) : (
+                                    <span className="block text-right text-[11.5px] text-slate-600">{isProduct ? position.unit : ''}</span>
+                                )}
+                            </td>
+                            <td className="border-l border-slate-100 px-1.5 py-1.5 text-right align-top">
+                                <TenderLinePriceInput row={row} field="unitPrice" value={position.unitPrice} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} />
+                            </td>
+                            <td className="border-l border-slate-100 px-1.5 py-1.5 text-right align-top">
+                                <TenderLinePriceInput row={row} field="discount" value={position.discount} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} max={100} />
+                            </td>
+                            <td className="border-l border-slate-100 px-1.5 py-1.5 text-right align-top">
+                                <TenderLinePriceInput row={row} field="taxRate" value={taxRate} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} max={100} />
+                            </td>
+                            <td className="border-l border-slate-100 px-2 py-1.5 text-right align-top">
+                                <span className="font-mono text-[12px] font-semibold text-slate-900">
+                                    {isProduct && row.total > 0 ? fmtMoney(row.total) : ''}
+                                </span>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+            <tfoot>
+                {isDraft && canManage && (
+                    <tr className="border-t border-slate-200 bg-white">
+                        <td />
+                        <td colSpan={7} className="px-2 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="secondary" icon={<Package size={12} />} onClick={() => onOpenProductPicker(lastRowId)} className={lineActionButtonClass}>{t('tenders.product_add')}</Button>
+                                <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={() => onAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik_add')}</Button>
+                                <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={() => onAddRow('DESCRIPTION', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.description_add')}</Button>
+                            </div>
+                        </td>
+                    </tr>
+                )}
+                <tr className="border-t-2 border-slate-200 bg-slate-50/60">
+                    <td colSpan={7} className="px-2 py-2 text-right font-semibold text-slate-700">{t('tenders.general_total')}</td>
+                    <td className="px-2 py-2 text-right font-mono text-[12px] font-bold text-slate-900">
+                        {fmtMoney(grandTotal)}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    );
+};

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Spin } from 'antd';
+import Modal from 'antd/es/modal';
+import Spin from 'antd/es/spin';
 
 interface BlockingDialogProps {
     open: boolean;
@@ -9,7 +10,7 @@ interface BlockingDialogProps {
 
 export const BlockingDialog: React.FC<BlockingDialogProps> = ({ open, title, description }) => {
     return (
-        <Modal open={open} centered footer={null} closable={false} maskClosable={false} keyboard={false} width={448}>
+        <Modal open={open} centered footer={null} closable={false} mask={{ closable: false }} keyboard={false} width={448}>
             <div className="flex items-start gap-4">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-primary_alt">
                     <Spin size="small" />

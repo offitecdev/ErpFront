@@ -37,7 +37,7 @@ const COLOR_ALT_ROW = [245, 245, 247] as const;
 // ── Yazı tipi boyutları (puan) — tenderPdf ile uyumlu ─────────────────────────
 const FS_BASE = 9;
 const FS_HEADER = 9;       // Lacivert şeritlerdeki başlıklar
-const FS_TITLE = 16;       // "Gesamtbericht" başlığı
+const FS_TITLE = 16;       // "Gesamtrapport" başlığı
 const FS_VALUE = 9;        // Tablo değer hücreleri
 
 // ── Fontlar (tenderPdf ile birebir: Arial/Arimo) ──────────────────────────────
@@ -401,7 +401,7 @@ const drawCoverHeader = (
     const implDate = kind === 'general' ? dateShort(today) : dateShort(reportDate(report));
     const reportDateLabel = kind === 'general' ? dateShort(today) : dateShort(reportDate(report));
     const boxTitle = kind === 'general' ? 'Genel Rapor No :' : 'Saha Rapor No :';
-    const docTitle = kind === 'general' ? `Gesamtbericht ${reportNo}` : `Feldbericht ${reportNo}`;
+    const docTitle = kind === 'general' ? `Gesamtrapport ${reportNo}` : `Montage-Rapport ${reportNo}`;
 
     // ── Sol lacivert bilgi kutusu ─────────────────────────────────────────────
     const boxX = LEFT;
@@ -473,7 +473,7 @@ const drawCoverHeader = (
         rYy += addr.length * 4.8;
     }
 
-    // ── "Gesamtbericht {no}" başlığı ──────────────────────────────────────────
+    // ── "Gesamtrapport {no}" başlığı ──────────────────────────────────────────
     const yTitle = Math.max(boxBottom, rYy) + 16;
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_TITLE);
