@@ -4,6 +4,7 @@ import type {
     InventoryLocation,
     InventoryArticle,
     ArticleStockSummary,
+    ArticleListItem,
     StockBalanceRow,
     StockMovementRow,
     PurchaseProposalRow,
@@ -27,6 +28,20 @@ interface InventoryState {
     articles: ArticleStockSummary[];
     articlesLoading: boolean;
     fetchArticlesSummary: () => Promise<void>;
+
+    // Server-side paginated products list (15 at a time) — separate from the full
+    // `articles` summary, which is only loaded on demand (e.g. the stats modal).
+    articlesPageItems: ArticleListItem[];
+    articlesTotal: number;
+    articlesPageLoading: boolean;
+    fetchArticlesPage: (params: {
+        page: number;
+        pageSize?: number;
+        search?: string;
+        status?: string;
+        itemType?: string;
+    }) => Promise<void>;
+
     createArticle: (data: Partial<InventoryArticle>) => Promise<InventoryArticle>;
     updateArticle: (id: string, patch: Partial<InventoryArticle>) => Promise<InventoryArticle>;
     deleteArticle: (id: string) => Promise<void>;
@@ -46,6 +61,9 @@ interface InventoryState {
         movementType: MovementType;
         quantity: number;
         unitCost?: number | null;
+        supplierId?: string | null;
+        itemKind?: 'PRODUCT' | 'MATERIAL';
+        materialId?: string | null;
         sourceLocationId?: string | null;
         destLocationId?: string | null;
         referenceId?: string | null;
@@ -81,10 +99,25 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     fetchArticlesSummary: async () => {
         set({ articlesLoading: true });
         try {
-            const articles = await inventoryApi.articlesSummary();
+            // Only used on demand now (product stats modal / form fallback); images
+            // are no longer shown in the list, so skip the heavy base64 payload.
+            const articles = await inventoryApi.articlesSummary(false);
             set({ articles });
         } finally {
             set({ articlesLoading: false });
+        }
+    },
+
+    articlesPageItems: [],
+    articlesTotal: 0,
+    articlesPageLoading: false,
+    fetchArticlesPage: async ({ page, pageSize = 15, search, status, itemType }) => {
+        set({ articlesPageLoading: true });
+        try {
+            const res = await inventoryApi.articlesSummaryPaged({ page, pageSize, search, status, itemType });
+            set({ articlesPageItems: res.items, articlesTotal: res.total });
+        } finally {
+            set({ articlesPageLoading: false });
         }
     },
     createArticle: async (data) => {

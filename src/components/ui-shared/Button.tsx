@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button as AntButton } from 'antd';
+import AntButton from 'antd/es/button';
 import type { ButtonType } from 'antd/es/button';
 import { cx } from '../../lib/utils/cx';
 

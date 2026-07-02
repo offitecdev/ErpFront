@@ -17,7 +17,6 @@ import {
     File05 as FileSpreadsheet,
     Hash01 as Hash,
     Mail01 as Mail,
-    MarkerPin01 as MapPin,
     Phone,
     Plus,
     RefreshCcw01 as RefreshIcon,
@@ -39,6 +38,11 @@ import { Checkbox } from '../../components/ui-shared/Checkbox';
 import { Modal } from '../../components/ui-shared/Modal';
 import { tenderApi } from '../../lib/api/tender';
 import type { TenderListItem } from '../../types/tender';
+import { customerApi } from '../../lib/api/customer';
+import { ContactsTab, AddressesTab } from './CustomerEntityTabs';
+import { OrdersTab, BillingTab } from './CustomerOrdersBilling';
+import { CustomerReports } from './CustomerReports';
+import { CUSTOMER_TYPE_OPTIONS, CUSTOMER_LANGUAGE_OPTIONS, CUSTOMER_STATUS_OPTIONS, DEFAULT_CUSTOMER_TYPE, DEFAULT_CUSTOMER_STATUS, getCustomerTypeLabel, getCustomerLanguageLabel, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
 
 import { t as i18nT } from '@/i18n/translate';
 
@@ -46,15 +50,39 @@ interface CustomerDashboardDto {
     id: string;
     companyName: string;
     segment?: string | null;
+    customerType?: string | null;
     taxOffice?: string | null;
     taxNumber?: string | null;
+    vatNumber?: string | null;
     mainEmail?: string | null;
     mainPhone?: string | null;
+    mobilePhone?: string | null;
+    website?: string | null;
+    language?: string | null;
+    customerSource?: string | null;
+    responsibleFirstName?: string | null;
+    responsibleLastName?: string | null;
     address?: string | null;
+    status?: string | null;
     isActive: boolean;
     activities?: ActivityDto[];
     notes?: NoteDto[];
     contacts?: ContactDto[];
+    locations?: LocationDto[];
+}
+
+interface LocationDto {
+    id: string;
+    name: string;
+    address?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    contactPerson?: string | null;
+    isPrimary: boolean;
+    notes?: string | null;
 }
 
 interface ActivityDto {
@@ -81,6 +109,8 @@ interface ContactDto {
     title?: string | null;
     email?: string | null;
     phone?: string | null;
+    mobilePhone?: string | null;
+    notes?: string | null;
     isPrimaryContact: boolean;
 }
 
@@ -117,28 +147,44 @@ const fmtMoney = (v?: number | null) =>
 const activityActor = (activity: ActivityDto) =>
     activity.employeeName || activity.employeeEmail || activity.employeeId;
 
-type CustomerTabId = 'profile' | 'offers' | 'projects' | 'notes' | 'activities';
+type CustomerTabId = 'profile' | 'contacts' | 'locations' | 'offers' | 'orders' | 'billing' | 'projects' | 'reports' | 'notes' | 'activities';
 
 interface EditForm {
     companyName: string;
     segment: string;
+    customerType: string;
     taxOffice: string;
     taxNumber: string;
+    vatNumber: string;
     mainEmail: string;
     mainPhone: string;
+    mobilePhone: string;
+    website: string;
+    language: string;
+    customerSource: string;
+    responsibleFirstName: string;
+    responsibleLastName: string;
     address: string;
-    isActive: boolean;
+    status: string;
 }
 
 const toEditForm = (d: CustomerDashboardDto): EditForm => ({
     companyName: d.companyName ?? '',
     segment: d.segment ?? '',
+    customerType: d.customerType ?? DEFAULT_CUSTOMER_TYPE,
     taxOffice: d.taxOffice ?? '',
     taxNumber: d.taxNumber ?? '',
+    vatNumber: d.vatNumber ?? '',
     mainEmail: d.mainEmail ?? '',
     mainPhone: d.mainPhone ?? '',
+    mobilePhone: d.mobilePhone ?? '',
+    website: d.website ?? '',
+    language: d.language ?? '',
+    customerSource: d.customerSource ?? '',
+    responsibleFirstName: d.responsibleFirstName ?? '',
+    responsibleLastName: d.responsibleLastName ?? '',
     address: d.address ?? '',
-    isActive: d.isActive ?? true,
+    status: d.status ?? DEFAULT_CUSTOMER_STATUS,
 });
 
 export const CustomerDashboard = () => {
@@ -151,8 +197,9 @@ export const CustomerDashboard = () => {
 
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState<EditForm>({
-        companyName: '', segment: '', taxOffice: '', taxNumber: '',
-        mainEmail: '', mainPhone: '', address: '', isActive: true,
+        companyName: '', segment: '', customerType: DEFAULT_CUSTOMER_TYPE, taxOffice: '', taxNumber: '',
+        vatNumber: '', mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
+        customerSource: '', responsibleFirstName: '', responsibleLastName: '', address: '', status: DEFAULT_CUSTOMER_STATUS,
     });
     const [savingProfile, setSavingProfile] = useState(false);
 
@@ -168,6 +215,17 @@ export const CustomerDashboard = () => {
     const [savingNote, setSavingNote] = useState(false);
     const [savingActivity, setSavingActivity] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Inline edit / delete state for notes and activities (logs)
+    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+    const [editNoteForm, setEditNoteForm] = useState({ noteType: 'internal', noteText: '', isHighlight: false });
+    const [savingNoteEdit, setSavingNoteEdit] = useState(false);
+    const [confirmDeleteNoteId, setConfirmDeleteNoteId] = useState<string | null>(null);
+
+    const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+    const [editActivityForm, setEditActivityForm] = useState({ activityType: 'Meeting', description: '' });
+    const [savingActivityEdit, setSavingActivityEdit] = useState(false);
+    const [confirmDeleteActivityId, setConfirmDeleteActivityId] = useState<string | null>(null);
 
     // Silent in-place refresh of the customer section after every action —
     // does NOT trigger the full-page skeleton, so the active tab stays put.
@@ -294,14 +352,86 @@ export const CustomerDashboard = () => {
         }
     };
 
+    const startEditNote = (n: NoteDto) => {
+        setEditingNoteId(n.id);
+        setEditNoteForm({ noteType: n.noteType, noteText: n.noteText, isHighlight: n.isHighlight });
+    };
+
+    const handleUpdateNote = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingNoteId || !id) return;
+        if (!editNoteForm.noteText.trim()) return toast.error(i18nT('crm.customers.errorNoteEmpty'));
+        try {
+            setSavingNoteEdit(true);
+            await customerApi.updateNote(id, editingNoteId, editNoteForm);
+            toast.success(i18nT('crm.noteUpdated'));
+            setEditingNoteId(null);
+            await fetchData();
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || i18nT('crm.customers.errorNoteAdd'));
+        } finally {
+            setSavingNoteEdit(false);
+        }
+    };
+
+    const handleDeleteNote = async () => {
+        if (!confirmDeleteNoteId || !id) return;
+        try {
+            await customerApi.deleteNote(id, confirmDeleteNoteId);
+            toast.success(i18nT('crm.noteDeleted'));
+            setConfirmDeleteNoteId(null);
+            await fetchData();
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || i18nT('common.error'));
+        }
+    };
+
+    const startEditActivity = (a: ActivityDto) => {
+        setEditingActivityId(a.id);
+        setEditActivityForm({ activityType: a.activityType, description: a.description ?? '' });
+    };
+
+    const handleUpdateActivity = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingActivityId || !id) return;
+        try {
+            setSavingActivityEdit(true);
+            await customerApi.updateActivity(id, editingActivityId, editActivityForm);
+            toast.success(i18nT('crm.activityUpdated'));
+            setEditingActivityId(null);
+            await fetchData();
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || i18nT('crm.customers.errorActivityAdd'));
+        } finally {
+            setSavingActivityEdit(false);
+        }
+    };
+
+    const handleDeleteActivity = async () => {
+        if (!confirmDeleteActivityId || !id) return;
+        try {
+            await customerApi.deleteActivity(id, confirmDeleteActivityId);
+            toast.success(i18nT('crm.activityDeleted'));
+            setConfirmDeleteActivityId(null);
+            await fetchData();
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || i18nT('common.error'));
+        }
+    };
+
     const totalTenderValue = tenders.reduce((s, t) => s + (t.grandTotal ?? 0), 0);
     const approvedTenders = tenders.filter((t) => t.status === "Approved" || t.status === "Exported").length;
     const projectTenders = tenders.filter((t) => t.projectId);
 
     const customerTabs: { id: CustomerTabId; label: string; count?: number }[] = [
         { id: 'profile', label: i18nT('crm.profil') },
+        { id: 'contacts', label: i18nT('crm.tab_contacts'), count: data.contacts?.length ?? 0 },
+        { id: 'locations', label: i18nT('crm.tab_locations'), count: data.locations?.length ?? 0 },
         { id: 'offers', label: i18nT('crm.offers'), count: tenders.length },
+        { id: 'orders', label: i18nT('crm.tab_orders') },
+        { id: 'billing', label: i18nT('crm.tab_billing') },
         { id: 'projects', label: i18nT('nav.projects'), count: projectTenders.length },
+        { id: 'reports', label: i18nT('crm.tab_reports') },
         { id: 'notes', label: i18nT('crm.internal_notes'), count: data.notes?.length ?? 0 },
         { id: 'activities', label: i18nT('crm.activities_label'), count: data.activities?.length ?? 0 },
     ];
@@ -313,8 +443,8 @@ export const CustomerDashboard = () => {
                 title={
                     <span className="flex items-center gap-3">
                         <span>{data.companyName}</span>
-                        <StatusChip variant={data.isActive ? 'active' : 'passive'}>
-                            {data.isActive ?i18nT('common.active') :i18nT('common.inactive')}
+                        <StatusChip variant={getCustomerStatusOption(data.status).variant}>
+                            {getCustomerStatusLabel(data.status)}
                         </StatusChip>
                         {refreshing && <RefreshIcon size={14} className="animate-spin text-slate-400" />}
                     </span>
@@ -392,11 +522,17 @@ export const CustomerDashboard = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[12.5px]">
                             <InfoRow icon={<Building2 size={11} />} label={i18nT('common.company')} value={data.companyName} />
                             <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.colSegment')} value={data.segment} />
-                            <InfoRow icon={<Mail size={11} />} label={i18nT('common.email')} value={data.mainEmail} />
-                            <InfoRow icon={<Phone size={11} />} label={i18nT('common.phone')} value={data.mainPhone} />
+                            <InfoRow icon={<FileText size={11} />} label={i18nT('crm.customers.customerType')} value={getCustomerTypeLabel(data.customerType)} />
+                            <InfoRow icon={<Mail size={11} />} label={i18nT('common.email')} value={data.mainEmail} linkType="email" />
+                            <InfoRow icon={<Phone size={11} />} label={i18nT('common.phone')} value={data.mainPhone} linkType="tel" />
+                            <InfoRow icon={<Phone size={11} />} label={i18nT('crm.customers.mobilePhone')} value={data.mobilePhone} linkType="tel" />
+                            <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.website')} value={data.website} />
+                            <InfoRow icon={<FileText size={11} />} label={i18nT('crm.customers.language')} value={getCustomerLanguageLabel(data.language)} />
                             <InfoRow icon={<Hash size={11} />} label={i18nT('common.tax')} value={data.taxNumber ? `${data.taxNumber} / ${data.taxOffice ?? ''}` : null} />
-                            <InfoRow icon={<Activity size={11} />} label={i18nT('common.status')} value={data.isActive ? i18nT('common.active') : i18nT('common.inactive')} />
-                            <InfoRow icon={<MapPin size={11} />} label={i18nT('common.address')} value={data.address} full />
+                            <InfoRow icon={<Hash size={11} />} label={i18nT('crm.customers.vatNumber')} value={data.vatNumber} />
+                            <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.customerSource')} value={data.customerSource} />
+                            <InfoRow icon={<UserIcon size={11} />} label={i18nT('crm.customers.responsibleEmployee')} value={[data.responsibleFirstName, data.responsibleLastName].filter(Boolean).join(' ') || null} />
+                            <InfoRow icon={<Activity size={11} />} label={i18nT('common.status')} value={getCustomerStatusLabel(data.status)} />
                         </div>
                     ) : (
                         <form onSubmit={handleSaveProfile} className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -418,14 +554,25 @@ export const CustomerDashboard = () => {
                                     <option value="Startup">{i18nT('crm.customers.segmentStartup')}</option>
                                 </Select>
                             </Field>
+                            <Field label={i18nT('crm.customers.customerType')}>
+                                <Select
+                                    value={editForm.customerType}
+                                    onChange={(e) => setEditForm({ ...editForm, customerType: e.target.value })}
+                                >
+                                    {CUSTOMER_TYPE_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{i18nT(o.labelKey)}</option>
+                                    ))}
+                                </Select>
+                            </Field>
                             <Field label={i18nT('common.status')}>
-                                <Checkbox
-                                    label={i18nT('common.active')}
-                                    size="sm"
-                                    isSelected={editForm.isActive}
-                                    onChange={(checked) => setEditForm({ ...editForm, isActive: checked })}
-                                    className="rounded-lg bg-primary px-2.5 py-2 ring-1 ring-secondary ring-inset"
-                                />
+                                <Select
+                                    value={editForm.status}
+                                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                >
+                                    {CUSTOMER_STATUS_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{i18nT(o.labelKey)}</option>
+                                    ))}
+                                </Select>
                             </Field>
                             <Field label={i18nT('crm.customers.taxOffice')}>
                                 <Input value={editForm.taxOffice}
@@ -435,6 +582,21 @@ export const CustomerDashboard = () => {
                                 <Input value={editForm.taxNumber}
                                     onChange={(e) => setEditForm({ ...editForm, taxNumber: e.target.value })} />
                             </Field>
+                            <Field label={i18nT('crm.customers.vatNumber')}>
+                                <Input value={editForm.vatNumber}
+                                    onChange={(e) => setEditForm({ ...editForm, vatNumber: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('crm.customers.language')}>
+                                <Select
+                                    value={editForm.language}
+                                    onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
+                                >
+                                    <option value="">{i18nT('common.select')}</option>
+                                    {CUSTOMER_LANGUAGE_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{i18nT(o.labelKey)}</option>
+                                    ))}
+                                </Select>
+                            </Field>
                             <Field label={i18nT('common.email')}>
                                 <Input type="email" value={editForm.mainEmail}
                                     onChange={(e) => setEditForm({ ...editForm, mainEmail: e.target.value })} />
@@ -443,9 +605,28 @@ export const CustomerDashboard = () => {
                                 <Input value={editForm.mainPhone}
                                     onChange={(e) => setEditForm({ ...editForm, mainPhone: e.target.value })} />
                             </Field>
-                            <Field label={i18nT('common.address')} className="md:col-span-2">
-                                <Textarea rows={2} value={editForm.address}
-                                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                            <Field label={i18nT('crm.customers.mobilePhone')}>
+                                <Input value={editForm.mobilePhone}
+                                    onChange={(e) => setEditForm({ ...editForm, mobilePhone: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('crm.customers.website')}>
+                                <Input value={editForm.website}
+                                    onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                                    placeholder="https://" />
+                            </Field>
+                            <Field label={i18nT('crm.customers.customerSource')}>
+                                <Input value={editForm.customerSource}
+                                    onChange={(e) => setEditForm({ ...editForm, customerSource: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('crm.customers.responsibleEmployee')}>
+                                <div className="flex gap-2">
+                                    <Input value={editForm.responsibleFirstName}
+                                        onChange={(e) => setEditForm({ ...editForm, responsibleFirstName: e.target.value })}
+                                        placeholder={i18nT('crm.customers.responsibleFirstName')} />
+                                    <Input value={editForm.responsibleLastName}
+                                        onChange={(e) => setEditForm({ ...editForm, responsibleLastName: e.target.value })}
+                                        placeholder={i18nT('crm.customers.responsibleLastName')} />
+                                </div>
                             </Field>
                             <div className="md:col-span-2 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                                 <Button variant="secondary" type="button" icon={<XIcon size={13} />} onClick={() => setEditing(false)}>{i18nT('common.cancel')}</Button>
@@ -454,6 +635,26 @@ export const CustomerDashboard = () => {
                         </form>
                     )}
                 </Card>
+            )}
+
+            {/* ---- CONTACTS (Kontaktpersonen) ---- */}
+            {activeCustomerTab === 'contacts' && id && (
+                <ContactsTab customerId={id} items={data.contacts ?? []} onChanged={fetchData} />
+            )}
+
+            {/* ---- LOCATIONS (Standorte) ---- */}
+            {activeCustomerTab === 'locations' && id && (
+                <AddressesTab customerId={id} items={data.locations ?? []} onChanged={fetchData} />
+            )}
+
+            {/* ---- ORDERS (Aufträge) ---- */}
+            {activeCustomerTab === 'orders' && id && (
+                <OrdersTab customerId={id} />
+            )}
+
+            {/* ---- BILLING (Rechnungen) ---- */}
+            {activeCustomerTab === 'billing' && id && (
+                <BillingTab customerId={id} />
             )}
 
             {/* ---- OFFERS ---- */}
@@ -558,6 +759,11 @@ export const CustomerDashboard = () => {
                 </Card>
             )}
 
+            {/* ---- REPORTS (Field / General / Delivery) ---- */}
+            {activeCustomerTab === 'reports' && id && (
+                <CustomerReports customerId={id} />
+            )}
+
             {/* ---- NOTES ---- */}
             {activeCustomerTab === 'notes' && (
                 <Card
@@ -604,27 +810,60 @@ export const CustomerDashboard = () => {
                             {data.notes!.map((n) => (
                                 <div
                                     key={n.id}
-                                    className={`border rounded-md p-2.5 ${n.isHighlight ?"border-rose-200 bg-rose-50/40" :"border-slate-200 bg-white"}`}
+                                    className={`group relative border rounded-md p-2.5 ${n.isHighlight ?"border-rose-200 bg-rose-50/40" :"border-slate-200 bg-white"}`}
                                 >
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium ${n.noteType === 'technical' ?"bg-cyan-50 text-cyan-700" :"bg-slate-100 text-slate-600"}`}>
-                                            {n.noteType === 'technical' ?i18nT('crm.technical') :i18nT('crm.internal')}
-                                        </span>
-                                        {n.isHighlight && (
-                                            <span className="text-[10.5px] px-1.5 py-0.5 rounded font-medium bg-rose-50 text-rose-700 flex items-center gap-1">
-                                                <AlertTriangle size={9} />{i18nT('crm.critical')}</span>
-                                        )}
-                                        <span className="text-[10.5px] text-slate-400 ml-auto flex items-center gap-1 font-mono">
-                                            <Calendar size={9} />
-                                            {dayjs(n.createdAt).format("DD.MM.YYYY HH:mm")}
-                                        </span>
-                                    </div>
-                                    <p className="text-[12.5px] text-slate-700 leading-relaxed whitespace-pre-wrap">{n.noteText}</p>
-                                    {n.createdBy && (
-                                        <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-1">
-                                            <UserIcon size={9} />
-                                            {n.createdBy.firstName} {n.createdBy.lastName}
-                                        </div>
+                                    {editingNoteId === n.id ? (
+                                        <form onSubmit={handleUpdateNote} className="space-y-2">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Select value={editNoteForm.noteType} onChange={(e) => setEditNoteForm({ ...editNoteForm, noteType: e.target.value })}>
+                                                    <option value="internal">{i18nT('crm.internal_yorum')}</option>
+                                                    <option value="technical">{i18nT('crm.technical_note')}</option>
+                                                </Select>
+                                                <Checkbox
+                                                    label={i18nT('crm.critical')}
+                                                    size="sm"
+                                                    isSelected={editNoteForm.isHighlight}
+                                                    onChange={(checked) => setEditNoteForm({ ...editNoteForm, isHighlight: checked })}
+                                                    className="rounded-lg bg-primary px-2.5 py-2 ring-1 ring-secondary ring-inset"
+                                                />
+                                            </div>
+                                            <Textarea rows={3} value={editNoteForm.noteText} onChange={(e) => setEditNoteForm({ ...editNoteForm, noteText: e.target.value })} />
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button variant="secondary" size="sm" type="button" icon={<XIcon size={12} />} onClick={() => setEditingNoteId(null)}>{i18nT('common.cancel')}</Button>
+                                                <Button variant="primary" size="sm" type="submit" loading={savingNoteEdit} icon={<Save size={12} />}>{i18nT('common.save')}</Button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <>
+                                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button type="button" onClick={() => startEditNote(n)} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700" title={i18nT('common.edit')}>
+                                                    <EditIcon size={12} />
+                                                </button>
+                                                <button type="button" onClick={() => setConfirmDeleteNoteId(n.id)} className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600" title={i18nT('common.delete')}>
+                                                    <TrashIcon size={12} />
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 mb-1 pr-12">
+                                                <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium ${n.noteType === 'technical' ?"bg-cyan-50 text-cyan-700" :"bg-slate-100 text-slate-600"}`}>
+                                                    {n.noteType === 'technical' ?i18nT('crm.technical') :i18nT('crm.internal')}
+                                                </span>
+                                                {n.isHighlight && (
+                                                    <span className="text-[10.5px] px-1.5 py-0.5 rounded font-medium bg-rose-50 text-rose-700 flex items-center gap-1">
+                                                        <AlertTriangle size={9} />{i18nT('crm.critical')}</span>
+                                                )}
+                                                <span className="text-[10.5px] text-slate-400 ml-auto flex items-center gap-1 font-mono">
+                                                    <Calendar size={9} />
+                                                    {dayjs(n.createdAt).format("DD.MM.YYYY HH:mm")}
+                                                </span>
+                                            </div>
+                                            <p className="text-[12.5px] text-slate-700 leading-relaxed whitespace-pre-wrap">{n.noteText}</p>
+                                            {n.createdBy && (
+                                                <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-1">
+                                                    <UserIcon size={9} />
+                                                    {n.createdBy.firstName} {n.createdBy.lastName}
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             ))}
@@ -674,24 +913,57 @@ export const CustomerDashboard = () => {
                     ) : (
                         <ol className="relative border-l border-slate-200 ml-1 space-y-3">
                             {data.activities!.map((a) => (
-                                <li key={a.id} className="ml-3.5">
+                                <li key={a.id} className="group ml-3.5">
                                     <span className={`absolute w-2.5 h-2.5 rounded-full -left-[5px] mt-1 ${ACTIVITY_COLOR[a.activityType] || 'bg-slate-400'}`} />
-                                    <div className="flex items-center justify-between mb-0.5">
-                                        <div className="min-w-0">
-                                            <span className="text-[12.5px] font-semibold text-slate-800">
-                                                {getActivityLabel(a.activityType)}
-                                            </span>
-                                            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
-                                                <UserIcon size={10} />
-                                                <span className="truncate">{activityActor(a)}</span>
+                                    {editingActivityId === a.id ? (
+                                        <form onSubmit={handleUpdateActivity} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end pb-1">
+                                            <div className="sm:col-span-4">
+                                                <Select value={editActivityForm.activityType} onChange={(e) => setEditActivityForm({ ...editActivityForm, activityType: e.target.value })}>
+                                                    <option value="Meeting">{i18nT('crm.customers.activityMeeting')}</option>
+                                                    <option value="Call">{i18nT('common.phone')}</option>
+                                                    <option value="Email">{i18nT('crm.customers.activityEmail')}</option>
+                                                    <option value="SiteVisit">{i18nT('crm.customers.activityFieldVisit')}</option>
+                                                    <option value="ProjectPhase">{i18nT('crm.project_faz')}</option>
+                                                </Select>
                                             </div>
-                                        </div>
-                                        <time className="text-[11px] text-slate-400 font-mono">
-                                            {dayjs(a.activityDate).format("DD.MM.YYYY HH:mm")}
-                                        </time>
-                                    </div>
-                                    {a.description && (
-                                        <p className="text-[12px] text-slate-600 leading-relaxed">{a.description}</p>
+                                            <div className="sm:col-span-5">
+                                                <Input value={editActivityForm.description} onChange={(e) => setEditActivityForm({ ...editActivityForm, description: e.target.value })} />
+                                            </div>
+                                            <div className="sm:col-span-3 flex items-center gap-1.5">
+                                                <Button variant="secondary" size="sm" type="button" icon={<XIcon size={12} />} onClick={() => setEditingActivityId(null)}>{i18nT('common.cancel')}</Button>
+                                                <Button variant="primary" size="sm" type="submit" loading={savingActivityEdit} icon={<Save size={12} />}>{i18nT('common.save')}</Button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <div className="min-w-0">
+                                                    <span className="text-[12.5px] font-semibold text-slate-800">
+                                                        {getActivityLabel(a.activityType)}
+                                                    </span>
+                                                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                                                        <UserIcon size={10} />
+                                                        <span className="truncate">{activityActor(a)}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button type="button" onClick={() => startEditActivity(a)} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700" title={i18nT('common.edit')}>
+                                                            <EditIcon size={12} />
+                                                        </button>
+                                                        <button type="button" onClick={() => setConfirmDeleteActivityId(a.id)} className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600" title={i18nT('common.delete')}>
+                                                            <TrashIcon size={12} />
+                                                        </button>
+                                                    </div>
+                                                    <time className="text-[11px] text-slate-400 font-mono">
+                                                        {dayjs(a.activityDate).format("DD.MM.YYYY HH:mm")}
+                                                    </time>
+                                                </div>
+                                            </div>
+                                            {a.description && (
+                                                <p className="text-[12px] text-slate-600 leading-relaxed">{a.description}</p>
+                                            )}
+                                        </>
                                     )}
                                 </li>
                             ))}
@@ -721,6 +993,38 @@ export const CustomerDashboard = () => {
                     <p className="leading-relaxed">{i18nT('crm.delete_customer_confirm', { name: data.companyName })}</p>
                 </div>
             </Modal>
+
+            {/* Note delete confirmation */}
+            <Modal
+                open={confirmDeleteNoteId !== null}
+                title={i18nT('common.delete')}
+                onClose={() => setConfirmDeleteNoteId(null)}
+                width="sm"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setConfirmDeleteNoteId(null)}>{i18nT('common.cancel')}</Button>
+                        <Button variant="danger" icon={<TrashIcon size={13} />} onClick={handleDeleteNote}>{i18nT('common.delete')}</Button>
+                    </>
+                }
+            >
+                <p className="text-[13px] text-slate-600">{i18nT('crm.noteDeleteConfirm')}</p>
+            </Modal>
+
+            {/* Activity delete confirmation */}
+            <Modal
+                open={confirmDeleteActivityId !== null}
+                title={i18nT('common.delete')}
+                onClose={() => setConfirmDeleteActivityId(null)}
+                width="sm"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setConfirmDeleteActivityId(null)}>{i18nT('common.cancel')}</Button>
+                        <Button variant="danger" icon={<TrashIcon size={13} />} onClick={handleDeleteActivity}>{i18nT('common.delete')}</Button>
+                    </>
+                }
+            >
+                <p className="text-[13px] text-slate-600">{i18nT('crm.activityDeleteConfirm')}</p>
+            </Modal>
         </div>
     );
 };
@@ -737,10 +1041,22 @@ const KPI: React.FC<{ label: string; value: string; icon: React.ReactNode; accen
     </div>
 );
 
-const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value?: string | null; full?: boolean }> = ({ icon, label, value, full }) => (
+// Build a clickable href: mailto: for email, tel: (digits/+ only) for phone.
+const buildContactHref = (linkType: 'email' | 'tel', value: string) =>
+    linkType === 'email' ? `mailto:${value.trim()}` : `tel:${value.replace(/[^+\d]/g, '')}`;
+
+const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value?: string | null; full?: boolean; linkType?: 'email' | 'tel' }> = ({ icon, label, value, full, linkType }) => (
     <div className={`flex items-center gap-2.5 py-1.5 ${full ? 'sm:col-span-2' : ''}`}>
         <span className="text-slate-400">{icon}</span>
         <span className="text-[10.5px] uppercase tracking-wider font-semibold text-slate-400 w-16 flex-shrink-0">{label}</span>
-        <span className="text-slate-800 truncate">{value || <span className="text-slate-300">-</span>}</span>
+        {value ? (
+            linkType ? (
+                <a href={buildContactHref(linkType, value)} className="text-blue-700 hover:underline truncate">{value}</a>
+            ) : (
+                <span className="text-slate-800 truncate">{value}</span>
+            )
+        ) : (
+            <span className="text-slate-300">-</span>
+        )}
     </div>
 );

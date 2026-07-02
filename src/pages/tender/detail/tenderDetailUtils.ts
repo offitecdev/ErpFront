@@ -15,14 +15,9 @@ export const getStatusLabel = (): Record<string, string> => ({
     Exported:t('crm.tenders.statusExported'),
 });
 
-export const fmtMoney = (v: number) =>
-    new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);
-
-export const fmtNumber = (v: number) =>
-    new Intl.NumberFormat('de-CH', { maximumFractionDigits: 4 }).format(v);
-
-export const fmtVatRate = (v: number) =>
-    new Intl.NumberFormat('de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v);
+// Currency/number formatters were relocated to `utils/formatters.ts`; re-exported
+// here so existing `./tenderDetailUtils` importers keep working unchanged.
+export { fmtMoney, fmtNumber, fmtVatRate } from './utils/formatters';
 
 export interface TreeNode extends PositionDto {
     isArticleMapping?: boolean;
@@ -330,6 +325,7 @@ export const flattenTenderTreeForPdf = (tree: TreeNode[]) => {
             const displayLabel = nextDisplayLabel(n);
             flatTree.push({
                 rowKey: n.id,
+                sourceArticleId: (n as any).sourceArticleId ?? null,
                 shortDescription: displayLabel ? `${displayLabel} ${n.shortDescription}` : n.shortDescription,
                 longDescription: n.longDescription,
                 rowType: n.rowType,

@@ -39,8 +39,9 @@ interface TenderState {
     stockArticles: ArticleStockSummary[];
     stockArticlesLoading: boolean;
     stockArticlesLoaded: boolean;
+    stockArticlesHaveImages: boolean;
     locations: InventoryLocation[];
-    fetchStockArticles: (force?: boolean) => Promise<void>;
+    fetchStockArticles: (force?: boolean, includeImages?: boolean) => Promise<void>;
     fetchLocations: () => Promise<void>;
 
     activities: any[];
@@ -82,6 +83,7 @@ interface TenderState {
 }
 
 let stockArticlesRequest: Promise<void> | null = null;
+let stockArticlesRequestHasImages = false;
 
 export const useTenderStore = create<TenderState>((set, get) => ({
     list: [],
@@ -126,7 +128,10 @@ export const useTenderStore = create<TenderState>((set, get) => ({
     fetchDetail: async (id, silent = false) => {
         if (!silent) set({ loadingDetail: true });
         try {
-            const detail = await tenderApi.getById(id, { includeImages: true });
+            // Image-less load. Product/line images are no longer embedded in the
+            // tender detail (they were several MB of base64 and only ever needed
+            // for the PDF) — they are fetched on demand at PDF-generation time.
+            const detail = await tenderApi.getById(id, { includeImages: false });
             set({ detail });
         } finally {
             if (!silent) set({ loadingDetail: false });
@@ -159,16 +164,24 @@ export const useTenderStore = create<TenderState>((set, get) => ({
     stockArticles: [],
     stockArticlesLoading: false,
     stockArticlesLoaded: false,
+    stockArticlesHaveImages: false,
     locations: [],
-    fetchStockArticles: async (force = false) => {
-        if (!force && get().stockArticlesLoaded) return;
-        if (!force && stockArticlesRequest) return stockArticlesRequest;
+    fetchStockArticles: async (force = false, includeImages = false) => {
+        const state = get();
+        // Already have what the caller needs (and images too, if requested).
+        if (!force && state.stockArticlesLoaded && (!includeImages || state.stockArticlesHaveImages)) return;
+        // A non-image fetch can piggyback on an in-flight request; an image
+        // fetch must go out on its own if the pending one is image-less.
+        if (!force && stockArticlesRequest && (!includeImages || stockArticlesRequestHasImages)) {
+            return stockArticlesRequest;
+        }
 
+        stockArticlesRequestHasImages = includeImages;
         stockArticlesRequest = (async () => {
             set({ stockArticlesLoading: true });
             try {
-                const stockArticles = await inventoryApi.articlesSummary();
-                set({ stockArticles, stockArticlesLoaded: true });
+                const stockArticles = await inventoryApi.articlesSummary(includeImages);
+                set({ stockArticles, stockArticlesLoaded: true, stockArticlesHaveImages: includeImages });
             } finally {
                 set({ stockArticlesLoading: false });
                 stockArticlesRequest = null;

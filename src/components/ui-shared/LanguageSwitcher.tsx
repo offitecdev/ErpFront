@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LuGlobe as MdLanguage } from 'react-icons/lu';
+import { LuGlobe as MdLanguage } from '@/components/icons/lucideLocal';
 import { Check } from '../icons/antIconCompat';
 
 import { t } from '@/i18n/translate';

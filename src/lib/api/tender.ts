@@ -16,6 +16,7 @@ import type {
     PositionMaterialMappingDto,
     TenderMaterialUsageDto,
 } from '../../types/tender';
+import type { PersonLite } from '../../types/maintenance';
 
 export interface TenderListFilter {
     customerId?: string;
@@ -64,6 +65,15 @@ export const tenderApi = {
         return res.data;
     },
 
+    // Fetch ONLY the product image URLs needed for the PDF (by article id), instead
+    // of re-loading the whole tender detail with every image inlined.
+    getProductImages: async (id: string, articleIds: string[]): Promise<Array<{ id: string; imageUrl: string | null }>> => {
+        const ids = [...new Set(articleIds.filter(Boolean))];
+        if (ids.length === 0) return [];
+        const res = await apiClient.post(`/tenders/${id}/product-images`, { ids });
+        return res.data;
+    },
+
     createManual: async (input: {
         customerId?: string | null;
         tenderNumber: string;
@@ -74,7 +84,15 @@ export const tenderApi = {
         return res.data;
     },
 
-    updateMeta: async (id: string, input: { customerId?: string | null; format?: TenderFormat; validUntil?: string | null }): Promise<TenderListItem> => {
+    updateMeta: async (id: string, input: {
+        customerId?: string | null;
+        format?: TenderFormat;
+        validUntil?: string | null;
+        billingAddress?: string | null;
+        deliveryAddress?: string | null;
+        billingSameAsInstallation?: boolean | null;
+        internalDeliveryDate?: string | null;
+    }): Promise<TenderListItem> => {
         try {
             const res = await apiClient.patch(`/tenders/${id}/meta`, input);
             return res.data;
@@ -306,18 +324,23 @@ export const tenderApi = {
         return res.data;
     },
 
-    createScheduleSlot: async (id: string, input: { startTime: string; endTime: string; notes?: string }) => {
+    createScheduleSlot: async (id: string, input: { startTime: string; endTime: string; notes?: string; technicianIds?: string[] }): Promise<OfferScheduleSlotDto> => {
         const res = await apiClient.post(`/tenders/${id}/schedule-slots`, input);
         return res.data;
     },
 
-    updateScheduleSlot: async (id: string, slotId: string, input: { startTime: string; endTime: string; notes?: string }) => {
+    updateScheduleSlot: async (id: string, slotId: string, input: { startTime: string; endTime: string; notes?: string; technicianIds?: string[] }): Promise<OfferScheduleSlotDto> => {
         const res = await apiClient.patch(`/tenders/${id}/schedule-slots/${slotId}`, input);
         return res.data;
     },
 
     deleteScheduleSlot: async (id: string, slotId: string): Promise<void> => {
         await apiClient.delete(`/tenders/${id}/schedule-slots/${slotId}`);
+    },
+
+    listTechnicians: async (): Promise<PersonLite[]> => {
+        const res = await apiClient.get('/tenders/options/technicians');
+        return res.data;
     },
 
     sendOfferMail: async (id: string, input: {

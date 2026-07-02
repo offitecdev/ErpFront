@@ -26,6 +26,7 @@ export interface TenderPdfData {
     activities?: Array<{ activityType: string; description?: string | null; activityDate: string; employeeName?: string | null }>;
     positions: Array<{
         rowKey?: string;
+        sourceArticleId?: string | null;
         shortDescription: string;
         longDescription?: string | null;
         rowType?: string;
@@ -718,7 +719,11 @@ function drawRow(
         descCursor += TITLE_IMAGE_GAP;
         try {
             const imgFmt = detectImageFormat(pos.imageUrl);
-            doc.addImage(pos.imageUrl, imgFmt as any, descX, descCursor, IMG_SIZE, IMG_SIZE);
+            // Alias identical product images (same article) so jsPDF embeds the
+            // bytes once and references them — big speed/size win when a product
+            // repeats across rows, without altering the image itself.
+            const alias = pos.sourceArticleId ? `art-${pos.sourceArticleId}` : undefined;
+            doc.addImage(pos.imageUrl, imgFmt as any, descX, descCursor, IMG_SIZE, IMG_SIZE, alias, 'NONE');
             descCursor += IMG_SIZE;
         } catch { /* ignore */ }
     }

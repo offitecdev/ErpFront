@@ -1,6 +1,4 @@
-import { formatMissingTranslationKey } from './autoFallback';
-
-const AUTO_KEYS = [
+export const AUTO_KEYS = [
     '0_ise_hareket_yok',
     '120_dk',
     '120_x_80_x_60',
@@ -1275,12 +1273,3 @@ const AUTO_KEYS = [
     'zorunlu_her_urune_ozgu_manuel_veya_kamera',
     'zorunlu_kontrol_maddelerini_tamamlayin',
 ] as const;
-
-const buildAutoTranslations = (language: 'tr' | 'en' | 'de'): Record<string, string> =>
-    Object.fromEntries(AUTO_KEYS.map((key) => [key, formatMissingTranslationKey(`auto.${key}`, language)]));
-
-export const autoTranslations = {
-    tr: buildAutoTranslations('tr'),
-    en: buildAutoTranslations('en'),
-    de: buildAutoTranslations('de'),
-};

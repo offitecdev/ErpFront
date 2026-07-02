@@ -1,3 +1,5 @@
+import type { PersonLite } from './maintenance';
+
 export type TenderFormat = 'SIA451' | 'CRBX';
 export type TenderStatus = 'Draft' | 'Approved' | 'Exported';
 export type TenderRowType = 'SECTION' | 'TITLE' | 'DESCRIPTION' | 'PRODUCT' | 'CUSTOM';
@@ -17,6 +19,9 @@ export interface TenderListItem {
     format: TenderFormat;
     status: TenderStatus;
     validUntil?: string | null;
+    billingAddress?: string | null;
+    deliveryAddress?: string | null;
+    billingSameAsInstallation?: boolean | null;
     sourceStatus?: string | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;
@@ -42,11 +47,22 @@ export interface TenderActivity {
     referenceId?: string | null;
 }
 
+export interface OfferScheduleSlotAssignmentDto {
+    id: string;
+    slotId: string;
+    technicianId: string;
+    assignedAt?: string;
+    technician?: PersonLite | null;
+}
+
 export interface OfferScheduleSlotDto {
     id: string;
     tenantId: string;
     tenderId: string;
     customerId?: string | null;
+    assignedTechId?: string | null;
+    assignedTechnician?: PersonLite | null;
+    technicianAssignments?: OfferScheduleSlotAssignmentDto[];
     startTime: string;
     endTime: string;
     notes?: string | null;

@@ -99,7 +99,7 @@ import {
     LuShoppingBag as ShoppingBag,
     LuHouse as Home01,
     LuCircleAlert as Alert
-} from 'react-icons/lu';
+} from './lucideLocal';
 
 export {
     Activity,

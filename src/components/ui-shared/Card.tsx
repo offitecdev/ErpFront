@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card as AntCard } from 'antd';
+import AntCard from 'antd/es/card';
 import { cx } from '../../lib/utils/cx';
 
 import { t } from '@/i18n/translate';
@@ -27,12 +27,12 @@ export const Card: React.FC<CardProps> = ({
 }) => (
     <AntCard
         data-ui-card
-        bordered={false}
+        variant="borderless"
         className={cx(t('auto.overflow_hidden_rounded_xl_border_border_slate_2'), className)}
         styles={{ body: { padding: 0 } }}
     >
         {(title || actions) && (
-            <div className="flex items-center justify-between gap-3 border-b border-secondary bg-primary px-4 py-4 md:px-6">
+            <div data-ui-card-header className="flex items-center justify-between gap-3 border-b border-secondary bg-primary px-4 py-4 md:px-6">
                 <div className="flex min-w-0 items-center gap-2.5">
                     {icon && <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#272f67]">{icon}</span>}
                     <div className="min-w-0">

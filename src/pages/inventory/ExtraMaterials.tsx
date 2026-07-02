@@ -1,18 +1,33 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Coins01 as Coins, Hash01 as Hash, Image01 as ImageIcon, Package, PackagePlus, Save01 as Save, SearchLg as Search, Trash01 as Trash2, UploadCloud02 as Upload, X } from '@/components/icons/antIconCompat';
+import {
+    ArrowLeft,
+    BarChart03,
+    ChevronLeft,
+    ChevronRight,
+    Image01 as ImageIcon,
+    PackagePlus,
+    Save01 as Save,
+    SearchLg as Search,
+    Trash01 as Trash2,
+    UploadCloud02 as Upload,
+    X,
+} from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
-import { PageHeader } from '../../components/layout/PageHeader';
+import { StockModuleHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { Input } from '../../components/ui-shared/Field';
+import { Input, Select } from '../../components/ui-shared/Field';
+import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectMaterial } from '../../types/project';
 
 import { t } from '@/i18n/translate';
+
+const BRAND = '#272f67';
 
 type MaterialForm = Pick<ProjectMaterial, 'name' | 'serialId' | 'stockQuantity' | 'unitCost'> & {
     imageUrl?: string | null;
@@ -47,6 +62,10 @@ export const ExtraMaterials = () => {
     const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('');
+    const [avgInfoOpen, setAvgInfoOpen] = useState(false);
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 50;
 
     const load = async () => {
         setLoading(true);
@@ -65,63 +84,172 @@ export const ExtraMaterials = () => {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return materials;
-        return materials.filter((m) => m.name.toLowerCase().includes(q) || (m.serialId || '').toLowerCase().includes(q));
-    }, [materials, search]);
+        return materials.filter((m) => {
+            if (statusFilter === 'ACTIVE' && !m.isActive) return false;
+            if (statusFilter === 'INACTIVE' && m.isActive) return false;
+            if (!q) return true;
+            return m.name.toLowerCase().includes(q) || (m.serialId || '').toLowerCase().includes(q);
+        });
+    }, [materials, search, statusFilter]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, statusFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const paged = useMemo(
+        () => filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE),
+        [filtered, pageSafe],
+    );
+    const rangeFrom = filtered.length === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+    const rangeTo = Math.min(pageSafe * PAGE_SIZE, filtered.length);
+
+    const listRef = useRef<HTMLDivElement>(null);
+    const [listHeight, setListHeight] = useState(0);
+    useLayoutEffect(() => {
+        const el = listRef.current;
+        if (!el) return;
+        const recompute = () => {
+            const top = el.getBoundingClientRect().top;
+            setListHeight(Math.max(240, window.innerHeight - top - 24));
+        };
+        recompute();
+        window.addEventListener('resize', recompute);
+        return () => window.removeEventListener('resize', recompute);
+    }, []);
 
     const stats = useMemo(() => {
-        const totalQty = materials.reduce((s, m) => s + Number(m.stockQuantity || 0), 0);
-        const totalValue = materials.reduce((s, m) => s + Number(m.stockQuantity || 0) * Number(m.unitCost || 0), 0);
-        return { total: materials.length, totalQty, totalValue };
+        const priced = materials.filter((m) => Number(m.unitCost || 0) > 0);
+        const avgPrice = priced.length ? priced.reduce((s, m) => s + Number(m.unitCost || 0), 0) / priced.length : 0;
+        return { total: materials.length, avgPrice, pricedCount: priced.length };
     }, [materials]);
 
     return (
         <div>
-            <PageHeader
-                breadcrumb={t('auto.breadcrumb_materials')}
-                title={t('nav.materials')}
-                description={t('auto.projeye_sonradan_eklenebilen_malzemelerin_gorsel')}
+            <StockModuleHeader
+                label="Stock › Materials"
                 actions={
-                    canManage && (
-                        <Button variant="primary" icon={<PackagePlus size={13} />} onClick={() => navigate('/inventory/extra-materials/new')}>{t('auto.yeni_malzeme')}</Button>
-                    )
+                    <>
+                        <Button
+                            variant="secondary"
+                            icon={<BarChart03 size={14} />}
+                            onClick={() => setAvgInfoOpen(true)}
+                            aria-label="Details"
+                            title="Details"
+                            className="!h-8 !w-8 !px-0"
+                        />
+                        {canManage && (
+                            <Button variant="primary" icon={<PackagePlus size={13} />} onClick={() => navigate('/inventory/extra-materials/new')}>{t('auto.yeni_malzeme')}</Button>
+                        )}
+                    </>
                 }
             />
 
-            {/* KPI summary */}
-            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <MaterialStat icon={<Package size={16} />} accent="indigo" label={t('auto.malzeme_listesi')} value={fmtNumber(stats.total)} />
-                <MaterialStat icon={<Hash size={16} />} accent="sky" label={t('auto.mevcut_miktar')} value={fmtNumber(stats.totalQty)} />
-                <MaterialStat icon={<Coins size={16} />} accent="emerald" label={t('inventory.dashboard.stockValue')} value={fmtMoney(stats.totalValue)} />
-            </div>
+            {avgInfoOpen && (
+                <AverageSalesPriceInfoModal
+                    pricedCount={stats.pricedCount}
+                    total={stats.total}
+                    avgPrice={stats.avgPrice}
+                    onClose={() => setAvgInfoOpen(false)}
+                />
+            )}
 
-            <Card
-                title={t('auto.malzeme_listesi')}
-                icon={<PackagePlus size={14} />}
-                noPadding
-                actions={
-                    <div className="relative">
-                        <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={t('auto.ara_kod_ad_barkod')}
-                            className="w-[180px] rounded-lg border border-slate-200 bg-slate-50/80 py-1.5 pl-7 pr-2.5 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10 md:w-[240px]"
-                        />
+            <Card className="border-0 rounded-none" noPadding>
+                <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/60">
+                    <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
+                        <div className="flex shrink-0 items-center gap-2 pr-1">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
+                                <PackagePlus size={13} />
+                            </span>
+                            <h3 className="whitespace-nowrap text-[14px] font-semibold text-slate-900">{t('auto.malzeme_listesi')}</h3>
+                        </div>
+                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+                            <div className="relative shrink-0">
+                                <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder={t('auto.ara_kod_ad_barkod')}
+                                    className="h-8 w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-7 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearch('')}
+                                        aria-label={t('common.clear')}
+                                        title={t('common.clear')}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="relative w-[148px] shrink-0">
+                                <Select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                >
+                                    <option value="">{t('auto.tum_durumlar')}</option>
+                                    <option value="ACTIVE">{t('common.active')}</option>
+                                    <option value="INACTIVE">{t('common.inactive')}</option>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-3">
+                            <span className="font-mono text-[11.5px] text-slate-500">
+                                {rangeFrom}-{rangeTo} / {filtered.length}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    disabled={pageSafe <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.back')}
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
+                                <span className="px-1 font-mono text-[11.5px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                                <button
+                                    type="button"
+                                    disabled={pageSafe >= totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.next')}
+                                >
+                                    <ChevronRight size={14} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                }
-            >
-                <div className="overflow-x-auto">
-                    <table className="w-full text-[12.5px]">
-                        <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
+                </div>
+
+                <div
+                    ref={listRef}
+                    style={{ height: listHeight || undefined }}
+                    className="overflow-auto bg-white"
+                >
+                    <table className="min-w-[980px] w-full table-fixed text-[12.5px]">
+                        <colgroup>
+                            <col style={{ width: 64 }} />
+                            <col style={{ width: 150 }} />
+                            <col style={{ width: 280 }} />
+                            <col style={{ width: 150 }} />
+                            <col style={{ width: 120 }} />
+                            <col style={{ width: 116 }} />
+                            <col style={{ width: 100 }} />
+                        </colgroup>
+                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[10.5px] text-[#86868B] bg-slate-50 border-b border-slate-200 uppercase tracking-[0.08em] shadow-[0_1px_0_0_rgb(226_232_240)]">
                             <tr>
-                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.gorsel')}</th>
-                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.malzeme')}</th>
-                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.kod')}</th>
-                                <th className="px-3 py-2.5 text-right font-semibold">{t('auto.mevcut_miktar')}</th>
-                                <th className="px-3 py-2.5 text-right font-semibold">{t('auto.birim_fiyat')}</th>
-                                <th className="px-3 py-2.5 text-right font-semibold">{t('inventory.dashboard.stockValue')}</th>
-                                <th className="px-3 py-2.5 text-right font-semibold">{t('common.actions')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('auto.gorsel')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('auto.stok_kodu')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('auto.malzeme')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{'Satış Fiyatı'}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('auto.mevcut')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -142,9 +270,9 @@ export const ExtraMaterials = () => {
                                     </td>
                                 </tr>
                             )}
-                            {!loading && filtered.map((material) => (
+                            {!loading && paged.map((material) => (
                                 <tr key={material.id} className="group cursor-pointer transition-colors hover:bg-slate-50/60" onClick={() => navigate(`/inventory/extra-materials/${material.id}/edit`)}>
-                                    <td className="px-3 py-2.5 w-[60px]">
+                                    <td className="px-3 py-2">
                                         {material.imageUrl ? (
                                             <img src={material.imageUrl} alt={material.name} className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
                                         ) : (
@@ -153,12 +281,16 @@ export const ExtraMaterials = () => {
                                             </div>
                                         )}
                                     </td>
-                                    <td className="px-3 py-2.5 font-medium text-slate-800 group-hover:text-[#272f67]">{material.name}</td>
-                                    <td className="px-3 py-2.5 font-mono text-[11.5px] text-slate-500">{material.serialId}</td>
-                                    <td className="px-3 py-2.5 text-right font-mono">{fmtNumber(material.stockQuantity)}</td>
-                                    <td className="px-3 py-2.5 text-right font-mono text-slate-600">{fmtMoney(material.unitCost)}</td>
-                                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-800">{fmtMoney(Number(material.stockQuantity || 0) * Number(material.unitCost || 0))}</td>
-                                    <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                    <td className="truncate px-3 py-2 font-mono text-[11.5px] text-slate-700">{material.serialId}</td>
+                                    <td className="truncate px-3 py-2 font-medium text-slate-800 group-hover:text-[#272f67]">{material.name}</td>
+                                    <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">{fmtMoney(material.unitCost)}</td>
+                                    <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtNumber(material.stockQuantity)}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        <StatusChip variant={material.isActive ? 'active' : 'passive'}>
+                                            {material.isActive ? t('common.active') : t('common.inactive')}
+                                        </StatusChip>
+                                    </td>
+                                    <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="inline-flex items-center gap-1">
                                             <button
                                                 className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
@@ -189,18 +321,66 @@ export const ExtraMaterials = () => {
     );
 };
 
-const STAT_ACCENT: Record<'indigo' | 'sky' | 'emerald', string> = {
-    indigo: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100',
-    sky: 'bg-sky-50 text-sky-600 ring-1 ring-sky-100',
-    emerald: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
-};
+const AverageSalesPriceInfoModal = ({
+    pricedCount,
+    total,
+    avgPrice,
+    onClose,
+}: {
+    pricedCount: number;
+    total: number;
+    avgPrice: number;
+    onClose: () => void;
+}) => (
+    <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+        onClick={onClose}
+        role="presentation"
+    >
+        <div
+            className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+                <div>
+                    <h2 className="text-[20px] font-semibold tracking-tight" style={{ color: BRAND }}>
+                        Average Sales Price
+                    </h2>
+                    <p className="mt-1 text-[13px] text-slate-500">How this figure is calculated</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    aria-label="Close"
+                >
+                    <X size={26} />
+                </button>
+            </div>
 
-const MaterialStat = ({ icon, label, value, accent }: { icon: ReactNode; label: string; value: string; accent: 'indigo' | 'sky' | 'emerald' }) => (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm">
-        <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${STAT_ACCENT[accent]}`}>{icon}</span>
-        <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</div>
-            <div className="mt-0.5 truncate text-[18px] font-semibold text-slate-800">{value}</div>
+            <div className="space-y-4 overflow-y-auto px-6 py-5 text-[13.5px] leading-relaxed text-slate-700">
+                <p>
+                    The <span className="font-semibold">Average Sales Price</span> is the mean sales price across all
+                    materials that have a price set. Materials without a price (0) are excluded so they do not drag the
+                    average down.
+                </p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-3 font-mono text-[13px] text-slate-700">
+                    Average = Σ (sales price of priced materials) ÷ (number of priced materials)
+                </div>
+                <ul className="space-y-1.5">
+                    <li className="flex justify-between gap-4 border-b border-slate-100 pb-1.5">
+                        <span className="text-slate-500">Materials with a price</span>
+                        <span className="font-mono font-semibold text-slate-800">{pricedCount} / {total}</span>
+                    </li>
+                    <li className="flex justify-between gap-4">
+                        <span className="text-slate-500">Current average sales price</span>
+                        <span className="font-mono font-semibold" style={{ color: BRAND }}>{fmtMoney(avgPrice)}</span>
+                    </li>
+                </ul>
+                <p className="text-[12.5px] text-slate-400">
+                    Tip: add a sales price to every material to keep this average accurate.
+                </p>
+            </div>
         </div>
     </div>
 );
@@ -325,15 +505,13 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
 
     return (
         <div>
-            <PageHeader
-                breadcrumb={t('auto.breadcrumb_materials')}
-                title={mode === 'edit' ?t('auto.malzeme_bilgileri') :t('auto.yeni_malzeme')}
-                description={mode === 'edit' ? form.name :t('auto.yeni_malzeme_karti_olusturun')}
+            <StockModuleHeader
+                label="Stock › Materials"
                 actions={
-                    <div className="flex items-center gap-2">
+                    <>
                         <Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/inventory/extra-materials')}>{t('auto.listeye_don')}</Button>
                         <Button variant="primary" loading={saving} disabled={!canManage || !isDirty} icon={<Save size={13} />} onClick={save}>{t('common.save')}</Button>
-                    </div>
+                    </>
                 }
             />
 
@@ -395,14 +573,10 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
 
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     <section className="rounded-md border border-slate-200 bg-white p-3 shadow-xs">
-                        <div className="mb-3 text-[11px] font-semibold uppercase text-slate-500">{t('auto.stok_ve_fiyat')}</div>
+                        <div className="mb-3 text-[11px] font-semibold uppercase text-slate-500">{'Satış Fiyatı'}</div>
                         <div className="max-w-lg space-y-2">
-                            <MaterialInfoRow label={t('auto.mevcut_miktar')}>
-                                <div className="max-w-[150px]">
-                                    <Input size="sm" className={materialInputClass} type="number" min={0} value={form.stockQuantity} onChange={(e) => setForm({ ...form, stockQuantity: Number(e.target.value) || 0 })} />
-                                </div>
-                            </MaterialInfoRow>
-                            <MaterialInfoRow label={t('auto.birim_fiyat')}>
+                            {/* Malzemelerde yalnızca satış fiyatı girilir (unitCost alanında saklanır). */}
+                            <MaterialInfoRow label={'Satış Fiyatı'}>
                                 <div className="max-w-[150px]">
                                     <Input size="sm" className={materialInputClass} type="number" min={0} value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) || 0 })} />
                                 </div>

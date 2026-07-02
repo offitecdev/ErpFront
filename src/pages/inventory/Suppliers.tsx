@@ -1,13 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Building05 as Building, Package, Save01 as Save } from '@/components/icons/antIconCompat';
+import {
+    ArrowLeft,
+    Building05 as Building,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Package,
+    Plus,
+    Save01 as Save,
+    SearchLg as Search,
+    X,
+} from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
-import { PageHeader } from '../../components/layout/PageHeader';
+import { StockModuleHeader } from '../../components/layout/PageHeader';
+import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
-import { Field, Input } from '../../components/ui-shared/Field';
+import { Field, Input, Select } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { inventoryApi } from '../../lib/api/inventory';
 import type { SupplierRow } from '../../types/inventory';
 
@@ -25,6 +38,11 @@ export const Suppliers = () => {
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({ companyName: '', phone: '', address: '' });
     const [saving, setSaving] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 50;
 
     const load = async () => {
         setLoading(true);
@@ -39,12 +57,56 @@ export const Suppliers = () => {
         void load();
     }, []);
 
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return suppliers.filter((supplier) => {
+            if (statusFilter === 'ACTIVE' && !supplier.isActive) return false;
+            if (statusFilter === 'INACTIVE' && supplier.isActive) return false;
+            if (!q) return true;
+            return (
+                supplier.companyName.toLowerCase().includes(q) ||
+                (supplier.contactName || '').toLowerCase().includes(q) ||
+                (supplier.email || '').toLowerCase().includes(q) ||
+                (supplier.phone || '').toLowerCase().includes(q) ||
+                (supplier.address || '').toLowerCase().includes(q)
+            );
+        });
+    }, [search, statusFilter, suppliers]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, statusFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const pageSafe = Math.min(page, totalPages);
+    const paged = useMemo(
+        () => filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE),
+        [filtered, pageSafe],
+    );
+    const rangeFrom = filtered.length === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+    const rangeTo = Math.min(pageSafe * PAGE_SIZE, filtered.length);
+
+    const listRef = useRef<HTMLDivElement>(null);
+    const [listHeight, setListHeight] = useState(0);
+    useLayoutEffect(() => {
+        const el = listRef.current;
+        if (!el) return;
+        const recompute = () => {
+            const top = el.getBoundingClientRect().top;
+            setListHeight(Math.max(240, window.innerHeight - top - 24));
+        };
+        recompute();
+        window.addEventListener('resize', recompute);
+        return () => window.removeEventListener('resize', recompute);
+    }, []);
+
     const create = async () => {
         if (!form.companyName.trim()) return toast.error(t('auto.tedarikci_sirket_adi_zorunludur'));
         setSaving(true);
         try {
             const supplier = await inventoryApi.createSupplier(form);
             setForm({ companyName: '', phone: '', address: '' });
+            setAddOpen(false);
             await load();
             navigate(`/inventory/suppliers/${supplier.id}`);
         } catch (e: any) {
@@ -56,62 +118,164 @@ export const Suppliers = () => {
 
     return (
         <div>
-            <PageHeader
-                breadcrumb={t('auto.breadcrumb_suppliers')}
-                title={t('nav.suppliers')}
-                description={t('auto.tedarikci_bilgileri_urun_baglantilari_ve_alisver')}
+            <StockModuleHeader
+                label="Stock › Suppliers"
+                actions={
+                    <Button icon={addOpen ? <ChevronDown size={13} /> : <Plus size={13} />} onClick={() => setAddOpen((o) => !o)}>
+                        {t('auto.yeni_tedarikci')}
+                    </Button>
+                }
             />
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-                <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
+            {/* Aşağı doğru açılan "Yeni Tedarikçi" bölümü — liste her zaman görünür kalır. */}
+            {addOpen && (
+                <section className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-xs">
                     <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
                         <Building size={13} />{t('auto.yeni_tedarikci')}</div>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <Field label={t('auto.sirket_adi')} required><Input size="sm" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></Field>
                         <Field label={t('common.phone')}><Input size="sm" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
                         <Field label={t('common.address')}><Input size="sm" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
-                        <Button size="sm" className="w-full" icon={<Save size={13} />} loading={saving} onClick={create}>{t('common.save')}</Button>
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                        <Button size="sm" icon={<Save size={13} />} loading={saving} onClick={create}>{t('common.save')}</Button>
                     </div>
                 </section>
+            )}
 
-                <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-xs">
-                    <div className="border-b border-slate-100 px-4 py-3 text-[11px] font-semibold uppercase text-slate-500">{t('auto.genel_liste')}</div>
-                    {loading ? (
-                        <div className="p-4 text-[12px] text-slate-500">{t('common.loading')}</div>
-                    ) : suppliers.length === 0 ? (
-                        <EmptyState icon={<Building size={28} />} title={t('auto.tedarikci_yok')} description={t('auto.ilk_tedarikciyi_soldaki_formdan_ekleyin')} />
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-[12.5px]">
-                                <thead className="border-b border-slate-100 bg-slate-50 text-[10.5px] uppercase text-slate-500">
-                                    <tr>
-                                        <th className="px-4 py-2 text-left">{t('auto.sirket')}</th>
-                                        <th className="px-4 py-2 text-left">{t('common.phone')}</th>
-                                        <th className="px-4 py-2 text-left">{t('common.address')}</th>
-                                        <th className="px-4 py-2 text-right">{t('auto.urun')}</th>
-                                        <th className="px-4 py-2 text-right">{t('auto.alim_adedi')}</th>
-                                        <th className="px-4 py-2 text-right">{t('auto.alisveris')}</th>
-                                        <th className="px-4 py-2 text-left">{t('auto.son_alim')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {suppliers.map((supplier) => (
-                                        <tr key={supplier.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/inventory/suppliers/${supplier.id}`)}>
-                                            <td className="px-4 py-3 font-semibold text-slate-900">{supplier.companyName}</td>
-                                            <td className="px-4 py-3 text-slate-600">{supplier.phone || '-'}</td>
-                                            <td className="px-4 py-3 text-slate-600">{supplier.address || '-'}</td>
-                                            <td className="px-4 py-3 text-right font-mono">{supplier.articleCount || 0}</td>
-                                            <td className="px-4 py-3 text-right font-mono">{number(supplier.totalPurchaseQuantity)}</td>
-                                            <td className="px-4 py-3 text-right font-mono">{money(supplier.totalPurchaseAmount)}</td>
-                                            <td className="px-4 py-3 text-slate-600">{supplier.latestPurchaseDate ? dayjs(supplier.latestPurchaseDate).format('DD.MM.YYYY') : '-'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+            <Card className="border-0 rounded-none" noPadding>
+                <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/60">
+                    <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
+                        <div className="flex shrink-0 items-center gap-2 pr-1">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
+                                <Building size={13} />
+                            </span>
+                            <h3 className="whitespace-nowrap text-[14px] font-semibold text-slate-900">{t('auto.genel_liste')}</h3>
                         </div>
-                    )}
-                </section>
-            </div>
+                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+                            <div className="relative shrink-0">
+                                <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder={t('auto.ara_kod_ad_barkod')}
+                                    className="h-8 w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-7 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearch('')}
+                                        aria-label={t('common.clear')}
+                                        title={t('common.clear')}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="relative w-[148px] shrink-0">
+                                <Select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                >
+                                    <option value="">{t('auto.tum_durumlar')}</option>
+                                    <option value="ACTIVE">{t('common.active')}</option>
+                                    <option value="INACTIVE">{t('common.inactive')}</option>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-3">
+                            <span className="font-mono text-[11.5px] text-slate-500">
+                                {rangeFrom}-{rangeTo} / {filtered.length}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    disabled={pageSafe <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.back')}
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
+                                <span className="px-1 font-mono text-[11.5px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                                <button
+                                    type="button"
+                                    disabled={pageSafe >= totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.next')}
+                                >
+                                    <ChevronRight size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    ref={listRef}
+                    style={{ height: listHeight || undefined }}
+                    className="overflow-auto bg-white"
+                >
+                    <table className="min-w-[1220px] w-full table-fixed text-[12.5px]">
+                        <colgroup>
+                            <col style={{ width: 210 }} />
+                            <col style={{ width: 150 }} />
+                            <col style={{ width: 260 }} />
+                            <col style={{ width: 92 }} />
+                            <col style={{ width: 118 }} />
+                            <col style={{ width: 130 }} />
+                            <col style={{ width: 120 }} />
+                            <col style={{ width: 112 }} />
+                            <col style={{ width: 72 }} />
+                        </colgroup>
+                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[10.5px] text-[#86868B] bg-slate-50 border-b border-slate-200 uppercase tracking-[0.08em] shadow-[0_1px_0_0_rgb(226_232_240)]">
+                            <tr>
+                                <th className="px-3 py-2 text-left font-semibold">{t('auto.sirket')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('common.phone')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('common.address')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('auto.urun')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('auto.alim_adedi')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('auto.alisveris')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('auto.son_alim')}</th>
+                                <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
+                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {loading && <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-400">{t('common.loading')}</td></tr>}
+                            {!loading && filtered.length === 0 && (
+                                <tr>
+                                    <td colSpan={9}>
+                                        <EmptyState icon={<Building size={28} />} title={t('auto.tedarikci_yok')} description={t('auto.ilk_tedarikciyi_soldaki_formdan_ekleyin')} />
+                                    </td>
+                                </tr>
+                            )}
+                            {!loading && paged.map((supplier) => (
+                                <tr key={supplier.id} className="cursor-pointer transition-colors hover:bg-slate-50/60" onClick={() => navigate(`/inventory/suppliers/${supplier.id}`)}>
+                                    <td className="truncate px-3 py-2 font-semibold text-slate-900">{supplier.companyName}</td>
+                                    <td className="truncate px-3 py-2 text-slate-600">{supplier.phone || '-'}</td>
+                                    <td className="truncate px-3 py-2 text-slate-600">{supplier.address || '-'}</td>
+                                    <td className="px-3 py-2 text-right font-mono">{supplier.articleCount || 0}</td>
+                                    <td className="px-3 py-2 text-right font-mono">{number(supplier.totalPurchaseQuantity)}</td>
+                                    <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{money(supplier.totalPurchaseAmount)}</td>
+                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{supplier.latestPurchaseDate ? dayjs(supplier.latestPurchaseDate).format('DD.MM.YYYY') : '-'}</td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                        <StatusChip variant={supplier.isActive ? 'active' : 'passive'}>
+                                            {supplier.isActive ? t('common.active') : t('common.inactive')}
+                                        </StatusChip>
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                        <ChevronRight size={13} className="ml-auto text-slate-400" />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
         </div>
     );
 };
@@ -130,10 +294,8 @@ export const SupplierDetail = () => {
 
     return (
         <div>
-            <PageHeader
-                breadcrumb={t('auto.breadcrumb_suppliers')}
-                title={supplier.companyName}
-                description={[supplier.phone, supplier.address].filter(Boolean).join(' · ') ||t('auto.tedarikci_detayi')}
+            <StockModuleHeader
+                label={`Stock › Suppliers › ${supplier.companyName}`}
                 actions={<Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/inventory/suppliers')}>{t('auto.listeye_don')}</Button>}
             />
 

@@ -111,14 +111,14 @@ export const ServiceReportAdd = () => {
     };
 
     const submit = async () => {
-        if (!projectId) return toast.error('Proje seçin.');
-        if (!appointmentId) return toast.error('Randevu seçin.');
-        if (!operationsDone.trim()) return toast.error('Yapılan işleri girin.');
+        if (!projectId) return toast.error(t('services.toastSelectProject'));
+        if (!appointmentId) return toast.error(t('services.toastSelectAppointment'));
+        if (!operationsDone.trim()) return toast.error(t('services.toastEnterWork'));
 
         const startedAt = buildIso(startTime);
         const endedAt = buildIso(endTime);
         if (dayjs(endedAt).valueOf() <= dayjs(startedAt).valueOf()) {
-            return toast.error('Bitiş saati başlangıçtan sonra olmalı.');
+            return toast.error(t('services.toastEndTimeAfterStart'));
         }
 
         const payload: CompleteInstallationInput = {
@@ -142,10 +142,10 @@ export const ServiceReportAdd = () => {
             } else {
                 await projectApi.completeAppointmentAsManager(appointmentId, payload);
             }
-            toast.success('Saha raporu kaydedildi.');
+            toast.success(t('services.toastReportSaved'));
             navigate(returnTo);
         } catch (e: any) {
-            toast.error(e.response?.data?.error || 'Rapor kaydedilemedi.');
+            toast.error(e.response?.data?.error || t('services.toastSaveError'));
         } finally {
             setSubmitting(false);
         }
@@ -155,31 +155,31 @@ export const ServiceReportAdd = () => {
         <div>
             <PageHeader
                 breadcrumb={t('nav.serviceReports')}
-                title="Yeni Saha Raporu"
-                description="Proje ve randevu seçin, yapılan işleri, malzemeleri ve harici giderleri girin."
+                title={t('services.newReportTitle')}
+                description={t('services.newReportDesc')}
             />
 
             <div className="mb-4">
-                <Button variant="ghost" size="sm" icon={<ArrowLeft size={14} />} onClick={() => navigate(returnTo)}>Geri</Button>
+                <Button variant="ghost" size="sm" icon={<ArrowLeft size={14} />} onClick={() => navigate(returnTo)}>{t('auth.back')}</Button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-4">
-                    <Card title="Rapor bilgileri">
+                    <Card title={t('services.cardReportInfo')}>
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <Field label="Proje" required>
+                            <Field label={t('services.labelProject')} required>
                                 {lockedProjectId ? (
                                     <Input value={project?.projectName || '…'} disabled readOnly />
                                 ) : (
                                     <Select value={projectId} onChange={(e) => void onSelectProject(e.target.value)}>
-                                        <option value="">Proje seçin</option>
+                                        <option value="">{t('services.selectProject')}</option>
                                         {projects.map((p) => <option key={p.id} value={p.id}>{p.projectName}</option>)}
                                     </Select>
                                 )}
                             </Field>
-                            <Field label="Randevu (gün)" required>
+                            <Field label={t('services.labelAppointment')} required>
                                 <Select value={appointmentId} disabled={!project} onChange={(e) => onSelectAppointment(e.target.value)}>
-                                    <option value="">Randevu seçin</option>
+                                    <option value="">{t('services.selectAppointment')}</option>
                                     {appointments.map((a) => (
                                         <option key={a.id} value={a.id}>
                                             {dayjs(a.startTime).format('DD.MM.YYYY')} · {dayjs(a.startTime).format('HH:mm')}–{dayjs(a.endTime).format('HH:mm')}
@@ -187,33 +187,33 @@ export const ServiceReportAdd = () => {
                                     ))}
                                 </Select>
                             </Field>
-                            <Field label="Başlangıç saati" required>
+                            <Field label={t('services.labelStartTime')} required>
                                 <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
                             </Field>
-                            <Field label="Bitiş saati" required>
+                            <Field label={t('services.labelEndTime')} required>
                                 <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
                             </Field>
                         </div>
                         <div className="mt-3 grid grid-cols-1 gap-3">
-                            <Field label="Yapılan işler" required hint="Her satır ayrı bir iş kalemi olarak raporlanır.">
+                            <Field label={t('services.labelWorkDone')} required hint={t('services.hintWorkDone')}>
                                 <Textarea rows={4} value={operationsDone} onChange={(e) => setOperationsDone(e.target.value)} placeholder="0555 kodlu klima borusu takıldı…" />
                             </Field>
-                            <Field label="Teknik notlar">
+                            <Field label={t('services.labelTechnicalNotes')}>
                                 <Textarea rows={3} value={technicalNotes} onChange={(e) => setTechnicalNotes(e.target.value)} />
                             </Field>
                         </div>
                     </Card>
 
                     <Card
-                        title="Kullanılan malzemeler"
-                        actions={<Button variant="secondary" size="sm" icon={<PlusIcon size={13} />} onClick={() => setMaterialRows((rows) => [...rows, { materialId: '', quantity: 1 }])}>Satır</Button>}
+                        title={t('services.cardMaterials')}
+                        actions={<Button variant="secondary" size="sm" icon={<PlusIcon size={13} />} onClick={() => setMaterialRows((rows) => [...rows, { materialId: '', quantity: 1 }])}>{t('services.addRow')}</Button>}
                     >
-                        {materialRows.length === 0 && <p className="text-[12.5px] text-slate-500">Malzeme eklemek için "Satır" ekleyin.</p>}
+                        {materialRows.length === 0 && <p className="text-[12.5px] text-slate-500">{t('services.noMaterialsHint')}</p>}
                         <div className="space-y-2">
                             {materialRows.map((row, index) => (
                                 <div key={index} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_120px_40px]">
                                     <Select value={row.materialId} onChange={(e) => setMaterialRows((rows) => rows.map((r, i) => i === index ? { ...r, materialId: e.target.value } : r))}>
-                                        <option value="">Malzeme seçin</option>
+                                        <option value="">{t('services.selectMaterial')}</option>
                                         {materials.map((m) => <option key={m.id} value={m.id}>{m.serialId ? `${m.serialId} · ` : ''}{m.name}</option>)}
                                     </Select>
                                     <Input type="number" min={0} step="1" value={row.quantity} onChange={(e) => setMaterialRows((rows) => rows.map((r, i) => i === index ? { ...r, quantity: Number(e.target.value) } : r))} />
@@ -224,10 +224,10 @@ export const ServiceReportAdd = () => {
                     </Card>
 
                     <Card
-                        title="Harici giderler"
-                        actions={<Button variant="secondary" size="sm" icon={<PlusIcon size={13} />} onClick={() => setExpenseRows((rows) => [...rows, { expenseType: 'Nakliye', amount: 0, description: '' }])}>Satır</Button>}
+                        title={t('services.cardExpenses')}
+                        actions={<Button variant="secondary" size="sm" icon={<PlusIcon size={13} />} onClick={() => setExpenseRows((rows) => [...rows, { expenseType: 'Nakliye', amount: 0, description: '' }])}>{t('services.addRow')}</Button>}
                     >
-                        {expenseRows.length === 0 && <p className="text-[12.5px] text-slate-500">Harici gider eklemek için "Satır" ekleyin.</p>}
+                        {expenseRows.length === 0 && <p className="text-[12.5px] text-slate-500">{t('services.noExpensesHint')}</p>}
                         <div className="space-y-2">
                             {expenseRows.map((row, index) => (
                                 <div key={index} className="grid grid-cols-1 gap-2 md:grid-cols-[160px_120px_1fr_40px]">
@@ -235,7 +235,7 @@ export const ServiceReportAdd = () => {
                                         {EXPENSE_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}
                                     </Select>
                                     <Input type="number" min={0} step="0.01" value={row.amount} onChange={(e) => setExpenseRows((rows) => rows.map((r, i) => i === index ? { ...r, amount: Number(e.target.value) } : r))} />
-                                    <Input value={row.description} placeholder="Açıklama" onChange={(e) => setExpenseRows((rows) => rows.map((r, i) => i === index ? { ...r, description: e.target.value } : r))} />
+                                    <Input value={row.description} placeholder={t('services.descPlaceholder')} onChange={(e) => setExpenseRows((rows) => rows.map((r, i) => i === index ? { ...r, description: e.target.value } : r))} />
                                     <Button variant="ghost" size="sm" icon={<TrashIcon size={13} />} onClick={() => setExpenseRows((rows) => rows.filter((_, i) => i !== index))} />
                                 </div>
                             ))}
@@ -244,17 +244,17 @@ export const ServiceReportAdd = () => {
                 </div>
 
                 <div className="space-y-4">
-                    <Card title="Özet">
+                    <Card title={t('services.cardSummary')}>
                         <dl className="space-y-2 text-[12.5px]">
-                            <div className="flex justify-between"><dt className="text-slate-500">Proje</dt><dd className="font-medium text-slate-800">{project?.projectName || '—'}</dd></div>
-                            <div className="flex justify-between"><dt className="text-slate-500">Müşteri</dt><dd className="font-medium text-slate-800">{project?.customer?.companyName || '—'}</dd></div>
-                            <div className="flex justify-between"><dt className="text-slate-500">Randevu günü</dt><dd className="font-medium text-slate-800">{selectedAppointment ? dayjs(selectedAppointment.startTime).format('DD.MM.YYYY') : '—'}</dd></div>
-                            <div className="flex justify-between"><dt className="text-slate-500">Malzeme satırı</dt><dd className="font-medium text-slate-800">{materialRows.length}</dd></div>
-                            <div className="flex justify-between"><dt className="text-slate-500">Gider satırı</dt><dd className="font-medium text-slate-800">{expenseRows.length}</dd></div>
+                            <div className="flex justify-between"><dt className="text-slate-500">{t('services.labelProject')}</dt><dd className="font-medium text-slate-800">{project?.projectName || '—'}</dd></div>
+                            <div className="flex justify-between"><dt className="text-slate-500">{t('services.labelCustomer')}</dt><dd className="font-medium text-slate-800">{project?.customer?.companyName || '—'}</dd></div>
+                            <div className="flex justify-between"><dt className="text-slate-500">{t('services.labelAppointmentDay')}</dt><dd className="font-medium text-slate-800">{selectedAppointment ? dayjs(selectedAppointment.startTime).format('DD.MM.YYYY') : '—'}</dd></div>
+                            <div className="flex justify-between"><dt className="text-slate-500">{t('services.labelMaterialRows')}</dt><dd className="font-medium text-slate-800">{materialRows.length}</dd></div>
+                            <div className="flex justify-between"><dt className="text-slate-500">{t('services.labelExpenseRows')}</dt><dd className="font-medium text-slate-800">{expenseRows.length}</dd></div>
                         </dl>
                         <div className="mt-4">
                             <Button variant="primary" size="md" className="w-full" disabled={submitting} icon={<SaveIcon size={14} />} onClick={() => void submit()}>
-                                {submitting ? 'Kaydediliyor…' : 'Kaydet'}
+                                {submitting ? t('services.saving') : t('common.save')}
                             </Button>
                         </div>
                     </Card>

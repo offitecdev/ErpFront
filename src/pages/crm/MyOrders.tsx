@@ -37,13 +37,18 @@ const AddonRow: React.FC<{ addon: MyOrderAddonDto; onBilled: () => void }> = ({ 
     const remaining = addon.billingSummary?.remainingPercent ?? 100;
     return (
         <tr className="bg-slate-50/50">
-            <td className="py-2 pl-8 pr-4">
-                <div className="flex items-center gap-2">
-                    <span className="truncate text-[12px] font-semibold text-primary">{addon.orderNumber}</span>
-                    {addon.revisionNumber ? (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">N{addon.revisionNumber}</span>
-                    ) : null}
-                    <span className="text-[11px] text-tertiary">{t('crm.additional_order')}</span>
+            <td className="py-2 pl-2 pr-4">
+                {/* Same leading indent as OrderRow (toggle column + gap) so addon
+                    order numbers line up vertically with the main order numbers */}
+                <div className="flex items-center gap-1.5">
+                    <span className="inline-block w-5 shrink-0" />
+                    <div className="flex items-center gap-2">
+                        <span className="truncate text-[12px] font-semibold text-primary">{addon.orderNumber}</span>
+                        {addon.revisionNumber ? (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">N{addon.revisionNumber}</span>
+                        ) : null}
+                        <span className="text-[11px] text-tertiary">{t('crm.additional_order')}</span>
+                    </div>
                 </div>
             </td>
             <td className="px-4 py-2 text-[12px] text-secondary">-</td>
@@ -82,13 +87,13 @@ const OrderRow: React.FC<{ order: MyOrderDto; onBilled: () => void; showAddons: 
                             <button
                                 type="button"
                                 onClick={() => setExpanded((v) => !v)}
-                                className="shrink-0 text-slate-400 hover:text-slate-600"
+                                className="flex w-5 shrink-0 justify-center text-slate-400 hover:text-slate-600"
                                 aria-label={t('crm.additional_siparisleri_goster')}
                             >
-                                {showExpanded ? <DownOutlined /> : <RightOutlined />}
+                                {showExpanded ? <DownOutlined size={16} /> : <RightOutlined size={16} />}
                             </button>
                         ) : (
-                            <span className="inline-block w-3" />
+                            <span className="inline-block w-5 shrink-0" />
                         )}
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
@@ -238,7 +243,14 @@ export const MyOrders = () => {
                             <table className="w-full text-left text-[12.5px]">
                                 <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
                                     <tr>
-                                        <th className="px-4 py-2.5 font-semibold">{t('crm.order_no')}</th>
+                                        <th className="pl-2 pr-4 py-2.5 font-semibold">
+                                            {/* Match the row leading (toggle gutter + gap) so the
+                                                header sits over the order numbers */}
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="inline-block w-5 shrink-0" />
+                                                {t('crm.order_no')}
+                                            </span>
+                                        </th>
                                         <th className="px-4 py-2.5 font-semibold">{t('nav.quickActionsGroup.customers')}</th>
                                         <th className="px-4 py-2.5 font-semibold">{t('common.status')}</th>
                                         <th className="px-4 py-2.5 text-right font-semibold">{t('common.total')}</th>

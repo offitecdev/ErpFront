@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle as WarningOutlined, Camera01 as CameraOutlined, Hash01 as NumberOutlined, Scan as ScanOutlined, XClose as CloseOutlined } from '../icons/antIconCompat';
-import { LuKeyRound as MdVpnKey } from 'react-icons/lu';
+import { LuKeyRound as MdVpnKey } from '@/components/icons/lucideLocal';
 import { toast } from 'sonner';
 import { Button } from './Button';
 import { Input } from './Field';

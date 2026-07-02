@@ -237,6 +237,17 @@ main table:not([role="grid"]):not([data-unstyled-table]) thead,
   background: var(--color-bg-secondary) !important;
 }
 
+/* Remove only the line directly above the column headers, keep every other table line.
+   1) the Card header divider, when that card's body holds a native table
+   2) the top border of any wrapper sitting directly around a native table (e.g. Articles) */
+[data-ui-card]:has([data-ui-card-body] table:not([role="grid"]):not([data-unstyled-table])) [data-ui-card-header] {
+  border-bottom-color: transparent !important;
+}
+main div:has(> table:not([role="grid"]):not([data-unstyled-table])),
+[role="dialog"] div:has(> table:not([role="grid"]):not([data-unstyled-table])) {
+  border-top-color: transparent !important;
+}
+
 main table:not([role="grid"]):not([data-unstyled-table]) th,
 [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) th {
   position: relative;

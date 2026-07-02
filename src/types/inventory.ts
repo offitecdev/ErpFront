@@ -6,6 +6,8 @@ export type ProposalStatus = 'PENDING' | 'APPROVED' | 'CONVERTED' | 'REJECTED';
 
 export type ArticleStatus = 'ACTIVE' | 'INACTIVE' | 'IN_SUPPLY' | 'IN_PRODUCTION';
 
+export type ItemType = 'PRODUCT' | 'MATERIAL';
+
 export interface InventoryLocation {
     id: string;
     tenantId: string;
@@ -29,6 +31,7 @@ export interface InventoryArticle {
     supplierBarcode?: string | null;
     imageUrl?: string | null;
     category?: string | null;
+    itemType?: ItemType;
     status: ArticleStatus;
     isActive: boolean;
     minStockLevel: number;
@@ -55,6 +58,33 @@ export interface ArticleStockSummary extends InventoryArticle {
         currentQuantity: number;
         reservedQuantity: number;
     }[];
+}
+
+// Lean row for the products LIST screen and the tender product picker. Holds only
+// what the table renders plus `id` for linking/navigation — no images, suppliers,
+// movements or cost breakdown. Product detail is loaded separately (by id).
+export interface ArticleListItem {
+    id: string;
+    articleCode: string;
+    name: string;
+    category?: string | null;
+    itemType?: ItemType;
+    systemBarcode?: string | null;
+    supplierBarcode?: string | null;
+    unit: string;
+    salePrice?: number;
+    baseCost: number;
+    status: ArticleStatus;
+    minStockLevel: number;
+    criticalStockLevel: number;
+    totalQuantity: number;
+}
+
+export interface ArticleListPage {
+    items: ArticleListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
 }
 
 export interface StockBalanceRow {
@@ -89,6 +119,7 @@ export interface StockMovementRow {
     movementType: MovementType;
     quantity: number;
     unitCost?: number | null;
+    supplierId?: string | null;
     sourceLocationId?: string | null;
     destinationLocationId?: string | null;
     transactionDate: string;
@@ -96,6 +127,25 @@ export interface StockMovementRow {
     referenceId?: string | null;
     description?: string | null;
     employee?: { firstName: string; lastName: string };
+    supplier?: { companyName: string } | null;
+}
+
+// Stok hareketi seçiminde kullanılan birleşik ürün + malzeme arama sonucu.
+export interface SearchItem {
+    kind: 'PRODUCT' | 'MATERIAL';
+    id: string;
+    code: string;
+    name: string;
+    barcode?: string | null;
+    unit?: string;
+    salePrice: number;
+    baseCost?: number;
+    imageUrl?: string | null;
+    itemType?: ItemType;
+    minStockLevel?: number;
+    criticalStockLevel?: number;
+    maxStockLevel?: number | null;
+    stockQuantity?: number;
 }
 
 export interface PurchaseProposalRow {

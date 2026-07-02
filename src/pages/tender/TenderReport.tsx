@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BarChart03 as BarChart3, Coins01 as Coins, Percent01 as Percent, PieChart03 as PieChart, TrendUp01 as TrendingUp } from '@/components/icons/antIconCompat';
 
@@ -10,22 +10,10 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { useTenderStore } from '../../store/tenderStore';
 
 import { t } from '@/i18n/translate';
-import { useTranslation } from 'react-i18next';
+import { fmtMoney } from './detail/utils/formatters';
+import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 
 
-
-const useLanguageRefresh = () => {
-    const { i18n } = useTranslation();
-    const [, setTick] = useState(0);
-    useEffect(() => {
-        const handler = () => setTick(t => t + 1);
-        i18n.on('languageChanged', handler);
-        return () => i18n.off('languageChanged', handler);
-    }, [i18n]);
-};
-
-const fmtMoney = (v: number) =>
-    new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);
 
 const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info'> = {
     Draft: 'warning',

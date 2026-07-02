@@ -3,11 +3,17 @@ import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "vite"
 
-export default defineConfig({
-  base: './',
+export default defineConfig(({ mode }) => ({
+  // Web (nginx) needs an absolute base so assets resolve to /assets/... on
+  // deep routes after a refresh. Electron loads via file:// and needs a
+  // relative base. Desktop builds pass `--mode electron`.
+  base: mode === 'electron' ? './' : '/',
   plugins: [react(), tailwindcss()],
   server: {
-    hmr: process.env.VITE_ENABLE_HMR === 'true',
+    // Hot Module Replacement is on by default so the dev server (`npm run dev`)
+    // live-updates the browser on every save. Set VITE_DISABLE_HMR=true to
+    // turn it off (e.g. for environments where the HMR websocket can't connect).
+    hmr: process.env.VITE_DISABLE_HMR !== 'true',
   },
   build: {
     modulePreload: {
@@ -38,9 +44,10 @@ export default defineConfig({
           if (normalizedId.includes('/node_modules/jspdf/') || normalizedId.includes('/node_modules/pdf-lib/') || normalizedId.includes('/node_modules/qrcode/')) {
             return 'vendor-pdf';
           }
-          if (normalizedId.includes('/node_modules/antd/') || normalizedId.includes('/node_modules/@ant-design/')) {
-            return 'vendor-antd';
-          }
+          // antd is intentionally NOT forced into a single chunk. Doing so made
+          // the shell's ConfigProvider import drag the entire antd bundle onto
+          // the critical path. Letting Rollup split it keeps only the shell's
+          // antd deps eager; per-page components load with their lazy routes.
           if (normalizedId.includes('/node_modules/html5-qrcode/')) {
             return 'vendor-scanner';
           }
@@ -56,4 +63,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-})
+}))

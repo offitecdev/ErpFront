@@ -3,6 +3,7 @@ import type {
     InventoryLocation,
     InventoryArticle,
     ArticleStockSummary,
+    ArticleListPage,
     StockBalanceRow,
     StockMovementRow,
     PurchaseProposalRow,
@@ -10,6 +11,7 @@ import type {
     MovementType,
     SupplierRow,
     ArticleSupplierRow,
+    SearchItem,
 } from '../../types/inventory';
 
 export const inventoryApi = {
@@ -38,14 +40,43 @@ export const inventoryApi = {
         return res.data;
     },
 
-    articlesSummary: async (): Promise<ArticleStockSummary[]> => {
+    articlesSummary: async (includeImages = false): Promise<ArticleStockSummary[]> => {
+        // Base64 thumbnails make this list response ~1MB+; only request them for
+        // consumers that actually render images (e.g. the product picker).
+        const query = includeImages ? '?includeImages=true' : '';
         try {
-            const res = await apiClient.get('/inventory/articles/summary');
+            const res = await apiClient.get(`/inventory/articles/summary${query}`);
             return res.data;
         } catch {
-            const res = await apiClient.get('/articles?includeStock=true');
+            const res = await apiClient.get(`/articles?includeStock=true${includeImages ? '&includeImages=true' : ''}`);
             return res.data;
         }
+    },
+
+    // Server-side pagination for the products list / tender picker — pulls one
+    // page (default 15) at a time with search/status/itemType applied in the DB.
+    // Returns only the lean fields the table shows plus id; images and detail
+    // fields are NOT fetched here (load product detail separately by id).
+    articlesSummaryPaged: async (params: {
+        page?: number;
+        pageSize?: number;
+        search?: string;
+        status?: string;
+        itemType?: string;
+    }): Promise<ArticleListPage> => {
+        const query = new URLSearchParams();
+        query.set('page', String(params.page ?? 1));
+        query.set('pageSize', String(params.pageSize ?? 15));
+        if (params.search) query.set('search', params.search);
+        if (params.status) query.set('status', params.status);
+        if (params.itemType) query.set('itemType', params.itemType);
+        const res = await apiClient.get(`/inventory/articles/summary/paged?${query.toString()}`);
+        return res.data;
+    },
+
+    searchItems: async (q: string): Promise<SearchItem[]> => {
+        const res = await apiClient.get(`/inventory/search-items?q=${encodeURIComponent(q)}`);
+        return res.data;
     },
 
     scanMovement: async (input: {
@@ -53,6 +84,9 @@ export const inventoryApi = {
         movementType: MovementType;
         quantity: number;
         unitCost?: number | null;
+        supplierId?: string | null;
+        itemKind?: 'PRODUCT' | 'MATERIAL';
+        materialId?: string | null;
         sourceLocationId?: string | null;
         destLocationId?: string | null;
         referenceId?: string | null;

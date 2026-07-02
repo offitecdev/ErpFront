@@ -23,6 +23,7 @@ import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
+import { CUSTOMER_TYPE_OPTIONS, CUSTOMER_LANGUAGE_OPTIONS, CUSTOMER_STATUS_OPTIONS, DEFAULT_CUSTOMER_TYPE, DEFAULT_CUSTOMER_STATUS, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
 
 import { t } from '@/i18n/translate';
 
@@ -35,6 +36,7 @@ interface CustomerRow {
     mainEmail?: string | null;
     mainPhone?: string | null;
     address?: string | null;
+    status?: string | null;
     isActive: boolean;
 }
 
@@ -59,11 +61,20 @@ export const CustomerList = () => {
     const [form, setForm] = useState({
         companyName: '',
         segment: '',
+        customerType: DEFAULT_CUSTOMER_TYPE,
         taxOffice: '',
         taxNumber: '',
+        vatNumber: '',
         mainEmail: '',
         mainPhone: '',
+        mobilePhone: '',
+        website: '',
+        language: '',
+        customerSource: '',
+        responsibleFirstName: '',
+        responsibleLastName: '',
         address: '',
+        status: DEFAULT_CUSTOMER_STATUS,
     });
     const pageSize = 10;
 
@@ -112,8 +123,9 @@ export const CustomerList = () => {
             await apiClient.post('/customers', form);
             toast.success(t('crm.customers.successAdd'));
             setForm({
-                companyName: '', segment: '', taxOffice: '', taxNumber: '',
-                mainEmail: '', mainPhone: '', address: '',
+                companyName: '', segment: '', customerType: DEFAULT_CUSTOMER_TYPE, taxOffice: '', taxNumber: '',
+                vatNumber: '', mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
+                customerSource: '', responsibleFirstName: '', responsibleLastName: '', address: '', status: DEFAULT_CUSTOMER_STATUS,
             });
             setSubmitAttempted(false);
             setShowForm(false);
@@ -192,6 +204,26 @@ export const CustomerList = () => {
                                 <option value="Startup">{t('crm.customers.segmentStartup')}</option>
                             </Select>
                         </Field>
+                        <Field label={t('crm.customers.customerType')}>
+                            <Select
+                                value={form.customerType}
+                                onChange={(e) => setForm({ ...form, customerType: e.target.value })}
+                            >
+                                {CUSTOMER_TYPE_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
+                                ))}
+                            </Select>
+                        </Field>
+                        <Field label={t('common.status')}>
+                            <Select
+                                value={form.status}
+                                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                            >
+                                {CUSTOMER_STATUS_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
+                                ))}
+                            </Select>
+                        </Field>
                         <Field label={t('crm.customers.taxOffice')}>
                             <Input value={form.taxOffice}
                                 onChange={(e) => setForm({ ...form, taxOffice: e.target.value })} />
@@ -200,6 +232,21 @@ export const CustomerList = () => {
                             <Input value={form.taxNumber}
                                 onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} />
                         </Field>
+                        <Field label={t('crm.customers.vatNumber')}>
+                            <Input value={form.vatNumber}
+                                onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.customers.language')}>
+                            <Select
+                                value={form.language}
+                                onChange={(e) => setForm({ ...form, language: e.target.value })}
+                            >
+                                <option value="">{t('common.select')}</option>
+                                {CUSTOMER_LANGUAGE_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
+                                ))}
+                            </Select>
+                        </Field>
                         <Field label={t('common.email')}>
                             <Input type="email" value={form.mainEmail}
                                 onChange={(e) => setForm({ ...form, mainEmail: e.target.value })} />
@@ -207,6 +254,29 @@ export const CustomerList = () => {
                         <Field label={t('common.phone')}>
                             <Input value={form.mainPhone}
                                 onChange={(e) => setForm({ ...form, mainPhone: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.customers.mobilePhone')}>
+                            <Input value={form.mobilePhone}
+                                onChange={(e) => setForm({ ...form, mobilePhone: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.customers.website')}>
+                            <Input value={form.website}
+                                onChange={(e) => setForm({ ...form, website: e.target.value })}
+                                placeholder="https://" />
+                        </Field>
+                        <Field label={t('crm.customers.customerSource')}>
+                            <Input value={form.customerSource}
+                                onChange={(e) => setForm({ ...form, customerSource: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.customers.responsibleEmployee')}>
+                            <div className="flex gap-2">
+                                <Input value={form.responsibleFirstName}
+                                    onChange={(e) => setForm({ ...form, responsibleFirstName: e.target.value })}
+                                    placeholder={t('crm.customers.responsibleFirstName')} />
+                                <Input value={form.responsibleLastName}
+                                    onChange={(e) => setForm({ ...form, responsibleLastName: e.target.value })}
+                                    placeholder={t('crm.customers.responsibleLastName')} />
+                            </div>
                         </Field>
                         <Field label={t('crm.customers.address')} className="md:col-span-3">
                             <Textarea rows={2} value={form.address}
@@ -308,8 +378,8 @@ export const CustomerList = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5">
-                                            <StatusChip variant={c.isActive ? 'active' : 'passive'}>
-                                                {c.isActive ?t('common.active') :t('common.inactive')}
+                                            <StatusChip variant={getCustomerStatusOption(c.status).variant}>
+                                                {getCustomerStatusLabel(c.status)}
                                             </StatusChip>
                                         </td>
                                         <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
