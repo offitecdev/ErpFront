@@ -15,9 +15,8 @@ import type {
     TextField,
 } from '../types/tenderDetail.types';
 import { sortPositions, buildSimpleTenderLines } from '../utils/tenderLine.utils';
-import { isInlinePatchConfirmed } from '../utils/tenderInlinePatch.utils';
+import { isInlinePatchConfirmed, normalizeInlinePatchValue } from '../utils/tenderInlinePatch.utils';
 import {
-    toPlainMarkdown,
     buildProductDefaults,
     createTempPositionId,
 } from '../utils/tenderProduct.utils';
@@ -63,9 +62,13 @@ export const useTenderLineStaging = ({
     const [pendingMeta, setPendingMeta] = useState<TenderMetaPatch>({});
     const [dirtyLineIds, setDirtyLineIds] = useState<Set<string>>(() => new Set());
     const [savingAll, setSavingAll] = useState(false);
+    // React state is not synchronous. This ref closes the small window in which
+    // a double click can enter handleSaveAll twice before savingAll re-renders.
+    const savingAllRef = useRef(false);
 
-    const [pendingAddrId, setPendingAddrId] = useState<{ INSTALLATION: string | null; BILLING: string | null }>({
+    const [pendingAddrId, setPendingAddrId] = useState<{ INSTALLATION: string | null; DELIVERY: string | null; BILLING: string | null }>({
         INSTALLATION: null,
+        DELIVERY: null,
         BILLING: null,
     });
 
@@ -208,9 +211,14 @@ export const useTenderLineStaging = ({
     const handleMetaFieldChange = (fieldKey: string, patch: TenderMetaPatch) => {
         handleTenderMetaChange(patch);
         if (fieldKey === 'installation') setPendingAddrId((prev) => ({ ...prev, INSTALLATION: null }));
+        if (fieldKey === 'delivery') setPendingAddrId((prev) => ({ ...prev, DELIVERY: null }));
         if (fieldKey === 'billing') setPendingAddrId((prev) => ({ ...prev, BILLING: null }));
     };
 
+    // Picking (or inline-creating) an address only stages it, like every other
+    // meta edit — nothing is persisted until the user presses the top-bar Save
+    // (see handleSaveAll). The optimistic update makes the picked value show at
+    // once so the pending change is visible before it is saved.
     const handleAddressPick = (patch: TenderMetaPatch) => handleTenderMetaChange(patch);
 
     // ── Manual Save flush ────────────────────────────────────────────────────
@@ -219,123 +227,187 @@ export const useTenderLineStaging = ({
     const isDirty = pendingChangeCount > 0;
 
  
-    const handleSaveAll = async () => {
-        if (!id || savingAll || !isDirty) return;
+    const handleSaveAll = async (): Promise<boolean> => {
+        if (!id || savingAllRef.current || !isDirty) return true;
+        savingAllRef.current = true;
         setSavingAll(true);
         try {
             let hadFailure = false;
-
-            if (pendingMetaCount > 0) {
-                const updated = await tenderApi.updateMeta(id, pendingMeta);
-                const latest = useTenderStore.getState();
-                if (latest.detail && latest.detail.tender.id === id) {
-                    useTenderStore.setState({
-                        detail: { ...latest.detail, tender: { ...latest.detail.tender, ...updated } },
-                        list: latest.list.map((item) => (item.id === id ? { ...item, ...updated } : item)),
-                    });
-                }
-                setPendingMeta({});
-            }
+            const sentMeta = pendingMeta;
 
    
-            await Promise.all([...pendingCreateIds.current].map(async (tempId) => {
-                const payload = {
+            // Persist creates, edits and deletes as one atomic unit of work.
+            const pendingCreateTempIds = [...pendingCreateIds.current];
+            const pendingUpdateIds = Object.keys(pendingPositionPatches.current).filter(
+                (positionId) => !positionId.startsWith('local-position-') && !pendingDeleteIds.current.has(positionId),
+            );
+            const pendingDeletePositionIds = [...pendingDeleteIds.current];
+            const createEntries = pendingCreateTempIds.map((tempId) => ({
+                clientId: tempId,
+                position: {
                     ...(pendingCreatePayloads.current[tempId] ?? {}),
                     ...(pendingPositionPatches.current[tempId] ?? {}),
-                };
-                try {
-                    const result = await tenderApi.addPosition(id, payload);
-                    const serverPosition = result.position;
-                    const serverId = result.positionId || serverPosition?.id;
-                    if (!serverId) throw new Error(t('tenders.sata_r_id_info_ala_namada'));
-                    // Pin the row's React key to its original temp id so the temp→real
-                    // id swap doesn't remount the row.
-                    stableRowKeys.current.set(serverId, stableRowKeys.current.get(tempId) ?? tempId);
-                    setLocalPositions((positions) =>
-                        positions.map((position) =>
-                            position.id === tempId
-                                ? {
-                                    ...position,
-                                    ...(serverPosition ?? {}),
-                                    id: serverId,
-                                    calculation: serverPosition?.calculation ?? position.calculation,
-                                    articleMappings: serverPosition?.articleMappings ?? position.articleMappings,
-                                    materialMappings: serverPosition?.materialMappings ?? position.materialMappings,
-                                }
-                                : position,
-                        ),
-                    );
-                    setSelectedId((current) => (current === tempId ? serverId : current));
-                    delete pendingCreatePayloads.current[tempId];
-                    delete pendingPositionPatches.current[tempId];
-                    delete optimisticPositionIds.current[tempId];
-                    pendingCreateIds.current.delete(tempId);
-                } catch {
-                    hadFailure = true;
-                }
+                },
             }));
+            const updateEntries = pendingUpdateIds.flatMap((positionId) => {
+                const patch = pendingPositionPatches.current[positionId];
+                return patch ? [{ positionId, patch }] : [];
+            });
+            const sentCreateByClientId = new Map(createEntries.map((entry) => [entry.clientId, entry.position]));
+            const sentUpdateById = new Map(updateEntries.map((entry) => [entry.positionId, entry.patch]));
+            const hasNewerPatch = (sent: Partial<PositionDto> | undefined, latest: InlinePositionPatch | undefined) =>
+                Boolean(latest && Object.entries(latest).some(([field, value]) =>
+                    normalizeInlinePatchValue(sent?.[field as keyof PositionDto]) !== normalizeInlinePatchValue(value),
+                ));
 
-            // Delete the rows the user removed; roll a failed delete back into view.
-            await Promise.all([...pendingDeleteIds.current].map(async (pid) => {
+            if (
+                pendingMetaCount > 0
+                || createEntries.length > 0
+                || updateEntries.length > 0
+                || pendingDeletePositionIds.length > 0
+            ) {
                 try {
-                    await tenderApi.deletePosition(id, pid);
-                    pendingDeleteIds.current.delete(pid);
-                    delete pendingDeletePositions.current[pid];
+                    const result = await tenderApi.savePositions(id, {
+                        positions: createEntries,
+                        updates: updateEntries,
+                        deleteIds: pendingDeletePositionIds,
+                        meta: sentMeta,
+                    });
+                    const createdByClientId = new Map(
+                        result.positions.map((created) => [created.clientId, created]),
+                    );
+                    const updatedById = new Map(
+                        result.updatedPositions.map((position) => [position.id, position]),
+                    );
+                    const tempToServerId = new Map<string, string>();
+                    const remainingCreatePatches = new Map<string, InlinePositionPatch>();
+                    const remainingUpdatePatches = new Map<string, InlinePositionPatch>();
+
+                    pendingCreateTempIds.forEach((tempId) => {
+                        const created = createdByClientId.get(tempId);
+                        const serverPosition = created?.position;
+                        const serverId = created?.positionId || serverPosition?.id;
+                        if (!serverId) {
+                            hadFailure = true;
+                            return;
+                        }
+
+                        // Preserve an input commit made while the request was in
+                        // flight by moving it from the temp id to the server id.
+                        const latestPatch = pendingPositionPatches.current[tempId];
+                        const keepLatestPatch = hasNewerPatch(sentCreateByClientId.get(tempId), latestPatch);
+                        if (keepLatestPatch && latestPatch) {
+                            pendingPositionPatches.current[serverId] = latestPatch;
+                            remainingCreatePatches.set(serverId, latestPatch);
+                        }
+
+                        stableRowKeys.current.set(serverId, stableRowKeys.current.get(tempId) ?? tempId);
+                        tempToServerId.set(tempId, serverId);
+                        delete pendingCreatePayloads.current[tempId];
+                        delete pendingPositionPatches.current[tempId];
+                        delete optimisticPositionIds.current[tempId];
+                        pendingCreateIds.current.delete(tempId);
+                    });
+
+                    pendingUpdateIds.forEach((positionId) => {
+                        const updated = updatedById.get(positionId);
+                        if (!updated) {
+                            hadFailure = true;
+                            return;
+                        }
+                        const latestPatch = pendingPositionPatches.current[positionId];
+                        const keepLatestPatch = hasNewerPatch(sentUpdateById.get(positionId), latestPatch);
+                        if (keepLatestPatch && latestPatch) {
+                            remainingUpdatePatches.set(positionId, latestPatch);
+                        } else {
+                            delete pendingPositionPatches.current[positionId];
+                        }
+                    });
+
+                    pendingDeletePositionIds.forEach((positionId) => {
+                        pendingDeleteIds.current.delete(positionId);
+                        delete pendingDeletePositions.current[positionId];
+                    });
+
+                    if (pendingMetaCount > 0) {
+                        if (!result.updatedTender) {
+                            hadFailure = true;
+                        } else {
+                            const latest = useTenderStore.getState();
+                            if (latest.detail && latest.detail.tender.id === id) {
+                                useTenderStore.setState({
+                                    detail: {
+                                        ...latest.detail,
+                                        tender: { ...latest.detail.tender, ...result.updatedTender },
+                                    },
+                                    list: latest.list.map((item) =>
+                                        item.id === id ? { ...item, ...result.updatedTender } : item,
+                                    ),
+                                });
+                            }
+                            setPendingMeta((current) => Object.fromEntries(
+                                Object.entries(current).filter(([field, value]) =>
+                                    normalizeInlinePatchValue(value)
+                                    !== normalizeInlinePatchValue(sentMeta[field as keyof TenderMetaPatch]),
+                                ),
+                            ) as TenderMetaPatch);
+                        }
+                    }
+
+                    setLocalPositions((positions) => positions.map((position) => {
+                        const serverId = tempToServerId.get(position.id);
+                        if (serverId) {
+                            const created = createdByClientId.get(position.id)?.position;
+                            const latestPatch = remainingCreatePatches.get(serverId);
+                            return {
+                                ...position,
+                                ...(created ?? {}),
+                                ...(latestPatch ?? {}),
+                                id: serverId,
+                                calculation: created?.calculation ?? position.calculation,
+                                articleMappings: created?.articleMappings ?? position.articleMappings,
+                                materialMappings: created?.materialMappings ?? position.materialMappings,
+                            };
+                        }
+                        const updated = updatedById.get(position.id);
+                        if (!updated) return position;
+                        return {
+                            ...position,
+                            ...updated,
+                            ...(remainingUpdatePatches.get(position.id) ?? {}),
+                            calculation: updated.calculation ?? position.calculation,
+                            articleMappings: updated.articleMappings ?? position.articleMappings,
+                            materialMappings: updated.materialMappings ?? position.materialMappings,
+                        };
+                    }));
+                    setSelectedId((current) => current ? (tempToServerId.get(current) ?? current) : current);
                 } catch {
                     hadFailure = true;
-                    const snapshot = pendingDeletePositions.current[pid];
-                    if (snapshot) {
-                        setLocalPositions((positions) =>
-                            positions.some((position) => position.id === pid)
-                                ? positions
-                                : sortPositions([...positions, snapshot]),
-                        );
+                    const snapshots = pendingDeletePositionIds
+                        .map((positionId) => pendingDeletePositions.current[positionId])
+                        .filter((position): position is PositionDto => Boolean(position));
+                    if (snapshots.length > 0) {
+                        setLocalPositions((positions) => sortPositions([
+                            ...positions,
+                            ...snapshots.filter((snapshot) => !positions.some((position) => position.id === snapshot.id)),
+                        ]));
                     }
                 }
-            }));
-
-            // Update existing rows with buffered edits. Temp ids were handled by the
-            // create step above, so they are skipped here.
-            const lineIds = Object.keys(pendingPositionPatches.current).filter(
-                (pid) => !pid.startsWith('local-position-'),
-            );
-            const results = await Promise.allSettled(
-                lineIds.map(async (pid) => {
-                    const payload = pendingPositionPatches.current[pid];
-                    if (!payload) return;
-                    const updated = await tenderApi.updatePosition(id, pid, payload);
-                    const localPatch = pendingPositionPatches.current[pid] ?? {};
-                    setLocalPositions((positions) =>
-                        positions.map((position) =>
-                            position.id === pid
-                                ? {
-                                    ...position,
-                                    ...updated,
-                                    ...localPatch,
-                                    calculation: updated.calculation ?? position.calculation,
-                                    articleMappings: updated.articleMappings ?? position.articleMappings,
-                                    materialMappings: updated.materialMappings ?? position.materialMappings,
-                                }
-                                : position,
-                        ),
-                    );
-                    delete pendingPositionPatches.current[pid];
-                }),
-            );
-            if (results.some((r) => r.status === 'rejected')) hadFailure = true;
+            }
 
             // Rebuild the dirty set from whatever is still staged (any failed
             // create / delete / edit remains buffered for the next Save).
             recomputeDirtyLineIds();
 
-            if (hadFailure) {
-                toast.error(t('tenders.line_guncellenemedi'));
-            } else {
-                toast.success(t('tenders.degisiklikler_kaydedildi'));
-            }
+            // Success is signalled by the save button's spinner stopping — no
+            // "saved" toast; only failures surface a notification.
+            if (hadFailure) toast.error(t('tenders.line_guncellenemedi'));
+            return !hadFailure;
         } catch (error: any) {
             toast.error(error.response?.data?.error || t('tenders.tender_info_guncellenemedi'));
+            return false;
         } finally {
+            savingAllRef.current = false;
             setSavingAll(false);
         }
     };
@@ -368,8 +440,8 @@ export const useTenderLineStaging = ({
     // Autosave disabled: adding a row/product only stages it locally. The optimistic
     // row is shown immediately and its create payload is buffered in
     // `pendingCreatePayloads`; nothing is persisted until the user clicks Save
-    // (see handleSaveAll), which POSTs each staged row and swaps its temp id for the
-    // real server id.
+    // (see handleSaveAll), which sends the complete unit of work once and swaps
+    // each temporary id for its real server id.
     const handleAddRow = (
         rowType: 'TITLE' | 'DESCRIPTION' | 'PRODUCT',
         article?: ProductSource,
@@ -391,6 +463,13 @@ export const useTenderLineStaging = ({
         const productDefaults = isProduct
             ? buildProductDefaults(resolvedArticle, options, fallbackTaxRate)
             : null;
+        const stagedSourceArticleId = isProduct ? (productDefaults?.sourceArticleId ?? null) : null;
+        // Shown on the optimistic row only. Article-linked products never SEND the
+        // image with the save: it's a base64 LONGTEXT the backend/PDF already resolve
+        // from the article via sourceArticleId — uploading it made saves take seconds.
+        const displayImageUrl = isProduct || descriptionLike
+            ? (productDefaults?.imageUrl || resolvedArticle?.imageUrl || options?.imageUrl || null)
+            : null;
         const createPayload = {
             ...positionMeta,
             rowType,
@@ -401,7 +480,7 @@ export const useTenderLineStaging = ({
                     ?t('tenders.baslik')
                     : ' ',
             longDescription: isProduct
-                ? toPlainMarkdown(articleDescription || options?.description)
+                ? (articleDescription || options?.description || '')
                 : descriptionLike
                     ? ''
                     : null,
@@ -410,7 +489,7 @@ export const useTenderLineStaging = ({
             unitPrice: isProduct ? productDefaults?.unitPrice : null,
             discount: isProduct ? productDefaults?.discount : 0,
             taxRate: isProduct ? productDefaults?.taxRate : 0,
-            imageUrl: isProduct || descriptionLike ? (productDefaults?.imageUrl || resolvedArticle?.imageUrl || options?.imageUrl || null) : null,
+            imageUrl: stagedSourceArticleId ? undefined : displayImageUrl,
         } as Partial<PositionDto>;
 
         const optimisticPosition: PositionDto = {
@@ -431,7 +510,7 @@ export const useTenderLineStaging = ({
             unitPrice: createPayload.unitPrice ?? null,
             discount: createPayload.discount ?? 0,
             taxRate: createPayload.taxRate ?? null,
-            imageUrl: createPayload.imageUrl ?? null,
+            imageUrl: displayImageUrl,
             calculation: null,
             articleMappings: [],
             materialMappings: [],
@@ -447,7 +526,36 @@ export const useTenderLineStaging = ({
         recomputeDirtyLineIds();
     };
 
-  
+    // Move a quote line one slot up or down by swapping its displayOrder with the
+    // adjacent sibling. Both rows are staged as ordinary inline `displayOrder`
+    // patches, so the new order persists with the next Save and re-sorts the
+    // local view immediately.
+    const handleMoveRow = (rowId: string, direction: 'up' | 'down') => {
+        if (!tender || !isDraft || !canManage) return;
+        const rows = sortPositions(localPositions);
+        const index = rows.findIndex((row) => row.id === rowId);
+        if (index < 0) return;
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) return;
+
+        const current = rows[index];
+        const target = rows[targetIndex];
+        // Fall back to the sorted position for legacy rows with a null order.
+        const orderOf = (row: PositionDto, idx: number) =>
+            row.displayOrder == null ? (idx + 1) * 1000 : Number(row.displayOrder);
+        let currentOrder = orderOf(current, index);
+        let targetOrder = orderOf(target, targetIndex);
+        // Legacy rows can share an order; derive distinct values from their
+        // sorted positions so the swap actually changes the sequence.
+        if (currentOrder === targetOrder) {
+            currentOrder = (index + 1) * 1000;
+            targetOrder = (targetIndex + 1) * 1000;
+        }
+
+        handleInlinePositionChange(current.id, { displayOrder: targetOrder });
+        handleInlinePositionChange(target.id, { displayOrder: currentOrder });
+    };
+
     const handleBulkDelete = () => {
         const simpleRows = buildSimpleTenderLines(localPositions, fallbackTaxRate);
         const selectedRows = simpleRows.filter((row) => selectedRowIds[row.id]);
@@ -507,6 +615,7 @@ export const useTenderLineStaging = ({
         handleAddressPick,
         handleSaveAll,
         handleAddRow,
+        handleMoveRow,
         handleBulkDelete,
         handleBulkDiscount,
     };

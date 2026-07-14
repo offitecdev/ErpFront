@@ -1,21 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-    AlertTriangle,
     DownloadCloud02 as Download,
     File05 as FileText,
 } from '@/components/icons/antIconCompat';
 
 import { Button } from '@/components/ui-shared/Button';
-import { Checkbox } from '@/components/ui-shared/Checkbox';
-import { Field, Input } from '@/components/ui-shared/Field';
+import { Field } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { PdfGeneratingOverlay } from '@/components/pdf/PdfGeneratingOverlay';
 import { tenderApi } from '@/lib/api/tender';
 import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
 import { useTenderStore } from '@/store/tenderStore';
 import { t } from '@/i18n/translate';
+import { toCurrencyCode } from '@/utils/currency';
+import { localizeTenderNumber } from '@/utils/tenderNumber';
 import { flattenTenderTreeForPdf } from '../../tenderDetailUtils';
 
 type ExportFormat = 'PDF' | 'CRBX' | 'SIA451';
@@ -36,12 +35,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
     // Shows the "Generating PDF…" overlay while the doc is assembled (incl. the
     // image-fetch stage). Holds the current sub-line, or null when idle.
     const [pdfStage, setPdfStage] = useState<string | null>(null);
-    const [includeQrBill, setIncludeQrBill] = useState(false);
-    const [reference, setReference] = useState('');
+    // 0–100 across the whole pipeline (images → layout → finalize → download),
+    // so the overlay tracks the download status until it's finished.
+    const [pdfProgress, setPdfProgress] = useState<number | null>(null);
     const [pdfLang, setPdfLang] = useState<PdfLanguage>('de');
     const { detail, activities } = useTenderStore();
     const { settings } = usePdfSettingsStore();
-    const navigate = useNavigate();
 
     const handleExport = async () => {
         if (!detail) return;
@@ -53,13 +52,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                 // used in this tender (not the whole detail, not duplicates). This
                 // is the single biggest cost of generating the PDF.
                 setPdfStage(t('tenders.pdf_gorseller_yukleniyor'));
+                setPdfProgress(5);
                 const articleIds = [...new Set(
                     flatPositions.map((p: any) => p.sourceArticleId).filter(Boolean) as string[],
                 )];
+                // Rows without a source article may carry their own uploaded image
+                // (manual products, description rows) — those are stored on the
+                // position and, like article images, only ever fetched for the PDF.
+                const positionIds = flatPositions
+                    .filter((p: any) => !p.sourceArticleId && p.id)
+                    .map((p: any) => p.id as string);
                 const imageById = new Map<string, string>();
-                if (articleIds.length > 0) {
+                if (articleIds.length > 0 || positionIds.length > 0) {
                     try {
-                        const images = await tenderApi.getProductImages(tenderId, articleIds);
+                        const images = await tenderApi.getProductImages(tenderId, articleIds, positionIds);
                         images.forEach((row) => {
                             if (row.imageUrl) imageById.set(row.id, row.imageUrl);
                         });
@@ -68,11 +74,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                     }
                 }
                 setPdfStage(t('tenders.pdf_olusturuluyor'));
+                setPdfProgress(10);
                 const positions = flatPositions.map((p: any) => ({
                     ...p,
-                    imageUrl: (p.sourceArticleId && imageById.get(p.sourceArticleId)) || p.imageUrl || null,
+                    imageUrl: (p.sourceArticleId && imageById.get(p.sourceArticleId))
+                        || imageById.get(p.id)
+                        || p.imageUrl
+                        || null,
                 }));
                 const { exportTenderPdf } = await import('@/utils/pdf/tenderPdf');
+                // The offer's own currency wins over the company default so the
+                // exported PDF matches what's shown on screen.
+                const pdfSettings = {
+                    ...settings,
+                    currency: toCurrencyCode((detail.tender as { currency?: string | null }).currency),
+                };
                 await exportTenderPdf(
                     {
                         tenderNumber: detail.tender.tenderNumber,
@@ -87,11 +103,24 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                         activities,
                         positions,
                         grandTotal,
-                        referenceNumber: reference || undefined,
-                        qrBillEnabled: includeQrBill,
                         lang: pdfLang,
                     },
-                    settings
+                    pdfSettings,
+                    // Map pipeline stages onto one 0–100 bar: images ≤10 %,
+                    // position layout 10–80 %, finalize (QR/background merge)
+                    // 90 %, browser download hand-off 100 %.
+                    (p) => {
+                        if (p.stage === 'positions') {
+                            setPdfStage(t('tenders.pdf_positions_progress', { done: p.done, total: p.total }));
+                            setPdfProgress(10 + Math.round((p.done / Math.max(1, p.total)) * 70));
+                        } else if (p.stage === 'finalize') {
+                            setPdfStage(t('tenders.pdf_finalizing'));
+                            setPdfProgress(90);
+                        } else {
+                            setPdfStage(t('tenders.pdf_downloading'));
+                            setPdfProgress(100);
+                        }
+                    }
                 );
                 toast.success(t('tenders.pdf_indirildi'));
                 onClose();
@@ -101,7 +130,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${tenderNumber}-${format}.json`;
+                a.download = `${localizeTenderNumber(tenderNumber)}-${format}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
                 toast.success(t('tenders.verisi_indirildi', { format }));
@@ -112,12 +141,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
         } finally {
             setLoading(false);
             setPdfStage(null);
+            setPdfProgress(null);
         }
     };
 
     return (
         <>
-        <PdfGeneratingOverlay open={pdfStage !== null} detail={pdfStage} />
+        <PdfGeneratingOverlay open={pdfStage !== null} detail={pdfStage} progress={pdfProgress} />
         <Modal
             open={open}
             title={t('tenders.tender_export')}
@@ -174,28 +204,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                                 ))}
                             </div>
                         </Field>
-                        <Field label={t('tenders.reference_numarasi')} hint={t('tenders.qr_bill_reference_skipped_when_empty')}>
-                            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t('tenders.rf18_5390_0754_7034')} />
-                        </Field>
-                        <Checkbox
-                            label={t('tenders.sayfanin_altina_isvicre_qr_bill_empfangsschein_z')}
-                            size="sm"
-                            isSelected={includeQrBill}
-                            onChange={setIncludeQrBill}
-                            className="rounded-lg bg-brand-primary_alt px-3 py-2 ring-1 ring-utility-brand-200 ring-inset"
-                        />
-
-                        {!settings.letterheadBackground && (
-                            <div className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200/70 rounded p-2 flex items-start gap-2">
-                                <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                                <span>{t('tenders.antetli_kagit_arka_plani_yuklenmemis_pdf_varsayi')}<button
-                                        type="button"
-                                        className="text-blue-700 underline ml-1"
-                                        onClick={() => { onClose(); navigate('/settings/pdf'); }}
-                                    >{t('tenders.simdi_add')}</button>
-                                </span>
-                            </div>
-                        )}
                     </>
                 )}
             </div>

@@ -9,7 +9,7 @@ import {
     Trash01 as Trash2,
 } from '@/components/icons/antIconCompat';
 
-import { RichTextMarkdownEditor, markdownToHtml } from '../../TenderRichText';
+import { RichTextMarkdownEditor, richTextToHtml } from '../../TenderRichText';
 import type { TreeNode } from '../../tenderDetailUtils';
 import { t } from '@/i18n/translate';
 
@@ -288,7 +288,7 @@ export const TreeRowDescriptionCell = ({
                         )}
                         <span
                             className={`rich-text-preview min-w-0 leading-5 [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h2]:text-slate-900 [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_h3]:text-slate-800 [&_ul]:list-disc [&_ul]:pl-7 [&_li]:my-0.5 [&_li]:pl-1 ${rowType === 'DESCRIPTION' ?"text-[12.5px] text-slate-600" :"text-[12.5px] text-slate-700"}`}
-                            dangerouslySetInnerHTML={{ __html: markdownToHtml(node.longDescription || '') }}
+                            dangerouslySetInnerHTML={{ __html: richTextToHtml(node.longDescription || '') }}
                         />
                     </div>
                 ) : isInlineContentRow ? (

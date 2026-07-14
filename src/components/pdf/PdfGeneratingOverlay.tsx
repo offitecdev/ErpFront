@@ -10,9 +10,11 @@ type PdfGeneratingOverlayProps = {
     open: boolean;
     /** Optional sub-line, e.g. "Loading product images…" for the image stage. */
     detail?: string | null;
+    /** Optional 0–100 completion; shows a progress bar under the status text. */
+    progress?: number | null;
 };
 
-export const PdfGeneratingOverlay = ({ open, detail }: PdfGeneratingOverlayProps) => {
+export const PdfGeneratingOverlay = ({ open, detail, progress }: PdfGeneratingOverlayProps) => {
     if (!open || typeof document === 'undefined') return null;
 
     return createPortal(
@@ -26,6 +28,14 @@ export const PdfGeneratingOverlay = ({ open, detail }: PdfGeneratingOverlayProps
                     <div className="text-[14px] font-semibold text-slate-800">{t('tenders.pdf_olusturuluyor')}</div>
                     {detail && <div className="mt-1 text-[12px] text-slate-500">{detail}</div>}
                 </div>
+                {typeof progress === 'number' && (
+                    <div className="h-1.5 w-52 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                            className="h-full rounded-full bg-[#1f2654] transition-[width] duration-200 ease-out"
+                            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                        />
+                    </div>
+                )}
             </div>
         </div>,
         document.body,

@@ -17,6 +17,7 @@ import {
     File05 as FileSpreadsheet,
     Hash01 as Hash,
     Mail01 as Mail,
+    MarkerPin01 as MapPin,
     Phone,
     Plus,
     RefreshCcw01 as RefreshIcon,
@@ -37,9 +38,11 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
 import { Modal } from '../../components/ui-shared/Modal';
 import { tenderApi } from '../../lib/api/tender';
+import { localizeTenderNumber } from '../../utils/tenderNumber';
 import type { TenderListItem } from '../../types/tender';
 import { customerApi } from '../../lib/api/customer';
 import { ContactsTab, AddressesTab } from './CustomerEntityTabs';
+import { CustomerProductDiscounts } from './CustomerProductDiscounts';
 import { OrdersTab, BillingTab } from './CustomerOrdersBilling';
 import { CustomerReports } from './CustomerReports';
 import { CUSTOMER_TYPE_OPTIONS, CUSTOMER_LANGUAGE_OPTIONS, CUSTOMER_STATUS_OPTIONS, DEFAULT_CUSTOMER_TYPE, DEFAULT_CUSTOMER_STATUS, getCustomerTypeLabel, getCustomerLanguageLabel, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
@@ -49,20 +52,21 @@ import { t as i18nT } from '@/i18n/translate';
 interface CustomerDashboardDto {
     id: string;
     companyName: string;
-    segment?: string | null;
     customerType?: string | null;
-    taxOffice?: string | null;
-    taxNumber?: string | null;
     vatNumber?: string | null;
+    priceList?: string | null;
     mainEmail?: string | null;
     mainPhone?: string | null;
     mobilePhone?: string | null;
     website?: string | null;
     language?: string | null;
-    customerSource?: string | null;
     responsibleFirstName?: string | null;
     responsibleLastName?: string | null;
+    addressName?: string | null;
     address?: string | null;
+    postalCode?: string | null;
+    city?: string | null;
+    country?: string | null;
     status?: string | null;
     isActive: boolean;
     activities?: ActivityDto[];
@@ -147,43 +151,45 @@ const fmtMoney = (v?: number | null) =>
 const activityActor = (activity: ActivityDto) =>
     activity.employeeName || activity.employeeEmail || activity.employeeId;
 
-type CustomerTabId = 'profile' | 'contacts' | 'locations' | 'offers' | 'orders' | 'billing' | 'projects' | 'reports' | 'notes' | 'activities';
+type CustomerTabId = 'profile' | 'contacts' | 'locations' | 'discounts' | 'offers' | 'orders' | 'billing' | 'projects' | 'reports' | 'notes' | 'activities';
 
 interface EditForm {
     companyName: string;
-    segment: string;
     customerType: string;
-    taxOffice: string;
-    taxNumber: string;
     vatNumber: string;
+    priceList: string;
     mainEmail: string;
     mainPhone: string;
     mobilePhone: string;
     website: string;
     language: string;
-    customerSource: string;
     responsibleFirstName: string;
     responsibleLastName: string;
+    addressName: string;
     address: string;
+    postalCode: string;
+    city: string;
+    country: string;
     status: string;
 }
 
 const toEditForm = (d: CustomerDashboardDto): EditForm => ({
     companyName: d.companyName ?? '',
-    segment: d.segment ?? '',
     customerType: d.customerType ?? DEFAULT_CUSTOMER_TYPE,
-    taxOffice: d.taxOffice ?? '',
-    taxNumber: d.taxNumber ?? '',
     vatNumber: d.vatNumber ?? '',
+    priceList: d.priceList ?? '',
     mainEmail: d.mainEmail ?? '',
     mainPhone: d.mainPhone ?? '',
     mobilePhone: d.mobilePhone ?? '',
     website: d.website ?? '',
     language: d.language ?? '',
-    customerSource: d.customerSource ?? '',
     responsibleFirstName: d.responsibleFirstName ?? '',
     responsibleLastName: d.responsibleLastName ?? '',
+    addressName: d.addressName ?? '',
     address: d.address ?? '',
+    postalCode: d.postalCode ?? '',
+    city: d.city ?? '',
+    country: d.country ?? '',
     status: d.status ?? DEFAULT_CUSTOMER_STATUS,
 });
 
@@ -197,9 +203,10 @@ export const CustomerDashboard = () => {
 
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState<EditForm>({
-        companyName: '', segment: '', customerType: DEFAULT_CUSTOMER_TYPE, taxOffice: '', taxNumber: '',
-        vatNumber: '', mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
-        customerSource: '', responsibleFirstName: '', responsibleLastName: '', address: '', status: DEFAULT_CUSTOMER_STATUS,
+        companyName: '', customerType: DEFAULT_CUSTOMER_TYPE,
+        vatNumber: '', priceList: '', mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
+        responsibleFirstName: '', responsibleLastName: '', addressName: '', address: '', postalCode: '', city: '', country: '',
+        status: DEFAULT_CUSTOMER_STATUS,
     });
     const [savingProfile, setSavingProfile] = useState(false);
 
@@ -427,6 +434,7 @@ export const CustomerDashboard = () => {
         { id: 'profile', label: i18nT('crm.profil') },
         { id: 'contacts', label: i18nT('crm.tab_contacts'), count: data.contacts?.length ?? 0 },
         { id: 'locations', label: i18nT('crm.tab_locations'), count: data.locations?.length ?? 0 },
+        { id: 'discounts', label: i18nT('crm.tab_productDiscounts') },
         { id: 'offers', label: i18nT('crm.offers'), count: tenders.length },
         { id: 'orders', label: i18nT('crm.tab_orders') },
         { id: 'billing', label: i18nT('crm.tab_billing') },
@@ -451,13 +459,7 @@ export const CustomerDashboard = () => {
                 }
                 description={
                     <span className="flex items-center gap-3 text-[12.5px]">
-                        {data.segment && <><Tag size={11} className="inline" /> {data.segment}</>}
-                        {data.taxNumber && (
-                            <>
-                                <span className="text-slate-300">·</span>
-                                <span className="font-mono">{data.taxNumber}</span>
-                            </>
-                        )}
+                        {data.vatNumber && <><Hash size={11} className="inline" /> <span className="font-mono">{data.vatNumber}</span></>}
                     </span>
                 }
                 actions={
@@ -519,21 +521,32 @@ export const CustomerDashboard = () => {
                     }
                 >
                     {!editing ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[12.5px]">
-                            <InfoRow icon={<Building2 size={11} />} label={i18nT('common.company')} value={data.companyName} />
-                            <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.colSegment')} value={data.segment} />
-                            <InfoRow icon={<FileText size={11} />} label={i18nT('crm.customers.customerType')} value={getCustomerTypeLabel(data.customerType)} />
-                            <InfoRow icon={<Mail size={11} />} label={i18nT('common.email')} value={data.mainEmail} linkType="email" />
-                            <InfoRow icon={<Phone size={11} />} label={i18nT('common.phone')} value={data.mainPhone} linkType="tel" />
-                            <InfoRow icon={<Phone size={11} />} label={i18nT('crm.customers.mobilePhone')} value={data.mobilePhone} linkType="tel" />
-                            <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.website')} value={data.website} />
-                            <InfoRow icon={<FileText size={11} />} label={i18nT('crm.customers.language')} value={getCustomerLanguageLabel(data.language)} />
-                            <InfoRow icon={<Hash size={11} />} label={i18nT('common.tax')} value={data.taxNumber ? `${data.taxNumber} / ${data.taxOffice ?? ''}` : null} />
-                            <InfoRow icon={<Hash size={11} />} label={i18nT('crm.customers.vatNumber')} value={data.vatNumber} />
-                            <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.customerSource')} value={data.customerSource} />
-                            <InfoRow icon={<UserIcon size={11} />} label={i18nT('crm.customers.responsibleEmployee')} value={[data.responsibleFirstName, data.responsibleLastName].filter(Boolean).join(' ') || null} />
-                            <InfoRow icon={<Activity size={11} />} label={i18nT('common.status')} value={getCustomerStatusLabel(data.status)} />
-                        </div>
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[12.5px]">
+                                <InfoRow icon={<Building2 size={11} />} label={i18nT('common.company')} value={data.companyName} />
+                                <InfoRow icon={<FileText size={11} />} label={i18nT('crm.customers.customerType')} value={getCustomerTypeLabel(data.customerType)} />
+                                <InfoRow icon={<Mail size={11} />} label={i18nT('common.email')} value={data.mainEmail} linkType="email" />
+                                <InfoRow icon={<Phone size={11} />} label={i18nT('common.phone')} value={data.mainPhone} linkType="tel" />
+                                <InfoRow icon={<Phone size={11} />} label={i18nT('crm.customers.mobilePhone')} value={data.mobilePhone} linkType="tel" />
+                                <InfoRow icon={<Tag size={11} />} label={i18nT('crm.customers.website')} value={data.website} />
+                                <InfoRow icon={<FileText size={11} />} label={i18nT('crm.customers.language')} value={getCustomerLanguageLabel(data.language)} />
+                                <InfoRow icon={<Hash size={11} />} label={i18nT('crm.customers.vatNumber')} value={data.vatNumber} />
+                                <InfoRow icon={<UserIcon size={11} />} label={i18nT('crm.customers.responsibleEmployee')} value={[data.responsibleFirstName, data.responsibleLastName].filter(Boolean).join(' ') || null} />
+                                <InfoRow icon={<Activity size={11} />} label={i18nT('common.status')} value={getCustomerStatusLabel(data.status)} />
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                                    <MapPin size={11} /> {i18nT('crm.locationPrimary')}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[12.5px]">
+                                    <InfoRow icon={<Tag size={11} />} label={i18nT('crm.locationName')} value={data.addressName} />
+                                    <InfoRow icon={<MapPin size={11} />} label={i18nT('common.address')} value={data.address} />
+                                    <InfoRow icon={<Hash size={11} />} label={i18nT('crm.postalCode')} value={data.postalCode} />
+                                    <InfoRow icon={<Building2 size={11} />} label={i18nT('crm.city')} value={data.city} />
+                                    <InfoRow icon={<MapPin size={11} />} label={i18nT('crm.country')} value={data.country} />
+                                </div>
+                            </div>
+                        </>
                     ) : (
                         <form onSubmit={handleSaveProfile} className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <Field label={i18nT('crm.customers.companyName')} required className="md:col-span-2">
@@ -542,17 +555,6 @@ export const CustomerDashboard = () => {
                                     onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
                                     placeholder={i18nT('crm.customers.companyNamePlaceholder')}
                                 />
-                            </Field>
-                            <Field label={i18nT('crm.customers.colSegment')}>
-                                <Select
-                                    value={editForm.segment}
-                                    onChange={(e) => setEditForm({ ...editForm, segment: e.target.value })}
-                                >
-                                    <option value="">{i18nT('common.select')}</option>
-                                    <option value="Enterprise">{i18nT('crm.customers.segmentEnterprise')}</option>
-                                    <option value="SMB">{i18nT('crm.customers.segmentSMB')}</option>
-                                    <option value="Startup">{i18nT('crm.customers.segmentStartup')}</option>
-                                </Select>
                             </Field>
                             <Field label={i18nT('crm.customers.customerType')}>
                                 <Select
@@ -573,14 +575,6 @@ export const CustomerDashboard = () => {
                                         <option key={o.value} value={o.value}>{i18nT(o.labelKey)}</option>
                                     ))}
                                 </Select>
-                            </Field>
-                            <Field label={i18nT('crm.customers.taxOffice')}>
-                                <Input value={editForm.taxOffice}
-                                    onChange={(e) => setEditForm({ ...editForm, taxOffice: e.target.value })} />
-                            </Field>
-                            <Field label={i18nT('crm.customers.taxNumber')}>
-                                <Input value={editForm.taxNumber}
-                                    onChange={(e) => setEditForm({ ...editForm, taxNumber: e.target.value })} />
                             </Field>
                             <Field label={i18nT('crm.customers.vatNumber')}>
                                 <Input value={editForm.vatNumber}
@@ -614,10 +608,6 @@ export const CustomerDashboard = () => {
                                     onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
                                     placeholder="https://" />
                             </Field>
-                            <Field label={i18nT('crm.customers.customerSource')}>
-                                <Input value={editForm.customerSource}
-                                    onChange={(e) => setEditForm({ ...editForm, customerSource: e.target.value })} />
-                            </Field>
                             <Field label={i18nT('crm.customers.responsibleEmployee')}>
                                 <div className="flex gap-2">
                                     <Input value={editForm.responsibleFirstName}
@@ -627,6 +617,29 @@ export const CustomerDashboard = () => {
                                         onChange={(e) => setEditForm({ ...editForm, responsibleLastName: e.target.value })}
                                         placeholder={i18nT('crm.customers.responsibleLastName')} />
                                 </div>
+                            </Field>
+                            <div className="md:col-span-2 mt-1 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                                <MapPin size={11} /> {i18nT('crm.locationPrimary')}
+                            </div>
+                            <Field label={i18nT('crm.locationName')} className="md:col-span-2">
+                                <Input value={editForm.addressName}
+                                    onChange={(e) => setEditForm({ ...editForm, addressName: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('common.address')} className="md:col-span-2">
+                                <Input value={editForm.address}
+                                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('crm.postalCode')}>
+                                <Input value={editForm.postalCode}
+                                    onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('crm.city')}>
+                                <Input value={editForm.city}
+                                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+                            </Field>
+                            <Field label={i18nT('crm.country')} className="md:col-span-2">
+                                <Input value={editForm.country}
+                                    onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} />
                             </Field>
                             <div className="md:col-span-2 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                                 <Button variant="secondary" type="button" icon={<XIcon size={13} />} onClick={() => setEditing(false)}>{i18nT('common.cancel')}</Button>
@@ -647,6 +660,11 @@ export const CustomerDashboard = () => {
                 <AddressesTab customerId={id} items={data.locations ?? []} onChanged={fetchData} />
             )}
 
+            {/* ---- PRODUCT DISCOUNTS (Produktrabatte) ---- */}
+            {activeCustomerTab === 'discounts' && id && (
+                <CustomerProductDiscounts customerId={id} />
+            )}
+
             {/* ---- ORDERS (Aufträge) ---- */}
             {activeCustomerTab === 'orders' && id && (
                 <OrdersTab customerId={id} />
@@ -665,7 +683,7 @@ export const CustomerDashboard = () => {
                     icon={<FileSpreadsheet size={13} />}
                     noPadding
                     actions={
-                        <Button variant="primary" size="sm" icon={<Plus size={11} />} onClick={() => navigate('/crm/tenders')}>{i18nT('nav.tenderManagement')}</Button>
+                        <Button variant="primary" size="sm" icon={<Plus size={11} />} onClick={() => navigate(`/crm/tenders/new?customerId=${id}`)}>{i18nT('nav.quickActionsGroup.newTender')}</Button>
                     }
                 >
                     {tenders.length === 0 ? (
@@ -674,7 +692,7 @@ export const CustomerDashboard = () => {
                             title={i18nT('crm.tender_not_found')}
                             description={i18nT('crm.bu_customer_icin_no_hazirlanmis_bir_tender_bul')}
                             action={
-                                <Button variant="primary" size="sm" icon={<Plus size={11} />} onClick={() => navigate('/crm/tenders')}>{i18nT('nav.quickActionsGroup.newTender')}</Button>
+                                <Button variant="primary" size="sm" icon={<Plus size={11} />} onClick={() => navigate(`/crm/tenders/new?customerId=${id}`)}>{i18nT('nav.quickActionsGroup.newTender')}</Button>
                             }
                         />
                     ) : (
@@ -690,7 +708,7 @@ export const CustomerDashboard = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold text-slate-900 text-[13px]">{t.tenderNumber}</span>
+                                            <span className="font-semibold text-slate-900 text-[13px]">{localizeTenderNumber(t.tenderNumber)}</span>
                                             <span className="text-[11px] text-slate-400 font-mono">v{t.version}</span>
                                             <StatusChip variant={t.projectId ? 'order' : t.status === "Draft" ? 'warning' : t.status === "Approved" ? 'approved' : 'info'}>
                                                 {t.projectId ?i18nT('crm.tenders.statusOrdered') : t.status === "Draft" ?i18nT('crm.tenders.statusDraft') : t.status === "Approved" ?i18nT('crm.tenders.statusApproved') :i18nT('crm.tenders.statusExported')}
@@ -741,7 +759,7 @@ export const CustomerDashboard = () => {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="text-[13px] font-semibold text-slate-900">{t.tenderNumber}</span>
+                                            <span className="text-[13px] font-semibold text-slate-900">{localizeTenderNumber(t.tenderNumber)}</span>
                                             <StatusChip variant="active">{i18nT('nav.projects')}</StatusChip>
                                             <span className="font-mono text-[10.5px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
                                                 {t.format}
@@ -1046,9 +1064,9 @@ const buildContactHref = (linkType: 'email' | 'tel', value: string) =>
     linkType === 'email' ? `mailto:${value.trim()}` : `tel:${value.replace(/[^+\d]/g, '')}`;
 
 const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value?: string | null; full?: boolean; linkType?: 'email' | 'tel' }> = ({ icon, label, value, full, linkType }) => (
-    <div className={`flex items-center gap-2.5 py-1.5 ${full ? 'sm:col-span-2' : ''}`}>
-        <span className="text-slate-400">{icon}</span>
-        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-slate-400 w-16 flex-shrink-0">{label}</span>
+    <div className={`flex items-baseline gap-2.5 py-1.5 ${full ? 'sm:col-span-2' : ''}`}>
+        <span className="text-slate-400 flex-shrink-0 translate-y-[2px]">{icon}</span>
+        <span className="text-[10.5px] uppercase tracking-wider font-semibold text-slate-400 w-28 flex-shrink-0 leading-tight">{label}</span>
         {value ? (
             linkType ? (
                 <a href={buildContactHref(linkType, value)} className="text-blue-700 hover:underline truncate">{value}</a>

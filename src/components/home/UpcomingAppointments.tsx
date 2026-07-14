@@ -17,6 +17,7 @@ import { projectApi } from '../../lib/api/project';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import { tenderApi } from '../../lib/api/tender';
 import { useAuthStore } from '../../store/authStore';
+import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 type UpcomingCategory = 'assembly' | 'maintenance' | 'offer' | 'deadline';
 
@@ -53,6 +54,16 @@ const CATEGORY_META: Record<UpcomingCategory, {
 
 const WINDOW_DAYS = 30;
 
+// True when the current user is a technician assigned to this appointment (lead or
+// co-technician). Assigned technicians open their own installation task screen even
+// if they also hold manager permissions; only managers not on the job go to the
+// project admin screen.
+const isAssignedTechnician = (appt: any, userId?: string | null) =>
+    Boolean(userId) && (
+        appt.assignedTechnician?.id === userId ||
+        (appt.technicianAssignments || []).some((a: any) => a?.technician?.id === userId)
+    );
+
 export const UpcomingAppointments = ({
     categories,
     limit = 15,
@@ -64,6 +75,7 @@ export const UpcomingAppointments = ({
     const { t } = useTranslation();
     const navigate = useNavigate();
     const permissions = useAuthStore((state) => state.permissions);
+    const userId = useAuthStore((state) => state.user?.id);
 
     const [items, setItems] = useState<UpcomingItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -119,7 +131,11 @@ export const UpcomingAppointments = ({
                     title: customer || (orderNumber ? `#${orderNumber}` : t('home.upcoming.assembly', { defaultValue: 'Montaj' })),
                     subtitle: orderNumber ? t('home.upcoming.orderNo', { number: orderNumber, defaultValue: `Sipariş #${orderNumber}` }) : undefined,
                     date: startTime,
-                    navigateTo: canAllOrders && projectId ? `/projects/${projectId}` : `/projects/installation/tasks/${appt.id}`,
+                    navigateTo: isAssignedTechnician(appt, userId)
+                        ? `/projects/installation/tasks/${appt.id}`
+                        : canAllOrders && projectId
+                            ? `/projects/${projectId}`
+                            : `/projects/installation/tasks/${appt.id}`,
                 });
             });
         }
@@ -151,7 +167,7 @@ export const UpcomingAppointments = ({
                 collected.push({
                     id: `tender-${tender.id}`,
                     category: isUrgent ? 'deadline' : 'offer',
-                    title: tender.customerName || `#${tender.tenderNumber}`,
+                    title: tender.customerName || `#${localizeTenderNumber(tender.tenderNumber)}`,
                     subtitle: t('home.upcoming.validUntil', {
                         date: validUntil.format('DD MMM'),
                         defaultValue: `Geçerlilik: ${validUntil.format('DD MMM')}`,
@@ -168,7 +184,7 @@ export const UpcomingAppointments = ({
             : collected;
         setItems(visible.slice(0, limit));
         setLoading(false);
-    }, [canAllOrders, canMyInstallations, canAllMaintenance, canMyMaintenance, canTenders, shouldLoadAssembly, shouldLoadMaintenance, shouldLoadTenders, enabledCategories, limit, t]);
+    }, [userId, canAllOrders, canMyInstallations, canAllMaintenance, canMyMaintenance, canTenders, shouldLoadAssembly, shouldLoadMaintenance, shouldLoadTenders, enabledCategories, limit, t]);
 
     useEffect(() => {
         void load();
@@ -191,14 +207,14 @@ export const UpcomingAppointments = ({
     if (!hasAnySource) return null;
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-xl border border-[#EAEAEC] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <button
                 type="button"
                 onClick={() => setOpen((value) => !value)}
                 className="flex w-full items-center gap-2.5 px-4 py-3.5 text-left"
                 aria-expanded={open}
             >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#272f67]/8 text-[#272f67]">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#E7F6EC] text-[#16A34A] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]">
                     <CalendarOutlined size={17} />
                 </span>
                 <span className="min-w-0 flex-1">

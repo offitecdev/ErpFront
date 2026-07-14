@@ -66,3 +66,21 @@ input[type="search"]::-webkit-search-cancel-button {
 .recharts-surface path {
     outline: none;
 }
+
+/* Google Translate's browser extension injects this selection icon/tooltip
+   into the page even inside `translate="no"` text editors. Keep it from
+   covering the caret and the rich-text selection toolbar. */
+#gtx-trans,
+.gtx-trans-icon,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-te-spinner-pos {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.goog-text-highlight {
+    background: inherit !important;
+    box-shadow: none !important;
+}

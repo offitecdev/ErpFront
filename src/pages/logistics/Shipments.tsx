@@ -34,6 +34,7 @@ import type { ProjectDto } from '../../types/project';
 import type { ShipmentDto, ShipmentInput, ShipmentStatus } from '../../types/logistics';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import { useTranslation } from 'react-i18next';
 
 const useLanguageRefresh = () => {
@@ -477,7 +478,7 @@ const ShipmentForm = ({
         <Field label={t('nav.projects')} className="md:col-span-3">
             <Select value={form.projectId || ''} onChange={(e) => onChange((p) => ({ ...p, projectId: e.target.value }))}>
                 <option value="">{t('logistics.proje_yok')}</option>
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.projectName}</option>)}
+                {projects.map((project) => <option key={project.id} value={project.id}>{localizeTenderNumbersInText(project.projectName)}</option>)}
             </Select>
         </Field>
 

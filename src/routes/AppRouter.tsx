@@ -49,7 +49,7 @@ const MyOrderDetail = lazyNamed(() => import('../pages/crm/MyOrderDetail'), 'MyO
 const TenderList = lazyNamed(() => import('../pages/tender/TenderList'), 'TenderList');
 const TenderDetail = lazyNamed(() => import('../pages/tender/TenderDetail'), 'TenderDetail');
 const TenderReport = lazyNamed(() => import('../pages/tender/TenderReport'), 'TenderReport');
-const InventoryDashboard = lazyNamed(() => import('../pages/inventory/InventoryDashboard'), 'InventoryDashboard');
+const SupplyRequests = lazyNamed(() => import('../pages/inventory/SupplyRequests'), 'SupplyRequests');
 const Articles = lazyNamed(() => import('../pages/inventory/Articles'), 'Articles');
 const ArticleCreate = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleCreate');
 const ArticleDetail = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleDetail');
@@ -77,6 +77,7 @@ const Projects = lazyNamed(() => import('../pages/project/Projects'), 'Projects'
 const ProjectFlow = lazyNamed(() => import('../pages/project/ProjectFlow'), 'ProjectFlow');
 const ProjectDetail = lazyNamed(() => import('../pages/project/ProjectDetail'), 'ProjectDetail');
 const ProjectInstallation = lazyNamed(() => import('../pages/project/ProjectInstallation'), 'ProjectInstallation');
+const TechnicianDeliveryReports = lazyNamed(() => import('../pages/project/features/installations/components/TechnicianDeliveryReports'), 'TechnicianDeliveryReports');
 const BookingPage = lazyNamed(() => import('../pages/project/BookingPage'), 'BookingPage');
 const ServiceReports = lazyNamed(() => import('../pages/services/ServiceReports'), 'ServiceReports');
 const ServiceReportAdd = lazyNamed(() => import('../pages/services/ServiceReportAdd'), 'ServiceReportAdd');
@@ -152,7 +153,7 @@ export const AppRouter = () => {
                     <Route path="/crm/tenders" element={page(TenderList)} />
                     <Route path="/crm/tenders/:id" element={page(TenderDetail)} />
                     <Route path="/crm/tenders/:id/report" element={page(TenderReport)} />
-                    <Route path="/inventory" element={page(InventoryDashboard)} />
+                    <Route path="/inventory" element={page(SupplyRequests)} />
                     <Route path="/inventory/articles" element={page(Articles)} />
                     <Route path="/inventory/articles/new" element={page(ArticleCreate)} />
                     <Route path="/inventory/articles/:id" element={page(ArticleDetail)} />
@@ -185,6 +186,7 @@ export const AppRouter = () => {
                     <Route path="/projects/installation/calendar" element={<Navigate to="/calendar" replace />} />
                     <Route path="/projects/installation/tasks" element={<ProjectModuleRoute component={ProjectInstallation} />} />
                     <Route path="/projects/installation/tasks/:appointmentId" element={<ProjectModuleRoute component={ProjectInstallation} />} />
+                    <Route path="/projects/installation/delivery" element={<ProjectModuleRoute component={TechnicianDeliveryReports} />} />
                     <Route path="/projects/:id" element={<ProjectModuleRoute component={ProjectDetail} />} />
                     <Route path="/services/reports" element={<ProjectModuleRoute component={ServiceReports} />} />
                     <Route path="/services/reports/new" element={<ProjectModuleRoute component={ServiceReportAdd} />} />

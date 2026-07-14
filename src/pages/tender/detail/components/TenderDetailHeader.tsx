@@ -7,6 +7,7 @@ import {
     GitBranch01 as GitBranch,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import { localizeTenderNumber } from '@/utils/tenderNumber';
 
 import { PageHeader } from '../../../../components/layout/PageHeader';
 import { Button } from '../../../../components/ui-shared/Button';
@@ -57,7 +58,7 @@ export const TenderDetailHeader = ({
     <PageHeader
         title={
             <span className="flex items-center gap-3">
-                <span>{tender.tenderNumber}</span>
+                <span>{localizeTenderNumber(tender.tenderNumber)}</span>
                 <span className="text-[12px] font-mono text-slate-400">v{tender.version}</span>
                 <StatusChip variant={tenderStatusVariant}>
                     {tenderStatusLabel}

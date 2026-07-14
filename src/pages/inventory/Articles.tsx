@@ -1,16 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     AlertTriangle,
     ArrowLeft,
-    BarChart03,
     Camera01 as Camera,
     ChevronLeft,
     ChevronRight,
     ChevronSelectorVertical,
-    Coins01 as Coins,
-    Hash01 as Hash,
     Image01 as ImageIcon,
     List,
     Package,
@@ -18,16 +15,12 @@ import {
     Save01 as Save,
     Scan as ScanBarcode,
     SearchLg as Search,
-    Tag01 as Tag,
     Trash01 as Trash2,
     UploadCloud02 as Upload,
     X,
 } from '@/components/icons/antIconCompat';
 
-import { ProductQuickViewModal } from '../../components/product/ProductQuickViewModal';
-
 import { StockModuleHeader } from '../../components/layout/PageHeader';
-import { BulletHint, useBulletHint } from '../../components/ui-shared/BulletHint';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
@@ -40,10 +33,9 @@ import { useInventoryStore } from '../../store/inventoryStore';
 import { articleApi } from '../../lib/api/inventory';
 import { useAuthStore } from '../../store/authStore';
 import type { ArticleStatus, InventoryArticle, ItemType } from '../../types/inventory';
+import { RichTextMarkdownEditor } from '../tender/detail/TenderRichText';
 
 const BRAND = '#272f67';
-// Matches the tender line editors so the "writing" surfaces share one typeface.
-const INLINE_INPUT_FONT_FAMILY = "'Google Sans', 'Product Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 
 import { t } from '@/i18n/translate';
 import { useTranslation } from 'react-i18next';
@@ -95,9 +87,9 @@ const suggestCode = () => {
     return `ART-${year}-${rand}`;
 };
 
-const emptyArticle = (): Partial<InventoryArticle> => ({
+const emptyArticle = (name = ''): Partial<InventoryArticle> => ({
     articleCode: suggestCode(),
-    name: '',
+    name,
     description: '',
     baseCost: 0,
     salePrice: 0,
@@ -123,9 +115,6 @@ export const Articles = () => {
         || permissions.includes('inventory.articles.update');
 
     const {
-        articles,
-        articlesLoading,
-        fetchArticlesSummary,
         articlesPageItems,
         articlesTotal,
         articlesPageLoading,
@@ -136,10 +125,7 @@ export const Articles = () => {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
-    const [detailsOpen, setDetailsOpen] = useState(false);
-    const [statsLoaded, setStatsLoaded] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
-    const [quickViewId, setQuickViewId] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 15;
 
@@ -181,86 +167,21 @@ export const Articles = () => {
         });
     };
 
-    // İstatistik kartları ("Details") tüm ürünleri ister; yalnızca modal açılınca yüklenir.
-    const openDetails = () => {
-        setDetailsOpen(true);
-        if (!statsLoaded) {
-            void fetchArticlesSummary().then(() => setStatsLoaded(true));
-        }
-    };
-
     const paged = articlesPageItems;
     const totalPages = Math.max(1, Math.ceil(articlesTotal / PAGE_SIZE));
     const pageSafe = Math.min(page, totalPages);
     const rangeFrom = articlesTotal === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
     const rangeTo = Math.min(pageSafe * PAGE_SIZE, articlesTotal);
 
-    // Liste, ekranın altına kadar uzasın: kabın tepe konumunu ölçüp yüksekliği viewport'a göre sabitle.
-    // Böylece kolon başlıkları sabit kalırken veri en alta dek akar (AntCard/flex zincirine bağımlı değil).
-    const listRef = useRef<HTMLDivElement>(null);
-    const [listHeight, setListHeight] = useState(0);
-    useLayoutEffect(() => {
-        const el = listRef.current;
-        if (!el) return;
-        const recompute = () => {
-            const top = el.getBoundingClientRect().top;
-            // Alt boşluk: sayfa kabının kendi alt padding'i (~24px) kadar pay bırak ki dış kaydırma oluşmasın.
-            setListHeight(Math.max(240, window.innerHeight - top - 24));
-        };
-        recompute();
-        window.addEventListener('resize', recompute);
-        return () => window.removeEventListener('resize', recompute);
-    }, []);
-
-    const stats = useMemo(() => {
-        // Full catalogue (products only) — loaded lazily when the stats modal opens.
-        const products = articles.filter((a) => (a.itemType ?? 'PRODUCT') === 'PRODUCT');
-        const totalQty = products.reduce((s, a) => s + a.totalQuantity, 0);
-        const totalValue = products.reduce((s, a) => s + a.totalQuantity * articleUnitCost(a), 0);
-        const critical = products.filter((a) => a.criticalStockLevel > 0 && a.totalQuantity <= a.criticalStockLevel).length;
-        return { total: products.length, totalQty, totalValue, critical };
-    }, [articles]);
-
     return (
         <div>
-            <StockModuleHeader
-                label="Stock › Products"
-                actions={
-                    <>
-                        <Button
-                            variant="secondary"
-                            icon={<BarChart03 size={14} />}
-                            onClick={openDetails}
-                            aria-label="Details"
-                            title="Details"
-                            className="!h-8 !w-8 !px-0"
-                        />
-                        {canManage && (
-                            <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles/new')}>{t('auto.yeni_urun')}</Button>
-                        )}
-                    </>
-                }
-            />
-
-            {detailsOpen && (
-                <ProductStatsModal
-                    loading={!statsLoaded && articlesLoading}
-                    total={stats.total}
-                    totalQty={stats.totalQty}
-                    totalValue={stats.totalValue}
-                    critical={stats.critical}
-                    onClose={() => setDetailsOpen(false)}
-                />
-            )}
-
-            <ProductQuickViewModal articleId={quickViewId} onClose={() => setQuickViewId(null)} />
-
             <Card
                 className="border-0 rounded-none"
                 noPadding
             >
-                {/* Üst çubuk: filtreler solda (arama + tarama + tüm durumlar), sayfalama sağda — tek satır. */}
-                <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/60">
+                {/* Üst çubuk: filtreler solda (arama + tarama + tüm durumlar), sayfalama sağda — tek satır.
+                    Chrome-less: kart/şerit yok, yalnızca kontroller kendi arka planını taşır. */}
+                <div className="shrink-0 overflow-x-auto pb-2">
                     <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
                         <div className="flex shrink-0 items-center gap-2 pr-1">
                             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
@@ -339,15 +260,22 @@ export const Articles = () => {
                                 <ChevronRight size={14} />
                             </button>
                         </div>
+                        {canManage && (
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                icon={<Plus size={16} />}
+                                onClick={() => navigate('/inventory/articles/new')}
+                                className="!h-9 !px-4 !text-[13px] !font-semibold"
+                            >
+                                {t('auto.yeni_urun')}
+                            </Button>
+                        )}
                     </div>
                 </div>
                 </div>
 
-                <div
-                    ref={listRef}
-                    style={{ height: listHeight || undefined }}
-                    className="overflow-auto bg-white"
-                >
+                <div className="bg-white">
                     <table className="min-w-[1240px] w-full table-fixed text-[12.5px]">
                         <colgroup>
                             <col style={{ width: 132 }} />
@@ -405,16 +333,6 @@ export const Articles = () => {
                                         <td className="truncate px-3 py-2 font-mono text-[11.5px] text-slate-700">{a.articleCode}</td>
                                         <td className="px-3 py-2">
                                             <div className="flex min-w-0 items-center gap-1.5">
-                                                {/* Tag icon between the row start and the title — opens the product quick view. */}
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => { e.stopPropagation(); setQuickViewId(a.id); }}
-                                                    className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#272f67] hover:text-[#272f67]"
-                                                    title={t('common.detail')}
-                                                    aria-label={t('common.detail')}
-                                                >
-                                                    <Tag size={13} />
-                                                </button>
                                                 <span className="truncate font-medium text-slate-800 group-hover:text-[#272f67]">{a.name}</span>
                                                 {(a.itemType ?? 'PRODUCT') === 'MATERIAL' && (
                                                     <span className="shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-100">{t('auto.malzeme')}</span>
@@ -465,7 +383,6 @@ export const Articles = () => {
                                                                 if (!confirm(t('auto.delete_article_confirm', { name: a.name }))) return;
                                                                 try {
                                                                     await deleteArticle(a.id);
-                                                                    setStatsLoaded(false);
                                                                     reloadCurrentPage();
                                                                     toast.success(t('auto.urun_silindi'));
                                                                 } catch (e: any) {
@@ -510,7 +427,11 @@ export const ArticleDetail = () => <ArticleFormPage mode="edit" />;
 
 const ArticleFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    // When opened from another screen (e.g. the tender product picker), a ?name=
+    // query param pre-fills the product name so the user only fills the rest.
+    const prefillName = searchParams.get('name')?.trim() ?? '';
     const { createArticle, updateArticle } = useInventoryStore();
     const [editing, setEditing] = useState<InventoryArticle | null>(null);
     const [loaded, setLoaded] = useState(mode === 'create');
@@ -572,56 +493,12 @@ const ArticleFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
     return (
         <ArticleFormCard
             mode={mode}
-            initial={mode === 'edit' && editing ? editing : emptyArticle()}
+            initial={mode === 'edit' && editing ? editing : emptyArticle(prefillName)}
             onClose={() => navigate('/inventory/articles')}
             onSubmit={submit}
         />
     );
 };
-
-const STAT_ACCENT: Record<'indigo' | 'sky' | 'emerald' | 'rose', string> = {
-    indigo: 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100',
-    sky: 'bg-sky-50 text-sky-600 ring-1 ring-sky-100',
-    emerald: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
-    rose: 'bg-rose-50 text-rose-600 ring-1 ring-rose-100',
-};
-
-const StatBox: React.FC<{ label: string; value: string; small?: boolean; accent?: 'rose'; active?: boolean; icon?: React.ReactNode; tone?: 'indigo' | 'sky' | 'emerald' | 'rose' }> = ({ label, value, small, accent, icon, tone = 'indigo' }) => (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm">
-        {icon && <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${STAT_ACCENT[tone]}`}>{icon}</span>}
-        <div className="min-w-0">
-            <div className="text-[10px] font-semibold text-[#86868B] uppercase tracking-[0.08em]">{label}</div>
-            <div className={`mt-0.5 truncate ${small ? 'text-[15px]' : 'text-[18px]'} font-semibold ${accent === 'rose' ? 'text-rose-700' : 'text-slate-800'}`}>
-                {value}
-            </div>
-        </div>
-    </div>
-);
-
-// "Details" düğmesiyle açılan genel istatistik kartları (eskiden liste üstündeydi).
-const ProductStatsModal: React.FC<{ loading?: boolean; total: number; totalQty: number; totalValue: number; critical: number; onClose: () => void }> = ({ loading, total, totalQty, totalValue, critical, onClose }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose} role="presentation">
-        <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                <h2 className="text-[20px] font-semibold tracking-tight" style={{ color: BRAND }}>{t('inventory.articles.title')}</h2>
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                    aria-label="Close"
-                >
-                    <X size={26} />
-                </button>
-            </div>
-            <div className="grid grid-cols-1 gap-3 px-6 py-6 sm:grid-cols-2">
-                <StatBox label={t('inventory.dashboard.totalProducts')} value={loading ? '…' : `${total}`} icon={<Package size={16} />} tone="indigo" active />
-                <StatBox label={t('auto.toplam_adet')} value={loading ? '…' : fmtNumber(totalQty)} icon={<Hash size={16} />} tone="sky" />
-                <StatBox label={t('inventory.dashboard.stockValue')} value={loading ? '…' : fmtMoney(totalValue)} icon={<Coins size={16} />} tone="emerald" small />
-                <StatBox label={t('auto.kritik_seviye')} value={loading ? '…' : `${critical}`} icon={<AlertTriangle size={16} />} tone="rose" accent={critical > 0 ? 'rose' : undefined} />
-            </div>
-        </div>
-    </div>
-);
 
 type FormData = Partial<InventoryArticle>;
 
@@ -642,15 +519,13 @@ const ArticleFormCard: React.FC<{
     initial: FormData;
     onClose: () => void;
     onSubmit: (data: FormData) => Promise<void>;
-}> = ({ initial, onClose, onSubmit }) => {
+}> = ({ mode, initial, onSubmit }) => {
+    const navigate = useNavigate();
     const [form, setForm] = useState<FormData>({ ...initial });
     const [submitting, setSubmitting] = useState(false);
     const [scannerOpen, setScannerOpen] = useState(false);
     const [scannerMode, setScannerMode] = useState<'serial' | 'general'>('serial');
-    const [descFocused, setDescFocused] = useState(false);
-    const { dismissed: bulletHintDismissed, dismiss: dismissBulletHint } = useBulletHint();
     const fileRef = useRef<HTMLInputElement>(null);
-    const descRef = useRef<HTMLTextAreaElement>(null);
 
     const normalizeForm = (value: FormData) => JSON.stringify({
         articleCode: value.articleCode || '',
@@ -681,58 +556,6 @@ const ArticleFormCard: React.FC<{
         reader.readAsDataURL(file);
     };
 
-    // Madde işareti: satır başında "-" veya "*" + boşluk ile oluşur, Enter ile otomatik devam, boş maddede çıkış.
-    const BULLET = '• ';
-
-    const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        const el = e.currentTarget;
-        const value = form.description ?? '';
-        const start = el.selectionStart;
-        const end = el.selectionEnd;
-        if (start !== end) return;
-
-        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-        const line = value.slice(lineStart, start);
-
-        // Satır başında yalnızca "-" veya "*" varken boşluğa basılırsa madde işaretine dönüştür.
-        if (e.key === ' ' && (line === '-' || line === '*')) {
-            e.preventDefault();
-            const next = `${value.slice(0, lineStart)}${BULLET}${value.slice(start)}`;
-            const pos = lineStart + BULLET.length;
-            setForm((p) => ({ ...p, description: next }));
-            // First bullet created → retire the one-time hint.
-            dismissBulletHint();
-            requestAnimationFrame(() => {
-                descRef.current?.focus();
-                descRef.current?.setSelectionRange(pos, pos);
-            });
-            return;
-        }
-
-        if (e.key !== 'Enter') return;
-        if (!line.startsWith(BULLET)) return;
-
-        e.preventDefault();
-        if (line.trim() === BULLET.trim()) {
-            // Boş madde: işareti kaldır ve listeden çık.
-            const next = `${value.slice(0, lineStart)}${value.slice(start)}`;
-            setForm((p) => ({ ...p, description: next }));
-            requestAnimationFrame(() => {
-                descRef.current?.focus();
-                descRef.current?.setSelectionRange(lineStart, lineStart);
-            });
-        } else {
-            const insert = `\n${BULLET}`;
-            const next = `${value.slice(0, start)}${insert}${value.slice(end)}`;
-            const pos = start + insert.length;
-            setForm((p) => ({ ...p, description: next }));
-            requestAnimationFrame(() => {
-                descRef.current?.focus();
-                descRef.current?.setSelectionRange(pos, pos);
-            });
-        }
-    };
-
     const submit = async () => {
         if (!form.articleCode || !form.name || !form.unit) {
             toast.error(t('auto.kod_ad_ve_birim_zorunludur'));
@@ -754,15 +577,29 @@ const ArticleFormCard: React.FC<{
    return (
         <>
             <StockModuleHeader
-                label="Stock › Products"
+                label={
+                    <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        aria-label={t('common.back')}
+                        title={t('common.back')}
+                        className="-ml-1 inline-flex items-center justify-center rounded p-0.5 text-[#272f67] transition-colors hover:text-[#1a2255]"
+                    >
+                        <ChevronLeft size={22} strokeWidth={2.75} />
+                    </button>
+                }
                 actions={
                     <>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="inline-flex h-8 items-center gap-1.5 rounded px-1 text-[13px] font-semibold text-slate-700 transition-colors hover:text-slate-950"
-                        >
-                            <ArrowLeft size={15} className="text-slate-400" />{t('auto.listeye_don')}</button>
+                        {mode === 'edit' && initial.id && (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<ChevronSelectorVertical size={14} />}
+                                onClick={() => navigate(`/inventory/movements?item=${initial.id}`)}
+                                aria-label={t('nav.movements')}
+                                title={t('nav.movements')}
+                            />
+                        )}
                         <Button
                             variant="primary"
                             size="sm"
@@ -810,29 +647,12 @@ const ArticleFormCard: React.FC<{
                         <section className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
                                 <List size={13} />{t('common.description')}</div>
-                            <div className="relative">
-                                {/* First-time-only tip; bullets are made by typing a hyphen + space. */}
-                                {descFocused && !bulletHintDismissed && (
-                                    <BulletHint
-                                        onDismiss={dismissBulletHint}
-                                        className="absolute right-2 -top-1.5 z-30 -translate-y-full"
-                                    />
-                                )}
-                                <div className="overflow-hidden rounded-md border border-slate-200 bg-white flex flex-col">
-                                    <textarea
-                                        ref={descRef}
-                                        rows={8}
-                                        value={form.description ?? ''}
-                                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                        onKeyDown={handleDescriptionKeyDown}
-                                        onFocus={() => setDescFocused(true)}
-                                        onBlur={() => setDescFocused(false)}
-                                        className="w-full p-3 text-[12.5px] bg-white focus:outline-none resize-y min-h-[260px]"
-                                        style={{ fontFamily: INLINE_INPUT_FONT_FAMILY }}
-                                        placeholder={t('auto.urun_ile_ilgili_detayli_aciklamalari_buraya_yaza')}
-                                    />
-                                </div>
-                            </div>
+                            <RichTextMarkdownEditor
+                                value={form.description ?? ''}
+                                onChange={(description) => setForm((previous) => ({ ...previous, description }))}
+                                minHeight={220}
+                                placeholder={t('auto.urun_ile_ilgili_detayli_aciklamalari_buraya_yaza')}
+                            />
                         </section>
 
                         <div className="space-y-3">

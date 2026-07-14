@@ -12,6 +12,8 @@ import { Modal } from '../../components/ui-shared/Modal';
 import { Button } from '../../components/ui-shared/Button';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { BillingButton } from '../../components/billing/BillingButton';
+import { SpecialClosureModal } from './SpecialClosureModal';
+import { useAuthStore } from '../../store/authStore';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
@@ -19,6 +21,7 @@ import type { InvoiceDto, MyOrderDto } from '../../types/billing';
 import type { ProjectDto } from '../../types/project';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 type Phase = 'overview' | 'technical' | 'billing' | 'done';
 
@@ -37,8 +40,18 @@ interface BillItem {
 
 const DoneChip = ({ done, pendingLabel }: { done: boolean; pendingLabel?: string }) => (
     <StatusChip variant={done ? 'active' : 'warning'}>
-        {done ? t('projects.flow.stateCompleted') : (pendingLabel || t('projects.flow.statePending'))}
+        {done ? <Check size={14} strokeWidth={3} aria-label={t('projects.flow.stateCompleted')} /> : (pendingLabel || t('projects.flow.statePending'))}
     </StatusChip>
+);
+
+/** Plain "label: ✓ / Pending" line — no colored badge, used on the orders side. */
+const OrderStat = ({ label, done }: { label: string; done: boolean }) => (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px] text-slate-600">
+        <span className="font-medium">{label}:</span>
+        {done
+            ? <Check size={14} strokeWidth={3} className="text-emerald-600" aria-label={t('projects.flow.stateCompleted')} />
+            : <span className="text-slate-400">{t('projects.flow.statePending')}</span>}
+    </span>
 );
 
 export const ProjectProcessModal = ({
@@ -60,8 +73,14 @@ export const ProjectProcessModal = ({
     const [flow, setFlow] = useState<ProjectFlow | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [showSpecialClosure, setShowSpecialClosure] = useState(false);
+
+    const permissions = useAuthStore((state) => state.permissions);
+    // "Special Closure" (Sonderabschluss) is a project-manager-only privilege.
+    const canSpecialClose = permissions.includes('projects.manage');
 
     const alreadyCompleted = project.status === 'COMPLETED';
+    const alreadyClosed = alreadyCompleted || project.status === 'SPECIALLY_CLOSED';
 
     // Everything the flow needs is derived client-side from the bulk lists.
     const loadSources = async () => {
@@ -105,9 +124,9 @@ export const ProjectProcessModal = ({
     const billItems = useMemo<BillItem[]>(() => {
         const items: BillItem[] = [];
         for (const order of orders) {
-            items.push({ id: order.id, label: order.orderNumber, amount: Number(order.totalAmount) || 0, isAddon: false });
+            items.push({ id: order.id, label: localizeTenderNumbersInText(order.orderNumber), amount: Number(order.totalAmount) || 0, isAddon: false });
             for (const addon of order.addonSalesOrders || []) {
-                items.push({ id: addon.id, label: addon.orderNumber, amount: Number(addon.totalAmount) || 0, isAddon: true });
+                items.push({ id: addon.id, label: localizeTenderNumbersInText(addon.orderNumber), amount: Number(addon.totalAmount) || 0, isAddon: true });
             }
         }
         return items;
@@ -177,9 +196,15 @@ export const ProjectProcessModal = ({
         if (phase === 'overview') {
             return (
                 <>
+                    {mode === 'complete' && canSpecialClose && !alreadyClosed && (
+                        // Pushed to the left of the footer; the rest stay right-aligned.
+                        <Button variant="danger" className="mr-auto" onClick={() => setShowSpecialClosure(true)}>
+                            {t('projects.specialClosure.button')}
+                        </Button>
+                    )}
                     <Button variant="ghost" onClick={onClose}>{t('projects.complete.close')}</Button>
                     {mode === 'complete' && (
-                        <Button variant="primary" disabled={alreadyCompleted} onClick={evaluate}>
+                        <Button variant="primary" disabled={alreadyClosed} onClick={evaluate}>
                             {t('projects.complete.completeProject')}
                         </Button>
                     )}
@@ -208,6 +233,7 @@ export const ProjectProcessModal = ({
     })();
 
     return (
+        <>
         <Modal
             open
             onClose={onClose}
@@ -248,7 +274,7 @@ export const ProjectProcessModal = ({
                                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#272f67] text-white"><ReceiptText size={14} /></span>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="truncate font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</span>
+                                                <span className="truncate font-mono text-[12.5px] font-semibold text-slate-800">{localizeTenderNumbersInText(order.orderNumber)}</span>
                                                 {addonCount > 0 && (
                                                     <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
                                                         <Plus size={9} />{t('projects.complete.addonCount', { count: addonCount })}
@@ -256,12 +282,8 @@ export const ProjectProcessModal = ({
                                                 )}
                                             </div>
                                         </div>
-                                        <StatusChip variant={order.deliveryReport === 'completed' ? 'active' : 'warning'}>
-                                            {t('projects.flow.colTechnical')}: {order.deliveryReport === 'completed' ? t('projects.flow.stateCompleted') : t('projects.flow.statePending')}
-                                        </StatusChip>
-                                        <StatusChip variant={billedForOrder(order.id) >= 100 ? 'active' : 'warning'}>
-                                            {t('projects.flow.colBilling')}: {billedForOrder(order.id) >= 100 ? t('projects.flow.stateCompleted') : t('projects.flow.statePending')}
-                                        </StatusChip>
+                                        <OrderStat label={t('projects.flow.colTechnical')} done={order.deliveryReport === 'completed'} />
+                                        <OrderStat label={t('projects.flow.colBilling')} done={billedForOrder(order.id) >= 100} />
                                     </div>
                                 );
                             })}
@@ -286,7 +308,7 @@ export const ProjectProcessModal = ({
                             return (
                                 <div key={order.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</div>
+                                        <div className="font-mono text-[12.5px] font-semibold text-slate-800">{localizeTenderNumbersInText(order.orderNumber)}</div>
                                         <div className="mt-0.5">
                                             <StatusChip variant={isSkipped ? 'passive' : 'warning'}>
                                                 {isSkipped ? t('projects.complete.skipped') : t('projects.complete.technicalIncompleteBadge')}
@@ -358,5 +380,18 @@ export const ProjectProcessModal = ({
                 </div>
             )}
         </Modal>
+
+        {showSpecialClosure && (
+            <SpecialClosureModal
+                project={project}
+                onClose={() => setShowSpecialClosure(false)}
+                onClosed={() => {
+                    setShowSpecialClosure(false);
+                    if (onCompleted) onCompleted();
+                    else onClose();
+                }}
+            />
+        )}
+        </>
     );
 };

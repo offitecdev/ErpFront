@@ -4,7 +4,6 @@ export { TenderWorkspaceTabs } from './TenderWorkspaceTabs';
 
 export { TenderProductPickerModal } from './product/TenderProductPickerModal';
 export { TenderManualProductModal } from './product/TenderManualProductModal';
-export { TenderStockArticleModal } from './product/TenderStockArticleModal';
 
 export { TenderLineTable } from './lines/TenderLineTable';
 

@@ -2,7 +2,9 @@
 import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
+import { localizeTenderNumber } from '../tenderNumber';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
+import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
 
 // Arial yerine metrik olarak özdeş, Türkçe karakter destekli Arimo gömülür.
 import arialBoldUrl from '../../assets/fonts/ARIALBD.ttf?url';
@@ -55,6 +57,11 @@ export interface TenderPdfData {
 
 // ── PDF dilleri (Türkçe / Almanca / İngilizce) ───────────────────────────────
 export type PdfLang = 'tr' | 'de' | 'en';
+
+// Eski kayıtlarda kalan "T-2026-5494" / "TKF-2026-5720" gibi numaralar PDF'e
+// yazılırken seçilen dilin teklif ön ekine çevrilir (ör. Almanca PDF'te
+// "A-2026-5720"). Ekran gösterimleriyle aynı eşleme kullanılır.
+export { localizeTenderNumber };
 
 interface PdfStrings {
     offerNumber: string;
@@ -117,12 +124,12 @@ const I18N: Record<PdfLang, PdfStrings> = {
         qrReference: 'Reference',
     },
     de: {
-        offerNumber: 'Offert-Nr. :',
+        offerNumber: 'Angebots-Nr. :',
         kommission: 'Kommission:',
-        offerDate: 'Offertdatum:',
+        offerDate: 'Angebotsdatum:',
         validUntil: 'Gültig bis:',
         seller: 'Verkäufer:',
-        offerTitle: 'Offerte',
+        offerTitle: 'Angebot',
         greeting: 'Sehr geehrte Damen und Herren',
         intro: 'Vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen nachfolgend unser Angebot. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten.',
         colPos: 'Pos',
@@ -292,14 +299,24 @@ const fmtDateShort = (iso?: string | null) => {
     return `${yy}-${mm}-${dd}`;
 };
 
+/** Live status of the PDF pipeline, for download-progress UIs. */
+export type TenderPdfProgress =
+    | { stage: 'positions'; done: number; total: number }
+    | { stage: 'finalize' }
+    | { stage: 'download' };
+
 export async function buildTenderPdfBytes(
     data: TenderPdfData,
-    settings: PdfCompanySettings
+    settings: PdfCompanySettings,
+    onProgress?: (p: TenderPdfProgress) => void
 ): Promise<Uint8Array> {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     await registerFonts(doc);
     const fmt = fmtMoneyForCurrency(settings.currency);
     const L = I18N[data.lang ?? 'de'];
+    // Teklif numarası kapakta, başlıkta, QR mesajında ve dosya adında hep
+    // seçilen dilin ön ekiyle görünsün.
+    data = { ...data, tenderNumber: localizeTenderNumber(data.tenderNumber, data.lang ?? 'de') };
 
     // ── SAYFA 1: Kapak & Giriş ───────────────────────────────────────────────
     drawCoverPage(doc, data, settings, L);
@@ -310,6 +327,7 @@ export async function buildTenderPdfBytes(
     y = drawTableHeader(doc, y, L);
 
     let rowIndex = 0;
+    let drawn = 0;
     for (const pos of data.positions) {
         const rowHeight = measureRow(doc, pos);
         if (y + rowHeight > PAGE_H - FOOTER_RESERVED_BOTTOM) {
@@ -320,7 +338,15 @@ export async function buildTenderPdfBytes(
         }
         y = drawRow(doc, pos, y, fmt, L, rowIndex);
         rowIndex++;
+        drawn++;
+        if (onProgress) {
+            onProgress({ stage: 'positions', done: drawn, total: data.positions.length });
+            // The layout loop is synchronous — yield periodically so the
+            // status overlay actually repaints while long offers render.
+            if (drawn % 8 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+        }
     }
+    onProgress?.({ stage: 'finalize' });
 
     // ── Toplamlar ───────────────────────────────────────────────────────────
     const totalsBlockHeight = 45;
@@ -357,10 +383,12 @@ export async function buildTenderPdfBytes(
 
 export async function exportTenderPdf(
     data: TenderPdfData,
-    settings: PdfCompanySettings
+    settings: PdfCompanySettings,
+    onProgress?: (p: TenderPdfProgress) => void
 ): Promise<void> {
-    const finalBytes = await buildTenderPdfBytes(data, settings);
-    downloadPdf(finalBytes, `${data.tenderNumber}.pdf`);
+    const finalBytes = await buildTenderPdfBytes(data, settings, onProgress);
+    onProgress?.({ stage: 'download' });
+    downloadPdf(finalBytes, `${localizeTenderNumber(data.tenderNumber, data.lang ?? 'de')}.pdf`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -438,13 +466,7 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
         doc.text(addr, rX, rYy);
         rYy += addr.length * 4.8;
     }
-    if (data.customerEmail || data.customerPhone) {
-        doc.setFontSize(9);
-        doc.setTextColor(...COLOR_MUTED);
-        const contact = [data.customerPhone, data.customerEmail].filter(Boolean).join(' Â· ');
-        doc.text(contact, rX, rYy + 1);
-        doc.setTextColor(...COLOR_TEXT);
-    }
+    // Customer phone / email are intentionally omitted from the PDF recipient block.
 
     // ── Başlık + giriş metni ─────────────────────────────────────────────────
     let yTitle = Math.max(boxBottom, rYy) + 18;
@@ -618,6 +640,10 @@ function looksLikeCatalogCode(line: string): boolean {
 }
 
 function normalizePdfText(text: string): string {
+    // Rich-text (HTML) long descriptions are flattened to the plain dialect
+    // ('• ' bullets + newlines) before layout — same treatment the legacy
+    // markdown markers already get further down.
+    if (looksLikeRichHtml(text)) text = richHtmlToPlainText(text);
     return text
         .replace(/ /g, ' ')
         .replace(/[‐‑‒–—−]/g, '-')
@@ -633,7 +659,7 @@ function plainMarkdownLine(line: string): string {
     return line
         .trimStart()
         .replace(/^#{1,2}\s+/, '')
-        .replace(/^- /, '')
+        .replace(/^[-•] /, '')
         .replace(/\*\*(.+?)\*\*/g, '$1')
         .replace(/_(.+?)_/g, '$1');
 }
@@ -658,7 +684,7 @@ function drawMarkdownText(
         const trimmed = rawLine.trimStart();
         const heading = trimmed.match(/^(#{1,2})\s+(.*)$/);
         const headingLevel = heading ? (heading[1]?.length === 1 ? 1 : 2) : 0;
-        const isBullet = trimmed.startsWith('- ');
+        const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('• ');
         const cleaned = heading ? plainMarkdownLine(heading[2] ?? '') : plainMarkdownLine(trimmed);
         const text = `${isBullet ? '• ' : ''}${cleaned}`;
 
@@ -855,6 +881,10 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     doc.setLineDashPattern([], 0);
 
     const amount = data.grandTotal;
+    // The Swiss QR-bill is legally valid only for CHF/EUR. Offers in another
+    // currency still render, but the QR part falls back to CHF so the code stays
+    // scannable/payable.
+    const qrCurrency: 'CHF' | 'EUR' = s.currency === 'EUR' ? 'EUR' : 'CHF';
     const payload = buildQrBillPayload({
         iban: s.iban,
         creditorName: s.companyName,
@@ -864,7 +894,7 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         creditorCity: s.city,
         creditorCountry: s.country,
         amount,
-        currency: s.currency,
+        currency: qrCurrency,
         debtorName: data.customerName,
         debtorAddressLine1: data.customerAddress || '',
         debtorAddressLine2: '',
@@ -914,7 +944,7 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     doc.text(L.qrAmount, 87, yTop + 70);
     doc.setFont(FONT, 'normal');
     doc.setFontSize(8);
-    doc.text(s.currency, 67, yTop + 74);
+    doc.text(qrCurrency, 67, yTop + 74);
     doc.text(amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 87, yTop + 74);
 
     if (data.referenceNumber) {

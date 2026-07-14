@@ -4,7 +4,7 @@ import { Field, Input, Select } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { t } from '@/i18n/translate';
 
-export type TenderAddressTarget = 'INSTALLATION' | 'BILLING' | 'CUSTOMER';
+export type TenderAddressTarget = 'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER';
 
 export type TenderAddressCreateForm = {
     name: string;
@@ -51,6 +51,7 @@ export const TenderAddressCreateModal = ({
             <Field label={t('crm.addressTarget')} className="sm:col-span-2">
                 <Select value={target} onChange={(e) => onTargetChange(e.target.value as TenderAddressTarget)}>
                     <option value="INSTALLATION">{t('crm.addressTargetInstallation')}</option>
+                    <option value="DELIVERY">{t('crm.addressTargetDelivery')}</option>
                     <option value="BILLING">{t('crm.addressTargetBilling')}</option>
                     <option value="CUSTOMER">{t('crm.addressTargetCustomer')}</option>
                 </Select>

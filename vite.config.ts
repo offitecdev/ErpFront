@@ -38,12 +38,10 @@ export default defineConfig(({ mode }) => ({
           ) {
             return 'vendor-react';
           }
-          if (normalizedId.includes('/node_modules/qrcode.react/')) {
-            return 'vendor-qr';
-          }
-          if (normalizedId.includes('/node_modules/jspdf/') || normalizedId.includes('/node_modules/pdf-lib/') || normalizedId.includes('/node_modules/qrcode/')) {
-            return 'vendor-pdf';
-          }
+          // Do not force PDF/QR libraries into manual chunks. Those groups formed
+          // cross-chunk cycles with the app runtime, turning otherwise dynamic PDF
+          // imports into eager TenderDetail dependencies. Rollup's natural chunks
+          // keep them behind the export/dashboard interactions that use them.
           // antd is intentionally NOT forced into a single chunk. Doing so made
           // the shell's ConfigProvider import drag the entire antd bundle onto
           // the critical path. Letting Rollup split it keeps only the shell's

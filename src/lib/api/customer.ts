@@ -27,6 +27,17 @@ export interface CustomerLocationDto {
     notes?: string | null;
 }
 
+// Per-customer default discount (%) for a specific article; auto-applied when
+// the article is added to one of the customer's tenders.
+export interface CustomerProductDiscountDto {
+    id: string;
+    customerId: string;
+    articleId: string;
+    discount: number;
+    articleCode?: string | null;
+    articleName?: string | null;
+}
+
 export interface CustomerOrderDto {
     id: string;
     orderNumber: string;
@@ -75,4 +86,14 @@ export const customerApi = {
     // Orders (Aufträge) placed by this customer — all sales orders incl. addons
     listOrders: (customerId: string): Promise<CustomerOrderDto[]> =>
         apiClient.get(`/sales-orders?customerId=${customerId}`).then(r => r.data),
+
+    // Product discounts (Produktrabatte)
+    listProductDiscounts: (customerId: string): Promise<CustomerProductDiscountDto[]> =>
+        apiClient.get(`/customers/${customerId}/product-discounts`).then(r => r.data),
+    upsertProductDiscount: (customerId: string, body: { articleId: string; discount: number }): Promise<CustomerProductDiscountDto> =>
+        apiClient.post(`/customers/${customerId}/product-discounts`, body).then(r => r.data),
+    updateProductDiscount: (customerId: string, discountId: string, body: { discount: number }): Promise<CustomerProductDiscountDto> =>
+        apiClient.patch(`/customers/${customerId}/product-discounts/${discountId}`, body).then(r => r.data),
+    deleteProductDiscount: (customerId: string, discountId: string) =>
+        apiClient.delete(`/customers/${customerId}/product-discounts/${discountId}`),
 };

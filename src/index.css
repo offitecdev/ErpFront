@@ -26,6 +26,36 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Always reserve the viewport scrollbar gutter. Ant Design Drawer/Modal
+   (notification panel, dialogs, etc.) lock scrolling with `overflow: hidden`
+   when they open, which would otherwise remove the scrollbar and widen the
+   viewport — shifting the `fixed` header's right-aligned icons (calendar,
+   notifications, language, profile). `scrollbar-gutter: stable` keeps the
+   gutter reserved even while overflow is hidden, so nothing moves. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Ant Design's modal/drawer scroll-lock compensates for the scrollbar it hides
+   with `overflow: hidden` by shrinking <body> to `width: calc(100% - <scrollbar>px)`:
+     - Modal (@rc-component/portal `useScrollLocker`) injects a global stylesheet
+       rule `html body { overflow-y: hidden; width: calc(100% - Npx); }`.
+     - Drawer (@rc-component/util `ScrollLocker`) sets the same width inline on <body>.
+   But `scrollbar-gutter: stable` (above) already reserves that gutter permanently,
+   and the lock's overflow guard reads the reserved gutter as a live scrollbar — so
+   the compensation double-counts it and narrows <body> by the scrollbar width. That
+   shifts normal-flow content (e.g. the project list rows) left on open and back right
+   on close: the "slides left then right" wobble. Fixed header icons are anchored to
+   the viewport, not <body>, so they never moved.
+
+   Cancel ONLY the width compensation and keep the overflow lock (a separate
+   declaration) so background scroll stays disabled. `html body` matches the Modal's
+   injected selector, and the `!important` also overrides the Drawer's inline width.
+   Harmless when no lock is active — <body>'s natural width is already `auto`. */
+html body {
+  width: auto !important;
+}
+
 /* ── Scrollbar ── */
 /* Untitled UI-style toast alerts */
 .offitec-toaster {
@@ -540,6 +570,25 @@ textarea,
   border-color: #cbd5e1 !important;
   color: #ffffff !important;
 }
+.ofi-btn-danger:not(:disabled):not([disabled]) {
+  background: #d30f15 !important;
+  border-color: #d30f15 !important;
+  color: #ffffff !important;
+}
+.ofi-btn-danger:not(:disabled):not([disabled]):hover {
+  background: #b80d12 !important;
+  border-color: #b80d12 !important;
+  color: #ffffff !important;
+}
+.ofi-btn-danger:not(:disabled):not([disabled]) * {
+  color: #ffffff !important;
+}
+.ofi-btn-danger:disabled,
+.ofi-btn-danger[disabled] {
+  background: #cbd5e1 !important;
+  border-color: #cbd5e1 !important;
+  color: #ffffff !important;
+}
 .ant-btn-default {
   background: #ffffff !important;
   border-color: #e2e8f0 !important;
@@ -844,8 +893,16 @@ select option:checked {
   box-shadow: none !important;
 }
 
+.offitec-sidebar-menu.ant-menu-inline-collapsed .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  background: #eef4ff !important;
+  color: #1f2654 !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
 .offitec-sidebar-menu .ant-menu-item-selected .ant-menu-item-icon,
-.offitec-sidebar-menu .ant-menu-item-selected .ant-menu-title-content {
+.offitec-sidebar-menu .ant-menu-item-selected .ant-menu-title-content,
+.offitec-sidebar-menu.ant-menu-inline-collapsed .ant-menu-submenu-selected > .ant-menu-submenu-title .ant-menu-item-icon {
   color: #1f2654 !important;
   font-weight: 700 !important;
 }
@@ -1032,15 +1089,22 @@ select option:checked {
   --color-brand-950: #8a6f3a;
 }
 
-/* Solid navy utilities → gold; subtle navy tints → soft gold. */
+/* Navy remap, dark mode. Text is the focus: navy TEXT becomes plain light
+   text (never gold), and soft navy tints (hover/selected washes, chips,
+   rings) become quiet translucent "glass" whites. Gold survives only on
+   SOLID navy surfaces (primary buttons, the today badge) where a filled
+   accent is intentional. */
 .dark [class~="bg-[#272f67]"] { background-color: #e6cf9e !important; }
-.dark [class~="text-[#272f67]"] { color: #e6cf9e !important; }
-.dark [class~="border-[#272f67]"] { border-color: #e6cf9e !important; }
+.dark [class~="text-[#272f67]"] { color: var(--ofi-d-text, #fff) !important; }
+.dark [class*="text-[#272f67]/"] { color: var(--ofi-d-text-3, #c4c9d2) !important; }
+.dark [class~="border-[#272f67]"] { border-color: rgba(255, 255, 255, 0.35) !important; }
 .dark [class~="hover:bg-[#272f67]"]:hover { background-color: #e6cf9e !important; }
-.dark [class~="hover:text-[#272f67]"]:hover { color: #e6cf9e !important; }
-.dark [class*="bg-[#272f67]/"] { background-color: rgba(230, 207, 158, 0.16) !important; }
-.dark [class*="border-[#272f67]/"] { border-color: rgba(230, 207, 158, 0.30) !important; }
-.dark [class*="ring-[#272f67]/"] { --tw-ring-color: rgba(230, 207, 158, 0.22) !important; }
+.dark [class~="hover:text-[#272f67]"]:hover { color: var(--ofi-d-text, #fff) !important; }
+.dark [class*="bg-[#272f67]/"] { background-color: rgba(255, 255, 255, 0.08) !important; }
+.dark [class*="border-[#272f67]/"] { border-color: rgba(255, 255, 255, 0.16) !important; }
+.dark [class*="border-l-[#272f67]"] { border-left-color: rgba(255, 255, 255, 0.4) !important; }
+.dark [class~="ring-[#272f67]"] { --tw-ring-color: rgba(255, 255, 255, 0.45) !important; }
+.dark [class*="ring-[#272f67]/"] { --tw-ring-color: rgba(255, 255, 255, 0.25) !important; }
 
 @layer base {
   * {
@@ -1203,4 +1267,199 @@ select option:checked {
     background-color: #ffedd5;
     color: #c2410c;
   }
+}
+
+/* A Card that hosts a table contributes no additional chrome. */
+main [data-ui-card]:has(table:not([role="grid"]):not([data-unstyled-table])) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+main [data-ui-card]:has(table:not([role="grid"]):not([data-unstyled-table])) [data-ui-card-header] {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 2px 2px 10px;
+}
+/* Table layering: the gray backing and the header share the exact same top
+   edge and 12px outer curve. There is no top inset, so the backing cannot
+   protrude above the column headers; only its 4px side/bottom reveal remains
+   visible behind the separate white body card. */
+main div:has(> table:not([role="grid"]):not([data-unstyled-table])),
+[role="dialog"] div:has(> table:not([role="grid"]):not([data-unstyled-table])) {
+  box-sizing: border-box;
+  padding: 0 4px 4px;
+  border: 0 !important;
+  border-radius: 12px;
+  background: #f3f2f1;
+}
+
+/* The page is the only vertical scroll surface. Table wrappers may still
+   widen the page for broad column sets, but never create a nested scrollbar. */
+main div:has(> table:not([role="grid"]):not([data-unstyled-table])) {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]),
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) {
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) thead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead tr,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) thead tr {
+  border: 0;
+}
+
+/* Once the header is actually stuck, it becomes the white floating card seen
+   in the scrolled reference. Building the surface from the header cells keeps
+   the corners reliable with native table layout. */
+main table:not([role="grid"]):not([data-unstyled-table]) thead[data-scroll-stuck] {
+  background: transparent !important;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.10);
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead[data-scroll-stuck] th {
+  background: #ffffff !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead[data-scroll-stuck] th:first-child {
+  border-left: 1px solid rgba(52, 51, 50, 0.06) !important;
+  border-radius: 12px 0 0 12px;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead[data-scroll-stuck] th:last-child {
+  border-right: 1px solid rgba(52, 51, 50, 0.06) !important;
+  border-radius: 0 12px 12px 0;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) th,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) th {
+  height: 38px;
+  padding: 10px 1.5rem !important;
+  border-bottom: 0 !important;
+  background: #f3f2f1 !important;
+  color: #343332 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 18px;
+  letter-spacing: 0 !important;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead:not([data-scroll-stuck]) th:first-child,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) thead:not([data-scroll-stuck]) th:first-child {
+  border-radius: 12px 0 0 0;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) thead:not([data-scroll-stuck]) th:last-child,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) thead:not([data-scroll-stuck]) th:last-child {
+  border-radius: 0 12px 0 0;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody td,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody td {
+  min-height: 48px;
+  padding: 14px 1.5rem !important;
+  border-bottom: 1px solid #f0efee !important;
+  background: #ffffff;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:first-child td:first-child,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:first-child td:first-child {
+  border-top-left-radius: 12px;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:first-child td:last-child,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:first-child td:last-child {
+  border-top-right-radius: 12px;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td:first-child,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 8px;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td:last-child,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 8px;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td {
+  background: #fafaf9 !important;
+}
+
+main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td,
+[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td {
+  border-bottom-color: transparent !important;
+}
+
+.dark main div:has(> table:not([role="grid"]):not([data-unstyled-table])),
+.dark [role="dialog"] div:has(> table:not([role="grid"]):not([data-unstyled-table])) {
+  background: var(--ofi-d-hover, #232326) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]),
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) {
+  color: var(--ofi-d-text-2, #e9ebf0) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) thead,
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) thead {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) thead[data-scroll-stuck] {
+  background: transparent !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) thead[data-scroll-stuck] th {
+  background: var(--ofi-d-surface-3, #1b1c1c) !important;
+  border-color: var(--ofi-d-border) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) th,
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) th {
+  border-bottom: 0 !important;
+  background: var(--ofi-d-hover, #232326) !important;
+  color: var(--ofi-d-text-3, #c4c9d2) !important;
+  -webkit-text-fill-color: var(--ofi-d-text-3, #c4c9d2) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) tbody td,
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody td {
+  background: var(--ofi-d-surface) !important;
+  border-bottom-color: var(--ofi-d-border) !important;
+  color: var(--ofi-d-text-2, #e9ebf0) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) td :is(a, button),
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) td :is(a, button) {
+  color: var(--ofi-d-text-3, #c4c9d2) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) td :is(a, button):hover,
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) td :is(a, button):hover {
+  background: var(--ofi-d-hover, #232326) !important;
+  color: var(--ofi-d-text, #ffffff) !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td,
+.dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.06) !important;
 }

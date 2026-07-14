@@ -13,6 +13,7 @@ type TenderCustomerSectionProps = {
     dropdownVisible: boolean;
     customers: CustomerOption[];
     onSelectCustomer: (customer: CustomerOption) => void;
+    onClearCustomer: () => void;
     onAddCustomer: () => void;
 };
 
@@ -25,6 +26,7 @@ export const TenderCustomerSection = ({
     dropdownVisible,
     customers,
     onSelectCustomer,
+    onClearCustomer,
     onAddCustomer,
 }: TenderCustomerSectionProps) => (
     <div className="flex items-start gap-1.5">
@@ -37,8 +39,16 @@ export const TenderCustomerSection = ({
                 onOpenChange(true);
             }}
             onFocus={() => onOpenChange(true)}
+            // Also open on click so a single tap reopens the list even when the
+            // input already holds focus (e.g. right after selecting a customer) —
+            // onFocus alone wouldn't fire again in that case.
+            onClick={() => onOpenChange(true)}
             onBlur={() => window.setTimeout(() => onOpenChange(false), 120)}
             placeholder={loading ?t('tenders.musteriler_loading') :t('tenders.customer_adi_yazin')}
+            // antd's native clear icon (round X) sits pinned at the very end of the
+            // input box, vertically centred; clicking it unlinks the whole customer.
+            allowClear
+            onClear={onClearCustomer}
             // Don't disable on metaSaving: changing an address / date must not
             // make the customer field look like it is reloading. Re-selecting a
             // customer mid-save is still guarded in handleSelectTenderCustomer.
@@ -86,7 +96,7 @@ export const TenderCustomerSection = ({
             onClick={onAddCustomer}
             title={t('crm.customers.newCustomer')}
             aria-label={t('crm.customers.newCustomer')}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#1f2654]"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#1f2654]"
         >
             <Plus size={13} />
         </button>

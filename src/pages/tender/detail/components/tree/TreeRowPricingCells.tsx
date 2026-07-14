@@ -1,10 +1,10 @@
 import type { PositionDto } from '@/types/tender';
 import {
     FIXED_VAT,
-    fmtMoney,
     fmtVatRate,
     type TreeNode,
 } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { t } from '@/i18n/translate';
 
 type TreeRowPricingCellsProps = {
@@ -33,7 +33,9 @@ export const TreeRowPricingCells = ({
     displayTotal,
     updateInlineNumber,
     onInlinePositionChange,
-}: TreeRowPricingCellsProps) => (
+}: TreeRowPricingCellsProps) => {
+    const fmtMoney = useMoneyFormat();
+    return (
     <>
         {/* Qty (read-only) */}
         <td className="px-1.5 py-2 text-right align-top">
@@ -139,4 +141,5 @@ export const TreeRowPricingCells = ({
             ) : <span className="text-slate-300">â€”</span>}
         </td>
     </>
-);
+    );
+};

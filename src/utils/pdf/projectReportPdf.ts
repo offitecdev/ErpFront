@@ -7,12 +7,15 @@ import arialItalicUrl from '../../assets/fonts/ARIALI.ttf?url';
 import defaultLetterheadUrl from '../../assets/docs/sablon.pdf?url';
 import { usePdfSettingsStore, type PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
+import { localizeTenderNumber } from '../tenderNumber';
 
 type ReportKind = 'daily' | 'general';
 
 export interface ProjectGeneralReportOptions {
-    startDate: string;
-    endDate: string;
+    // Optional bounds. The general report is a signed aggregate of ALL field
+    // reports up to now, so these are normally omitted.
+    startDate?: string;
+    endDate?: string;
     preparedBy?: string;
 }
 
@@ -79,7 +82,7 @@ const clean = (value: unknown) => String(value ?? '').trim();
 // Para/sayı biçimi: "11.034,07" (de-DE: nokta binlik, virgül ondalık)
 const numFmt = (value?: number | null) =>
     new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
-const moneyFmt = (value: number | null | undefined, currency: 'CHF' | 'EUR' = 'CHF') => `${currency} ${numFmt(value)}`;
+const moneyFmt = (value: number | null | undefined, currency: string = 'CHF') => `${currency} ${numFmt(value)}`;
 
 // Tablo/imza tarihleri: "18.05.2026"
 const dateFmt = (value?: string | Date | null) => {
@@ -420,7 +423,7 @@ const drawCoverHeader = (
     doc.text(reportNo, boxRight - CELL_PAD - 1, boxY + 5.4, { align: 'right' });
 
     const infoRows: [string, string][] = [
-        ['Kommission:', project.tender?.tenderNumber || project.tenderId || '-'],
+        ['Kommission:', project.tender?.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : (project.tenderId || '-')],
         ['Uygulanma Tarihi:', implDate],
         ['Rapor Tarihi:', reportDateLabel],
         ['Teknisyen:', preparedBy],
@@ -666,7 +669,7 @@ const drawOvertime = (
     reports: any[],
     appointments: any[],
     project: ProjectDto,
-    currency: 'CHF' | 'EUR',
+    currency: string,
     y: number
 ): { y: number; total: number } => {
     y = sectionBar(doc, 'Ek Çalışmalar', y);
@@ -714,7 +717,7 @@ const drawMaterials = (
     doc: jsPDF,
     usedMaterials: any[],
     extraMaterials: any[],
-    currency: 'CHF' | 'EUR',
+    currency: string,
     y: number
 ): { y: number; total: number } => {
     y = sectionBar(doc, 'Kullanılan / Ek Malzemeler', y);
@@ -750,7 +753,7 @@ const drawMaterials = (
 const drawExpenses = (
     doc: jsPDF,
     expenses: any[],
-    currency: 'CHF' | 'EUR',
+    currency: string,
     extraMaterialTotal: number,
     overtimeTotal: number,
     y: number
@@ -884,6 +887,19 @@ const drawApproval = (
         doc.text('İmza:', x + 5, y + topH + 7);
     });
 
+    // Customer signature into the "Müşteri Yetkilisi" cell — the most recent
+    // signed field report in the aggregate.
+    const sig = [...reports].reverse().find((r) => r?.customerSignature)?.customerSignature;
+    if (sig) {
+        try {
+            const s = String(sig);
+            const fmt = s.includes('image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(s, fmt, LEFT + colW + 16, y + topH + 2, colW - 22, boxH - topH - 6, undefined, 'FAST');
+        } catch {
+            /* ignore bad signature data */
+        }
+    }
+
     return y + boxH + 8;
 };
 
@@ -955,19 +971,24 @@ const saveReport = async (
 ) => {
     const settings = usePdfSettingsStore.getState().settings;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    // The general report is a signed aggregate of every field report up to now,
+    // so the range is open-ended (all history) capped at today.
+    const today = new Date().toISOString().slice(0, 10);
+    const genStart = options.startDate;
+    const genEnd = options.endDate || today;
     const firstReportDate = dateKey(reportDate(reports[0]));
     const filteredReports = kind === 'general'
-        ? reportsBetween(reports, options.startDate, options.endDate)
+        ? reportsBetween(reports, genStart, genEnd)
         : reportsBetween(reports, firstReportDate, firstReportDate);
     const filteredReportDate = dateKey(reportDate(filteredReports[0]));
     const appointments = kind === 'general'
-        ? appointmentsBetween(project, options.startDate, options.endDate)
+        ? appointmentsBetween(project, genStart, genEnd)
         : appointmentsBetween(project, filteredReportDate, filteredReportDate);
     const extraMaterials = kind === 'general'
-        ? materialsBetween(project, options.startDate, options.endDate)
+        ? materialsBetween(project, genStart, genEnd)
         : materialsBetween(project, filteredReportDate, filteredReportDate);
     const expenses = kind === 'general'
-        ? expensesBetween(project, options.startDate, options.endDate)
+        ? expensesBetween(project, genStart, genEnd)
         : expensesBetween(project, filteredReportDate, filteredReportDate);
     const usedMaterials = usedMaterialsFromReports(filteredReports);
     const preparedBy = authorName(project, options.preparedBy);
@@ -1010,8 +1031,9 @@ const saveReport = async (
     }
 
     const safeName = clean(project.projectName).replace(/[\\/:*?"<>|]/g, '-').slice(0, 80) || 'proje';
+    const lastReportDate = dateKey(reportDate(filteredReports[filteredReports.length - 1]));
     const suffix = kind === 'general'
-        ? `genel-rapor-${options.startDate}-${options.endDate}`
+        ? `genel-rapor-${lastReportDate || today}`
         : `saha-raporu-${filteredReportDate}`;
     downloadPdf(finalBytes, `${safeName}-${suffix}.pdf`);
 };
@@ -1020,6 +1042,6 @@ export const exportProjectReportPdf = async (project: ProjectDto, report: any) =
     await saveReport(project, [report], 'daily');
 };
 
-export const exportProjectGeneralReportPdf = async (project: ProjectDto, options: ProjectGeneralReportOptions) => {
+export const exportProjectGeneralReportPdf = async (project: ProjectDto, options: ProjectGeneralReportOptions = {}) => {
     await saveReport(project, project.reports || [], 'general', options);
 };

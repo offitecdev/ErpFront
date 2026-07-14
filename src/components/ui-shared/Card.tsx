@@ -2,8 +2,6 @@ import React from 'react';
 import AntCard from 'antd/es/card';
 import { cx } from '../../lib/utils/cx';
 
-import { t } from '@/i18n/translate';
-
 interface CardProps {
     title?: React.ReactNode;
     description?: React.ReactNode;
@@ -28,7 +26,9 @@ export const Card: React.FC<CardProps> = ({
     <AntCard
         data-ui-card
         variant="borderless"
-        className={cx(t('auto.overflow_hidden_rounded_xl_border_border_slate_2'), className)}
+        // Literal card chrome (was a broken auto-i18n key that resolved to garbage
+        // text instead of classes): hairline neutral border + soft shadow.
+        className={cx('overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]', className)}
         styles={{ body: { padding: 0 } }}
     >
         {(title || actions) && (

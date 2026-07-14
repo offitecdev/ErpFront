@@ -3,12 +3,10 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { t } from '@/i18n/translate';
 
 export type SplitablePath =
-    | '/'
     | '/employees'
     | '/attendance-records'
     | '/attendance-settings'
-    | '/roles'
-    | '/crm/customers';
+    | '/roles';
 
 export interface SplitableRoute {
     path: SplitablePath;
@@ -17,12 +15,10 @@ export interface SplitableRoute {
 }
 
 export const SPLITABLE_ROUTES: SplitableRoute[] = [
-    { path: '/', label: 'nav.attendance' },
     { path: '/employees', label: 'nav.employeeList' },
     { path: '/attendance-records', label: 'nav.attendanceRecords', permission: 'attendance.read' },
     { path: '/attendance-settings', label: 'nav.attendanceQR', permission: 'tenants.update' },
     { path: '/roles', label: 'nav.roleManagement' },
-    { path: '/crm/customers', label: 'nav.customerList', permission: 'crm.customers.view' },
 ];
 
 interface SplitViewContextValue {

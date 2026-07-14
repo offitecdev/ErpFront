@@ -1,4 +1,4 @@
-export type ProjectStatus = 'AWAITING_APPROVAL' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+export type ProjectStatus = 'AWAITING_APPROVAL' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'SPECIALLY_CLOSED' | 'CANCELLED';
 export type AppointmentStatus = 'AVAILABLE' | 'BOOKED' | 'COMPLETED' | 'CANCELLED';
 
 export interface ProjectCustomer {
@@ -7,6 +7,9 @@ export interface ProjectCustomer {
     mainEmail?: string | null;
     mainPhone?: string | null;
     address?: string | null;
+    // Preferred correspondence language (TR/EN/DE); field & delivery report PDFs
+    // are rendered in this language regardless of the active UI language.
+    language?: string | null;
 }
 
 export interface ProjectMaterial {
@@ -16,6 +19,8 @@ export interface ProjectMaterial {
     name: string;
     stockQuantity: number;
     unitCost: number;
+    minStockLevel?: number;
+    criticalStockLevel?: number;
     imageUrl?: string | null;
     isActive: boolean;
 }
@@ -56,11 +61,14 @@ export interface ProjectSalesOrder {
     totalAmount: number;
     createdByEmployeeId?: string;
     createdAt: string;
+    // Business date shown to the user; for addon orders this is the original
+    // appointment date the extra work belongs to. Falls back to createdAt when null.
+    orderDate?: string | null;
     updatedAt?: string;
     customer?: ProjectCustomer | null;
     tender?: ProjectDto['tender'];
     parentSalesOrder?: { id: string; orderNumber: string } | null;
-    addonSalesOrders?: Array<{ id: string; orderNumber: string; revisionNumber?: number | null; totalAmount: number; createdAt: string }>;
+    addonSalesOrders?: Array<{ id: string; orderNumber: string; revisionNumber?: number | null; totalAmount: number; createdAt: string; orderDate?: string | null }>;
     createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
 }
 
@@ -115,7 +123,27 @@ export interface ProjectDto {
     expenses?: any[];
     projectVariations?: any[];
     extraMaterials?: any[];
+    addonRequests?: ProjectAddonRequestDto[];
     _count?: { reports: number; expenses: number; projectVariations: number; salesOrders?: number };
+}
+
+export interface ProjectAddonRequestDto {
+    id: string;
+    tenantId: string;
+    projectId: string;
+    salesOrderId?: string | null;
+    appointmentId?: string | null;
+    requestedById: string;
+    requestedByName?: string | null;
+    status: 'PENDING' | 'HANDLED' | 'DISMISSED';
+    note?: string | null;
+    expenseTotal: number;
+    materialTotal: number;
+    overtimeTotal: number;
+    total: number;
+    createdAt: string;
+    resolvedById?: string | null;
+    resolvedAt?: string | null;
 }
 
 export interface MailSettingDto {

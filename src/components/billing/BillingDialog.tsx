@@ -60,6 +60,10 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
     }, [mode, percent, remainingPercent]);
 
     const previewAmount = round2((baseAmount * effectivePercent) / 100);
+    // Cumulative view: what the totals look like once this invoice is added
+    // (e.g. 10% billed + 10% now = 20% billed, remaining balance shrinks accordingly).
+    const afterBilledPercent = Math.min(100, round2((summary?.billedPercent ?? 0) + effectivePercent));
+    const afterRemainingAmount = Math.max(0, round2((summary?.remainingAmount ?? baseAmount) - previewAmount));
     const fullyBilled = remainingPercent <= 0;
     const partialInvalid = mode === 'PARTIAL' && (!Number.isFinite(percent) || percent <= 0 || percent > remainingPercent);
 
@@ -115,11 +119,13 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                         </div>
                         <div>
                             <div className="text-tertiary">{t('billing.billed')}</div>
-                            <div className="mt-0.5 font-semibold text-primary">%{summary?.billedPercent ?? 0}</div>
+                            <div className="mt-0.5 font-semibold text-primary">{fmtMoney(summary?.billedAmount ?? 0)}</div>
+                            <div className="text-[11px] text-tertiary">%{summary?.billedPercent ?? 0}</div>
                         </div>
                         <div>
-                            <div className="text-tertiary">{t('billing.remaining')}</div>
-                            <div className="mt-0.5 font-semibold text-emerald-600">%{remainingPercent}</div>
+                            <div className="text-tertiary">{t('billing.remainingBalance')}</div>
+                            <div className="mt-0.5 font-semibold text-emerald-600">{fmtMoney(summary?.remainingAmount ?? baseAmount)}</div>
+                            <div className="text-[11px] text-emerald-600">%{remainingPercent}</div>
                         </div>
                     </div>
 
@@ -171,9 +177,15 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                                 </Field>
                             )}
 
-                            <div className="flex items-center justify-between rounded-lg border border-[#272f67]/20 bg-[#272f67]/5 px-3 py-2.5">
-                                <span className="text-sm font-medium text-secondary">{t('billing.amountToBill', { percent: effectivePercent })}</span>
-                                <span className="text-base font-semibold text-[#272f67]">{fmtMoney(previewAmount)}</span>
+                            <div className="rounded-lg border border-[#272f67]/20 bg-[#272f67]/5 px-3 py-2.5">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-secondary">{t('billing.amountToBill', { percent: effectivePercent })}</span>
+                                    <span className="text-base font-semibold text-[#272f67]">{fmtMoney(previewAmount)}</span>
+                                </div>
+                                <div className="mt-1.5 flex items-center justify-between border-t border-[#272f67]/10 pt-1.5 text-[12px]">
+                                    <span className="text-tertiary">{t('billing.afterInvoice', { percent: afterBilledPercent })}</span>
+                                    <span className="font-semibold text-amber-600">{t('billing.remainingBalance')}: {fmtMoney(afterRemainingAmount)}</span>
+                                </div>
                             </div>
                         </>
                     )}

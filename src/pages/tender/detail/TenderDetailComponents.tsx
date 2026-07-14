@@ -136,15 +136,12 @@ export const NewArticleModal: React.FC<{
                     </Field>
                 </div>
                 <Field label={t('common.description')} hint={t('tenders.pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor')}>
-                    <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
-                        <RichTextMarkdownEditor
-                            value={form.description}
-                            onChange={(description) => setForm({ ...form, description })}
-                            minHeight={260}
-                            className="border-0"
-                            placeholder={t('tenders.orn_10_bakim_seti_10_lecksuchspray_10_reinigungs')}
-                        />
-                    </div>
+                    <RichTextMarkdownEditor
+                        value={form.description}
+                        onChange={(description) => setForm({ ...form, description })}
+                        minHeight={260}
+                        placeholder={t('tenders.orn_10_bakim_seti_10_lecksuchspray_10_reinigungs')}
+                    />
                 </Field>
             </div>
 

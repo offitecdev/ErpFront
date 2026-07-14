@@ -24,6 +24,7 @@ import { billingApi, myOrdersApi } from '../../lib/api/billing';
 import { buildProjectFlows, type FlowSources, type ProjectFlow as ProjectFlowData, type StageState, type OrderFlow } from '../../lib/projectFlow';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const STATE_VARIANT: Record<StageState, 'warning' | 'info' | 'active'> = {
     pending: 'warning',
@@ -62,7 +63,7 @@ const StageCell = ({ label, state, pendingLabel }: { label: string; state: Stage
 const OrderRow = ({ order }: { order: OrderFlow }) => (
     <div className="rounded-lg border border-slate-200 bg-slate-50/40 p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</div>
+            <div className="font-mono text-[12.5px] font-semibold text-slate-800">{localizeTenderNumbersInText(order.orderNumber)}</div>
             {order.billing === 'completed' && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#059669]">
                     <CheckCircle size={13} /> {t('projects.flow.stateCompleted')}
@@ -92,7 +93,7 @@ const ProjectFlowCard = ({ flow, onChanged }: { flow: ProjectFlowData; onChanged
                 <span className="text-slate-400">{open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</span>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        <span className="truncate text-[14px] font-semibold text-slate-900">{project.projectName}</span>
+                        <span className="truncate text-[14px] font-semibold text-slate-900">{localizeTenderNumbersInText(project.projectName)}</span>
                         {flow.readyForBilling && (
                             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#059669]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[#059669]">
                                 <CheckCircle size={11} /> {t('projects.flow.readyTitle')}

@@ -1,5 +1,5 @@
 import { apiClient } from '../axios';
-import type { AppointmentDto, MailSettingDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
+import type { AppointmentDto, MailSettingDto, ProjectAddonRequestDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
 import type { PersonLite } from '../../types/maintenance';
 
 export type SalesOrderMode = 'PROJECT_NEW' | 'PROJECT_EXISTING' | 'PROJECT_ADDON' | 'INVOICE';
@@ -42,6 +42,7 @@ export interface ServiceReportDto {
     overtimeCost: number;
     operationsDone: string;
     technicalNotes?: string | null;
+    customerSignature?: string | null;
     isSigned: boolean;
     hoursApprovedAt?: string | null;
     autoApproved?: boolean;
@@ -102,6 +103,12 @@ export const projectApi = {
         return res.data;
     },
 
+    // Admin/manager-facing: delete a project sales order. The backend guards this —
+    // main orders with addons or any invoiced order are rejected.
+    deleteSalesOrder: async (projectId: string, salesOrderId: string): Promise<void> => {
+        await apiClient.delete(`/projects/${projectId}/sales-orders/${salesOrderId}`);
+    },
+
     createAddonOrder: async (id: string, input: { parentSalesOrderId: string }) => {
         const res = await apiClient.post(`/projects/${id}/addon-orders`, input);
         return res.data as {
@@ -109,6 +116,23 @@ export const projectApi = {
             salesOrder: SalesOrderDto;
             totals: { expenses: number; extraMaterials: number; overtime: number; total: number };
         };
+    },
+
+    // Technician-facing: request that the manager create an addon order from the
+    // extra work accrued on a parent order (technicians cannot create it directly).
+    requestAddonOrder: async (id: string, input: { salesOrderId?: string | null; appointmentId?: string | null; note?: string } = {}) => {
+        const res = await apiClient.post(`/projects/${id}/addon-order-requests`, input);
+        return res.data as {
+            message: string;
+            addonRequest: ProjectAddonRequestDto;
+            totals: { expenseTotal: number; materialTotal: number; overtimeTotal: number; total: number };
+        };
+    },
+
+    // Manager-facing: mark a technician addon request as HANDLED or DISMISSED.
+    resolveAddonRequest: async (requestId: string, status: 'HANDLED' | 'DISMISSED' | 'PENDING') => {
+        const res = await apiClient.patch(`/projects/addon-order-requests/${requestId}`, { status });
+        return res.data as { message: string; addonRequest: ProjectAddonRequestDto };
     },
 
     update: async (id: string, patch: Partial<ProjectDto>): Promise<ProjectDto> => {
@@ -121,12 +145,12 @@ export const projectApi = {
         return res.data;
     },
 
-    addReport: async (id: string, input: { salesOrderId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string; images?: string[] }) => {
+    addReport: async (id: string, input: { salesOrderId?: string | null; appointmentId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string; images?: string[] }) => {
         const res = await apiClient.post(`/projects/${id}/reports`, input);
         return res.data;
     },
 
-    updateReport: async (reportId: string, input: { salesOrderId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string; images?: string[] }) => {
+    updateReport: async (reportId: string, input: { salesOrderId?: string | null; appointmentId?: string | null; workDate: string; startedAt: string; endedAt: string; operationsDone: string; technicalNotes?: string; images?: string[] }) => {
         const res = await apiClient.patch(`/projects/reports/${reportId}`, input);
         return res.data;
     },
@@ -161,14 +185,29 @@ export const projectApi = {
         return res.data;
     },
 
-    listMyInstallations: async (start: string, end: string): Promise<AppointmentDto[]> => {
-        const res = await apiClient.get('/projects/technician/installations', { params: { start, end } });
+    // `calendar: true` asks the backend for the trimmed grid payload (no report /
+    // material / tender trees); the popup then fetches full detail on click via
+    // getMyInstallationDetail. Other callers omit it and keep the rich payload.
+    listMyInstallations: async (start: string, end: string, opts: { calendar?: boolean } = {}): Promise<AppointmentDto[]> => {
+        const res = await apiClient.get('/projects/technician/installations', { params: { start, end, ...(opts.calendar ? { view: 'calendar' } : {}) } });
         return res.data;
     },
 
     // Manager-facing: every order appointment in the tenant for the range.
-    listAppointments: async (start: string, end: string): Promise<AppointmentDto[]> => {
-        const res = await apiClient.get('/projects/appointments', { params: { start, end } });
+    listAppointments: async (start: string, end: string, opts: { calendar?: boolean } = {}): Promise<AppointmentDto[]> => {
+        const res = await apiClient.get('/projects/appointments', { params: { start, end, ...(opts.calendar ? { view: 'calendar' } : {}) } });
+        return res.data;
+    },
+
+    // Lazy calendar-popup detail for a single order appointment (manager scope).
+    getAppointmentDetail: async (appointmentId: string): Promise<AppointmentDto> => {
+        const res = await apiClient.get(`/projects/appointments/${appointmentId}/detail`);
+        return res.data;
+    },
+
+    // Lazy calendar-popup detail for a single order appointment (technician scope).
+    getMyInstallationDetail: async (appointmentId: string): Promise<AppointmentDto> => {
+        const res = await apiClient.get(`/projects/technician/installations/${appointmentId}/detail`);
         return res.data;
     },
 
@@ -244,12 +283,12 @@ export const projectApi = {
         }
     },
 
-    createMaterial: async (input: { name: string; serialId: string; unitCost: number; stockQuantity: number; imageUrl?: string | null }): Promise<ProjectMaterial> => {
+    createMaterial: async (input: { name: string; serialId: string; unitCost: number; stockQuantity: number; minStockLevel?: number; criticalStockLevel?: number; imageUrl?: string | null }): Promise<ProjectMaterial> => {
         const res = await apiClient.post('/inventory/materials', input);
         return res.data;
     },
 
-    updateMaterial: async (id: string, input: Partial<Pick<ProjectMaterial, 'name' | 'serialId' | 'unitCost' | 'stockQuantity' | 'imageUrl' | 'isActive'>>): Promise<ProjectMaterial> => {
+    updateMaterial: async (id: string, input: Partial<Pick<ProjectMaterial, 'name' | 'serialId' | 'unitCost' | 'stockQuantity' | 'minStockLevel' | 'criticalStockLevel' | 'imageUrl' | 'isActive'>>): Promise<ProjectMaterial> => {
         const res = await apiClient.patch(`/inventory/materials/${id}`, input);
         return res.data;
     },
@@ -264,8 +303,16 @@ export const projectApi = {
     },
 };
 
+export interface PublicBookingResponse {
+    /** 'book' = customer still picks an available slot; 'scheduled' = installations already planned (read-only view). */
+    mode: 'book' | 'scheduled';
+    projectName: string;
+    availableSlots: AppointmentDto[];
+    scheduledAppointments: AppointmentDto[];
+}
+
 export const bookingApi = {
-    getSlots: async (token: string, startDate: string, endDate: string): Promise<{ projectName: string; availableSlots: AppointmentDto[] }> => {
+    getSlots: async (token: string, startDate: string, endDate: string): Promise<PublicBookingResponse> => {
         const res = await apiClient.get(`/booking/slots?token=${encodeURIComponent(token)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
         return res.data;
     },

@@ -84,6 +84,8 @@ interface TenderState {
 
 let stockArticlesRequest: Promise<void> | null = null;
 let stockArticlesRequestHasImages = false;
+let detailRequestId: string | null = null;
+let detailRequest: Promise<void> | null = null;
 
 export const useTenderStore = create<TenderState>((set, get) => ({
     list: [],
@@ -126,14 +128,22 @@ export const useTenderStore = create<TenderState>((set, get) => ({
     detail: null,
     loadingDetail: false,
     fetchDetail: async (id, silent = false) => {
+        if (detailRequestId === id && detailRequest) return detailRequest;
         if (!silent) set({ loadingDetail: true });
         try {
             // Image-less load. Product/line images are no longer embedded in the
             // tender detail (they were several MB of base64 and only ever needed
             // for the PDF) — they are fetched on demand at PDF-generation time.
-            const detail = await tenderApi.getById(id, { includeImages: false });
-            set({ detail });
+            detailRequestId = id;
+            detailRequest = tenderApi.getById(id, { includeImages: false }).then((detail) => {
+                set({ detail });
+            });
+            await detailRequest;
         } finally {
+            if (detailRequestId === id) {
+                detailRequestId = null;
+                detailRequest = null;
+            }
             if (!silent) set({ loadingDetail: false });
         }
     },

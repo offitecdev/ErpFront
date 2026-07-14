@@ -12,6 +12,7 @@ import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { articleApi } from '@/lib/api/inventory';
 import { t } from '@/i18n/translate';
 import type { ArticleStatus, InventoryArticle } from '@/types/inventory';
+import { richTextToHtml } from '@/pages/tender/detail/TenderRichText';
 
 // A single, reusable "quick view" for a product. Opened by the tag icon in the
 // product lists (inventory list + tender picker). It is the one list-side place
@@ -131,7 +132,10 @@ export const ProductQuickViewModal = ({ articleId, onClose }: ProductQuickViewMo
                                 <div className="mb-1 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
                                     <Package size={12} />{t('common.description')}
                                 </div>
-                                <div className="whitespace-pre-wrap leading-5 text-slate-700">{article.description}</div>
+                                <div
+                                    className="leading-5 text-slate-700 [&_h1]:my-1 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:my-1 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:my-1 [&_h3]:text-base [&_h3]:font-semibold [&_h4]:my-1 [&_h4]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                                    dangerouslySetInnerHTML={{ __html: richTextToHtml(article.description) }}
+                                />
                             </div>
                         )}
                     </div>

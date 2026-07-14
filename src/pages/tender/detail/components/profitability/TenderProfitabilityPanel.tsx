@@ -8,9 +8,10 @@ import {
 import { Card } from '@/components/ui-shared/Card';
 import { t } from '@/i18n/translate';
 
-import { fmtMoney } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import type { SimpleTenderLine } from '../../types/tenderDetail.types';
 import { plainTextPreview } from '../../utils/tenderLine.utils';
+import { AutoFitAmount } from '../common/AutoFitAmount';
 
 export type TenderProfitabilityRow = SimpleTenderLine & {
     unitCost: number;
@@ -51,6 +52,7 @@ export const TenderProfitabilityPanel = ({
     selectedId,
     onSelectRow,
 }: TenderProfitabilityPanelProps) => {
+    const fmtMoney = useMoneyFormat();
     if (!open) {
         return (
             <div className="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-3 2xl:flex-col 2xl:justify-start">
@@ -100,9 +102,11 @@ export const TenderProfitabilityPanel = ({
                         <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
                             {t('tenders.profit')}
                         </div>
-                        <div className={`mt-1 font-mono text-[22px] font-semibold leading-none tracking-tight ${isProfit ? 'text-emerald-700' : 'text-rose-600'}`}>
-                            {fmtMoney(result)}
-                        </div>
+                        <AutoFitAmount
+                            value={fmtMoney(result)}
+                            basePx={22}
+                            className={`mt-1 font-mono font-semibold leading-none tracking-tight ${isProfit ? 'text-emerald-700' : 'text-rose-600'}`}
+                        />
                     </div>
                     <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold tabular-nums ring-1 ring-inset ${isProfit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-rose-50 text-rose-600 ring-rose-200/70'}`}>
                         {isProfit ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
@@ -124,12 +128,12 @@ export const TenderProfitabilityPanel = ({
             <div className="grid grid-cols-2 gap-2.5">
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.sales')}</div>
-                    <div className="mt-1.5 font-mono text-[16px] font-semibold text-slate-900">{fmtMoney(revenue)}</div>
+                    <AutoFitAmount value={fmtMoney(revenue)} basePx={16} className="mt-1.5 font-mono font-semibold text-slate-900" />
                     <div className="mt-0.5 text-[10px] text-slate-400">{t('tenders.kdv_haric')}</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.cost')}</div>
-                    <div className="mt-1.5 font-mono text-[16px] font-semibold text-slate-900">{fmtMoney(cost)}</div>
+                    <AutoFitAmount value={fmtMoney(cost)} basePx={16} className="mt-1.5 font-mono font-semibold text-slate-900" />
                     <div className="mt-0.5 text-[10px] text-slate-400">{costShare.toFixed(0)}%</div>
                 </div>
             </div>
@@ -147,17 +151,15 @@ export const TenderProfitabilityPanel = ({
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                         <div className="rounded-lg bg-slate-50 py-1.5">
                             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.sales')}</div>
-                            <div className="mt-0.5 font-mono text-[12.5px] font-semibold text-slate-800">{fmtMoney(selectedLine.revenue)}</div>
+                            <AutoFitAmount value={fmtMoney(selectedLine.revenue)} basePx={12.5} className="mt-0.5 text-center font-mono font-semibold text-slate-800" />
                         </div>
                         <div className="rounded-lg bg-slate-50 py-1.5">
                             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.cost')}</div>
-                            <div className="mt-0.5 font-mono text-[12.5px] font-semibold text-slate-800">{fmtMoney(selectedLine.cost)}</div>
+                            <AutoFitAmount value={fmtMoney(selectedLine.cost)} basePx={12.5} className="mt-0.5 text-center font-mono font-semibold text-slate-800" />
                         </div>
                         <div className={`rounded-lg py-1.5 ${selectedLine.result >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
                             <div className={`text-[10px] font-semibold uppercase tracking-wider ${selectedLine.result >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{t('tenders.profit')}</div>
-                            <div className={`mt-0.5 font-mono text-[12.5px] font-semibold ${selectedLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                                {fmtMoney(selectedLine.result)}
-                            </div>
+                            <AutoFitAmount value={fmtMoney(selectedLine.result)} basePx={12.5} className={`mt-0.5 text-center font-mono font-semibold ${selectedLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`} />
                             <div className={`text-[10px] font-semibold ${selectedLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{selectedLine.resultRate.toFixed(1)}%</div>
                         </div>
                     </div>
@@ -208,9 +210,9 @@ export const TenderProfitabilityPanel = ({
                                         <span className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                                             <span className={`block h-full rounded-full ${rowProfit ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${rowMargin}%` }} />
                                         </span>
-                                        <span className="mt-1 flex items-center justify-between text-[10.5px] text-slate-400">
-                                            <span className="tabular-nums">{fmtMoney(row.revenue)}</span>
-                                            <span className={`font-mono font-semibold ${rowProfit ? 'text-emerald-700' : 'text-rose-700'}`}>{fmtMoney(row.result)}</span>
+                                        <span className="mt-1 flex items-center justify-between gap-2 text-[10.5px] text-slate-400">
+                                            <AutoFitAmount value={fmtMoney(row.revenue)} basePx={10.5} className="tabular-nums" />
+                                            <AutoFitAmount value={fmtMoney(row.result)} basePx={10.5} className={`text-right font-mono font-semibold ${rowProfit ? 'text-emerald-700' : 'text-rose-700'}`} />
                                         </span>
                                     </span>
                                 </button>

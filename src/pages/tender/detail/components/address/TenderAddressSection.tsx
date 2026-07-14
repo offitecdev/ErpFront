@@ -100,14 +100,17 @@ type TenderBillingAddressRowProps = {
     sameAsInstallation: boolean;
     onSameAsInstallationChange: (checked: boolean) => void;
     billingPicker: ReactNode;
+    // Tracks the active address type so the checkbox reads "Wie Projektadresse"
+    // or "Wie Lieferadresse" — matching the toggle above, not a fixed label.
+    label: string;
 };
 
-// "Billing same as installation": when on, billing mirrors the installation
+// "Billing same as installation": when on, billing mirrors the project/delivery
 // address and its own picker is hidden (no duplicate entry).
-export const TenderBillingAddressRow = ({ sameAsInstallation, onSameAsInstallationChange, billingPicker }: TenderBillingAddressRowProps) => (
+export const TenderBillingAddressRow = ({ sameAsInstallation, onSameAsInstallationChange, billingPicker, label }: TenderBillingAddressRowProps) => (
     <div className="space-y-1.5">
         <Checkbox
-            label={t('crm.sameAsInstallation')}
+            label={label}
             size="sm"
             isSelected={sameAsInstallation}
             onChange={onSameAsInstallationChange}

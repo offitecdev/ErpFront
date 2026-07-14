@@ -159,9 +159,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     },
 
     scanMovement: async (input) => {
+        // Hareketi kaydet ve dön. Tüm tenant'ı yeniden çeken ağır dashboard (depo
+        // lokasyonları dahil) + articles-summary yenilemeleri KALDIRILDI; hareket
+        // ekranı yalnızca ilgili ürünün yalın stok bilgisini (getArticleStock) çeker.
         const res = await inventoryApi.scanMovement(input);
-        await get().fetchDashboard();
-        await get().fetchArticlesSummary();
         return res.data;
     },
 }));

@@ -120,8 +120,10 @@ export const maintenanceApi = {
         return res.data;
     },
 
-    listTasks: async (start: string, end: string): Promise<MaintenanceTaskDto[]> => {
-        const res = await apiClient.get('/maintenance/tasks', { params: { start, end } });
+    // `calendar: true` requests the trimmed grid payload (no report / material
+    // trees); the popup fetches full detail on click via getTaskDetail.
+    listTasks: async (start: string, end: string, opts: { calendar?: boolean } = {}): Promise<MaintenanceTaskDto[]> => {
+        const res = await apiClient.get('/maintenance/tasks', { params: { start, end, ...(opts.calendar ? { view: 'calendar' } : {}) } });
         return res.data;
     },
 
@@ -130,13 +132,25 @@ export const maintenanceApi = {
         return res.data;
     },
 
-    listMyTasks: async (start: string, end: string): Promise<MaintenanceTaskDto[]> => {
-        const res = await apiClient.get('/maintenance/technician/tasks', { params: { start, end } });
+    // Lazy calendar-popup detail for a single task (manager scope).
+    getTaskDetail: async (taskId: string): Promise<MaintenanceTaskDto> => {
+        const res = await apiClient.get(`/maintenance/tasks/${taskId}/detail`);
+        return res.data;
+    },
+
+    listMyTasks: async (start: string, end: string, opts: { calendar?: boolean } = {}): Promise<MaintenanceTaskDto[]> => {
+        const res = await apiClient.get('/maintenance/technician/tasks', { params: { start, end, ...(opts.calendar ? { view: 'calendar' } : {}) } });
         return res.data;
     },
 
     getMyTask: async (taskId: string): Promise<MaintenanceTaskDto> => {
         const res = await apiClient.get(`/maintenance/technician/tasks/${taskId}`);
+        return res.data;
+    },
+
+    // Lazy calendar-popup detail for a single task (technician scope).
+    getMyTaskDetail: async (taskId: string): Promise<MaintenanceTaskDto> => {
+        const res = await apiClient.get(`/maintenance/technician/tasks/${taskId}/detail`);
         return res.data;
     },
 

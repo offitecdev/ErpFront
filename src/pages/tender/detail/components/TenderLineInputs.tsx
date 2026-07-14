@@ -93,6 +93,12 @@ BufferedTextInput.displayName = 'BufferedTextInput';
 const toNumberDraft = (value: number | null | undefined) =>
     value != null && Number(value) > 0 ? Number(value) : null;
 
+// When auto-fit is on, wait this long after the last keystroke before resizing —
+// so the font stays put while typing and only settles once the user pauses.
+const AUTOFIT_DEBOUNCE_MS = 300;
+const AUTOFIT_BASE_PX = 11.5;
+const AUTOFIT_MIN_PX = 9;
+
 export const BufferedNumberInput = memo(({
     ariaLabel,
     value,
@@ -105,6 +111,7 @@ export const BufferedNumberInput = memo(({
     navCol,
     registerCell,
     onArrowNav,
+    autoFit = false,
 }: {
     ariaLabel: string;
     value: number | null | undefined;
@@ -112,13 +119,39 @@ export const BufferedNumberInput = memo(({
     className: string;
     field: NumberField;
     commit: (positionId: string, field: NumberField, value: number) => void;
+    // Shrink the font a notch (down to AUTOFIT_MIN_PX) so a long figure fits the
+    // cell once the user stops typing; native input scroll covers the overflow
+    // past the floor. Used for the unit-price field where a wide amount is common.
+    autoFit?: boolean;
 } & InlineCellNavProps) => {
     const [draft, setDraft] = useState<number | null>(() => toNumberDraft(value));
+    const [autoFitPx, setAutoFitPx] = useState<number | null>(null);
     const focusedRef = useRef(false);
     const skipCommitRef = useRef(false);
     // antd's InputNumber ref exposes { focus, blur, nativeElement }; typed loosely
     // so we can reach the underlying <input> for select-all on keyboard navigation.
     const inputRef = useRef<any>(null);
+
+    // After the user pauses, measure the real text overflow and step the font
+    // down just enough to fit — the CSS var below then persists the size across
+    // antd re-renders.
+    useEffect(() => {
+        if (!autoFit) return;
+        const timer = window.setTimeout(() => {
+            const inputEl = inputRef.current?.nativeElement?.querySelector?.('input') as HTMLInputElement | null;
+            if (!inputEl) return;
+            const restore = inputEl.style.fontSize;
+            let px = AUTOFIT_BASE_PX;
+            inputEl.style.fontSize = `${px}px`;
+            while (px > AUTOFIT_MIN_PX && inputEl.scrollWidth > inputEl.clientWidth + 1) {
+                px -= 0.5;
+                inputEl.style.fontSize = `${px}px`;
+            }
+            inputEl.style.fontSize = restore;
+            setAutoFitPx(px);
+        }, AUTOFIT_DEBOUNCE_MS);
+        return () => window.clearTimeout(timer);
+    }, [draft, autoFit]);
 
     useEffect(() => {
         if (!focusedRef.current) setDraft(toNumberDraft(value));
@@ -180,8 +213,12 @@ export const BufferedNumberInput = memo(({
                 }
             }}
             onClick={(event) => event.stopPropagation()}
-            className={className}
-            style={{ width: '100%', fontFamily: INLINE_INPUT_FONT_FAMILY }}
+            className={autoFit && autoFitPx != null ? `${className} [&_.ant-input-number-input]:!text-[length:var(--fit-fs)]` : className}
+            style={{
+                width: '100%',
+                fontFamily: INLINE_INPUT_FONT_FAMILY,
+                ...(autoFit && autoFitPx != null ? { ['--fit-fs' as string]: `${autoFitPx}px` } : {}),
+            }}
             parser={(displayValue) => {
                 const normalized = String(displayValue ?? '').replace(/'/g, '').replace(',', '.');
                 const parsed = Number(normalized);
@@ -211,7 +248,7 @@ export const InlineDescriptionEditor = memo(({
         minHeight={minHeight}
         variant="inline"
         placeholder=""
-        className="w-full rounded-lg border-slate-200 bg-white px-2 py-1 focus-within:border-[#1f2654] focus-within:ring-2 focus-within:ring-[#1f2654]/10"
+        className="w-full"
     />
 ));
 InlineDescriptionEditor.displayName = 'InlineDescriptionEditor';

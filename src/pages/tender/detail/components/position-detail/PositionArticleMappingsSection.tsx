@@ -10,12 +10,12 @@ import { Field, Input, Select } from '../../../../../components/ui-shared/Field'
 import type { ArticleStockSummary } from '../../../../../types/inventory';
 import {
     FIXED_VAT,
-    fmtMoney,
     fmtNumber,
     fmtVatRate,
     lineTotalWithTax,
     type TreeNode,
 } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { t } from '@/i18n/translate';
 import { getArticlePrice } from '../../utils/positionDetail.utils';
 
@@ -71,7 +71,9 @@ export const PositionArticleMappingsSection: React.FC<{
     onMapArticle,
     onSelectArticleMapping,
     renderLong,
-}) => (
+}) => {
+    const fmtMoney = useMoneyFormat();
+    return (
     <>
         <div className="text-[11.5px] text-slate-500 leading-relaxed">{t('tenders.stock_urunden_tender_line_create_burada')}</div>
 
@@ -255,4 +257,5 @@ export const PositionArticleMappingsSection: React.FC<{
             >{t('tenders.product_add')}</Button>
         </div>
     </>
-);
+    );
+};

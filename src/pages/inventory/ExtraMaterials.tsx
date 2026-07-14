@@ -1,8 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     ArrowLeft,
-    BarChart03,
     ChevronLeft,
     ChevronRight,
     Image01 as ImageIcon,
@@ -27,9 +26,9 @@ import type { ProjectMaterial } from '../../types/project';
 
 import { t } from '@/i18n/translate';
 
-const BRAND = '#272f67';
-
 type MaterialForm = Pick<ProjectMaterial, 'name' | 'serialId' | 'stockQuantity' | 'unitCost'> & {
+    minStockLevel: number;
+    criticalStockLevel: number;
     imageUrl?: string | null;
 };
 
@@ -44,6 +43,8 @@ const emptyMaterial = (): MaterialForm => ({
     serialId: `MAT-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
     stockQuantity: 0,
     unitCost: 0,
+    minStockLevel: 0,
+    criticalStockLevel: 0,
     imageUrl: '',
 });
 
@@ -63,7 +64,6 @@ export const ExtraMaterials = () => {
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
-    const [avgInfoOpen, setAvgInfoOpen] = useState(false);
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
 
@@ -105,58 +105,10 @@ export const ExtraMaterials = () => {
     const rangeFrom = filtered.length === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
     const rangeTo = Math.min(pageSafe * PAGE_SIZE, filtered.length);
 
-    const listRef = useRef<HTMLDivElement>(null);
-    const [listHeight, setListHeight] = useState(0);
-    useLayoutEffect(() => {
-        const el = listRef.current;
-        if (!el) return;
-        const recompute = () => {
-            const top = el.getBoundingClientRect().top;
-            setListHeight(Math.max(240, window.innerHeight - top - 24));
-        };
-        recompute();
-        window.addEventListener('resize', recompute);
-        return () => window.removeEventListener('resize', recompute);
-    }, []);
-
-    const stats = useMemo(() => {
-        const priced = materials.filter((m) => Number(m.unitCost || 0) > 0);
-        const avgPrice = priced.length ? priced.reduce((s, m) => s + Number(m.unitCost || 0), 0) / priced.length : 0;
-        return { total: materials.length, avgPrice, pricedCount: priced.length };
-    }, [materials]);
-
     return (
         <div>
-            <StockModuleHeader
-                label="Stock › Materials"
-                actions={
-                    <>
-                        <Button
-                            variant="secondary"
-                            icon={<BarChart03 size={14} />}
-                            onClick={() => setAvgInfoOpen(true)}
-                            aria-label="Details"
-                            title="Details"
-                            className="!h-8 !w-8 !px-0"
-                        />
-                        {canManage && (
-                            <Button variant="primary" icon={<PackagePlus size={13} />} onClick={() => navigate('/inventory/extra-materials/new')}>{t('auto.yeni_malzeme')}</Button>
-                        )}
-                    </>
-                }
-            />
-
-            {avgInfoOpen && (
-                <AverageSalesPriceInfoModal
-                    pricedCount={stats.pricedCount}
-                    total={stats.total}
-                    avgPrice={stats.avgPrice}
-                    onClose={() => setAvgInfoOpen(false)}
-                />
-            )}
-
             <Card className="border-0 rounded-none" noPadding>
-                <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/60">
+                <div className="shrink-0 overflow-x-auto pb-2">
                     <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
                         <div className="flex shrink-0 items-center gap-2 pr-1">
                             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
@@ -222,15 +174,22 @@ export const ExtraMaterials = () => {
                                     <ChevronRight size={14} />
                                 </button>
                             </div>
+                            {canManage && (
+                                <Button
+                                    variant="primary"
+                                    size="lg"
+                                    icon={<PackagePlus size={16} />}
+                                    onClick={() => navigate('/inventory/extra-materials/new')}
+                                    className="!h-9 !px-4 !text-[13px] !font-semibold"
+                                >
+                                    {t('auto.yeni_malzeme')}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div
-                    ref={listRef}
-                    style={{ height: listHeight || undefined }}
-                    className="overflow-auto bg-white"
-                >
+                <div className="bg-white">
                     <table className="min-w-[980px] w-full table-fixed text-[12.5px]">
                         <colgroup>
                             <col style={{ width: 64 }} />
@@ -321,70 +280,6 @@ export const ExtraMaterials = () => {
     );
 };
 
-const AverageSalesPriceInfoModal = ({
-    pricedCount,
-    total,
-    avgPrice,
-    onClose,
-}: {
-    pricedCount: number;
-    total: number;
-    avgPrice: number;
-    onClose: () => void;
-}) => (
-    <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-        onClick={onClose}
-        role="presentation"
-    >
-        <div
-            className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-        >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                <div>
-                    <h2 className="text-[20px] font-semibold tracking-tight" style={{ color: BRAND }}>
-                        Average Sales Price
-                    </h2>
-                    <p className="mt-1 text-[13px] text-slate-500">How this figure is calculated</p>
-                </div>
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                    aria-label="Close"
-                >
-                    <X size={26} />
-                </button>
-            </div>
-
-            <div className="space-y-4 overflow-y-auto px-6 py-5 text-[13.5px] leading-relaxed text-slate-700">
-                <p>
-                    The <span className="font-semibold">Average Sales Price</span> is the mean sales price across all
-                    materials that have a price set. Materials without a price (0) are excluded so they do not drag the
-                    average down.
-                </p>
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-3 font-mono text-[13px] text-slate-700">
-                    Average = Σ (sales price of priced materials) ÷ (number of priced materials)
-                </div>
-                <ul className="space-y-1.5">
-                    <li className="flex justify-between gap-4 border-b border-slate-100 pb-1.5">
-                        <span className="text-slate-500">Materials with a price</span>
-                        <span className="font-mono font-semibold text-slate-800">{pricedCount} / {total}</span>
-                    </li>
-                    <li className="flex justify-between gap-4">
-                        <span className="text-slate-500">Current average sales price</span>
-                        <span className="font-mono font-semibold" style={{ color: BRAND }}>{fmtMoney(avgPrice)}</span>
-                    </li>
-                </ul>
-                <p className="text-[12.5px] text-slate-400">
-                    Tip: add a sales price to every material to keep this average accurate.
-                </p>
-            </div>
-        </div>
-    </div>
-);
-
 export const ExtraMaterialCreate = () => <ExtraMaterialFormPage mode="create" />;
 
 export const ExtraMaterialEdit = () => <ExtraMaterialFormPage mode="edit" />;
@@ -430,6 +325,8 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
                         serialId: material.serialId,
                         stockQuantity: material.stockQuantity,
                         unitCost: material.unitCost,
+                        minStockLevel: material.minStockLevel ?? 0,
+                        criticalStockLevel: material.criticalStockLevel ?? 0,
                         imageUrl: material.imageUrl || '',
                     };
                     setForm(next);
@@ -450,6 +347,8 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
         serialId: value.serialId || '',
         stockQuantity: Number(value.stockQuantity || 0),
         unitCost: Number(value.unitCost || 0),
+        minStockLevel: Number(value.minStockLevel || 0),
+        criticalStockLevel: Number(value.criticalStockLevel || 0),
         imageUrl: value.imageUrl || '',
     });
     const isDirty = initialForm ? normalizeForm(form) !== normalizeForm(initialForm) : false;
@@ -469,6 +368,7 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
         if (!form.name.trim()) return toast.error(t('auto.malzeme_adi_zorunludur'));
         if (!form.serialId.trim()) return toast.error(t('auto.kod_zorunludur'));
         if (form.stockQuantity < 0 || form.unitCost < 0) return toast.error(t('auto.miktar_ve_fiyat_negatif_olamaz'));
+        if (form.minStockLevel < 0 || form.criticalStockLevel < 0) return toast.error('Minimum ve kritik seviye negatif olamaz.');
 
         setSaving(true);
         try {
@@ -506,7 +406,7 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
     return (
         <div>
             <StockModuleHeader
-                label="Stock › Materials"
+                label=""
                 actions={
                     <>
                         <Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/inventory/extra-materials')}>{t('auto.listeye_don')}</Button>
@@ -579,6 +479,23 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
                             <MaterialInfoRow label={'Satış Fiyatı'}>
                                 <div className="max-w-[150px]">
                                     <Input size="sm" className={materialInputClass} type="number" min={0} value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) || 0 })} />
+                                </div>
+                            </MaterialInfoRow>
+                        </div>
+                    </section>
+
+                    <section className="rounded-md border border-slate-200 bg-white p-3 shadow-xs">
+                        <div className="mb-3 text-[11px] font-semibold uppercase text-slate-500">Stok Seviyeleri</div>
+                        <div className="max-w-lg space-y-2">
+                            {/* Tedarik Talepleri ekranı bu eşiklere göre minimum/kritik listeler üretir. */}
+                            <MaterialInfoRow label="Minimum Seviye">
+                                <div className="max-w-[150px]">
+                                    <Input size="sm" className={materialInputClass} type="number" min={0} value={form.minStockLevel} onChange={(e) => setForm({ ...form, minStockLevel: Number(e.target.value) || 0 })} />
+                                </div>
+                            </MaterialInfoRow>
+                            <MaterialInfoRow label="Kritik Seviye">
+                                <div className="max-w-[150px]">
+                                    <Input size="sm" className={materialInputClass} type="number" min={0} value={form.criticalStockLevel} onChange={(e) => setForm({ ...form, criticalStockLevel: Number(e.target.value) || 0 })} />
                                 </div>
                             </MaterialInfoRow>
                         </div>

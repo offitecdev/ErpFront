@@ -3,6 +3,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumber } from '@/utils/tenderNumber';
 
 import { projectApi, type SalesOrderMode } from '../../../../lib/api/project';
 import type { ProjectDto } from '../../../../types/project';
@@ -14,6 +15,31 @@ type UseTenderOrderDecisionParams = {
     overtimeHourlyRate: number;
     fetchDetail: (id: string, silent?: boolean) => Promise<void>;
     navigate: NavigateFunction;
+    // Flushes all staged line/meta edits (the top-bar Save); Approve and the
+    // order flows call this automatically instead of demanding a manual save.
+    saveAll: () => Promise<boolean>;
+};
+
+// An order requires the quote's single project/delivery address (EITHER the
+// Projektadresse or the Lieferadresse — one of the two, never both) and the
+// billing address. Shows a toast naming whichever is missing and returns false
+// so the caller can bail out. When "same as installation" is on, billing
+// mirrors that active address.
+const hasRequiredAddresses = (tender: TenderListItem): boolean => {
+    const installation = String((tender as any).installationAddress ?? '').trim();
+    const delivery = String((tender as any).deliveryAddress ?? '').trim();
+    const active = installation || delivery;
+    const sameAsInstallation = !!(tender as any).billingSameAsInstallation;
+    const billing = sameAsInstallation ? active : String((tender as any).billingAddress ?? '').trim();
+    if (!active) {
+        toast.error(t('tenders.installation_address_required'));
+        return false;
+    }
+    if (!billing) {
+        toast.error(t('tenders.billing_address_required'));
+        return false;
+    }
+    return true;
 };
 
 // Owns the "turn this tender into an order/project" flow: the decision modal's
@@ -21,9 +47,12 @@ type UseTenderOrderDecisionParams = {
 // existing-project search, and the submit/approve/create-project handlers. The
 // resulting project id (freshly created or already linked) is surfaced as
 // `projectId` so the caller can drive its sales-order UI.
-export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fetchDetail, navigate }: UseTenderOrderDecisionParams) => {
+export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fetchDetail, navigate, saveAll }: UseTenderOrderDecisionParams) => {
     const [projectCreateLoading, setProjectCreateLoading] = useState(false);
     const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+    // When set, the "Project created successfully" popup is shown, offering to
+    // jump into the new project or stay on the tender.
+    const [projectCreatedModalId, setProjectCreatedModalId] = useState<string | null>(null);
     const [orderDecisionOpen, setOrderDecisionOpen] = useState(false);
     const [orderDecisionLoading, setOrderDecisionLoading] = useState(false);
     const [orderMode, setOrderMode] = useState<SalesOrderMode>('PROJECT_NEW');
@@ -49,25 +78,30 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         return () => window.clearTimeout(timer);
     }, [attachExistingProject, orderDecisionOpen, projectSearch]);
 
-    const openOrderDecision = () => {
+    // Approve/order flows persist pending edits automatically — clicking them
+    // acts as a save, so no separate manual Save step is required.
+    const flushPendingEdits = async (): Promise<boolean> => {
+        if (!isDirty) return true;
+        return saveAll();
+    };
+
+    const openOrderDecision = async () => {
         if (!tender) return;
-        if (isDirty) { toast.error(t('tenders.once_kaydedin')); return; }
+        if (!(await flushPendingEdits())) return;
         setOrderMode('PROJECT_NEW');
         setAttachExistingProject(false);
         setSelectedExistingProject(null);
         setProjectSearch('');
         setProjectSearchResults([]);
-        setOrderProjectName(tender.tenderNumber);
+        setOrderProjectName(localizeTenderNumber(tender.tenderNumber));
         setOrderDecisionOpen(true);
     };
 
     const handleSubmitOrderDecision = async () => {
         if (!tender) return;
-        // No delivery address → nothing can be delivered, so the order isn't created.
-        if (!String((tender as any).deliveryAddress ?? '').trim()) {
-            toast.error(t('tenders.delivery_address_required'));
-            return;
-        }
+        // Both the installation (deliveryAddress) and billing addresses must be set
+        // before an order can be created.
+        if (!hasRequiredAddresses(tender)) return;
         const finalMode: SalesOrderMode = orderMode === 'PROJECT_NEW' && attachExistingProject ? 'PROJECT_EXISTING' : orderMode;
         if (finalMode === 'PROJECT_NEW' && !orderProjectName.trim()) {
             toast.error(t('tenders.project_ismi_zorunludur'));
@@ -92,6 +126,7 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
             toast.success(res.message ||t('tenders.order_created'));
             await fetchDetail(tender.id, true);
             setOrderDecisionOpen(false);
+            if (res.project?.id) setProjectCreatedModalId(res.project.id);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.order_olusturulamadi'));
         } finally {
@@ -102,15 +137,12 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
 
     const handleApprove = async () => {
         if (!tender) return;
-        // Manual save: unsaved line/meta edits must be persisted before approval.
-        if (isDirty) { toast.error(t('tenders.once_kaydedin')); return; }
-        // Block the whole approve → deliver flow up front when no delivery address
-        // is set: with no address there is nothing to deliver.
-        if (!String((tender as any).deliveryAddress ?? '').trim()) {
-            toast.error(t('tenders.delivery_address_required'));
-            return;
-        }
-        openOrderDecision();
+        // Approve doubles as Save: staged line/meta edits are flushed first.
+        if (!(await flushPendingEdits())) return;
+        // Block the whole approve → deliver flow up front unless the
+        // installation, delivery and billing addresses are set.
+        if (!hasRequiredAddresses(tender)) return;
+        await openOrderDecision();
     };
 
     const handleCreateProject = async () => {
@@ -119,19 +151,18 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
             return;
         }
         if (!tender) return;
-        if (isDirty) { toast.error(t('tenders.once_kaydedin')); return; }
-        // No delivery address → nothing can be delivered, so the order isn't created.
-        if (!String((tender as any).deliveryAddress ?? '').trim()) {
-            toast.error(t('tenders.delivery_address_required'));
-            return;
-        }
+        // Creating the project also acts as save for any staged edits.
+        if (!(await flushPendingEdits())) return;
+        if (!hasRequiredAddresses(tender)) return;
         setProjectCreateLoading(true);
         try {
             const res = await projectApi.createFromTender(tender.id, undefined, overtimeHourlyRate);
             setCreatedProjectId(res.project.id);
             toast.success(res.message ||t('tenders.order_created'));
             await fetchDetail(tender.id, true);
-            navigate(`/projects/${res.project.id}`);
+            // Ask the user whether to open the project or stay, instead of
+            // navigating away automatically.
+            setProjectCreatedModalId(res.project.id);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.order_olusturulamadi'));
         } finally {
@@ -163,5 +194,13 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         handleSubmitOrderDecision,
         handleApprove,
         handleCreateProject,
+        // "Project created successfully" popup wiring.
+        projectCreatedModalId,
+        goToCreatedProject: () => {
+            const target = projectCreatedModalId;
+            setProjectCreatedModalId(null);
+            if (target) navigate(`/projects/${target}`);
+        },
+        dismissProjectCreated: () => setProjectCreatedModalId(null),
     };
 };

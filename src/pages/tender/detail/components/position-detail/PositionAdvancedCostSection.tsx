@@ -2,7 +2,8 @@ import React from 'react';
 
 import { Field, Input } from '../../../../../components/ui-shared/Field';
 import type { CostInput } from '../../../../../types/tender';
-import { fmtMoney, fmtNumber, fmtVatRate, type TreeNode } from '../../tenderDetailUtils';
+import { fmtNumber, fmtVatRate, type TreeNode } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { t } from '@/i18n/translate';
 
 export const PositionAdvancedCostSection: React.FC<{
@@ -35,7 +36,9 @@ export const PositionAdvancedCostSection: React.FC<{
     totalWithTax,
     position,
     unitPrice,
-}) => (
+}) => {
+    const fmtMoney = useMoneyFormat();
+    return (
     <details className="border border-slate-200/70 rounded-md bg-white">
         <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-50/60 select-none">{t('tenders.additional_cost_opsiyonel')}</summary>
         <div className="px-3 pb-3 space-y-3">
@@ -120,4 +123,5 @@ export const PositionAdvancedCostSection: React.FC<{
 
         </div>
     </details>
-);
+    );
+};

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import {
@@ -13,7 +13,6 @@ import {
     Sliders02 as SlidersHorizontal,
 } from '@/components/icons/antIconCompat';
 
-import { StockModuleHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
@@ -22,7 +21,7 @@ import { StatusChip } from '../../components/ui-shared/StatusBadge';
 
 import { useInventoryStore } from '../../store/inventoryStore';
 import { inventoryApi, articleApi } from '../../lib/api/inventory';
-import type { ArticleStockSummary, MovementType, SearchItem, SupplierRow } from '../../types/inventory';
+import type { ArticleStockInfo, ArticleStockSummary, MovementType, SearchItem, SupplierRow } from '../../types/inventory';
 
 import { t } from '@/i18n/translate';
 
@@ -102,6 +101,7 @@ const TabStrip = <T extends string>({ tabs, value, onChange }: { tabs: { key: T;
 
 export const Movements = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
     const { movements, fetchMovements, scanMovement, articles, fetchArticlesSummary } = useInventoryStore();
 
     const [formTab, setFormTab] = useState<FormTab>('movement');
@@ -115,6 +115,10 @@ export const Movements = () => {
     const [selected, setSelected] = useState<SearchItem | null>(null);
 
     const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+
+    // Seçili ürünün yalın canlı stok bilgisi (sayaç + ortalama maliyet). Depo verisi
+    // içermez; her hareketten sonra tek uçtan hızlıca yenilenir.
+    const [stockInfo, setStockInfo] = useState<ArticleStockInfo | null>(null);
 
     const [form, setForm] = useState<{
         movementType: MovementType;
@@ -138,14 +142,19 @@ export const Movements = () => {
     const [submitting, setSubmitting] = useState(false);
 
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const prefillApplied = useRef(false);
 
     useEffect(() => {
         inventoryApi.listSuppliers().then(setSuppliers).catch(() => setSuppliers([]));
-        // Ön seçim ve ortalama maliyet tablosu için ürün özetini hazır tut.
-        fetchArticlesSummary();
-    }, [fetchArticlesSummary]);
+    }, []);
 
     const preselectId = searchParams.get('item');
+
+    // Ağır ürün özeti (tüm tenant + depo bakiyeleri) yalnızca Ürünler sayfasından
+    // gelen ön seçim (?item=) varsa çekilir; normal arama akışında hiç yüklenmez.
+    useEffect(() => {
+        if (preselectId && articles.length === 0) fetchArticlesSummary();
+    }, [preselectId, articles.length, fetchArticlesSummary]);
 
     // Otomatik arama (debounce) — alış/çıkış hareketlerinde ürün ve malzeme birlikte aranır.
     useEffect(() => {
@@ -171,13 +180,20 @@ export const Movements = () => {
         };
     }, [query]);
 
+    // Seçili ürünün canlı stok bilgisini (sayaç + ortalama maliyet) yalın uçtan çeker.
+    const refreshStockInfo = (articleId: string) => {
+        void inventoryApi.getArticleStock(articleId).then(setStockInfo).catch(() => setStockInfo(null));
+    };
+
     const selectItem = (item: SearchItem) => {
         setSelected(item);
         setQuery(`${item.name} · ${item.code}`);
         setDropdownOpen(false);
         setResults([]);
+        setStockInfo(null);
         if (item.kind === 'PRODUCT') {
             fetchMovements(item.id);
+            refreshStockInfo(item.id);
             setSettings({
                 minStockLevel: item.minStockLevel ?? 0,
                 criticalStockLevel: item.criticalStockLevel ?? 0,
@@ -190,6 +206,7 @@ export const Movements = () => {
         setSelected(null);
         setQuery('');
         setResults([]);
+        setStockInfo(null);
     };
 
     // Ürün listesi (Stok > Ürünler) sayfasındaki yukarı/aşağı ikonundan gelen ön seçim.
@@ -205,14 +222,39 @@ export const Movements = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [preselectId, articles]);
 
+    // Tedarik Talepleri ekranındaki "yukarı ok" buradan gelir: ürün/malzeme, miktar ve
+    // tedarikçi router state ile önceden dolu gelir; giriş (IN) hareketi seçili olur ve
+    // kullanıcının yalnızca alış fiyatını girip kaydetmesi yeterlidir.
+    useEffect(() => {
+        const pre = (location.state as { supplyPrefill?: {
+            kind: 'PRODUCT' | 'MATERIAL'; id: string; code: string; name: string; unit?: string; quantity?: number; supplierId?: string;
+        } } | null)?.supplyPrefill;
+        if (!pre || prefillApplied.current) return;
+        prefillApplied.current = true;
+        selectItem({
+            kind: pre.kind,
+            id: pre.id,
+            code: pre.code,
+            name: pre.name,
+            unit: pre.unit || undefined,
+            salePrice: 0,
+            itemType: pre.kind,
+        });
+        setFormTab('movement');
+        setCardTab('general');
+        setForm((f) => ({
+            ...f,
+            movementType: 'IN',
+            quantity: pre.quantity && pre.quantity > 0 ? pre.quantity : 1,
+            supplierId: pre.supplierId || '',
+        }));
+        // State'i temizle ki sayfa yenilenince prefill tekrar uygulanmasın.
+        window.history.replaceState({}, document.title);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.state]);
+
     const isMaterial = selected?.kind === 'MATERIAL';
     const isInbound = form.movementType === 'IN';
-
-    // Seçili ürünün tam kaydı (ortalama maliyet bileşenleri için).
-    const selectedArticle = useMemo(
-        () => (selected && selected.kind === 'PRODUCT' ? articles.find((a) => a.id === selected.id) ?? null : null),
-        [selected, articles],
-    );
 
     const handleSubmit = async () => {
         if (!selected) {
@@ -231,7 +273,7 @@ export const Movements = () => {
 
         setSubmitting(true);
         try {
-            await scanMovement({
+            const movement = await scanMovement({
                 codeOrBarcode: selected.code,
                 movementType: form.movementType,
                 quantity: form.quantity,
@@ -243,7 +285,15 @@ export const Movements = () => {
             });
             toast.success(t('auto.stok_hareketi_kaydedildi'));
             if (selected.kind === 'PRODUCT') {
+                // Yalnızca ilgili ürünün hareket geçmişi ve yalın stok bilgisi yenilenir.
                 fetchMovements(selected.id);
+                refreshStockInfo(selected.id);
+            } else {
+                // Malzeme hareketinde yanıt güncel stok adedini taşır — sayacı anında güncelle.
+                const nextQty = (movement as unknown as { stockQuantity?: number }).stockQuantity;
+                if (typeof nextQty === 'number') {
+                    setSelected((p) => (p ? { ...p, stockQuantity: nextQty } : p));
+                }
             }
             setForm((p) => ({ ...p, quantity: 1, unitCost: '', salePrice: '', description: '' }));
         } catch (e: any) {
@@ -278,8 +328,6 @@ export const Movements = () => {
 
     return (
         <div>
-            <StockModuleHeader label="Stock › Stock Movements" />
-
             {/* Seçili kalem her zaman görünür. */}
             {selected && (
                 <div className="mb-4 flex items-center gap-3 rounded-md border border-emerald-200/60 bg-emerald-50/60 p-2.5">
@@ -514,9 +562,9 @@ export const Movements = () => {
                                 description={t('auto.barkod_veya_stok_kodunu_girip_tab_a_basin_gecmis')}
                             />
                         ) : cardTab === 'general' ? (
-                            <GeneralInfoTab selected={selected} article={selectedArticle} movements={movements} />
+                            <GeneralInfoTab selected={selected} stockInfo={stockInfo} movements={movements} />
                         ) : (
-                            <AverageCostTab selected={selected} article={selectedArticle} />
+                            <AverageCostTab selected={selected} stockInfo={stockInfo} />
                         )}
                     </Card>
                 </div>
@@ -528,14 +576,14 @@ export const Movements = () => {
 // Genel Bilgi sekmesi: ad + toplam adet (ana görünüm) ve hareket dökümü. Ürün ve malzemeyi kapsar.
 const GeneralInfoTab = ({
     selected,
-    article,
+    stockInfo,
     movements,
 }: {
     selected: SearchItem;
-    article: ArticleStockSummary | null;
+    stockInfo: ArticleStockInfo | null;
     movements: ReturnType<typeof useInventoryStore.getState>['movements'];
 }) => {
-    const totalQuantity = selected.stockQuantity ?? article?.totalQuantity ?? 0;
+    const totalQuantity = stockInfo?.totalQuantity ?? selected.stockQuantity ?? 0;
     return (
         <div>
             <div className="flex items-center gap-4 border-b border-slate-100 p-4">
@@ -572,7 +620,7 @@ const GeneralInfoTab = ({
                     description={t('auto.yeni_hareket_kaydedince_burada_gorunecek')}
                 />
             ) : (
-                <div className="max-h-[520px] overflow-x-auto overflow-y-auto">
+                <div>
                     <table className="w-full text-[12.5px]">
                         <thead className="sticky top-0 border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
                             <tr>
@@ -625,8 +673,8 @@ const GeneralInfoTab = ({
 };
 
 // Ortalama Maliyet Hesabı sekmesi: ağırlıklı ortalama maliyetin nasıl oluştuğu.
-const AverageCostTab = ({ selected, article }: { selected: SearchItem; article: ArticleStockSummary | null }) => {
-    if (selected.kind !== 'PRODUCT' || !article) {
+const AverageCostTab = ({ selected, stockInfo }: { selected: SearchItem; stockInfo: ArticleStockInfo | null }) => {
+    if (selected.kind !== 'PRODUCT' || !stockInfo) {
         return (
             <EmptyState
                 icon={<SlidersHorizontal size={28} />}
@@ -637,12 +685,12 @@ const AverageCostTab = ({ selected, article }: { selected: SearchItem; article: 
     }
 
     const rows = [
-        { label: 'Supplier purchases', qty: Number(article.supplierCostQuantity ?? 0), value: Number(article.supplierCostValue ?? 0) },
-        { label: 'Manual entries', qty: Number(article.manualCostQuantity ?? 0), value: Number(article.manualCostValue ?? 0) },
+        { label: 'Supplier purchases', qty: Number(stockInfo.supplierCostQuantity ?? 0), value: Number(stockInfo.supplierCostValue ?? 0) },
+        { label: 'Manual entries', qty: Number(stockInfo.manualCostQuantity ?? 0), value: Number(stockInfo.manualCostValue ?? 0) },
     ];
-    const totalQty = Number(article.costBasisQuantity ?? rows.reduce((s, r) => s + r.qty, 0));
-    const totalValue = Number(article.costBasisValue ?? rows.reduce((s, r) => s + r.value, 0));
-    const weightedAvg = Number(article.weightedAverageCost ?? (totalQty > 0 ? totalValue / totalQty : 0));
+    const totalQty = Number(stockInfo.costBasisQuantity ?? rows.reduce((s, r) => s + r.qty, 0));
+    const totalValue = Number(stockInfo.costBasisValue ?? rows.reduce((s, r) => s + r.value, 0));
+    const weightedAvg = Number(stockInfo.weightedAverageCost ?? (totalQty > 0 ? totalValue / totalQty : 0));
 
     return (
         <div className="overflow-x-auto">

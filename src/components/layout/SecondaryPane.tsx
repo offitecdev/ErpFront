@@ -14,12 +14,10 @@ const lazyNamed = (
 ) => lazy<PaneComponent>(() => loader().then((mod) => ({ default: (mod as Record<string, PaneComponent>)[exportName] })));
 
 const SECONDARY_PAGES: Record<SplitablePath, React.LazyExoticComponent<PaneComponent>> = {
-    '/': lazyNamed(() => import('../../pages/Dashboard'), 'Dashboard'),
     '/employees': lazyNamed(() => import('../../pages/iam/Employees'), 'Employees'),
     '/attendance-records': lazyNamed(() => import('../../pages/attendance/AttendanceRecords'), 'AttendanceRecords'),
     '/attendance-settings': lazyNamed(() => import('../../pages/attendance/AttendanceSettings'), 'AttendanceSettings'),
     '/roles': lazyNamed(() => import('../../pages/iam/Roles'), 'Roles'),
-    '/crm/customers': lazyNamed(() => import('../../pages/crm/CustomerList'), 'CustomerList'),
 };
 
 const PaneFallback = () => (

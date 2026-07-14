@@ -26,6 +26,15 @@ const lazyBackend: BackendModule = {
     },
 };
 
+// Keeps the browser tab title in sync with the active language. Called once init
+// resolves and again on every language switch, so the tab reads e.g. "Offitec
+// Management Panel" / "Offitec Verwaltungspanel" / "Offitec Yönetim Paneli".
+const syncDocumentTitle = (): void => {
+    if (typeof document !== 'undefined') {
+        document.title = i18n.t('common.appTitle');
+    }
+};
+
 let initPromise: Promise<unknown> | null = null;
 
 // Kicks off i18next initialisation and returns a promise that resolves once the
@@ -58,6 +67,10 @@ export const initI18n = (): Promise<unknown> => {
                     caches: ['localStorage'],
                     lookupLocalStorage: 'offitec:lang',
                 },
+            })
+            .then(() => {
+                syncDocumentTitle();
+                i18n.on('languageChanged', syncDocumentTitle);
             });
     }
     return initPromise;

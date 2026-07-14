@@ -60,13 +60,13 @@ export interface ArticleStockSummary extends InventoryArticle {
     }[];
 }
 
-// Lean row for the products LIST screen and the tender product picker. Holds only
-// what the table renders plus `id` for linking/navigation — no images, suppliers,
-// movements or cost breakdown. Product detail is loaded separately (by id).
+// Lean row for the products list and tender picker. Description is optional for
+// consumers that can stage a row directly; images, suppliers and movements stay out.
 export interface ArticleListItem {
     id: string;
     articleCode: string;
     name: string;
+    description?: string | null;
     category?: string | null;
     itemType?: ItemType;
     systemBarcode?: string | null;
@@ -78,6 +78,23 @@ export interface ArticleListItem {
     minStockLevel: number;
     criticalStockLevel: number;
     totalQuantity: number;
+}
+
+// Stok hareketi ekranı için tek ürünün yalın canlı stok bilgisi. Depo/lokasyon
+// verisi taşımaz — yalnızca sayaç (totalQuantity) ve ortalama maliyet dökümü.
+export interface ArticleStockInfo {
+    id: string;
+    totalQuantity: number;
+    minStockLevel: number;
+    criticalStockLevel: number;
+    maxStockLevel?: number | null;
+    weightedAverageCost: number;
+    costBasisQuantity: number;
+    costBasisValue: number;
+    supplierCostQuantity: number;
+    supplierCostValue: number;
+    manualCostQuantity: number;
+    manualCostValue: number;
 }
 
 export interface ArticleListPage {
@@ -201,6 +218,86 @@ export interface ArticleSupplierRow {
     supplier?: SupplierRow;
     location?: Pick<InventoryLocation, 'id' | 'locationName' | 'locationType'>;
     article?: Pick<InventoryArticle, 'id' | 'articleCode' | 'name' | 'unit' | 'baseCost' | 'imageUrl'>;
+}
+
+// --- TEDARİK TALEPLERİ (Supply Requests) ---
+
+// Minimum/kritik seviyeye düşmüş tek bir ürün/malzeme (yalın liste satırı).
+export interface LowStockItem {
+    kind: ItemType;
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    totalQuantity: number;
+    minStockLevel: number;
+    criticalStockLevel: number;
+    isCritical: boolean;
+    isBelowMin: boolean;
+}
+
+export interface LowStockResponse {
+    minimum: LowStockItem[];
+    critical: LowStockItem[];
+}
+
+// Bir kalemin daha önce alım yaptığı tedarikçi + son alım özeti.
+export interface ItemSupplier {
+    supplierId: string;
+    companyName: string;
+    email?: string | null;
+    phone?: string | null;
+    lastPurchaseDate?: string | null;
+    lastPurchasePrice?: number | null;
+    lastPurchaseQuantity?: number | null;
+    currency?: string | null;
+    purchaseCount: number;
+}
+
+export interface ItemSuppliersResponse {
+    item: { kind: ItemType; id: string; code: string; name: string; unit: string };
+    suppliers: ItemSupplier[];
+}
+
+export type SupplyRequestStatus = 'PENDING' | 'RECEIVED' | 'CANCELLED';
+
+export interface SupplyRequestRow {
+    id: string;
+    tenantId: string;
+    itemType: ItemType;
+    articleId?: string | null;
+    materialId?: string | null;
+    itemName: string;
+    itemCode?: string | null;
+    unit?: string | null;
+    supplierId?: string | null;
+    supplierName?: string | null;
+    supplierEmail?: string | null;
+    requestedQuantity: number;
+    emailSubject?: string | null;
+    emailBody?: string | null;
+    emailSent: boolean;
+    status: SupplyRequestStatus;
+    createdByEmpId?: string | null;
+    createdAt: string;
+    receivedAt?: string | null;
+    receivedByEmpId?: string | null;
+}
+
+export interface CreateSupplyRequestInput {
+    itemType: ItemType;
+    articleId?: string | null;
+    materialId?: string | null;
+    itemName: string;
+    itemCode?: string | null;
+    unit?: string | null;
+    supplierId?: string | null;
+    supplierName?: string | null;
+    supplierEmail?: string | null;
+    requestedQuantity: number;
+    emailSubject?: string;
+    emailBody?: string;
+    sendEmail?: boolean;
 }
 
 export interface InventoryDashboard {
