@@ -55,7 +55,9 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
     const [projectCreatedModalId, setProjectCreatedModalId] = useState<string | null>(null);
     const [orderDecisionOpen, setOrderDecisionOpen] = useState(false);
     const [orderDecisionLoading, setOrderDecisionLoading] = useState(false);
-    const [orderMode, setOrderMode] = useState<SalesOrderMode>('PROJECT_NEW');
+    // Null until the user picks a card — the decision modal opens with neither
+    // order type pre-selected.
+    const [orderMode, setOrderMode] = useState<SalesOrderMode | null>(null);
     const [attachExistingProject, setAttachExistingProject] = useState(false);
     const [orderProjectName, setOrderProjectName] = useState('');
     const [projectSearch, setProjectSearch] = useState('');
@@ -88,7 +90,7 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
     const openOrderDecision = async () => {
         if (!tender) return;
         if (!(await flushPendingEdits())) return;
-        setOrderMode('PROJECT_NEW');
+        setOrderMode(null);
         setAttachExistingProject(false);
         setSelectedExistingProject(null);
         setProjectSearch('');
@@ -102,6 +104,11 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         // Both the installation (deliveryAddress) and billing addresses must be set
         // before an order can be created.
         if (!hasRequiredAddresses(tender)) return;
+        // No card chosen yet — force the user to pick an order type first.
+        if (!orderMode) {
+            toast.error(t('tenders.order_turunu_select'));
+            return;
+        }
         const finalMode: SalesOrderMode = orderMode === 'PROJECT_NEW' && attachExistingProject ? 'PROJECT_EXISTING' : orderMode;
         if (finalMode === 'PROJECT_NEW' && !orderProjectName.trim()) {
             toast.error(t('tenders.project_ismi_zorunludur'));

@@ -49,10 +49,32 @@ export interface TenderPdfData {
         articles?: Array<{ name: string; imageUrl?: string | null; qty: number; price: number }>;
     }>;
     grandTotal: number;
+    /**
+     * Belge düzeyi (toplu) indirim özeti — ekrandaki fiyat özetiyle birebir.
+     * Verildiğinde toplamlar bloğunda net/KDV/genel toplam bu değerlerden
+     * çizilir ve indirim gerçekten uygulanmışsa (discountAmount > 0) bir
+     * "İndirim" satırı eklenir. İndirim yoksa satır da başlık da PDF'te yer
+     * almaz. Verilmezse eski davranışa (grandTotal'dan net/KDV türetme) düşülür.
+     */
+    totals?: TenderPdfTotals | null;
     referenceNumber?: string;
     qrBillEnabled?: boolean;
     /** PDF dili (indirmeden önce seçilir). Varsayılan: Almanca. */
     lang?: PdfLang;
+}
+
+/** İndirim uygulanmış toplam özeti (ekrandaki `TenderPricingSummary` ile aynı). */
+export interface TenderPdfTotals {
+    /** Belge düzeyi indirim yüzdesi (ör. 10 = %10). */
+    discountPercent: number;
+    /** Toplam indirim tutarı (net üzerinden). 0 ise indirim satırı gizlenir. */
+    discountAmount: number;
+    /** İndirim sonrası net tutar (KDV hariç). */
+    netTotal: number;
+    /** İndirim sonrası KDV tutarı. */
+    vatTotal: number;
+    /** İndirim sonrası genel toplam (KDV dahil) — nihai sonuç. */
+    grossTotal: number;
 }
 
 // ── PDF dilleri (Türkçe / Almanca / İngilizce) ───────────────────────────────
@@ -82,6 +104,7 @@ interface PdfStrings {
     subtotal: string;
     net: string;
     vat: string;
+    discount: string;
     grandTotal: string;
     paymentTerms: string;
     // Swiss QR-Bill etiketleri (yasal olarak DE/FR/IT/EN; TR seçiminde EN kullanılır)
@@ -113,6 +136,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
         subtotal: 'Ara Toplam',
         net: 'Net Tutar',
         vat: 'KDV',
+        discount: 'İndirim',
         grandTotal: 'TOPLAM',
         paymentTerms: 'Ödeme Koşulları',
         // Swiss QR-Bill Türkçeyi desteklemediği için İngilizce etiketler kullanılır
@@ -142,6 +166,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
         subtotal: 'Zwischensumme',
         net: 'Nettobetrag',
         vat: 'MwSt.',
+        discount: 'Rabatt',
         grandTotal: 'GESAMT',
         paymentTerms: 'Zahlungsbedingungen',
         qrReceipt: 'Empfangsschein',
@@ -170,6 +195,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
         subtotal: 'Subtotal',
         net: 'Net Amount',
         vat: 'VAT',
+        discount: 'Discount',
         grandTotal: 'TOTAL',
         paymentTerms: 'Payment Terms',
         qrReceipt: 'Receipt',
@@ -349,7 +375,9 @@ export async function buildTenderPdfBytes(
     onProgress?.({ stage: 'finalize' });
 
     // ── Toplamlar ───────────────────────────────────────────────────────────
-    const totalsBlockHeight = 45;
+    // İndirim satırı eklenecekse blok bir satır kadar daha yüksek olur.
+    const hasDiscountRow = (data.totals?.discountAmount ?? 0) > 0;
+    const totalsBlockHeight = 45 + (hasDiscountRow ? 8 : 0);
     if (y + totalsBlockHeight > PAGE_H - FOOTER_RESERVED_BOTTOM) {
         doc.addPage();
         y = HEADER_RESERVED_TOP_REST + 5;
@@ -827,9 +855,14 @@ function drawTotals(
     fmt: (v: number) => string,
     L: PdfStrings
 ) {
-    const grand = data.grandTotal;
-    const net = s.vatRate > 0 ? grand / (1 + s.vatRate / 100) : grand;
-    const vat = grand - net;
+    // İndirim özeti verildiyse ekrandaki değerleri birebir kullan; aksi halde
+    // eski davranışa (genel toplamdan net/KDV türetme) düşülür.
+    const p = data.totals ?? null;
+    const net = p ? p.netTotal : (s.vatRate > 0 ? data.grandTotal / (1 + s.vatRate / 100) : data.grandTotal);
+    const vat = p ? p.vatTotal : data.grandTotal - net;
+    const grand = p ? p.grossTotal : data.grandTotal;
+    const discountAmount = p ? p.discountAmount : 0;
+    const discountPercent = p ? p.discountPercent : 0;
 
     const labelX = 120;
     const valueX = T_X1 - CELL_PAD;
@@ -851,6 +884,13 @@ function drawTotals(
 
     totalRow(L.net, fmt(net), { bold: true });
     totalRow(`${L.vat} ${fmtVatRate(s.vatRate)}`, fmt(vat), { bold: true });
+    // Toplu indirim yalnızca gerçekten uygulanmışsa listelenir ve tam olarak
+    // genel toplamın (nihai rakam) üstünde yer alır; indirim yoksa ne bu satır
+    // ne de "İndirim" başlığı PDF'te görünür.
+    if (discountAmount > 0) {
+        const label = discountPercent > 0 ? `${L.discount} ${fmtDiscount(discountPercent)}` : L.discount;
+        totalRow(label, `− ${fmt(discountAmount)}`);
+    }
     totalRow(L.grandTotal, fmt(grand), { bold: true });
 
     doc.setDrawColor(...COLOR_NAVY);

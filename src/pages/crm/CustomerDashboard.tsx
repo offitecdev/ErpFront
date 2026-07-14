@@ -825,10 +825,14 @@ export const CustomerDashboard = () => {
                         <div className="text-[12px] text-slate-400 text-center py-4">{i18nT('crm.no_notes_yet')}</div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {data.notes!.map((n) => (
+                            {data.notes!.map((n) => {
+                                // Critical notes render as a translucent "glass" red card;
+                                // every text element inside flips to white so it stays legible.
+                                const hot = n.isHighlight;
+                                return (
                                 <div
                                     key={n.id}
-                                    className={`group relative border rounded-md p-2.5 ${n.isHighlight ?"border-rose-200 bg-rose-50/40" :"border-slate-200 bg-white"}`}
+                                    className={`group relative overflow-hidden border rounded-md p-2.5 ${hot ?"border-[#dc2626]/30 bg-[#dc2626]/15 shadow-sm shadow-red-900/5 ring-1 ring-inset ring-white/40 backdrop-blur-lg" :"border-slate-200 bg-white"}`}
                                 >
                                     {editingNoteId === n.id ? (
                                         <form onSubmit={handleUpdateNote} className="space-y-2">
@@ -854,29 +858,29 @@ export const CustomerDashboard = () => {
                                     ) : (
                                         <>
                                             <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button type="button" onClick={() => startEditNote(n)} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700" title={i18nT('common.edit')}>
+                                                <button type="button" onClick={() => startEditNote(n)} className={`p-1 rounded ${hot ?"text-white hover:bg-white/25 [filter:drop-shadow(0_1px_1px_rgba(127,29,29,0.7))]" :"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`} title={i18nT('common.edit')}>
                                                     <EditIcon size={12} />
                                                 </button>
-                                                <button type="button" onClick={() => setConfirmDeleteNoteId(n.id)} className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600" title={i18nT('common.delete')}>
+                                                <button type="button" onClick={() => setConfirmDeleteNoteId(n.id)} className={`p-1 rounded ${hot ?"text-white hover:bg-white/25 [filter:drop-shadow(0_1px_1px_rgba(127,29,29,0.7))]" :"text-slate-400 hover:bg-rose-50 hover:text-rose-600"}`} title={i18nT('common.delete')}>
                                                     <TrashIcon size={12} />
                                                 </button>
                                             </div>
                                             <div className="flex items-center gap-1.5 mb-1 pr-12">
-                                                <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium ${n.noteType === 'technical' ?"bg-cyan-50 text-cyan-700" :"bg-slate-100 text-slate-600"}`}>
+                                                <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-medium ${hot ?"bg-red-600/80 text-white" : n.noteType === 'technical' ?"bg-cyan-50 text-cyan-700" :"bg-slate-100 text-slate-600"}`}>
                                                     {n.noteType === 'technical' ?i18nT('crm.technical') :i18nT('crm.internal')}
                                                 </span>
                                                 {n.isHighlight && (
-                                                    <span className="text-[10.5px] px-1.5 py-0.5 rounded font-medium bg-rose-50 text-rose-700 flex items-center gap-1">
+                                                    <span className="text-[10.5px] px-1.5 py-0.5 rounded font-semibold bg-red-600/80 text-white flex items-center gap-1">
                                                         <AlertTriangle size={9} />{i18nT('crm.critical')}</span>
                                                 )}
-                                                <span className="text-[10.5px] text-slate-400 ml-auto flex items-center gap-1 font-mono">
+                                                <span className={`text-[10.5px] ml-auto flex items-center gap-1 font-mono ${hot ? 'text-white [text-shadow:0_1px_2px_rgba(80,7,7,0.95)]' : 'text-slate-400'}`}>
                                                     <Calendar size={9} />
                                                     {dayjs(n.createdAt).format("DD.MM.YYYY HH:mm")}
                                                 </span>
                                             </div>
-                                            <p className="text-[12.5px] text-slate-700 leading-relaxed whitespace-pre-wrap">{n.noteText}</p>
+                                            <p className={`text-[12.5px] leading-relaxed whitespace-pre-wrap ${hot ? 'text-white [text-shadow:0_1px_3px_rgba(80,7,7,0.95)]' : 'text-slate-700'}`}>{n.noteText}</p>
                                             {n.createdBy && (
-                                                <div className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-1">
+                                                <div className={`text-[10.5px] mt-1 flex items-center gap-1 ${hot ? 'text-white [text-shadow:0_1px_2px_rgba(80,7,7,0.95)]' : 'text-slate-400'}`}>
                                                     <UserIcon size={9} />
                                                     {n.createdBy.firstName} {n.createdBy.lastName}
                                                 </div>
@@ -884,7 +888,8 @@ export const CustomerDashboard = () => {
                                         </>
                                     )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </Card>

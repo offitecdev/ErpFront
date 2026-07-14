@@ -10,7 +10,7 @@ type TenderOrderDecisionModalProps = {
     onClose: () => void;
     loading: boolean;
     onSubmit: () => void;
-    mode: SalesOrderMode;
+    mode: SalesOrderMode | null;
     onModeChange: (mode: SalesOrderMode) => void;
     attachExisting: boolean;
     onAttachExistingChange: (value: boolean) => void;
