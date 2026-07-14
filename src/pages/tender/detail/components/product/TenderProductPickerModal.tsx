@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
     File05 as FileText,
     Package,
@@ -9,7 +8,6 @@ import Pagination from 'antd/es/pagination';
 import { Button } from '@/components/ui-shared/Button';
 import { Field, Input } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
-import { ProductQuickViewModal } from '@/components/product/ProductQuickViewModal';
 import { t } from '@/i18n/translate';
 import type { ArticleListItem } from '@/types/inventory';
 
@@ -44,10 +42,6 @@ export const TenderProductPickerModal = ({
     onCreateStockArticle,
     onSelectArticle,
 }: TenderProductPickerModalProps) => {
-    // Tag icon opens the shared product quick view (the one list-side place, besides
-    // the detail screen, where the product image is shown).
-    const [quickViewId, setQuickViewId] = useState<string | null>(null);
-
     // "No results" only after a completed fetch — while loading we show the spinner.
     const isEmpty = !loading && items.length === 0;
 
@@ -86,11 +80,11 @@ export const TenderProductPickerModal = ({
                     ) : (
                         <div className="divide-y divide-slate-100">
                             {items.map((article) => (
-                                <div key={article.id} className="group flex items-center gap-2 px-3 py-2 transition-colors hover:bg-slate-50">
-                                    {/* Tag icon sits between the row start and the product title. */}
+                                <div key={article.id} className="group flex items-center gap-2 px-3 py-2 transition-colors hover:bg-[#1f2654]">
+                                    {/* Tag icon opens the product's detail page in a new window. */}
                                     <button
                                         type="button"
-                                        onClick={() => setQuickViewId(article.id)}
+                                        onClick={() => window.open(`/inventory/articles/${article.id}`, '_blank', 'noopener')}
                                         className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#1f2654] hover:text-[#1f2654]"
                                         title={t('common.detail')}
                                         aria-label={t('common.detail')}
@@ -100,7 +94,7 @@ export const TenderProductPickerModal = ({
                                     <button
                                         type="button"
                                         onClick={() => onSelectArticle(article)}
-                                        className="min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] font-medium text-slate-800 transition-colors hover:bg-[#1f2654] hover:text-white"
+                                        className="min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] font-medium text-slate-800 transition-colors group-hover:text-white!"
                                         title={article.name}
                                     >
                                         {article.name}
@@ -123,8 +117,6 @@ export const TenderProductPickerModal = ({
                     </div>
                 )}
             </div>
-
-            <ProductQuickViewModal articleId={quickViewId} onClose={() => setQuickViewId(null)} />
         </Modal>
     );
 };

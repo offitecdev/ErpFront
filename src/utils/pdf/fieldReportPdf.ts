@@ -7,6 +7,8 @@ import arialItalicUrl from '../../assets/fonts/ARIALI.ttf?url';
 import defaultLetterheadUrl from '../../assets/docs/sablon.pdf?url';
 import { usePdfSettingsStore, type PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
+import { getReportTranslator, type FixedTranslator } from '../../i18n/reportLanguage';
+import { localizeTenderNumber } from '../tenderNumber';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SAHA RAPORU (Montage-Rapport) — kullanıcı görsellerine birebir uyan, PARASIZ çıktı.
@@ -76,11 +78,11 @@ const registerFonts = async (doc: jsPDF) => {
 // ── Biçimleyiciler ────────────────────────────────────────────────────────────
 const clean = (value: unknown) => String(value ?? '').trim();
 
-const dateFmt = (value?: string | Date | null) => {
+const dateFmt = (value?: string | Date | null, locale = 'tr-TR') => {
     if (!value) return '-';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '-';
-    return d.toLocaleDateString('tr-TR');
+    return d.toLocaleDateString(locale);
 };
 
 // Üst kutu tarihleri: "26-06-15" (YY-MM-DD)
@@ -94,11 +96,11 @@ const dateShort = (value?: string | Date | null) => {
     return `${yy}-${mm}-${dd}`;
 };
 
-const timeFmt = (value?: string | Date | null) => {
+const timeFmt = (value?: string | Date | null, locale = 'tr-TR') => {
     if (!value) return '-';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '-';
-    return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 };
 
 const minutesBetween = (start?: string | null, end?: string | null) => {
@@ -109,13 +111,13 @@ const minutesBetween = (start?: string | null, end?: string | null) => {
     return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
 };
 
-const durationFmt = (minutes?: number | null) => {
+const durationFmt = (minutes: number | null | undefined, t: FixedTranslator) => {
     const total = Math.max(0, Math.round(Number(minutes || 0)));
     const hours = Math.floor(total / 60);
     const mins = total % 60;
-    if (hours && mins) return `${hours} saat ${mins} dakika`;
-    if (hours) return `${hours} saat`;
-    return `${mins} dakika`;
+    if (hours && mins) return t('projects.field.pdf.durationHm', { h: hours, m: mins });
+    if (hours) return t('projects.field.pdf.durationH', { h: hours });
+    return t('projects.field.pdf.durationM', { m: mins });
 };
 
 const reportWorkDate = (report: any) => report?.workDate || report?.reportDate || report?.startedAt;
@@ -150,11 +152,11 @@ const cityFrom = (address?: string | null, fallback = '-') => {
     return fallback;
 };
 
-const countryLabel = (code?: string) => {
+const countryLabel = (code: string | undefined, t: FixedTranslator) => {
     const c = clean(code).toUpperCase();
-    if (c === 'CH' || c === 'CHE') return 'İsviçre';
-    if (c === 'DE') return 'Almanya';
-    if (c === 'AT') return 'Avusturya';
+    if (c === 'CH' || c === 'CHE') return t('projects.field.pdf.countryCH');
+    if (c === 'DE') return t('projects.field.pdf.countryDE');
+    if (c === 'AT') return t('projects.field.pdf.countryAT');
     return code || '-';
 };
 
@@ -298,7 +300,8 @@ const drawCoverHeader = (
     project: ProjectDto,
     settings: PdfCompanySettings,
     report: any,
-    preparedBy: string
+    preparedBy: string,
+    t: FixedTranslator
 ): { reportNo: string; y: number } => {
     const reportNo = reportNumber(project, report);
     const implDate = dateShort(reportWorkDate(report));
@@ -317,14 +320,14 @@ const drawCoverHeader = (
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_BASE);
     doc.setTextColor(...COLOR_WHITE);
-    doc.text('Saha Rapor No :', boxX + CELL_PAD + 1, boxY + 5.4);
+    doc.text(`${t('projects.field.pdf.reportNo')} :`, boxX + CELL_PAD + 1, boxY + 5.4);
     doc.text(reportNo, boxRight - CELL_PAD - 1, boxY + 5.4, { align: 'right' });
 
     const infoRows: [string, string][] = [
-        ['Kommission:', project.tender?.tenderNumber || project.tenderId || '-'],
-        ['Uygulanma Tarihi:', implDate],
-        ['Rapor Tarihi:', reportDateLabel],
-        ['Teknisyen:', preparedBy],
+        [`${t('projects.field.pdf.commission')}:`, project.tender?.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : (project.tenderId || '-')],
+        [`${t('projects.field.pdf.executionDate')}:`, implDate],
+        [`${t('projects.field.pdf.reportDate')}:`, reportDateLabel],
+        [`${t('projects.field.pdf.technician')}:`, preparedBy],
     ];
 
     let ry = boxY + barH;
@@ -378,7 +381,7 @@ const drawCoverHeader = (
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_TITLE);
     doc.setTextColor(...COLOR_TEXT);
-    doc.text(`Montage-Rapport ${reportNo}`, LEFT, yTitle);
+    doc.text(`${t('projects.field.pdf.title')} ${reportNo}`, LEFT, yTitle);
 
     return { reportNo, y: yTitle + 8 };
 };
@@ -463,7 +466,8 @@ const drawJobItem = (
     doc: jsPDF,
     index: number,
     job: { title: string; body: string; note?: string },
-    y: number
+    y: number,
+    t: FixedTranslator
 ): number => {
     const numberW = 11;
     const boxX = LEFT + numberW;
@@ -472,7 +476,7 @@ const drawJobItem = (
     const rowH = 9;
 
     const bodyLines = doc.splitTextToSize(job.body, boxW - labelW - 8);
-    const noteLines = job.note ? doc.splitTextToSize(`Teknik not: ${job.note}`, boxW - labelW - 8) : [];
+    const noteLines = job.note ? doc.splitTextToSize(`${t('projects.field.pdf.technicalNote')}: ${job.note}`, boxW - labelW - 8) : [];
     const bodyH = Math.max(rowH, bodyLines.length * 4.4 + 4 + (noteLines.length ? noteLines.length * 4 + 2 : 0));
     const itemH = rowH + bodyH;
 
@@ -494,7 +498,7 @@ const drawJobItem = (
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_BASE);
     doc.setTextColor(...COLOR_TEXT);
-    doc.text('İş Tanımı', boxX + 3, y + rowH / 2 + 1.4);
+    doc.text(t('projects.field.pdf.jobDefinition'), boxX + 3, y + rowH / 2 + 1.4);
     doc.setDrawColor(...COLOR_GRID);
     doc.line(boxX + labelW, y, boxX + labelW, y + rowH);
     doc.setFont(FONT, 'normal');
@@ -504,7 +508,7 @@ const drawJobItem = (
     doc.setFillColor(...COLOR_ALT_ROW);
     doc.rect(boxX, y + rowH, labelW, bodyH, 'F');
     doc.setFont(FONT, 'bold');
-    doc.text('Açıklama', boxX + 3, y + rowH + 5.4);
+    doc.text(t('projects.field.pdf.description'), boxX + 3, y + rowH + 5.4);
     doc.line(boxX + labelW, y + rowH, boxX + labelW, y + itemH);
     doc.setFont(FONT, 'normal');
     doc.text(bodyLines, boxX + labelW + 4, y + rowH + 5);
@@ -519,8 +523,8 @@ const drawJobItem = (
     return y + itemH;
 };
 
-const drawJobs = (doc: jsPDF, report: any, y: number): number => {
-    y = sectionBar(doc, 'Yapılan Tüm İşler', y);
+const drawJobs = (doc: jsPDF, report: any, y: number, t: FixedTranslator): number => {
+    y = sectionBar(doc, t('projects.field.pdf.jobsTitle'), y);
     const jobs = jobsFromReport(report);
     if (jobs.length === 0) {
         doc.setFont(FONT, 'normal');
@@ -529,7 +533,7 @@ const drawJobs = (doc: jsPDF, report: any, y: number): number => {
         doc.text('-', LEFT + 2, y + 4);
         return y + 12;
     }
-    jobs.forEach((job, index) => { y = drawJobItem(doc, index, job, y); });
+    jobs.forEach((job, index) => { y = drawJobItem(doc, index, job, y, t); });
     return y + 4;
 };
 
@@ -540,42 +544,43 @@ const drawOvertime = (
     maxMin: number,
     workedMin: number,
     overtimeMin: number,
-    y: number
+    y: number,
+    t: FixedTranslator
 ): number => {
-    y = sectionBar(doc, 'Ek Çalışma', y);
+    y = sectionBar(doc, t('projects.field.pdf.overtimeTitle'), y);
     const columns: TableColumn[] = [
-        { header: 'Planlanan Saat', width: CONTENT_W / 4 },
-        { header: 'Azami Saat', width: CONTENT_W / 4 },
-        { header: 'Toplam Çalışılan Saat', width: CONTENT_W / 4 },
-        { header: 'Ek Çalışma Süresi', width: CONTENT_W / 4 },
+        { header: t('projects.field.pdf.plannedHours'), width: CONTENT_W / 4 },
+        { header: t('projects.field.pdf.maxHours'), width: CONTENT_W / 4 },
+        { header: t('projects.field.pdf.totalWorkedHours'), width: CONTENT_W / 4 },
+        { header: t('projects.field.pdf.overtimeDuration'), width: CONTENT_W / 4 },
     ];
-    const rows = [[durationFmt(plannedMin), durationFmt(maxMin), durationFmt(workedMin), durationFmt(overtimeMin)]];
+    const rows = [[durationFmt(plannedMin, t), durationFmt(maxMin, t), durationFmt(workedMin, t), durationFmt(overtimeMin, t)]];
     return drawTable(doc, columns, rows, y, { minRowH: 12, alt: false });
 };
 
 const materialId = (item: any) => item.material?.serialId || item.serialId || item.materialId || '-';
-const materialName = (item: any) => item.material?.name || item.name || 'Malzeme';
+const materialName = (item: any, t: FixedTranslator) => item.material?.name || item.name || t('projects.field.pdf.materialFallback');
 
 // ── Malzeme tablosu (Id + Adı — PARASIZ) ──────────────────────────────────────
-const drawMaterialTable = (doc: jsPDF, title: string, items: any[], y: number): number => {
+const drawMaterialTable = (doc: jsPDF, title: string, items: any[], y: number, t: FixedTranslator): number => {
     y = sectionBar(doc, title, y);
     const columns: TableColumn[] = [
-        { header: 'Malzeme Id', width: 45 },
-        { header: 'Malzeme Adı', width: CONTENT_W - 45 },
+        { header: t('projects.field.pdf.materialId'), width: 45 },
+        { header: t('projects.field.pdf.materialName'), width: CONTENT_W - 45 },
     ];
     const rows = items.length > 0
-        ? items.map((item) => [String(materialId(item)), String(materialName(item))])
+        ? items.map((item) => [String(materialId(item)), String(materialName(item, t))])
         : [['-', '-']];
     return drawTable(doc, columns, rows, y, { minRowH: 9 });
 };
 
 // ── Harici Giderler (yalnızca tip + açıklama — PARASIZ) ────────────────────────
-const drawExpenses = (doc: jsPDF, expenses: any[], y: number): number => {
+const drawExpenses = (doc: jsPDF, expenses: any[], y: number, t: FixedTranslator): number => {
     if (expenses.length === 0) return y;
-    y = sectionBar(doc, 'Harici Giderler', y);
+    y = sectionBar(doc, t('projects.field.pdf.expensesTitle'), y);
     const columns: TableColumn[] = [
-        { header: 'Harici Gider Tipi', width: 55 },
-        { header: 'Açıklama', width: CONTENT_W - 55 },
+        { header: t('projects.field.pdf.expenseType'), width: 55 },
+        { header: t('projects.field.pdf.expenseDescription'), width: CONTENT_W - 55 },
     ];
     const rows = expenses.map((expense) => [String(expense.expenseType || '-'), String(expense.description || '-')]);
     return drawTable(doc, columns, rows, y, { minRowH: 11 });
@@ -586,7 +591,7 @@ const detectImageFormat = (dataUrl: string): 'PNG' | 'JPEG' => {
     return 'PNG';
 };
 
-const drawImages = (doc: jsPDF, report: any, y: number): number => {
+const drawImages = (doc: jsPDF, report: any, y: number, t: FixedTranslator): number => {
     const images: string[] = [];
     if (Array.isArray(report.images)) {
         report.images.forEach((img: any) => {
@@ -595,13 +600,13 @@ const drawImages = (doc: jsPDF, report: any, y: number): number => {
         });
     }
 
-    y = sectionBar(doc, 'Görseller', y);
+    y = sectionBar(doc, t('projects.field.pdf.imagesTitle'), y);
 
     if (images.length === 0) {
         doc.setFont(FONT, 'italic');
         doc.setFontSize(FS_BASE);
         doc.setTextColor(...COLOR_MUTED);
-        doc.text('Bu rapor için görsel bulunmuyor.', LEFT + 2, y + 4);
+        doc.text(t('projects.field.pdf.noImages'), LEFT + 2, y + 4);
         return y + 12;
     }
 
@@ -627,13 +632,13 @@ const drawImages = (doc: jsPDF, report: any, y: number): number => {
 };
 
 // ── Onay ve İmza ──────────────────────────────────────────────────────────────
-const drawApproval = (doc: jsPDF, project: ProjectDto, report: any, preparedBy: string, y: number): number => {
+const drawApproval = (doc: jsPDF, project: ProjectDto, report: any, preparedBy: string, y: number, t: FixedTranslator, locale: string): number => {
     y = ensurePage(doc, y, 90);
-    y = sectionBar(doc, 'Onay ve İmza', y);
+    y = sectionBar(doc, t('projects.field.pdf.approvalTitle'), y);
 
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
-    const text = 'Yukarıdaki raporda belirtilmiş olan çalışma süresi , ek çalışma , harici gider ve ek malzeme kalemlerini sahada gerçekleştiğini kabul ediyorum ve onaylıyorum.';
+    const text = t('projects.field.pdf.approvalConfirm');
     const lines = doc.splitTextToSize(text, CONTENT_W - 10);
     const textBoxH = lines.length * 4.6 + 7;
     doc.setFillColor(...COLOR_NAVY);
@@ -645,11 +650,11 @@ const drawApproval = (doc: jsPDF, project: ProjectDto, report: any, preparedBy: 
     const boxH = 50;
     const colW = CONTENT_W / 2;
     const topH = 26;
-    const signDate = dateFmt(reportWorkDate(report));
+    const signDate = dateFmt(reportWorkDate(report), locale);
 
     const columns: [string, string][] = [
-        ['Servis Teknisyeni', preparedBy],
-        ['Müşteri Yetkilisi', project.customer?.companyName || '-'],
+        [t('projects.field.pdf.technicianRole'), preparedBy],
+        [t('projects.field.pdf.customerRole'), project.customer?.companyName || '-'],
     ];
 
     doc.setDrawColor(...COLOR_GRID);
@@ -669,11 +674,22 @@ const drawApproval = (doc: jsPDF, project: ProjectDto, report: any, preparedBy: 
         doc.setFont(FONT, 'normal');
         doc.text(doc.splitTextToSize(name, colW - 8)[0], cx, y + 13, { align: 'center' });
         doc.setTextColor(...COLOR_MUTED);
-        doc.text(`Tarih : ${signDate}`, cx, y + 19, { align: 'center' });
+        doc.text(`${t('projects.field.pdf.date')} : ${signDate}`, cx, y + 19, { align: 'center' });
         doc.setTextColor(...COLOR_TEXT);
         doc.setFont(FONT, 'normal');
-        doc.text('İmza:', x + 5, y + topH + 7);
+        doc.text(`${t('projects.field.pdf.signature')}:`, x + 5, y + topH + 7);
     });
+
+    // Customer signature image into the "Müşteri Yetkilisi" cell, if captured.
+    if (report?.customerSignature) {
+        try {
+            const sig = String(report.customerSignature);
+            const fmt = sig.includes('image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(sig, fmt, LEFT + colW + 16, y + topH + 2, colW - 22, boxH - topH - 6, undefined, 'FAST');
+        } catch {
+            /* ignore bad signature data */
+        }
+    }
 
     return y + boxH + 8;
 };
@@ -764,41 +780,44 @@ export const exportFieldReportPdf = async (project: ProjectDto, report: any, opt
 
     await registerFonts(doc);
 
+    // Rapor, müşterinin tercih ettiği yazışma dilinde üretilir.
+    const { t, locale } = await getReportTranslator(project.customer?.language);
+
     // SAYFA 1: üst bilgi + randevu/saat tablosu
-    const cover = drawCoverHeader(doc, project, settings, report, preparedBy);
+    const cover = drawCoverHeader(doc, project, settings, report, preparedBy, t);
     let y = cover.y;
     y = drawScheduleGrid(doc, [
         {
-            labels: ['Randevu Tarihi', 'Planlanan Başlangıç', 'Planlanan Bitiş', 'Planlanan Saat'],
-            values: [dateFmt(apptStart || reportWorkDate(report)), timeFmt(apptStart), timeFmt(apptEnd), durationFmt(plannedMin)],
+            labels: [t('projects.field.pdf.appointmentDate'), t('projects.field.pdf.plannedStart'), t('projects.field.pdf.plannedEnd'), t('projects.field.pdf.plannedHours')],
+            values: [dateFmt(apptStart || reportWorkDate(report), locale), timeFmt(apptStart, locale), timeFmt(apptEnd, locale), durationFmt(plannedMin, t)],
         },
         {
-            labels: ['Azami Onaylı Saat', 'Başlangıç', 'Bitiş', 'Toplam Çalışılan Saat'],
-            values: [durationFmt(maxMin), timeFmt(report?.startedAt), timeFmt(report?.endedAt), durationFmt(workedMin)],
+            labels: [t('projects.field.pdf.maxApprovedHours'), t('projects.field.pdf.start'), t('projects.field.pdf.end'), t('projects.field.pdf.totalWorkedHours')],
+            values: [durationFmt(maxMin, t), timeFmt(report?.startedAt, locale), timeFmt(report?.endedAt, locale), durationFmt(workedMin, t)],
         },
         {
-            labels: ['Servis Tipi', 'Raporu Hazırlayan', 'Para Birimi', 'Ülke/Şehir'],
-            values: ['Montaj', preparedBy, currency, `${countryLabel(settings.country)} / ${cityFrom(project.customer?.address, settings.city)}`],
+            labels: [t('projects.field.pdf.serviceType'), t('projects.field.pdf.preparedBy'), t('projects.field.pdf.currency'), t('projects.field.pdf.countryCity')],
+            values: [t('projects.field.pdf.serviceTypeAssembly'), preparedBy, currency, `${countryLabel(settings.country, t)} / ${cityFrom(project.customer?.address, settings.city)}`],
         },
     ], y);
 
     // SAYFA 2: yapılan işler + ek çalışma + kullanılan malzemeler
     doc.addPage();
     y = REST_CONTENT_TOP;
-    y = drawJobs(doc, report, y);
-    y = drawOvertime(doc, plannedMin, maxMin, workedMin, overtimeMin, y);
+    y = drawJobs(doc, report, y, t);
+    y = drawOvertime(doc, plannedMin, maxMin, workedMin, overtimeMin, y, t);
     y += 4;
-    y = drawMaterialTable(doc, 'Kullanılan Malzemeler', usedMaterials, y);
+    y = drawMaterialTable(doc, t('projects.field.pdf.usedMaterials'), usedMaterials, y, t);
 
     // SAYFA 3: ek malzemeler + harici giderler + görseller + onay
     doc.addPage();
     y = REST_CONTENT_TOP;
-    y = drawMaterialTable(doc, 'Ek Malzemeler', extraMaterials, y);
+    y = drawMaterialTable(doc, t('projects.field.pdf.extraMaterials'), extraMaterials, y, t);
     y += 4;
-    y = drawExpenses(doc, expenses, y);
+    y = drawExpenses(doc, expenses, y, t);
     y += 4;
-    y = drawImages(doc, report, y);
-    drawApproval(doc, project, report, preparedBy, y);
+    y = drawImages(doc, report, y, t);
+    drawApproval(doc, project, report, preparedBy, y, t, locale);
 
     const contentBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(doc.output('arraybuffer'));
     let finalBytes: Uint8Array<ArrayBufferLike> = contentBytes;

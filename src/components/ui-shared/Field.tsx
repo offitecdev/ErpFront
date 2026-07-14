@@ -1,9 +1,6 @@
 import React from 'react';
-import AntDatePicker from 'antd/es/date-picker';
 import AntInput from 'antd/es/input';
 import AntSelect from 'antd/es/select';
-import dayjs from 'dayjs';
-import type { Dayjs } from 'dayjs';
 
 import { t } from '@/i18n/translate';
 
@@ -36,6 +33,11 @@ export const inputClass = "w-full rounded-lg bg-primary text-primary shadow-xs r
 
 type SharedInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> & {
     size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+    // antd Input extras forwarded via ...rest to AntInput (ignored by the native
+    // date branch). `allowClear` renders a round clear icon at the end of the box;
+    // `onClear` fires when it is clicked.
+    allowClear?: boolean;
+    onClear?: () => void;
 };
 
 type SharedTextareaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'> & {
@@ -48,6 +50,14 @@ const antSizeMap: Record<string, 'small' | 'middle' | 'large'> = {
     lg: 'large',
     xl: 'large',
     '2xl': 'large',
+};
+
+const nativeInputSizeMap: Record<string, string> = {
+    sm: 'h-8 px-2.5 text-sm',
+    md: 'h-10 px-3 text-sm',
+    lg: 'h-11 px-3.5 text-base',
+    xl: 'h-12 px-4 text-base',
+    '2xl': 'h-14 px-4 text-lg',
 };
 
 export const Input: React.FC<SharedInputProps> = ({
@@ -67,29 +77,21 @@ export const Input: React.FC<SharedInputProps> = ({
     ...rest
 }) => {
     if (type === 'date') {
-        const dateValue = value && typeof value === 'string' ? dayjs(value) : undefined;
-        const dateDefaultValue = defaultValue && typeof defaultValue === 'string' ? dayjs(defaultValue as string) : undefined;
-
         return (
-            <AntDatePicker
+            <input
+                {...rest}
                 id={id}
-                value={dateValue}
-                defaultValue={dateDefaultValue}
-                onChange={(_date: Dayjs | null, dateString: string | null) => {
-                    const strVal = dateString ?? '';
-                    onChange?.({
-                        target: { value: strVal, name },
-                        currentTarget: { value: strVal, name },
-                    } as React.ChangeEvent<HTMLInputElement>);
-                }}
-                placeholder={placeholder ??t('auto.tarih_secin')}
+                name={name}
+                type="date"
+                value={value as string | undefined}
+                defaultValue={defaultValue as string | undefined}
+                onChange={onChange}
+                placeholder={placeholder ?? t('auto.tarih_secin')}
                 disabled={disabled}
-                size={antSizeMap[size] || 'middle'}
-                className={className}
-                style={{ width: '100%' }}
-                minDate={min ? dayjs(min as string) : undefined}
-                maxDate={max ? dayjs(max as string) : undefined}
-                format="YYYY-MM-DD"
+                required={required}
+                min={min}
+                max={max}
+                className={`${inputClass} ${nativeInputSizeMap[size] || nativeInputSizeMap.md} ${className}`}
             />
         );
     }
@@ -167,6 +169,10 @@ type SharedSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'si
     defaultValue?: string | number | null;
     onChange?: React.ChangeEventHandler<HTMLSelectElement>;
     size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+    // Turn the dropdown into a type-to-filter combobox: options narrow live as you
+    // type and can be picked directly, matching the search-and-select pattern used
+    // for pickers elsewhere in the app.
+    showSearch?: boolean;
 };
 
 const optionText = (children: React.ReactNode): string => {
@@ -200,11 +206,16 @@ export const Select: React.FC<SharedSelectProps> = ({
     size = 'md',
     id,
     title,
+    showSearch,
     'aria-label': ariaLabel,
 }) => {
     const items = optionChildrenToItems(children);
     const placeholder = items.find((item) => item.value === '')?.label ||t('common.select');
-    const selectedValue = value === undefined || value === null || value === '' ? undefined : String(value);
+    // When a `value` prop is supplied the Select is controlled: map an empty value to
+    // `null` (not `undefined`) so AntSelect stays controlled and reflects programmatic
+    // resets. Passing `undefined` would make AntSelect uncontrolled and it would keep
+    // showing the last-picked option even after the parent clears its state.
+    const selectedValue = value === undefined ? undefined : value === null || value === '' ? null : String(value);
     const defaultSelectedValue = defaultValue === undefined || defaultValue === null || defaultValue === '' ? undefined : String(defaultValue);
 
     return (
@@ -226,6 +237,9 @@ export const Select: React.FC<SharedSelectProps> = ({
             className={className || 'w-full'}
             style={{ width: '100%' }}
             options={items.filter((item) => item.value !== '')}
+            showSearch={showSearch}
+            filterOption={showSearch ? (input, option) =>
+                String(option?.label ?? '').toLocaleLowerCase('tr-TR').includes(input.toLocaleLowerCase('tr-TR')) : undefined}
             allowClear
         />
     );

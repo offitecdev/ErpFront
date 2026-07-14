@@ -7,7 +7,7 @@ import defaultLetterheadUrl from '../../assets/docs/sablon.pdf?url';
 import { usePdfSettingsStore, type PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
 import type { DeliveryReportDto, DeliveryResponseItem } from '../../lib/api/project';
-import { t } from '@/i18n/translate';
+import { getReportTranslator, type FixedTranslator } from '@/i18n/reportLanguage';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TESLİM RAPORU (Schlussrapport) — kullanıcı şablonuna (teslim_rapor) uyan,
@@ -136,6 +136,7 @@ const drawCoverHeader = (
     settings: PdfCompanySettings,
     project: ProjectDto | null | undefined,
     preparedBy: string,
+    t: FixedTranslator,
 ) => {
     const boxW = 95;
     const boxX = LEFT;
@@ -215,7 +216,7 @@ const drawCoverHeader = (
 // Kategori | Kontrol Adımı | Evet | Hayır | Uygulanamaz | Ölçüm Değerleri / Açıklama
 const COLS = { kat: 28, step: 49, yes: 13, no: 13, na: 22, meas: 50 };
 
-const drawTableHeader = (doc: jsPDF, y: number) => {
+const drawTableHeader = (doc: jsPDF, y: number, t: FixedTranslator) => {
     const h = 9;
     doc.setFillColor(...COLOR_NAVY);
     doc.rect(LEFT, y, CONTENT_W, h, 'F');
@@ -285,14 +286,14 @@ const drawKatCell = (doc: jsPDF, name: string, y: number, h: number) => {
     doc.text(lines, LEFT + COLS.kat / 2, y + h / 2 - (lines.length - 1) * 2.1 + 1, { align: 'center' });
 };
 
-const drawResponses = (doc: jsPDF, responses: DeliveryResponseItem[], startY: number) => {
+const drawResponses = (doc: jsPDF, responses: DeliveryResponseItem[], startY: number, t: FixedTranslator) => {
     const categories: string[] = [];
     for (const r of responses) {
         const key = r.category?.trim() || t('projects.delivery.uncategorized');
         if (!categories.includes(key)) categories.push(key);
     }
     let y = ensureSpace(doc, startY, 18);
-    y = drawTableHeader(doc, y);
+    y = drawTableHeader(doc, y, t);
 
     for (const category of categories) {
         const items = responses.filter((r) => (r.category?.trim() || t('projects.delivery.uncategorized')) === category);
@@ -310,7 +311,7 @@ const drawResponses = (doc: jsPDF, responses: DeliveryResponseItem[], startY: nu
             }
             if (chunk.length === 0) {
                 doc.addPage();
-                y = drawTableHeader(doc, REST_CONTENT_TOP);
+                y = drawTableHeader(doc, REST_CONTENT_TOP, t);
                 continue;
             }
             drawKatCell(doc, category, chunkStart, used);
@@ -319,14 +320,14 @@ const drawResponses = (doc: jsPDF, responses: DeliveryResponseItem[], startY: nu
             y = ry;
             if (i < items.length) {
                 doc.addPage();
-                y = drawTableHeader(doc, REST_CONTENT_TOP);
+                y = drawTableHeader(doc, REST_CONTENT_TOP, t);
             }
         }
     }
     return y;
 };
 
-const drawImages = (doc: jsPDF, images: Array<{ imageData: string }>, y: number) => {
+const drawImages = (doc: jsPDF, images: Array<{ imageData: string }>, y: number, t: FixedTranslator) => {
     if (!images.length) return y;
     y = ensureSpace(doc, y, 16);
     doc.setFont(FONT, 'bold');
@@ -360,7 +361,7 @@ const drawImages = (doc: jsPDF, images: Array<{ imageData: string }>, y: number)
     return y;
 };
 
-const drawApproval = (doc: jsPDF, report: DeliveryReportDto, preparedBy: string, project: ProjectDto | null | undefined, y: number) => {
+const drawApproval = (doc: jsPDF, report: DeliveryReportDto, preparedBy: string, project: ProjectDto | null | undefined, y: number, t: FixedTranslator) => {
     y = ensureSpace(doc, y, 58);
     y += 4;
 
@@ -437,9 +438,12 @@ export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     await registerFonts(doc);
 
-    let y = drawCoverHeader(doc, report, settings, project, preparedBy);
+    // Render the whole report in the customer's correspondence language.
+    const { t } = await getReportTranslator(project?.customer?.language);
+
+    let y = drawCoverHeader(doc, report, settings, project, preparedBy, t);
     void FIRST_CONTENT_TOP;
-    y = drawResponses(doc, Array.isArray(report.responses) ? report.responses : [], y);
+    y = drawResponses(doc, Array.isArray(report.responses) ? report.responses : [], y, t);
 
     if (report.notes) {
         y = ensureSpace(doc, y, 16);
@@ -457,8 +461,8 @@ export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [
         y += lines.length * 4.6;
     }
 
-    y = drawImages(doc, fieldImages, y + 4);
-    drawApproval(doc, report, preparedBy, project, y);
+    y = drawImages(doc, fieldImages, y + 4, t);
+    drawApproval(doc, report, preparedBy, project, y, t);
 
     const contentBytes: Uint8Array<ArrayBufferLike> = new Uint8Array(doc.output('arraybuffer'));
     let finalBytes: Uint8Array<ArrayBufferLike> = contentBytes;

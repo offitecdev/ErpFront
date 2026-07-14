@@ -9,9 +9,9 @@ import { Checkbox } from '@/components/ui-shared/Checkbox';
 import { useTenderStore } from '@/store/tenderStore';
 import type { PositionDto, TenderChangeLog } from '@/types/tender';
 import {
-    fmtMoney,
     type TreeNode,
 } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { t } from '@/i18n/translate';
 import {
     getTreeRowBorderClass,
@@ -40,6 +40,7 @@ export const TreeRow: React.FC<{
 }> = ({ node, level, selectedId, onSelect, checkedIds, onCheckedChange, isDraft, tenderId, onInlinePositionChange, onInlineMappingChange, onAddChild, onAddProduct, onUpdated }) => {
     const hasChildren = node.children.length > 0;
     const isSelected = selectedId === node.id;
+    const fmtMoney = useMoneyFormat();
     const { updatePosition, deletePosition } = useTenderStore();
     const { rowType, isSectionRow, isRootSection, isInlineContentRow, isTitleRow, isSeparatedContentRow } = getTreeRowFlags(node, level);
     const insertionParentId = isSectionRow ? node.id : (node.parentPositionId || null);

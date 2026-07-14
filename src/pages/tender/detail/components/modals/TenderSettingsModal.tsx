@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import {
     CalendarPlus01 as CalendarPlus,
     Edit01 as Pencil,
+    File05 as FileText,
     Mail01 as Mail,
     Plus,
     Trash01 as Trash2,
@@ -11,7 +12,7 @@ import {
 } from '@/components/icons/antIconCompat';
 
 import { Button } from '@/components/ui-shared/Button';
-import { Field, Input, Select, Textarea } from '@/components/ui-shared/Field';
+import { Field, Input, Select } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { projectApi } from '@/lib/api/project';
 import { tenderApi } from '@/lib/api/tender';
@@ -21,12 +22,16 @@ import { useTenderStore } from '@/store/tenderStore';
 import type { OfferScheduleSlotDto, TenderMaterialUsageDto } from '@/types/tender';
 import type { ProjectMaterial } from '@/types/project';
 import { t } from '@/i18n/translate';
+import { toCurrencyCode } from '@/utils/currency';
+import { localizeTenderNumber } from '@/utils/tenderNumber';
 import {
     flattenTenderTreeForPdf,
-    fmtMoney,
     fmtNumber,
     type TreeNode,
 } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
+import { RichTextMarkdownEditor, looksLikeRichHtml } from '../../TenderRichText';
+import { MailDraftsDrawer } from '../mail/MailDraftsDrawer';
 
 const bytesToBase64 = (bytes: Uint8Array) => {
     let binary = '';
@@ -52,6 +57,8 @@ type TenderSettingsModalProps = {
 
 export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, onClose, tenderId, tree, grandTotal, initialTab = 'mail', inline = false, hideTabs = false, overtimeHourlyRate, onOvertimeHourlyRateChange, onChanged }) => {
     const { detail, activities } = useTenderStore();
+    // Prices in the modal (position list, material costs) follow the offer's currency.
+    const fmtMoney = useMoneyFormat();
     const { user } = useAuthStore();
     const { settings } = usePdfSettingsStore();
     const [slots, setSlots] = useState<OfferScheduleSlotDto[]>([]);
@@ -72,6 +79,9 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
         message:t('tenders.merhaba_teklifimizi_pdf_olarak_ekte_iletiyoruz_p'),
     });
     const [loading, setLoading] = useState(false);
+    // Side pop-up with the database-backed, tenant-wide mail drafts. Stays open
+    // until explicitly closed.
+    const [draftsOpen, setDraftsOpen] = useState(false);
 
     const loadSlots = async () => {
         if (!open) return;
@@ -106,7 +116,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
         setForm((prev) => ({
             ...prev,
             to: detail.tender.customerEmail || '',
-            subject: t('tenders.tender_email_subject', { number: detail.tender.tenderNumber }),
+            subject: t('tenders.tender_email_subject', { number: localizeTenderNumber(detail.tender.tenderNumber) }),
         }));
     }, [open, detail?.tender.id, overtimeHourlyRate, initialTab]);
 
@@ -194,8 +204,10 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
         setLoading(true);
         try {
             onOvertimeHourlyRateChange(Math.max(0, Number(localOvertimeRate || 0)));
+            const overtimeNoteText = `Not: Planlanan gÃ¼nlÃ¼k Ã§alÄ±ÅŸma sÃ¼resinin %15 Ã¼zerindeki fazla Ã§alÄ±ÅŸmalar ${localOvertimeRate} CHF/saat Ã¼zerinden ayrÄ±ca hesaplanÄ±r.`;
+            // The message may now be rich HTML; append the note in kind.
             const overtimeNote = Number(localOvertimeRate || 0) > 0
-                ? `\n\nNot: Planlanan gÃ¼nlÃ¼k Ã§alÄ±ÅŸma sÃ¼resinin %15 Ã¼zerindeki fazla Ã§alÄ±ÅŸmalar ${localOvertimeRate} CHF/saat Ã¼zerinden ayrÄ±ca hesaplanÄ±r.`
+                ? (looksLikeRichHtml(form.message) ? `<br><br>${overtimeNoteText}` : `\n\n${overtimeNoteText}`)
                 : '';
             const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdf');
             const pdfBytes = await buildTenderPdfBytes({
@@ -211,12 +223,12 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 activities,
                 positions: flattenTenderTreeForPdf(tree),
                 grandTotal,
-            }, settings);
+            }, { ...settings, currency: toCurrencyCode((detail.tender as { currency?: string | null }).currency) });
             const res = await tenderApi.sendOfferMail(tenderId, {
                 ...form,
                 message: `${form.message}${overtimeNote}`,
                 attachments: [{
-                    filename: `${detail.tender.tenderNumber}.pdf`,
+                    filename: `${localizeTenderNumber(detail.tender.tenderNumber, 'de')}.pdf`,
                     contentType: 'application/pdf',
                     contentBase64: bytesToBase64(pdfBytes),
                 }],
@@ -269,13 +281,36 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
 
                 {activeTab === 'mail' && (
                     <div className="space-y-3">
+                        <div className="flex items-center justify-end">
+                            <button
+                                type="button"
+                                title={t('tenders.mail_drafts')}
+                                onClick={() => setDraftsOpen(true)}
+                                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors ${
+                                    draftsOpen
+                                        ? 'border-blue-700 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800'
+                                }`}
+                            >
+                                <FileText size={13} />
+                                {t('tenders.mail_drafts')}
+                            </button>
+                        </div>
                         <div className="grid grid-cols-2 gap-3">
                             <Field label={t('settings.mail.senderName')}><Input value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} /></Field>
                             <Field label={t('settings.mail.senderEmail')}><Input value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></Field>
                         </div>
                         <Field label={t('tenders.alici')}><Input value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></Field>
                         <Field label={t('tenders.konu')}><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></Field>
-                        <Field label={t('tenders.additional_mesaj')}><Textarea rows={12} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></Field>
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-sm font-medium text-secondary">{t('tenders.additional_mesaj')}</span>
+                            <RichTextMarkdownEditor
+                                value={form.message}
+                                onChange={(message) => setForm((prev) => ({ ...prev, message }))}
+                                minHeight={220}
+                                placeholder=""
+                            />
+                        </div>
                         <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{t('tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i')}</div>
                     </div>
                 )}
@@ -436,6 +471,15 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                     )}
                 </div>
                 )}
+
+                {/* Side pop-up: database-backed mail drafts, shared by all offers. */}
+                <MailDraftsDrawer
+                    open={draftsOpen}
+                    onClose={() => setDraftsOpen(false)}
+                    currentSubject={form.subject}
+                    currentMessage={form.message}
+                    onApply={(draft) => setForm((prev) => ({ ...prev, subject: draft.subject, message: draft.message || '' }))}
+                />
         </div>
     );
 

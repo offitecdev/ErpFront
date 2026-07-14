@@ -90,14 +90,14 @@ export const Home = () => {
         <div className="w-full lg:flex lg:items-start lg:gap-8">
           <div className="min-w-0 flex-1">
             {/* Welcome */}
-            <div className="mb-8 border-b border-slate-200/70 pb-6">
-                <p className="text-[12px] font-medium uppercase tracking-wider text-slate-400">
+            <div className="mb-8 border-b border-[#EAEAEC] pb-6 dark:border-white/10">
+                <p className="text-[12px] font-medium uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
                     {dayjs().format('dddd, DD MMMM YYYY')}
                 </p>
-                <h1 className="mt-1.5 text-[24px] font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+                <h1 className="mt-1.5 text-[24px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white sm:text-[28px]">
                     {t(greetingKey, { defaultValue: greetingDefaults[greetingKey] })}, {firstName}
                 </h1>
-                <p className="mt-1.5 text-[14px] text-slate-500">
+                <p className="mt-1.5 text-[14px] text-[#6B7280] dark:text-[#c4c9d2]">
                     {t('home.subtitle', { defaultValue: 'Hızlı erişim ile çalışmana kaldığın yerden devam et.' })}
                 </p>
             </div>
@@ -111,7 +111,7 @@ export const Home = () => {
             </div>
 
             {tiles.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-[13px] text-slate-400">
+                <div className="rounded-xl border border-[#EAEAEC] bg-white px-4 py-10 text-center text-[13px] text-[#98A0AE] dark:text-[#8f95a1]">
                     {t('home.noModules', { defaultValue: 'Erişilebilir modül bulunamadı.' })}
                 </div>
             ) : (
@@ -123,20 +123,20 @@ export const Home = () => {
                                 key={tile.key}
                                 type="button"
                                 onClick={() => navigate(tile.key)}
-                                className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[#272f67]/40 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#272f67]/25"
+                                className="group flex items-center gap-3.5 rounded-xl border border-[#EAEAEC] bg-white p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:border-[#D5D7DB] hover:shadow-[0_6px_20px_rgba(16,24,40,0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/25 dark:focus-visible:ring-[#e6cf9e]/30"
                             >
-                                <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-[#272f67] transition-colors duration-150 group-hover:border-[#272f67]/30 group-hover:bg-white">
-                                    <Icon size={24} />
+                                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#F3F4F6] text-[#3F4350] transition-colors duration-150 group-hover:bg-[#E7F6EC] group-hover:text-[#16A34A] dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e] dark:group-hover:bg-[#e6cf9e]/16 dark:group-hover:text-[#f0dcae]">
+                                    <Icon size={22} />
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[15.5px] font-semibold text-slate-900">
+                                    <span className="block truncate text-[15px] font-semibold text-[#1A1A1A] dark:text-white">
                                         {labelFor(tile)}
                                     </span>
-                                    <span className="mt-0.5 block truncate text-[13px] text-slate-500">
+                                    <span className="mt-0.5 block truncate text-[13px] text-[#6B7280] dark:text-[#aab0bb]">
                                         {t(tile.descKey, { defaultValue: tile.defaultDesc })}
                                     </span>
                                 </span>
-                                <ArrowRight size={17} className="shrink-0 text-slate-300 transition-colors duration-150 group-hover:text-[#272f67]" />
+                                <ArrowRight size={17} className="shrink-0 text-[#C4C7CE] transition-colors duration-150 group-hover:text-[#16A34A] dark:text-white/25 dark:group-hover:text-[#e6cf9e]" />
                             </button>
                         );
                     })}
@@ -146,7 +146,8 @@ export const Home = () => {
 
           {/* Right column: analog clock + upcoming appointments */}
           <aside className="mt-8 space-y-6 lg:mt-0 lg:w-80 lg:shrink-0">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            {/* Background-tinted "surface" card — the reference's non-white card variant */}
+            <div className="rounded-xl border border-[#E7E8EC] bg-[#F4F5F7] p-5 dark:border-white/10 dark:bg-[#151616]">
                 <AnalogClock />
             </div>
             <UpcomingAppointments

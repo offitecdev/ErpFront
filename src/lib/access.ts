@@ -40,14 +40,9 @@ export const getRoleProfile = (user: AnyUser): RoleProfile => {
     return 'full';
 };
 
-// For restricted profiles, only these nav/route keys are ever shown — regardless
-// of the raw permission list. Keys match the MENU leaf keys / single-section paths
-// in MainLayout (and the Home quick-access tiles).
-//   technician   → home, calendar, device assembly (montaj görevleri)
-//   projectOfficer (project manager role) → home, calendar, CRM, stock (products + materials +
-//      locations + suppliers), projects + orders, service programs
+
 export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]> = {
-    technician: ['/', '/calendar', '/projects/installation/tasks'],
+    technician: ['/', '/calendar', '/projects/installation/tasks', '/projects/installation/delivery'],
     projectOfficer: [
         '/',
         '/calendar',
@@ -58,7 +53,10 @@ export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]
         '/inventory/extra-materials',
         '/inventory/locations',
         '/projects',
+        '/projects/installation/delivery',
         '/crm/my-orders',
+        '/inventory/movements',
+        '/inventory',
         '/services/reports',
     ],
 };

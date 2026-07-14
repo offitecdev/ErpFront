@@ -331,8 +331,9 @@ const AddressList: React.FC<{ customerId: string; items: any[]; onChanged: () =>
 );
 
 export const AddressesTab: React.FC<{ customerId: string; items: any[]; onChanged: () => void }> = ({ customerId, items, onChanged }) => (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-5">
         <AddressList customerId={customerId} items={items} onChanged={onChanged} kind="INSTALLATION" title={i18nT('crm.installationAddresses')} addLabel={i18nT('crm.installationAddressAdd')} />
+        <AddressList customerId={customerId} items={items} onChanged={onChanged} kind="DELIVERY" title={i18nT('crm.deliveryAddresses')} addLabel={i18nT('crm.deliveryAddressAdd')} />
         <AddressList customerId={customerId} items={items} onChanged={onChanged} kind="BILLING" title={i18nT('crm.billingAddresses')} addLabel={i18nT('crm.billingAddressAdd')} />
     </div>
 );

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { CurrencyCode } from '../utils/currency';
 
 export interface PdfCompanySettings {
     companyName: string;
@@ -16,7 +17,9 @@ export interface PdfCompanySettings {
     website?: string;
     taxId?: string;
     vatRate: number;
-    currency: 'CHF' | 'EUR';
+    // Offer currencies (CHF/EUR/USD/GBP/TRY). Note: the Swiss QR-bill is only
+    // legally valid for CHF/EUR — other codes render but aren't payable via QR.
+    currency: CurrencyCode;
     paymentTerms: string;
     footerNote: string;
     /** base64 PNG/JPG to be used as page background (letterhead) - fallback */

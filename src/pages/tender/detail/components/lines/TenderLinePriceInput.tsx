@@ -1,5 +1,6 @@
 import type { NumberField, SimpleTenderLine } from '../../types/tenderDetail.types';
 import { INLINE_NUMBER_INPUT_CLASS } from '../../utils/tenderDetail.constants';
+import { AutoFitAmount } from '../common/AutoFitAmount';
 import { BufferedNumberInput } from '../TenderLineInputs';
 
 type TenderLinePriceInputProps = {
@@ -41,10 +42,14 @@ export const TenderLinePriceInput = ({
             registerCell={registerCell}
             onArrowNav={onArrowNav}
             className={INLINE_NUMBER_INPUT_CLASS}
+            autoFit={field === 'unitPrice'}
         />
     ) : (
-        <span className="font-mono text-[12px] text-slate-700">
-            {value != null && Number(value) > 0 ? `${value}${suffix ?? ''}` : ''}
-        </span>
+        <AutoFitAmount
+            value={value != null && Number(value) > 0 ? `${value}${suffix ?? ''}` : ''}
+            basePx={12}
+            scrollbar="thin"
+            className="font-mono text-slate-700"
+        />
     );
 };

@@ -61,6 +61,8 @@ const billedPercentForOrder = (orderId: string, invoices: InvoiceDto[]): number 
 const computeOrderFlow = (
     order: MyOrderDto,
     sources: Pick<FlowSources, 'deliveryReports' | 'fieldReports' | 'invoices'>,
+    /** A signed project-level handover report (salesOrderId null) delivers every order. */
+    projectDelivered: boolean,
 ): OrderFlow => {
     const field = sources.fieldReports.filter((r) => r.salesOrderId === order.id);
     const fieldReport: StageState = field.some((r) => r.isSigned)
@@ -70,7 +72,7 @@ const computeOrderFlow = (
             : 'pending';
 
     const delivery = sources.deliveryReports.filter((r) => r.salesOrderId === order.id);
-    const deliveryReport: StageState = delivery.some((r) => r.isSigned)
+    const deliveryReport: StageState = projectDelivered || delivery.some((r) => r.isSigned)
         ? 'completed'
         : delivery.length > 0
             ? 'ongoing'
@@ -114,7 +116,12 @@ const computeProjectBillingPercent = (
 
 export const computeProjectFlow = (project: ProjectDto, sources: FlowSources): ProjectFlow => {
     const rawOrders = sources.orders.filter((o) => o.projectId === project.id);
-    const orders = rawOrders.map((order) => computeOrderFlow(order, sources));
+    // The handover report is per-project: one signed report (no salesOrderId)
+    // marks the technical delivery done for all of the project's orders.
+    const projectDelivered = sources.deliveryReports.some(
+        (r) => r.projectId === project.id && !r.salesOrderId && r.isSigned,
+    );
+    const orders = rawOrders.map((order) => computeOrderFlow(order, sources, projectDelivered));
 
     const deliveredCount = orders.filter((o) => o.deliveryReport === 'completed').length;
     const technicalPercent = orders.length > 0 ? clampPercent((deliveredCount / orders.length) * 100) : 0;

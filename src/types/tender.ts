@@ -20,8 +20,18 @@ export interface TenderListItem {
     status: TenderStatus;
     validUntil?: string | null;
     billingAddress?: string | null;
+    // Projektadresse (installation/Montage); deliveryAddress is the Lieferadresse.
+    installationAddress?: string | null;
     deliveryAddress?: string | null;
     billingSameAsInstallation?: boolean | null;
+    internalDeliveryDate?: string | null;
+    priceList?: string | null;
+    paymentTerms?: string | null;
+    commissionNumber?: string | null;
+    // Currency the offer is denominated in (CHF/EUR/USD/GBP/TRY); symbol-only.
+    currency?: string | null;
+    // Document-level direct discount (%) applied to the net total.
+    directDiscount?: number | null;
     sourceStatus?: string | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;
@@ -103,6 +113,18 @@ export interface TenderChatterSummary {
     noteCount: number;
     documentCount: number;
     logCount: number;
+}
+
+// Tenant-wide reusable offer-mail draft (subject + message template),
+// shared by the mail composer of every tender.
+export interface TenderMailDraftDto {
+    id: string;
+    tenantId: string;
+    subject: string;
+    message: string | null;
+    createdBy?: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface CalculationItemDto {

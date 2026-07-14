@@ -20,7 +20,7 @@ import { apiClient } from '../../lib/axios';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
-import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
+import { Field, Input, Select } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { CUSTOMER_TYPE_OPTIONS, CUSTOMER_LANGUAGE_OPTIONS, CUSTOMER_STATUS_OPTIONS, DEFAULT_CUSTOMER_TYPE, DEFAULT_CUSTOMER_STATUS, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
@@ -30,21 +30,13 @@ import { t } from '@/i18n/translate';
 interface CustomerRow {
     id: string;
     companyName: string;
-    segment?: string | null;
-    taxOffice?: string | null;
-    taxNumber?: string | null;
+    vatNumber?: string | null;
     mainEmail?: string | null;
     mainPhone?: string | null;
     address?: string | null;
     status?: string | null;
     isActive: boolean;
 }
-
-const SEGMENT_LABEL: Record<string, string> = {
-    Enterprise:t('crm.customers.segmentEnterprise'),
-    SMB:t('crm.customers.segmentSMB'),
-    Startup:t('crm.customers.segmentStartup'),
-};
 
 export const CustomerList = () => {
     const navigate = useNavigate();
@@ -60,20 +52,21 @@ export const CustomerList = () => {
 
     const [form, setForm] = useState({
         companyName: '',
-        segment: '',
         customerType: DEFAULT_CUSTOMER_TYPE,
-        taxOffice: '',
-        taxNumber: '',
         vatNumber: '',
+        priceList: '',
         mainEmail: '',
         mainPhone: '',
         mobilePhone: '',
         website: '',
         language: '',
-        customerSource: '',
         responsibleFirstName: '',
         responsibleLastName: '',
+        addressName: '',
         address: '',
+        postalCode: '',
+        city: '',
+        country: '',
         status: DEFAULT_CUSTOMER_STATUS,
     });
     const pageSize = 10;
@@ -123,9 +116,11 @@ export const CustomerList = () => {
             await apiClient.post('/customers', form);
             toast.success(t('crm.customers.successAdd'));
             setForm({
-                companyName: '', segment: '', customerType: DEFAULT_CUSTOMER_TYPE, taxOffice: '', taxNumber: '',
-                vatNumber: '', mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
-                customerSource: '', responsibleFirstName: '', responsibleLastName: '', address: '', status: DEFAULT_CUSTOMER_STATUS,
+                companyName: '', customerType: DEFAULT_CUSTOMER_TYPE, vatNumber: '', priceList: '',
+                mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
+                responsibleFirstName: '', responsibleLastName: '',
+                addressName: '', address: '', postalCode: '', city: '', country: '',
+                status: DEFAULT_CUSTOMER_STATUS,
             });
             setSubmitAttempted(false);
             setShowForm(false);
@@ -193,17 +188,6 @@ export const CustomerList = () => {
                                 placeholder={t('crm.customers.companyNamePlaceholder')}
                             />
                         </Field>
-                        <Field label={t('crm.customers.colSegment')}>
-                            <Select
-                                value={form.segment}
-                                onChange={(e) => setForm({ ...form, segment: e.target.value })}
-                            >
-                                <option value="">{t('common.select')}</option>
-                                <option value="Enterprise">{t('crm.customers.segmentEnterprise')}</option>
-                                <option value="SMB">{t('crm.customers.segmentSMB')}</option>
-                                <option value="Startup">{t('crm.customers.segmentStartup')}</option>
-                            </Select>
-                        </Field>
                         <Field label={t('crm.customers.customerType')}>
                             <Select
                                 value={form.customerType}
@@ -224,17 +208,13 @@ export const CustomerList = () => {
                                 ))}
                             </Select>
                         </Field>
-                        <Field label={t('crm.customers.taxOffice')}>
-                            <Input value={form.taxOffice}
-                                onChange={(e) => setForm({ ...form, taxOffice: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.customers.taxNumber')}>
-                            <Input value={form.taxNumber}
-                                onChange={(e) => setForm({ ...form, taxNumber: e.target.value })} />
-                        </Field>
                         <Field label={t('crm.customers.vatNumber')}>
                             <Input value={form.vatNumber}
                                 onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.customers.pricelist')}>
+                            <Input value={form.priceList}
+                                onChange={(e) => setForm({ ...form, priceList: e.target.value })} />
                         </Field>
                         <Field label={t('crm.customers.language')}>
                             <Select
@@ -264,10 +244,6 @@ export const CustomerList = () => {
                                 onChange={(e) => setForm({ ...form, website: e.target.value })}
                                 placeholder="https://" />
                         </Field>
-                        <Field label={t('crm.customers.customerSource')}>
-                            <Input value={form.customerSource}
-                                onChange={(e) => setForm({ ...form, customerSource: e.target.value })} />
-                        </Field>
                         <Field label={t('crm.customers.responsibleEmployee')}>
                             <div className="flex gap-2">
                                 <Input value={form.responsibleFirstName}
@@ -278,9 +254,28 @@ export const CustomerList = () => {
                                     placeholder={t('crm.customers.responsibleLastName')} />
                             </div>
                         </Field>
-                        <Field label={t('crm.customers.address')} className="md:col-span-3">
-                            <Textarea rows={2} value={form.address}
+                        <div className="md:col-span-3 mt-1 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                            <MapPin size={11} /> {t('crm.locationPrimary')}
+                        </div>
+                        <Field label={t('crm.locationName')} className="md:col-span-3">
+                            <Input value={form.addressName}
+                                onChange={(e) => setForm({ ...form, addressName: e.target.value })} />
+                        </Field>
+                        <Field label={t('common.address')} className="md:col-span-3">
+                            <Input value={form.address}
                                 onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.postalCode')}>
+                            <Input value={form.postalCode}
+                                onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.city')}>
+                            <Input value={form.city}
+                                onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                        </Field>
+                        <Field label={t('crm.country')}>
+                            <Input value={form.country}
+                                onChange={(e) => setForm({ ...form, country: e.target.value })} />
                         </Field>
                         <div className="md:col-span-3 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                             <Button variant="secondary" type="button" onClick={() => { setSubmitAttempted(false); setShowForm(false); }}>{t('common.cancel')}</Button>
@@ -318,8 +313,7 @@ export const CustomerList = () => {
                             <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                                 <tr>
                                     <th className="px-4 py-2.5 font-semibold">{t('common.company')}</th>
-                                    <th className="px-4 py-2.5 font-semibold">{t('crm.customers.colSegment')}</th>
-                                    <th className="px-4 py-2.5 font-semibold">{t('common.tax')}</th>
+                                    <th className="px-4 py-2.5 font-semibold">{t('crm.customers.vatNumber')}</th>
                                     <th className="px-4 py-2.5 font-semibold">{t('crm.customers.colContact')}</th>
                                     <th className="px-4 py-2.5 font-semibold">{t('common.status')}</th>
                                     <th className="px-4 py-2.5 font-semibold text-right">{t('common.actions')}</th>
@@ -347,21 +341,11 @@ export const CustomerList = () => {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-2.5">
-                                            {c.segment ? (
-                                                <span className="text-[12px] font-medium text-blue-700">
-                                                    {SEGMENT_LABEL[c.segment] || c.segment}
-                                                </span>
-                                            ) : (
-                                                <span className="text-slate-300">—</span>
-                                            )}
-                                        </td>
                                         <td className="px-4 py-2.5 text-[12px] text-slate-600">
-                                            {c.taxNumber ? (
+                                            {c.vatNumber ? (
                                                 <div className="flex items-center gap-1.5 font-mono">
                                                     <Hash size={10} className="text-slate-300" />
-                                                    {c.taxNumber}
-                                                    {c.taxOffice && <span className="text-slate-400 ml-1">/ {c.taxOffice}</span>}
+                                                    {c.vatNumber}
                                                 </div>
                                             ) : (
                                                 <span className="text-slate-300">—</span>

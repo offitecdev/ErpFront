@@ -10,8 +10,8 @@ export const DEFAULT_TENDER_LINE_COLUMN_WIDTHS: Record<TenderLineColumnKey, numb
     quantity: 88,
     unit: 88,
     unitPrice: 96,
-    discount: 70,
-    taxRate: 70,
+    discount: 84,
+    taxRate: 84,
     total: 104,
 };
 

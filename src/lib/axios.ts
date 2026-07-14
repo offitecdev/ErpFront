@@ -63,7 +63,7 @@ apiClient.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const selectedTenantId = sessionStorage.getItem('selectedTenantId');
+    const selectedTenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
     const url = config.url || '';
     const isIdentityRequest = url.startsWith('/auth') || (config.method?.toLowerCase() === 'get' && url.startsWith('/tenants'));
     if (selectedTenantId && !isIdentityRequest) {

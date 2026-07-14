@@ -23,6 +23,10 @@ interface AddToStockModalProps {
     onClose: () => void;
     /** Modal açıldığında önceden seçili kalem (opsiyonel). */
     presetArticleId?: string | null;
+    /** Önceden doldurulacak miktar (tedarik talebinden gelen). */
+    presetQuantity?: number | null;
+    /** Önceden seçili tedarikçi (tedarik talebinden gelen). */
+    presetSupplierId?: string | null;
     /** Stoğa ekleme başarılı olduğunda çağrılır. */
     onDone?: () => void;
 }
@@ -32,7 +36,7 @@ interface AddToStockModalProps {
  * olarak alış maliyetiyle birlikte stoğa ekle. Lokasyon seçimi yoktur; arka uçta tek
  * global ana depo kullanılır. Ağırlıklı ortalama maliyet mevcut mantıkla hesaplanır.
  */
-export const AddToStockModal = ({ open, onClose, presetArticleId, onDone }: AddToStockModalProps) => {
+export const AddToStockModal = ({ open, onClose, presetArticleId, presetQuantity, presetSupplierId, onDone }: AddToStockModalProps) => {
     const { articles, fetchArticlesSummary } = useInventoryStore();
 
     const [articleId, setArticleId] = useState('');
@@ -59,14 +63,14 @@ export const AddToStockModal = ({ open, onClose, presetArticleId, onDone }: AddT
         setArticleId(presetArticleId ?? '');
         setSearch('');
         setMode('supplier');
-        setQuantity(0);
+        setQuantity(presetQuantity ?? 0);
         setUnitCost('');
-        setSupplierId('');
+        setSupplierId(presetSupplierId ?? '');
         setNewSupplierName('');
         setSupplierPhone('');
         setLastPurchaseDate('');
         setNotes('');
-    }, [open, presetArticleId]);
+    }, [open, presetArticleId, presetQuantity, presetSupplierId]);
 
     const selected = articles.find((a) => a.id === articleId) || null;
 

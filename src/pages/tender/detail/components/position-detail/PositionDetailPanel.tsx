@@ -22,7 +22,7 @@ import {
     mergeArticleMappingUpdate,
     type TreeNode,
 } from '../../tenderDetailUtils';
-import { RichTextMarkdownEditor, markdownToHtml } from '../../TenderRichText';
+import { RichTextMarkdownEditor, richTextToHtml } from '../../TenderRichText';
 import { t } from '@/i18n/translate';
 import { TabBtn } from '../common/TabBtn';
 import { PositionAdvancedCostSection } from './PositionAdvancedCostSection';
@@ -534,6 +534,11 @@ const MetaEditTab: React.FC<{
     const [desc, setDesc] = useState(position.shortDescription);
     const [longDesc, setLongDesc] = useState(position.longDescription || '');
     const [imageUrl, setImageUrl] = useState<string | null>(position.imageUrl || null);
+    // Tracks an explicit image change in THIS panel. The tender detail is loaded
+    // image-less, so comparing against position.imageUrl is meaningless — and
+    // unconditionally sending imageUrl both wiped stored images on unrelated edits
+    // and re-uploaded base64 blobs with every save.
+    const [imageDirty, setImageDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [uploadingImg, setUploadingImg] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -542,12 +547,13 @@ const MetaEditTab: React.FC<{
         setDesc(position.shortDescription);
         setLongDesc(position.longDescription || '');
         setImageUrl(position.imageUrl || null);
+        setImageDirty(false);
     }, [position.id]);
 
     const hasChanges =
         desc !== position.shortDescription
         || longDesc !== (position.longDescription || '')
-        || imageUrl !== (position.imageUrl || null);
+        || imageDirty;
 
     const handleImageFile = (file: File) => {
         if (!file.type.startsWith('image/')) {
@@ -562,6 +568,7 @@ const MetaEditTab: React.FC<{
         const reader = new FileReader();
         reader.onload = () => {
             setImageUrl(reader.result as string);
+            setImageDirty(true);
             setUploadingImg(false);
         };
         reader.onerror = () => {
@@ -577,8 +584,10 @@ const MetaEditTab: React.FC<{
             await updatePosition(tenderId, position.id, {
                 shortDescription: desc.trim(),
                 longDescription: longDesc || null,
-                imageUrl: imageUrl,
+                // Only ship the image when it was actually changed here.
+                ...(imageDirty ? { imageUrl } : {}),
             });
+            setImageDirty(false);
             toast.success(t('tenders.updated'));
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.kaydedilemedi'));
@@ -630,7 +639,7 @@ const MetaEditTab: React.FC<{
                                 <button
                                     type="button"
                                     className="text-[11px] text-red-600 hover:text-red-700 self-start"
-                                    onClick={() => setImageUrl(null)}
+                                    onClick={() => { setImageUrl(null); setImageDirty(true); }}
                                 >{t('common.remove')}</button>
                             )}
                         </div>
@@ -661,7 +670,7 @@ const MetaEditTab: React.FC<{
                 ) : longDesc ? (
                     <div
                         className="rounded-md border border-slate-200 bg-white p-3 text-[13px] leading-6 text-slate-800 [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-7 [&_li]:pl-1"
-                        dangerouslySetInnerHTML={{ __html: markdownToHtml(longDesc) }}
+                        dangerouslySetInnerHTML={{ __html: richTextToHtml(longDesc) }}
                     />
                 ) : (
                     <div className="text-slate-400 text-[12px]">{t('tenders.line_content_not_found')}</div>

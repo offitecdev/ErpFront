@@ -1,6 +1,6 @@
 import React from 'react';
 import AntButton from 'antd/es/button';
-import type { ButtonType } from 'antd/es/button';
+import type { ButtonProps as AntButtonProps } from 'antd/es/button';
 import { cx } from '../../lib/utils/cx';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle';
@@ -21,11 +21,14 @@ interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>
     htmlType?: 'button' | 'submit' | 'reset';
 }
 
-const typeMap: Record<Variant, { type: ButtonType; danger?: boolean }> = {
+// AntD v6 dropped the old `type="primary" + danger` = solid-red behaviour; a solid
+// red button now comes from the color/variant API. Map `danger` to that so it renders
+// red instead of falling back to the navy `colorPrimary`.
+const typeMap: Record<Variant, Pick<AntButtonProps, 'type' | 'danger' | 'color' | 'variant'>> = {
     primary: { type: 'primary' },
     secondary: { type: 'default' },
     ghost: { type: 'text' },
-    danger: { type: 'primary', danger: true },
+    danger: { color: 'danger', variant: 'solid' },
     subtle: { type: 'default' },
 };
 
@@ -56,7 +59,7 @@ export const Button: React.FC<ButtonProps> = ({
     style,
     ...rest
 }) => {
-    const { type, danger } = typeMap[variant];
+    const { type, danger, color, variant: antVariant } = typeMap[variant];
     const antSize = sizeMap[size] || 'middle';
     const leadingIcon = iconLeading ?? icon;
 
@@ -65,12 +68,14 @@ export const Button: React.FC<ButtonProps> = ({
             {...rest}
             type={type}
             danger={danger}
+            color={color}
+            variant={antVariant}
             size={antSize}
             icon={leadingIcon}
             loading={isLoading ?? loading}
             disabled={isDisabled ?? disabled}
             htmlType={htmlType ?? legacyType ?? 'button'}
-            className={cx('transition-all duration-150 active:translate-y-px', className)}
+            className={cx('transition-all duration-150 active:translate-y-px', variant === 'danger' && 'ofi-btn-danger', className)}
             style={style}
         >
             {children}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -15,8 +15,11 @@ import { apiClient } from '../../lib/axios';
 const suggestTenderNumber = () => {
     const year = dayjs().year();
     const rand = Math.floor(Math.random() * 9000) + 1000;
-    const lang = i18n.language;
-    const prefix = lang === 'de' ? 'T' : lang === 'en' ? 'A' : 'TKF';
+    // Language-specific document initial: A(ngebot) for German, O(ffer) for
+    // English — e.g. "A-2026-4474". Anything else falls back to the German
+    // offer prefix so a tender number never carries a non-offer code.
+    const lang = (i18n.language || '').split('-')[0];
+    const prefix = lang === 'en' ? 'O' : 'A';
     return `${prefix}-${year}-${rand}`;
 };
 
@@ -31,6 +34,10 @@ const defaultTenderValidUntil = () => dayjs().add(1, 'month').format('YYYY-MM-DD
 export const TenderCreate = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    // Optional: pre-link the new quote to a specific customer (e.g. when launched
+    // from that customer's panel via `/crm/tenders/new?customerId=<id>`).
+    const customerId = searchParams.get('customerId') || undefined;
     const { permissions } = useAuthStore();
     const canManage = permissions.length === 0 || permissions.includes('tenders.manage');
     const { createTender } = useTenderStore();
@@ -48,7 +55,7 @@ export const TenderCreate = () => {
         const validUntil = defaultTenderValidUntil();
         const tenderNumber = suggestTenderNumber();
 
-        createTender({ tenderNumber, format: 'SIA451', validUntil })
+        createTender({ tenderNumber, format: 'SIA451', validUntil, customerId })
             .then((created) => {
                 toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
                 navigate(`/crm/tenders/${created.id}`, { replace: true });
@@ -79,7 +86,7 @@ export const TenderCreate = () => {
                 toast.error(error.response?.data?.error || error.message || t('tenders.tender_olusturulamadi'));
                 navigate('/crm/tenders', { replace: true });
             });
-    }, [canManage, createTender, navigate, t]);
+    }, [canManage, createTender, navigate, t, customerId]);
 
     return (
         <div>

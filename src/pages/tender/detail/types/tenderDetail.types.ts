@@ -6,7 +6,7 @@ export type NumberField = 'quantity' | 'unitPrice' | 'discount' | 'taxRate';
 
 export type InlinePositionPatch = Pick<
     Partial<PositionDto>,
-    'quantity' | 'unit' | 'unitPrice' | 'discount' | 'taxRate' | 'shortDescription' | 'longDescription' | 'rowType' | 'imageUrl'
+    'quantity' | 'unit' | 'unitPrice' | 'discount' | 'taxRate' | 'shortDescription' | 'longDescription' | 'rowType' | 'imageUrl' | 'displayOrder'
 >;
 
 export type ProductSource = {
@@ -65,7 +65,11 @@ export type CustomerOption = {
     segment?: string | null;
     mainEmail?: string | null;
     mainPhone?: string | null;
+    addressName?: string | null;
     address?: string | null;
+    postalCode?: string | null;
+    city?: string | null;
+    country?: string | null;
     taxNumber?: string | null;
 };
 

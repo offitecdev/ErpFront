@@ -3,6 +3,7 @@ import type {
     InventoryLocation,
     InventoryArticle,
     ArticleStockSummary,
+    ArticleStockInfo,
     ArticleListPage,
     StockBalanceRow,
     StockMovementRow,
@@ -12,6 +13,12 @@ import type {
     SupplierRow,
     ArticleSupplierRow,
     SearchItem,
+    LowStockResponse,
+    ItemSuppliersResponse,
+    SupplyRequestRow,
+    SupplyRequestStatus,
+    CreateSupplyRequestInput,
+    ItemType,
 } from '../../types/inventory';
 
 export const inventoryApi = {
@@ -63,6 +70,7 @@ export const inventoryApi = {
         search?: string;
         status?: string;
         itemType?: string;
+        includeDescription?: boolean;
     }): Promise<ArticleListPage> => {
         const query = new URLSearchParams();
         query.set('page', String(params.page ?? 1));
@@ -70,7 +78,15 @@ export const inventoryApi = {
         if (params.search) query.set('search', params.search);
         if (params.status) query.set('status', params.status);
         if (params.itemType) query.set('itemType', params.itemType);
+        if (params.includeDescription) query.set('includeDescription', 'true');
         const res = await apiClient.get(`/inventory/articles/summary/paged?${query.toString()}`);
+        return res.data;
+    },
+
+    // Tek ürünün yalın canlı stok bilgisi (sayaç + ortalama maliyet). Depo/lokasyon,
+    // tedarikçi listesi ve görsel çekilmez — stok hareketi sonrası hızlı yenileme için.
+    getArticleStock: async (id: string): Promise<ArticleStockInfo> => {
+        const res = await apiClient.get(`/inventory/articles/${id}/stock`);
         return res.data;
     },
 
@@ -150,6 +166,40 @@ export const inventoryApi = {
     },
 };
 
+// Tedarik Talepleri (Supply Requests) — yalnızca ilgili kayıtları çeker.
+export const supplyApi = {
+    // Minimum/kritik seviyeye düşen ürün + malzemeler (eşiği tanımlı olanlar).
+    lowStock: async (): Promise<LowStockResponse> => {
+        const res = await apiClient.get('/inventory/supply/low-stock');
+        return res.data;
+    },
+
+    // Bir kalemin daha önce alım yaptığı tedarikçiler + son alım özeti.
+    itemSuppliers: async (kind: ItemType, id: string): Promise<ItemSuppliersResponse> => {
+        const res = await apiClient.get(`/inventory/supply/item/${kind}/${id}/suppliers`);
+        return res.data;
+    },
+
+    listRequests: async (status: SupplyRequestStatus = 'PENDING'): Promise<SupplyRequestRow[]> => {
+        const res = await apiClient.get(`/inventory/supply/requests?status=${status}`);
+        return res.data;
+    },
+
+    createRequest: async (input: CreateSupplyRequestInput): Promise<SupplyRequestRow & { emailPreview?: boolean }> => {
+        const res = await apiClient.post('/inventory/supply/requests', input);
+        return res.data;
+    },
+
+    receiveRequest: async (id: string): Promise<SupplyRequestRow> => {
+        const res = await apiClient.patch(`/inventory/supply/requests/${id}/receive`);
+        return res.data;
+    },
+
+    deleteRequest: async (id: string): Promise<void> => {
+        await apiClient.delete(`/inventory/supply/requests/${id}`);
+    },
+};
+
 export const articleApi = {
     list: async (params?: {
         search?: string;
@@ -169,8 +219,11 @@ export const articleApi = {
         return res.data;
     },
 
-    getById: async (id: string): Promise<InventoryArticle> => {
-        const res = await apiClient.get(`/articles/${id}`);
+    getById: async (id: string, options?: { includeImages?: boolean }): Promise<InventoryArticle> => {
+        // includeImages: false skips the base64 image payload (megabytes) for
+        // consumers that only need text/pricing fields (e.g. the tender picker).
+        const query = options?.includeImages === false ? '?includeImages=false' : '';
+        const res = await apiClient.get(`/articles/${id}${query}`);
         return res.data;
     },
 

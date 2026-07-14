@@ -7,11 +7,13 @@ import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Input } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { BillingButton } from '../../components/billing/BillingButton';
 import { myOrdersApi } from '../../lib/api/billing';
 import type { MyOrderAddonDto, MyOrderDto } from '../../types/billing';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const PAGE_SIZE = 10;
 
@@ -20,34 +22,38 @@ const fmtMoney = (v?: number | null) =>
         ? new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v)
         : '-';
 
-const billingChipColor = (remaining: number) =>
-    remaining <= 0 ? 'bg-emerald-600' : remaining >= 100 ? 'bg-amber-500' : 'bg-sky-600';
+// Solid status chips, matching the shared StatusChip used across the other
+// modules (no translucent "glass" tints).
+const billingChipVariant = (remaining: number): 'active' | 'warning' | 'info' =>
+    remaining <= 0 ? 'active' : remaining >= 100 ? 'warning' : 'info';
 
 const billingChipLabel = (billed: number, remaining: number) =>
     remaining <= 0 ?t('crm.billed') : remaining >= 100 ?t('crm.faturalanmadi') : t('crm.partially_billed', { percent: Math.round(billed) });
 
 const BillingChip = ({ billed, remaining }: { billed: number; remaining: number }) => (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold text-white shadow-xs ${billingChipColor(remaining)}`}>
+    <StatusChip variant={billingChipVariant(remaining)}>
         {billingChipLabel(billed, remaining)}
-    </span>
+    </StatusChip>
 );
 
 const AddonRow: React.FC<{ addon: MyOrderAddonDto; onBilled: () => void }> = ({ addon, onBilled }) => {
     const billed = addon.billingSummary?.billedPercent ?? 0;
     const remaining = addon.billingSummary?.remainingPercent ?? 100;
     return (
-        <tr className="bg-slate-50/50">
+        // Amber tint marks addon orders apart from the navy-tinted main orders.
+        // Translucent (amber-400/10) so it stays dark-theme safe.
+        <tr className="bg-amber-400/10 transition-colors hover:bg-amber-400/20">
             <td className="py-2 pl-2 pr-4">
                 {/* Same leading indent as OrderRow (toggle column + gap) so addon
                     order numbers line up vertically with the main order numbers */}
                 <div className="flex items-center gap-1.5">
                     <span className="inline-block w-5 shrink-0" />
                     <div className="flex items-center gap-2">
-                        <span className="truncate text-[12px] font-semibold text-primary">{addon.orderNumber}</span>
+                        <span className="truncate text-[12px] font-semibold text-primary">{localizeTenderNumbersInText(addon.orderNumber)}</span>
                         {addon.revisionNumber ? (
                             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">N{addon.revisionNumber}</span>
                         ) : null}
-                        <span className="text-[11px] text-tertiary">{t('crm.additional_order')}</span>
+                        <span className="whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{t('crm.additional_order')}</span>
                     </div>
                 </div>
             </td>
@@ -60,10 +66,11 @@ const AddonRow: React.FC<{ addon: MyOrderAddonDto; onBilled: () => void }> = ({ 
             <td className="px-4 py-2 text-right text-[12px] text-amber-600">{fmtMoney(addon.billingSummary?.remainingAmount)}</td>
             <td className="px-4 py-2 text-right">
                 <BillingButton
-                    target={{ type: 'order', id: addon.id, label: t('crm.additional_order_label', { number: addon.orderNumber }) }}
+                    target={{ type: 'order', id: addon.id, label: t('crm.additional_order_label', { number: localizeTenderNumbersInText(addon.orderNumber) }) }}
                     onBilled={onBilled}
                     size="sm"
                     variant="ghost"
+                    remainingPercent={remaining}
                 />
             </td>
         </tr>
@@ -72,7 +79,9 @@ const AddonRow: React.FC<{ addon: MyOrderAddonDto; onBilled: () => void }> = ({ 
 
 const OrderRow: React.FC<{ order: MyOrderDto; onBilled: () => void; showAddons: boolean }> = ({ order, onBilled, showAddons }) => {
     const navigate = useNavigate();
-    const [expanded, setExpanded] = useState(false);
+    // Addons start expanded so the main order and its additional orders are
+    // billed from the same grouped view; the toggle only collapses them.
+    const [expanded, setExpanded] = useState(true);
     const addons = order.addonSalesOrders || [];
     const billed = order.billingSummary?.billedPercent ?? 0;
     const remaining = order.billingSummary?.remainingPercent ?? 100;
@@ -80,7 +89,7 @@ const OrderRow: React.FC<{ order: MyOrderDto; onBilled: () => void; showAddons: 
 
     return (
         <>
-            <tr className="transition-colors hover:bg-slate-50/80 active:bg-slate-100">
+            <tr className="bg-[#272f67]/[0.04] transition-colors hover:bg-[#272f67]/[0.08] active:bg-[#272f67]/[0.1]">
                 <td className="pl-2 pr-4 py-3">
                     <div className="flex items-start gap-1.5">
                         {addons.length > 0 && showAddons ? (
@@ -97,7 +106,7 @@ const OrderRow: React.FC<{ order: MyOrderDto; onBilled: () => void; showAddons: 
                         )}
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="truncate text-[13px] font-semibold text-primary">{order.orderNumber}</span>
+                                <span className="truncate text-[13px] font-semibold text-primary">{localizeTenderNumbersInText(order.orderNumber)}</span>
                                 {order.project && (
                                     <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">{t('common.detail')}</span>
                                 )}
@@ -124,10 +133,11 @@ const OrderRow: React.FC<{ order: MyOrderDto; onBilled: () => void; showAddons: 
                 <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                         <BillingButton
-                            target={{ type: 'order', id: order.id, label: t('crm.order_label', { number: order.orderNumber }) }}
+                            target={{ type: 'order', id: order.id, label: t('crm.order_label', { number: localizeTenderNumbersInText(order.orderNumber) }) }}
                             onBilled={onBilled}
                             size="sm"
                             variant="primary"
+                            remainingPercent={remaining}
                         />
                         <Button variant="secondary" size="sm" onClick={() => navigate(`/crm/my-orders/${order.id}`)}>{t('common.detail')}</Button>
                     </div>

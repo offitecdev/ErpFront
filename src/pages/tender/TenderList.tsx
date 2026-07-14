@@ -28,6 +28,8 @@ import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../lib/axios';
 import type { CustomerLite, TenderFormat, TenderListItem } from '../../types/tender';
+import { formatMoney, toCurrencyCode } from '../../utils/currency';
+import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 import { t as i18nT } from '@/i18n/translate';
 import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
@@ -62,10 +64,8 @@ const initialsFromName = (value?: string | null) => {
     return source.map((part) => part.charAt(0)).join('').slice(0, 2).toUpperCase();
 };
 
-const fmtMoney = (v?: number | null) =>
-    typeof v === 'number'
-        ? new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v)
-        : '—';
+const fmtMoney = (v?: number | null, currency?: string | null) =>
+    typeof v === 'number' ? formatMoney(v, toCurrencyCode(currency)) : '—';
 
 export const TenderList = () => {
     useLanguageRefresh();
@@ -338,7 +338,7 @@ export const TenderList = () => {
                                     <td className="px-4 py-2.5 font-semibold text-slate-900">
                                         <div className="flex items-center gap-1.5">
                                             <FileSpreadsheet size={13} className="text-[#272f67]" />
-                                            {t.tenderNumber}
+                                            {localizeTenderNumber(t.tenderNumber)}
                                         </div>
                                     </td>
                                     <td className="px-4 py-2.5 text-slate-700">
@@ -366,7 +366,7 @@ export const TenderList = () => {
                                         </div>
                                     </td>
                                     <td className="px-4 py-2.5 text-right font-semibold text-slate-900 font-mono">
-                                        {fmtMoney(t.grandTotal)}
+                                        {fmtMoney(t.grandTotal, t.currency)}
                                     </td>
                                     <td className="px-4 py-2.5 text-slate-500 text-[12px]">
                                         {dayjs(t.createdAt).format("DD.MM.YYYY HH:mm")}

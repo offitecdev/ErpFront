@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
-import { LuArrowLeft, LuArrowRight, LuCheck, LuMoon, LuSun } from '@/components/icons/lucideLocal';
+import { LuArrowLeft, LuArrowRight, LuBookOpen, LuCheck, LuCloudDownload, LuGlobe, LuMoon, LuSun, LuX } from '@/components/icons/lucideLocal';
 import { toast } from 'sonner';
 import AntInput, { type InputRef } from 'antd/es/input';
 import { Button } from '@/components/ui-shared/Button';
@@ -17,6 +17,9 @@ import '../styles/login.css';
 
 // Accepted top-level domains for the workspace.
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.(com|eu|ch|uk|tr)$/i;
+const LOGIN_GUIDE_DISMISSED_KEY = 'offitec-login-guide-dismissed';
+const MANUAL_PDF_URL = '/Benutzerhandbuch.pdf';
+const PRODUCTION_PROTOTYPE_URL = 'https://prototip.offitec.ch/';
 
 type Step = 'email' | 'password';
 
@@ -53,6 +56,13 @@ export const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showGuidePopup, setShowGuidePopup] = useState(() => {
+        try {
+            return window.localStorage.getItem(LOGIN_GUIDE_DISMISSED_KEY) !== 'true';
+        } catch {
+            return true;
+        }
+    });
     const passwordRef = useRef<InputRef>(null);
 
     const { login, fetchProfile } = useAuthStore();
@@ -110,6 +120,15 @@ export const Login = () => {
         else handleLogin();
     };
 
+    const dismissGuidePopup = () => {
+        setShowGuidePopup(false);
+        try {
+            window.localStorage.setItem(LOGIN_GUIDE_DISMISSED_KEY, 'true');
+        } catch {
+            // Ignore storage errors; the close action should still feel immediate.
+        }
+    };
+
     return (
         <main className="ofi-login2 grid min-h-screen place-items-center px-6">
             {/* Navy logo, top-left */}
@@ -123,6 +142,93 @@ export const Login = () => {
                 <LanguageSwitcher />
                 <ThemeToggle />
             </div>
+
+            <nav className="ofi-login2__resource-dock" aria-label="Login-Schnellzugriffe">
+                <a className="ofi-login2__resource-card ofi-login2__resource-card--manual" href={MANUAL_PDF_URL} download="Benutzerhandbuch.pdf">
+                    <span className="ofi-login2__resource-icon">
+                        <LuBookOpen size={18} />
+                    </span>
+                    <span className="ofi-login2__resource-copy">
+                        <span className="ofi-login2__resource-kicker">Handbuch</span>
+                        <span className="ofi-login2__resource-title">Benutzerhandbuch</span>
+                    </span>
+                    <LuCloudDownload className="ofi-login2__resource-action" size={16} />
+                </a>
+                <a className="ofi-login2__resource-card ofi-login2__resource-card--prototype" href={PRODUCTION_PROTOTYPE_URL} target="_blank" rel="noreferrer">
+                    <span className="ofi-login2__resource-icon">
+                        <LuGlobe size={18} />
+                    </span>
+                    <span className="ofi-login2__resource-copy">
+                        <span className="ofi-login2__resource-kicker">Weblink</span>
+                        <span className="ofi-login2__resource-title">Produktionsprototyp Türkei</span>
+                    </span>
+                    <LuArrowRight className="ofi-login2__resource-action" size={16} />
+                </a>
+            </nav>
+
+            <AnimatePresence>
+                {showGuidePopup && (
+                    <motion.div
+                        className="ofi-login2__guide-layer"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.14 }}
+                    >
+                        <motion.section
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="ofi-login-guide-title"
+                            className="ofi-login2__guide-panel"
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                            <button type="button" className="ofi-login2__guide-close" onClick={dismissGuidePopup} aria-label="Popup schließen">
+                                <LuX size={18} />
+                            </button>
+
+                            <div className="ofi-login2__guide-badge">
+                                Beim ersten Einstieg
+                            </div>
+
+                            <h2 id="ofi-login-guide-title">Willkommen im Offitec Arbeitsbereich</h2>
+                            <p className="ofi-login2__guide-lead">
+                                Nutzen Sie die Schnellzugriffe für das Benutzerhandbuch und den Produktionsprototyp Türkei.
+                            </p>
+
+                            <div className="ofi-login2__guide-grid">
+                                <a className="ofi-login2__guide-card ofi-login2__guide-card--manual" href={MANUAL_PDF_URL} download="Benutzerhandbuch.pdf">
+                                    <span className="ofi-login2__guide-card-icon">
+                                        <LuBookOpen size={24} />
+                                    </span>
+                                    <span className="ofi-login2__guide-card-kicker">PDF-Handbuch</span>
+                                    <strong>Benutzerhandbuch</strong>
+                                    <span>Zum Benutzerhandbuch klicken und herunterladen.</span>
+                                    <em>
+                                        Handbuch herunterladen
+                                        <LuArrowRight size={15} />
+                                    </em>
+                                </a>
+
+                                <a className="ofi-login2__guide-card ofi-login2__guide-card--prototype" href={PRODUCTION_PROTOTYPE_URL} target="_blank" rel="noreferrer">
+                                    <span className="ofi-login2__guide-card-icon">
+                                        <LuGlobe size={24} />
+                                    </span>
+                                    <span className="ofi-login2__guide-card-kicker">Web-Prototyp</span>
+                                    <strong>Produktionsprototyp Türkei</strong>
+                                    <span>Vorläufiger Link zum Produktionsprototyp.</span>
+                                    <em>
+                                        Prototyp öffnen
+                                        <LuArrowRight size={15} />
+                                    </em>
+                                </a>
+                            </div>
+                        </motion.section>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Centered minimal column */}
             <div className="ofi-login2__enter relative z-[1] w-full max-w-[420px]">

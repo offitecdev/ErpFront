@@ -40,6 +40,9 @@ export const useTenderProductPicker = () => {
                 page: productPickerPage,
                 pageSize: PRODUCT_PICKER_PAGE_SIZE,
                 search: debouncedSearch || undefined,
+                // Include the one extra text field needed to stage a complete row;
+                // this avoids a second article-detail request after selection.
+                includeDescription: true,
             })
             .then((res) => {
                 if (cancelled) return;

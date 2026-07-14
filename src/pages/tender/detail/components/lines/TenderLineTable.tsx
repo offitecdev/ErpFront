@@ -1,14 +1,18 @@
+
 import {
+    ChevronDown,
+    ChevronUp,
     File05 as FileText,
     Package,
     Plus,
+    Tag01,
 } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
 import { Checkbox } from '@/components/ui-shared/Checkbox';
 import { t } from '@/i18n/translate';
 
-import { markdownToHtml } from '../../TenderRichText';
-import { fmtMoney } from '../../tenderDetailUtils';
+import { richTextToHtml } from '../../TenderRichText';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import type {
     ManualProductForm,
     NumberField,
@@ -24,6 +28,7 @@ import {
     lineActionButtonClass,
 } from '../../utils/tenderDetail.constants';
 import { cleanImportedProductDescription } from '../../utils/tenderLine.utils';
+import { AutoFitAmount } from '../common/AutoFitAmount';
 import { BufferedTextInput, InlineDescriptionEditor } from '../TenderLineInputs';
 import { TenderLineHeaderCell } from './TenderLineTableHeader';
 import { TenderLinePriceInput } from './TenderLinePriceInput';
@@ -35,7 +40,6 @@ type TenderLineTableProps = {
     canManage: boolean;
     sectionSchemaOpen: boolean;
     fallbackTaxRate: number;
-    grandTotal: number;
     selectedId: string | null;
     selectedRowIds: Record<string, boolean>;
     allRowsSelected: boolean;
@@ -51,6 +55,7 @@ type TenderLineTableProps = {
     registerCell: (key: string, handle: { focus: () => void } | null) => void;
     onArrowNav: (col: string, rowIndex: number, dir: 1 | -1) => boolean;
     onAddRow: (rowType: 'TITLE' | 'DESCRIPTION' | 'PRODUCT', article?: ProductSource, options?: Partial<ManualProductForm>, afterRowId?: string) => void;
+    onMoveRow: (rowId: string, direction: 'up' | 'down') => void;
     onOpenProductPicker: (afterRowId?: string) => void;
 };
 
@@ -61,7 +66,6 @@ export const TenderLineTable = ({
     canManage,
     sectionSchemaOpen,
     fallbackTaxRate,
-    grandTotal,
     selectedId,
     selectedRowIds,
     allRowsSelected,
@@ -77,9 +81,14 @@ export const TenderLineTable = ({
     registerCell,
     onArrowNav,
     onAddRow,
+    onMoveRow,
     onOpenProductPicker,
 }: TenderLineTableProps) => {
+    // Row totals follow the offer's selected currency (symbol-only display).
+    const fmtMoney = useMoneyFormat();
     const fixedLineColumnStyle = (key: TenderLineColumnKey) => ({ width: DEFAULT_TENDER_LINE_COLUMN_WIDTHS[key] });
+
+    const canReorder = isDraft && canManage;
 
     return (
         <table data-tender-detail-table className="min-w-[1160px] w-full table-fixed text-[12px]">
@@ -137,20 +146,60 @@ export const TenderLineTable = ({
                             className={`group border-b border-slate-100 transition-colors ${isSelected ? 'bg-[#1f2654]/[0.045]' : row.kind === 'TITLE' ? 'bg-slate-50/70' : 'hover:bg-slate-50/60'}`}
                         >
                             <td className="px-1.5 py-1.5 text-center align-top">
-                                <Checkbox
-                                    aria-label={t('tenders.line_select')}
-                                    size="sm"
-                                    isSelected={!!selectedRowIds[row.id]}
-                                    onChange={(checked) => onToggleRow(row.id, checked)}
-                                    onClick={(event) => event.stopPropagation()}
-                                />
+                                <div className="flex flex-col items-center gap-1">
+                                    <Checkbox
+                                        aria-label={t('tenders.line_select')}
+                                        size="sm"
+                                        isSelected={!!selectedRowIds[row.id]}
+                                        onChange={(checked) => onToggleRow(row.id, checked)}
+                                        onClick={(event) => event.stopPropagation()}
+                                    />
+                                    {canReorder && (
+                                        <div className="flex flex-col items-center opacity-40 transition-opacity group-hover:opacity-100">
+                                            <button
+                                                type="button"
+                                                aria-label={t('tenders.move_up')}
+                                                title={t('tenders.move_up')}
+                                                disabled={rowIndex === 0}
+                                                onClick={(event) => { event.stopPropagation(); onMoveRow(row.id, 'up'); }}
+                                                className="inline-flex h-4 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                                            >
+                                                <ChevronUp size={13} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                aria-label={t('tenders.move_down')}
+                                                title={t('tenders.move_down')}
+                                                disabled={rowIndex === pagedRows.length - 1}
+                                                onClick={(event) => { event.stopPropagation(); onMoveRow(row.id, 'down'); }}
+                                                className="inline-flex h-4 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                                            >
+                                                <ChevronDown size={13} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </td>
                             <td className="px-3 py-1.5 align-top">
-                                <div className={`flex min-w-0 ${row.label ? 'gap-2' : ''}`}>
+                                <div className={`flex min-w-0 ${row.label ? 'gap-1.5' : ''}`}>
                                     {row.label && (
-                                        <span className={`mt-0.5 w-10 shrink-0 font-mono ${row.kind === 'TITLE' ?"text-[13px] font-semibold text-slate-900" :"text-[12px] text-slate-700"}`}>
+                                        <span className={`mt-0.5 shrink-0 whitespace-nowrap font-mono tabular-nums ${row.kind === 'TITLE' ?"text-[13px] font-semibold text-slate-900" :"text-[12px] text-slate-700"}`}>
                                             {row.label}
                                         </span>
+                                    )}
+                                    {isProduct && position.sourceArticleId && (
+                                        <button
+                                            type="button"
+                                            aria-label={t('tenders.product_detayina_git')}
+                                            title={t('tenders.product_detayina_git')}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                window.open(`/inventory/articles/${position.sourceArticleId}`, '_blank', 'noopener');
+                                            }}
+                                            className="-mt-px inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        >
+                                            <Tag01 size={13} />
+                                        </button>
                                     )}
                                     <div className="min-w-0 flex-1">
                                         {!isDescription && (
@@ -186,7 +235,7 @@ export const TenderLineTable = ({
                                                 ) : position.longDescription ? (
                                                     <div
                                                         className="rich-text-preview text-[12.5px] leading-5 text-slate-700 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_li]:pl-0.5"
-                                                        dangerouslySetInnerHTML={{ __html: markdownToHtml(position.longDescription) }}
+                                                        dangerouslySetInnerHTML={{ __html: richTextToHtml(position.longDescription) }}
                                                     />
                                                 ) : null}
                                             </div>
@@ -205,7 +254,7 @@ export const TenderLineTable = ({
                                         ) : visibleLongDescription ? (
                                             <div
                                                 className="rich-text-preview text-[12.5px] leading-5 text-slate-700 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_li]:pl-0.5"
-                                                dangerouslySetInnerHTML={{ __html: markdownToHtml(visibleLongDescription) }}
+                                                dangerouslySetInnerHTML={{ __html: richTextToHtml(visibleLongDescription) }}
                                             />
                                         ) : null}
                                     </div>
@@ -242,19 +291,16 @@ export const TenderLineTable = ({
                                 <TenderLinePriceInput row={row} field="taxRate" value={taxRate} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} max={100} />
                             </td>
                             <td className="border-l border-slate-100 px-2 py-1.5 text-right align-top">
-                                <span className="font-mono text-[12px] font-semibold text-slate-900">
-                                    {isProduct && row.total > 0 ? fmtMoney(row.total) : ''}
-                                </span>
+                                {isProduct && row.total > 0 ? (
+                                    <AutoFitAmount value={fmtMoney(row.total)} basePx={12} scrollbar="thin" className="font-mono font-semibold text-slate-900" />
+                                ) : null}
                             </td>
                         </tr>
                     );
                 })}
-            </tbody>
-            <tfoot>
                 {isDraft && canManage && (
-                    <tr className="border-t border-slate-200 bg-white">
-                        <td />
-                        <td colSpan={7} className="px-2 py-2">
+                    <tr data-tender-line-actions className="border-0">
+                        <td colSpan={8} className="px-3 py-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="secondary" icon={<Package size={12} />} onClick={() => onOpenProductPicker(lastRowId)} className={lineActionButtonClass}>{t('tenders.product_add')}</Button>
                                 <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={() => onAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik_add')}</Button>
@@ -263,13 +309,7 @@ export const TenderLineTable = ({
                         </td>
                     </tr>
                 )}
-                <tr className="border-t-2 border-slate-200 bg-slate-50/60">
-                    <td colSpan={7} className="px-2 py-2 text-right font-semibold text-slate-700">{t('tenders.general_total')}</td>
-                    <td className="px-2 py-2 text-right font-mono text-[12px] font-bold text-slate-900">
-                        {fmtMoney(grandTotal)}
-                    </td>
-                </tr>
-            </tfoot>
+            </tbody>
         </table>
     );
 };

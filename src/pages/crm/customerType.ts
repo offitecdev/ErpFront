@@ -5,11 +5,10 @@ import { t as i18nT } from '@/i18n/translate';
 export const CUSTOMER_TYPE_OPTIONS = [
     { value: 'PRIVATE', labelKey: 'crm.customers.customerTypePrivate' },
     { value: 'COMPANY', labelKey: 'crm.customers.customerTypeCompany' },
-    { value: 'PROPERTY_MGMT', labelKey: 'crm.customers.customerTypePropertyManagement' },
-    { value: 'COMMERCIAL_DEALER', labelKey: 'crm.customers.customerTypeCommercialDealer' },
-    { value: 'ARCHITECT_PLANNER', labelKey: 'crm.customers.customerTypeArchitectPlanner' },
+    { value: 'PUBLIC_ADMIN', labelKey: 'crm.customers.customerTypePublicAdministration' },
 ] as const;
 
+// Default to the private customer (PrivatKunde) — the first option in the list.
 export const DEFAULT_CUSTOMER_TYPE = 'PRIVATE';
 
 // Preferred correspondence language — shared by the create form and the profile view/edit.
@@ -44,8 +43,18 @@ export const getCustomerStatusOption = (status?: string | null) =>
 export const getCustomerStatusLabel = (status?: string | null) =>
     i18nT(getCustomerStatusOption(status).labelKey);
 
+// No longer selectable, but existing customers may still carry these values —
+// keep them resolvable for display instead of mislabeling them as the fallback.
+const LEGACY_CUSTOMER_TYPE_LABEL_KEYS: Record<string, string> = {
+    PROPERTY_MGMT: 'crm.customers.customerTypePropertyManagement',
+    COMMERCIAL_DEALER: 'crm.customers.customerTypeCommercialDealer',
+    ARCHITECT_PLANNER: 'crm.customers.customerTypeArchitectPlanner',
+};
+
 // Resolve a stored code to its translated label; unknown/empty falls back to the first option.
 export const getCustomerTypeLabel = (type?: string | null) => {
     const match = CUSTOMER_TYPE_OPTIONS.find((o) => o.value === type);
-    return i18nT((match ?? CUSTOMER_TYPE_OPTIONS[0]).labelKey);
+    if (match) return i18nT(match.labelKey);
+    if (type && LEGACY_CUSTOMER_TYPE_LABEL_KEYS[type]) return i18nT(LEGACY_CUSTOMER_TYPE_LABEL_KEYS[type]);
+    return i18nT(CUSTOMER_TYPE_OPTIONS[0].labelKey);
 };

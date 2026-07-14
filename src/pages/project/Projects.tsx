@@ -6,6 +6,7 @@ import {
     ArrowRight,
     Briefcase01 as BriefcaseBusiness,
     CalendarCheck01 as CalendarClock,
+    Check,
     CurrencyDollarCircle as CircleDollarSign,
     FilterLines,
     Plus,
@@ -14,35 +15,22 @@ import {
 } from '@/components/icons/antIconCompat';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui-shared/Button';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { PageHeader } from '../../components/layout/PageHeader';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { Input, Select } from '../../components/ui-shared/Field';
+import { Select } from '../../components/ui-shared/Field';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
 import type { ProjectDto, ProjectStatus } from '../../types/project';
 import { ProjectProcessModal } from './ProjectProcessModal';
+import { ProjectStatusBadge } from './features/components/common/ProjectStatusBadge';
+import { getStatusLabel } from './features/utils/projectFormatters';
 
 import { t } from '@/i18n/translate';
-
-const getStatusLabel = (): Record<ProjectStatus, string> => ({
-    AWAITING_APPROVAL:t('projects.statusPending'),
-    ACTIVE:t('common.active'),
-    ON_HOLD:t('projects.statusOnHold'),
-    COMPLETED:t('common.completed'),
-    CANCELLED:t('common.cancel'),
-});
-
-const STATUS_VARIANT: Record<ProjectStatus, 'warning' | 'active' | 'passive' | 'info'> = {
-    AWAITING_APPROVAL: 'warning',
-    ACTIVE: 'active',
-    ON_HOLD: 'info',
-    COMPLETED: 'active',
-    CANCELLED: 'passive',
-};
+import { localizeTenderNumber, localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const money = (value: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(value || 0);
@@ -126,51 +114,51 @@ export const Projects = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb="Proje Yönetimi"
-                title={t('projects.tableTitle')}
+                breadcrumb={t('projects.breadcrumb')}
+                title={t('projects.title')}
                 description={t('projects.description')}
             />
-
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                <Stat label={t('projects.activeProjects')} value={stats.active} icon={<BriefcaseBusiness size={14} />} tone="brand" />
-                <Stat label={t('projects.pendingApproval')} value={stats.awaiting} icon={<AlertCircle size={14} />} tone="warning" />
-                <Stat label={t('projects.fieldReport')} value={stats.reportCount} icon={<CalendarClock size={14} />} tone="success" />
-                <Stat label={t('projects.tenderBudget')} value={money(stats.budget)} icon={<CircleDollarSign size={14} />} tone="total" small />
+                <Stat label={t('projects.activeProjects')} value={stats.active} icon={<BriefcaseBusiness size={16} />} tone="brand" />
+                <Stat label={t('projects.pendingApproval')} value={stats.awaiting} icon={<AlertCircle size={16} />} tone="warning" />
+                <Stat label={t('projects.fieldReport')} value={stats.reportCount} icon={<CalendarClock size={16} />} tone="success" />
+                <Stat label={t('projects.tenderBudget')} value={money(stats.budget)} icon={<CircleDollarSign size={16} />} tone="total" small />
             </div>
 
             <Card
                 title={t('projects.projectList')}
                 icon={<BriefcaseBusiness size={14} />}
                 noPadding
-            >
+                actions={
                     <form
-                        className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-slate-100 px-3 py-3 [scrollbar-width:thin]"
+                        className="flex items-center gap-2"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            void load({ status, search });
+                            // Searching always spans every status: reset the status
+                            // filter so a match is never hidden by a stale selection.
+                            setStatus('');
+                            void load({ status: '', search });
                         }}
                     >
-                        <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
-                            <FilterLines size={16} />
-                        </div>
-                        <div className="relative shrink-0">
-                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input
+                        <div className="relative">
+                            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={t('projects.searchPlaceholder')}
-                                className="ofi-light-search-input w-[230px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
+                                className="ofi-light-search-input min-h-9 rounded-md border border-slate-300 bg-slate-50/80 py-2 pl-8 pr-2.5 text-[12px] text-slate-950 transition-colors placeholder:text-slate-400 focus:border-[#272f67] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#272f67]/10 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
                             />
                         </div>
-                        <Select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus | '')} className="w-[150px]">
+                        <Select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus | '')} size="sm" className="w-[150px] text-[12px]">
                             <option value="">{t('auto.tum_durumlar')}</option>
                             {Object.entries(getStatusLabel()).map(([key, label]) => (
                                 <option key={key} value={key}>{label}</option>
                             ))}
                         </Select>
-                        <Button type="submit" variant="secondary" size="sm" className="shrink-0">{t('auto.uygula')}</Button>
-                        <Button type="button" variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={clearFilters} className="shrink-0">{t('common.clear')}</Button>
+                        <Button type="submit" variant="ghost" size="sm" icon={<FilterLines size={12} />}>{t('auto.uygula')}</Button>
                     </form>
+                }
+            >
                 <div className="overflow-x-auto">
                     <table className="w-full text-[12.5px]">
                         <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
@@ -198,33 +186,30 @@ export const Projects = () => {
                             {!loading && projects.length === 0 && (
                                 <tr>
                                     <td colSpan={10}>
-                                        <div className="px-4 py-4">
-                                            <div className="mb-3 flex items-start gap-2 rounded-md border border-[#d30f15]/20 bg-[#d30f15]/5 px-3 py-2 text-[12px] font-medium text-[#b90d12]">
-                                                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                                                <span>{t('auto.secili_filtrelere_uygun_proje_bulunamadi_arama_v')}</span>
-                                            </div>
+                                        <div className="px-4 py-6">
                                             <EmptyState
                                                 icon={<BriefcaseBusiness size={32} />}
                                                 title={t('auto.proje_yok')}
-                                                description={t('auto.onayli_teklif_uzerinden_proje_olusturabilirsiniz')}
-                                                action={
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            setSearch('');
-                                                            setStatus('');
-                                                            void load({ status: '', search: '' });
-                                                        }}
-                                                    >{t('auto.filtreleri_temizle')}</Button>
-                                                }
+                                                description={(search || status)
+                                                    ?t('auto.secili_filtrelere_uygun_proje_bulunamadi_arama_v')
+                                                    :t('auto.onayli_teklif_uzerinden_proje_olusturabilirsiniz')}
+                                                action={(search || status) ? (
+                                                    <Button variant="secondary" size="sm" icon={<XIcon size={13} />} onClick={clearFilters}>
+                                                        {t('auto.filtreleri_temizle')}
+                                                    </Button>
+                                                ) : undefined}
                                             />
                                         </div>
                                     </td>
                                 </tr>
                             )}
                             {!loading && projects.map((project) => {
-                                const booked = project.appointments?.find((a) => a.status === 'BOOKED');
+                                // Prefer the next upcoming booked appointment; fall back to the most
+                                // recent one so past-only projects still show their last plan.
+                                const bookedAll = (project.appointments || [])
+                                    .filter((a) => a.status === 'BOOKED')
+                                    .sort((a, b) => dayjs(a.startTime).valueOf() - dayjs(b.startTime).valueOf());
+                                const booked = bookedAll.find((a) => dayjs(a.startTime).isAfter(dayjs())) || bookedAll[bookedAll.length - 1];
                                 return (
                                     <tr
                                         key={project.id}
@@ -233,7 +218,7 @@ export const Projects = () => {
                                     >
                                         <td className="px-3 py-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-800">{project.projectName}</span>
+                                                <span className="font-medium text-slate-800">{localizeTenderNumbersInText(project.projectName)}</span>
                                                 {addonMap[project.id] > 0 && (
                                                     <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
                                                         <Plus size={9} />{t('projects.complete.addonCount', { count: addonMap[project.id] })}
@@ -243,12 +228,22 @@ export const Projects = () => {
                                             <div className="text-[11px] text-slate-400">{dayjs(project.createdAt).format('DD.MM.YYYY')}</div>
                                         </td>
                                         <td className="px-3 py-2 text-slate-600">{project.customer?.companyName || project.customerId}</td>
-                                        <td className="px-3 py-2 font-mono text-[11.5px] text-slate-500">{project.tender?.tenderNumber || project.tenderId || '-'}</td>
+                                        <td className="px-3 py-2 font-mono text-[11.5px] text-slate-500">{project.tender?.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : (project.tenderId || '-')}</td>
                                         <td className="px-3 py-2 text-right font-mono">{money(project.plannedBudget)}</td>
                                         <td className="px-3 py-2 text-right font-mono">{project._count?.reports || 0}</td>
-                                        <td className="px-3 py-2 text-slate-500">{booked ? dayjs(booked.startTime).format("DD.MM.YYYY HH:mm") : '-'}</td>
                                         <td className="px-3 py-2">
-                                            <StatusChip variant={STATUS_VARIANT[project.status]}>{getStatusLabel()[project.status]}</StatusChip>
+                                            {booked ? (
+                                                <span className={`inline-flex items-center gap-1.5 ${dayjs(booked.startTime).isAfter(dayjs()) ? 'text-[#272f67]' : 'text-slate-500'}`}>
+                                                    <CalendarClock size={12} className="shrink-0" />
+                                                    <span>
+                                                        <span className="block font-medium leading-tight">{dayjs(booked.startTime).format('DD.MM.YYYY')}</span>
+                                                        <span className="block text-[11px] leading-tight text-slate-400">{dayjs(booked.startTime).format('HH:mm')}</span>
+                                                    </span>
+                                                </span>
+                                            ) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <ProjectStatusBadge status={project.status} />
                                         </td>
                                         <td className="px-3 py-2">
                                             {(() => {
@@ -257,7 +252,7 @@ export const Projects = () => {
                                                 const done = flow.technicalStatus === 'completed';
                                                 return (
                                                     <StatusChip variant={done ? 'active' : 'info'}>
-                                                        {done ? t('projects.flow.stateCompleted') : t('projects.flow.stateOngoing')}
+                                                        {done ? <Check size={13} strokeWidth={3} aria-label={t('projects.flow.stateCompleted')} /> : t('projects.flow.stateOngoing')}
                                                     </StatusChip>
                                                 );
                                             })()}
@@ -269,7 +264,7 @@ export const Projects = () => {
                                                 const done = flow.billingStatus === 'completed';
                                                 return (
                                                     <StatusChip variant={done ? 'active' : 'warning'}>
-                                                        {done ? t('projects.flow.stateCompleted') : t('projects.flow.statePending')}
+                                                        {done ? <Check size={13} strokeWidth={3} aria-label={t('projects.flow.stateCompleted')} /> : t('projects.flow.statePending')}
                                                     </StatusChip>
                                                 );
                                             })()}
@@ -305,26 +300,18 @@ export const Projects = () => {
 
 type StatTone = 'brand' | 'success' | 'warning' | 'total';
 
-const statToneClass: Record<StatTone, { card: string; label: string; value: string }> = {
+const statToneClass: Record<StatTone, { bubble: string }> = {
     brand: {
-        card:"border-[#272f67] bg-white",
-        label: 'text-[#272f67]',
-        value: 'text-[#272f67]',
+        bubble: 'bg-[#272f67]/10 text-[#272f67]',
     },
     success: {
-        card:"border-[#059669] bg-white",
-        label: 'text-[#059669]',
-        value: 'text-[#059669]',
+        bubble: 'bg-emerald-500/10 text-emerald-600',
     },
     warning: {
-        card:"border-[#f59e0b] bg-white",
-        label: 'text-[#f59e0b]',
-        value: 'text-[#f59e0b]',
+        bubble: 'bg-amber-500/10 text-amber-600',
     },
     total: {
-        card:"border-[#64748b] bg-white",
-        label: 'text-[#64748b]',
-        value: 'text-[#64748b]',
+        bubble: 'bg-slate-500/10 text-slate-600',
     },
 };
 
@@ -332,12 +319,14 @@ const Stat = ({ label, value, icon, small, tone = 'brand' }: { label: string; va
     const styles = statToneClass[tone];
 
     return (
-        <div className={`rounded-lg border-2 px-4 py-3 ${styles.card}`}>
-            <div className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-normal ${styles.label}`}>
-                {icon}
-                {label}
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-shadow hover:shadow-md">
+            <div className="flex items-center gap-3">
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${styles.bubble}`}>{icon}</span>
+                <div className="min-w-0">
+                    <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+                    <div className={`truncate font-semibold text-slate-900 ${small ? 'text-[15px]' : 'text-[20px]'}`}>{value}</div>
+                </div>
             </div>
-            <div className={`mt-1 font-semibold ${small ? 'text-[15px]' : 'text-[21px]'} ${styles.value}`}>{value}</div>
         </div>
     );
 };

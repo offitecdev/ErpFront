@@ -7,12 +7,10 @@ import { useAttendanceStore } from '../../store/attendanceStore';
 import { useThemeStore } from '../../store/themeStore';
 import {
     Bell01 as BellOutlined,
-    Box as AppstoreOutlined,
     Briefcase01 as FundProjectionScreenOutlined,
     Building02 as BankOutlined,
     Building03 as ContactsOutlined,
     Calendar as CalendarOutlined,
-    Check as CheckOutlined,
     FileCheck02 as ServiceReportsOutlined,
     Clock as ClockCircleOutlined,
     SwitchHorizontal01 as SplitCellsOutlined,
@@ -28,12 +26,15 @@ import {
     Home01 as HomeOutlined,
     XClose as CloseOutlined,
 } from '../icons/antIconCompat';
-import { getRoleProfile, isKeyAllowedForProfile, type RoleProfile } from '../../lib/access';
+import { getRoleProfile } from '../../lib/access';
+import { useGuardedNavigate } from '../../store/navGuardStore';
+import { hrefFor, isModifiedClick } from '../../lib/navLink';
 import Badge from 'antd/es/badge';
-import AntButton from 'antd/es/button';
-import Menu from 'antd/es/menu';
 import AntSelect from 'antd/es/select';
+import Switch from 'antd/es/switch';
 import { SlidePanel } from './SlidePanel';
+import { AppSidebar, type QuickCreateItem } from './AppSidebar';
+import { WorkspaceTabs } from './WorkspaceTabs';
 import { SplitViewProvider, useSplitView, SPLITABLE_ROUTES, type SplitablePath } from './SplitViewContext';
 import { SecondaryPane } from './SecondaryPane';
 import { notificationApi, type NotificationDto } from '../../lib/api/notifications';
@@ -44,14 +45,6 @@ import offitecLogoDark from '../../assets/images/darkmode.png';
 /* ── Menü Tipleri ── */
 type MenuLeaf = { key: string; label: string; permission?: string; hideForTechnician?: boolean; technicianOnly?: boolean };
 type MenuIcon = React.ComponentType<any>;
-type QuickAction = {
-    id: string;
-    label: string;
-    path: string;
-    icon: MenuIcon;
-    permission?: string;
-    feature?: 'projects';
-};
 type ModuleLauncherItem = {
     id: string;
     label: string;
@@ -114,6 +107,21 @@ const MENU_SECTIONS: MenuSection[] = [
     },
     {
         type: 'group',
+        key: 'projects',
+        label: 'nav.projects',
+        feature: 'projects',
+        icon: FundProjectionScreenOutlined,
+        items: [
+            { key: '/projects', label: 'nav.projectManagement', permission: 'projects.view', hideForTechnician: true },
+            { key: '/projects/flow', label: 'nav.projectFlow', permission: 'projects.view', hideForTechnician: true },
+            { key: '/crm/my-orders', label: 'nav.myOrders', permission: 'crm.customers.view', hideForTechnician: true },
+            { key: '/projects/installation/tasks', label: 'nav.installationTasks', permission: 'projects.report', technicianOnly: true },
+            { key: '/projects/installation/delivery', label: 'nav.deliveryReports', permission: 'projects.report', technicianOnly: true },
+            { key: '/settings/mail', label: 'nav.mailSettings', permission: 'mail.manage', hideForTechnician: true },
+        ],
+    },
+    {
+        type: 'group',
         key: 'inventory',
         label: 'nav.inventory',
         icon: InboxOutlined,
@@ -153,20 +161,6 @@ const MENU_SECTIONS: MenuSection[] = [
 
     {
         type: 'group',
-        key: 'projects',
-        label: 'nav.projects',
-        feature: 'projects',
-        icon: FundProjectionScreenOutlined,
-        items: [
-            { key: '/projects', label: 'nav.projectManagement', permission: 'projects.view', hideForTechnician: true },
-            { key: '/projects/flow', label: 'nav.projectFlow', permission: 'projects.view', hideForTechnician: true },
-            { key: '/crm/my-orders', label: 'nav.myOrders', permission: 'crm.customers.view', hideForTechnician: true },
-            { key: '/projects/installation/tasks', label: 'nav.installationTasks', permission: 'projects.report', technicianOnly: true },
-            { key: '/settings/mail', label: 'nav.mailSettings', permission: 'mail.manage', hideForTechnician: true },
-        ],
-    },
-    {
-        type: 'group',
         key: 'services',
         label: 'nav.services',
         feature: 'projects',
@@ -188,7 +182,6 @@ const MENU_SECTIONS: MenuSection[] = [
     },
 ];
 
-const QUICK_ACTION_STORAGE_KEY = 'offitec:header-quick-actions';
 MENU_SECTIONS.forEach((section) => {
     if (section.type !== 'group' || section.key !== 'projects') return;
     section.items.forEach((item) => {
@@ -198,19 +191,6 @@ MENU_SECTIONS.forEach((section) => {
         }
     });
 });
-
-const QUICK_ACTION_LIMIT = 4;
-const DEFAULT_QUICK_ACTION_IDS = ['new-tender', 'maintenance', 'inventory', 'customers'];
-const QUICK_ACTIONS: QuickAction[] = [
-    { id: 'new-tender', label: 'nav.quickActionsGroup.newTender', path: '/crm/tenders/new', icon: PlusOutlined, permission: 'tenders.manage' },
-    { id: 'maintenance', label: 'nav.quickActionsGroup.maintenance', path: '/maintenance', icon: CalendarOutlined, permission: 'maintenance.contracts.manage' },
-    { id: 'inventory', label: 'nav.quickActionsGroup.inventory', path: '/inventory/articles', icon: InboxOutlined, permission: 'inventory.view' },
-    { id: 'customers', label: 'nav.quickActionsGroup.customers', path: '/crm/customers', icon: ContactsOutlined, permission: 'crm.customers.view' },
-    { id: 'shipment', label: 'nav.quickActionsGroup.shipment', path: '/logistics/shipments/new', icon: CarOutlined, permission: 'logistics.manage' },
-    { id: 'employees', label: 'nav.quickActionsGroup.employees', path: '/employees', icon: TeamOutlined },
-    { id: 'projects', label: 'nav.quickActionsGroup.projects', path: '/projects', icon: FundProjectionScreenOutlined, permission: 'projects.view', feature: 'projects' },
-    { id: 'regie', label: 'nav.quickActionsGroup.regie', path: '/maintenance/regie', icon: ClockCircleOutlined, permission: 'regie.calls.manage' },
-];
 
 const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
     {
@@ -314,100 +294,12 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
     },
 ];
 
-/* ── Sidebar Ant Design Menu ── */
-const SidebarMenu: React.FC<{
-    sections: MenuSection[];
-    activeUrl: string;
-    roleProfile: RoleProfile;
-    permissions: string[];
-    projectModuleEnabled: boolean;
-    onNavigate: (path: string) => void;
-    collapsed: boolean;
-}> = ({ sections, activeUrl, roleProfile, permissions, projectModuleEnabled, onNavigate, collapsed }) => {
-    const { t } = useTranslation();
-    const restricted = roleProfile !== 'full';
-    const canSee = (item: MenuLeaf) => {
-        // Restricted profiles (technician, project officer) are gated by an explicit
-        // allowlist — the raw permission set is ignored for menu visibility. We still
-        // honour the technician / non-technician flags so duplicate entries that point
-        // to the same route (e.g. the technician vs. office variant of /services/reports)
-        // collapse to a single visible item instead of showing twice.
-        if (restricted) {
-            if (item.technicianOnly && roleProfile !== 'technician') return false;
-            if (item.hideForTechnician && roleProfile === 'technician') return false;
-            return isKeyAllowedForProfile(roleProfile, item.key);
-        }
-        if (item.technicianOnly) return false;
-        return !item.permission || permissions.includes(item.permission);
-    };
-    const leafLabel = (item: MenuLeaf) => t(item.label);
-
-    const menuItems = sections
-        .filter((section) => section.feature !== 'projects' || projectModuleEnabled)
-        .map((section) => {
-            if (section.type === 'single') {
-                if (restricted && !isKeyAllowedForProfile(roleProfile, section.path)) return null;
-                const Icon = section.icon;
-                return {
-                    key: section.path,
-                    icon: <Icon size={18} />,
-                    label: t(section.label),
-                };
-            }
-            const visibleChildren = section.items.filter(canSee);
-            if (!visibleChildren.length) return null;
-            const Icon = section.icon;
-            return {
-                key: section.key,
-                icon: <Icon size={18} />,
-                label: t(section.label),
-                popupClassName: 'offitec-sidebar-menu-popup',
-                children: visibleChildren.map((item) => ({
-                    key: item.key,
-                    label: leafLabel(item),
-                })),
-            };
-        })
-        .filter(Boolean) as any[];
-
-    const selectedKeys = menuItems.flatMap((item: any) => {
-        if (item.children) {
-            return item.children
-                .filter((child: any) => child.key === activeUrl)
-                .map((child: any) => child.key);
-        }
-        if (item.key === activeUrl) {
-            return [item.key];
-        }
-        return [];
-    });
-
-    const defaultOpenKeys = !collapsed ? menuItems
-        .filter((item: any) => item.children?.some((child: any) => selectedKeys.includes(child.key)))
-        .map((item: any) => item.key) : [];
-
-    return (
-        <Menu
-            className="offitec-sidebar-menu"
-            mode="inline"
-            selectedKeys={selectedKeys}
-            defaultOpenKeys={defaultOpenKeys}
-            items={menuItems}
-            onClick={({ key }) => onNavigate(key)}
-            inlineCollapsed={collapsed}
-            style={{
-                border: 'none',
-                background: 'transparent',
-                fontSize: 13,
-                fontWeight: 500,
-            }}
-        />
-    );
-};
-
 /* ── İç Layout ── */
 const MainLayoutInner: React.FC = () => {
     const navigate = useNavigate();
+    // Menu / tab switches use this so leaving a tender with unsaved changes prompts
+    // to save first; direct `navigate` stays for programmatic redirects.
+    const guardedNavigate = useGuardedNavigate();
     const location = useLocation();
     const { t, i18n } = useTranslation();
 
@@ -421,8 +313,6 @@ const MainLayoutInner: React.FC = () => {
     const [notifications, setNotifications] = useState<NotificationDto[]>([]);
     const [notificationsLoading, setNotificationsLoading] = useState(false);
     const [isSplitMenuOpen, setIsSplitMenuOpen] = useState(false);
-    const [isQuickActionMenuOpen, setIsQuickActionMenuOpen] = useState(false);
-    const [isModuleMenuOpen, setIsModuleMenuOpen] = useState(false);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
     const SIDEBAR_OPEN_STORAGE_KEY = "offitec:sidebar-open";
@@ -432,24 +322,11 @@ const MainLayoutInner: React.FC = () => {
     });
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches);
-    const [quickActionIds, setQuickActionIds] = useState<string[]>(() => {
-        if (typeof window === 'undefined') return DEFAULT_QUICK_ACTION_IDS;
-        try {
-            const stored = JSON.parse(window.localStorage.getItem(QUICK_ACTION_STORAGE_KEY) || '[]');
-            if (Array.isArray(stored) && stored.every((item) => typeof item === 'string')) {
-                return stored.slice(0, QUICK_ACTION_LIMIT);
-            }
-        } catch {
-            // Ignore corrupted localStorage and fall back to defaults.
-        }
-        return DEFAULT_QUICK_ACTION_IDS;
-    });
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const splitMenuRef = useRef<HTMLDivElement>(null);
-    const quickActionMenuRef = useRef<HTMLDivElement>(null);
-    const moduleMenuRef = useRef<HTMLDivElement>(null);
     const searchOverlayInputRef = useRef<HTMLInputElement>(null);
+    const pageScrollRef = useRef<HTMLDivElement>(null);
     const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
     const projectModuleEnabled = selectedTenant?.isProjectModuleEnabled !== false;
     const roleProfile = useMemo(() => getRoleProfile(user), [user]);
@@ -457,22 +334,6 @@ const MainLayoutInner: React.FC = () => {
         () => MENU_SECTIONS.filter((section) => section.feature !== 'projects' || projectModuleEnabled),
         [projectModuleEnabled]
     );
-    const availableQuickActions = useMemo(
-        () => QUICK_ACTIONS.filter((action) => {
-            const hasPermission = !action.permission || permissions.includes(action.permission);
-            const featureEnabled = action.feature !== 'projects' || projectModuleEnabled;
-            return hasPermission && featureEnabled;
-        }),
-        [permissions, projectModuleEnabled],
-    );
-    const visibleQuickActions = useMemo(() => {
-        const byId = new Map(availableQuickActions.map((action) => [action.id, action]));
-        const orderedIds = [
-            ...quickActionIds,
-            ...DEFAULT_QUICK_ACTION_IDS.filter((id) => !quickActionIds.includes(id)),
-        ];
-        return orderedIds.map((id) => byId.get(id)).filter(Boolean).slice(0, QUICK_ACTION_LIMIT) as QuickAction[];
-    }, [availableQuickActions, quickActionIds]);
     const moduleLauncherItems = useMemo(() => {
         return MODULE_LAUNCHER_ITEMS.filter((item) => {
             const hasPermission = !item.permission || permissions.includes(item.permission);
@@ -493,11 +354,16 @@ const MainLayoutInner: React.FC = () => {
             `${t(item.label)} ${t(item.group)} ${item.keywords || ''} ${item.path}`.toLocaleLowerCase(activeLocale).includes(query),
         );
     }, [activeLocale, globalSearch, moduleLauncherItems, t]);
-    const activeModuleId = useMemo(() => {
-        return moduleLauncherItems
-            .filter((item) => item.path === location.pathname || (item.path !== '/' && location.pathname.startsWith(item.path + '/')))
-            .sort((a, b) => b.path.length - a.path.length)[0]?.id;
-    }, [location.pathname, moduleLauncherItems]);
+    // Quick-create actions surfaced by the sidebar three-dot button ("the new card").
+    const quickCreateItems: QuickCreateItem[] = useMemo(
+        () => moduleLauncherItems.slice(0, 8).map((item) => ({
+            id: item.id,
+            label: t(item.label),
+            icon: item.icon,
+            iconClassName: item.iconClassName,
+        })),
+        [moduleLauncherItems, t],
+    );
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -507,16 +373,57 @@ const MainLayoutInner: React.FC = () => {
             if (splitMenuRef.current && !splitMenuRef.current.contains(event.target as Node)) {
                 setIsSplitMenuOpen(false);
             }
-            if (quickActionMenuRef.current && !quickActionMenuRef.current.contains(event.target as Node)) {
-                setIsQuickActionMenuOpen(false);
-            }
-            if (moduleMenuRef.current && !moduleMenuRef.current.contains(event.target as Node)) {
-                setIsModuleMenuOpen(false);
-            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    /* A table starts with the SVG's gray header band. Once that header sticks
+       to the page scrollport, mark it so CSS can present it as a separate
+       white card, matching the scrolled reference without changing the
+       table's initial appearance. */
+    useEffect(() => {
+        const scroller = pageScrollRef.current;
+        if (!scroller) return;
+
+        let animationFrame = 0;
+        const updateStickyTableHeaders = () => {
+            animationFrame = 0;
+            const scrollportTop = scroller.getBoundingClientRect().top;
+            const headers = scroller.querySelectorAll<HTMLTableSectionElement>(
+                'table:not([role="grid"]):not([data-unstyled-table]) > thead',
+            );
+
+            headers.forEach((header) => {
+                const table = header.closest('table');
+                if (!table) return;
+                const tableRect = table.getBoundingClientRect();
+                const isStuck = tableRect.top < scrollportTop
+                    && tableRect.bottom > scrollportTop + header.offsetHeight;
+                header.toggleAttribute('data-scroll-stuck', isStuck);
+            });
+        };
+        const scheduleUpdate = () => {
+            if (animationFrame) return;
+            animationFrame = window.requestAnimationFrame(updateStickyTableHeaders);
+        };
+
+        scheduleUpdate();
+        scroller.addEventListener('scroll', scheduleUpdate, { passive: true });
+        window.addEventListener('resize', scheduleUpdate);
+        const contentObserver = new MutationObserver(scheduleUpdate);
+        contentObserver.observe(scroller, { childList: true, subtree: true });
+
+        return () => {
+            scroller.removeEventListener('scroll', scheduleUpdate);
+            window.removeEventListener('resize', scheduleUpdate);
+            contentObserver.disconnect();
+            if (animationFrame) window.cancelAnimationFrame(animationFrame);
+            scroller.querySelectorAll('[data-scroll-stuck]').forEach((header) => {
+                header.removeAttribute('data-scroll-stuck');
+            });
+        };
+    }, [isSplit, location.pathname, selectedTenantId]);
 
     useEffect(() => {
         if (!isSearchOverlayOpen) return;
@@ -584,10 +491,6 @@ const MainLayoutInner: React.FC = () => {
     }, [isMobileSidebarOpen]);
 
     useEffect(() => {
-        window.localStorage.setItem(QUICK_ACTION_STORAGE_KEY, JSON.stringify(quickActionIds.slice(0, QUICK_ACTION_LIMIT)));
-    }, [quickActionIds]);
-
-    useEffect(() => {
         if (!projectModuleEnabled && (location.pathname.startsWith('/projects') || location.pathname === '/settings/mail' || location.pathname === '/settings/checklists')) {
             navigate('/');
         }
@@ -612,28 +515,10 @@ const MainLayoutInner: React.FC = () => {
             .sort((a, b) => b.length - a.length)[0] ?? location.pathname;
     }, [location.pathname, visibleMenuSections]);
 
-    const handleQuickActionSelect = (action: QuickAction) => {
-        setIsQuickActionMenuOpen(false);
-        if (action.path.startsWith('#')) return;
-        navigate(action.path);
-    };
-
     const handleModuleSelect = (item: ModuleLauncherItem) => {
-        setIsModuleMenuOpen(false);
         setIsSearchOverlayOpen(false);
         if (item.path.startsWith('#')) return;
-        navigate(item.path);
-    };
-
-    const toggleQuickAction = (actionId: string) => {
-        setQuickActionIds((current) => {
-            if (current.includes(actionId)) {
-                const next = current.filter((id) => id !== actionId);
-                return next.length ? next : current;
-            }
-            const next = [...current, actionId];
-            return next.slice(Math.max(0, next.length - QUICK_ACTION_LIMIT));
-        });
+        guardedNavigate(item.path);
     };
 
     const MAIN_SIDEBAR_WIDTH = 256;
@@ -641,75 +526,33 @@ const MainLayoutInner: React.FC = () => {
     const visibleWidth = sidebarPinnedOpen ? MAIN_SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH;
 
     return (
-        <div className="min-h-screen bg-[#f8fafd] font-sans text-[#1D1D1F] lg:flex">
-            {/* ── Sidebar ── */}
-            <aside
-                style={{ width: sidebarPinnedOpen ? MAIN_SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH }}
-                className="hidden lg:fixed lg:top-16 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col bg-[#f8fafd] border-r border-slate-200/60 transition-[width] duration-200 overflow-hidden hover:w-[256px] group/sidebar"
-                data-expanded={sidebarPinnedOpen ? "true" : undefined}
-                onMouseEnter={() => {
-                    if (!sidebarPinnedOpen) {
-                        const el = document.querySelector('[data-expanded]') as HTMLElement;
-                        if (el) el.style.width = `${MAIN_SIDEBAR_WIDTH}px`;
-                    }
+        <div
+            className="min-h-screen bg-[#f8fafd] font-sans text-[#1D1D1F] lg:flex"
+            // Live sidebar width, published as an inheritable CSS variable so
+            // viewport-fixed descendants (e.g. TenderQuoteTopBar) can align their
+            // left edge to the content column in every sidebar state — collapsed
+            // (72px) or pinned open (256px). A fixed left offset alone hid the bar's
+            // buttons behind the pinned sidebar.
+            style={{ '--app-shell-inset': `${visibleWidth}px` } as React.CSSProperties}
+        >
+            {/* ── Sidebar (Evernote-style rail: hover-peek, flyout side-tabs, no footer) ── */}
+            <AppSidebar
+                variant="desktop"
+                sections={MENU_SECTIONS}
+                activeUrl={activeUrl}
+                roleProfile={roleProfile}
+                permissions={permissions}
+                projectModuleEnabled={projectModuleEnabled}
+                onNavigate={(path) => guardedNavigate(path)}
+                pinnedOpen={sidebarPinnedOpen}
+                onTogglePin={() => setSidebarPinnedOpen((open) => !open)}
+                onOpenSearch={() => setIsSearchOverlayOpen(true)}
+                quickCreateItems={quickCreateItems}
+                onQuickCreate={(qi) => {
+                    const item = moduleLauncherItems.find((m) => m.id === qi.id);
+                    if (item) handleModuleSelect(item);
                 }}
-                onMouseLeave={() => {
-                    if (!sidebarPinnedOpen) {
-                        const el = document.querySelector('[data-expanded]') as HTMLElement;
-                        if (el) el.style.width = `${COLLAPSED_SIDEBAR_WIDTH}px`;
-                    }
-                }}
-            >
-                <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
-                    <SidebarMenu
-                        sections={MENU_SECTIONS}
-                        activeUrl={activeUrl}
-                        roleProfile={roleProfile}
-                        permissions={permissions}
-                        projectModuleEnabled={projectModuleEnabled}
-                        onNavigate={(path) => navigate(path)}
-                        collapsed={!sidebarPinnedOpen}
-                    />
-                </div>
-                {/* Sidebar Footer */}
-                <div className={`border-t border-slate-200/60 ${sidebarPinnedOpen ? 'p-3' : "px-4 py-3"}`}>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#272f67] text-sm font-semibold text-white">
-                            {initials || <UserOutlined />}
-                        </div>
-                        {sidebarPinnedOpen && (
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-primary">{user?.firstName} {user?.lastName}</p>
-                                <p className="truncate text-xs text-tertiary">{user?.email}</p>
-                            </div>
-                        )}
-                    </div>
-                    {sidebarPinnedOpen && (
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                            <AntButton
-                                type="text"
-                                size="small"
-                                aria-label={isDarkMode ? t('common.lightMode', { defaultValue: 'Light mode' }) : t('common.darkMode', { defaultValue: 'Dark mode' })}
-                                icon={isDarkMode ? <LuSun size={16} /> : <LuMoon size={16} />}
-                                onClick={toggleTheme}
-                            >
-                                {isDarkMode ? t('common.lightMode', { defaultValue: 'Light mode' }) : t('common.darkMode', { defaultValue: 'Dark mode' })}
-                            </AntButton>
-                            <AntButton
-                                type="text"
-                                size="small"
-                                icon={<LogoutOutlined />}
-                                onClick={() => {
-                                    logout();
-                                    navigate('/login');
-                                }}
-                            >
-                                {t('nav.logout')}
-                            </AntButton>
-                        </div>
-                    )}
-                </div>
-            </aside>
+            />
 
             {/* ── Mobile sidebar drawer ── */}
             <div
@@ -734,53 +577,32 @@ const MainLayoutInner: React.FC = () => {
                             <CloseOutlined size={18} />
                         </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto py-2">
-                        <SidebarMenu
+                    <div className="flex-1 overflow-y-auto py-1">
+                        <AppSidebar
+                            variant="mobile"
                             sections={MENU_SECTIONS}
                             activeUrl={activeUrl}
                             roleProfile={roleProfile}
                             permissions={permissions}
                             projectModuleEnabled={projectModuleEnabled}
-                            onNavigate={(path) => { navigate(path); setIsMobileSidebarOpen(false); }}
-                            collapsed={false}
+                            onNavigate={(path) => { guardedNavigate(path); setIsMobileSidebarOpen(false); }}
+                            pinnedOpen
+                            onTogglePin={() => { }}
+                            onOpenSearch={() => { setIsMobileSidebarOpen(false); setIsSearchOverlayOpen(true); }}
+                            quickCreateItems={quickCreateItems}
+                            onQuickCreate={(qi) => {
+                                const item = moduleLauncherItems.find((m) => m.id === qi.id);
+                                if (item) { setIsMobileSidebarOpen(false); handleModuleSelect(item); }
+                            }}
                         />
-                    </div>
-                    <div className="border-t border-slate-200/60 p-3">
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#272f67] text-sm font-semibold text-white">
-                                {initials || <UserOutlined />}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-primary">{user?.firstName} {user?.lastName}</p>
-                                <p className="truncate text-xs text-tertiary">{user?.email}</p>
-                            </div>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                            <AntButton
-                                type="text"
-                                size="small"
-                                icon={isDarkMode ? <LuSun size={16} /> : <LuMoon size={16} />}
-                                onClick={toggleTheme}
-                            >
-                                {isDarkMode ? t('common.lightMode', { defaultValue: 'Light mode' }) : t('common.darkMode', { defaultValue: 'Dark mode' })}
-                            </AntButton>
-                            <AntButton
-                                type="text"
-                                size="small"
-                                icon={<LogoutOutlined />}
-                                onClick={() => { logout(); navigate('/login'); }}
-                            >
-                                {t('nav.logout')}
-                            </AntButton>
-                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Placeholder for sidebar space */}
+            {/* Placeholder for sidebar space — animates in step with the sidebar width */}
             <div
                 style={{ paddingLeft: visibleWidth }}
-                className="invisible hidden lg:sticky lg:top-0 lg:bottom-0 lg:left-0 lg:block"
+                className="invisible hidden transition-[padding-left] duration-300 ease-in-out lg:sticky lg:top-0 lg:bottom-0 lg:left-0 lg:block"
             />
 
             {/* ── Ana İçerik ── */}
@@ -808,134 +630,22 @@ const MainLayoutInner: React.FC = () => {
                                 <MenuOutlined size={18} />
                             </button>
                         </div>
-                        <button type="button" onClick={() => navigate('/')} className="ml-2 flex h-9 shrink-0 items-center">
+                        <a
+                            href={hrefFor('/')}
+                            onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
+                            className="ml-2 flex h-9 shrink-0 items-center"
+                        >
                             <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" width={360} height={143} decoding="async" fetchPriority="high" className="h-9 w-auto max-w-[148px] object-contain" />
-                        </button>
+                        </a>
                         <button
                             type="button"
                             aria-label={t('nav.search')}
-                            onClick={() => {
-                                setIsSearchOverlayOpen(true);
-                                setIsModuleMenuOpen(false);
-                            }}
+                            onClick={() => setIsSearchOverlayOpen(true)}
                             className="ml-9 hidden size-10 shrink-0 items-center justify-center rounded-full bg-[#eaf1fb] text-slate-700 transition-[background-color,box-shadow,transform] duration-200 hover:bg-white hover:text-[#1f2654] hover:shadow-xs hover:ring-1 hover:ring-[#d3e3fd] sm:flex"
                         >
                             <SearchOutlined style={{ fontSize: 19 }} />
                         </button>
-                        <div className="relative hidden items-center gap-1.5 lg:flex ml-3.5" ref={moduleMenuRef}>
-                            <button
-                                type="button"
-                                aria-label={t('nav.modules')}
-                                aria-expanded={isModuleMenuOpen}
-                                onClick={() => {
-                                    setIsModuleMenuOpen((open) => !open);
-                                    setIsSearchOverlayOpen(false);
-                                }}
-                                className={`inline-flex size-10 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isModuleMenuOpen ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg' : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654]'}`}
-                            >
-                                <AppstoreOutlined style={{ fontSize: 22 }} />
-                            </button>
-                            {isModuleMenuOpen && (
-                                <div className="absolute left-0 top-12 z-[60] w-[500px] rounded-2xl border border-slate-200 bg-white p-3.5 animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl">
-                                    <div className="grid grid-cols-3 gap-2.5">
-                                        {moduleLauncherItems.map((item) => {
-                                            const ItemIcon = item.icon;
-                                            const isActiveModule = item.id === activeModuleId;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={() => handleModuleSelect(item)}
-                                                    className={`group flex h-[104px] min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-3 text-center transition-[background-color,border-color,transform] duration-150 hover:-translate-y-0.5 ${isActiveModule
-                                                        ? "border-[#272f67] bg-[#272f67] text-white"
-                                                        : 'border-slate-200 bg-white text-slate-900 hover:border-[#8ea2ff]/50 hover:bg-[#eef4ff] dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10'
-                                                        }`}
-                                                    title={t(item.label)}
-                                                >
-                                                    <span className={`flex size-9 items-center justify-center rounded-lg transition-colors ${isActiveModule ? 'bg-white/12 text-white group-hover:bg-white/18' : 'bg-white text-slate-900 group-hover:bg-slate-100'}`}>
-                                                        <ItemIcon style={{ fontSize: 28 }} />
-                                                    </span>
-                                                    <span className={`line-clamp-2 max-w-full text-[14px] leading-5 ${isActiveModule ? 'font-bold text-white' : "font-semibold text-slate-900 dark:text-white"}`}>{t(item.label)}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="hidden" ref={quickActionMenuRef}>
-                                {visibleQuickActions.map((action) => {
-                                    const ActionIcon = action.icon;
-                                    return (
-                                        <button
-                                            key={action.id}
-                                            type="button"
-                                            onClick={() => handleQuickActionSelect(action)}
-                                            className="inline-flex h-9 max-w-[142px] items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-3 text-[12px] font-semibold text-slate-700 shadow-xs transition-colors hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654]"
-                                            title={t(action.label)}
-                                        >
-                                            <ActionIcon style={{ fontSize: 14 }} />
-                                            <span className="truncate">{t(action.label)}</span>
-                                        </button>
-                                    );
-                                })}
-                                <button
-                                    type="button"
-                                    aria-label={t('nav.quickActions')}
-                                    aria-expanded={isQuickActionMenuOpen}
-                                    onClick={() => setIsQuickActionMenuOpen((open) => !open)}
-                                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200/90 bg-white text-[#1f2654] shadow-xs transition-colors hover:border-[#d3e3fd] hover:bg-[#d3e3fd]"
-                                >
-                                    <PlusOutlined style={{ fontSize: 14 }} />
-                                </button>
-                                {isQuickActionMenuOpen && (
-                                    <div className="absolute left-0 top-11 z-50 w-72 rounded-2xl bg-white p-2 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2">
-                                        <div className="px-3 py-2">
-                                            <p className="text-[12px] font-semibold text-slate-900">{t('nav.quickActions')}</p>
-                                            <p className="mt-0.5 text-[11px] text-slate-500">{t('nav.quickActionsHint')}</p>
-                                        </div>
-                                        <div className="grid gap-1">
-                                            {availableQuickActions.map((action) => {
-                                                const ActionIcon = action.icon;
-                                                const selected = quickActionIds.includes(action.id);
-                                                return (
-                                                    <button
-                                                        key={action.id}
-                                                        type="button"
-                                                        onClick={() => toggleQuickAction(action.id)}
-                                                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-semibold transition-colors ${selected ? 'bg-[#d3e3fd] text-[#1f2654]' : 'text-slate-700 hover:bg-slate-100'}`}
-                                                    >
-                                                        <ActionIcon style={{ fontSize: 14 }} />
-                                                        <span className="min-w-0 flex-1 truncate">{t(action.label)}</span>
-                                                        <span className={`flex h-4 min-w-4 items-center justify-center rounded-full border ${selected ? 'border-[#1f2654] bg-[#1f2654] text-white' : 'border-slate-300'}`}>
-                                                            {selected && <CheckOutlined style={{ fontSize: 10 }} />}
-                                                        </span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {tenants.length > 0 && (
-                                <div className="hidden">
-                                    <AntSelect
-                                        value={selectedTenantId || undefined}
-                                        onChange={(value: string) => setSelectedTenant(value)}
-                                        className="offitec-tenant-select"
-                                        style={{ width: 190, height: 36 }}
-                                        size="middle"
-                                        prefix={<BankOutlined style={{ fontSize: 13, color: '#64748b' }} />}
-                                        title={t('nav.modules')}
-                                        options={tenants.map((tenant) => ({
-                                            value: tenant.id,
-                                            label: tenant.parentTenantId ? `  ${tenant.tenantName}` : tenant.tenantName,
-                                        }))}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        <WorkspaceTabs userId={user?.id} />
                     </div>
 
                     <div className="flex items-center gap-1">
@@ -957,9 +667,9 @@ const MainLayoutInner: React.FC = () => {
                             </div>
                         )}
 
-                        <button
-                            type="button"
-                            onClick={() => navigate('/calendar')}
+                        <a
+                            href={hrefFor('/calendar')}
+                            onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/calendar'); }}
                             className={`mr-1 inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold shadow-xs transition-colors ${location.pathname === '/calendar'
                                 ? 'border-[#272f67] bg-[#272f67] text-white'
                                 : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654]'
@@ -969,7 +679,7 @@ const MainLayoutInner: React.FC = () => {
                         >
                             <CalendarOutlined style={{ fontSize: 16 }} />
                             <span className="hidden sm:inline">{t('nav.calendar')}</span>
-                        </button>
+                        </a>
 
                         {/* Split view */}
                         {canSplit && (
@@ -1047,6 +757,18 @@ const MainLayoutInner: React.FC = () => {
                                     <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-brand-primary_alt hover:text-brand-secondary">
                                         <SettingOutlined style={{ fontSize: 13 }} className="text-slate-400" /> {t('nav.settingsMenu')}
                                     </button>
+                                    <div className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-secondary">
+                                        {isDarkMode
+                                            ? <LuSun size={13} className="text-slate-400" />
+                                            : <LuMoon size={13} className="text-slate-400" />}
+                                        <span className="flex-1 text-left">{t('common.darkMode', { defaultValue: 'Dark mode' })}</span>
+                                        <Switch
+                                            size="small"
+                                            checked={isDarkMode}
+                                            onChange={toggleTheme}
+                                            aria-label={t('common.darkMode', { defaultValue: 'Dark mode' })}
+                                        />
+                                    </div>
                                     <div className="my-1 border-t border-secondary" />
                                     <button
                                         onClick={() => {
@@ -1134,7 +856,7 @@ const MainLayoutInner: React.FC = () => {
 
                 {/* Page content */}
                 <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#f8fafd]">
-                    <div className={`overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-6 transition-all duration-200 ${isSplit ? 'flex-1 lg:w-1/2 lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70' : 'flex-1'}`}>
+                    <div ref={pageScrollRef} className={`overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-6 transition-all duration-200 ${isSplit ? 'flex-1 lg:w-1/2 lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70' : 'flex-1'}`}>
                         <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
                     </div>
 
@@ -1189,7 +911,7 @@ const MainLayoutInner: React.FC = () => {
                                         }
                                         if (notification.linkUrl) {
                                             setIsNotificationPanelOpen(false);
-                                            navigate(notification.linkUrl);
+                                            guardedNavigate(notification.linkUrl);
                                         }
                                     }}
                                 >

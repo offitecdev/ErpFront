@@ -21,6 +21,7 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { BillingButton } from '../../components/billing/BillingButton';
 import { t as i18nT } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import { customerApi, type CustomerOrderDto } from '../../lib/api/customer';
 import { billingApi } from '../../lib/api/billing';
 import type { InvoiceDto, InvoiceStatus } from '../../types/billing';
@@ -83,12 +84,12 @@ export const OrdersTab: React.FC<{ customerId: string }> = ({ customerId }) => {
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[13px] font-semibold text-slate-900">{o.orderNumber}</span>
+                                    <span className="text-[13px] font-semibold text-slate-900">{localizeTenderNumbersInText(o.orderNumber)}</span>
                                     <StatusChip variant={orderStatusVariant(o.status)}>{o.status}</StatusChip>
                                     {o.parentSalesOrderId && <span className="font-mono text-[10.5px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded">{i18nT('crm.orderAddon')}</span>}
                                 </div>
                                 <div className="mt-0.5 text-[11.5px] text-slate-500">
-                                    {o.project?.projectName ? `${o.project.projectName} · ` : ''}
+                                    {o.project?.projectName ? `${localizeTenderNumbersInText(o.project.projectName)} · ` : ''}
                                     {dayjs(o.createdAt).format('DD.MM.YYYY')}
                                 </div>
                             </div>
@@ -101,8 +102,8 @@ export const OrdersTab: React.FC<{ customerId: string }> = ({ customerId }) => {
                                         type: 'order',
                                         id: o.id,
                                         label: o.parentSalesOrderId
-                                            ? i18nT('crm.additional_order_label', { number: o.orderNumber })
-                                            : i18nT('crm.order_label', { number: o.orderNumber }),
+                                            ? i18nT('crm.additional_order_label', { number: localizeTenderNumbersInText(o.orderNumber) })
+                                            : i18nT('crm.order_label', { number: localizeTenderNumbersInText(o.orderNumber) }),
                                     }}
                                     onBilled={() => void load()}
                                     size="sm"
@@ -236,7 +237,7 @@ export const BillingTab: React.FC<{ customerId: string }> = ({ customerId }) => 
                                             <span className="ml-auto font-mono font-semibold text-slate-900 text-[13px]">{fmtMoney(inv.amount)}</span>
                                         </div>
                                         <div className="mt-1 text-[11.5px] text-slate-500">
-                                            {inv.salesOrder?.orderNumber ? `${inv.salesOrder.orderNumber} · ` : ''}
+                                            {inv.salesOrder?.orderNumber ? `${localizeTenderNumbersInText(inv.salesOrder.orderNumber)} · ` : ''}
                                             {dayjs(inv.createdAt).format('DD.MM.YYYY')}
                                         </div>
                                         {inv.notes && <p className="mt-1 text-[12px] text-slate-600 whitespace-pre-wrap">{inv.notes}</p>}
@@ -275,7 +276,7 @@ export const BillingTab: React.FC<{ customerId: string }> = ({ customerId }) => 
                         <Select value={form.salesOrderId} onChange={(e) => setForm({ ...form, salesOrderId: e.target.value })}>
                             <option value="">{i18nT('common.select')}</option>
                             {orders.map((o) => (
-                                <option key={o.id} value={o.id}>{o.orderNumber} — {fmtMoney(o.totalAmount)}</option>
+                                <option key={o.id} value={o.id}>{localizeTenderNumbersInText(o.orderNumber)} — {fmtMoney(o.totalAmount)}</option>
                             ))}
                         </Select>
                     </Field>

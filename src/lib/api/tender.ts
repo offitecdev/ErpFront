@@ -11,6 +11,7 @@ import type {
     TenderChangeLog,
     TenderChatterSummary,
     TenderDocumentDto,
+    TenderMailDraftDto,
     OfferScheduleSlotDto,
     PositionArticleMappingDto,
     PositionMaterialMappingDto,
@@ -60,17 +61,24 @@ export const tenderApi = {
         return res.data;
     },
 
-    getById: async (id: string, options?: { includeImages?: boolean }): Promise<TenderDetailDto> => {
-        const res = await apiClient.get(`/tenders/${id}${options?.includeImages ? '?includeImages=true' : ''}`);
+    getById: async (id: string, options?: { includeImages?: boolean; light?: boolean }): Promise<TenderDetailDto> => {
+        const params = new URLSearchParams();
+        if (options?.includeImages) params.set('includeImages', 'true');
+        // light=true keeps the response to plain position figures (no article/material
+        // mappings, long descriptions or activities) — enough for read-only summaries.
+        if (options?.light) params.set('light', 'true');
+        const res = await apiClient.get(`/tenders/${id}${params.toString() ? '?' + params : ''}`);
         return res.data;
     },
 
-    // Fetch ONLY the product image URLs needed for the PDF (by article id), instead
-    // of re-loading the whole tender detail with every image inlined.
-    getProductImages: async (id: string, articleIds: string[]): Promise<Array<{ id: string; imageUrl: string | null }>> => {
+    // Fetch ONLY the image URLs needed for the PDF — product images by article id
+    // plus per-position uploaded images by position id — instead of re-loading the
+    // whole tender detail with every image inlined.
+    getProductImages: async (id: string, articleIds: string[], positionIds: string[] = []): Promise<Array<{ id: string; imageUrl: string | null }>> => {
         const ids = [...new Set(articleIds.filter(Boolean))];
-        if (ids.length === 0) return [];
-        const res = await apiClient.post(`/tenders/${id}/product-images`, { ids });
+        const posIds = [...new Set(positionIds.filter(Boolean))];
+        if (ids.length === 0 && posIds.length === 0) return [];
+        const res = await apiClient.post(`/tenders/${id}/product-images`, { ids, positionIds: posIds });
         return res.data;
     },
 
@@ -89,9 +97,14 @@ export const tenderApi = {
         format?: TenderFormat;
         validUntil?: string | null;
         billingAddress?: string | null;
+        installationAddress?: string | null;
         deliveryAddress?: string | null;
         billingSameAsInstallation?: boolean | null;
         internalDeliveryDate?: string | null;
+        commissionNumber?: string | null;
+        priceList?: string | null;
+        currency?: string | null;
+        directDiscount?: number | null;
     }): Promise<TenderListItem> => {
         try {
             const res = await apiClient.patch(`/tenders/${id}/meta`, input);
@@ -140,6 +153,36 @@ export const tenderApi = {
         position: Partial<PositionDto>
     ): Promise<{ message: string; positionId: string; position?: PositionDto }> => {
         const res = await apiClient.post(`/tenders/${tenderId}/positions`, position);
+        return res.data;
+    },
+
+    addPositions: async (
+        tenderId: string,
+        positions: Array<{ clientId: string; position: Partial<PositionDto> }>
+    ): Promise<{
+        message: string;
+        positions: Array<{ clientId: string; positionId: string; position?: PositionDto }>;
+    }> => {
+        const res = await apiClient.post(`/tenders/${tenderId}/positions/batch`, { positions });
+        return res.data;
+    },
+
+    savePositions: async (
+        tenderId: string,
+        input: {
+            positions: Array<{ clientId: string; position: Partial<PositionDto> }>;
+            updates: Array<{ positionId: string; patch: Partial<PositionDto> }>;
+            deleteIds: string[];
+            meta: Partial<TenderListItem>;
+        }
+    ): Promise<{
+        message: string;
+        positions: Array<{ clientId: string; positionId: string; position?: PositionDto }>;
+        updatedPositions: PositionDto[];
+        deletedPositionIds: string[];
+        updatedTender: Partial<TenderListItem> | null;
+    }> => {
+        const res = await apiClient.post(`/tenders/${tenderId}/positions/save`, input);
         return res.data;
     },
 
@@ -341,6 +384,26 @@ export const tenderApi = {
     listTechnicians: async (): Promise<PersonLite[]> => {
         const res = await apiClient.get('/tenders/options/technicians');
         return res.data;
+    },
+
+    // ── Tenant-wide offer-mail drafts (shared by all tenders) ───────────────
+    listMailDrafts: async (): Promise<TenderMailDraftDto[]> => {
+        const res = await apiClient.get('/tenders/mail-drafts');
+        return res.data;
+    },
+
+    createMailDraft: async (input: { subject: string; message: string | null }): Promise<TenderMailDraftDto> => {
+        const res = await apiClient.post('/tenders/mail-drafts', input);
+        return res.data;
+    },
+
+    updateMailDraft: async (draftId: string, patch: { subject?: string; message?: string | null }): Promise<TenderMailDraftDto> => {
+        const res = await apiClient.patch(`/tenders/mail-drafts/${draftId}`, patch);
+        return res.data;
+    },
+
+    deleteMailDraft: async (draftId: string): Promise<void> => {
+        await apiClient.delete(`/tenders/mail-drafts/${draftId}`);
     },
 
     sendOfferMail: async (id: string, input: {

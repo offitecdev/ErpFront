@@ -8,17 +8,56 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import { projectApi } from '../../lib/api/project';
+import { getRoleProfile } from '../../lib/access';
 import { useAuthStore } from '../../store/authStore';
 import { ensureMaintenanceLocale } from '../maintenance/MaintenanceShared';
+import { EventDetailModal } from './EventDetailModal';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumber } from '@/utils/tenderNumber';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 dayjs.extend(isoWeek);
 
 type CalendarView = 'day' | 'week' | 'month' | 'year';
-type CalendarCategory = 'orders' | 'maintenance';
+export type CalendarCategory = 'orders' | 'maintenance';
 
-type CalendarEvent = {
+// A person shown in the popup's "participants" list. `tag` is a translation-key
+// suffix (calendar.detail.tag*) so lead / alternative / technician stay localised.
+export type Participant = {
+    id?: string;
+    name: string;
+    tag: 'lead' | 'alternative' | 'technician';
+    role?: string | null;
+    email?: string | null;
+    phone?: string | null;
+};
+
+// Normalised detail payload rendered by EventDetailModal. Fetched lazily when an
+// event is clicked (via CalendarEvent.loadDetail) so the calendar list itself
+// stays lightweight — the grid only needs the summary fields below.
+export type EventDetail = {
+    status?: string | null;
+    notes?: string | null;
+    customerName?: string | null;
+    customerEmail?: string | null;
+    customerPhone?: string | null;
+    customerAddress?: string | null;
+    participants: Participant[];
+    // orders / installation
+    projectName?: string | null;
+    manager?: string | null;
+    orderNumber?: string | null;
+    orderTotal?: number | null;
+    tenderNumber?: string | null;
+    // maintenance
+    contractTitle?: string | null;
+    contractCode?: string | null;
+    siteName?: string | null;
+    period?: string | null;
+};
+
+export type CalendarEvent = {
     id: string;
     category: CalendarCategory;
     title: string;
@@ -28,6 +67,9 @@ type CalendarEvent = {
     end: dayjs.Dayjs;
     allDay: boolean;
     navigateTo?: string;
+    // Lazily fetches the popup detail when the event is clicked. Undefined events
+    // (none currently) simply render header-only.
+    loadDetail?: () => Promise<EventDetail>;
 };
 
 // Vibrant, high-contrast palette — one clear colour per category. No dots anywhere.
@@ -122,10 +164,111 @@ const positionEvents = (events: CalendarEvent[]): Positioned[] => {
     return out;
 };
 
+const personName = (person?: { firstName?: string; lastName?: string } | null) =>
+    person ? `${person.firstName || ''} ${person.lastName || ''}`.trim() : '';
+
+// Drop blanks and repeats (a lead technician may also appear in the assignment
+// list) keeping the first occurrence so lead/alternative tags win.
+const dedupeParticipants = (list: Participant[]): Participant[] => {
+    const seen = new Set<string>();
+    const out: Participant[] = [];
+    for (const person of list) {
+        const key = person.id || person.name;
+        if (!person.name || seen.has(key)) continue;
+        seen.add(key);
+        out.push(person);
+    }
+    return out;
+};
+
+// True when the current user is a technician assigned to this appointment (lead or
+// co-technician). Such users open their own installation task screen even if they
+// also hold manager permissions — the order stays editable on the project screen
+// only for managers who are not assigned to the job.
+const isAssignedTechnician = (appt: any, userId?: string | null) =>
+    Boolean(userId) && (
+        appt.assignedTechnician?.id === userId ||
+        (appt.technicianAssignments || []).some((a: any) => a?.technician?.id === userId)
+    );
+
+// The lead technician sits first; assignment-list members follow. Works on both
+// the trimmed list payload (names only, feeding the grid meta line) and the full
+// detail payload (emails / phones / roles, feeding the popup participants list).
+const orderParticipants = (appt: any): Participant[] => dedupeParticipants([
+    ...(appt.assignedTechnician
+        ? [{
+            id: appt.assignedTechnician.id,
+            name: personName(appt.assignedTechnician),
+            tag: 'lead' as const,
+            role: appt.assignedTechnician.roleName,
+            email: appt.assignedTechnician.email,
+            phone: appt.assignedTechnician.phone,
+        }]
+        : []),
+    ...(appt.technicianAssignments || [])
+        .map((a: any) => a.technician)
+        .filter(Boolean)
+        .map((tech: any) => ({
+            id: tech.id,
+            name: personName(tech),
+            tag: 'technician' as const,
+            role: tech.roleName,
+            email: tech.email,
+            phone: tech.phone,
+        })),
+]);
+
+const maintenanceParticipants = (task: any): Participant[] => dedupeParticipants([
+    ...(task.technician
+        ? [{ id: task.technician.id, name: personName(task.technician), tag: 'lead' as const, role: task.technician.roleName, email: task.technician.email, phone: task.technician.phone }]
+        : []),
+    ...(task.alternativeTechnician
+        ? [{ id: task.alternativeTechnician.id, name: personName(task.alternativeTechnician), tag: 'alternative' as const, role: task.alternativeTechnician.roleName, email: task.alternativeTechnician.email, phone: task.alternativeTechnician.phone }]
+        : []),
+    ...(task.assignments || [])
+        .map((a: any) => a.technician)
+        .filter(Boolean)
+        .map((tech: any) => ({ id: tech.id, name: personName(tech), tag: 'technician' as const, role: tech.roleName, email: tech.email, phone: tech.phone })),
+]);
+
+// Map the lazily-fetched detail payloads to the popup's normalised EventDetail.
+const buildOrderDetail = (appt: any): EventDetail => ({
+    status: appt.status,
+    notes: appt.notes,
+    customerName: appt.project?.customer?.companyName,
+    customerEmail: appt.project?.customer?.mainEmail,
+    customerPhone: appt.project?.customer?.mainPhone,
+    customerAddress: appt.project?.customer?.address,
+    participants: orderParticipants(appt),
+    projectName: appt.project?.projectName,
+    manager: personName(appt.project?.manager) || undefined,
+    orderNumber: appt.salesOrder?.orderNumber,
+    orderTotal: appt.salesOrder?.totalAmount ?? null,
+    tenderNumber: (() => {
+        const raw = appt.salesOrder?.tender?.tenderNumber ?? appt.project?.tender?.tenderNumber ?? null;
+        return raw ? localizeTenderNumber(raw) : null;
+    })(),
+});
+
+const buildMaintenanceDetail = (task: any): EventDetail => ({
+    status: task.status,
+    customerName: task.contract?.customer?.companyName,
+    customerEmail: task.contract?.customer?.mainEmail,
+    customerPhone: task.contract?.customer?.mainPhone,
+    customerAddress: task.contract?.customer?.address,
+    participants: maintenanceParticipants(task),
+    contractTitle: task.contract?.title,
+    contractCode: task.contract?.contractCode,
+    siteName: task.siteName || task.contract?.siteName,
+    period: task.contract?.period,
+});
+
 export const UnifiedCalendar = () => {
     ensureMaintenanceLocale();
     const navigate = useNavigate();
     const permissions = useAuthStore((state) => state.permissions);
+    const user = useAuthStore((state) => state.user);
+    const userId = user?.id;
 
     const [view, setView] = useState<CalendarView>('week');
     const [anchor, setAnchor] = useState(() => dayjs());
@@ -134,6 +277,7 @@ export const UnifiedCalendar = () => {
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(false);
     const [now, setNow] = useState(() => dayjs());
+    const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
 
     useEffect(() => {
         const id = window.setInterval(() => setNow(dayjs()), 60_000);
@@ -141,9 +285,14 @@ export const UnifiedCalendar = () => {
     }, []);
 
     const has = useCallback((perm: string) => permissions.includes(perm), [permissions]);
-    const canAllOrders = has('projects.view') || has('projects.manage');
+    // Technicians must only ever see their own assigned tasks, never the whole
+    // tenant's — even if they also carry a manager-level view permission. The
+    // "all *" sources are therefore gated behind not being a technician so a
+    // technician always falls through to the self-scoped endpoints below.
+    const isTechnician = useMemo(() => getRoleProfile(user) === 'technician', [user]);
+    const canAllOrders = !isTechnician && (has('projects.view') || has('projects.manage'));
     const canMyInstallations = has('projects.report');
-    const canAllMaintenance = has('maintenance.contracts.manage');
+    const canAllMaintenance = !isTechnician && has('maintenance.contracts.manage');
     const canMyMaintenance = has('maintenance.tasks.manage') || has('maintenance.reports.manage');
 
     const range = useMemo(() => viewRange(view, anchor), [view, anchor]);
@@ -154,16 +303,20 @@ export const UnifiedCalendar = () => {
         const end = range.end.format('YYYY-MM-DD');
 
         const orderSource = canAllOrders
-            ? projectApi.listAppointments(start, end)
+            ? projectApi.listAppointments(start, end, { calendar: true })
             : canMyInstallations
-                ? projectApi.listMyInstallations(start, end)
+                ? projectApi.listMyInstallations(start, end, { calendar: true })
                 : null;
         const maintenanceSource = canAllMaintenance
-            ? maintenanceApi.listTasks(start, end)
+            ? maintenanceApi.listTasks(start, end, { calendar: true })
             : canMyMaintenance
-                ? maintenanceApi.listMyTasks(start, end)
+                ? maintenanceApi.listMyTasks(start, end, { calendar: true })
                 : null;
         const maintenanceDetail = canAllMaintenance ? '/maintenance/tasks' : '/maintenance/technician/tasks';
+        // The popup fetches full detail on click via the appropriate single-item
+        // endpoint (manager vs technician scope mirrors the list source above).
+        const fetchOrderDetail = canAllOrders ? projectApi.getAppointmentDetail : projectApi.getMyInstallationDetail;
+        const fetchMaintenanceDetail = canAllMaintenance ? maintenanceApi.getTaskDetail : maintenanceApi.getMyTaskDetail;
 
         const [orderResult, maintenanceResult] = await Promise.allSettled([
             orderSource ?? Promise.resolve([]),
@@ -178,28 +331,28 @@ export const UnifiedCalendar = () => {
                 const endTime = appt.endTime ? dayjs(appt.endTime) : startTime.add(1, 'hour');
                 const orderNumber = appt.salesOrder?.orderNumber;
                 const customer = appt.project?.customer?.companyName;
-                const techs = (appt.technicianAssignments || [])
-                    .map((a: any) => a.technician)
-                    .filter(Boolean)
-                    .map((tech: any) => `${tech.firstName} ${tech.lastName}`.trim());
-                if (techs.length === 0 && appt.assignedTechnician) {
-                    techs.push(`${appt.assignedTechnician.firstName} ${appt.assignedTechnician.lastName}`.trim());
-                }
+                // Technician names for the compact chip meta line (names are present
+                // in the trimmed list payload; contacts arrive with the popup fetch).
+                const techs = orderParticipants(appt).map((p) => p.name);
                 // Admins/managers edit the order on the project admin screen; technicians
                 // open their own installation task screen.
                 const projectId = appt.project?.id;
+                const appointmentId = appt.id;
                 collected.push({
                     id: `order-${appt.id}`,
                     category: 'orders',
-                    title: customer || (orderNumber ? t('calendar.order', { number: orderNumber }) : t('calendar.orders')),
-                    subtitle: orderNumber ? t('calendar.order', { number: orderNumber }) : undefined,
+                    title: customer || (orderNumber ? t('calendar.order', { number: localizeTenderNumbersInText(orderNumber) }) : t('calendar.orders')),
+                    subtitle: orderNumber ? t('calendar.order', { number: localizeTenderNumbersInText(orderNumber) }) : undefined,
                     meta: techs.length ? `${t('calendar.technician')}: ${techs.join(', ')}` : undefined,
                     start: startTime,
                     end: endTime,
                     allDay: false,
-                    navigateTo: canAllOrders && projectId
-                        ? `/projects/${projectId}`
-                        : `/projects/installation/tasks/${appt.id}`,
+                    navigateTo: isAssignedTechnician(appt, userId)
+                        ? `/projects/installation/tasks/${appt.id}`
+                        : canAllOrders && projectId
+                            ? `/projects/${projectId}`
+                            : `/projects/installation/tasks/${appt.id}`,
+                    loadDetail: () => fetchOrderDetail(appointmentId).then(buildOrderDetail),
                 });
             });
         }
@@ -209,7 +362,8 @@ export const UnifiedCalendar = () => {
                 const hasTime = Boolean(task.scheduledStartTime);
                 const startTime = dayjs(task.scheduledStartTime || task.plannedDate);
                 const endTime = task.scheduledEndTime ? dayjs(task.scheduledEndTime) : startTime.add(1, 'hour');
-                const tech = task.technician ? `${task.technician.firstName} ${task.technician.lastName}`.trim() : null;
+                const tech = maintenanceParticipants(task)[0]?.name || null;
+                const taskId = task.id;
                 collected.push({
                     id: `maintenance-${task.id}`,
                     category: 'maintenance',
@@ -220,13 +374,14 @@ export const UnifiedCalendar = () => {
                     end: endTime,
                     allDay: !hasTime,
                     navigateTo: `${maintenanceDetail}/${task.id}`,
+                    loadDetail: () => fetchMaintenanceDetail(taskId).then(buildMaintenanceDetail),
                 });
             });
         }
 
         setEvents(collected);
         setLoading(false);
-    }, [range.start.valueOf(), range.end.valueOf(), canAllOrders, canMyInstallations, canAllMaintenance, canMyMaintenance]);
+    }, [range.start.valueOf(), range.end.valueOf(), userId, canAllOrders, canMyInstallations, canAllMaintenance, canMyMaintenance]);
 
     useEffect(() => {
         void load();
@@ -266,7 +421,14 @@ export const UnifiedCalendar = () => {
         setAnchor(day);
     };
 
+    // Clicking an event opens the detail popup; the popup itself offers a button
+    // to jump to the full order / task screen via navigateTo.
     const openEvent = (event: CalendarEvent) => {
+        setActiveEvent(event);
+    };
+
+    const openEventFull = (event: CalendarEvent) => {
+        setActiveEvent(null);
         if (event.navigateTo) navigate(event.navigateTo);
     };
 
@@ -335,6 +497,12 @@ export const UnifiedCalendar = () => {
                     <FilterPanel enabled={enabled} onToggle={(key) => setEnabled((cur) => ({ ...cur, [key]: !cur[key] }))} />
                 </aside>
             </div>
+
+            <EventDetailModal
+                event={activeEvent}
+                onClose={() => setActiveEvent(null)}
+                onOpenFull={openEventFull}
+            />
         </div>
     );
 };

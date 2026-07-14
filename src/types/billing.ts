@@ -65,6 +65,7 @@ export interface MyOrderAddonDto {
     revisionNumber?: number | null;
     totalAmount: number;
     createdAt: string;
+    orderDate?: string | null;
     billingSummary?: BillingSummaryDto | null;
 }
 

@@ -16,6 +16,7 @@ import { deliveryReportApi, signatureApi, type DeliveryReportDto, type Signature
 import type { MyOrderDetailDto } from '../../types/billing';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const fmtMoney = (v?: number | null) =>
     typeof v === 'number'
@@ -25,15 +26,17 @@ const fmtMoney = (v?: number | null) =>
 const fmtDate = (v?: string | null) => (v ? dayjs(v).format('DD.MM.YYYY') : '-');
 const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
-const billingChipColor = (remaining: number) =>
-    remaining <= 0 ? 'bg-emerald-600' : remaining >= 100 ? 'bg-amber-500' : 'bg-sky-600';
+// Solid status chips, matching the shared StatusChip used across the other
+// modules (no translucent "glass" tints).
+const billingChipVariant = (remaining: number): 'active' | 'warning' | 'info' =>
+    remaining <= 0 ? 'active' : remaining >= 100 ? 'warning' : 'info';
 const billingChipLabel = (billed: number, remaining: number) =>
     remaining <= 0 ?t('crm.billed') : remaining >= 100 ?t('crm.faturalanmadi') : t('crm.partially_billed', { percent: Math.round(billed) });
 
 const BillingChip = ({ billed, remaining }: { billed: number; remaining: number }) => (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold text-white shadow-xs ${billingChipColor(remaining)}`}>
+    <StatusChip variant={billingChipVariant(remaining)}>
         {billingChipLabel(billed, remaining)}
-    </span>
+    </StatusChip>
 );
 
 type TabKey = 'addons' | 'quotation' | 'billing';
@@ -41,21 +44,23 @@ type TabKey = 'addons' | 'quotation' | 'billing';
 interface StageItem { label: string; meta?: string; done: boolean }
 interface Stage { key: string; label: string; completed: boolean; items: StageItem[] }
 
+// Compact stage checkbox chip, shown top-right in the page header so the
+// completion state is visible at a glance for everyone.
 const StageBar = ({ stage, onOpen }: { stage: Stage; onOpen: () => void }) => (
     <button
         type="button"
         onClick={onOpen}
         title={stage.label}
-        className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-3 text-left transition-colors ${
+        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors ${
             stage.completed
                 ? 'border-[#059669]/30 bg-[#059669]/5 hover:bg-[#059669]/10'
                 : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
         }`}
     >
-        <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-600">{stage.label}</span>
         {stage.completed
-            ? <CheckCircle size={17} className="shrink-0 text-[#059669]" />
-            : <span className="size-3.5 shrink-0 rounded-full border-2 border-slate-300" />}
+            ? <CheckCircle size={15} className="shrink-0 text-[#059669]" />
+            : <span className="size-3 shrink-0 rounded-full border-2 border-slate-300" />}
+        <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-slate-600">{stage.label}</span>
     </button>
 );
 
@@ -97,9 +102,9 @@ const StageDetailModal = ({ stage, onClose }: { stage: Stage; onClose: () => voi
     );
 };
 
-const TabBar = ({ tab, onSelect, addonCount }: { tab: TabKey; onSelect: (t: TabKey) => void; addonCount: number }) => {
+const TabBar = ({ tab, onSelect, orderCount }: { tab: TabKey; onSelect: (t: TabKey) => void; orderCount: number }) => {
     const tabs: Array<{ key: TabKey; label: string; badge?: number }> = [
-        { key: 'addons', label: t('projects.complete.tabAddons'), badge: addonCount },
+        { key: 'addons', label: t('nav.myOrders'), badge: orderCount },
         { key: 'quotation', label: t('projects.complete.tabQuotation') },
         { key: 'billing', label: t('projects.complete.tabBilling') },
     ];
@@ -160,7 +165,6 @@ export const MyOrderDetail = () => {
     const stages = useMemo<Stage[]>(() => {
         if (!order) return [];
         const summary = order.billingSummary;
-        const phases = order.project?.phases || [];
         const reports = order.reports || [];
         const projectGenerals = generalSignatures.filter((s) => s.projectId === order.project?.id);
 
@@ -169,15 +173,7 @@ export const MyOrderDetail = () => {
             key: 'quotation',
             label: t('projects.complete.stageQuotation'),
             completed: true,
-            items: [{ label: order.orderNumber, meta: t('projects.complete.approved'), done: true }],
-        };
-
-        // Installation — complete once every phase is done.
-        const installation: Stage = {
-            key: 'installation',
-            label: t('projects.complete.stageInstallation'),
-            completed: phases.length > 0 && phases.every((p) => p.isCompleted),
-            items: phases.map((p) => ({ label: p.phaseName, meta: `${clampPercent(p.progressPercentage)}%`, done: p.isCompleted })),
+            items: [{ label: localizeTenderNumbersInText(order.orderNumber), meta: t('projects.complete.approved'), done: true }],
         };
 
         // Field reports — only signed reports count toward completion.
@@ -208,7 +204,7 @@ export const MyOrderDetail = () => {
             key: 'deliveryReport',
             label: t('projects.complete.stageDeliveryReport'),
             completed: deliverySigned > 0,
-            items: deliveryReports.map((r) => ({ label: r.checklistName || r.orderNumber || fmtDate(r.createdAt), meta: r.isSigned ? t('projects.complete.signedLabel') : t('projects.complete.unsignedLabel'), done: r.isSigned })),
+            items: deliveryReports.map((r) => ({ label: r.checklistName || (r.orderNumber ? localizeTenderNumbersInText(r.orderNumber) : fmtDate(r.createdAt)), meta: r.isSigned ? t('projects.complete.signedLabel') : t('projects.complete.unsignedLabel'), done: r.isSigned })),
         };
 
         // Billing.
@@ -223,7 +219,7 @@ export const MyOrderDetail = () => {
             })),
         };
 
-        return [quotation, installation, fieldReport, generalReport, deliveryReport, billing];
+        return [quotation, fieldReport, generalReport, deliveryReport, billing];
     }, [order, deliveryReports, generalSignatures]);
 
     if (loading) {
@@ -249,63 +245,72 @@ export const MyOrderDetail = () => {
         <div>
             <PageHeader
                 breadcrumb={t('crm.breadcrumb_my_orders')}
-                title={order.orderNumber}
+                title={localizeTenderNumbersInText(order.orderNumber)}
                 description={order.customer?.companyName || ''}
                 actions={
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-end gap-2">
+                        {/* Stage checkboxes — top-right so completion state is
+                            immediately visible; click for completed/incomplete detail. */}
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                            {stages.map((stage) => (
+                                <StageBar key={stage.key} stage={stage} onOpen={() => setActiveStage(stage)} />
+                            ))}
+                        </div>
+                        {/* Invoicing happens from the "My Orders" list below, not the header. */}
                         <Button variant="ghost" size="md" icon={<ArrowLeftOutlined />} onClick={() => navigate('/crm/my-orders')}>{t('common.back')}</Button>
-                        <BillingButton
-                            target={{ type: 'order', id: order.id, label: t('crm.order_label', { number: order.orderNumber }) }}
-                            onBilled={() => void load()}
-                            size="md"
-                            variant="primary"
-                        />
                     </div>
                 }
             />
 
-            {/* Process bars — completion rates per stage, click for completed/incomplete detail. */}
-            <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-                {stages.map((stage) => (
-                    <StageBar key={stage.key} stage={stage} onOpen={() => setActiveStage(stage)} />
-                ))}
-            </div>
-
-            <TabBar tab={tab} onSelect={setTab} addonCount={addons.length} />
+            <TabBar tab={tab} onSelect={setTab} orderCount={addons.length + 1} />
 
             {tab === 'addons' && (
-                <Card title={t('crm.additional_orders_count', { count: addons.length })} noPadding>
-                    {addons.length === 0 ? (
-                        <div className="p-6">
-                            <EmptyState title={t('crm.additional_order_not_found')} description={t('crm.bu_order_icin_additional_order_bulunmuyor')} />
+                <Card title={t('nav.myOrders')} noPadding>
+                    <div className="divide-y divide-slate-100">
+                        {/* Main order first — navy tint sets it apart from the amber addon rows. */}
+                        <div className="flex items-center justify-between gap-3 bg-[#272f67]/[0.04] px-4 py-3 transition-colors hover:bg-[#272f67]/[0.08]">
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-primary">{localizeTenderNumbersInText(order.orderNumber)}</span>
+                                    <span className="whitespace-nowrap rounded bg-[#272f67]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#272f67]">{t('projects.mainOrder')}</span>
+                                    <BillingChip billed={summary?.billedPercent ?? 0} remaining={remaining} />
+                                </div>
+                                <div className="mt-0.5 text-xs text-tertiary">{fmtDate(order.createdAt)} · {fmtMoney(order.totalAmount)}</div>
+                            </div>
+                            <BillingButton
+                                target={{ type: 'order', id: order.id, label: t('crm.order_label', { number: localizeTenderNumbersInText(order.orderNumber) }) }}
+                                onBilled={() => void load()}
+                                size="sm"
+                                variant="primary"
+                                remainingPercent={remaining}
+                            />
                         </div>
-                    ) : (
-                        <div className="divide-y divide-slate-100">
-                            {addons.map((addon) => {
-                                const aRemaining = addon.billingSummary?.remainingPercent ?? 100;
-                                return (
-                                    <div key={addon.id} className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50/80">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-semibold text-primary">{addon.orderNumber}</span>
-                                                {addon.revisionNumber ? (
-                                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">N{addon.revisionNumber}</span>
-                                                ) : null}
-                                                <BillingChip billed={addon.billingSummary?.billedPercent ?? 0} remaining={aRemaining} />
-                                            </div>
-                                            <div className="mt-0.5 text-xs text-tertiary">{fmtDate(addon.createdAt)} · {fmtMoney(addon.totalAmount)}</div>
+                        {addons.map((addon) => {
+                            const aRemaining = addon.billingSummary?.remainingPercent ?? 100;
+                            return (
+                                <div key={addon.id} className="flex items-center justify-between gap-3 bg-amber-400/10 px-4 py-3 transition-colors hover:bg-amber-400/20">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-primary">{localizeTenderNumbersInText(addon.orderNumber)}</span>
+                                            <span className="whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{t('projects.addonOrder')}</span>
+                                            {addon.revisionNumber ? (
+                                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">N{addon.revisionNumber}</span>
+                                            ) : null}
+                                            <BillingChip billed={addon.billingSummary?.billedPercent ?? 0} remaining={aRemaining} />
                                         </div>
-                                        <BillingButton
-                                            target={{ type: 'order', id: addon.id, label: t('crm.additional_order_label', { number: addon.orderNumber }) }}
-                                            onBilled={() => void load()}
-                                            size="sm"
-                                            variant="secondary"
-                                        />
+                                        <div className="mt-0.5 text-xs text-tertiary">{fmtDate(addon.orderDate || addon.createdAt)} · {fmtMoney(addon.totalAmount)}</div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                    <BillingButton
+                                        target={{ type: 'order', id: addon.id, label: t('crm.additional_order_label', { number: localizeTenderNumbersInText(addon.orderNumber) }) }}
+                                        onBilled={() => void load()}
+                                        size="sm"
+                                        variant="secondary"
+                                        remainingPercent={aRemaining}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
                 </Card>
             )}
 
@@ -317,7 +322,7 @@ export const MyOrderDetail = () => {
                                 <div className="space-y-2 text-sm">
                                     <div className="flex items-center justify-between">
                                         <span className="text-tertiary">{t('nav.projects')}</span>
-                                        <span className="font-medium text-primary">{order.project.projectName}</span>
+                                        <span className="font-medium text-primary">{localizeTenderNumbersInText(order.project.projectName)}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-tertiary">{t('common.status')}</span>

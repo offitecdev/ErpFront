@@ -2,7 +2,9 @@ import React from 'react';
 
 import { Field, Input } from '../../../../../components/ui-shared/Field';
 import type { CostInput } from '../../../../../types/tender';
-import { fmtMoney, fmtVatRate } from '../../tenderDetailUtils';
+import { fmtVatRate } from '../../tenderDetailUtils';
+import { useMoneyFormat } from '../../utils/useMoneyFormat';
+import { AutoFitAmount } from '../common/AutoFitAmount';
 import { t } from '@/i18n/translate';
 
 type PositionPricing = {
@@ -43,7 +45,9 @@ export const PositionPricingSection: React.FC<{
     pricingTotalWithTax,
     autoSaveDirty,
     saving,
-}) => (
+}) => {
+    const fmtMoney = useMoneyFormat();
+    return (
     <div className="border border-slate-200/70 rounded-md p-3 bg-white space-y-2.5">
         <div className="flex items-center justify-between">
             <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.line_price')}</h4>
@@ -135,38 +139,38 @@ export const PositionPricingSection: React.FC<{
 
         {/* Live summary */}
         <div className="border-t border-slate-100 pt-2 space-y-1 text-[11.5px]">
-            <div className="flex items-center justify-between text-slate-500">
-                <span>{t('tenders.brut')}{pricing.quantity} × {fmtMoney(pricing.unitPrice)})</span>
-                <span className="font-mono">{fmtMoney(pricingGross)}</span>
+            <div className="flex items-center justify-between gap-2 text-slate-500">
+                <span className="shrink-0">{t('tenders.brut')}{pricing.quantity} × {fmtMoney(pricing.unitPrice)})</span>
+                <AutoFitAmount value={fmtMoney(pricingGross)} basePx={11.5} className="font-mono" />
             </div>
             {pricing.discount > 0 && (
-                <div className="flex items-center justify-between text-slate-500">
-                    <span>{t('tenders.discount')}{pricing.discount}%)</span>
-                    <span className="font-mono text-red-600">−{fmtMoney(pricingDiscountAmount)}</span>
+                <div className="flex items-center justify-between gap-2 text-slate-500">
+                    <span className="shrink-0">{t('tenders.discount')}{pricing.discount}%)</span>
+                    <AutoFitAmount value={`−${fmtMoney(pricingDiscountAmount)}`} basePx={11.5} className="font-mono text-red-600" />
                 </div>
             )}
             {!isArticle && (
-                <div className="flex items-center justify-between text-slate-500">
-                    <span>{t('tenders.additional_cost')}</span>
-                    <span className="font-mono">{cost.additionalCost > 0 ? '+' : ''}{fmtMoney(cost.additionalCost)}</span>
+                <div className="flex items-center justify-between gap-2 text-slate-500">
+                    <span className="shrink-0">{t('tenders.additional_cost')}</span>
+                    <AutoFitAmount value={`${cost.additionalCost > 0 ? '+' : ''}${fmtMoney(cost.additionalCost)}`} basePx={11.5} className="font-mono" />
                 </div>
             )}
-            <div className="flex items-center justify-between font-semibold text-slate-700">
-                <span>{t('tenders.net_amount')}</span>
-                <span className="font-mono">{fmtMoney(pricingTaxBase)}</span>
+            <div className="flex items-center justify-between gap-2 font-semibold text-slate-700">
+                <span className="shrink-0">{t('tenders.net_amount')}</span>
+                <AutoFitAmount value={fmtMoney(pricingTaxBase)} basePx={11.5} className="font-mono" />
             </div>
-            <div className="flex items-center justify-between text-slate-500">
-                <span className="flex items-center gap-1">
+            <div className="flex items-center justify-between gap-2 text-slate-500">
+                <span className="flex shrink-0 items-center gap-1">
                     KDV
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-slate-100 text-slate-500 border border-slate-200 font-mono">
                         %{fmtVatRate(effectiveVat)}
                     </span>
                 </span>
-                <span className="font-mono">+{fmtMoney(pricingTaxAmount)}</span>
+                <AutoFitAmount value={`+${fmtMoney(pricingTaxAmount)}`} basePx={11.5} className="font-mono" />
             </div>
-            <div className="flex items-center justify-between font-semibold text-blue-800 border-t border-slate-100 pt-1">
-                <span>{t('tenders.total_kdv_dahil')}</span>
-                <span className="font-mono">{fmtMoney(pricingTotalWithTax)}</span>
+            <div className="flex items-center justify-between gap-2 font-semibold text-blue-800 border-t border-slate-100 pt-1">
+                <span className="shrink-0">{t('tenders.total_kdv_dahil')}</span>
+                <AutoFitAmount value={fmtMoney(pricingTotalWithTax)} basePx={11.5} className="font-mono" />
             </div>
         </div>
 
@@ -176,4 +180,5 @@ export const PositionPricingSection: React.FC<{
             </div>
         )}
     </div>
-);
+    );
+};

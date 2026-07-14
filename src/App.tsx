@@ -86,8 +86,25 @@ function App() {
 
     useEffect(() => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (token) fetchProfile();
-        else useAuthStore.setState({ isLoading: false });
+        if (token) {
+            fetchProfile();
+
+            // Start direct tender visits in parallel with profile validation.
+            // This removes the old profile -> route JS -> tender API waterfall.
+            const match = window.location.pathname.match(/^\/crm\/tenders\/([^/?#]+)$/);
+            const tenderId = match?.[1];
+            if (tenderId && tenderId !== 'new') {
+                void import('./pages/tender/TenderDetail').catch(() => undefined);
+                void import('./store/tenderStore')
+                    .then(({ useTenderStore }) => {
+                        const state = useTenderStore.getState();
+                        if (state.detail?.tender.id !== tenderId) {
+                            return state.fetchDetail(tenderId);
+                        }
+                    })
+                    .catch(() => undefined);
+            }
+        } else useAuthStore.setState({ isLoading: false });
     }, [fetchProfile]);
 
     useEffect(() => {
@@ -103,7 +120,7 @@ function App() {
             theme={{
                 algorithm: isDarkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
                 token: {
-                    fontFamily: '"Google Sans", Arial, sans-serif',
+                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
                     borderRadius: 10,
                     borderRadiusXS: 10,
                     borderRadiusSM: 10,

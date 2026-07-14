@@ -18,6 +18,7 @@ import { projectApi, deliveryReportApi, type ServiceReportDto, type DeliveryRepo
 import type { ProjectDto } from '../../types/project';
 
 import { t } from '@/i18n/translate';
+import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const money = (value: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(value || 0);
@@ -348,7 +349,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                                 )}
                                 {projects.map((p) => (
                                     <tr key={p.id} className="hover:bg-slate-50/60">
-                                        <td className="px-3 py-2 font-medium text-slate-800">{p.projectName}</td>
+                                        <td className="px-3 py-2 font-medium text-slate-800">{localizeTenderNumbersInText(p.projectName)}</td>
                                         <td className="px-3 py-2 text-slate-600">{p.customer?.companyName || '—'}</td>
                                         <td className="px-3 py-2 w-[160px]">
                                             <Input type="date" value={ranges[p.id]?.start || ''} onChange={(e) => setRanges((prev) => ({ ...prev, [p.id]: { ...prev[p.id], start: e.target.value } }))} />
@@ -399,7 +400,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                                         <td className="px-3 py-2 text-slate-600">{dayjs(r.sentAt || r.createdAt).format('DD.MM.YYYY HH:mm')}</td>
                                         <td className="px-3 py-2 font-medium text-slate-800">{r.checklistName || '—'}</td>
                                         <td className="px-3 py-2">
-                                            <div className="font-medium text-slate-800">{r.customerName || r.orderNumber || '—'}</div>
+                                            <div className="font-medium text-slate-800">{r.customerName || (r.orderNumber ? localizeTenderNumbersInText(r.orderNumber) : '—')}</div>
                                             <div className="text-[11px] text-slate-500">{r.projectName || '—'}</div>
                                         </td>
                                         <td className="px-3 py-2">
@@ -423,7 +424,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
             <Modal
                 open={previewOpen}
                 title={t('projects.general.previewTitle')}
-                description={previewProject ? `${previewProject.projectName} · ${dayjs(previewRange.start).format('DD.MM.YYYY')} – ${dayjs(previewRange.end).format('DD.MM.YYYY')}` : ''}
+                description={previewProject ? `${localizeTenderNumbersInText(previewProject.projectName)} · ${dayjs(previewRange.start).format('DD.MM.YYYY')} – ${dayjs(previewRange.end).format('DD.MM.YYYY')}` : ''}
                 onClose={() => setPreviewOpen(false)}
                 width="xl"
                 footer={

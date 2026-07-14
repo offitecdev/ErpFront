@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -36,7 +36,7 @@ export const Suppliers = () => {
     const navigate = useNavigate();
     const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
     const [loading, setLoading] = useState(false);
-    const [form, setForm] = useState({ companyName: '', phone: '', address: '' });
+    const [form, setForm] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '' });
     const [saving, setSaving] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -86,26 +86,12 @@ export const Suppliers = () => {
     const rangeFrom = filtered.length === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
     const rangeTo = Math.min(pageSafe * PAGE_SIZE, filtered.length);
 
-    const listRef = useRef<HTMLDivElement>(null);
-    const [listHeight, setListHeight] = useState(0);
-    useLayoutEffect(() => {
-        const el = listRef.current;
-        if (!el) return;
-        const recompute = () => {
-            const top = el.getBoundingClientRect().top;
-            setListHeight(Math.max(240, window.innerHeight - top - 24));
-        };
-        recompute();
-        window.addEventListener('resize', recompute);
-        return () => window.removeEventListener('resize', recompute);
-    }, []);
-
     const create = async () => {
         if (!form.companyName.trim()) return toast.error(t('auto.tedarikci_sirket_adi_zorunludur'));
         setSaving(true);
         try {
             const supplier = await inventoryApi.createSupplier(form);
-            setForm({ companyName: '', phone: '', address: '' });
+            setForm({ companyName: '', contactName: '', email: '', phone: '', address: '' });
             setAddOpen(false);
             await load();
             navigate(`/inventory/suppliers/${supplier.id}`);
@@ -118,15 +104,6 @@ export const Suppliers = () => {
 
     return (
         <div>
-            <StockModuleHeader
-                label="Stock › Suppliers"
-                actions={
-                    <Button icon={addOpen ? <ChevronDown size={13} /> : <Plus size={13} />} onClick={() => setAddOpen((o) => !o)}>
-                        {t('auto.yeni_tedarikci')}
-                    </Button>
-                }
-            />
-
             {/* Aşağı doğru açılan "Yeni Tedarikçi" bölümü — liste her zaman görünür kalır. */}
             {addOpen && (
                 <section className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-xs">
@@ -134,6 +111,8 @@ export const Suppliers = () => {
                         <Building size={13} />{t('auto.yeni_tedarikci')}</div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <Field label={t('auto.sirket_adi')} required><Input size="sm" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></Field>
+                        <Field label="Yetkili"><Input size="sm" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} /></Field>
+                        <Field label="E-posta"><Input size="sm" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="tedarikci@ornek.com" /></Field>
                         <Field label={t('common.phone')}><Input size="sm" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
                         <Field label={t('common.address')}><Input size="sm" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
                     </div>
@@ -144,7 +123,7 @@ export const Suppliers = () => {
             )}
 
             <Card className="border-0 rounded-none" noPadding>
-                <div className="shrink-0 overflow-x-auto border-b border-slate-200 bg-slate-50/60">
+                <div className="shrink-0 overflow-x-auto pb-2">
                     <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
                         <div className="flex shrink-0 items-center gap-2 pr-1">
                             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
@@ -210,15 +189,20 @@ export const Suppliers = () => {
                                     <ChevronRight size={14} />
                                 </button>
                             </div>
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                icon={addOpen ? <ChevronDown size={16} /> : <Plus size={16} />}
+                                onClick={() => setAddOpen((o) => !o)}
+                                className="!h-9 !px-4 !text-[13px] !font-semibold"
+                            >
+                                {t('auto.yeni_tedarikci')}
+                            </Button>
                         </div>
                     </div>
                 </div>
 
-                <div
-                    ref={listRef}
-                    style={{ height: listHeight || undefined }}
-                    className="overflow-auto bg-white"
-                >
+                <div className="bg-white">
                     <table className="min-w-[1220px] w-full table-fixed text-[12.5px]">
                         <colgroup>
                             <col style={{ width: 210 }} />
@@ -284,11 +268,48 @@ export const SupplierDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [supplier, setSupplier] = useState<SupplierRow | null>(null);
+    const [editOpen, setEditOpen] = useState(false);
+    const [editForm, setEditForm] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', isActive: true });
+    const [saving, setSaving] = useState(false);
+
+    const load = async () => {
+        if (!id) return;
+        try {
+            const data = await inventoryApi.getSupplier(id);
+            setSupplier(data);
+            setEditForm({
+                companyName: data.companyName || '',
+                contactName: data.contactName || '',
+                email: data.email || '',
+                phone: data.phone || '',
+                address: data.address || '',
+                isActive: data.isActive,
+            });
+        } catch {
+            toast.error(t('auto.tedarikci_yuklenemedi'));
+        }
+    };
 
     useEffect(() => {
-        if (!id) return;
-        void inventoryApi.getSupplier(id).then(setSupplier).catch(() => toast.error(t('auto.tedarikci_yuklenemedi')));
+        void load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+
+    const save = async () => {
+        if (!id) return;
+        if (!editForm.companyName.trim()) return toast.error(t('auto.tedarikci_sirket_adi_zorunludur'));
+        setSaving(true);
+        try {
+            await inventoryApi.updateSupplier(id, editForm);
+            toast.success('Tedarikçi güncellendi.');
+            setEditOpen(false);
+            await load();
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || 'Tedarikçi güncellenemedi.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     if (!supplier) return <div className="h-80 animate-pulse rounded-md border border-slate-100 bg-slate-50" />;
 
@@ -296,8 +317,55 @@ export const SupplierDetail = () => {
         <div>
             <StockModuleHeader
                 label={`Stock › Suppliers › ${supplier.companyName}`}
-                actions={<Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/inventory/suppliers')}>{t('auto.listeye_don')}</Button>}
+                actions={
+                    <>
+                        <Button variant="secondary" icon={<Save size={13} />} onClick={() => setEditOpen((o) => !o)}>Düzenle</Button>
+                        <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/inventory/suppliers')}>{t('auto.listeye_don')}</Button>
+                    </>
+                }
             />
+
+            {/* İletişim bilgileri / düzenleme */}
+            <section className="mb-4 overflow-hidden rounded-md border border-slate-200 bg-white shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-slate-500">
+                        <Building size={13} /> İletişim Bilgileri
+                    </div>
+                    {editOpen && (
+                        <button type="button" onClick={() => { setEditOpen(false); void load(); }} className="text-slate-400 hover:text-slate-600" aria-label={t('common.clear')}>
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+                {editOpen ? (
+                    <div className="p-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <Field label={t('auto.sirket_adi')} required><Input size="sm" value={editForm.companyName} onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })} /></Field>
+                            <Field label="Yetkili"><Input size="sm" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} /></Field>
+                            <Field label="E-posta"><Input size="sm" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="tedarikci@ornek.com" /></Field>
+                            <Field label={t('common.phone')}><Input size="sm" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></Field>
+                            <Field label={t('common.address')}><Input size="sm" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></Field>
+                            <Field label={t('common.status')}>
+                                <Select size="sm" value={editForm.isActive ? 'ACTIVE' : 'INACTIVE'} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.value === 'ACTIVE' })}>
+                                    <option value="ACTIVE">{t('common.active')}</option>
+                                    <option value="INACTIVE">{t('common.inactive')}</option>
+                                </Select>
+                            </Field>
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2">
+                            <Button variant="secondary" size="sm" onClick={() => { setEditOpen(false); void load(); }} disabled={saving}>{t('common.cancel')}</Button>
+                            <Button size="sm" icon={<Save size={13} />} loading={saving} onClick={save}>{t('common.save')}</Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-2 p-4 text-[12.5px] sm:grid-cols-2">
+                        <InfoLine label="Yetkili" value={supplier.contactName} />
+                        <InfoLine label="E-posta" value={supplier.email} />
+                        <InfoLine label={t('common.phone')} value={supplier.phone} />
+                        <InfoLine label={t('common.address')} value={supplier.address} />
+                    </div>
+                )}
+            </section>
 
             <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
                 <Metric label={t('auto.urun')} value={String(supplier.articleCount || 0)} />
@@ -341,5 +409,12 @@ const Metric = ({ label, value }: { label: string; value: string }) => (
     <div className="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-xs">
         <div className="text-[10px] font-semibold uppercase text-slate-500">{label}</div>
         <div className="mt-1 font-semibold text-slate-950">{value}</div>
+    </div>
+);
+
+const InfoLine = ({ label, value }: { label: string; value?: string | null }) => (
+    <div className="flex items-baseline gap-2">
+        <span className="w-20 shrink-0 text-[11px] font-semibold uppercase text-slate-400">{label}</span>
+        <span className="min-w-0 truncate text-slate-700">{value || '—'}</span>
     </div>
 );
