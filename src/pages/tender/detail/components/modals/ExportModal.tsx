@@ -16,6 +16,7 @@ import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
 import { localizeTenderNumber } from '@/utils/tenderNumber';
 import { flattenTenderTreeForPdf } from '../../tenderDetailUtils';
+import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
 
 type ExportFormat = 'PDF' | 'CRBX' | 'SIA451';
 type PdfLanguage = 'tr' | 'de' | 'en';
@@ -27,9 +28,11 @@ type ExportModalProps = {
     tenderNumber: string;
     tree: any[];
     grandTotal: number;
+    /** Belge düzeyi indirim özeti (PDF toplamlarında indirim satırı için). */
+    pdfTotals?: TenderPdfTotals | null;
 };
 
-export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderId, tenderNumber, tree, grandTotal }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderId, tenderNumber, tree, grandTotal, pdfTotals }) => {
     const [format, setFormat] = useState<ExportFormat>('PDF');
     const [loading, setLoading] = useState(false);
     // Shows the "Generating PDF…" overlay while the doc is assembled (incl. the
@@ -103,6 +106,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                         activities,
                         positions,
                         grandTotal,
+                        totals: pdfTotals ?? null,
                         lang: pdfLang,
                     },
                     pdfSettings,

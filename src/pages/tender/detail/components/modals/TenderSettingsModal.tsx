@@ -32,6 +32,7 @@ import {
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { RichTextMarkdownEditor, looksLikeRichHtml } from '../../TenderRichText';
 import { MailDraftsDrawer } from '../mail/MailDraftsDrawer';
+import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
 
 const bytesToBase64 = (bytes: Uint8Array) => {
     let binary = '';
@@ -47,6 +48,8 @@ type TenderSettingsModalProps = {
     tenderId: string;
     tree: TreeNode[];
     grandTotal: number;
+    /** Belge düzeyi indirim özeti (mail PDF'inde indirim satırı için). */
+    pdfTotals?: TenderPdfTotals | null;
     initialTab?: TenderSettingsTabKey;
     inline?: boolean;
     hideTabs?: boolean;
@@ -55,7 +58,7 @@ type TenderSettingsModalProps = {
     onChanged: () => Promise<void>;
 };
 
-export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, onClose, tenderId, tree, grandTotal, initialTab = 'mail', inline = false, hideTabs = false, overtimeHourlyRate, onOvertimeHourlyRateChange, onChanged }) => {
+export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, onClose, tenderId, tree, grandTotal, pdfTotals, initialTab = 'mail', inline = false, hideTabs = false, overtimeHourlyRate, onOvertimeHourlyRateChange, onChanged }) => {
     const { detail, activities } = useTenderStore();
     // Prices in the modal (position list, material costs) follow the offer's currency.
     const fmtMoney = useMoneyFormat();
@@ -223,6 +226,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 activities,
                 positions: flattenTenderTreeForPdf(tree),
                 grandTotal,
+                totals: pdfTotals ?? null,
             }, { ...settings, currency: toCurrencyCode((detail.tender as { currency?: string | null }).currency) });
             const res = await tenderApi.sendOfferMail(tenderId, {
                 ...form,

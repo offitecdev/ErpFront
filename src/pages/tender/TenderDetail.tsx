@@ -372,6 +372,18 @@ export const TenderDetail = () => {
         () => computeTenderPricingSummary(simpleRows, fallbackTaxRate, detail?.tender.directDiscount),
         [simpleRows, fallbackTaxRate, detail?.tender.directDiscount],
     );
+    // PDF toplamları için indirim özeti: indirim satırı yalnızca gerçekten
+    // uygulandıysa çizilir, net/KDV/genel toplam ekrandaki özetle birebir olur.
+    const pdfTotals = useMemo(
+        () => ({
+            discountPercent: pricingSummary.directDiscount,
+            discountAmount: pricingSummary.directDiscountAmount,
+            netTotal: pricingSummary.netTotal,
+            vatTotal: pricingSummary.vatTotal,
+            grossTotal: pricingSummary.grossTotal,
+        }),
+        [pricingSummary],
+    );
     const selectedRows = useMemo(
         () => simpleRows.filter((row) => selectedRowIds[row.id]),
         [simpleRows, selectedRowIds],
@@ -1330,6 +1342,7 @@ export const TenderDetail = () => {
                         tenderId={tender.id}
                         tree={tree}
                         grandTotal={grandTotal}
+                        pdfTotals={pdfTotals}
                         initialTab={settingsInitialTab}
                         overtimeHourlyRate={overtimeHourlyRate}
                         onOvertimeHourlyRateChange={setOvertimeHourlyRate}
@@ -1428,6 +1441,7 @@ export const TenderDetail = () => {
                         tenderNumber={tender.tenderNumber}
                         tree={tree}
                         grandTotal={grandTotal}
+                        pdfTotals={pdfTotals}
                     />
                 </Suspense>
             )}
