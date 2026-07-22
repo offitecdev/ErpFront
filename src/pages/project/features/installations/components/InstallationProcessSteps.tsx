@@ -13,7 +13,7 @@ export const InstallationProcessSteps = ({ steps }: { steps: ProcessStep[] }) =>
     const currentIndex = steps.findIndex((step) => !step.done);
 
     return (
-        <div className="flex items-center gap-2 overflow-x-auto rounded-lg border border-slate-200 bg-white px-3 py-3">
+        <div className="ofi-rep-panel flex items-center gap-2 overflow-x-auto rounded-xl px-3.5 py-3">
             {steps.map((step, index) => {
                 const state = step.done ? 'done' : index === currentIndex ? 'current' : 'pending';
                 const circle =

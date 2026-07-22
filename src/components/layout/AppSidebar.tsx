@@ -32,7 +32,7 @@ const HEADER_HEIGHT = 64; // matches the fixed header (h-16)
    panel grey-99 (#FBFBFA), hover grey-96 (~black/5), selected grey-90 (~black/8).
    Dark mode: text is the focus — hover/active are quiet translucent "glass"
    whites; gold/wheat survives only as a muted icon tint (never as a state bg). */
-const ROW_IDLE = 'text-black/85 hover:bg-black/5 hover:text-black dark:text-white/85 dark:hover:bg-white/8 dark:hover:text-white';
+const ROW_IDLE = 'text-black/85 hover:bg-[#eef1fa] hover:text-black dark:text-white/85 dark:hover:bg-white/8 dark:hover:text-white';
 const ROW_ACTIVE = 'bg-black/8 text-black dark:bg-white/10 dark:text-white dark:ring-1 dark:ring-inset dark:ring-white/10';
 const DOT_IDLE = 'bg-black/25 dark:bg-white/30';
 const DOT_ACTIVE = 'bg-black dark:bg-white';
@@ -225,6 +225,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 const groupActive = activeGroupKey === section.key;
                 const groupOpen = accordionMode && openGroups.includes(section.key);
                 const flyoutActive = flyoutKey === section.key;
+                // The selected child row is the single source of truth while it is
+                // visible (accordion / flyout) — the parent header must not read as
+                // selected too. Only the collapsed rail (children hidden) keeps the
+                // location hint on the group icon.
+                const headerHighlight = accordionMode ? false : (groupActive || flyoutActive);
                 return (
                     <div key={section.key}>
                         <button
@@ -233,9 +238,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                             onClick={() => handleGroupClick(section.key)}
                             // The flyout "side tab" also opens when the pointer lands on the icon.
                             onMouseEnter={() => { if (!accordionMode) openFlyout(section.key); }}
-                            className={`${rowBase} ${rowPad} ${groupActive || flyoutActive ? `${ROW_ACTIVE} font-semibold` : `${ROW_IDLE} font-medium`}`}
+                            className={`${rowBase} ${rowPad} ${headerHighlight ? `${ROW_ACTIVE} font-semibold` : `${ROW_IDLE} font-medium`}`}
                         >
-                            <Icon size={19} className={`shrink-0 ${groupActive || flyoutActive ? ICON_ACTIVE : ICON_IDLE}`} />
+                            <Icon size={19} className={`shrink-0 ${headerHighlight ? ICON_ACTIVE : ICON_IDLE}`} />
                             {expanded && (
                                 <>
                                     <span className="flex-1 truncate text-[13.5px]">{t(section.label)}</span>
@@ -272,7 +277,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     /* ── Top: search + quick access bar ── */
     const topSection = (
         <div className="px-2 pt-2 pb-1.5">
-            {/* Search */}
+            {/* Search — opens the quick-search overlay; lives in the sidebar,
+                not the header. */}
             <button
                 type="button"
                 onClick={onOpenSearch}
@@ -317,7 +323,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         type="button"
                                         role="menuitem"
                                         onClick={() => { onQuickCreate(qi); setQuickCreateOpen(false); }}
-                                        className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-[#232326]"
+                                        className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[#eef1fa] dark:hover:bg-[#232326]"
                                     >
                                         <QIcon size={18} className={`shrink-0 dark:!text-[#e6cf9e]/80 ${qi.iconClassName || 'text-black/70'}`} />
                                         <span className="truncate text-[13.5px] font-medium text-black dark:text-white">{qi.label}</span>
@@ -350,7 +356,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 style={{ width }}
                 onMouseLeave={() => { if (flyoutKey) scheduleFlyoutClose(); }}
                 onMouseEnter={cancelFlyoutClose}
-                className="hidden lg:fixed lg:top-16 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col bg-[#f8fafd] transition-[width] duration-300 ease-in-out"
+                className="hidden lg:fixed lg:top-16 lg:bottom-0 lg:left-0 lg:z-40 lg:flex lg:flex-col bg-[#f6f8fb] transition-[width] duration-300 ease-in-out"
             >
                 {topSection}
                 <div className="mx-2 my-1 h-px bg-black/8 dark:bg-white/10" />

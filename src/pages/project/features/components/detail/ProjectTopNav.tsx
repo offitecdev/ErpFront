@@ -1,10 +1,13 @@
+import { useRef, useState } from 'react';
 import type React from 'react';
 import {
     Activity,
     CalendarCheck01 as CalendarClock,
+    ChevronDown,
     Clipboard as ClipboardPenLine,
     List,
     PackagePlus,
+    Coins01 as Wallet,
     Receipt as ReceiptText,
 } from '@/components/icons/antIconCompat';
 
@@ -25,8 +28,8 @@ type Group = {
     subs: SubItem[];
 };
 
-// The full ERP workflow tree. Labels are lazily resolved so language switches
-// re-render correctly. `overview` and `addons` behave as single leaf groups.
+// The full ERP workflow, now as a horizontal top menu. Labels are lazily resolved
+// so language switches re-render correctly.
 const getGroups = (): Group[] => [
     {
         section: 'overview',
@@ -55,6 +58,7 @@ const getGroups = (): Group[] => [
         icon: <ClipboardPenLine size={15} />,
         subs: [
             { key: 'fieldReports', label: () => t('projects.fieldReport') },
+            { key: 'generalReport', label: () => t('projects.flow.generalReport') },
             { key: 'delivery', label: () => t('projects.delivery.reportsTab') },
             { key: 'signatures', label: () => t('nav.signatures') },
         ],
@@ -70,6 +74,12 @@ const getGroups = (): Group[] => [
         ],
     },
     {
+        section: 'billing',
+        label: () => t('projects.flow.billing'),
+        icon: <Wallet size={15} />,
+        subs: [],
+    },
+    {
         section: 'addons',
         label: () => t('projects.addonOrder'),
         icon: <PackagePlus size={15} />,
@@ -81,12 +91,15 @@ const getGroups = (): Group[] => [
 
 // A short, readable badge instead of a bare red dot (per ERP-style requirement).
 const AttentionBadge = ({ label }: { label: string }) => (
-    <span className="ml-auto inline-flex items-center rounded-full bg-red-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-red-700">
+    <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-red-700">
         {label}
     </span>
 );
 
-export const ProjectWorkflowNav = ({
+// Horizontal workflow menu. Groups with sub-sections open their dropdown on hover
+// (and on focus/click, so keyboard and touch keep working). Clicking a group jumps
+// to its default sub-section.
+export const ProjectTopNav = ({
     activeView,
     onChange,
     addonAttention = false,
@@ -96,32 +109,55 @@ export const ProjectWorkflowNav = ({
     addonAttention?: boolean;
 }) => {
     const groups = getGroups();
+    const [openSection, setOpenSection] = useState<ProjectSectionKey | null>(null);
+    // Small close delay so the pointer can travel from the trigger into the dropdown.
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Which top-level group should render an attention badge.
+    const scheduleClose = () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        closeTimer.current = setTimeout(() => setOpenSection(null), 120);
+    };
+    const cancelClose = () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        closeTimer.current = null;
+    };
+    const openMenu = (section: ProjectSectionKey) => {
+        cancelClose();
+        setOpenSection(section);
+    };
+
     const sectionAttention = (section: ProjectSectionKey): string | null => {
         if (section === 'addons' && addonAttention) return t('projects.addonRequestBadge');
-        return null;
-    };
-    // Which sub-item should render an attention badge.
-    const subAttention = (sub: ProjectSubSectionKey): string | null => {
-        if (sub === 'addonOrders' && addonAttention) return t('projects.addonRequestBadge');
         return null;
     };
 
     return (
         <nav
             aria-label="Project workflow"
-            className="mb-4 flex gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1.5 md:flex-col md:overflow-visible dark:border-white/15 dark:bg-white/5"
+            className="mb-4 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1.5 md:overflow-visible dark:border-white/15 dark:bg-white/5"
         >
             {groups.map((group) => {
                 const active = activeView.section === group.section;
                 const badge = sectionAttention(group.section);
+                const hasSubs = group.subs.length > 0;
+                const open = openSection === group.section && hasSubs;
                 return (
-                    <div key={group.section} className="shrink-0 md:shrink">
+                    <div
+                        key={group.section}
+                        className="relative shrink-0"
+                        onMouseEnter={() => hasSubs && openMenu(group.section)}
+                        onMouseLeave={scheduleClose}
+                    >
                         <button
                             type="button"
-                            onClick={() => onChange(viewForSection(group.section))}
-                            className={`flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${
+                            aria-haspopup={hasSubs || undefined}
+                            aria-expanded={hasSubs ? open : undefined}
+                            onClick={() => {
+                                onChange(viewForSection(group.section));
+                                setOpenSection(null);
+                            }}
+                            onFocus={() => hasSubs && openMenu(group.section)}
+                            className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${
                                 active
                                     ? 'bg-[#272f67] text-white shadow-sm'
                                     : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-white dark:hover:bg-white/10'
@@ -130,28 +166,39 @@ export const ProjectWorkflowNav = ({
                             <span className="shrink-0">{group.icon}</span>
                             <span>{group.label()}</span>
                             {badge && !active && <AttentionBadge label={badge} />}
+                            {hasSubs && (
+                                <ChevronDown
+                                    size={13}
+                                    className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${active ? 'text-white/70' : 'text-slate-400'}`}
+                                />
+                            )}
                         </button>
 
-                        {/* Sub-sections appear when the group is active. On desktop they nest
-                            under the group; on mobile they flow inline horizontally. */}
-                        {active && group.subs.length > 0 && (
-                            <div className="mt-1 flex gap-1 md:ml-2 md:mt-1 md:flex-col md:border-l md:border-slate-200 md:pl-2 dark:md:border-white/15">
+                        {open && (
+                            <div
+                                className="absolute left-0 top-full z-30 mt-1 min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-white/15 dark:bg-slate-900"
+                                onMouseEnter={cancelClose}
+                                onMouseLeave={scheduleClose}
+                            >
                                 {group.subs.map((sub) => {
-                                    const subActive = activeView.subSection === sub.key;
-                                    const subBadge = subAttention(sub.key);
+                                    const subActive = active && activeView.subSection === sub.key;
+                                    const subBadge = sub.key === 'addonOrders' && addonAttention ? t('projects.addonRequestBadge') : null;
                                     return (
                                         <button
                                             key={sub.key}
                                             type="button"
-                                            onClick={() => onChange({ section: group.section, subSection: sub.key })}
-                                            className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors md:w-full ${
+                                            onClick={() => {
+                                                onChange({ section: group.section, subSection: sub.key });
+                                                setOpenSection(null);
+                                            }}
+                                            className={`flex w-full items-center justify-between gap-2 whitespace-nowrap px-3.5 py-2 text-left text-[12.5px] font-medium transition-colors ${
                                                 subActive
-                                                    ? 'bg-[#eef4ff] text-[#272f67]'
-                                                    : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:text-white/70 dark:hover:bg-white/10'
+                                                    ? 'bg-[#eef4ff] text-[#272f67] dark:bg-white/10 dark:text-white'
+                                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-white/70 dark:hover:bg-white/10'
                                             }`}
                                         >
                                             <span>{sub.label()}</span>
-                                            {subBadge && !subActive && <AttentionBadge label={subBadge} />}
+                                            {subBadge && <AttentionBadge label={subBadge} />}
                                         </button>
                                     );
                                 })}

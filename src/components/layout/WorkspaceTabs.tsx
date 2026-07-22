@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGuardedNavigate } from '../../store/navGuardStore';
@@ -62,31 +62,34 @@ const readStoredTabs = (userId?: string): string[] => {
     return [];
 };
 
-interface WorkspaceTabsProps {
-    /** Current user id — tabs are persisted per user. */
-    userId?: string;
+interface WorkspaceTabsContextValue {
+    tabs: TabDefinition[];
+    tabIds: string[];
+    activePath?: string;
+    openTab: (definition: TabDefinition) => void;
+    closeTab: (event: React.MouseEvent, id: string) => void;
 }
 
+const WorkspaceTabsContext = createContext<WorkspaceTabsContextValue | null>(null);
+
+const useWorkspaceTabs = () => {
+    const ctx = useContext(WorkspaceTabsContext);
+    if (!ctx) throw new Error('WorkspaceTab components must be used within WorkspaceTabsProvider');
+    return ctx;
+};
+
 /**
- * Header workspace tabs: a "+" launcher that opens frequently used list/detail
- * routes as closable tabs. The tab strip fills the space up to the tenant
- * selector and shows as many tabs as fully fit that space — anything that would
- * overflow is simply hidden (no scrolling). The open set is remembered in
- * localStorage, keyed per user.
- *
- * Kept as a standalone component so the header shell stays free of this logic.
+ * Header workspace tabs, split into a shared provider plus two placement
+ * pieces: the "+" launcher (lives in the brand cluster at the top of the menu)
+ * and the tab strip (lives in the middle of the header). The open set is
+ * remembered in localStorage, keyed per user.
  */
-export const WorkspaceTabs: React.FC<WorkspaceTabsProps> = ({ userId }) => {
+export const WorkspaceTabsProvider: React.FC<{ userId?: string; children: React.ReactNode }> = ({ userId, children }) => {
     // Guarded so switching tabs while a tender has unsaved changes prompts to save.
     const navigate = useGuardedNavigate();
     const location = useLocation();
-    const { t } = useTranslation();
 
     const [tabIds, setTabIds] = useState<string[]>(() => readStoredTabs(userId));
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    const menuRef = useRef<HTMLDivElement>(null);
-    const stripRef = useRef<HTMLDivElement>(null);
     // Tracks which user's tabs are currently loaded so persistence never leaks
     // one user's tabs into another user's storage key.
     const hydratedFor = useRef(userId);
@@ -123,48 +126,8 @@ export const WorkspaceTabs: React.FC<WorkspaceTabsProps> = ({ userId }) => {
         return matches[0];
     }, [tabs, location.pathname]);
 
-    // Show only the tabs that fully fit the available width; hide the overflow.
-    // We measure the real DOM nodes (they are `shrink-0`, so each has an intrinsic
-    // width) and toggle `display` inline — no scrolling, no arrows.
-    useLayoutEffect(() => {
-        const strip = stripRef.current;
-        if (!strip) return;
-
-        const fit = () => {
-            const kids = Array.from(strip.children) as HTMLElement[];
-            const available = strip.clientWidth;
-            const gap = 4; // matches gap-1 (0.25rem)
-            // Reveal everything first so measurement reflects natural widths.
-            kids.forEach((kid) => { kid.style.display = ''; });
-            let used = 0;
-            kids.forEach((kid) => {
-                used += (used > 0 ? gap : 0) + kid.offsetWidth;
-                if (used > available) kid.style.display = 'none';
-            });
-        };
-
-        fit();
-        if (typeof ResizeObserver === 'undefined') return;
-        const observer = new ResizeObserver(fit);
-        observer.observe(strip);
-        return () => observer.disconnect();
-    }, [tabs]);
-
-    // Close the "+" menu on outside click.
-    useEffect(() => {
-        if (!isMenuOpen) return;
-        const onMouseDown = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setIsMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', onMouseDown);
-        return () => document.removeEventListener('mousedown', onMouseDown);
-    }, [isMenuOpen]);
-
     const openTab = useCallback(
         (definition: TabDefinition) => {
-            setIsMenuOpen(false);
             setTabIds((prev) => {
                 const next = prev.includes(definition.id) ? prev : [...prev, definition.id];
                 persist(next);
@@ -199,86 +162,146 @@ export const WorkspaceTabs: React.FC<WorkspaceTabsProps> = ({ userId }) => {
         [location.pathname, navigate, persist],
     );
 
+    const value = useMemo(
+        () => ({ tabs, tabIds, activePath, openTab, closeTab }),
+        [tabs, tabIds, activePath, openTab, closeTab],
+    );
+
+    return <WorkspaceTabsContext.Provider value={value}>{children}</WorkspaceTabsContext.Provider>;
+};
+
+/** The "+" launcher — sits at the top of the menu, right of the split toggle. */
+export const WorkspaceTabLauncher: React.FC<{ className?: string }> = ({ className = '' }) => {
+    const { t } = useTranslation();
+    const { tabIds, openTab } = useWorkspaceTabs();
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Close the "+" menu on outside click.
+    useEffect(() => {
+        if (!isMenuOpen) return;
+        const onMouseDown = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onMouseDown);
+        return () => document.removeEventListener('mousedown', onMouseDown);
+    }, [isMenuOpen]);
+
     return (
-        <div className="workspace-tabs ml-3 hidden min-w-0 flex-1 items-center gap-1.5 lg:flex" ref={menuRef}>
-            {/* "+" launcher */}
-            <div className="relative shrink-0">
-                <button
-                    type="button"
-                    aria-label={t('nav.workspaceTabs.add')}
-                    aria-expanded={isMenuOpen}
-                    title={t('nav.workspaceTabs.add')}
-                    onClick={() => setIsMenuOpen((open) => !open)}
-                    className={`inline-flex size-10 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isMenuOpen
-                        ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg'
-                        : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
-                        }`}
-                >
-                    <PlusIcon style={{ fontSize: 22 }} />
-                </button>
+        <div className={`relative shrink-0 ${className}`} ref={menuRef}>
+            <button
+                type="button"
+                aria-label={t('nav.workspaceTabs.add')}
+                aria-expanded={isMenuOpen}
+                title={t('nav.workspaceTabs.add')}
+                onClick={() => setIsMenuOpen((open) => !open)}
+                className={`inline-flex size-9 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isMenuOpen
+                    ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg'
+                    : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
+                    }`}
+            >
+                <PlusIcon style={{ fontSize: 20 }} />
+            </button>
 
-                {isMenuOpen && (
-                    <div className="absolute left-0 top-12 z-[60] w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl">
-                        <p className="px-3 pb-1.5 pt-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
-                            {t('nav.workspaceTabs.menuTitle')}
-                        </p>
-                        <div className="grid gap-0.5">
-                            {TAB_CATALOG.map((item) => {
-                                const ItemIcon = item.icon;
-                                const isOpen = tabIds.includes(item.id);
-                                return (
-                                    <a
-                                        key={item.id}
-                                        href={hrefFor(item.path)}
-                                        onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); openTab(item); }}
-                                        className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition-colors ${isOpen
-                                            ? 'bg-[#d3e3fd] text-[#1f2654] dark:bg-white/12 dark:text-white'
-                                            : 'text-slate-700 hover:bg-slate-100 dark:text-white/85 dark:hover:bg-white/10 dark:hover:text-white'
-                                            }`}
-                                    >
-                                        <ItemIcon style={{ fontSize: 16 }} className="shrink-0" />
-                                        <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
-                                    </a>
-                                );
-                            })}
-                        </div>
+            {isMenuOpen && (
+                <div className="absolute left-0 top-11 z-[60] w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl">
+                    <p className="px-3 pb-1.5 pt-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
+                        {t('nav.workspaceTabs.menuTitle')}
+                    </p>
+                    <div className="grid gap-0.5">
+                        {TAB_CATALOG.map((item) => {
+                            const ItemIcon = item.icon;
+                            const isOpen = tabIds.includes(item.id);
+                            return (
+                                <a
+                                    key={item.id}
+                                    href={hrefFor(item.path)}
+                                    onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); setIsMenuOpen(false); openTab(item); }}
+                                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition-colors ${isOpen
+                                        ? 'bg-[#d3e3fd] text-[#1f2654] dark:bg-white/12 dark:text-white'
+                                        : 'text-slate-700 hover:bg-slate-100 dark:text-white/85 dark:hover:bg-white/10 dark:hover:text-white'
+                                        }`}
+                                >
+                                    <ItemIcon style={{ fontSize: 16 }} className="shrink-0" />
+                                    <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
+                                </a>
+                            );
+                        })}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
-            {/* Tab strip — shows as many tabs as fit; overflow is hidden. */}
-            <div ref={stripRef} className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-                {tabs.map((tab) => {
-                    const isActive = tab.path === activePath;
-                    return (
-                        <a
-                            key={tab.id}
-                            href={hrefFor(tab.path)}
-                            data-active={isActive || undefined}
-                            onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); navigate(tab.path); }}
-                            title={t(tab.labelKey)}
-                            className={`group inline-flex h-9 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors ${isActive
-                                ? 'border-[#272f67] bg-[#272f67] text-white'
-                                : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/80 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
+/** The tab strip — shows as many tabs as fully fit; overflow is hidden. */
+export const WorkspaceTabStrip: React.FC = () => {
+    const navigate = useGuardedNavigate();
+    const { t } = useTranslation();
+    const { tabs, activePath, closeTab } = useWorkspaceTabs();
+    const stripRef = useRef<HTMLDivElement>(null);
+
+    // Show only the tabs that fully fit the available width; hide the overflow.
+    // We measure the real DOM nodes (they are `shrink-0`, so each has an intrinsic
+    // width) and toggle `display` inline — no scrolling, no arrows.
+    useLayoutEffect(() => {
+        const strip = stripRef.current;
+        if (!strip) return;
+
+        const fit = () => {
+            const kids = Array.from(strip.children) as HTMLElement[];
+            const available = strip.clientWidth;
+            const gap = 4; // matches gap-1 (0.25rem)
+            // Reveal everything first so measurement reflects natural widths.
+            kids.forEach((kid) => { kid.style.display = ''; });
+            let used = 0;
+            kids.forEach((kid) => {
+                used += (used > 0 ? gap : 0) + kid.offsetWidth;
+                if (used > available) kid.style.display = 'none';
+            });
+        };
+
+        fit();
+        if (typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(fit);
+        observer.observe(strip);
+        return () => observer.disconnect();
+    }, [tabs]);
+
+    return (
+        <div ref={stripRef} className="workspace-tabs hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex">
+            {tabs.map((tab) => {
+                const isActive = tab.path === activePath;
+                return (
+                    <a
+                        key={tab.id}
+                        href={hrefFor(tab.path)}
+                        data-active={isActive || undefined}
+                        onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); navigate(tab.path); }}
+                        title={t(tab.labelKey)}
+                        className={`group inline-flex h-9 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors ${isActive
+                            ? 'border-[#272f67] bg-[#272f67] text-white'
+                            : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/80 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
+                            }`}
+                    >
+                        <span className="min-w-0 truncate">{t(tab.labelKey)}</span>
+                        <span
+                            role="button"
+                            tabIndex={-1}
+                            aria-label={t('nav.workspaceTabs.close')}
+                            onClick={(event) => closeTab(event, tab.id)}
+                            className={`-mr-1 flex size-4 shrink-0 items-center justify-center rounded-full transition-colors ${isActive
+                                ? 'text-white/70 hover:bg-white/20 hover:text-white'
+                                : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-white/55 dark:hover:bg-white/12 dark:hover:text-white'
                                 }`}
                         >
-                            <span className="min-w-0 truncate">{t(tab.labelKey)}</span>
-                            <span
-                                role="button"
-                                tabIndex={-1}
-                                aria-label={t('nav.workspaceTabs.close')}
-                                onClick={(event) => closeTab(event, tab.id)}
-                                className={`-mr-1 flex size-4 shrink-0 items-center justify-center rounded-full transition-colors ${isActive
-                                    ? 'text-white/70 hover:bg-white/20 hover:text-white'
-                                    : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-white/55 dark:hover:bg-white/12 dark:hover:text-white'
-                                    }`}
-                            >
-                                <CloseIcon style={{ fontSize: 12 }} />
-                            </span>
-                        </a>
-                    );
-                })}
-            </div>
+                            <CloseIcon style={{ fontSize: 12 }} />
+                        </span>
+                    </a>
+                );
+            })}
         </div>
     );
 };

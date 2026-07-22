@@ -32,7 +32,7 @@ export const DeleteOfferModal: React.FC<DeleteOfferModalProps> = ({
             onCancel={onCancel}
             centered
             footer={null}
-            maskClosable={!deleting}
+            mask={{ closable: !deleting }}
             keyboard={!deleting}
             width={456}
             destroyOnHidden

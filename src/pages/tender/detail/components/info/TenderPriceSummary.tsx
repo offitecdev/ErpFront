@@ -20,7 +20,7 @@ export const TenderPriceSummary = ({ summary, canEdit, onDirectDiscountChange }:
     };
 
     return (
-        <div className="border-t border-slate-200/70 px-3 py-3">
+        <div className="px-3 py-3">
             <div className="ml-auto w-full max-w-sm space-y-1 text-[12.5px]">
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-slate-500">{t('tenders.direct_discount')}</span>
@@ -62,7 +62,9 @@ export const TenderPriceSummary = ({ summary, canEdit, onDirectDiscountChange }:
                     <span className="text-slate-500">{t('tenders.vat_amount')}</span>
                     <span className="font-mono font-medium tabular-nums text-slate-800">{fmtMoney(summary.vatTotal)}</span>
                 </div>
-                <div className="flex items-center justify-between border-t border-slate-200 pt-1">
+                {/* No rule above the final total — the weight of the figure itself
+                    separates it from the rows above. */}
+                <div className="flex items-center justify-between pt-1">
                     <span className="font-semibold text-slate-700">{t('tenders.total_incl_vat')}</span>
                     <span className="font-mono text-[13.5px] font-bold tabular-nums text-slate-900">{fmtMoney(summary.grossTotal)}</span>
                 </div>

@@ -3,10 +3,8 @@ import type React from 'react';
 import dayjs from 'dayjs';
 import {
     AlertCircle,
-    ArrowRight,
     Briefcase01 as BriefcaseBusiness,
     CalendarCheck01 as CalendarClock,
-    Check,
     CurrencyDollarCircle as CircleDollarSign,
     FilterLines,
     Plus,
@@ -19,13 +17,11 @@ import { Button } from '../../components/ui-shared/Button';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { PageHeader } from '../../components/layout/PageHeader';
-import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { Select } from '../../components/ui-shared/Field';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
 import type { ProjectDto, ProjectStatus } from '../../types/project';
-import { ProjectProcessModal } from './ProjectProcessModal';
 import { ProjectStatusBadge } from './features/components/common/ProjectStatusBadge';
 import { getStatusLabel } from './features/utils/projectFormatters';
 
@@ -35,6 +31,23 @@ import { localizeTenderNumber, localizeTenderNumbersInText } from '@/utils/tende
 const money = (value: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(value || 0);
 
+// The three states a project is filtered by. ProjectStatus still carries the
+// legacy AWAITING_APPROVAL / ON_HOLD / CANCELLED values and existing records
+// keep rendering their own badge — they are just not offered as filters.
+const FILTERABLE_STATUSES: ProjectStatus[] = ['ACTIVE', 'SPECIALLY_CLOSED', 'COMPLETED'];
+
+/** Technical / invoicing progress across all of a project's orders — the plain
+ *  figure, no progress bar. */
+const PercentCell = ({ percent }: { percent?: number }) => {
+    if (percent === undefined) return <span className="text-slate-300">—</span>;
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    return (
+        <span className={`font-mono text-[12.5px] font-semibold tabular-nums ${clamped >= 100 ? 'text-emerald-600' : 'text-slate-700'}`}>
+            {clamped}%
+        </span>
+    );
+};
+
 export const Projects = () => {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<ProjectDto[]>([]);
@@ -43,8 +56,7 @@ export const Projects = () => {
     const [status, setStatus] = useState<ProjectStatus | ''>('');
     const [flowMap, setFlowMap] = useState<Record<string, ProjectFlow>>({});
     const [addonMap, setAddonMap] = useState<Record<string, number>>({});
-    const [processTarget, setProcessTarget] = useState<ProjectDto | null>(null);
-    // Bulk lists for the delivery/billing chips, fetched once and reused across filters.
+    // Bulk lists for the delivery/billing percentages, fetched once and reused across filters.
     const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.list>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.list>>; invoices: Awaited<ReturnType<typeof billingApi.listInvoices>> } | null>(null);
 
     const load = async (next: { status: ProjectStatus | ''; search: string } = { status, search }) => {
@@ -106,11 +118,6 @@ export const Projects = () => {
         void load({ status: '', search: '' });
     };
 
-    const openProcess = (project: ProjectDto, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setProcessTarget(project);
-    };
-
     return (
         <div>
             <PageHeader
@@ -151,8 +158,8 @@ export const Projects = () => {
                         </div>
                         <Select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus | '')} size="sm" className="w-[150px] text-[12px]">
                             <option value="">{t('auto.tum_durumlar')}</option>
-                            {Object.entries(getStatusLabel()).map(([key, label]) => (
-                                <option key={key} value={key}>{label}</option>
+                            {FILTERABLE_STATUSES.map((key) => (
+                                <option key={key} value={key}>{getStatusLabel()[key]}</option>
                             ))}
                         </Select>
                         <Button type="submit" variant="ghost" size="sm" icon={<FilterLines size={12} />}>{t('auto.uygula')}</Button>
@@ -172,20 +179,19 @@ export const Projects = () => {
                                 <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('projects.flow.colTechnical')}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('projects.flow.colBilling')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('projects.complete.processButton')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading && Array.from({ length: 5 }).map((_, i) => (
                                 <tr key={i}>
-                                    <td colSpan={10} className="px-3 py-3">
+                                    <td colSpan={9} className="px-3 py-3">
                                         <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
                                     </td>
                                 </tr>
                             ))}
                             {!loading && projects.length === 0 && (
                                 <tr>
-                                    <td colSpan={10}>
+                                    <td colSpan={9}>
                                         <div className="px-4 py-6">
                                             <EmptyState
                                                 icon={<BriefcaseBusiness size={32} />}
@@ -245,39 +251,14 @@ export const Projects = () => {
                                         <td className="px-3 py-2">
                                             <ProjectStatusBadge status={project.status} />
                                         </td>
+                                        {/* Percentages across ALL of the project's orders, not a
+                                            done/not-done tick: computeProjectFlow already averages
+                                            delivery sign-off and invoiced share over every order. */}
                                         <td className="px-3 py-2">
-                                            {(() => {
-                                                const flow = flowMap[project.id];
-                                                if (!flow) return <span className="text-slate-300">—</span>;
-                                                const done = flow.technicalStatus === 'completed';
-                                                return (
-                                                    <StatusChip variant={done ? 'active' : 'info'}>
-                                                        {done ? <Check size={13} strokeWidth={3} aria-label={t('projects.flow.stateCompleted')} /> : t('projects.flow.stateOngoing')}
-                                                    </StatusChip>
-                                                );
-                                            })()}
+                                            <PercentCell percent={flowMap[project.id]?.technicalPercent} />
                                         </td>
                                         <td className="px-3 py-2">
-                                            {(() => {
-                                                const flow = flowMap[project.id];
-                                                if (!flow) return <span className="text-slate-300">—</span>;
-                                                const done = flow.billingStatus === 'completed';
-                                                return (
-                                                    <StatusChip variant={done ? 'active' : 'warning'}>
-                                                        {done ? <Check size={13} strokeWidth={3} aria-label={t('projects.flow.stateCompleted')} /> : t('projects.flow.statePending')}
-                                                    </StatusChip>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                icon={<ArrowRight size={13} />}
-                                                onClick={(e) => openProcess(project, e)}
-                                            >
-                                                {t('projects.complete.processButton')}
-                                            </Button>
+                                            <PercentCell percent={flowMap[project.id]?.billingPercent} />
                                         </td>
                                     </tr>
                                 );
@@ -287,13 +268,6 @@ export const Projects = () => {
                 </div>
             </Card>
 
-            {processTarget && (
-                <ProjectProcessModal
-                    project={processTarget}
-                    mode="progress"
-                    onClose={() => setProcessTarget(null)}
-                />
-            )}
         </div>
     );
 };

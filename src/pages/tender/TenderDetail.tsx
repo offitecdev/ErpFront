@@ -7,7 +7,6 @@ import {
     File05 as FileText,
     FileDownload02 as FileDown,
     Package,
-    Plus,
 } from '@/components/icons/antIconCompat';
 
 import { Card } from '../../components/ui-shared/Card';
@@ -1180,9 +1179,6 @@ export const TenderDetail = () => {
                 creatorName={creatorName}
             />
 
-            {/* Clears the fixed TenderQuoteTopBar so the tender number sits just below it. */}
-            <div aria-hidden className="h-5" />
-
             <TenderDetailHeader
                 tender={tender}
                 tenderStatusVariant={tenderStatusVariant}
@@ -1259,7 +1255,7 @@ export const TenderDetail = () => {
                                 isDraft && canManage ? (
                                     <div className="flex flex-wrap items-center justify-end gap-2">
                                         <Button size="sm" variant="secondary" icon={<Package size={12} />} onClick={() => openProductPicker(lastRowId)} className={lineActionButtonClass}>{t('tenders.product_add')}</Button>
-                                        <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={() => handleAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik_add')}</Button>
+                                        <Button size="sm" variant="secondary" onClick={() => handleAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik')}</Button>
                                         <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={() => handleAddRow('DESCRIPTION', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.description_add')}</Button>
                                         {someRowsSelected && (
                                             <>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { Clipboard as ClipboardPenLine, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2, X } from '@/components/icons/antIconCompat';
+import { Building02, Clipboard as ClipboardPenLine, Clock, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2, User01, X } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
 import { Field, Input, Select, Textarea } from '@/components/ui-shared/Field';
 import { projectApi } from '@/lib/api/project';
@@ -19,7 +19,7 @@ import { appointmentDuration } from '../../../utils/projectAppointments';
 import { operationItems as reportOperationItems } from '../../../installations/utils/installationScope';
 // appointmentTechnicianNames stays in ProjectDetail.tsx (shared with staying components);
 // referenced only at render time, so this back-import is safe despite the module cycle.
-import { appointmentTechnicianNames } from '../../../../ProjectDetail';
+import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 
 const FIELD_EXPENSE_TYPES = [
     { key: 'transport', value: 'Nakliye' },
@@ -111,7 +111,9 @@ export const FieldReportPanel = ({ project, order, appointment, report, material
                 const res = await projectApi.addReport(project.id, {
                     salesOrderId: orderPayloadId(order),
                     appointmentId: appointment.id,
-                    workDate: apptDate.startOf('day').toISOString(),
+                    // Plain calendar date (no instant): an ISO timestamp gets re-read in the
+                    // server's timezone and can land the report on the neighbouring day.
+                    workDate: apptDate.format('YYYY-MM-DD'),
                     startedAt,
                     endedAt,
                     operationsDone: operationsDoneText,
@@ -121,7 +123,7 @@ export const FieldReportPanel = ({ project, order, appointment, report, material
             } else {
                 await projectApi.updateReport(report.id, {
                     salesOrderId: report.salesOrderId ?? orderPayloadId(order),
-                    workDate: report.workDate,
+                    workDate: dayjs(report.workDate).format('YYYY-MM-DD'),
                     startedAt,
                     endedAt,
                     operationsDone: operationsDoneText,
@@ -187,62 +189,85 @@ export const FieldReportPanel = ({ project, order, appointment, report, material
         { key: 'expenses', label: t('auto.harici_giderler') },
         { key: 'materials', label: t('nav.materials') },
     ];
-    const tabClass = (active: boolean) =>
-        `-mb-px shrink-0 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-            active ? 'border-[#272f67] text-[#272f67]' : 'border-transparent text-slate-900 hover:text-[#272f67]'
-        }`;
-
     return (
         <div className="fixed inset-0 z-50">
             {/* Transparent backdrop: overlays the page without dimming or blurring it; click to close. */}
             <div className="absolute inset-0" onClick={onClose} role="presentation" />
 
             {/* Right-half panel: sharp corners, shadow along its inner (left) edge, slides in from the right. */}
-            <div className="absolute inset-y-0 right-0 flex h-full w-full flex-col bg-white shadow-[-10px_0_30px_-8px_rgba(15,23,42,0.28)] duration-300 animate-in slide-in-from-right md:w-1/2">
-                {/* Header + field report title with a close (X) button. */}
-                <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-                    <div className="min-w-0">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{t('projects.saha_raporu')}</div>
-                        <h2 className="mt-0.5 flex items-center gap-2 truncate text-[16px] font-semibold text-slate-900">
-                            <ClipboardPenLine size={16} className="shrink-0 text-slate-400" />
-                            {apptDate.format('DD.MM.YYYY')} · {apptDate.format('HH:mm')}-{dayjs(appointment.endTime).format('HH:mm')}
-                        </h2>
+            <div className="ofi-rep-sheet absolute inset-y-0 right-0 flex h-full w-full flex-col duration-300 animate-in slide-in-from-right md:w-1/2">
+                {/* Title band — its own tone, above the recessed meta canvas below,
+                    so the top of the panel reads as a distinct layer instead of
+                    dissolving into the body (in dark mode every neighbouring
+                    surface would otherwise collapse to the same colour). */}
+                <div className="ofi-rep-header flex items-start justify-between gap-4 px-5 py-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <span className="ofi-rep-headicon flex size-10 shrink-0 items-center justify-center rounded-xl">
+                            <ClipboardPenLine size={18} />
+                        </span>
+                        <div className="min-w-0">
+                            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">{t('projects.saha_raporu')}</div>
+                            <h2 className="mt-0.5 truncate text-[17px] font-semibold leading-tight text-slate-900">
+                                {apptDate.format('DD.MM.YYYY')}
+                            </h2>
+                            <div className="mt-0.5 truncate text-[12px] text-slate-500">
+                                {apptDate.format('HH:mm')}–{dayjs(appointment.endTime).format('HH:mm')} · {durationFmt(plannedMin)}
+                            </div>
+                        </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label={t('common.close')}
-                        className="flex size-9 shrink-0 items-center justify-center text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
                     >
-                        <X size={22} />
+                        <X size={20} />
                     </button>
                 </div>
 
-                {/* Reference strip: appointment time, customer and technician shown read-only at the top. */}
-                <div className="grid grid-cols-1 gap-3 border-b border-slate-200 px-5 py-3 sm:grid-cols-3">
-                    <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.randevu_saati')}</div>
-                        <div className="mt-0.5 text-[12.5px] font-medium text-slate-800">{apptDate.format('DD.MM.YYYY')} · {apptDate.format('HH:mm')}-{dayjs(appointment.endTime).format('HH:mm')}</div>
-                        <div className="text-[11px] text-slate-500">{durationFmt(plannedMin)}</div>
+                {/* Recessed canvas holding the read-only reference cards and the
+                    view menu, so both sit visibly below the title band. */}
+                <div className="ofi-rep-canvas space-y-3 px-5 py-3">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <div className="ofi-rep-panel min-w-0 rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                <Clock size={11} />{t('projects.randevu_saati')}
+                            </div>
+                            <div className="mt-1 truncate text-[12.5px] font-semibold text-slate-900">{apptDate.format('HH:mm')}–{dayjs(appointment.endTime).format('HH:mm')}</div>
+                            <div className="truncate text-[11px] text-slate-500">{durationFmt(plannedMin)}</div>
+                        </div>
+                        <div className="ofi-rep-panel min-w-0 rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                <Building02 size={11} />{t('projects.musteri')}
+                            </div>
+                            <div className="mt-1 truncate text-[12.5px] font-semibold text-slate-900">{project.customer?.companyName || project.customerId || '-'}</div>
+                            <div className="truncate text-[11px] text-slate-500">{project.customer?.mainPhone || '—'}</div>
+                        </div>
+                        <div className="ofi-rep-panel min-w-0 rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                <User01 size={11} />{t('projects.teknisyen')}
+                            </div>
+                            <div className="mt-1 truncate text-[12.5px] font-semibold text-slate-900">{appointmentTechnicianNames(appointment) || '-'}</div>
+                            <div className="truncate text-[11px] text-slate-500">{apptDate.format('DD.MM.YYYY')}</div>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.musteri')}</div>
-                        <div className="mt-0.5 truncate text-[12.5px] font-medium text-slate-800">{project.customer?.companyName || project.customerId || '-'}</div>
-                        {project.customer?.mainPhone && <div className="truncate text-[11px] text-slate-500">{project.customer.mainPhone}</div>}
-                    </div>
-                    <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.teknisyen')}</div>
-                        <div className="mt-0.5 truncate text-[12.5px] font-medium text-slate-800">{appointmentTechnicianNames(appointment)}</div>
-                    </div>
-                </div>
 
-                {/* Single solid light-gray bar: active tab is dark navy with an underline, others stay black. */}
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 bg-slate-100 px-3">
-                    {tabs.map((tb) => (
-                        <button key={tb.key} type="button" onClick={() => setTab(tb.key)} className={tabClass(tab === tb.key)}>
-                            {tb.label}
-                        </button>
-                    ))}
+                    {/* Same segmented menu as the technician detail screen. */}
+                    <div className="ofi-rep-tabs flex items-center gap-1 overflow-x-auto rounded-xl p-1">
+                        {tabs.map((tb) => (
+                            <button
+                                key={tb.key}
+                                type="button"
+                                aria-current={tab === tb.key ? 'page' : undefined}
+                                onClick={() => setTab(tb.key)}
+                                className={`ofi-rep-tab shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
+                                    tab === tb.key ? 'is-active' : ''
+                                }`}
+                            >
+                                {tb.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Scrollable content. */}

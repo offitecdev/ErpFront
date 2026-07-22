@@ -48,6 +48,7 @@ html.dark,
 html.dark body,
 .dark main,
 .dark .bg-\[\#f8fafd\],
+.dark .bg-\[\#f6f8fb\],
 .dark .bg-\[\#f8fafc\] {
   background: var(--ofi-d-bg) !important;
   color: var(--ofi-d-text);
@@ -86,10 +87,8 @@ html.dark body,
 .dark .bg-slate-950\/15 { background-color: rgba(0, 0, 0, 0.4) !important; }
 .dark .project-attention-strip {
   background:
-    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.30), transparent 36%),
-    radial-gradient(circle at 100% 18%, rgba(255, 140, 160, 0.18), transparent 34%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.09)),
-    linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(244, 63, 94, 0.05)) !important;
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.20), transparent 38%),
+    linear-gradient(135deg, rgba(184, 134, 11, 0.34), rgba(140, 94, 8, 0.14)) !important;
   border-color: rgba(255, 255, 255, 0.30) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
@@ -104,7 +103,7 @@ html.dark body,
   background:
     radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.32), transparent 40%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.11)),
-    rgba(244, 63, 94, 0.10) !important;
+    rgba(230, 207, 158, 0.12) !important;
   border-color: rgba(255, 255, 255, 0.32) !important;
   color: var(--ofi-d-text) !important;
   -webkit-text-fill-color: var(--ofi-d-text) !important;
@@ -117,7 +116,7 @@ html.dark body,
   background:
     radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.38), transparent 40%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.27), rgba(255, 255, 255, 0.14)),
-    rgba(244, 63, 94, 0.12) !important;
+    rgba(230, 207, 158, 0.15) !important;
   border-color: rgba(255, 255, 255, 0.42) !important;
 }
 /* selected / light-blue backgrounds → subtle neutral */
@@ -252,11 +251,18 @@ html.dark body,
 
 /* ── Hover — everything resolves to #232326 ── */
 .dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50\/40:hover,
+.dark .hover\:bg-slate-50\/60:hover,
+.dark .hover\:bg-slate-50\/70:hover,
 .dark .hover\:bg-slate-50\/80:hover,
 .dark .hover\:bg-slate-100:hover,
 .dark .hover\:bg-\[\#eef4ff\]:hover,
 .dark .hover\:bg-\[\#d3e3fd\]:hover,
-.dark .hover\:bg-white:hover {
+.dark .hover\:bg-rose-50:hover,
+.dark .hover\:bg-rose-50\/40:hover,
+.dark .hover\:bg-white:hover,
+.dark .hover\:bg-white\/50:hover,
+.dark .hover\:bg-white\/60:hover {
   background: var(--ofi-d-hover) !important;
 }
 .dark .hover\:text-slate-950:hover,
@@ -264,6 +270,12 @@ html.dark body,
 .dark .hover\:text-slate-700:hover,
 .dark .hover\:text-\[\#1f2654\]:hover,
 .dark .hover\:text-\[\#272f67\]:hover { color: var(--ofi-d-text) !important; }
+
+/* Inputs that brighten to solid white on focus (e.g. the Kommission number
+   field): text is remapped to white, so a white focus background makes typing
+   invisible. Focus resolves to a subtle raised dark surface instead. */
+.dark .focus\:bg-white:focus,
+.dark .focus-within\:bg-white:focus-within { background-color: var(--ofi-d-surface-3) !important; }
 
 /* Wheat-tinted focus and selected states for Tailwind-heavy screens. */
 .dark .focus\:border-\[\#272f67\]:focus,
@@ -480,6 +492,88 @@ html.dark body,
    Higher specificity than the blanket `text-[#1f2654] → light` flip so only THIS
    label turns gold. */
 .dark .ofi-addr-toggle .text-\[\#1f2654\] {
+  color: var(--ofi-d-wheat) !important;
+}
+/* Frosted content panels (address read-back, bulk-discount rate card): the light
+   theme's translucent-white glass would glare on dark, so it becomes the same
+   quiet translucent-white-over-dark well used by the toggle track. */
+.dark .ofi-glass-panel {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--ofi-d-border) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* ── Installation report detail — surface hierarchy (see index.css) ──
+   The blanket `.bg-white / .bg-slate-50 / .bg-slate-100 → #151616` rule above
+   flattens this screen into a single tone and strips every shadow, so the
+   layers are rebuilt here on their own class names. Depth runs
+   canvas (#08090a, recessed) < shell (#151616) < panel (#1b1c1c, raised),
+   which is why the shell reads as lifted off the page and the panels read as
+   lifted off the shell — the same order as light mode. */
+.dark .ofi-rep-shell {
+  background: var(--ofi-d-surface) !important;
+  border-color: var(--ofi-d-border-strong) !important;
+  box-shadow:
+    0 20px 48px -18px rgba(0, 0, 0, 0.9),
+    0 2px 8px rgba(0, 0, 0, 0.55) !important;
+}
+.dark .ofi-rep-canvas {
+  background: var(--ofi-d-bg) !important;
+}
+.dark .ofi-rep-panel {
+  background: var(--ofi-d-surface-3) !important;
+  border-color: var(--ofi-d-border) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55) !important;
+}
+.dark .ofi-rep-tabs {
+  background: #0f1010 !important;
+  border-color: var(--ofi-d-border) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.65) !important;
+}
+.dark .ofi-rep-tab {
+  color: var(--ofi-d-text-3) !important;
+}
+.dark .ofi-rep-tab:hover {
+  color: var(--ofi-d-text) !important;
+}
+/* Active pill: wheat label (the app's accent) on the raised hover tone. */
+.dark .ofi-rep-tab.is-active {
+  background: var(--ofi-d-hover) !important;
+  color: var(--ofi-d-wheat) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Order table rows (My Orders detail): hovering darkens the row to
+   --ofi-d-hover, so the labels are forced white to stay legible — including the
+   coloured amounts, which would otherwise sit at mid-tone on a dark fill.
+   Deliberately dark-mode only: in light mode the hover tint is a LIGHT grey, so
+   white text there would be invisible. */
+.dark .ofi-order-row:hover td,
+.dark .ofi-order-row:hover td span,
+.dark .ofi-order-row:hover td div {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Field-report slide-over. The sheet keeps a real inner-edge shadow (the
+   blanket bg-white rule kills it, leaving the panel with no edge against the
+   page), and the header band sits one tone above the canvas beneath it. */
+.dark .ofi-rep-sheet {
+  background: var(--ofi-d-surface) !important;
+  border-left: 1px solid var(--ofi-d-border-strong) !important;
+  box-shadow: -16px 0 44px -10px rgba(0, 0, 0, 0.92) !important;
+}
+.dark .ofi-rep-header {
+  background: linear-gradient(180deg, #1f2020 0%, var(--ofi-d-surface) 100%) !important;
+  border-bottom-color: var(--ofi-d-border) !important;
+}
+.dark .ofi-rep-headicon {
+  background: var(--ofi-d-wheat-soft) !important;
+  border-color: var(--ofi-d-wheat-border) !important;
   color: var(--ofi-d-wheat) !important;
 }
 .dark .ant-segmented .ant-segmented-item-selected * {

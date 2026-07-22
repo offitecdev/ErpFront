@@ -49,23 +49,28 @@ export const InstallationDetailHeaderBlock = memo(({
 
         <InstallationProcessSteps steps={steps} />
 
-        <div className="flex items-end justify-between gap-3 border-b border-slate-200">
-            <div className="flex min-w-0 flex-1 items-center gap-6 overflow-x-auto px-1">
-                {views.map((tab) => (
-                    <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setView(tab.key)}
-                        className={`relative whitespace-nowrap pb-3 text-[14px] font-semibold transition-colors ${
-                            view === tab.key
-                                ?'text-brand-700 after:absolute after:inset-x-0 after:-bottom-px after:border-b-2 after:border-brand-600'
-                                :'text-slate-600 hover:text-slate-950'
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+        {/* View menu. A segmented track rather than an underline: on its own
+            recessed surface with a raised pill for the active view, so the menu
+            reads as a distinct layer instead of dissolving into the panel behind
+            it — the underline version was invisible in dark mode, where every
+            neighbouring surface collapses to the same tone. */}
+        {/* Plain buttons + aria-current, not role="tablist"/"tab": the full tab
+            pattern also owes screen readers tabpanel linkage and arrow-key
+            navigation, and a half-implemented one reads worse than none. */}
+        <div className="ofi-rep-tabs flex items-center gap-1 overflow-x-auto rounded-xl p-1">
+            {views.map((tab) => (
+                <button
+                    key={tab.key}
+                    type="button"
+                    aria-current={view === tab.key ? 'page' : undefined}
+                    onClick={() => setView(tab.key)}
+                    className={`ofi-rep-tab shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-all duration-200 ${
+                        view === tab.key ? 'is-active' : ''
+                    }`}
+                >
+                    {tab.label}
+                </button>
+            ))}
         </div>
     </>
 ));

@@ -25,8 +25,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     breadcrumb,
 }) => {
     return (
-        <div className="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pb-4 border-b border-slate-200/60">
-            <div className="min-w-0">
+        // `flex-wrap` + shrinkable actions: in a narrow column (split view, small
+        // laptops) the action buttons wrap onto their own line instead of
+        // overflowing the column and becoming unreachable.
+        <div className="mb-5 flex flex-col sm:flex-row sm:flex-wrap sm:items-end sm:justify-between gap-3 pb-4 border-b border-slate-200/60">
+            <div className="min-w-0 flex-1 basis-[220px]">
                 {breadcrumb && (
                     <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
                         {breadcrumb}
@@ -40,7 +43,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                 )}
             </div>
             {actions && (
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     {actions}
                 </div>
             )}

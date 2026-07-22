@@ -40,6 +40,9 @@ interface InventoryState {
         search?: string;
         status?: string;
         itemType?: string;
+        code?: string;
+        name?: string;
+        barcode?: string;
     }) => Promise<void>;
 
     createArticle: (data: Partial<InventoryArticle>) => Promise<InventoryArticle>;
@@ -111,10 +114,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     articlesPageItems: [],
     articlesTotal: 0,
     articlesPageLoading: false,
-    fetchArticlesPage: async ({ page, pageSize = 15, search, status, itemType }) => {
+    fetchArticlesPage: async ({ page, pageSize = 15, search, status, itemType, code, name, barcode }) => {
         set({ articlesPageLoading: true });
         try {
-            const res = await inventoryApi.articlesSummaryPaged({ page, pageSize, search, status, itemType });
+            const res = await inventoryApi.articlesSummaryPaged({ page, pageSize, search, status, itemType, code, name, barcode });
             set({ articlesPageItems: res.items, articlesTotal: res.total });
         } finally {
             set({ articlesPageLoading: false });

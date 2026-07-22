@@ -4,7 +4,6 @@ import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { ChevronLeft, ChevronRight } from '@/components/icons/antIconCompat';
 
-import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import { projectApi } from '../../lib/api/project';
@@ -12,6 +11,9 @@ import { getRoleProfile } from '../../lib/access';
 import { useAuthStore } from '../../store/authStore';
 import { ensureMaintenanceLocale } from '../maintenance/MaintenanceShared';
 import { EventDetailModal } from './EventDetailModal';
+import { CalendarPlus01 } from '@/components/icons/antIconCompat';
+import { meetingApi, meetingParticipantName, type MeetingActivityDto } from '../../lib/api/meetings';
+import { MeetingComposerModal } from '../crm/overview/components/MeetingComposerModal';
 
 import { t } from '@/i18n/translate';
 import { localizeTenderNumber } from '@/utils/tenderNumber';
@@ -20,7 +22,7 @@ import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 dayjs.extend(isoWeek);
 
 type CalendarView = 'day' | 'week' | 'month' | 'year';
-export type CalendarCategory = 'orders' | 'maintenance';
+export type CalendarCategory = 'orders' | 'maintenance' | 'meetings' | 'tasks';
 
 // A person shown in the popup's "participants" list. `tag` is a translation-key
 // suffix (calendar.detail.tag*) so lead / alternative / technician stay localised.
@@ -72,29 +74,51 @@ export type CalendarEvent = {
     loadDetail?: () => Promise<EventDetail>;
 };
 
-// Vibrant, high-contrast palette — one clear colour per category. No dots anywhere.
+/* Domed-glass event surfaces: colored tint + colored text, NO left border line.
+   Depth comes from the shared GLASS_* classes below (blur, white ring, inner
+   top highlight + inner bottom shade + soft drop) plus a curved radial sheen
+   overlay. Meetings are purple, tasks are green; `swatch` keeps the strong hue
+   so the filter legend stays unambiguous. */
 const CATEGORY_STYLE: Record<CalendarCategory, {
-    swatch: string;       // filter square
-    block: string;        // solid timed block (day / week)
-    bar: string;          // all-day bar
-    chip: string;         // month cell row
-    accentBorder: string; // left accent for chips
+    swatch: string; // filter square
+    block: string;  // timed block (day / week) — tint + text only
+    bar: string;    // all-day bar — tint + text only
+    chip: string;   // month cell row
 }> = {
     orders: {
-        swatch: 'bg-blue-600',
-        block: 'bg-blue-600 text-white ring-blue-700 hover:bg-blue-700',
-        bar: 'bg-blue-600 text-white hover:bg-blue-700',
-        chip: 'bg-blue-50 text-blue-800 hover:bg-blue-100',
-        accentBorder: 'border-l-blue-600',
+        swatch: 'bg-blue-500',
+        block: 'bg-gradient-to-b from-blue-300/40 to-blue-400/55 text-blue-950 hover:to-blue-400/70 dark:from-blue-400/30 dark:to-blue-500/40 dark:text-blue-50',
+        bar: 'bg-gradient-to-b from-blue-300/40 to-blue-400/55 text-blue-950 hover:to-blue-400/70 dark:from-blue-400/30 dark:to-blue-500/40 dark:text-blue-50',
+        chip: 'bg-blue-100/80 text-blue-900 hover:bg-blue-200/80 dark:bg-blue-400/20 dark:text-blue-100 dark:hover:bg-blue-400/30',
     },
     maintenance: {
         swatch: 'bg-amber-500',
-        block: 'bg-amber-500 text-white ring-amber-600 hover:bg-amber-600',
-        bar: 'bg-amber-500 text-white hover:bg-amber-600',
-        chip: 'bg-amber-50 text-amber-800 hover:bg-amber-100',
-        accentBorder: 'border-l-amber-500',
+        block: 'bg-gradient-to-b from-amber-300/45 to-amber-400/60 text-amber-950 hover:to-amber-400/75 dark:from-amber-400/30 dark:to-amber-500/40 dark:text-amber-50',
+        bar: 'bg-gradient-to-b from-amber-300/45 to-amber-400/60 text-amber-950 hover:to-amber-400/75 dark:from-amber-400/30 dark:to-amber-500/40 dark:text-amber-50',
+        chip: 'bg-amber-100/80 text-amber-900 hover:bg-amber-200/80 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30',
+    },
+    meetings: {
+        swatch: 'bg-violet-500',
+        block: 'bg-gradient-to-b from-violet-300/40 to-violet-400/55 text-violet-950 hover:to-violet-400/70 dark:from-violet-400/30 dark:to-violet-500/40 dark:text-violet-50',
+        bar: 'bg-gradient-to-b from-violet-300/40 to-violet-400/55 text-violet-950 hover:to-violet-400/70 dark:from-violet-400/30 dark:to-violet-500/40 dark:text-violet-50',
+        chip: 'bg-violet-100/80 text-violet-900 hover:bg-violet-200/80 dark:bg-violet-400/20 dark:text-violet-100 dark:hover:bg-violet-400/30',
+    },
+    tasks: {
+        swatch: 'bg-emerald-500',
+        block: 'bg-gradient-to-b from-emerald-300/40 to-emerald-400/55 text-emerald-950 hover:to-emerald-400/70 dark:from-emerald-400/30 dark:to-emerald-500/40 dark:text-emerald-50',
+        bar: 'bg-gradient-to-b from-emerald-300/40 to-emerald-400/55 text-emerald-950 hover:to-emerald-400/70 dark:from-emerald-400/30 dark:to-emerald-500/40 dark:text-emerald-50',
+        chip: 'bg-emerald-100/80 text-emerald-900 hover:bg-emerald-200/80 dark:bg-emerald-400/20 dark:text-emerald-100 dark:hover:bg-emerald-400/30',
     },
 };
+
+/* iOS-style glass: vivid translucent tint + heavy blur + saturation boost —
+   never a dark overlay, never solid white. Text stays crisp via the strong
+   950/50 ink pairs above. */
+const GLASS_CARD =
+    'ring-1 ring-white/45 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] dark:ring-white/15 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]';
+/* Very light curved sheen — a hint of a lens, never a white patch. */
+const GLASS_SHEEN =
+    'pointer-events-none absolute inset-x-0 top-0 h-[55%] bg-[radial-gradient(120%_100%_at_50%_0%,rgba(255,255,255,0.32)_0%,rgba(255,255,255,0.10)_55%,transparent_80%)] dark:bg-[radial-gradient(120%_100%_at_50%_0%,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.05)_55%,transparent_80%)]';
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
 const HOUR_HEIGHT = 48; // px per hour in the time grid
@@ -270,14 +294,32 @@ export const UnifiedCalendar = () => {
     const user = useAuthStore((state) => state.user);
     const userId = user?.id;
 
+    // Technicians must only ever see their own assigned tasks, never the whole
+    // tenant's — even if they also carry a manager-level view permission. The
+    // "all *" sources are therefore gated behind not being a technician so a
+    // technician always falls through to the self-scoped endpoints below.
+    const isTechnician = useMemo(() => getRoleProfile(user) === 'technician', [user]);
+
     const [view, setView] = useState<CalendarView>('week');
     const [anchor, setAnchor] = useState(() => dayjs());
     const [selectedDay, setSelectedDay] = useState(() => dayjs());
-    const [enabled, setEnabled] = useState<Record<CalendarCategory, boolean>>({ orders: true, maintenance: true });
+    // Maintenance stays available as a filter but is off by default for office
+    // users — the calendar focuses on orders, meetings and tasks. Technicians
+    // live off their maintenance schedule, so for them it starts enabled.
+    const [enabled, setEnabled] = useState<Record<CalendarCategory, boolean>>(() => ({
+        orders: true,
+        maintenance: isTechnician,
+        meetings: true,
+        tasks: true,
+    }));
     const [events, setEvents] = useState<CalendarEvent[]>([]);
+    // Meeting activities load & refresh independently: saving one re-fetches ONLY
+    // this slice, never the whole calendar.
+    const [meetingEvents, setMeetingEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(false);
     const [now, setNow] = useState(() => dayjs());
     const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
+    const [composerOpen, setComposerOpen] = useState(false);
 
     useEffect(() => {
         const id = window.setInterval(() => setNow(dayjs()), 60_000);
@@ -285,11 +327,6 @@ export const UnifiedCalendar = () => {
     }, []);
 
     const has = useCallback((perm: string) => permissions.includes(perm), [permissions]);
-    // Technicians must only ever see their own assigned tasks, never the whole
-    // tenant's — even if they also carry a manager-level view permission. The
-    // "all *" sources are therefore gated behind not being a technician so a
-    // technician always falls through to the self-scoped endpoints below.
-    const isTechnician = useMemo(() => getRoleProfile(user) === 'technician', [user]);
     const canAllOrders = !isTechnician && (has('projects.view') || has('projects.manage'));
     const canMyInstallations = has('projects.report');
     const canAllMaintenance = !isTechnician && has('maintenance.contracts.manage');
@@ -383,11 +420,66 @@ export const UnifiedCalendar = () => {
         setLoading(false);
     }, [range.start.valueOf(), range.end.valueOf(), userId, canAllOrders, canMyInstallations, canAllMaintenance, canMyMaintenance]);
 
+    // Meeting activities (backend /meetings; created here or on the CRM overview)
+    // join the same grid as first-class events — loaded as their own slice.
+    const loadMeetings = useCallback(async () => {
+        const rows = await meetingApi.list(range.start.toISOString(), range.end.toISOString()).catch(() => [] as MeetingActivityDto[]);
+        setMeetingEvents(
+            rows
+                .filter((meeting) => dayjs(meeting.startTime).isValid())
+                .map((meeting) => {
+                    const startTime = dayjs(meeting.startTime);
+                    const endTime = dayjs(meeting.endTime);
+                    const people = meeting.participants.map(meetingParticipantName).filter(Boolean);
+                    return {
+                        id: `meeting-${meeting.id}`,
+                        category: (meeting.kind === 'TASK' ? 'tasks' : 'meetings') as CalendarCategory,
+                        title: meeting.customer?.companyName ? `${meeting.title} · ${meeting.customer.companyName}` : meeting.title,
+                        subtitle: people.length ? people.slice(0, 3).join(', ') : meeting.notes || undefined,
+                        start: startTime,
+                        end: endTime.isValid() ? endTime : startTime.add(1, 'hour'),
+                        allDay: false,
+                        loadDetail: () =>
+                            Promise.resolve({
+                                notes: meeting.notes || null,
+                                customerName: meeting.customer?.companyName || null,
+                                participants: meeting.participants.map((p) => ({
+                                    id: p.id,
+                                    name: meetingParticipantName(p),
+                                    tag: 'technician' as const,
+                                    role:
+                                        p.participantType === 'CUSTOMER'
+                                            ? t('crmOverview.picker.customers', { defaultValue: 'Müşteri' })
+                                            : p.employee?.roleName || null,
+                                    email: p.participantType === 'CUSTOMER' ? p.customer?.mainEmail : p.employee?.email,
+                                    phone: p.participantType === 'CUSTOMER' ? p.customer?.mainPhone : null,
+                                })).filter((p) => p.name),
+                            }),
+                    };
+                }),
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [range.start.valueOf(), range.end.valueOf()]);
+
     useEffect(() => {
         void load();
     }, [load]);
 
-    const visibleEvents = useMemo(() => events.filter((event) => enabled[event.category]), [events, enabled]);
+    useEffect(() => {
+        void loadMeetings();
+    }, [loadMeetings]);
+
+    const allEvents = useMemo(() => [...events, ...meetingEvents], [events, meetingEvents]);
+    const visibleEvents = useMemo(() => allEvents.filter((event) => enabled[event.category]), [allEvents, enabled]);
+
+    // Per-category totals for the current range, shown next to the filter labels.
+    const categoryCounts = useMemo(() => {
+        const counts: Record<CalendarCategory, number> = { orders: 0, maintenance: 0, meetings: 0, tasks: 0 };
+        allEvents.forEach((event) => {
+            counts[event.category] += 1;
+        });
+        return counts;
+    }, [allEvents]);
 
     const eventsByDay = useMemo(() => {
         const map = new Map<string, CalendarEvent[]>();
@@ -447,40 +539,48 @@ export const UnifiedCalendar = () => {
     ];
 
     return (
-        <div>
-            <PageHeader
-                breadcrumb={t('calendar.breadcrumb')}
-                title={t('calendar.title')}
-                description={t('calendar.description')}
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white">
-                            <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => step(-1)}><ChevronLeft size={15} /></button>
-                            <button type="button" className="h-8 border-x border-slate-200 px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50" onClick={goToday}>{t('calendar.today')}</button>
-                            <button type="button" className="flex h-8 w-8 items-center justify-center text-slate-500 hover:bg-slate-50" onClick={() => step(1)}><ChevronRight size={15} /></button>
-                        </div>
-                        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-                            {views.map((item) => (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    onClick={() => setView(item.key)}
-                                    className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-colors ${view === item.key ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'}`}
-                                >
-                                    {item.label}
-                                </button>
-                            ))}
-                        </div>
+        <div className="flex w-full flex-col gap-4">
+            {/* Header: compact title + one toolbar row (add, navigate, view switcher) */}
+            <header className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-baseline gap-3">
+                    <h1 className="text-[22px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">
+                        {t('calendar.title')}
+                    </h1>
+                    <span className="text-[13.5px] font-semibold capitalize text-[#07145c] dark:text-[#e6cf9e]">{periodLabel}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setComposerOpen(true)}
+                        className="flex items-center gap-2 rounded-xl border border-[#E3E7F0] bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[#07145c] transition-colors hover:bg-[#F7F8FC] dark:border-white/10 dark:bg-white/6 dark:text-[#e6cf9e] dark:hover:bg-white/10"
+                    >
+                        <CalendarPlus01 size={15} />
+                        {t('crmOverview.agenda.addMeeting', { defaultValue: 'Aktivite ekle' })}
+                    </button>
+                    <div className="inline-flex overflow-hidden rounded-xl border border-[#E3E7F0] bg-white dark:border-white/10 dark:bg-white/6">
+                        <button type="button" className="flex h-9 w-9 items-center justify-center text-slate-500 hover:bg-slate-50 dark:text-white/70 dark:hover:bg-white/10" onClick={() => step(-1)}><ChevronLeft size={15} /></button>
+                        <button type="button" className="h-9 border-x border-[#E3E7F0] px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-white/85 dark:hover:bg-white/10" onClick={goToday}>{t('calendar.today')}</button>
+                        <button type="button" className="flex h-9 w-9 items-center justify-center text-slate-500 hover:bg-slate-50 dark:text-white/70 dark:hover:bg-white/10" onClick={() => step(1)}><ChevronRight size={15} /></button>
                     </div>
-                }
-            />
-
-            <div className="mb-3 text-[13px] font-semibold capitalize text-slate-700">{periodLabel}</div>
+                    <div className="inline-flex rounded-xl border border-[#E3E7F0] bg-[#EEF1F7] p-1 dark:border-white/10 dark:bg-white/6">
+                        {views.map((item) => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                onClick={() => setView(item.key)}
+                                className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${view === item.key ? 'bg-white text-[#07145c] shadow-sm dark:bg-white/15 dark:text-white' : 'text-slate-600 hover:text-slate-950 dark:text-white/60 dark:hover:text-white'}`}
+                            >
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </header>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_288px]">
-                <Card noPadding className="overflow-hidden">
+                <Card noPadding className="overflow-hidden dark:border-white/10 dark:bg-[#151616]">
                     {loading ? (
-                        <div className="m-4 h-[560px] animate-pulse rounded-lg bg-slate-100" />
+                        <div className="m-4 h-[560px] animate-pulse rounded-lg bg-slate-100 dark:bg-white/5" />
                     ) : view === 'day' ? (
                         <TimeGrid days={[anchor]} eventsByDay={eventsByDay} now={now} onOpenEvent={openEvent} onOpenDay={openDay} />
                     ) : view === 'week' ? (
@@ -494,7 +594,12 @@ export const UnifiedCalendar = () => {
 
                 <aside className="flex h-fit flex-col gap-4">
                     <MiniCalendar anchor={anchor} selectedDay={selectedDay} now={now} eventsByDay={eventsByDay} onPickDay={pickDay} />
-                    <FilterPanel enabled={enabled} onToggle={(key) => setEnabled((cur) => ({ ...cur, [key]: !cur[key] }))} />
+                    <FilterPanel
+                        enabled={enabled}
+                        counts={categoryCounts}
+                        onToggle={(key) => setEnabled((cur) => ({ ...cur, [key]: !cur[key] }))}
+                    />
+                    <MeetingsList events={allEvents} now={now} onOpenEvent={openEvent} onAdd={() => setComposerOpen(true)} />
                 </aside>
             </div>
 
@@ -503,6 +608,9 @@ export const UnifiedCalendar = () => {
                 onClose={() => setActiveEvent(null)}
                 onOpenFull={openEventFull}
             />
+
+            {/* Saving refreshes ONLY the meetings slice — no full calendar reload. */}
+            <MeetingComposerModal open={composerOpen} onClose={() => setComposerOpen(false)} onSaved={() => void loadMeetings()} />
         </div>
     );
 };
@@ -515,14 +623,15 @@ const TimeBlock = ({ position, onOpen }: { position: Positioned; onOpen: (event:
         <button
             type="button"
             onClick={() => onOpen(event)}
-            disabled={!event.navigateTo}
+            disabled={!event.navigateTo && !event.loadDetail}
             style={{ top: position.top, height: position.height, left: `calc(${position.left}% + 2px)`, width: `calc(${position.width}% - 4px)` }}
-            className={`absolute z-10 flex flex-col overflow-hidden rounded-md px-1.5 py-1 text-left text-[11px] leading-tight shadow-sm ring-1 transition-colors ${style.block} ${event.navigateTo ? 'cursor-pointer' : 'cursor-default'}`}
+            className={`absolute z-10 flex flex-col overflow-hidden rounded-lg px-1.5 py-1 text-left text-[11px] leading-tight transition-colors ${GLASS_CARD} ${style.block} ${event.navigateTo ? 'cursor-pointer' : 'cursor-default'}`}
             title={`${event.start.format('HH:mm')} – ${event.end.format('HH:mm')} · ${event.title}`}
         >
-            <span className="truncate font-semibold">{event.title}</span>
+            <span aria-hidden className={GLASS_SHEEN} />
+            <span className="truncate text-[11.5px] font-bold">{event.title}</span>
             {!compact && (
-                <span className="truncate text-[10px] font-medium text-white/85">
+                <span className="truncate text-[10.5px] font-semibold opacity-90">
                     {event.start.format('HH:mm')}–{event.end.format('HH:mm')}{event.subtitle ? ` · ${event.subtitle}` : ''}
                 </span>
             )}
@@ -555,9 +664,9 @@ const TimeGrid = ({ days, eventsByDay, now, onOpenEvent, onOpenDay }: {
         // Headings, all-day band and the grid live inside one scroll container so
         // the vertical day borders line up — the scrollbar narrows them together.
         <div ref={scrollRef} className="max-h-[600px] overflow-y-auto">
-            <div className="sticky top-0 z-30 bg-white">
+            <div className="sticky top-0 z-30 bg-white dark:bg-[#151616]">
                 {/* Day headings */}
-                <div className="grid border-b border-slate-200 bg-slate-50/70" style={{ gridTemplateColumns }}>
+                <div className="grid border-b border-slate-200 bg-[#EEF1F7] dark:border-white/10 dark:bg-white/6" style={{ gridTemplateColumns }}>
                 <div />
                 {days.map((day) => {
                     const isToday = dayKey(day) === dayKey(today);
@@ -566,10 +675,10 @@ const TimeGrid = ({ days, eventsByDay, now, onOpenEvent, onOpenDay }: {
                             key={dayKey(day)}
                             type="button"
                             onClick={() => onOpenDay(day)}
-                            className="flex flex-col items-center gap-0.5 border-l border-slate-200 py-2 hover:bg-slate-100/70"
+                            className="flex flex-col items-center gap-0.5 border-l border-slate-200 py-2 hover:bg-slate-100/70 dark:border-white/10 dark:hover:bg-white/8"
                         >
-                            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{day.format('ddd')}</span>
-                            <span className={`flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-[14px] font-semibold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-800'}`}>
+                            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-white/45">{day.format('ddd')}</span>
+                            <span className={`flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-[14px] font-semibold ${isToday ? 'bg-[#07145c] text-white dark:bg-[#e6cf9e] dark:text-[#151616]' : 'text-slate-800 dark:text-white/90'}`}>
                                 {day.format(cols === 1 ? 'DD MMM' : 'DD')}
                             </span>
                         </button>
@@ -579,7 +688,7 @@ const TimeGrid = ({ days, eventsByDay, now, onOpenEvent, onOpenDay }: {
 
             {/* All-day band */}
             {hasAllDay && (
-                <div className="grid border-b border-slate-200 bg-white" style={{ gridTemplateColumns }}>
+                <div className="grid border-b border-slate-200 bg-white dark:border-white/10 dark:bg-[#151616]" style={{ gridTemplateColumns }}>
                     <div className="flex items-center justify-end pr-2 text-[10px] font-medium uppercase text-slate-400">{t('calendar.allDay')}</div>
                     {days.map((day, index) => (
                         <div key={dayKey(day)} className="space-y-1 border-l border-slate-100 p-1">
@@ -590,9 +699,10 @@ const TimeGrid = ({ days, eventsByDay, now, onOpenEvent, onOpenDay }: {
                                         key={event.id}
                                         type="button"
                                         onClick={() => onOpenEvent(event)}
-                                        disabled={!event.navigateTo}
-                                        className={`block w-full truncate rounded-md px-2 py-1 text-left text-[11px] font-semibold transition-colors ${style.bar} ${event.navigateTo ? '' : 'cursor-default'}`}
+                                        disabled={!event.navigateTo && !event.loadDetail}
+                                        className={`relative block w-full overflow-hidden truncate rounded-lg px-2 py-1 text-left text-[11px] font-semibold transition-colors ${GLASS_CARD} ${style.bar} ${event.navigateTo ? '' : 'cursor-default'}`}
                                     >
+                                        <span aria-hidden className={GLASS_SHEEN} />
                                         {event.title}
                                     </button>
                                 );
@@ -608,7 +718,7 @@ const TimeGrid = ({ days, eventsByDay, now, onOpenEvent, onOpenDay }: {
                     {/* Hour gutter */}
                     <div className="relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
                         {HOURS.map((hour) => (
-                            <div key={hour} className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-slate-400" style={{ top: hour * HOUR_HEIGHT }}>
+                            <div key={hour} className="absolute right-2 -translate-y-1/2 text-[10px] font-medium text-slate-400 dark:text-white/40" style={{ top: hour * HOUR_HEIGHT }}>
                                 {hour > 0 ? `${String(hour).padStart(2, '0')}:00` : ''}
                             </div>
                         ))}
@@ -619,9 +729,9 @@ const TimeGrid = ({ days, eventsByDay, now, onOpenEvent, onOpenDay }: {
                         const positioned = positionEvents(timed);
                         const isToday = dayKey(day) === dayKey(today);
                         return (
-                            <div key={dayKey(day)} className="relative border-l border-slate-200" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+                            <div key={dayKey(day)} className="relative border-l border-slate-200 dark:border-white/10" style={{ height: HOURS.length * HOUR_HEIGHT }}>
                                 {HOURS.map((hour) => (
-                                    <div key={hour} className="absolute inset-x-0 border-t border-slate-100" style={{ top: hour * HOUR_HEIGHT }} />
+                                    <div key={hour} className="absolute inset-x-0 border-t border-slate-100 dark:border-white/5" style={{ top: hour * HOUR_HEIGHT }} />
                                 ))}
                                 {isToday && (
                                     <div className="absolute inset-x-0 z-20 flex items-center" style={{ top: nowTop }}>
@@ -654,8 +764,8 @@ const MonthView = ({ anchor, range, eventsByDay, selectedDay, now, onSelectDay, 
     const weekDays = Array.from({ length: 7 }, (_, index) => range.start.add(index, 'day').format('ddd'));
     return (
         <div>
-            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70 text-center text-[11px] font-semibold uppercase capitalize text-slate-400">
-                {weekDays.map((day) => <div key={day} className="border-r border-slate-200 py-2 last:border-r-0">{day}</div>)}
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-[#EEF1F7] text-center text-[11px] font-semibold uppercase capitalize text-slate-400 dark:border-white/10 dark:bg-white/6 dark:text-white/45">
+                {weekDays.map((day) => <div key={day} className="border-r border-slate-200 py-2 last:border-r-0 dark:border-white/10">{day}</div>)}
             </div>
             <div className="grid grid-cols-7">
                 {days.map((day) => {
@@ -668,13 +778,13 @@ const MonthView = ({ anchor, range, eventsByDay, selectedDay, now, onSelectDay, 
                         <div
                             key={key}
                             onClick={() => onSelectDay(day)}
-                            className={`min-h-[120px] cursor-pointer border-b border-r border-slate-200 p-1.5 align-top transition-colors last:border-r-0 hover:bg-slate-50 ${isSelected ? 'bg-blue-50/60' : outside ? 'bg-slate-50/40' : 'bg-white'}`}
+                            className={`min-h-[120px] cursor-pointer border-b border-r border-slate-200 p-1.5 align-top transition-colors last:border-r-0 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5 ${isSelected ? 'bg-[#07145c]/5 dark:bg-[#e6cf9e]/10' : outside ? 'bg-[#F7F8FC] dark:bg-white/4' : 'bg-white dark:bg-[#151616]'}`}
                         >
                             <div className="mb-1 flex items-center justify-end">
                                 <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); onOpenDay(day); }}
-                                    className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold transition-colors hover:bg-slate-100 ${isToday ? 'bg-blue-600 text-white hover:bg-blue-700' : outside ? 'text-slate-300' : 'text-slate-700'}`}
+                                    className={`flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold transition-colors hover:bg-slate-100 dark:hover:bg-white/10 ${isToday ? 'bg-[#07145c] text-white hover:bg-[#0b1a6e] dark:bg-[#e6cf9e] dark:text-[#151616] dark:hover:bg-[#f0dcae]' : outside ? 'text-slate-300 dark:text-white/25' : 'text-slate-700 dark:text-white/85'}`}
                                 >
                                     {day.date()}
                                 </button>
@@ -687,8 +797,8 @@ const MonthView = ({ anchor, range, eventsByDay, selectedDay, now, onSelectDay, 
                                             key={event.id}
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); onOpenEvent(event); }}
-                                            disabled={!event.navigateTo}
-                                            className={`block w-full truncate rounded border-l-[3px] px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight transition-colors ${style.chip} ${style.accentBorder} ${event.navigateTo ? '' : 'cursor-default'}`}
+                                            disabled={!event.navigateTo && !event.loadDetail}
+                                            className={`block w-full truncate rounded-md px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight transition-colors ${style.chip} ${event.navigateTo ? '' : 'cursor-default'}`}
                                         >
                                             {!event.allDay && <span className="tabular-nums">{event.start.format('HH:mm')} </span>}{event.title}
                                         </button>
@@ -698,7 +808,7 @@ const MonthView = ({ anchor, range, eventsByDay, selectedDay, now, onSelectDay, 
                                     <button
                                         type="button"
                                         onClick={(e) => { e.stopPropagation(); onOpenDay(day); }}
-                                        className="px-1.5 text-[10px] font-semibold text-slate-500 hover:text-slate-800"
+                                        className="px-1.5 text-[10px] font-semibold text-slate-500 hover:text-slate-800 dark:text-white/50 dark:hover:text-white"
                                     >
                                         {t('calendar.more', { count: dayEvents.length - 3 })}
                                     </button>
@@ -731,8 +841,8 @@ const YearView = ({ anchor, eventsByDay, now, onOpenDay }: {
                 const gridStart = month.startOf('month').startOf('isoWeek');
                 const days = Array.from({ length: 42 }, (_, index) => gridStart.add(index, 'day'));
                 return (
-                    <div key={month.format('YYYY-MM')} className="rounded-lg border border-slate-200 p-2">
-                        <div className="mb-1.5 px-1 text-[12px] font-semibold capitalize text-slate-800">{month.format('MMMM')}</div>
+                    <div key={month.format('YYYY-MM')} className="rounded-lg border border-slate-200 p-2 dark:border-white/10">
+                        <div className="mb-1.5 px-1 text-[12px] font-semibold capitalize text-slate-800 dark:text-white/90">{month.format('MMMM')}</div>
                         <div className="grid grid-cols-7 gap-0.5">
                             {days.map((day) => {
                                 const key = dayKey(day);
@@ -744,7 +854,7 @@ const YearView = ({ anchor, eventsByDay, now, onOpenDay }: {
                                         key={key}
                                         type="button"
                                         onClick={() => onOpenDay(day)}
-                                        className={`flex h-6 items-center justify-center rounded text-[10px] font-medium transition-colors hover:ring-1 hover:ring-blue-400 ${outside ? 'text-slate-300' : heat(outside ? 0 : count) || 'text-slate-600'} ${isToday ? 'ring-2 ring-red-500' : ''}`}
+                                        className={`flex h-6 items-center justify-center rounded text-[10px] font-medium transition-colors hover:ring-1 hover:ring-blue-400 ${outside ? 'text-slate-300 dark:text-white/25' : heat(outside ? 0 : count) || 'text-slate-600 dark:text-white/70'} ${isToday ? 'ring-2 ring-red-500' : ''}`}
                                     >
                                         {day.date()}
                                     </button>
@@ -773,11 +883,11 @@ const MiniCalendar = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: {
     const weekDays = Array.from({ length: 7 }, (_, index) => gridStart.add(index, 'day').format('dd'));
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#151616]">
             <div className="mb-2 flex items-center justify-between">
-                <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" onClick={() => setCursor((c) => c.subtract(1, 'month'))}><ChevronLeft size={15} /></button>
-                <span className="text-[13px] font-semibold capitalize text-slate-800">{cursor.format('MMMM YYYY')}</span>
-                <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" onClick={() => setCursor((c) => c.add(1, 'month'))}><ChevronRight size={15} /></button>
+                <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-white/60 dark:hover:bg-white/10" onClick={() => setCursor((c) => c.subtract(1, 'month'))}><ChevronLeft size={15} /></button>
+                <span className="text-[13px] font-semibold capitalize text-slate-800 dark:text-white/90">{cursor.format('MMMM YYYY')}</span>
+                <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-white/60 dark:hover:bg-white/10" onClick={() => setCursor((c) => c.add(1, 'month'))}><ChevronRight size={15} /></button>
             </div>
             <div className="grid grid-cols-7 text-center text-[10px] font-medium uppercase text-slate-400">
                 {weekDays.map((day, index) => <div key={`${day}-${index}`} className="py-1">{day}</div>)}
@@ -794,7 +904,7 @@ const MiniCalendar = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: {
                             key={key}
                             type="button"
                             onClick={() => onPickDay(day)}
-                            className={`flex h-7 items-center justify-center rounded-md text-[11px] font-medium transition-colors ${isSelected ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-700' : outside ? 'text-slate-300 hover:bg-slate-100' : `text-slate-700 hover:bg-slate-100 ${hasEvents ? 'font-bold' : ''}`}`}
+                            className={`flex h-7 items-center justify-center rounded-md text-[11px] font-medium transition-colors ${isSelected ? 'bg-[#07145c] text-white dark:bg-[#e6cf9e] dark:text-[#151616]' : isToday ? 'bg-[#07145c]/8 text-[#07145c] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]' : outside ? 'text-slate-300 hover:bg-slate-100 dark:text-white/25 dark:hover:bg-white/8' : `text-slate-700 hover:bg-slate-100 dark:text-white/85 dark:hover:bg-white/8 ${hasEvents ? 'font-bold' : ''}`}`}
                         >
                             {day.date()}
                         </button>
@@ -805,17 +915,20 @@ const MiniCalendar = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: {
     );
 };
 
-const FilterPanel = ({ enabled, onToggle }: {
+const FilterPanel = ({ enabled, counts, onToggle }: {
     enabled: Record<CalendarCategory, boolean>;
+    counts: Record<CalendarCategory, number>;
     onToggle: (key: CalendarCategory) => void;
 }) => {
     const items: Array<{ key: CalendarCategory; label: string }> = [
         { key: 'orders', label: t('calendar.orders') },
+        { key: 'meetings', label: t('calendar.meetings', { defaultValue: 'Toplantılar' }) },
+        { key: 'tasks', label: t('calendar.tasks', { defaultValue: 'Görevler' }) },
         { key: 'maintenance', label: t('calendar.maintenance') },
     ];
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-            <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t('calendar.filters')}</h3>
+        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#151616]">
+            <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/45">{t('calendar.filters')}</h3>
             <div className="space-y-1">
                 {items.map((item) => {
                     const active = enabled[item.key];
@@ -825,16 +938,77 @@ const FilterPanel = ({ enabled, onToggle }: {
                             key={item.key}
                             type="button"
                             onClick={() => onToggle(item.key)}
-                            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-50"
+                            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                         >
-                            <span className={`flex h-4 w-4 items-center justify-center rounded-[5px] transition-colors ${active ? style.swatch : 'border border-slate-300 bg-white'}`}>
+                            <span className={`flex h-4 w-4 items-center justify-center rounded-[5px] transition-colors ${active ? style.swatch : 'border border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
                                 {active && <span className="h-1.5 w-1.5 rounded-[2px] bg-white" />}
                             </span>
-                            <span className={`text-[13px] font-medium ${active ? 'text-slate-800' : 'text-slate-400'}`}>{item.label}</span>
+                            <span className={`flex-1 text-[13px] font-medium ${active ? 'text-slate-800 dark:text-white/90' : 'text-slate-400 dark:text-white/40'}`}>{item.label}</span>
+                            <span className="rounded-full bg-[#EEF1F7] px-1.5 text-[10.5px] font-semibold tabular-nums text-slate-500 dark:bg-white/10 dark:text-white/60">{counts[item.key]}</span>
                         </button>
                     );
                 })}
             </div>
+        </div>
+    );
+};
+
+/* Sidebar "Meetings" card: the next meeting activities (meetings + tasks) from
+   today onwards, with a quick add shortcut. */
+const MeetingsList = ({ events, now, onOpenEvent, onAdd }: {
+    events: CalendarEvent[];
+    now: dayjs.Dayjs;
+    onOpenEvent: (event: CalendarEvent) => void;
+    onAdd: () => void;
+}) => {
+    const upcoming = useMemo(
+        () =>
+            events
+                .filter((event) => (event.category === 'meetings' || event.category === 'tasks') && event.end.isAfter(now.startOf('day')))
+                .sort((a, b) => a.start.valueOf() - b.start.valueOf())
+                .slice(0, 7),
+        [events, now],
+    );
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#151616]">
+            <div className="mb-2 flex items-center justify-between px-1">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/45">
+                    {t('calendar.meetings', { defaultValue: 'Toplantılar' })}
+                </h3>
+                <button
+                    type="button"
+                    onClick={onAdd}
+                    aria-label={t('crmOverview.agenda.addMeeting', { defaultValue: 'Aktivite ekle' })}
+                    className="flex size-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 dark:text-white/60 dark:hover:bg-white/10"
+                >
+                    <CalendarPlus01 size={14} />
+                </button>
+            </div>
+            {upcoming.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-200 px-3 py-5 text-center text-[12px] text-slate-400 dark:border-white/15 dark:text-white/40">
+                    {t('calendar.meetingsEmpty', { defaultValue: 'Yaklaşan toplantı veya görev yok.' })}
+                </p>
+            ) : (
+                <div className="space-y-0.5">
+                    {upcoming.map((event) => (
+                        <button
+                            key={event.id}
+                            type="button"
+                            onClick={() => onOpenEvent(event)}
+                            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[#F7F8FC] dark:hover:bg-white/5"
+                        >
+                            <span className={`h-7 w-1 shrink-0 rounded-full ${CATEGORY_STYLE[event.category].swatch}`} />
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[12.5px] font-semibold text-slate-800 dark:text-white/90">{event.title}</span>
+                                <span className="block text-[11px] tabular-nums text-slate-500 dark:text-white/50">
+                                    {event.start.format('DD MMM')}
+                                    {!event.allDay && ` · ${event.start.format('HH:mm')} – ${event.end.format('HH:mm')}`}
+                                </span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

@@ -78,7 +78,7 @@ export const displayExpenseType = (value?: string | null) => {
 export const STATUS_VARIANT: Record<ProjectStatus, 'warning' | 'active' | 'approved' | 'passive' | 'info' | 'danger'> = {
     AWAITING_APPROVAL: 'warning',
     // ACTIVE renders in brand blue ('approved') so it reads distinctly from the
-    // green COMPLETED state (which is shown as a green checkmark). See ProjectStatusBadge.
+    // green COMPLETED chip. See ProjectStatusBadge.
     ACTIVE: 'approved',
     ON_HOLD: 'info',
     COMPLETED: 'active',

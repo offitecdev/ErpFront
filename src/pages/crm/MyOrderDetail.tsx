@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft as ArrowLeftOutlined, CheckCircle, XClose } from '../../components/icons/antIconCompat';
+import { ArrowLeft as ArrowLeftOutlined, Check, CheckCircle, XClose } from '../../components/icons/antIconCompat';
 import dayjs from 'dayjs';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -9,9 +9,18 @@ import { Button } from '../../components/ui-shared/Button';
 import { Modal } from '../../components/ui-shared/Modal';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { BillingButton } from '../../components/billing/BillingButton';
+import { inputClass } from '../../components/ui-shared/Field';
 import { BillingProgressChart } from '../../components/billing/BillingProgressChart';
-import { myOrdersApi } from '../../lib/api/billing';
+import { billingApi, myOrdersApi } from '../../lib/api/billing';
+import {
+    linePercent,
+    lineBilled,
+    lineRemaining,
+    lineTotal,
+    orderBillingLines,
+    orderBillingTotals,
+    sharePercent,
+} from '../../lib/orderBillingTotals';
 import { deliveryReportApi, signatureApi, type DeliveryReportDto, type SignatureRequestDto } from '../../lib/api/project';
 import type { MyOrderDetailDto } from '../../types/billing';
 
@@ -28,16 +37,72 @@ const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(val
 
 // Solid status chips, matching the shared StatusChip used across the other
 // modules (no translucent "glass" tints).
-const billingChipVariant = (remaining: number): 'active' | 'warning' | 'info' =>
-    remaining <= 0 ? 'active' : remaining >= 100 ? 'warning' : 'info';
-const billingChipLabel = (billed: number, remaining: number) =>
-    remaining <= 0 ?t('crm.billed') : remaining >= 100 ?t('crm.faturalanmadi') : t('crm.partially_billed', { percent: Math.round(billed) });
+const billingChipVariant = (billed: number): 'active' | 'warning' | 'info' =>
+    billed >= 100 ? 'active' : billed <= 0 ? 'warning' : 'info';
+// Mirrors the My Orders list: the figure is always shown once anything is
+// invoiced, so a finished order reads "100% billed" rather than a bare "Billed".
+const billingChipLabel = (billed: number) =>
+    billed <= 0 ? t('crm.faturalanmadi') : t('crm.partially_billed', { percent: Math.round(billed) });
 
-const BillingChip = ({ billed, remaining }: { billed: number; remaining: number }) => (
-    <StatusChip variant={billingChipVariant(remaining)}>
-        {billingChipLabel(billed, remaining)}
-    </StatusChip>
+const BillingChip = ({ billed }: { billed: number }) => (
+    <StatusChip variant={billingChipVariant(billed)}>{billingChipLabel(billed)}</StatusChip>
 );
+
+/**
+ * Inline invoicing for one order — the same interaction as the project Billing
+ * tab, and the reason the list no longer opens a dialog: type a share (or leave
+ * it empty to invoice the whole remainder) and press Bill, right here on the
+ * order. A fully invoiced order shows a static chip instead.
+ */
+const BillingEntry = ({
+    orderId,
+    remainingPercent,
+    busy,
+    onBill,
+    registerInput,
+}: {
+    orderId: string;
+    remainingPercent: number;
+    busy: boolean;
+    onBill: (orderId: string, raw: string) => void;
+    registerInput: (el: HTMLInputElement | null) => void;
+}) => {
+    const remaining = Math.round(Math.max(0, remainingPercent));
+    const localRef = useRef<HTMLInputElement | null>(null);
+
+    if (remaining <= 0) {
+        return (
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                <Check size={12} strokeWidth={3} />{t('billing.fullyBilledChip')}
+            </span>
+        );
+    }
+    return (
+        <div className="flex shrink-0 items-center gap-2">
+            <input
+                ref={(el) => { localRef.current = el; registerInput(el); }}
+                type="number"
+                min={1}
+                max={remaining}
+                defaultValue=""
+                placeholder={`%${remaining}`}
+                aria-label={t('projects.detail.colPercent')}
+                className={`${inputClass} h-9 w-20 px-2.5 text-right text-sm`}
+                onKeyDown={(e) => { if (e.key === 'Enter') onBill(orderId, localRef.current?.value || ''); }}
+            />
+            {/* No icon: the label alone is clearer, and dropping it lets the
+                button sit at a size where the word is never clipped. */}
+            <Button
+                size="md"
+                variant="primary"
+                loading={busy}
+                onClick={() => onBill(orderId, localRef.current?.value || '')}
+            >
+                {t('billing.buttonLabel')}
+            </Button>
+        </div>
+    );
+};
 
 type TabKey = 'addons' | 'quotation' | 'billing';
 
@@ -138,6 +203,10 @@ export const MyOrderDetail = () => {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<TabKey>('addons');
     const [activeStage, setActiveStage] = useState<Stage | null>(null);
+    const [billingId, setBillingId] = useState<string | null>(null);
+    // Uncontrolled inputs read at submit time — same reason as the project
+    // Billing tab: the shared controlled Input lagged its first keystrokes.
+    const percentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
     const load = useCallback(async () => {
         if (!id) return;
@@ -161,6 +230,37 @@ export const MyOrderDetail = () => {
     useEffect(() => {
         void load();
     }, [load]);
+
+    // Empty input → FULL (the whole remainder); a number → PARTIAL of that share.
+    const billOrder = useCallback(async (orderId: string, raw: string) => {
+        const target = orderId === order?.id
+            ? order?.billingSummary
+            : (order?.addonSalesOrders || []).find((a) => a.id === orderId)?.billingSummary;
+        const remaining = Math.round(Math.max(0, target?.remainingPercent ?? 100));
+        if (remaining <= 0) return;
+        const trimmed = raw.trim();
+        const percent = trimmed ? Math.min(remaining, Math.max(0, Number(trimmed) || 0)) : remaining;
+        if (percent <= 0) {
+            toast.error(t('billing.maxPercent', { percent: remaining }));
+            return;
+        }
+        setBillingId(orderId);
+        try {
+            await billingApi.createInvoice({
+                salesOrderId: orderId,
+                billingType: trimmed && percent < remaining ? 'PARTIAL' : 'FULL',
+                percent: trimmed && percent < remaining ? percent : undefined,
+            });
+            const input = percentInputRefs.current[orderId];
+            if (input) input.value = '';
+            toast.success(t('billing.createSuccess'));
+            await load();
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || t('billing.createError'));
+        } finally {
+            setBillingId(null);
+        }
+    }, [order, load]);
 
     const stages = useMemo<Stage[]>(() => {
         if (!order) return [];
@@ -211,7 +311,7 @@ export const MyOrderDetail = () => {
         const billing: Stage = {
             key: 'billing',
             label: t('projects.complete.stageBilling'),
-            completed: (summary?.billedPercent ?? 0) >= 100,
+            completed: sharePercent(summary?.billedAmount ?? 0, summary?.baseAmount ?? 0) >= 100,
             items: (summary?.invoices || []).map((inv) => ({
                 label: inv.invoiceNumber,
                 meta: `${clampPercent(inv.billedPercent)}% · ${fmtMoney(inv.amount)}`,
@@ -234,12 +334,24 @@ export const MyOrderDetail = () => {
         );
     }
 
-    const summary = order.billingSummary;
-    const remaining = summary?.remainingPercent ?? 100;
     const cost = order.costSummary;
     const phases = order.project?.phases || [];
     const reports = order.reports || [];
     const addons = order.addonSalesOrders || [];
+
+    // The whole group — the main order AND its additional orders — through the
+    // same helper the My Orders list uses, so the two screens cannot disagree
+    // and invoiced + remaining always closes against the total.
+    const billingLines = orderBillingLines(order);
+    const openLines = billingLines.filter((line) => lineRemaining(line) > 0);
+    const invoiceLines = billingLines
+        .flatMap((line) => (line.summary?.invoices || []).map((inv) => ({
+            ...inv,
+            orderNumber: line.orderNumber,
+            isAddon: line.isAddon,
+        })))
+        .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf());
+    const groupBilling = orderBillingTotals(billingLines);
 
     return (
         <div>
@@ -266,50 +378,90 @@ export const MyOrderDetail = () => {
 
             {tab === 'addons' && (
                 <Card title={t('nav.myOrders')} noPadding>
-                    <div className="divide-y divide-slate-100">
-                        {/* Main order first — navy tint sets it apart from the amber addon rows. */}
-                        <div className="flex items-center justify-between gap-3 bg-[#272f67]/[0.04] px-4 py-3 transition-colors hover:bg-[#272f67]/[0.08]">
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-primary">{localizeTenderNumbersInText(order.orderNumber)}</span>
-                                    <span className="whitespace-nowrap rounded bg-[#272f67]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#272f67]">{t('projects.mainOrder')}</span>
-                                    <BillingChip billed={summary?.billedPercent ?? 0} remaining={remaining} />
-                                </div>
-                                <div className="mt-0.5 text-xs text-tertiary">{fmtDate(order.createdAt)} · {fmtMoney(order.totalAmount)}</div>
-                            </div>
-                            <BillingButton
-                                target={{ type: 'order', id: order.id, label: t('crm.order_label', { number: localizeTenderNumbersInText(order.orderNumber) }) }}
-                                onBilled={() => void load()}
-                                size="sm"
-                                variant="primary"
-                                remainingPercent={remaining}
-                            />
-                        </div>
-                        {addons.map((addon) => {
-                            const aRemaining = addon.billingSummary?.remainingPercent ?? 100;
-                            return (
-                                <div key={addon.id} className="flex items-center justify-between gap-3 bg-amber-400/10 px-4 py-3 transition-colors hover:bg-amber-400/20">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-primary">{localizeTenderNumbersInText(addon.orderNumber)}</span>
-                                            <span className="whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{t('projects.addonOrder')}</span>
-                                            {addon.revisionNumber ? (
-                                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">N{addon.revisionNumber}</span>
-                                            ) : null}
-                                            <BillingChip billed={addon.billingSummary?.billedPercent ?? 0} remaining={aRemaining} />
-                                        </div>
-                                        <div className="mt-0.5 text-xs text-tertiary">{fmtDate(addon.orderDate || addon.createdAt)} · {fmtMoney(addon.totalAmount)}</div>
-                                    </div>
-                                    <BillingButton
-                                        target={{ type: 'order', id: addon.id, label: t('crm.additional_order_label', { number: localizeTenderNumbersInText(addon.orderNumber) }) }}
-                                        onBilled={() => void load()}
-                                        size="sm"
-                                        variant="secondary"
-                                        remainingPercent={aRemaining}
-                                    />
-                                </div>
-                            );
-                        })}
+                    {/* Table rather than stacked cards: the amounts only mean
+                        anything when Total / Invoiced / Remaining line up in
+                        columns you can read down. Totals row closes the group. */}
+                    <div className="overflow-x-auto">
+                        {/* border-separate (with zero spacing, so it still reads as a
+                            plain table) — border-radius on cells is ignored under the
+                            default border-collapse, which the totals row needs. */}
+                        <table className="w-full min-w-[820px] border-separate border-spacing-0 text-left text-[12.5px]">
+                            <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th className="px-4 py-2.5 font-semibold">{t('projects.detail.colOrder')}</th>
+                                    <th className="px-3 py-2.5 font-semibold">{t('common.date')}</th>
+                                    <th className="px-3 py-2.5 font-semibold">{t('common.status')}</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">{t('common.total')}</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">{t('billing.billed')}</th>
+                                    <th className="px-3 py-2.5 text-right font-semibold">{t('billing.remaining')}</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold">{t('projects.detail.colAction')}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {billingLines.map((line) => {
+                                    // The addon row carries a revision number and its own
+                                    // order date; the main order has neither field shape,
+                                    // so narrow instead of casting through `any`.
+                                    const addonSource = line.isAddon
+                                        ? addons.find((a) => a.id === line.id)
+                                        : undefined;
+                                    const rowDate = addonSource
+                                        ? addonSource.orderDate || addonSource.createdAt
+                                        : order.createdAt;
+                                    return (
+                                        <tr key={line.id} className={`ofi-order-row ${line.isAddon ? 'bg-amber-400/10' : 'bg-[#272f67]/[0.04]'}`}>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-semibold text-primary">{localizeTenderNumbersInText(line.orderNumber)}</span>
+                                                    <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold ${line.isAddon ? 'bg-amber-100 text-amber-700' : 'bg-[#272f67]/10 text-[#272f67]'}`}>
+                                                        {line.isAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
+                                                    </span>
+                                                    {addonSource?.revisionNumber ? (
+                                                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                            N{addonSource.revisionNumber}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-3 text-tertiary">{fmtDate(rowDate)}</td>
+                                            <td className="px-3 py-3"><BillingChip billed={linePercent(line)} /></td>
+                                            <td className="px-3 py-3 text-right font-mono font-semibold text-primary">{fmtMoney(lineTotal(line))}</td>
+                                            <td className="px-3 py-3 text-right font-mono font-semibold text-emerald-600">{fmtMoney(lineBilled(line))}</td>
+                                            <td className="px-3 py-3 text-right font-mono font-semibold text-amber-600">{fmtMoney(lineRemaining(line))}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex justify-end">
+                                                    <BillingEntry
+                                                        orderId={line.id}
+                                                        remainingPercent={100 - linePercent(line)}
+                                                        busy={billingId === line.id}
+                                                        onBill={billOrder}
+                                                        registerInput={(el) => { percentInputRefs.current[line.id] = el; }}
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                            <tfoot>
+                                {/* Spacer so the total detaches from the order rows.
+                                    Lives in tfoot, not tbody, so the last data row keeps
+                                    its transparent bottom border. */}
+                                <tr aria-hidden>
+                                    <td colSpan={7} className="h-2 !border-b-0 !p-0" />
+                                </tr>
+                                {/* Plain white in light mode; `bg-white` is exactly what
+                                    dark.css remaps to the standard row surface, so in dark
+                                    the total sits at the same tone as the rows above it. */}
+                                <tr className="ofi-order-row bg-white">
+                                    <td className="rounded-l-xl px-4 py-3.5 font-semibold text-primary !border-b-0" colSpan={3}>{t('common.total')}</td>
+                                    <td className="px-3 py-3.5 text-right font-mono font-bold text-primary !border-b-0">{fmtMoney(groupBilling.total)}</td>
+                                    <td className="px-3 py-3.5 text-right font-mono font-bold text-emerald-600 !border-b-0">{fmtMoney(groupBilling.billed)}</td>
+                                    <td className="px-3 py-3.5 text-right font-mono font-bold text-amber-600 !border-b-0">{fmtMoney(groupBilling.remaining)}</td>
+                                    <td className="rounded-r-xl px-4 py-3.5 !border-b-0" />
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </Card>
             )}
@@ -425,43 +577,83 @@ export const MyOrderDetail = () => {
                 <div className="space-y-4">
                     <Card title={t('crm.billing_durumu')}>
                         <div className="flex items-center gap-4">
-                            <BillingProgressChart percent={summary?.billedPercent ?? 0} size={120} />
+                            <BillingProgressChart percent={groupBilling.percent} size={120} />
                             <div className="flex-1 space-y-2 text-sm">
                                 <div className="flex items-center justify-between">
                                     <span className="text-tertiary">{t('common.status')}</span>
-                                    <BillingChip billed={summary?.billedPercent ?? 0} remaining={remaining} />
+                                    <BillingChip billed={groupBilling.percent} />
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-tertiary">{t('common.total')}</span>
-                                    <span className="font-semibold text-primary">{fmtMoney(summary?.baseAmount)}</span>
+                                    <span className="font-semibold text-primary">{fmtMoney(groupBilling.total)}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-tertiary">{t('billing.billed')}</span>
-                                    <span className="font-semibold text-emerald-600">{fmtMoney(summary?.billedAmount)}</span>
+                                    <span className="font-semibold text-emerald-600">{fmtMoney(groupBilling.billed)}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-tertiary">{t('billing.remaining')}</span>
-                                    <span className="font-semibold text-amber-600">{fmtMoney(summary?.remainingAmount)}</span>
+                                    <span className="font-semibold text-amber-600">{fmtMoney(groupBilling.remaining)}</span>
                                 </div>
                             </div>
                         </div>
                     </Card>
 
-                    <Card title={t('projects.complete.stageBilling')} noPadding>
-                        {(summary?.invoices || []).length === 0 ? (
-                            <div className="p-6"><EmptyState title={t('projects.complete.noRecords')} /></div>
+                    {/* Still open: every order of this group that has a remainder,
+                        the main order and its additional orders alike. */}
+                    <Card title={t('projects.complete.unbilledItems')} noPadding>
+                        {openLines.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-[12.5px] text-[#047857]">{t('projects.complete.allBilled')}</div>
                         ) : (
                             <div className="divide-y divide-slate-100">
-                                {(summary?.invoices || []).map((inv) => (
+                                {openLines.map((line) => (
+                                    <div key={line.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="truncate font-semibold text-primary">{localizeTenderNumbersInText(line.orderNumber)}</span>
+                                                <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold ${line.isAddon ? 'bg-amber-100 text-amber-700' : 'bg-[#272f67]/10 text-[#272f67]'}`}>
+                                                    {line.isAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
+                                                </span>
+                                            </div>
+                                            <div className="mt-0.5 text-xs text-tertiary">
+                                                {t('billing.remaining')} {100 - linePercent(line)}%
+                                            </div>
+                                        </div>
+                                        <span className="shrink-0 font-mono text-sm font-semibold text-amber-600">{fmtMoney(lineRemaining(line))}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Already invoiced, across every order of the group. Deliberately
+                        no payment status here: whether an invoice is settled is decided
+                        against the project, not on this screen, so showing "paid" here
+                        would assert something this page does not own. */}
+                    <Card title={t('crm.issuedInvoices')} noPadding>
+                        {invoiceLines.length === 0 ? (
+                            <div className="px-4 py-8 text-center text-[12.5px] text-slate-400">{t('crm.noInvoicesYet')}</div>
+                        ) : (
+                            <div className="divide-y divide-slate-100">
+                                {invoiceLines.map((inv) => (
                                     <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3">
                                         <div className="min-w-0">
-                                            <div className="font-semibold text-primary">{inv.invoiceNumber}</div>
-                                            <div className="mt-0.5 text-xs text-tertiary">{fmtDate(inv.createdAt)} · {clampPercent(inv.billedPercent)}%</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="truncate font-semibold text-primary">{inv.invoiceNumber}</span>
+                                                {inv.isAddon && (
+                                                    <span className="whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                                        {t('projects.addonOrder')}
+                                                    </span>
+                                                )}
+                                                {inv.status === 'CANCELLED' && (
+                                                    <StatusChip variant="passive">{t('crm.invoiceStatus_CANCELLED')}</StatusChip>
+                                                )}
+                                            </div>
+                                            <div className="mt-0.5 text-xs text-tertiary">
+                                                {localizeTenderNumbersInText(inv.orderNumber)} · {fmtDate(inv.createdAt)} · {clampPercent(inv.billedPercent)}%
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="font-mono text-sm font-semibold text-primary">{fmtMoney(inv.amount)}</span>
-                                            <StatusChip variant={inv.status === 'CANCELLED' ? 'passive' : inv.status === 'PAID' ? 'active' : 'info'}>{inv.status}</StatusChip>
-                                        </div>
+                                        <span className="shrink-0 font-mono text-sm font-semibold text-primary">{fmtMoney(inv.amount)}</span>
                                     </div>
                                 ))}
                             </div>

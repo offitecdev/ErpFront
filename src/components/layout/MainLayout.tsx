@@ -13,7 +13,7 @@ import {
     Calendar as CalendarOutlined,
     FileCheck02 as ServiceReportsOutlined,
     Clock as ClockCircleOutlined,
-    SwitchHorizontal01 as SplitCellsOutlined,
+    SwitchHorizontal01 as SwapOutlined,
     LogOut01 as LogoutOutlined,
     Menu02 as MenuOutlined,
     Package as InboxOutlined,
@@ -34,10 +34,13 @@ import AntSelect from 'antd/es/select';
 import Switch from 'antd/es/switch';
 import { SlidePanel } from './SlidePanel';
 import { AppSidebar, type QuickCreateItem } from './AppSidebar';
-import { WorkspaceTabs } from './WorkspaceTabs';
-import { SplitViewProvider, useSplitView, SPLITABLE_ROUTES, type SplitablePath } from './SplitViewContext';
+import { WorkspaceTabsProvider, WorkspaceTabLauncher, WorkspaceTabStrip } from './WorkspaceTabs';
+import { SplitViewProvider, useSplitView, SPLIT_PANE_WINDOW_NAME } from './SplitViewContext';
+import { SplitViewToggle } from './SplitViewToggle';
 import { SecondaryPane } from './SecondaryPane';
+import { PaneErrorBoundary } from './PaneErrorBoundary';
 import { notificationApi, type NotificationDto } from '../../lib/api/notifications';
+import { GlobalAlertStack } from '../alerts/GlobalAlertStack';
 import { LanguageSwitcher } from '../ui-shared/LanguageSwitcher';
 import offitecLogo from '../../assets/images/offitec.png';
 import offitecLogoDark from '../../assets/images/darkmode.png';
@@ -101,6 +104,7 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.crm',
         icon: ContactsOutlined,
         items: [
+            { key: '/crm/overview', label: 'nav.crmOverview', permission: 'crm.customers.view' },
             { key: '/crm/customers', label: 'nav.customerList', permission: 'crm.customers.view' },
             { key: '/crm/tenders', label: 'nav.tenderManagement', permission: 'tenders.view' },
         ],
@@ -294,6 +298,10 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
     },
 ];
 
+/** True when this window is the split view's secondary-pane iframe — render a
+    bare shell (no header/sidebar) and skip app-chrome side effects. */
+const IS_SPLIT_PANE = typeof window !== 'undefined' && window.name === SPLIT_PANE_WINDOW_NAME;
+
 /* ── İç Layout ── */
 const MainLayoutInner: React.FC = () => {
     const navigate = useNavigate();
@@ -305,14 +313,15 @@ const MainLayoutInner: React.FC = () => {
 
     const { user, logout, permissions, tenants, selectedTenantId, setSelectedTenant } = useAuthStore();
     const { fetchTodayAttendance } = useAttendanceStore();
-    const { isSplit, openSplit } = useSplitView();
+    const { splitMode, isSplit, secondaryPath, secondaryCurrentPath, exitSplit, openSecondary } = useSplitView();
     const { isDarkMode, toggleTheme } = useThemeStore();
 
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
     const [notifications, setNotifications] = useState<NotificationDto[]>([]);
     const [notificationsLoading, setNotificationsLoading] = useState(false);
-    const [isSplitMenuOpen, setIsSplitMenuOpen] = useState(false);
+    // Live urgent-alert count from the floating alert deck; mirrored on the bell badge.
+    const [alertCount, setAlertCount] = useState(0);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
     const SIDEBAR_OPEN_STORAGE_KEY = "offitec:sidebar-open";
@@ -324,7 +333,6 @@ const MainLayoutInner: React.FC = () => {
     const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const splitMenuRef = useRef<HTMLDivElement>(null);
     const searchOverlayInputRef = useRef<HTMLInputElement>(null);
     const pageScrollRef = useRef<HTMLDivElement>(null);
     const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
@@ -369,9 +377,6 @@ const MainLayoutInner: React.FC = () => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsProfileDropdownOpen(false);
-            }
-            if (splitMenuRef.current && !splitMenuRef.current.contains(event.target as Node)) {
-                setIsSplitMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -457,7 +462,8 @@ const MainLayoutInner: React.FC = () => {
     }, [isNotificationPanelOpen]);
 
     useEffect(() => {
-        if (!user?.id) return;
+        // The pane iframe shows no bell — don't duplicate the polling.
+        if (!user?.id || IS_SPLIT_PANE) return;
         notificationApi.list({ unreadOnly: true, limit: 20 })
             .then(setNotifications)
             .catch(() => undefined);
@@ -499,9 +505,8 @@ const MainLayoutInner: React.FC = () => {
     const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase();
     const unreadNotificationCount = notifications.filter((notification) => !notification.isRead).length;
 
-    const canSplit = SPLITABLE_ROUTES.some(r => r.path === location.pathname);
-
     const activeUrl = useMemo(() => {
+        const current = location.pathname + location.search;
         const allHrefs: string[] = [];
         for (const section of visibleMenuSections) {
             if (section.type === 'single') {
@@ -511,9 +516,73 @@ const MainLayoutInner: React.FC = () => {
             }
         }
         return allHrefs
-            .filter((href) => href === '/' ? location.pathname === '/' : location.pathname === href || location.pathname.startsWith(`${href}/`))
+            .filter((href) => {
+                // Query-keyed entries (e.g. /maintenance/tasks?view=reports) match
+                // only their exact URL; the longest-match sort below then wins over
+                // the plain sibling so exactly one row carries the selection dot.
+                if (href.includes('?')) return current === href;
+                return href === '/' ? location.pathname === '/' : location.pathname === href || location.pathname.startsWith(`${href}/`);
+            })
             .sort((a, b) => b.length - a.length)[0] ?? location.pathname;
-    }, [location.pathname, visibleMenuSections]);
+    }, [location.pathname, location.search, visibleMenuSections]);
+
+    /* ── Dual-screen mode ──
+       While armed, picking a page from the side menu fills the secondary
+       (right) pane instead of navigating; the current page stays on the left. */
+    const handleSidebarNavigate = (path: string) => {
+        if (splitMode && !isMobile && path !== location.pathname + location.search) {
+            openSecondary(path);
+            return;
+        }
+        guardedNavigate(path);
+    };
+
+    const canSwapPanes = isSplit && !!secondaryPath;
+    const handleSwapPanes = () => {
+        const rightPath = secondaryCurrentPath || secondaryPath;
+        if (!rightPath) return;
+        const leftPath = location.pathname + location.search;
+        guardedNavigate(rightPath);
+        openSecondary(leftPath);
+    };
+
+    /* ── Pane sizing: drag the divider to give one screen more space ── */
+    const SPLIT_RATIO_KEY = 'offitec:split-ratio';
+    const [splitRatio, setSplitRatio] = useState(() => {
+        if (typeof window === 'undefined') return 50;
+        const stored = Number(window.localStorage.getItem(SPLIT_RATIO_KEY));
+        return Number.isFinite(stored) && stored >= 25 && stored <= 75 ? stored : 50;
+    });
+    const [isResizingPanes, setIsResizingPanes] = useState(false);
+    const mainRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        window.localStorage.setItem(SPLIT_RATIO_KEY, String(Math.round(splitRatio)));
+    }, [splitRatio]);
+
+    const startPaneResize = (event: React.PointerEvent) => {
+        event.preventDefault();
+        const main = mainRef.current;
+        if (!main) return;
+        setIsResizingPanes(true);
+        const onMove = (ev: PointerEvent) => {
+            const rect = main.getBoundingClientRect();
+            if (!rect.width) return;
+            const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+            setSplitRatio(Math.min(75, Math.max(25, pct)));
+        };
+        const onUp = () => {
+            setIsResizingPanes(false);
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+    };
 
     const handleModuleSelect = (item: ModuleLauncherItem) => {
         setIsSearchOverlayOpen(false);
@@ -525,14 +594,38 @@ const MainLayoutInner: React.FC = () => {
     const COLLAPSED_SIDEBAR_WIDTH = 72;
     const visibleWidth = sidebarPinnedOpen ? MAIN_SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH;
 
+    // ── Secondary-pane shell: just the page, full width of the iframe ──
+    if (IS_SPLIT_PANE) {
+        return (
+            <div
+                className="h-screen bg-[#f6f8fb] font-sans text-[#1D1D1F]"
+                // Fixed bars inside pages align to the shell inset — in the pane
+                // there is no sidebar, so the content column starts at 0.
+                style={{ '--app-shell-inset': '0px' } as React.CSSProperties}
+            >
+                <div
+                    ref={pageScrollRef}
+                    // `--page-gutter` is the page's horizontal padding; full-bleed
+                    // children (e.g. the tender top bar) negate it to reach the edge.
+                    className="h-full overflow-auto px-[var(--page-gutter)] py-4 [--page-gutter:1rem] sm:[--page-gutter:1.25rem]"
+                >
+                    <PaneErrorBoundary resetKey={location.pathname + location.search}>
+                        <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
+                    </PaneErrorBoundary>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
-            className="min-h-screen bg-[#f8fafd] font-sans text-[#1D1D1F] lg:flex"
-            // Live sidebar width, published as an inheritable CSS variable so
-            // viewport-fixed descendants (e.g. TenderQuoteTopBar) can align their
-            // left edge to the content column in every sidebar state — collapsed
-            // (72px) or pinned open (256px). A fixed left offset alone hid the bar's
-            // buttons behind the pinned sidebar.
+            className="min-h-screen bg-[#f6f8fb] font-sans text-[#1D1D1F] lg:flex"
+            // Live sidebar width, published as an inheritable CSS variable so any
+            // viewport-fixed descendant can align its left edge to the content
+            // column in every sidebar state — collapsed (72px) or pinned open
+            // (256px). Page-level bars should prefer `sticky` + `--page-gutter`
+            // (see TenderQuoteTopBar): a fixed bar spans the whole window and so
+            // overlays the second screen in split view.
             style={{ '--app-shell-inset': `${visibleWidth}px` } as React.CSSProperties}
         >
             {/* ── Sidebar (Evernote-style rail: hover-peek, flyout side-tabs, no footer) ── */}
@@ -543,7 +636,7 @@ const MainLayoutInner: React.FC = () => {
                 roleProfile={roleProfile}
                 permissions={permissions}
                 projectModuleEnabled={projectModuleEnabled}
-                onNavigate={(path) => guardedNavigate(path)}
+                onNavigate={handleSidebarNavigate}
                 pinnedOpen={sidebarPinnedOpen}
                 onTogglePin={() => setSidebarPinnedOpen((open) => !open)}
                 onOpenSearch={() => setIsSearchOverlayOpen(true)}
@@ -564,7 +657,7 @@ const MainLayoutInner: React.FC = () => {
                     className={`absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity duration-200 ${isMobileSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
                 />
                 <div
-                    className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col bg-[#f8fafd] shadow-2xl transition-transform duration-200 ease-out ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                    className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col bg-[#f6f8fb] shadow-2xl transition-transform duration-200 ease-out ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 >
                     <div className="flex h-14 items-center justify-between border-b border-slate-200/60 px-4">
                         <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec" width={360} height={143} decoding="async" fetchPriority="high" className="h-8 w-auto object-contain" />
@@ -609,44 +702,50 @@ const MainLayoutInner: React.FC = () => {
             <div className="flex min-w-0 flex-1 flex-col pt-16">
 
                 {/* Header */}
-                <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between bg-[#f8fafd] pr-3 pl-0 sm:pr-5">
-                    <div className="flex min-w-0 flex-1 items-center">
-                        <div className="flex w-[72px] shrink-0 items-center justify-center">
+                <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between bg-[#f6f8fb] pr-3 pl-0 sm:pr-5">
+                    <WorkspaceTabsProvider userId={user?.id}>
+                        <div className="flex min-w-0 flex-1 items-center">
+                            {/* Mobile drawer opener — the desktop header has no hamburger;
+                                the sidebar's own chevron pins/collapses it. */}
                             <button
                                 type="button"
-                                aria-label={sidebarPinnedOpen ? t('nav.sidebarCollapse') : t('nav.sidebarPin')}
-                                aria-pressed={isMobile ? isMobileSidebarOpen : sidebarPinnedOpen}
-                                onClick={() => {
-                                    // Read the breakpoint at click time so a stale `isMobile`
-                                    // state can never block the drawer from opening.
-                                    if (window.matchMedia('(max-width: 1023px)').matches) {
-                                        setIsMobileSidebarOpen((open) => !open);
-                                    } else {
-                                        setSidebarPinnedOpen((open) => !open);
-                                    }
-                                }}
-                                className="flex size-10 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
+                                aria-label={t('nav.sidebarPin')}
+                                aria-pressed={isMobileSidebarOpen}
+                                onClick={() => setIsMobileSidebarOpen((open) => !open)}
+                                className="ml-1 flex size-9 shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd] lg:hidden"
                             >
                                 <MenuOutlined size={18} />
                             </button>
+
+                            {/* ── Brand cluster: the logo stays fixed in the header at all
+                                times (independent of the sidebar), with the split toggle and
+                                "+" beside it. When the menu is open the cluster spans exactly
+                                the menu width so the icons align with its edge. */}
+                            <div
+                                style={!isMobile && sidebarPinnedOpen ? { width: MAIN_SIDEBAR_WIDTH } : undefined}
+                                className={`flex shrink-0 items-center gap-1.5 pl-3 pr-2 transition-[width] duration-300 ease-in-out`}
+                            >
+                                <a
+                                    href={hrefFor('/')}
+                                    onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
+                                    className={`flex h-9 min-w-0 items-center ${!isMobile && sidebarPinnedOpen ? 'flex-1' : ''}`}
+                                >
+                                    <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" width={360} height={143} decoding="async" fetchPriority="high" className="h-8 w-auto max-w-[120px] object-contain" />
+                                </a>
+                                {/* Dual-screen toggle — arming it collapses the menu. */}
+                                <SplitViewToggle
+                                    onEnter={() => setSidebarPinnedOpen(false)}
+                                    className="hidden size-8 shrink-0 lg:flex"
+                                />
+                                <WorkspaceTabLauncher className="hidden lg:block" />
+                            </div>
+
+                            {/* ── Middle: workspace tabs ── */}
+                            <div className="flex min-w-0 flex-1 items-center gap-2 pl-2">
+                                <WorkspaceTabStrip />
+                            </div>
                         </div>
-                        <a
-                            href={hrefFor('/')}
-                            onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
-                            className="ml-2 flex h-9 shrink-0 items-center"
-                        >
-                            <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" width={360} height={143} decoding="async" fetchPriority="high" className="h-9 w-auto max-w-[148px] object-contain" />
-                        </a>
-                        <button
-                            type="button"
-                            aria-label={t('nav.search')}
-                            onClick={() => setIsSearchOverlayOpen(true)}
-                            className="ml-9 hidden size-10 shrink-0 items-center justify-center rounded-full bg-[#eaf1fb] text-slate-700 transition-[background-color,box-shadow,transform] duration-200 hover:bg-white hover:text-[#1f2654] hover:shadow-xs hover:ring-1 hover:ring-[#d3e3fd] sm:flex"
-                        >
-                            <SearchOutlined style={{ fontSize: 19 }} />
-                        </button>
-                        <WorkspaceTabs userId={user?.id} />
-                    </div>
+                    </WorkspaceTabsProvider>
 
                     <div className="flex items-center gap-1">
                         {tenants.length > 0 && (
@@ -681,46 +780,6 @@ const MainLayoutInner: React.FC = () => {
                             <span className="hidden sm:inline">{t('nav.calendar')}</span>
                         </a>
 
-                        {/* Split view */}
-                        {canSplit && (
-                            <div className="relative" ref={splitMenuRef}>
-                                <button
-                                    onClick={() => setIsSplitMenuOpen(!isSplitMenuOpen)}
-                                    className={`flex size-9 items-center justify-center rounded-full transition-colors ${isSplit
-                                        ? "bg-[#272f67]/8 text-[#272f67]"
-                                        : 'text-slate-600 hover:bg-[#d3e3fd]'
-                                        }`}
-                                    title={t('nav.splitView')}
-                                    aria-label={t('nav.splitView')}
-                                >
-                                    <SplitCellsOutlined style={{ fontSize: 18 }} />
-                                </button>
-
-                                {isSplitMenuOpen && (
-                                    <div className="absolute top-9 right-0 z-50 w-60 rounded-xl bg-primary p-1.5 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2">
-                                        <div className="border-b border-secondary px-2.5 py-2 text-xs font-semibold text-tertiary">
-                                            {t('nav.splitPane')}
-                                        </div>
-                                        {SPLITABLE_ROUTES
-                                            .filter(r => !r.permission || permissions.includes(r.permission))
-                                            .filter(r => r.path !== location.pathname)
-                                            .map(r => (
-                                                <button
-                                                    key={r.path}
-                                                    onClick={() => {
-                                                        openSplit(r.path as SplitablePath);
-                                                        setIsSplitMenuOpen(false);
-                                                    }}
-                                                    className="w-full rounded-lg px-2.5 py-2 text-left text-sm font-medium text-secondary transition-colors hover:bg-brand-primary_alt hover:text-brand-secondary"
-                                                >
-                                                    {t(r.label)}
-                                                </button>
-                                            ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         <button
                             onClick={async () => {
                                 setIsNotificationPanelOpen(true);
@@ -730,7 +789,7 @@ const MainLayoutInner: React.FC = () => {
                             className="relative flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
                             aria-label={t('nav.notifications')}
                         >
-                            <Badge count={unreadNotificationCount > 0 ? unreadNotificationCount : 0} size="small" offset={[-2, 2]}>
+                            <Badge count={unreadNotificationCount + alertCount} size="small" offset={[-2, 2]}>
                                 <BellOutlined style={{ fontSize: 16 }} />
                             </Badge>
                         </button>
@@ -855,14 +914,62 @@ const MainLayoutInner: React.FC = () => {
                 )}
 
                 {/* Page content */}
-                <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#f8fafd]">
-                    <div ref={pageScrollRef} className={`overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-6 transition-all duration-200 ${isSplit ? 'flex-1 lg:w-1/2 lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70' : 'flex-1'}`}>
-                        <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
+                <main ref={mainRef} className="relative flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#f6f8fb]">
+                    <div
+                        ref={pageScrollRef}
+                        style={isSplit && !isMobile ? { width: `${splitRatio}%` } : undefined}
+                        className={`overflow-auto px-[var(--page-gutter)] ${isResizingPanes ? '' : 'transition-all duration-200'} ${isSplit
+                            ? 'flex-1 py-5 [--page-gutter:1rem] lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70'
+                            : 'flex-1 py-5 [--page-gutter:1rem] sm:[--page-gutter:1.5rem] lg:py-6 lg:[--page-gutter:2rem]'}`}
+                    >
+                        <PaneErrorBoundary resetKey={location.pathname + location.search}>
+                            <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
+                        </PaneErrorBoundary>
                     </div>
 
-                    {/* Split view is a desktop feature — the secondary pane is hidden on mobile */}
+                    {/* Divider: drag anywhere on the strip to resize the two screens;
+                        the middle buttons swap them or drop back to single-page view
+                        (the left page remains). */}
                     {isSplit && (
-                        <div className="hidden lg:block lg:w-1/2 lg:flex-shrink-0 overflow-hidden">
+                        <div
+                            className="absolute inset-y-0 z-30 hidden w-4 -translate-x-1/2 lg:block"
+                            style={{ left: `${splitRatio}%` }}
+                        >
+                            <div
+                                onPointerDown={startPaneResize}
+                                className="absolute inset-0 cursor-col-resize transition-colors hover:bg-sky-400/15"
+                            />
+                            <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={handleSwapPanes}
+                                    disabled={!canSwapPanes}
+                                    title={t('nav.swapPanes')}
+                                    aria-label={t('nav.swapPanes')}
+                                    className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#d3e3fd] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
+                                >
+                                    <SwapOutlined size={14} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={exitSplit}
+                                    title={t('nav.closeSplitView')}
+                                    aria-label={t('nav.closeSplitView')}
+                                    className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
+                                >
+                                    <CloseOutlined size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Split view is a desktop feature — the secondary pane is hidden
+                        on mobile. While dragging the divider the iframe must not
+                        swallow pointer events, or the drag would stick. */}
+                    {isSplit && (
+                        <div className={`hidden lg:block lg:min-w-0 lg:flex-1 overflow-hidden ${isResizingPanes ? 'pointer-events-none select-none' : ''}`}>
                             <SecondaryPane />
                         </div>
                     )}
@@ -903,7 +1010,8 @@ const MainLayoutInner: React.FC = () => {
                                 <button
                                     key={notification.id}
                                     type="button"
-                                    className="flex w-full items-start gap-3 rounded px-2 py-3 text-left transition-colors hover:bg-slate-50"
+                                    // Unread rows carry a tinted background so they stand out at a glance.
+                                    className={`flex w-full items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors ${notification.isRead ? 'hover:bg-slate-50 dark:hover:bg-white/5' : 'bg-sky-50/80 hover:bg-sky-100/80 dark:bg-sky-400/10 dark:hover:bg-sky-400/15'}`}
                                     onClick={async () => {
                                         if (!notification.isRead) {
                                             await notificationApi.markRead(notification.id).catch(() => undefined);
@@ -929,6 +1037,17 @@ const MainLayoutInner: React.FC = () => {
                     )}
                 </div>
             </SlidePanel>
+
+            {/* App-level urgent alerts (top-right page-turn deck, 10-day snooze).
+                Dismissed cards are archived into the notification list. */}
+            <GlobalAlertStack
+                onCountChange={setAlertCount}
+                onArchived={() => {
+                    notificationApi.list({ limit: 40 })
+                        .then(setNotifications)
+                        .catch(() => undefined);
+                }}
+            />
         </div>
     );
 };

@@ -29,6 +29,8 @@ const chf = (value?: number | null) =>
 const CATEGORY_ACCENT: Record<CalendarCategory, string> = {
     orders: 'bg-blue-600',
     maintenance: 'bg-amber-500',
+    meetings: 'bg-violet-600',
+    tasks: 'bg-emerald-600',
 };
 
 type StatusVariant = 'active' | 'approved' | 'info' | 'warning' | 'danger' | 'neutral';
@@ -95,7 +97,14 @@ export const EventDetailModal = ({
 
     const category = event?.category;
 
-    const headTitle = category === 'maintenance' ? t('calendar.detail.maintenanceTitle') : t('calendar.detail.appointmentTitle');
+    const headTitle =
+        category === 'maintenance'
+            ? t('calendar.detail.maintenanceTitle')
+            : category === 'meetings'
+                ? t('calendar.meetings', { defaultValue: 'Toplantılar' })
+                : category === 'tasks'
+                    ? t('calendar.tasks', { defaultValue: 'Görevler' })
+                    : t('calendar.detail.appointmentTitle');
     const status = detail?.status;
     const variant = status ? STATUS_VARIANT[status] ?? 'neutral' : 'neutral';
 

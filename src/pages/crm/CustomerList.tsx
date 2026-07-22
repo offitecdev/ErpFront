@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     Building02 as Building2,
@@ -40,13 +40,15 @@ interface CustomerRow {
 
 export const CustomerList = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [customers, setCustomers] = useState<CustomerRow[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [showForm, setShowForm] = useState(false);
+    // `?create=1` (CRM overview quick action) lands with the form already open.
+    const [showForm, setShowForm] = useState(() => new URLSearchParams(location.search).has('create'));
     const [submitting, setSubmitting] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
 
