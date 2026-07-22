@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
-import { CheckCircle, ChevronDown, ChevronRight, FileDownload02 as DownloadIcon, Save01 as Save, Send01 as Send } from '@/components/icons/antIconCompat';
+import { CheckCircle, ChevronDown, ChevronRight, FileDownload02 as DownloadIcon, RefreshCcw01, Save01 as Save, Send01 as Send } from '@/components/icons/antIconCompat';
 
 import { Button } from '@/components/ui-shared/Button';
 import { Checkbox } from '@/components/ui-shared/Checkbox';
@@ -118,7 +118,6 @@ export const DeliveryReportsTab = ({ project }: { project: ProjectDto; order?: {
     };
 
     const pending = reports.filter((r) => !r.isSigned);
-    const signed = reports.filter((r) => r.isSigned);
 
     const openSend = () => {
         setSendIds(new Set(pending.map((r) => r.id)));
@@ -159,7 +158,14 @@ export const DeliveryReportsTab = ({ project }: { project: ProjectDto; order?: {
         }
     };
 
-    if (loading) return <div className="h-48 animate-pulse rounded-lg bg-slate-100" />;
+    if (loading) {
+        return (
+            <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-lg border border-slate-200/70 bg-slate-50/60 text-slate-500">
+                <RefreshCcw01 size={18} className="animate-spin" />
+                <span className="text-[12px] font-medium">{t('projects.delivery.loading')}</span>
+            </div>
+        );
+    }
     if (reports.length === 0) {
         return <EmptyState icon={<CheckCircle size={28} />} title={t('projects.delivery.admin.empty')} description={t('projects.delivery.admin.emptyHint')} />;
     }
@@ -243,29 +249,9 @@ export const DeliveryReportsTab = ({ project }: { project: ProjectDto; order?: {
                 })}
             </div>
 
-            {/* Signatures — separate from the checklist. */}
-            <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-[12px] font-semibold text-slate-700">{t('projects.delivery.signaturesSection')}</div>
-                {signed.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-[12px] text-slate-400">{t('projects.delivery.noSignatures')}</div>
-                ) : (
-                    <div className="divide-y divide-slate-100">
-                        {signed.map((report) => (
-                            <div key={report.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                                <div className="min-w-0">
-                                    <div className="truncate text-[12.5px] font-semibold text-slate-800">{orderLabel(report)}</div>
-                                    <div className="text-[11px] text-slate-500">{report.signedAt ? dayjs(report.signedAt).format('DD.MM.YYYY HH:mm') : ''}</div>
-                                </div>
-                                {report.customerSignature
-                                    ? <img src={report.customerSignature} alt="" className="h-12 rounded-md border border-slate-200 bg-white" />
-                                    : <StatusChip variant="active">{t('projects.delivery.statusSigned')}</StatusChip>}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Send popup: the orders to be delivered to the customer. */}
+            {/* Send popup: the orders to be delivered to the customer. Signature
+                images are intentionally not rendered anywhere — the signed /
+                unsigned chip on each report row is the whole story. */}
             <Modal
                 open={sendOpen}
                 title={t('projects.delivery.sendTitle')}

@@ -33,7 +33,7 @@ export const InstallationTaskHeader = ({
     status: { label: string; tone: string };
     action?: React.ReactNode;
 }) => (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="ofi-rep-panel rounded-xl p-3.5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
                 <div className="font-mono text-[11px] font-semibold text-slate-500">{orderNumber ? localizeTenderNumbersInText(orderNumber) : '-'}</div>

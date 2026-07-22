@@ -86,12 +86,19 @@ export const TenderAddressPicker = ({
                     onClick={onAdd}
                     disabled={!hasCustomer}
                     title={t('crm.addAddressTitle')}
-                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-[#1f2654] disabled:opacity-40"
+                    aria-label={t('crm.addAddressTitle')}
+                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200/80 bg-white/60 text-slate-500 ring-1 ring-slate-900/5 backdrop-blur-md transition-colors hover:border-[#1f2654] hover:bg-white hover:text-[#1f2654] disabled:opacity-40"
                 >
                     <Plus size={13} />
                 </button>
             </div>
-            {displayValue ? <div className="px-3 pt-0.5 text-[12px] leading-5 text-slate-600">{renderLines(displayValue)}</div> : null}
+            {/* Frosted read-back of the picked address, so the selection stays
+                visible without competing with the control above it. */}
+            {displayValue ? (
+                <div className="ofi-glass-panel rounded-lg border border-slate-200/60 bg-white/50 px-3 py-1.5 text-[12px] leading-5 text-slate-600 ring-1 ring-slate-900/5 backdrop-blur-md backdrop-saturate-150">
+                    {renderLines(displayValue)}
+                </div>
+            ) : null}
         </div>
     );
 };

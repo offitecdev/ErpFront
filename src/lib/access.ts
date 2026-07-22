@@ -46,6 +46,7 @@ export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]
     projectOfficer: [
         '/',
         '/calendar',
+        '/crm/overview',
         '/crm/customers',
         '/crm/tenders',
         '/inventory/articles',

@@ -34,6 +34,11 @@ export const ProjectSignaturesTab = ({ project, order }: { project: ProjectDto; 
         <div className="space-y-4">
             <p className="text-[12.5px] text-slate-500">{t('signatures.projectDispatchHint')}</p>
 
+            {/* All three report types are dispatched from here, each row on its own:
+                a report that is ready shows "Send for signature", one that is already
+                signed/pending shows its status, and one whose underlying report does
+                not exist yet says so instead of offering a dead action. The field-report
+                flow keeps its own send — this is the single overview across all of them. */}
             <SignatureTargetList
                 project={project}
                 salesOrderId={salesOrderId}

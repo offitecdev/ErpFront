@@ -20,6 +20,12 @@ export const notificationApi = {
         return res.data;
     },
 
+    /** Personal notification for the current user (e.g. an archived alert card). */
+    create: async (input: { title: string; message?: string; type?: string; linkUrl?: string | null; isRead?: boolean }): Promise<NotificationDto> => {
+        const res = await apiClient.post('/notifications', input);
+        return res.data;
+    },
+
     markRead: async (id: string): Promise<NotificationDto> => {
         const res = await apiClient.patch(`/notifications/${id}/read`);
         return res.data;

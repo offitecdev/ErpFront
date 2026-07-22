@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-import { Card } from '@/components/ui-shared/Card';
 import type { DeliveryReportDto } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 import type { ProjectMaterial } from '@/types/project';
@@ -107,8 +106,12 @@ export const InstallationDetailCard = ({
     ];
 
     return (
-        <Card>
-            <div className="space-y-4">
+        // Three explicit layers (see .ofi-rep-* in index.css / dark.css): an
+        // elevated shell, a recessed canvas inside it, and raised panels on top
+        // of that. Replaces the previous <Card>, whose white-on-white nesting
+        // gave the whole screen a single flat surface.
+        <section className="ofi-rep-shell overflow-hidden rounded-2xl">
+            <div className="ofi-rep-canvas space-y-4 p-3 md:p-5">
                 <InstallationDetailHeaderBlock
                     selected={selected}
                     selectedReport={selectedReport}
@@ -122,6 +125,10 @@ export const InstallationDetailCard = ({
                     setView={setView}
                 />
 
+                {/* Content sheet: one raised panel per view, so switching tabs
+                    swaps the contents of a stable surface instead of dropping
+                    loose blocks straight onto the canvas. */}
+                <div className="ofi-rep-panel rounded-xl p-3 md:p-4">
                 {view === 'field' && (
                     <InstallationFieldReportSection
                         selected={selected}
@@ -200,7 +207,8 @@ export const InstallationDetailCard = ({
                         sendGeneral={sendGeneral}
                     />
                 )}
+                </div>
             </div>
-        </Card>
+        </section>
     );
 };

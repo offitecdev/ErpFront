@@ -36,7 +36,7 @@ export const UnsavedChangesModal: React.FC<UnsavedChangesModalProps> = ({
             onCancel={onCancel}
             centered
             footer={null}
-            maskClosable={!saving}
+            mask={{ closable: !saving }}
             keyboard={!saving}
             width={456}
             destroyOnHidden

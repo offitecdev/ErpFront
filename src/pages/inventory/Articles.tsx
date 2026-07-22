@@ -37,6 +37,12 @@ import { RichTextMarkdownEditor } from '../tender/detail/TenderRichText';
 
 const BRAND = '#272f67';
 
+// Filtre satırı kontrolü — ayrı kutu/çerçeve YOK: alanlar hücreyle bütünleşik,
+// kolonlar yalnızca ince dikey çizgilerle ayrılır (birleşik filtre bandı).
+// Odaklanınca yumuşak kenarlı (rounded) soluk bir zemin belirir.
+const ARTICLE_FILTER_CONTROL =
+    'h-7 w-full rounded-lg border-0 bg-transparent px-2 text-[11.5px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 focus:outline-none focus:bg-slate-50/80 dark:focus:bg-white/5 transition-colors';
+
 import { t } from '@/i18n/translate';
 import { useTranslation } from 'react-i18next';
 
@@ -125,6 +131,11 @@ export const Articles = () => {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('');
+    // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı) — sunucuda daraltır.
+    const [codeFilter, setCodeFilter] = useState('');
+    const [nameFilter, setNameFilter] = useState('');
+    const [barcodeFilter, setBarcodeFilter] = useState('');
+    const [debouncedColumns, setDebouncedColumns] = useState({ code: '', name: '', barcode: '' });
     const [scannerOpen, setScannerOpen] = useState(false);
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 15;
@@ -135,21 +146,49 @@ export const Articles = () => {
         return () => clearTimeout(id);
     }, [search]);
 
-    // Arama/filtre değişince ilk sayfaya dön.
+    // Kolon filtreleri de aynı şekilde debounce edilir. Değerler değişmediyse
+    // ÖNCEKİ nesne korunur: her seferinde yeni nesne üretmek, mount'tan 300ms
+    // sonra fetch'i ikinci kez tetikliyordu (liste iki kez yükleniyordu).
     useEffect(() => {
-        setPage(1);
-    }, [debouncedSearch, statusFilter]);
+        const id = setTimeout(() => {
+            setDebouncedColumns((prev) => {
+                const next = {
+                    code: codeFilter.trim(),
+                    name: nameFilter.trim(),
+                    barcode: barcodeFilter.trim(),
+                };
+                return prev.code === next.code && prev.name === next.name && prev.barcode === next.barcode
+                    ? prev
+                    : next;
+            });
+        }, 300);
+        return () => clearTimeout(id);
+    }, [codeFilter, nameFilter, barcodeFilter]);
 
     // Ürünler sayfa sayfa (15) sunucudan çekilir — tüm katalog tek seferde yüklenmez.
+    // Filtre değişimi + sayfa sıfırlama TEK efekte toplanır: filtre değiştiğinde
+    // sayfa > 1 ise önce sayfa sıfırlanır ve o tur fetch atlanır — ayrı bir
+    // reset efekti, eski sayfa + yeni filtreyle gereksiz bir ara istek çıkarıyordu.
+    const filterKeyRef = useRef<string | null>(null);
     useEffect(() => {
+        const filterKey = JSON.stringify([debouncedSearch, statusFilter, debouncedColumns]);
+        const filtersChanged = filterKeyRef.current !== null && filterKeyRef.current !== filterKey;
+        filterKeyRef.current = filterKey;
+        if (filtersChanged && page !== 1) {
+            setPage(1);
+            return;
+        }
         void fetchArticlesPage({
             page,
             pageSize: PAGE_SIZE,
             search: debouncedSearch || undefined,
             status: statusFilter || undefined,
             itemType: 'PRODUCT',
+            code: debouncedColumns.code || undefined,
+            name: debouncedColumns.name || undefined,
+            barcode: debouncedColumns.barcode || undefined,
         });
-    }, [page, debouncedSearch, statusFilter, fetchArticlesPage]);
+    }, [page, debouncedSearch, statusFilter, debouncedColumns, fetchArticlesPage]);
 
     const handleScanResult = (code: string) => {
         setScannerOpen(false);
@@ -164,6 +203,9 @@ export const Articles = () => {
             search: debouncedSearch || undefined,
             status: statusFilter || undefined,
             itemType: 'PRODUCT',
+            code: debouncedColumns.code || undefined,
+            name: debouncedColumns.name || undefined,
+            barcode: debouncedColumns.barcode || undefined,
         });
     };
 
@@ -276,7 +318,7 @@ export const Articles = () => {
                 </div>
 
                 <div className="bg-white">
-                    <table className="min-w-[1240px] w-full table-fixed text-[12.5px]">
+                    <table data-column-lines className="min-w-[1240px] w-full table-fixed text-[12.5px]">
                         <colgroup>
                             <col style={{ width: 132 }} />
                             <col style={{ width: 300 }} />
@@ -299,6 +341,52 @@ export const Articles = () => {
                                 <th className="px-3 py-2 text-center font-semibold">{'Stock'}</th>
                                 <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
                                 <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
+                            </tr>
+                            {/* Kolon bazlı filtre satırı — kod/ad/barkod sunucuda daraltır,
+                                durum seçicisi üstteki durum filtresiyle aynı state'i paylaşır. */}
+                            <tr data-filter-row>
+                                <th className="px-2 py-1.5 font-normal">
+                                    <input
+                                        value={codeFilter}
+                                        onChange={(e) => setCodeFilter(e.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={ARTICLE_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-1.5 font-normal">
+                                    <input
+                                        value={nameFilter}
+                                        onChange={(e) => setNameFilter(e.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={ARTICLE_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-1.5 font-normal">
+                                    <input
+                                        value={barcodeFilter}
+                                        onChange={(e) => setBarcodeFilter(e.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={ARTICLE_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-1.5" />
+                                <th className="px-2 py-1.5" />
+                                <th className="px-2 py-1.5" />
+                                <th className="px-2 py-1.5" />
+                                <th className="px-2 py-1.5 font-normal">
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className={ARTICLE_FILTER_CONTROL}
+                                    >
+                                        <option value="">{t('common.all')}</option>
+                                        <option value="ACTIVE">{t('common.active')}</option>
+                                        <option value="INACTIVE">{t('common.inactive')}</option>
+                                        <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
+                                        <option value="IN_PRODUCTION">{t('inventory.articles.statusProduction')}</option>
+                                    </select>
+                                </th>
+                                <th className="px-2 py-1.5" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">

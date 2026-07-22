@@ -54,3 +54,17 @@ export const useThemeStore = create<ThemeState>((set) => ({
             return { isDarkMode: next };
         }),
 }));
+
+/* Every window (the main app and the split view's pane iframe) runs its own
+   store instance, so a toggle in one leaves the other on the old palette. The
+   `storage` event fires in all OTHER same-origin windows, which is exactly the
+   signal needed to keep them in step. */
+if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event) => {
+        if (event.key !== STORAGE_KEY) return;
+        const mode = event.newValue === 'dark' ? 'dark' : 'light';
+        if (useThemeStore.getState().isDarkMode === (mode === 'dark')) return;
+        applyTheme(mode);
+        useThemeStore.setState({ isDarkMode: mode === 'dark' });
+    });
+}

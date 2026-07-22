@@ -23,18 +23,16 @@ type TenderQuoteTopBarProps = {
  * chrome is a bottom hairline that runs edge to edge; the icons sit directly on
  * that line: logs + Save on the left, the quote creator on the right.
  *
- * Pinned with CSS `fixed` (not `sticky`) on purpose. The app shell scrolls the
- * window/body, not the content container, so a `sticky` bar would scroll away
- * with the page — the Save action must stay reachable from the last row without
- * scrolling back up. Fixed keeps it glued below the header as the page moves.
+ * Pinned with `sticky`, scoped to the page's scroll container (MainLayout's
+ * content column is the scrollport, not the window). Sticky keeps the Save and
+ * logs actions reachable from the last row without scrolling back up, and —
+ * unlike the viewport-`fixed` it replaces — it stays inside its own column: in
+ * split view a fixed bar spanned the whole window and overlaid the second
+ * screen, and in the pane iframe it hung 64px down over the content.
  *
- * `lg:left-[var(--app-shell-inset,72px)]` tracks the live sidebar width that
- * MainLayout publishes (72px collapsed, 256px pinned open) so the bar's left
- * edge always lines up with the content column. Hardcoding 72px hid the Save
- * and Logs buttons behind the pinned-open sidebar (which is z-40, above this
- * bar's z-30); the 72px fallback keeps the bar sane if the var is ever absent.
- * The `#f8fafd` background matches the page so it reads as a line while masking
- * content scrolling underneath.
+ * The negative margins bleed the hairline through the scroll container's
+ * horizontal padding so it still runs edge to edge; `#f6f8fb` matches the page
+ * so it masks content scrolling underneath.
  */
 export const TenderQuoteTopBar = ({
     onOpenLogs,
@@ -45,7 +43,7 @@ export const TenderQuoteTopBar = ({
     onSave,
     creatorName,
 }: TenderQuoteTopBarProps) => (
-    <div className="fixed left-0 right-0 top-16 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-[#f8fafd] px-4 py-2 transition-[left] duration-200 sm:px-6 lg:left-[var(--app-shell-inset,72px)] lg:px-8">
+    <div className="sticky top-0 z-30 mx-[calc(var(--page-gutter,1rem)*-1)] mb-1 flex items-center justify-between gap-3 border-b border-slate-200 bg-[#f6f8fb] px-[var(--page-gutter,1rem)] py-2">
         <div className="flex items-center gap-3">
             <button
                 type="button"

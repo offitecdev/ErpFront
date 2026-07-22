@@ -155,7 +155,7 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
 
             {/* Offer amount footer — same figures as the offer's price summary, read-only. */}
             {!loading && detail && (
-                <div className="border-t border-slate-200/70 px-3 py-3">
+                <div className="px-3 py-3">
                     <div className="ml-auto w-full max-w-sm space-y-1 text-[12.5px]">
                         <div className="flex items-center justify-between gap-3">
                             <span className="text-slate-500">{t('tenders.direct_discount')}</span>

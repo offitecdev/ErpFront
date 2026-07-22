@@ -10,6 +10,7 @@ import {
     CheckCircle as CheckCircle2,
     ChevronDown,
     InfoCircle,
+    Phone,
     Plus,
     Receipt as ReceiptText,
     Trash01,
@@ -234,6 +235,7 @@ export const ProjectDetailHeader = memo(({
     onCreateAddon,
     onDeleteOrder,
     onOpenDetails,
+    onOpenContact,
     onComplete,
     onBack,
 }: {
@@ -246,10 +248,12 @@ export const ProjectDetailHeader = memo(({
     onCreateAddon: (parentOrderId: string) => void;
     onDeleteOrder?: (order: ProjectSalesOrder) => void;
     onOpenDetails: () => void;
+    onOpenContact: () => void;
     onComplete: () => void;
     onBack: () => void;
 }) => {
     const detailsLabel = t('common.detail');
+    const contactLabel = t('projects.detail.contactTitle');
     return (
         <div className="mb-5 flex flex-col gap-4 border-b border-slate-200/60 pb-4 lg:flex-row lg:items-stretch lg:justify-between">
             {/* Identity: name + status, then customer / manager / created date. */}
@@ -284,6 +288,15 @@ export const ProjectDetailHeader = memo(({
 
             {/* Actions. */}
             <div className="flex items-center gap-2 self-start lg:self-center">
+                <button
+                    type="button"
+                    aria-label={contactLabel}
+                    title={contactLabel}
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#272f67] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#272f67]"
+                    onClick={onOpenContact}
+                >
+                    <Phone size={16} strokeWidth={1.9} />
+                </button>
                 <button
                     type="button"
                     aria-label={detailsLabel}

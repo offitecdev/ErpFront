@@ -10,20 +10,18 @@ import type { ProjectDetailView } from '../../types/projectDetailNavigation';
 import { DeliveryReportsTab } from '../../projects/components/delivery/DeliveryReportsTab';
 import { ProjectSignaturesTab } from '../../../ProjectSignaturesTab';
 import { ProjectPositionsTab } from '../../../ProjectPositionsTab';
-import { ProjectActionDashboard } from './ProjectActionDashboard';
+import { BookingSection } from './booking/BookingSection';
 import { ProjectOverviewTab } from './tabs/ProjectOverviewTab';
 import { AddonOrderOverview } from './tabs/AddonOrderOverview';
+import { BillingTab } from './tabs/BillingTab';
 import { CreateAddonOrderTab } from './tabs/CreateAddonOrderTab';
 import { CostsTab } from './tabs/CostsTab';
+import { GeneralReportTab } from './tabs/GeneralReportTab';
 import { MaterialsTab } from './tabs/MaterialsTab';
 import { ReportsTab } from './tabs/ReportsTab';
-// BookingSection still lives in ProjectDetail.tsx; the reference is only resolved at
-// React render time, so this back-import is safe despite the module cycle.
-import { BookingSection } from '../../../ProjectDetail';
 
-// Single place that maps the new workflow navigation (section + subSection) to the
-// existing content components. This replaces the old flat 8-tab switch; the leaf
-// components themselves are untouched.
+// Single place that maps the workflow navigation (section + subSection) to the
+// content components. The leaf components themselves stay navigation-agnostic.
 export type RenderSectionArgs = {
     view: ProjectDetailView;
     project: ProjectDto;
@@ -39,6 +37,7 @@ export type RenderSectionArgs = {
     addonAttention: boolean;
     canCreateAddon: boolean;
     onNavigate: (view: ProjectDetailView) => void;
+    onSelectOrder: (orderId: string) => void;
     onReload: () => Promise<void>;
     onOrderCreated: (orderId: string) => Promise<void>;
 };
@@ -47,14 +46,19 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
     const {
         view, project, order, orders, isPrimary, isAddon, totals, materials,
         mailSettings, userEmail, awaitingAppointments, addonAttention, canCreateAddon,
-        onNavigate, onReload, onOrderCreated,
+        onNavigate, onSelectOrder, onReload, onOrderCreated,
     } = args;
 
-    // Add-on orders only expose their cost summary; every other section is not
-    // applicable, so the navigation stays visible but shows an explanatory state.
+    const goFieldReports = () => onNavigate({ section: 'field', subSection: 'fieldReports' });
+
+    // Add-on orders only expose their cost summary and billing; every other section
+    // is not applicable, so the navigation stays visible with an explanatory state.
     if (isAddon) {
         if (view.section === 'overview' && order) {
             return <AddonOrderOverview project={project} order={order} isPrimary={isPrimary} totals={totals} />;
+        }
+        if (view.section === 'billing') {
+            return <BillingTab project={project} orders={orders} onReload={onReload} />;
         }
         return (
             <EmptyState
@@ -68,23 +72,16 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
     switch (view.section) {
         case 'overview':
             return (
-                <div className="space-y-5">
-                    <ProjectActionDashboard
-                        project={project}
-                        order={order}
-                        isPrimary={isPrimary}
-                        totals={totals}
-                        awaitingAppointments={awaitingAppointments}
-                        addonAttention={addonAttention}
-                        onNavigate={onNavigate}
-                    />
-                    <ProjectOverviewTab
-                        project={project}
-                        order={order}
-                        isPrimary={isPrimary}
-                        onGoReports={() => onNavigate({ section: 'field', subSection: 'fieldReports' })}
-                    />
-                </div>
+                <ProjectOverviewTab
+                    project={project}
+                    order={order}
+                    orders={orders}
+                    isPrimary={isPrimary}
+                    awaitingAppointments={awaitingAppointments}
+                    addonAttention={addonAttention}
+                    onNavigate={onNavigate}
+                    onSelectOrder={onSelectOrder}
+                />
             );
         case 'positions':
             return <ProjectPositionsTab project={project} />;
@@ -102,6 +99,9 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
                 />
             );
         case 'field':
+            if (view.subSection === 'generalReport') {
+                return <GeneralReportTab project={project} onGoFieldReports={goFieldReports} />;
+            }
             if (view.subSection === 'delivery') {
                 return <DeliveryReportsTab project={project} order={order} />;
             }
@@ -111,7 +111,16 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
             return <ReportsTab project={project} order={order} isPrimary={isPrimary} materials={materials} onSaved={onReload} />;
         case 'costs':
             if (view.subSection === 'materials') {
-                return <MaterialsTab project={project} order={order} isPrimary={isPrimary} materials={materials} onSaved={onReload} />;
+                return (
+                    <MaterialsTab
+                        project={project}
+                        order={order}
+                        isPrimary={isPrimary}
+                        materials={materials}
+                        onSaved={onReload}
+                        onGoFieldReports={goFieldReports}
+                    />
+                );
             }
             if (view.subSection === 'overtime') {
                 return (
@@ -127,7 +136,9 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
                     />
                 );
             }
-            return <CostsTab project={project} order={order} isPrimary={isPrimary} onSaved={onReload} />;
+            return <CostsTab project={project} order={order} isPrimary={isPrimary} onGoFieldReports={goFieldReports} />;
+        case 'billing':
+            return <BillingTab project={project} orders={orders} onReload={onReload} />;
         case 'addons':
             return (
                 <CreateAddonOrderTab

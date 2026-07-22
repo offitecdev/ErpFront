@@ -17,7 +17,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #ffffff;
+  background: #f6f8fb;
   font-family: var(--font-body);
   font-size: 14px;
   color: #1d1d1f;
@@ -507,7 +507,7 @@ textarea,
   overflow: hidden;
 }
 .ant-table-wrapper .ant-table-container table > thead > tr > th {
-  background: #f8fafc !important;
+  background: #e9edf7 !important;
   color: #64748b !important;
   font-size: 11px !important;
   font-weight: 600 !important;
@@ -527,7 +527,7 @@ textarea,
   color: #334155;
 }
 .ant-table-wrapper .ant-table-container table > tbody > tr:hover > td {
-  background: #f8fafc !important;
+  background: #eef1fa !important;
 }
 .ant-table-wrapper .ant-table-container table > tbody > tr:last-child > td {
   border-bottom: 0 !important;
@@ -560,6 +560,16 @@ textarea,
 .ant-btn-primary {
   background: #272f67 !important;
   border-color: #272f67 !important;
+}
+/* Plain white label on the navy fill. Without this the button inherits whatever
+   the surrounding context sets — inside a table cell that is
+   `color: var(--color-text-tertiary)`, which renders grey-on-navy. Dark mode
+   keeps its near-black label on wheat: `.dark .ant-btn-primary` is (0,2,0) and
+   outranks this rule regardless of source order. */
+.ant-btn-primary,
+.ant-btn-primary * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 .ant-btn-primary:hover {
   background: #1f2654 !important;
@@ -872,7 +882,7 @@ select option:checked {
 
 .offitec-sidebar-menu .ant-menu-item:hover,
 .offitec-sidebar-menu .ant-menu-submenu-title:hover {
-  background: #f1f5f9 !important;
+  background: #eef1fa !important;
   color: #1f2654 !important;
 }
 
@@ -922,7 +932,7 @@ select option:checked {
 }
 
 .offitec-sidebar-menu-popup .ant-menu-item:hover {
-  background: #f5f7fb !important;
+  background: #eef1fa !important;
   color: #1f2654 !important;
 }
 
@@ -1002,7 +1012,7 @@ select option:checked {
   --app-text-muted-2: #6e6e73;
   --app-text-muted-3: #86868b;
   --app-text-muted-4: #cbd5e1;
-  --background: #ffffff;
+  --background: #f6f8fb;
   --foreground: #1d1d1f;
   --card: oklch(1 0 0);
   --card-foreground: #1d1d1f;
@@ -1291,7 +1301,7 @@ main div:has(> table:not([role="grid"]):not([data-unstyled-table])),
   padding: 0 4px 4px;
   border: 0 !important;
   border-radius: 12px;
-  background: #f3f2f1;
+  background: #e9edf7;
 }
 
 /* The page is the only vertical scroll surface. Table wrappers may still
@@ -1351,7 +1361,7 @@ main table:not([role="grid"]):not([data-unstyled-table]) th,
   height: 38px;
   padding: 10px 1.5rem !important;
   border-bottom: 0 !important;
-  background: #f3f2f1 !important;
+  background: #e9edf7 !important;
   color: #343332 !important;
   font-size: 12px !important;
   font-weight: 500 !important;
@@ -1399,7 +1409,7 @@ main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td:
 
 main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td,
 [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td {
-  background: #fafaf9 !important;
+  background: #eef1fa !important;
 }
 
 main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td,
@@ -1462,4 +1472,163 @@ main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:last-child td,
 .dark main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td,
 .dark [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover td {
   background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLO FİLTRE SATIRI (tr[data-filter-row]) — genel tablo tasarımına
+   EK: başlık bandının hemen altında, gövdeyle aynı beyaz zeminde bir
+   kolon-filtre satırı. Tasarımın geri kalanına (gri sırt, radius,
+   sticky, hover) hiç dokunmaz; yalnızca bu satırın hücrelerini,
+   başlık bandından ince bir çizgiyle ayrılacak şekilde stiller.
+   Şu an yalnızca Ürünler (Articles) tablosunda kullanılır. */
+main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th {
+  height: auto;
+  /* Yatay iz: hücre 1rem + alanın kendi 0.5rem (px-2) iç boşluğu = 1.5rem —
+     filtre metni kolon adlarıyla tam hizalı; odak zemini ise 8px içeriden
+     yumuşak kenarlı bir şerit olarak belirir. */
+  padding: 6px 1rem !important;
+  background: #ffffff !important;
+  border-top: 0 !important;
+  /* Gövde satır ayraçlarıyla aynı ton — filtre satırı sıradan bir satır gibi ayrılır */
+  border-bottom: 1px solid #f0efee !important;
+  border-radius: 0 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* Diğer tablolarda beyaz yüzey gövdeyle başlar ve üst köşeleri 12px
+   yuvarlaktır. Filtre satırlı tabloda beyaz yüzey filtre satırıyla başlar:
+   aynı yuvarlak köşeler buraya taşınır, gövdenin ilk satırından kaldırılır —
+   böylece kartın biçimi ve köşeleri diğer tablolarla birebir aynı kalır. */
+main table:not([role="grid"]):not([data-unstyled-table]) thead:not([data-scroll-stuck]) tr[data-filter-row] th:first-child {
+  border-top-left-radius: 12px !important;
+}
+main table:not([role="grid"]):not([data-unstyled-table]) thead:not([data-scroll-stuck]) tr[data-filter-row] th:last-child {
+  border-top-right-radius: 12px !important;
+}
+main table:not([role="grid"]):not([data-unstyled-table]):has(tr[data-filter-row]) tbody tr:first-child td:first-child {
+  border-top-left-radius: 0 !important;
+}
+main table:not([role="grid"]):not([data-unstyled-table]):has(tr[data-filter-row]) tbody tr:first-child td:last-child {
+  border-top-right-radius: 0 !important;
+}
+
+.dark main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th {
+  background: var(--ofi-d-surface, #151616) !important;
+  border-bottom-color: var(--ofi-d-border, rgba(255, 255, 255, 0.12)) !important;
+}
+
+/* Kolonlar arası dikey çizgiler (data-column-lines) — başlık bandı, filtre
+   satırı ve gövde boyunca #e2e8f0. Yalnızca bu attribute'u taşıyan tabloda
+   (Ürünler); diğer tablolar etkilenmez. */
+main table[data-column-lines] th:not(:first-child),
+main table[data-column-lines] td:not(:first-child) {
+  border-left: 1px solid #e2e8f0;
+}
+main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:not(:first-child) {
+  border-left: 1px solid #e2e8f0;
+}
+
+.dark main table[data-column-lines] th:not(:first-child),
+.dark main table[data-column-lines] td:not(:first-child),
+.dark main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:not(:first-child) {
+  border-left-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Project attention glass — dark golden yellow with a diagonal stripe
+   pattern (light mode; dark.css re-tints the same classes for dark).
+   ────────────────────────────────────────────────────────────────────────── */
+.project-attention-strip {
+  background:
+    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.72), transparent 44%),
+    linear-gradient(135deg, rgba(178, 128, 16, 0.30), rgba(140, 94, 8, 0.14));
+  border-color: rgba(146, 96, 10, 0.42);
+}
+.project-attention-title { color: #5b420a; }
+.project-attention-pill {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.62)),
+    rgba(218, 165, 32, 0.16);
+  border-color: rgba(184, 134, 11, 0.30);
+  color: #4d3a06;
+}
+.project-attention-pill:hover {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.72)),
+    rgba(218, 165, 32, 0.22);
+  border-color: rgba(184, 134, 11, 0.45);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Installation report detail — explicit surface hierarchy.
+
+   The screen used to be white blocks on a white card, which reads as one flat
+   sheet in light mode and collapses completely in dark (dark.css maps
+   bg-white / bg-slate-50 / bg-slate-100 to the SAME #151616 and kills their
+   shadow), so nothing stood out from anything else. Three named layers fix it:
+
+     shell   — the popup itself, lifted off the page
+     canvas  — recessed working area inside the shell
+     panel   — blocks raised back up off the canvas
+     tabs    — the view menu, its own recessed track with a raised active pill
+
+   Backgrounds live on these classes rather than on bg-* utilities, because
+   dark.css overrides those utilities with !important. dark.css re-tints the
+   same class names for dark mode.
+   ────────────────────────────────────────────────────────────────────────── */
+.ofi-rep-shell {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 14px 34px -14px rgba(16, 24, 40, 0.22);
+}
+.ofi-rep-canvas {
+  background: #f6f8fb;
+}
+.ofi-rep-panel {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+/* Recessed track so the active pill reads as sitting on top of it. */
+.ofi-rep-tabs {
+  background: rgba(241, 245, 249, 0.85);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.07);
+  backdrop-filter: blur(8px) saturate(1.4);
+}
+.ofi-rep-tab {
+  color: #64748b;
+}
+.ofi-rep-tab:hover {
+  color: #0f172a;
+}
+.ofi-rep-tab.is-active {
+  background: #ffffff;
+  color: #272f67;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(16, 24, 40, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+/* Field-report slide-over (admin). `sheet` is the panel surface itself — it
+   carries its own background/shadow because dark.css's bg-white rule would
+   otherwise strip the inner-edge shadow that separates it from the page.
+   `header` is the top band, deliberately a different tone from the canvas
+   below it so the title block reads as its own layer. */
+.ofi-rep-sheet {
+  background: #ffffff;
+  box-shadow: -10px 0 30px -8px rgba(15, 23, 42, 0.28);
+}
+.ofi-rep-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+.ofi-rep-headicon {
+  background: #eef1f8;
+  border: 1px solid rgba(39, 47, 103, 0.14);
+  color: #272f67;
 }

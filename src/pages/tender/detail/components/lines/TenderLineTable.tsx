@@ -4,7 +4,6 @@ import {
     ChevronUp,
     File05 as FileText,
     Package,
-    Plus,
     Tag01,
 } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
@@ -90,8 +89,11 @@ export const TenderLineTable = ({
 
     const canReorder = isDraft && canManage;
 
+    // The numeric columns are fixed (~578px); the description column takes the
+    // rest. 860px keeps it usable on laptops without forcing the whole card
+    // into horizontal scroll the way the old 1160px minimum did.
     return (
-        <table data-tender-detail-table className="min-w-[1160px] w-full table-fixed text-[12px]">
+        <table data-tender-detail-table className="min-w-[860px] w-full table-fixed text-[12px]">
             <colgroup>
                 <col style={fixedLineColumnStyle('select')} />
                 <col />
@@ -303,7 +305,7 @@ export const TenderLineTable = ({
                         <td colSpan={8} className="px-3 py-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="secondary" icon={<Package size={12} />} onClick={() => onOpenProductPicker(lastRowId)} className={lineActionButtonClass}>{t('tenders.product_add')}</Button>
-                                <Button size="sm" variant="secondary" icon={<Plus size={12} />} onClick={() => onAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik_add')}</Button>
+                                <Button size="sm" variant="secondary" onClick={() => onAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik')}</Button>
                                 <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={() => onAddRow('DESCRIPTION', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.description_add')}</Button>
                             </div>
                         </td>
