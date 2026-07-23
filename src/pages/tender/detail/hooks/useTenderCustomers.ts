@@ -24,7 +24,7 @@ type UseTenderCustomersParams = {
 };
 
 // Owns the tender's customer-picker list state: the query/open UI state, the
-// (deferred) full customer fetch, keeping the query synced to the saved
+// on-demand customer fetch, keeping the query synced to the saved
 // customer, and the client-side filtered list shown in the dropdown.
 export const useTenderCustomers = ({ canManage, isCreatingTender, detailCustomerName }: UseTenderCustomersParams) => {
     const [newTenderCustomerQuery, setNewTenderCustomerQuery] = useState('');
@@ -33,28 +33,25 @@ export const useTenderCustomers = ({ canManage, isCreatingTender, detailCustomer
     const [newTenderCustomersLoading, setNewTenderCustomersLoading] = useState(false);
 
     useEffect(() => {
-        if (!canManage) return;
+        if (!canManage || !newTenderCustomerOpen || newTenderCustomers.length > 0) return;
         let cancelled = false;
-        // Defer massive unpaginated fetch so it doesn't block LCP
-        const timer = window.setTimeout(() => {
-            if (cancelled) return;
-            setNewTenderCustomersLoading(true);
-            loadCustomerOptions()
-                .then((rows) => {
-                    if (!cancelled) setNewTenderCustomers(rows);
-                })
-                .catch(() => {
-                    if (!cancelled) setNewTenderCustomers([]);
-                })
-                .finally(() => {
-                    if (!cancelled) setNewTenderCustomersLoading(false);
-                });
-        }, 500);
+        // The 200-row list is only needed while the picker is open. Keeping it
+        // off the initial detail path avoids an unnecessary request and parse.
+        setNewTenderCustomersLoading(true);
+        loadCustomerOptions()
+            .then((rows) => {
+                if (!cancelled) setNewTenderCustomers(rows);
+            })
+            .catch(() => {
+                if (!cancelled) setNewTenderCustomers([]);
+            })
+            .finally(() => {
+                if (!cancelled) setNewTenderCustomersLoading(false);
+            });
         return () => {
             cancelled = true;
-            window.clearTimeout(timer);
         };
-    }, [canManage]);
+    }, [canManage, newTenderCustomerOpen, newTenderCustomers.length]);
 
     useEffect(() => {
         if (isCreatingTender || newTenderCustomerOpen) return;

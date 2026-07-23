@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+    ArrowDown,
     ArrowLeft,
+    ArrowUp,
     Building05 as Building,
     ChevronDown,
     ChevronLeft,
@@ -12,15 +14,17 @@ import {
     SearchLg as Search,
     X,
 } from '@/components/icons/antIconCompat';
+import Tooltip from 'antd/es/tooltip';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 import { StockModuleHeader } from '../../components/layout/PageHeader';
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { StatusChip } from '../../components/ui-shared/StatusBadge';
+import { Skeleton } from '../../components/ui-shared/Skeleton';
 import { inventoryApi } from '../../lib/api/inventory';
 import type { SupplierRow } from '../../types/inventory';
 
@@ -32,6 +36,70 @@ const money = (value?: number | null) =>
 const number = (value?: number | null) =>
     new Intl.NumberFormat('de-CH', { maximumFractionDigits: 2 }).format(value || 0);
 
+const SUPPLIER_FILTER_CONTROL =
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
+
+type SupplierSortKey =
+    | 'createdAt'
+    | 'companyName'
+    | 'phone'
+    | 'address'
+    | 'articleCount'
+    | 'totalPurchaseQuantity'
+    | 'totalPurchaseAmount'
+    | 'latestPurchaseDate'
+    | 'isActive';
+
+type SupplierSortDirection = 'asc' | 'desc';
+
+const SupplierSortableHeader = ({
+    label,
+    column,
+    sortBy,
+    sortDirection,
+    onSort,
+    align = 'left',
+}: {
+    label: ReactNode;
+    column: SupplierSortKey;
+    sortBy: SupplierSortKey;
+    sortDirection: SupplierSortDirection;
+    onSort: (column: SupplierSortKey, direction: SupplierSortDirection) => void;
+    align?: 'left' | 'right';
+}) => (
+    <th className={`px-2 py-3 font-semibold ${align === 'right' ? 'text-right' : 'text-left'}`}>
+        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+            <span className="truncate">{label}</span>
+            <span className="inline-flex shrink-0 items-center">
+                <Tooltip title={t('inventory.articles.sortAscending')}>
+                    <button
+                        type="button"
+                        onClick={() => onSort(column, 'asc')}
+                        aria-label={t('inventory.articles.sortAscending')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowUp size={10} />
+                    </button>
+                </Tooltip>
+                <Tooltip title={t('inventory.articles.sortDescending')}>
+                    <button
+                        type="button"
+                        onClick={() => onSort(column, 'desc')}
+                        aria-label={t('inventory.articles.sortDescending')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowDown size={10} />
+                    </button>
+                </Tooltip>
+            </span>
+        </div>
+    </th>
+);
+
 export const Suppliers = () => {
     const navigate = useNavigate();
     const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -40,7 +108,11 @@ export const Suppliers = () => {
     const [saving, setSaving] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('');
+    const [companyFilter, setCompanyFilter] = useState('');
+    const [phoneFilter, setPhoneFilter] = useState('');
+    const [addressFilter, setAddressFilter] = useState('');
+    const [sortBy, setSortBy] = useState<SupplierSortKey>('createdAt');
+    const [sortDirection, setSortDirection] = useState<SupplierSortDirection>('desc');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
 
@@ -59,9 +131,13 @@ export const Suppliers = () => {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return suppliers.filter((supplier) => {
-            if (statusFilter === 'ACTIVE' && !supplier.isActive) return false;
-            if (statusFilter === 'INACTIVE' && supplier.isActive) return false;
+        const companyQuery = companyFilter.trim().toLowerCase();
+        const phoneQuery = phoneFilter.trim().toLowerCase();
+        const addressQuery = addressFilter.trim().toLowerCase();
+        const matches = suppliers.filter((supplier) => {
+            if (companyQuery && !supplier.companyName.toLowerCase().includes(companyQuery)) return false;
+            if (phoneQuery && !(supplier.phone || '').toLowerCase().includes(phoneQuery)) return false;
+            if (addressQuery && !(supplier.address || '').toLowerCase().includes(addressQuery)) return false;
             if (!q) return true;
             return (
                 supplier.companyName.toLowerCase().includes(q) ||
@@ -71,11 +147,23 @@ export const Suppliers = () => {
                 (supplier.address || '').toLowerCase().includes(q)
             );
         });
-    }, [search, statusFilter, suppliers]);
+        const directionFactor = sortDirection === 'asc' ? 1 : -1;
+        return matches.sort((left, right) => {
+            const leftValue = left[sortBy] ?? '';
+            const rightValue = right[sortBy] ?? '';
+            const comparison = sortBy === 'createdAt' || sortBy === 'latestPurchaseDate'
+                ? (leftValue ? new Date(String(leftValue)).getTime() : 0)
+                    - (rightValue ? new Date(String(rightValue)).getTime() : 0)
+                : typeof leftValue === 'string'
+                    ? leftValue.localeCompare(String(rightValue))
+                    : Number(leftValue) - Number(rightValue);
+            return comparison === 0 ? left.id.localeCompare(right.id) : comparison * directionFactor;
+        });
+    }, [addressFilter, companyFilter, phoneFilter, search, sortBy, sortDirection, suppliers]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, statusFilter]);
+    }, [addressFilter, companyFilter, phoneFilter, search, sortBy, sortDirection]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const pageSafe = Math.min(page, totalPages);
@@ -104,6 +192,20 @@ export const Suppliers = () => {
 
     return (
         <div>
+            <InventoryListHeader
+                title={t('nav.suppliers')}
+                action={(
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        icon={addOpen ? <ChevronDown size={16} /> : <Plus size={16} />}
+                        onClick={() => setAddOpen((o) => !o)}
+                        className="!h-10 !px-4 !text-[13px] !font-semibold"
+                    >
+                        {t('auto.yeni_tedarikci')}
+                    </Button>
+                )}
+            />
             {/* Aşağı doğru açılan "Yeni Tedarikçi" bölümü — liste her zaman görünür kalır. */}
             {addOpen && (
                 <section className="mb-4 rounded-md border border-slate-200 bg-white p-4 shadow-xs">
@@ -111,8 +213,8 @@ export const Suppliers = () => {
                         <Building size={13} />{t('auto.yeni_tedarikci')}</div>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <Field label={t('auto.sirket_adi')} required><Input size="sm" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></Field>
-                        <Field label="Yetkili"><Input size="sm" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} /></Field>
-                        <Field label="E-posta"><Input size="sm" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="tedarikci@ornek.com" /></Field>
+                        <Field label={t('common.contactPerson')}><Input size="sm" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} /></Field>
+                        <Field label={t('common.email')}><Input size="sm" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="tedarikci@ornek.com" /></Field>
                         <Field label={t('common.phone')}><Input size="sm" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
                         <Field label={t('common.address')}><Input size="sm" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
                     </div>
@@ -123,49 +225,49 @@ export const Suppliers = () => {
             )}
 
             <Card className="border-0 rounded-none" noPadding>
-                <div className="shrink-0 overflow-x-auto pb-2">
-                    <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
-                        <div className="flex shrink-0 items-center gap-2 pr-1">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
-                                <Building size={13} />
-                            </span>
-                            <h3 className="whitespace-nowrap text-[14px] font-semibold text-slate-900">{t('auto.genel_liste')}</h3>
-                        </div>
-                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
-                            <div className="relative shrink-0">
-                                <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder={t('auto.ara_kod_ad_barkod')}
-                                    className="h-8 w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-7 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                                />
-                                {search && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSearch('')}
-                                        aria-label={t('common.clear')}
-                                        title={t('common.clear')}
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-                                    >
-                                        <X size={12} />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="relative w-[148px] shrink-0">
-                                <Select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                {/* Filtre + sayfalama — tek satır, tam genişlik, yatay kaydırma yok. */}
+                <div className="px-3 py-3">
+                    <div className="flex w-full flex-nowrap items-center gap-3">
+                        <div className="relative w-[240px] min-w-0 shrink">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={t('auto.ara_kod_ad_barkod')}
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                            />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch('')}
+                                    aria-label={t('common.clear')}
+                                    title={t('common.clear')}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
                                 >
-                                    <option value="">{t('auto.tum_durumlar')}</option>
-                                    <option value="ACTIVE">{t('common.active')}</option>
-                                    <option value="INACTIVE">{t('common.inactive')}</option>
-                                </Select>
-                            </div>
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="w-[200px] shrink-0">
+                            <Select
+                                value={`${sortBy}:${sortDirection}`}
+                                onChange={(event) => {
+                                    const [column, direction] = event.target.value.split(':') as [SupplierSortKey, SupplierSortDirection];
+                                    setSortBy(column);
+                                    setSortDirection(direction);
+                                }}
+                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                aria-label={t('inventory.articles.sortOrder')}
+                            >
+                                {sortBy !== 'createdAt' && (
+                                    <option value={`${sortBy}:${sortDirection}`}>{t('inventory.articles.sortOrder')}</option>
+                                )}
+                                <option value="createdAt:desc">{t('inventory.articles.newestFirst')}</option>
+                                <option value="createdAt:asc">{t('inventory.articles.oldestFirst')}</option>
+                            </Select>
                         </div>
                         <div className="ml-auto flex shrink-0 items-center gap-3">
-                            <span className="font-mono text-[11.5px] text-slate-500">
+                            <span className="font-mono text-[12px] text-slate-500">
                                 {rangeFrom}-{rangeTo} / {filtered.length}
                             </span>
                             <div className="flex items-center gap-1">
@@ -173,85 +275,108 @@ export const Suppliers = () => {
                                     type="button"
                                     disabled={pageSafe <= 1}
                                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                                     aria-label={t('common.back')}
                                 >
                                     <ChevronLeft size={14} />
                                 </button>
-                                <span className="px-1 font-mono text-[11.5px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
                                 <button
                                     type="button"
                                     disabled={pageSafe >= totalPages}
                                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                                     aria-label={t('common.next')}
                                 >
                                     <ChevronRight size={14} />
                                 </button>
                             </div>
-                            <Button
-                                variant="primary"
-                                size="lg"
-                                icon={addOpen ? <ChevronDown size={16} /> : <Plus size={16} />}
-                                onClick={() => setAddOpen((o) => !o)}
-                                className="!h-9 !px-4 !text-[13px] !font-semibold"
-                            >
-                                {t('auto.yeni_tedarikci')}
-                            </Button>
                         </div>
                     </div>
                 </div>
 
                 <div className="bg-white">
-                    <table className="min-w-[1220px] w-full table-fixed text-[12.5px]">
+                    <table className="w-full table-fixed text-[11.5px] [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
                         <colgroup>
-                            <col style={{ width: 210 }} />
-                            <col style={{ width: 150 }} />
-                            <col style={{ width: 260 }} />
-                            <col style={{ width: 92 }} />
-                            <col style={{ width: 118 }} />
-                            <col style={{ width: 130 }} />
-                            <col style={{ width: 120 }} />
-                            <col style={{ width: 112 }} />
-                            <col style={{ width: 72 }} />
+                            <col style={{ width: '19%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '21%' }} />
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '10%' }} />
+                            <col style={{ width: '11%' }} />
+                            <col style={{ width: '12%' }} />
+                            <col style={{ width: '6%' }} />
                         </colgroup>
-                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[10.5px] text-[#86868B] bg-slate-50 border-b border-slate-200 uppercase tracking-[0.08em] shadow-[0_1px_0_0_rgb(226_232_240)]">
+                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[11.5px] text-[#86868B] bg-slate-50 uppercase tracking-[0.08em]">
                             <tr>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.sirket')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('common.phone')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('common.address')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.urun')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.alim_adedi')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.alisveris')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.son_alim')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
+                                <SupplierSortableHeader label={t('auto.sirket')} column="companyName" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} />
+                                <SupplierSortableHeader label={t('common.phone')} column="phone" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} />
+                                <SupplierSortableHeader label={t('common.address')} column="address" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} />
+                                <SupplierSortableHeader label={t('auto.urun')} column="articleCount" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} align="right" />
+                                <SupplierSortableHeader label={t('auto.alim_adedi')} column="totalPurchaseQuantity" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} align="right" />
+                                <SupplierSortableHeader label={t('auto.alisveris')} column="totalPurchaseAmount" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} align="right" />
+                                <SupplierSortableHeader label={t('auto.son_alim')} column="latestPurchaseDate" sortBy={sortBy} sortDirection={sortDirection} onSort={(column, direction) => { setSortBy(column); setSortDirection(direction); }} />
+                                <th className="px-2.5 py-2.5 text-right font-semibold">{t('common.actions')}</th>
+                            </tr>
+                            <tr data-filter-row>
+                                <th className="px-2 py-2 font-normal">
+                                    <input
+                                        value={companyFilter}
+                                        onChange={(event) => setCompanyFilter(event.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={SUPPLIER_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2 font-normal">
+                                    <input
+                                        value={phoneFilter}
+                                        onChange={(event) => setPhoneFilter(event.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={SUPPLIER_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2 font-normal">
+                                    <input
+                                        value={addressFilter}
+                                        onChange={(event) => setAddressFilter(event.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={SUPPLIER_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {loading && <tr><td colSpan={9} className="px-4 py-6 text-center text-slate-400">{t('common.loading')}</td></tr>}
+                            {loading && Array.from({ length: 6 }).map((_, i) => (
+                                <tr key={`supplier-skeleton-${i}`}>
+                                    {Array.from({ length: 8 }).map((__, j) => (
+                                        <td key={j} className="px-2.5 py-2">
+                                            <Skeleton className={`h-4 w-full max-w-[120px] ${[3, 4, 5, 7].includes(j) ? 'ml-auto' : ''} bg-slate-100`} />
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
                             {!loading && filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={9}>
+                                    <td colSpan={8}>
                                         <EmptyState icon={<Building size={28} />} title={t('auto.tedarikci_yok')} description={t('auto.ilk_tedarikciyi_soldaki_formdan_ekleyin')} />
                                     </td>
                                 </tr>
                             )}
                             {!loading && paged.map((supplier) => (
-                                <tr key={supplier.id} className="cursor-pointer transition-colors hover:bg-slate-50/60" onClick={() => navigate(`/inventory/suppliers/${supplier.id}`)}>
-                                    <td className="truncate px-3 py-2 font-semibold text-slate-900">{supplier.companyName}</td>
-                                    <td className="truncate px-3 py-2 text-slate-600">{supplier.phone || '-'}</td>
-                                    <td className="truncate px-3 py-2 text-slate-600">{supplier.address || '-'}</td>
-                                    <td className="px-3 py-2 text-right font-mono">{supplier.articleCount || 0}</td>
-                                    <td className="px-3 py-2 text-right font-mono">{number(supplier.totalPurchaseQuantity)}</td>
-                                    <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{money(supplier.totalPurchaseAmount)}</td>
-                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{supplier.latestPurchaseDate ? dayjs(supplier.latestPurchaseDate).format('DD.MM.YYYY') : '-'}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                        <StatusChip variant={supplier.isActive ? 'active' : 'passive'}>
-                                            {supplier.isActive ? t('common.active') : t('common.inactive')}
-                                        </StatusChip>
-                                    </td>
-                                    <td className="px-3 py-2 text-right">
+                                <tr key={supplier.id} className="cursor-pointer transition-colors hover:bg-slate-100" onClick={() => navigate(`/inventory/suppliers/${supplier.id}`)}>
+                                    <td className="truncate px-2.5 py-2 font-semibold text-slate-900">{supplier.companyName}</td>
+                                    <td className="truncate px-2.5 py-2 text-slate-600">{supplier.phone || '-'}</td>
+                                    <td className="truncate px-2.5 py-2 text-slate-600">{supplier.address || '-'}</td>
+                                    <td className="px-2.5 py-2 text-right font-mono">{supplier.articleCount || 0}</td>
+                                    <td className="px-2.5 py-2 text-right font-mono">{number(supplier.totalPurchaseQuantity)}</td>
+                                    <td className="px-2.5 py-2 text-right font-mono whitespace-nowrap">{money(supplier.totalPurchaseAmount)}</td>
+                                    <td className="px-2.5 py-2 text-slate-600 whitespace-nowrap">{supplier.latestPurchaseDate ? dayjs(supplier.latestPurchaseDate).format('DD.MM.YYYY') : '-'}</td>
+                                    <td className="px-2.5 py-2 text-right">
                                         <ChevronRight size={13} className="ml-auto text-slate-400" />
                                     </td>
                                 </tr>
@@ -271,6 +396,27 @@ export const SupplierDetail = () => {
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({ companyName: '', contactName: '', email: '', phone: '', address: '', isActive: true });
     const [saving, setSaving] = useState(false);
+    // "Alınan ürünler" tablosu — doğrudan ürün arama + kolon bazlı filtreler.
+    const [productSearch, setProductSearch] = useState('');
+    const [productFilter, setProductFilter] = useState('');
+    const [locationFilter, setLocationFilter] = useState('');
+
+    const filteredProducts = useMemo(() => {
+        const list = supplier?.articleSuppliers || [];
+        const s = productSearch.trim().toLowerCase();
+        const pf = productFilter.trim().toLowerCase();
+        const lf = locationFilter.trim().toLowerCase();
+        return list.filter((row) => {
+            const name = (row.article?.name || row.articleId || '').toLowerCase();
+            const code = (row.article?.articleCode || '').toLowerCase();
+            const sku = (row.supplierSku || '').toLowerCase();
+            const loc = (row.location?.locationName || '').toLowerCase();
+            if (s && !(name.includes(s) || code.includes(s) || sku.includes(s) || loc.includes(s))) return false;
+            if (pf && !(name.includes(pf) || code.includes(pf) || sku.includes(pf))) return false;
+            if (lf && !loc.includes(lf)) return false;
+            return true;
+        });
+    }, [supplier, productSearch, productFilter, locationFilter]);
 
     const load = async () => {
         if (!id) return;
@@ -341,8 +487,8 @@ export const SupplierDetail = () => {
                     <div className="p-4">
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <Field label={t('auto.sirket_adi')} required><Input size="sm" value={editForm.companyName} onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })} /></Field>
-                            <Field label="Yetkili"><Input size="sm" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} /></Field>
-                            <Field label="E-posta"><Input size="sm" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="tedarikci@ornek.com" /></Field>
+                            <Field label={t('common.contactPerson')}><Input size="sm" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} /></Field>
+                            <Field label={t('common.email')}><Input size="sm" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} placeholder="tedarikci@ornek.com" /></Field>
                             <Field label={t('common.phone')}><Input size="sm" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></Field>
                             <Field label={t('common.address')}><Input size="sm" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></Field>
                             <Field label={t('common.status')}>
@@ -359,8 +505,8 @@ export const SupplierDetail = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-x-6 gap-y-2 p-4 text-[12.5px] sm:grid-cols-2">
-                        <InfoLine label="Yetkili" value={supplier.contactName} />
-                        <InfoLine label="E-posta" value={supplier.email} />
+                        <InfoLine label={t('common.contactPerson')} value={supplier.contactName} />
+                        <InfoLine label={t('common.email')} value={supplier.email} />
                         <InfoLine label={t('common.phone')} value={supplier.phone} />
                         <InfoLine label={t('common.address')} value={supplier.address} />
                     </div>
@@ -375,29 +521,90 @@ export const SupplierDetail = () => {
             </div>
 
             <section className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-xs">
-                <div className="border-b border-slate-100 px-4 py-3 text-[11px] font-semibold uppercase text-slate-500">{t('auto.alinan_urunler')}</div>
+                {/* Başlık + doğrudan ürün arama */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-500">{t('auto.alinan_urunler')}</div>
+                    <div className="relative w-[240px] max-w-full">
+                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            value={productSearch}
+                            onChange={(e) => setProductSearch(e.target.value)}
+                            placeholder={t('auto.ara_kod_ad_barkod')}
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                        />
+                        {productSearch && (
+                            <button
+                                type="button"
+                                onClick={() => setProductSearch('')}
+                                aria-label={t('common.clear')}
+                                title={t('common.clear')}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                            >
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+                </div>
                 {(supplier.articleSuppliers || []).length === 0 ? (
                     <EmptyState icon={<Package size={28} />} title={t('auto.urun_kaydi_yok')} description={t('auto.bu_tedarikciye_bagli_urun_henuz_eklenmemis')} />
                 ) : (
-                    <div className="divide-y divide-slate-100">
-                        {(supplier.articleSuppliers || []).map((row) => (
-                                <button
-                                    key={row.id}
-                                    type="button"
-                                    className="grid w-full grid-cols-[minmax(0,1fr)_120px_110px_120px_120px_110px] items-center gap-4 px-4 py-3 text-left text-[12.5px] hover:bg-slate-50"
-                                    onClick={() => navigate(`/inventory/articles/${row.articleId}`)}
-                                >
-                                    <span className="min-w-0">
-                                        <span className="block truncate font-semibold text-slate-900">{row.article?.name || row.articleId}</span>
-                                        <span className="text-[11px] text-slate-500">{row.article?.articleCode || '-'} · {row.supplierSku || '-'}</span>
-                                    </span>
-                                    <span className="truncate text-slate-600">{row.location?.locationName || '-'}</span>
-                                    <span className="text-right font-mono">{number(row.quantity)} {row.article?.unit || ''}</span>
-                                    <span className="text-right font-mono">{money(row.purchasePrice)}</span>
-                                    <span className="text-right font-mono">{money(Number(row.quantity || 0) * Number(row.purchasePrice || 0))}</span>
-                                    <span className="text-slate-600">{row.lastPurchaseDate ? dayjs(row.lastPurchaseDate).format('DD.MM.YYYY') : '-'}</span>
-                                </button>
-                        ))}
+                    <div className="overflow-x-auto">
+                        <table className="w-full table-fixed text-[11.5px] [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
+                            <colgroup>
+                                <col style={{ width: '32%' }} />
+                                <col style={{ width: '16%' }} />
+                                <col style={{ width: '13%' }} />
+                                <col style={{ width: '13%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '12%' }} />
+                            </colgroup>
+                            <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th className="px-2.5 py-2 text-left font-semibold">{t('auto.urun')}</th>
+                                    <th className="px-2.5 py-2 text-left font-semibold">{t('common.location')}</th>
+                                    <th className="px-2.5 py-2 text-right font-semibold">{t('common.quantity')}</th>
+                                    <th className="px-2.5 py-2 text-right font-semibold">{t('auto.alis_fiyati')}</th>
+                                    <th className="px-2.5 py-2 text-right font-semibold">{t('common.total')}</th>
+                                    <th className="px-2.5 py-2 text-left font-semibold">{t('auto.son_alim')}</th>
+                                </tr>
+                                {/* Kolon bazlı filtre satırı — ürün ve lokasyon metinle daraltır. */}
+                                <tr data-filter-row className="bg-white">
+                                    <th className="px-2 py-1.5 font-normal">
+                                        <input value={productFilter} onChange={(e) => setProductFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={SUPPLIER_FILTER_CONTROL} />
+                                    </th>
+                                    <th className="px-2 py-1.5 font-normal">
+                                        <input value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={SUPPLIER_FILTER_CONTROL} />
+                                    </th>
+                                    <th className="px-2 py-2" />
+                                    <th className="px-2 py-2" />
+                                    <th className="px-2 py-2" />
+                                    <th className="px-2 py-2" />
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredProducts.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-[12.5px] text-slate-400">{t('auto.arama_sonucu_yok')}</td>
+                                    </tr>
+                                ) : filteredProducts.map((row) => (
+                                    <tr
+                                        key={row.id}
+                                        className="cursor-pointer transition-colors hover:bg-slate-100"
+                                        onClick={() => navigate(`/inventory/articles/${row.articleId}`)}
+                                    >
+                                        <td className="px-2.5 py-2">
+                                            <span className="block truncate font-semibold text-slate-900">{row.article?.name || row.articleId}</span>
+                                            <span className="text-[11px] text-slate-500">{row.article?.articleCode || '-'} · {row.supplierSku || '-'}</span>
+                                        </td>
+                                        <td className="px-2.5 py-2 text-slate-600"><span className="block truncate">{row.location?.locationName || '-'}</span></td>
+                                        <td className="px-2.5 py-2 text-right font-mono whitespace-nowrap">{number(row.quantity)} {row.article?.unit || ''}</td>
+                                        <td className="px-2.5 py-2 text-right font-mono">{money(row.purchasePrice)}</td>
+                                        <td className="px-2.5 py-2 text-right font-mono">{money(Number(row.quantity || 0) * Number(row.purchasePrice || 0))}</td>
+                                        <td className="px-2.5 py-2 text-slate-600 whitespace-nowrap">{row.lastPurchaseDate ? dayjs(row.lastPurchaseDate).format('DD.MM.YYYY') : '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </section>

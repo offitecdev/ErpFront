@@ -13,6 +13,7 @@ import { PipelineCharts } from './components/PipelineCharts';
 import { FollowUpOffers } from './components/FollowUpOffers';
 import { WeekStrip } from './components/WeekStrip';
 import { SURFACE } from './components/OverviewCard';
+import { InventoryListHeader } from '../../../components/inventory/InventoryListHeader';
 import { PageSkeleton } from '../../../components/ui-shared/PageSkeleton';
 
 const sectionAnim = (delay: number) => ({
@@ -56,18 +57,16 @@ export const CrmOverview = () => {
         return <PageSkeleton />;
     }
 
+    // Fill toward the page edges (only the shell's 2rem gutter remains) so laptops and
+    // normal desktops use their full width instead of floating in a narrow centered
+    // column. The high cap keeps it from over-stretching on 2K/4K, where it stays
+    // centered; the wider 2xl gaps keep the side-by-side blocks breathing.
     return (
-        <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 pb-6">
-            {/* Header — just the title and ONE short caption, nothing else. */}
-            <motion.header {...sectionAnim(0)} className="pt-1">
-                <h1 className="text-[24px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">
-                    {t('crmOverview.title', { defaultValue: 'Genel Bakış' })}
-                </h1>
-                <p className="mt-1 text-[13.5px] text-[#6B7280] dark:text-[#aab0bb]">
-                    {t('crmOverview.subtitle', {
-                        defaultValue: 'Teklifler, satışlar ve ajandanın tek ekranda özeti',
-                    })}
-                </p>
+        <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-5 pb-6 2xl:gap-7">
+            {/* Header — just the title, same size/position as every other page
+                (InventoryListHeader), no caption underneath. */}
+            <motion.header {...sectionAnim(0)}>
+                <InventoryListHeader title={t('crmOverview.title', { defaultValue: 'Genel Bakış' })} />
             </motion.header>
 
             {data.error && (
@@ -97,8 +96,8 @@ export const CrmOverview = () => {
                 <QuickActions onNewTask={() => setComposerOpen(true)} />
             </motion.div>
 
-            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
-                <motion.div {...sectionAnim(0.16)} className="flex flex-col gap-4 xl:col-span-2">
+            <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-3 2xl:gap-7">
+                <motion.div {...sectionAnim(0.16)} className="flex flex-col gap-5 xl:col-span-2 2xl:gap-7">
                     <PipelineCharts
                         tenders={data.filteredTenders}
                         orders={data.filteredOrders}

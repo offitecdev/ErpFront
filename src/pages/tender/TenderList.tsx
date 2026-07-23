@@ -1,21 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
+    ArrowDown,
     ArrowRight,
+    ArrowUp,
     Building02 as Building2,
     ChevronLeft,
     ChevronRight,
     File05 as FileSpreadsheet,
-    FilterLines as Filter,
     Plus,
     SearchLg as Search,
     UploadCloud02 as Upload,
+    X,
     XClose,
 } from '@/components/icons/antIconCompat';
+import Tooltip from 'antd/es/tooltip';
 
-import { PageHeader } from '../../components/layout/PageHeader';
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Select } from '../../components/ui-shared/Field';
@@ -26,8 +29,7 @@ import { BlockingDialog } from '../../components/ui-shared/BlockingDialog';
 
 import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
-import { apiClient } from '../../lib/axios';
-import type { CustomerLite, TenderFormat, TenderListItem } from '../../types/tender';
+import type { TenderListItem } from '../../types/tender';
 import { formatMoney, toCurrencyCode } from '../../utils/currency';
 import { localizeTenderNumber } from '../../utils/tenderNumber';
 
@@ -35,23 +37,17 @@ import { t as i18nT } from '@/i18n/translate';
 import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
 import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 
-const getStatusLabel = (): Record<string, string> => ({
-    Draft:i18nT('crm.tenders.statusDraft'),
-    Approved:i18nT('crm.tenders.statusApproved'),
-    Exported:i18nT('crm.tenders.statusExported'),
-});
-
-const STATUS_VARIANT: Record<string, 'warning' | 'approved' | 'info' | 'passive'> = {
-    Draft: 'passive',
-    Approved: 'approved',
-    Exported: 'info',
-};
+// İş akışı iki durumludur: sipariş (projeye bağlı ya da kaynağı satış siparişi)
+// veya taslak (diğer her şey). Ham Draft/Approved/Exported durumları listede
+// "taslak" altında toplanır.
+const isOrderTender = (tender: TenderListItem) =>
+    Boolean(tender.projectId) || isSourceSalesOrder(tender.sourceStatus);
 
 const tenderStatusLabel = (tender: TenderListItem) =>
-    tender.projectId || isSourceSalesOrder(tender.sourceStatus) ?i18nT('crm.tenders.statusOrdered') : getStatusLabel()[tender.status];
+    isOrderTender(tender) ?i18nT('crm.tenders.statusOrdered') :i18nT('crm.tenders.statusDraft');
 
-const tenderStatusVariant = (tender: TenderListItem): 'warning' | 'approved' | 'info' | 'passive' | 'order' =>
-    tender.projectId || isSourceSalesOrder(tender.sourceStatus) ? 'order' : STATUS_VARIANT[tender.status];
+const tenderStatusVariant = (tender: TenderListItem): 'passive' | 'order' =>
+    isOrderTender(tender) ? 'order' : 'passive';
 
 const tenderCreatorName = (tender: TenderListItem) =>
     tender.createdByName || tender.createdByEmail || tender.createdByEmployeeId || '—';
@@ -67,6 +63,64 @@ const initialsFromName = (value?: string | null) => {
 const fmtMoney = (v?: number | null, currency?: string | null) =>
     typeof v === 'number' ? formatMoney(v, toCurrencyCode(currency)) : '—';
 
+// Filtre satırı kontrolü — Ürünler listesindeki desenle aynı: alan hücreyle bütünleşik,
+// odaklanınca yumuşak kenarlı soluk bir zemin belirir.
+const TENDER_FILTER_CONTROL =
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
+
+type TenderSortKey = 'tenderNumber' | 'customerName' | 'status' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
+const SortableHeader = ({
+    label,
+    column,
+    sortBy,
+    sortDirection,
+    onSort,
+    align = 'left',
+}: {
+    label: ReactNode;
+    column: TenderSortKey;
+    sortBy: TenderSortKey;
+    sortDirection: SortDirection;
+    onSort: (column: TenderSortKey, direction: SortDirection) => void;
+    align?: 'left' | 'right' | 'center';
+}) => (
+    <th className={`px-4 py-2.5 font-semibold ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
+        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
+            <span className="truncate">{label}</span>
+            <span className="inline-flex shrink-0 items-center">
+                <Tooltip title={i18nT('common.sortAscending')}>
+                    <button
+                        type="button"
+                        aria-label={i18nT('common.sortAscending')}
+                        aria-pressed={sortBy === column && sortDirection === 'asc'}
+                        onClick={() => onSort(column, 'asc')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowUp size={10} />
+                    </button>
+                </Tooltip>
+                <Tooltip title={i18nT('common.sortDescending')}>
+                    <button
+                        type="button"
+                        aria-label={i18nT('common.sortDescending')}
+                        aria-pressed={sortBy === column && sortDirection === 'desc'}
+                        onClick={() => onSort(column, 'desc')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowDown size={10} />
+                    </button>
+                </Tooltip>
+            </span>
+        </div>
+    </th>
+);
+
 export const TenderList = () => {
     useLanguageRefresh();
     const navigate = useNavigate();
@@ -75,87 +129,105 @@ export const TenderList = () => {
     const canImport = permissions.length === 0 || permissions.includes('tenders.import');
 
     const {
-        list, listTotal, listPage, listTotalPages, loadingList, filter, setFilter, fetchList,
-        importTender, importSalesOrderCsv,
+        list, listTotal, listPage, listTotalPages, loadingList, fetchList,
+        importSalesOrderCsv,
     } = useTenderStore();
 
-    const [customers, setCustomers] = useState<CustomerLite[]>([]);
-    const [searchInput, setSearchInput] = useState('');
-    const pageSize = 10;
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı) — sunucuda daraltır.
+    const [tenderNoFilter, setTenderNoFilter] = useState('');
+    const [customerFilter, setCustomerFilter] = useState('');
+    const [creatorFilter, setCreatorFilter] = useState('');
+    const [debouncedColumns, setDebouncedColumns] = useState({
+        tenderNumber: '',
+        customerName: '',
+        creatorName: '',
+    });
+    // İki durumlu filtre (taslak / sipariş) ve e-posta gönderim filtresi.
+    const [orderState, setOrderState] = useState<'' | 'draft' | 'order'>('');
+    const [mailSent, setMailSent] = useState<'' | 'yes' | 'no'>('');
+    const [sortBy, setSortBy] = useState<TenderSortKey>('createdAt');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 15;
 
+    // Excel'den (Odoo satış siparişi CSV) içe aktarma — sipariş kayıtları oluşturur.
     const [importOpen, setImportOpen] = useState(false);
     const [importAttempted, setImportAttempted] = useState(false);
-    const [salesCsvOpen, setSalesCsvOpen] = useState(false);
-    const [salesCsvAttempted, setSalesCsvAttempted] = useState(false);
-
-    const [importForm, setImportForm] = useState({
-        customerId: '',
-        format: 'SIA451' as TenderFormat,
-        xmlContent: '',
-    });
-    const [salesCsvForm, setSalesCsvForm] = useState({
-        fileName: '',
-        csvContent: '',
-    });
+    const [importForm, setImportForm] = useState({ fileName: '', csvContent: '' });
     const [importing, setImporting] = useState(false);
-    const [salesCsvImporting, setSalesCsvImporting] = useState(false);
-    const importMissing = importOpen && importAttempted && (!importForm.customerId || !importForm.xmlContent.trim());
-    const salesCsvMissing = salesCsvOpen && salesCsvAttempted && !salesCsvForm.csvContent.trim();
+    const importMissing = importOpen && importAttempted && !importForm.csvContent.trim();
 
+    // Sunucu taraflı arama — tuş vuruşlarını debounce et, harf başına istek atma.
     useEffect(() => {
-        fetchList({ page: 1, pageSize });
-    }, [fetchList]);
+        const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+        return () => clearTimeout(id);
+    }, [search]);
 
+    // Kolon filtreleri de aynı şekilde debounce edilir; değer değişmediyse önceki
+    // nesne korunur (aksi hâlde her mount sonrası fetch iki kez tetiklenirdi).
     useEffect(() => {
-        if (!importOpen || customers.length > 0) return;
-        apiClient.get('/customers?page=1&pageSize=100')
-            .then((r) => setCustomers(Array.isArray(r.data) ? r.data : r.data.items || []))
-            .catch(() => setCustomers([]));
-    }, [customers.length, importOpen]);
+        const id = setTimeout(() => {
+            setDebouncedColumns((prev) => {
+                const next = {
+                    tenderNumber: tenderNoFilter.trim(),
+                    customerName: customerFilter.trim(),
+                    creatorName: creatorFilter.trim(),
+                };
+                return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+            });
+        }, 300);
+        return () => clearTimeout(id);
+    }, [tenderNoFilter, customerFilter, creatorFilter]);
 
-    const stats = useMemo(() => {
-        const total = listTotal;
-        const draft = list.filter((t) => !t.projectId && t.status === "Draft").length;
-        const approved = list.filter((t) => !t.projectId && t.status === "Approved").length;
-        const exported = list.filter((t) => !t.projectId && t.status === "Exported").length;
-        const salesOrder = list.filter((t) => t.projectId || isSourceSalesOrder(t.sourceStatus)).length;
-        const totalValue = list.reduce((s, t) => s + (t.grandTotal ?? 0), 0);
-        return { total, draft, approved, exported, salesOrder, totalValue };
-    }, [list]);
-
-    const handleImport = async () => {
-        setImportAttempted(true);
-        if (!importForm.customerId || !importForm.xmlContent.trim()) {
-            toast.error(i18nT('tenders.customer_ve_xml_content_zorunludur'));
+    // Filtre değişimi + sayfa sıfırlama TEK efekte toplanır: filtre değiştiğinde
+    // sayfa > 1 ise önce sayfa sıfırlanır ve o tur fetch atlanır.
+    const filterKeyRef = useRef<string | null>(null);
+    useEffect(() => {
+        const filterKey = JSON.stringify([
+            debouncedSearch,
+            debouncedColumns,
+            orderState,
+            mailSent,
+            sortBy,
+            sortDirection,
+        ]);
+        const filtersChanged = filterKeyRef.current !== null && filterKeyRef.current !== filterKey;
+        filterKeyRef.current = filterKey;
+        if (filtersChanged && page !== 1) {
+            setPage(1);
             return;
         }
-        try {
-            setImporting(true);
-            const created = await importTender({
-                customerId: importForm.customerId,
-                xmlContent: importForm.xmlContent,
-                format: importForm.format,
-            });
-            toast.success(i18nT('tenders.tender_import_aktarildi'));
-            setImportOpen(false);
-            setImportAttempted(false);
-            setImportForm({ customerId: '', format: 'SIA451', xmlContent: '' });
-            navigate(`/crm/tenders/${created.id}`);
-        } catch (e: any) {
-            toast.error(e.response?.data?.error ||i18nT('tenders.import_aktarim_basarisiz'));
-        } finally {
-            setImporting(false);
-        }
+        void fetchList({
+            page,
+            pageSize: PAGE_SIZE,
+            search: debouncedSearch || undefined,
+            orderState: orderState || undefined,
+            mailSent: mailSent || undefined,
+            tenderNumber: debouncedColumns.tenderNumber || undefined,
+            customerName: debouncedColumns.customerName || undefined,
+            creatorName: debouncedColumns.creatorName || undefined,
+            sortBy,
+            sortDirection,
+        });
+    }, [
+        page,
+        debouncedSearch,
+        debouncedColumns,
+        orderState,
+        mailSent,
+        sortBy,
+        sortDirection,
+        fetchList,
+    ]);
+
+    const handleSort = (column: TenderSortKey, direction: SortDirection) => {
+        setSortBy(column);
+        setSortDirection(direction);
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const text = await file.text();
-        setImportForm((p) => ({ ...p, xmlContent: text }));
-    };
-
-    const handleSalesCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImportUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (/\.xlsx?$/i.test(file.name)) {
@@ -164,134 +236,207 @@ export const TenderList = () => {
             return;
         }
         const text = await file.text();
-        setSalesCsvForm({ fileName: file.name, csvContent: text });
+        setImportForm({ fileName: file.name, csvContent: text });
     };
 
-    const handleSalesCsvImport = async () => {
-        setSalesCsvAttempted(true);
-        if (!salesCsvForm.csvContent.trim()) {
+    const handleImport = async () => {
+        setImportAttempted(true);
+        if (!importForm.csvContent.trim()) {
             toast.error(i18nT('tenders.csv_file_zorunludur'));
             return;
         }
         try {
-            setSalesCsvImporting(true);
+            setImporting(true);
             const created = await importSalesOrderCsv({
-                csvContent: salesCsvForm.csvContent,
-                fileName: salesCsvForm.fileName || null,
+                csvContent: importForm.csvContent,
+                fileName: importForm.fileName || null,
             });
             toast.success(i18nT('tenders.sales_order_csv_import_aktarildi'));
-            setSalesCsvOpen(false);
-            setSalesCsvAttempted(false);
-            setSalesCsvForm({ fileName: '', csvContent: '' });
+            setImportOpen(false);
+            setImportAttempted(false);
+            setImportForm({ fileName: '', csvContent: '' });
             if (created) navigate(`/crm/tenders/${created.id}`);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||i18nT('tenders.import_csv_failed'));
         } finally {
-            setSalesCsvImporting(false);
+            setImporting(false);
         }
     };
 
-    const onSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        setFilter({ ...filter, search: searchInput.trim() || undefined });
-        fetchList({ ...filter, search: searchInput.trim() || undefined, page: 1, pageSize });
-    };
-
-    const goPage = (page: number) => {
-        const next = { ...filter, page, pageSize };
-        setFilter(next);
-        fetchList(next);
-    };
+    const totalPages = Math.max(1, listTotalPages);
+    const pageSafe = Math.min(listPage, totalPages);
+    const rangeFrom = listTotal === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+    const rangeTo = Math.min(pageSafe * PAGE_SIZE, listTotal);
 
     return (
         <div>
             <BlockingDialog
                 open={importing}
-                title={i18nT('tenders.tender_import_aktariliyor')}
-                description={i18nT('tenders.xml_data_okunuyor_ve_tender_satirlari_hazirlan')}
-            />
-            <BlockingDialog
-                open={salesCsvImporting}
                 title={i18nT('tenders.import_csving')}
                 description={i18nT('tenders.sales_order_satirlari_okunuyor_customer_product_v')}
             />
-            <PageHeader
-                breadcrumb={i18nT('tenders.crm_teklif_yonetimi')}
-                title={i18nT('tenders.tender_ve_tender_listesi')}
-                description={i18nT('tenders.tenders_import_aktarin_esnek_satirlarla_maliyetl')}
-                actions={
-                    <>
+            <InventoryListHeader
+                title={i18nT('crm.tenders.tableTitle')}
+                action={
+                    <div className="flex flex-wrap items-center gap-2">
                         {canImport && (
-                            <>
-                                <Button variant="secondary" icon={<Upload size={13} />} onClick={() => { setSalesCsvAttempted(false); setSalesCsvOpen(true); }}>{i18nT('tenders.csv_export')}</Button>
-                                <Button variant="secondary" icon={<Upload size={13} />} onClick={() => { setImportAttempted(false); setImportOpen(true); }}>{i18nT('tenders.xml_import_export')}</Button>
-                            </>
+                            <Button variant="secondary" icon={<Upload size={13} />} onClick={() => { setImportAttempted(false); setImportOpen(true); }}>{i18nT('tenders.import_from_excel')}</Button>
                         )}
                         {canManage && (
                             <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/crm/tenders/new')}>{i18nT('tenders.new_tender')}</Button>
                         )}
-                    </>
+                    </div>
                 }
             />
 
-            {/* Stat Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
-                <StatCard label={i18nT('common.total')} value={stats.total} accent="text-slate-800" />
-                <StatCard label={i18nT('crm.tenders.statusDraft')} value={stats.draft} accent="text-amber-700" />
-                <StatCard label={i18nT('crm.tenders.statusApproved')} value={stats.approved} accent="text-emerald-700" />
-                <StatCard label={i18nT('tenders.export_exported')} value={stats.exported} accent="text-[#272f67]" />
-                <StatCard label={i18nT('crm.tenders.statusOrdered')} value={stats.salesOrder} accent="text-emerald-700" />
-                <StatCard label={i18nT('tenders.tahmini_hacim')} value={fmtMoney(stats.totalValue)} accent="text-slate-900" small />
-            </div>
-
-            {/* Filters + Table */}
-            <Card
-                title={i18nT('crm.tenders.tableTitle')}
-                icon={<FileSpreadsheet size={13} />}
-                noPadding
-                actions={
-                    <form onSubmit={onSearch} className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Card noPadding>
+                {/* Üst çubuk — arama (esner) + sıralama + sayfalama (sağda).
+                    Durum ve e-posta filtreleri kolon filtre satırındadır. */}
+                <div className="px-3 py-3">
+                    <div className="flex w-full flex-wrap items-center gap-3">
+                        <div className="relative w-[240px] min-w-0 shrink">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
                                 placeholder={i18nT('tenders.tender_no')}
-                                className="ofi-light-search-input min-h-9 rounded-md border border-slate-300 bg-slate-50/80 py-2 pl-8 pr-2.5 text-[12px] text-slate-950 transition-colors placeholder:text-slate-400 focus:border-[#272f67] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#272f67]/10 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
                             />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch('')}
+                                    aria-label={i18nT('common.clear')}
+                                    title={i18nT('common.clear')}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
                         </div>
-                        <Select
-                            value={filter.status ?? ''}
-                            onChange={(e) => {
-                                const v = e.target.value as 'Draft' | 'Approved' | 'Exported' | '';
-                                const next = { ...filter, status: v === '' ? undefined : v, page: 1, pageSize };
-                                setFilter(next);
-                                fetchList(next);
-                            }}
-                            size="sm"
-                            className="w-[142px] text-[12px]"
-                        >
-                            <option value="">{i18nT('tenders.all_statuler')}</option>
-                            <option value="Draft">{i18nT('crm.tenders.statusDraft')}</option>
-                            <option value="Approved">{i18nT('crm.tenders.statusApproved')}</option>
-                            <option value="Exported">{i18nT('crm.tenders.statusExported')}</option>
-                        </Select>
-                        <Button type="submit" variant="ghost" size="sm" icon={<Filter size={12} />}>{i18nT('tenders.uygula')}</Button>
-                    </form>
-                }
-            >
+                        <div className="w-[200px] shrink-0">
+                            <Select
+                                value={`${sortBy}:${sortDirection}`}
+                                onChange={(event) => {
+                                    const [column, direction] = event.target.value.split(':') as [TenderSortKey, SortDirection];
+                                    handleSort(column, direction);
+                                }}
+                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                aria-label={i18nT('common.sortOrder')}
+                            >
+                                {sortBy !== 'createdAt' && (
+                                    <option value={`${sortBy}:${sortDirection}`}>{i18nT('common.sortOrder')}</option>
+                                )}
+                                <option value="createdAt:desc">{i18nT('common.sortNewest')}</option>
+                                <option value="createdAt:asc">{i18nT('common.sortOldest')}</option>
+                            </Select>
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-3">
+                            <span className="font-mono text-[12px] text-slate-500">
+                                {rangeFrom}-{rangeTo} / {listTotal}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    disabled={pageSafe <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={i18nT('common.back')}
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
+                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                                <button
+                                    type="button"
+                                    disabled={pageSafe >= totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={i18nT('common.next')}
+                                >
+                                    <ChevronRight size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="overflow-x-auto">
-                    <table className="w-full text-[12.5px] text-left">
+                    <table className="w-full table-fixed text-[12.5px] text-left [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
+                        <colgroup>
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '19%' }} />
+                            <col style={{ width: '7%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '15%' }} />
+                            <col style={{ width: '11%' }} />
+                            <col style={{ width: '12%' }} />
+                            <col style={{ width: '10%' }} />
+                        </colgroup>
                         <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                             <tr>
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('tenders.tender_no')}</th>
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('nav.quickActionsGroup.customers')}</th>
+                                <SortableHeader label={i18nT('tenders.tender_no')} column="tenderNumber" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                                <SortableHeader label={i18nT('nav.quickActionsGroup.customers')} column="customerName" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                                 <th className="px-4 py-2.5 font-semibold text-center">{i18nT('tenders.versiyon')}</th>
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('common.status')}</th>
+                                <SortableHeader label={i18nT('common.status')} column="status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                                 <th className="px-4 py-2.5 font-semibold">{i18nT('tenders.olusturan')}</th>
                                 <th className="px-4 py-2.5 font-semibold text-right">{i18nT('common.amount')}</th>
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('tenders.olusturma')}</th>
+                                <SortableHeader label={i18nT('tenders.olusturma')} column="createdAt" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                                 <th className="px-4 py-2.5 font-semibold text-center">{i18nT('tenders.mail')}</th>
+                            </tr>
+                            {/* Kolon bazlı filtre satırı — teklif no / müşteri / oluşturan metinle,
+                                durum (taslak/sipariş) ve e-posta (gönderildi/gönderilmedi) seçicilerle daraltır. */}
+                            <tr data-filter-row className="bg-white border-b border-slate-100">
+                                <th className="px-2 py-1.5 font-normal">
+                                    <input
+                                        value={tenderNoFilter}
+                                        onChange={(e) => setTenderNoFilter(e.target.value)}
+                                        placeholder={`${i18nT('common.filter')}...`}
+                                        className={TENDER_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-1.5 font-normal">
+                                    <input
+                                        value={customerFilter}
+                                        onChange={(e) => setCustomerFilter(e.target.value)}
+                                        placeholder={`${i18nT('common.filter')}...`}
+                                        className={TENDER_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-1.5 font-normal">
+                                    <select
+                                        value={orderState}
+                                        onChange={(e) => setOrderState(e.target.value as '' | 'draft' | 'order')}
+                                        aria-label={i18nT('common.status')}
+                                        className={TENDER_FILTER_CONTROL}
+                                    >
+                                        <option value="">{i18nT('tenders.all_statuler')}</option>
+                                        <option value="draft">{i18nT('crm.tenders.statusDraft')}</option>
+                                        <option value="order">{i18nT('crm.tenders.statusOrdered')}</option>
+                                    </select>
+                                </th>
+                                <th className="px-2 py-1.5 font-normal">
+                                    <input
+                                        value={creatorFilter}
+                                        onChange={(e) => setCreatorFilter(e.target.value)}
+                                        placeholder={`${i18nT('common.filter')}...`}
+                                        className={TENDER_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-1.5 font-normal">
+                                    <select
+                                        value={mailSent}
+                                        onChange={(e) => setMailSent(e.target.value as '' | 'yes' | 'no')}
+                                        aria-label={i18nT('tenders.mail')}
+                                        className={TENDER_FILTER_CONTROL}
+                                    >
+                                        <option value="">{i18nT('common.all')}</option>
+                                        <option value="yes">{i18nT('tenders.mail_sent')}</option>
+                                        <option value="no">{i18nT('tenders.mail_not_sent')}</option>
+                                    </select>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -313,17 +458,9 @@ export const TenderList = () => {
                                             title={i18nT('tenders.no_tenders_yet')}
                                             description={i18nT('tenders.crb_sia_451_dosyasini_import_aktarin_veya_sifirdan')}
                                             action={
-                                                <div className="flex gap-2 justify-center">
-                                                    {canImport && (
-                                                        <>
-                                                            <Button variant="secondary" icon={<Upload size={13} />} onClick={() => { setSalesCsvAttempted(false); setSalesCsvOpen(true); }}>{i18nT('tenders.csv_export')}</Button>
-                                                            <Button variant="secondary" icon={<Upload size={13} />} onClick={() => { setImportAttempted(false); setImportOpen(true); }}>{i18nT('tenders.xml_import_export')}</Button>
-                                                        </>
-                                                    )}
-                                                    {canManage && (
-                                                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/crm/tenders/new')}>{i18nT('tenders.new_tender')}</Button>
-                                                    )}
-                                                </div>
+                                                canManage && (
+                                                    <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/crm/tenders/new')}>{i18nT('tenders.new_tender')}</Button>
+                                                )
                                             }
                                         />
                                     </td>
@@ -337,14 +474,14 @@ export const TenderList = () => {
                                 >
                                     <td className="px-4 py-2.5 font-semibold text-slate-900">
                                         <div className="flex items-center gap-1.5">
-                                            <FileSpreadsheet size={13} className="text-[#272f67]" />
-                                            {localizeTenderNumber(t.tenderNumber)}
+                                            <FileSpreadsheet size={13} className="text-[#272f67] shrink-0" />
+                                            <span className="truncate">{localizeTenderNumber(t.tenderNumber)}</span>
                                         </div>
                                     </td>
                                     <td className="px-4 py-2.5 text-slate-700">
                                         <div className="flex items-center gap-1.5">
-                                            <Building2 size={11} className="text-slate-400" />
-                                            {t.customerName || '—'}
+                                            <Building2 size={11} className="text-slate-400 shrink-0" />
+                                            <span className="truncate">{t.customerName || '—'}</span>
                                         </div>
                                     </td>
                                     <td className="px-4 py-2.5 text-center text-slate-600 font-mono text-[11.5px]">
@@ -356,7 +493,7 @@ export const TenderList = () => {
                                         </StatusChip>
                                     </td>
                                     <td className="px-4 py-2.5 text-slate-600">
-                                        <div className="flex min-w-[140px] items-center gap-2">
+                                        <div className="flex min-w-0 items-center gap-2">
                                             <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-600">
                                                 {initialsFromName(tenderCreatorName(t))}
                                             </span>
@@ -393,173 +530,44 @@ export const TenderList = () => {
                         </tbody>
                     </table>
                 </div>
-                {!loadingList && listTotalPages > 1 && (
-                    <PaginationBar
-                        page={listPage}
-                        totalPages={listTotalPages}
-                        total={listTotal}
-                        onPage={goPage}
-                    />
-                )}
             </Card>
 
-            <Modal
-                open={salesCsvOpen}
-                title={i18nT('tenders.sales_order_csv_export')}
-                description={i18nT('tenders.odoo_sales_order_csv_dosyasindaki_customer_uru')}
-                onClose={() => { setSalesCsvOpen(false); setSalesCsvAttempted(false); }}
-                width="lg"
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => { setSalesCsvOpen(false); setSalesCsvAttempted(false); }}>{i18nT('common.cancel')}</Button>
-                        <Button variant="primary" loading={salesCsvImporting} onClick={handleSalesCsvImport}>{i18nT('tenders.csv_export')}</Button>
-                    </>
-                }
-            >
-                <div className="grid grid-cols-1 gap-3">
-                    {salesCsvMissing && (
-                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-utility-yellow-200 bg-warning-primary px-3 py-2 text-[12px] text-warning-primary">
-                            <StatusChip variant="warning">{i18nT('common.required')}</StatusChip>
-                            <span className="font-medium">{i18nT('tenders.cannot_import_without_csv_file')}</span>
-                        </div>
-                    )}
-                    <Field label={i18nT('tenders.csv_file')} required hint={i18nT('tenders.csv_uzantili_sales_order_dosyasini_select')} error={salesCsvMissing ?i18nT('tenders.csv_file_zorunludur') : null}>
-                        <input
-                            type="file"
-                            accept=".csv,text/csv"
-                            onChange={handleSalesCsvUpload}
-                            className="w-full text-[12px] file:mr-3 file:rounded file:border-0 file:bg-[#272f67]/10 file:px-3 file:py-1.5 file:font-medium file:text-[#272f67] hover:file:bg-[#272f67]/15"
-                        />
-                    </Field>
-                    {salesCsvForm.fileName && (
-                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700">
-                            {salesCsvForm.fileName}
-                        </div>
-                    )}
-                </div>
-            </Modal>
-
-            {/* Import Modal */}
+            {/* Excel'den içe aktarma (Odoo satış siparişi CSV) — sipariş kayıtları oluşturur. */}
             <Modal
                 open={importOpen}
-                title={i18nT('tenders.xml_tender_import')}
-                description={i18nT('tenders.crb_sia_451_standardina_uyumlu_xml_dosyasini_sis')}
+                title={i18nT('tenders.import_from_excel')}
+                description={i18nT('tenders.odoo_sales_order_csv_dosyasindaki_customer_uru')}
                 onClose={() => { setImportOpen(false); setImportAttempted(false); }}
                 width="lg"
                 footer={
                     <>
                         <Button variant="secondary" onClick={() => { setImportOpen(false); setImportAttempted(false); }}>{i18nT('common.cancel')}</Button>
-                        <Button variant="primary" loading={importing} onClick={handleImport}>{i18nT('tenders.import_export')}</Button>
+                        <Button variant="primary" loading={importing} onClick={handleImport}>{i18nT('tenders.import_from_excel')}</Button>
                     </>
                 }
             >
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                     {importMissing && (
-                        <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-md border border-utility-yellow-200 bg-warning-primary px-3 py-2 text-[12px] text-warning-primary">
+                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-utility-yellow-200 bg-warning-primary px-3 py-2 text-[12px] text-warning-primary">
                             <StatusChip variant="warning">{i18nT('common.required')}</StatusChip>
-                            <span className="font-medium">{i18nT('tenders.customer_ve_xml_icerik_alanlari_doldurulmadan_import')}</span>
+                            <span className="font-medium">{i18nT('tenders.cannot_import_without_csv_file')}</span>
                         </div>
                     )}
-                    <Field label={i18nT('nav.quickActionsGroup.customers')} required error={importMissing && !importForm.customerId ?i18nT('tenders.customer_secimi_zorunludur') : null}>
-                        <Select
-                            value={importForm.customerId}
-                            onChange={(e) => setImportForm({ ...importForm, customerId: e.target.value })}
-                        >
-                            <option value="">{i18nT('tenders.customer_select')}</option>
-                            {customers.map((c) => (
-                                <option key={c.id} value={c.id}>{c.companyName}</option>
-                            ))}
-                        </Select>
-                    </Field>
-                    <Field label={i18nT('tenders.format')} required>
-                        <Select
-                            value={importForm.format}
-                            onChange={(e) => setImportForm({ ...importForm, format: e.target.value as TenderFormat })}
-                        >
-                            <option value="SIA451">{i18nT('tenders.sia_451')}</option>
-                            <option value="CRBX">CRBX</option>
-                        </Select>
-                    </Field>
-                    <Field label={i18nT('tenders.xml_file')} hint={i18nT('tenders.xml_crbx_veya_sia451_uzantili_file_secebilirsin')} className="col-span-2">
+                    <Field label={i18nT('tenders.csv_file')} required hint={i18nT('tenders.csv_uzantili_sales_order_dosyasini_select')} error={importMissing ?i18nT('tenders.csv_file_zorunludur') : null}>
                         <input
                             type="file"
-                            accept=".xml,.crbx,.sia,.sia451,text/xml"
-                            onChange={handleFileUpload}
+                            accept=".csv,text/csv"
+                            onChange={handleImportUpload}
                             className="w-full text-[12px] file:mr-3 file:rounded file:border-0 file:bg-[#272f67]/10 file:px-3 file:py-1.5 file:font-medium file:text-[#272f67] hover:file:bg-[#272f67]/15"
                         />
                     </Field>
-                    <Field label={i18nT('tenders.xml_icerik')} required className="col-span-2" error={importMissing && !importForm.xmlContent.trim() ?i18nT('tenders.xml_icerik_zorunludur') : null}>
-                        <textarea
-                            value={importForm.xmlContent}
-                            onChange={(e) => setImportForm({ ...importForm, xmlContent: e.target.value })}
-                            placeholder={i18nT('tenders.tender')}
-                            rows={10}
-                            className="w-full rounded-md border border-slate-300 bg-slate-50/40 px-3 py-2 font-mono text-[12px] focus:border-[#272f67] focus:outline-none focus:ring-2 focus:ring-[#272f67]/10"
-                        />
-                    </Field>
+                    {importForm.fileName && (
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700">
+                            {importForm.fileName}
+                        </div>
+                    )}
                 </div>
             </Modal>
         </div>
     );
 };
-
-const pageWindow = (page: number, totalPages: number) => {
-    const start = Math.max(1, Math.min(page - 2, totalPages - 4));
-    return Array.from({ length: Math.min(5, totalPages) }, (_, i) => start + i);
-};
-
-const PaginationBar: React.FC<{
-    page: number;
-    totalPages: number;
-    total: number;
-    onPage: (page: number) => void;
-}> = ({ page, totalPages, total, onPage }) => (
-    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-[12px]">
-        <span className="text-slate-500">{i18nT('common.total')}{total}{i18nT('tenders.record')}</span>
-        <div className="inline-flex items-center gap-1">
-            <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => onPage(page - 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-            >
-                <ChevronLeft size={14} />
-            </button>
-            {pageWindow(page, totalPages).map((p) => (
-                <button
-                    key={p}
-                    type="button"
-                    onClick={() => onPage(p)}
-                    className={`h-8 min-w-8 rounded-md border px-2 font-medium ${p === page ?"border-[#272f67] bg-[#272f67] text-white" :"border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
-                >
-                    {p}
-                </button>
-            ))}
-            <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => onPage(page + 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-            >
-                <ChevronRight size={14} />
-            </button>
-        </div>
-    </div>
-);
-
-interface StatCardProps {
-    label: string;
-    value: number | string;
-    accent: string;
-    small?: boolean;
-}
-const StatCard: React.FC<StatCardProps> = ({ label, value, accent, small }) => (
-    <div className="bg-white border border-slate-200/70 rounded-md px-4 py-3">
-        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-            {label}
-        </div>
-        <div className={`mt-1 ${small ? 'text-[14px]' : 'text-[20px]'} font-semibold leading-tight ${accent}`}>
-            {value}
-        </div>
-    </div>
-);

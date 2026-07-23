@@ -37,12 +37,10 @@ interface GlobalAlertStackProps {
     onArchived: () => void;
 }
 
-/* A dismissed alert stays hidden for 10 days — urgent items resurface
-   occasionally instead of nagging on every app open. */
+
 const SNOOZE_KEY = 'globalAlerts.snooze.v1';
 const SNOOZE_MS = 10 * 24 * 60 * 60 * 1000;
-// Captured once when the app loads — snooze checks compare against app-open
-// time (render code must stay pure, so no Date.now() during render).
+
 const APP_OPENED_AT = Date.now();
 
 const readSnoozes = (): Record<string, number> => {
@@ -90,8 +88,8 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
     const [meetings, setMeetings] = useState<MeetingActivityDto[]>([]);
     const [snoozes, setSnoozes] = useState<Record<string, number>>(readSnoozes);
 
-    // One fetch per app open, slightly delayed so it never competes with the
-    // page the user actually navigated to.
+    // MainLayout loads this entire module after the detail page's LCP window.
+    // Yield once more before starting the aggregate requests.
     useEffect(() => {
         let cancelled = false;
         const timer = window.setTimeout(() => {
@@ -103,7 +101,7 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
                 .list(dayjs().subtract(1, 'hour').toISOString(), dayjs().add(24, 'hour').toISOString())
                 .then((rows) => !cancelled && setMeetings(Array.isArray(rows) ? rows : []))
                 .catch(() => undefined);
-        }, 2500);
+        }, 250);
         return () => {
             cancelled = true;
             window.clearTimeout(timer);

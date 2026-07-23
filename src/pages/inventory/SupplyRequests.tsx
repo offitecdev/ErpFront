@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
-    AlertTriangle,
     ArrowUp,
     CheckCircle,
-    Clock,
     Mail01 as Mail,
     Package,
     SearchLg as Search,
@@ -15,7 +13,7 @@ import {
     X,
 } from '@/components/icons/antIconCompat';
 
-import { PageHeader } from '../../components/layout/PageHeader';
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
@@ -158,10 +156,7 @@ export const SupplyRequests = () => {
 
     return (
         <div>
-            <PageHeader
-                title={t('supply.title')}
-                description={t('supply.description')}
-            />
+            <InventoryListHeader title={t('supply.title')} />
 
             <SubTabs tabs={tabs} activeTab={tab} onSelectTab={setTab} />
 
@@ -209,7 +204,7 @@ export const SupplyRequests = () => {
                             <div className="px-4 py-10 text-center text-[12.5px] text-slate-400">{t('supply.searchHint')}</div>
                         )}
                         {results.map((it) => (
-                            <div key={`${it.kind}-${it.id}`} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50/60">
+                            <div key={`${it.kind}-${it.id}`} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-100">
                                 <div className="flex min-w-0 items-center gap-2.5">
                                     <span className="flex size-8 items-center justify-center rounded-md bg-slate-100 text-slate-400">
                                         <Package size={14} />
@@ -276,12 +271,7 @@ const LowStockTab = ({
 }) => {
     const isCritical = level === 'critical';
     return (
-        <Card
-            title={isCritical ? t('supply.criticalTitle') : t('supply.minTitle')}
-            description={isCritical ? t('supply.criticalDesc') : t('supply.minDesc')}
-            icon={<AlertTriangle size={13} />}
-            noPadding
-        >
+        <Card noPadding>
             {loading ? (
                 <div className="space-y-2 p-3">
                     {[1, 2, 3, 4].map((i) => <div key={i} className="h-11 animate-pulse rounded bg-slate-100" />)}
@@ -307,7 +297,7 @@ const LowStockTab = ({
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {items.map((it) => (
-                                <tr key={`${it.kind}-${it.id}`} className="hover:bg-slate-50/60">
+                                <tr key={`${it.kind}-${it.id}`} className="hover:bg-slate-100">
                                     <td className="px-3 py-2">
                                         <div className="flex items-center gap-2.5">
                                             <span className="flex size-7 items-center justify-center rounded bg-slate-100 text-slate-400">
@@ -360,12 +350,7 @@ const PendingRequestsTab = ({
     onComplete: (r: SupplyRequestRow) => void;
     onDelete: (r: SupplyRequestRow) => void;
 }) => (
-    <Card
-        title={t('supply.pendingTitle')}
-        description={t('supply.pendingDesc')}
-        icon={<Clock size={13} />}
-        noPadding
-    >
+    <Card noPadding>
         {loading ? (
             <div className="space-y-2 p-3">
                 {[1, 2, 3].map((i) => <div key={i} className="h-12 animate-pulse rounded bg-slate-100" />)}
@@ -391,7 +376,7 @@ const PendingRequestsTab = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.map((r) => (
-                            <tr key={r.id} className="hover:bg-slate-50/60">
+                            <tr key={r.id} className="hover:bg-slate-100">
                                 <td className="px-3 py-2">
                                     <div className="font-medium text-slate-800">{r.itemName}</div>
                                     <div className="font-mono text-[11px] text-slate-500">
@@ -428,7 +413,7 @@ const PendingRequestsTab = ({
                                                 type="button"
                                                 title={t('supply.goToMovementsTip')}
                                                 onClick={() => onGoToMovements(r)}
-                                                className="flex size-7 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-blue-100"
+                                                className="flex size-7 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-slate-100"
                                             >
                                                 <ArrowUp size={14} />
                                             </button>
@@ -439,7 +424,7 @@ const PendingRequestsTab = ({
                                                 type="button"
                                                 title={t('common.delete')}
                                                 onClick={() => onDelete(r)}
-                                                className="flex size-7 items-center justify-center rounded-md border border-slate-200 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                                                className="flex size-7 items-center justify-center rounded-md border border-slate-200 text-slate-400 transition-colors hover:bg-slate-100 hover:text-rose-600"
                                             >
                                                 <Trash2 size={12} />
                                             </button>

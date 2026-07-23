@@ -214,7 +214,7 @@ export const PipelineCharts: React.FC<PipelineChartsProps> = ({ tenders, orders,
             icon={<PieChart03 size={16} />}
             bodyClassName="pt-3"
         >
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 2xl:gap-8">
                 <Donut
                     title={t('crmOverview.charts.stagesTitle', { defaultValue: 'Teklif aşamaları' })}
                     subtitle={t('crmOverview.charts.stagesSubtitle', { defaultValue: 'Tüm teklifler' })}

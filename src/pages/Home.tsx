@@ -123,9 +123,9 @@ export const Home = () => {
                                 key={tile.key}
                                 type="button"
                                 onClick={() => navigate(tile.key)}
-                                className="group flex items-center gap-3.5 rounded-xl border border-[#EAEAEC] bg-white p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:border-[#D5D7DB] hover:shadow-[0_6px_20px_rgba(16,24,40,0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16A34A]/25 dark:focus-visible:ring-[#e6cf9e]/30"
+                                className="group flex items-center gap-3.5 rounded-xl border border-[#EAEAEC] bg-white p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 hover:-translate-y-0.5 hover:border-[#D5D7DB] hover:shadow-[0_6px_20px_rgba(16,24,40,0.08)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#272f67]/25 dark:focus-visible:ring-[#e6cf9e]/30"
                             >
-                                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#F3F4F6] text-[#3F4350] transition-colors duration-150 group-hover:bg-[#E7F6EC] group-hover:text-[#16A34A] dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e] dark:group-hover:bg-[#e6cf9e]/16 dark:group-hover:text-[#f0dcae]">
+                                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#F3F4F6] text-[#3F4350] transition-colors duration-150 group-hover:bg-[#272f67]/10 group-hover:text-[#272f67] dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e] dark:group-hover:bg-[#e6cf9e]/16 dark:group-hover:text-[#f0dcae]">
                                     <Icon size={22} />
                                 </span>
                                 <span className="min-w-0 flex-1">
@@ -136,7 +136,7 @@ export const Home = () => {
                                         {t(tile.descKey, { defaultValue: tile.defaultDesc })}
                                     </span>
                                 </span>
-                                <ArrowRight size={17} className="shrink-0 text-[#C4C7CE] transition-colors duration-150 group-hover:text-[#16A34A] dark:text-white/25 dark:group-hover:text-[#e6cf9e]" />
+                                <ArrowRight size={17} className="shrink-0 text-[#C4C7CE] transition-colors duration-150 group-hover:text-[#272f67] dark:text-white/25 dark:group-hover:text-[#e6cf9e]" />
                             </button>
                         );
                     })}

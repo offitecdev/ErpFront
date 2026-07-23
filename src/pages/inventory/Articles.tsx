@@ -3,14 +3,18 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     AlertTriangle,
+    ArrowDown,
     ArrowLeft,
+    ArrowUp,
     Camera01 as Camera,
+    CheckCircle,
     ChevronLeft,
     ChevronRight,
     ChevronSelectorVertical,
     Image01 as ImageIcon,
     List,
     Package,
+    PackageX,
     Plus,
     Save01 as Save,
     Scan as ScanBarcode,
@@ -18,14 +22,16 @@ import {
     Trash01 as Trash2,
     UploadCloud02 as Upload,
     X,
+    XCircle,
 } from '@/components/icons/antIconCompat';
+import Tooltip from 'antd/es/tooltip';
 
 import { StockModuleHeader } from '../../components/layout/PageHeader';
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { Skeleton } from '../../components/ui-shared/Skeleton';
 import { BarcodeScannerModal } from '../../components/ui-shared/BarcodeScannerModal';
 
@@ -41,7 +47,7 @@ const BRAND = '#272f67';
 // kolonlar yalnızca ince dikey çizgilerle ayrılır (birleşik filtre bandı).
 // Odaklanınca yumuşak kenarlı (rounded) soluk bir zemin belirir.
 const ARTICLE_FILTER_CONTROL =
-    'h-7 w-full rounded-lg border-0 bg-transparent px-2 text-[11.5px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 focus:outline-none focus:bg-slate-50/80 dark:focus:bg-white/5 transition-colors';
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
 
 import { t } from '@/i18n/translate';
 import { useTranslation } from 'react-i18next';
@@ -56,20 +62,6 @@ const useLanguageRefresh = () => {
     }, [i18n]);
 };
 
-const getStatusLabel = (): Record<ArticleStatus, string> => ({
-    ACTIVE:t('common.active'),
-    INACTIVE:t('common.inactive'),
-    IN_SUPPLY:t('inventory.articles.statusSupply'),
-    IN_PRODUCTION:t('inventory.articles.statusProduction'),
-});
-
-const STATUS_VARIANT: Record<ArticleStatus, 'active' | 'passive' | 'info' | 'warning'> = {
-    ACTIVE: 'active',
-    INACTIVE: 'passive',
-    IN_SUPPLY: 'warning',
-    IN_PRODUCTION: 'info',
-};
-
 const fmtMoney = (v: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(v);
 
@@ -80,6 +72,68 @@ const articleUnitCost = (article: { baseCost?: number | null; weightedAverageCos
     const weightedAverageCost = Number(article.weightedAverageCost ?? 0);
     return weightedAverageCost > 0 ? weightedAverageCost : Number(article.baseCost || 0);
 };
+
+type ArticleSortKey =
+    | 'createdAt'
+    | 'articleCode'
+    | 'name'
+    | 'barcode'
+    | 'salePrice'
+    | 'totalQuantity'
+    | 'minStockLevel'
+    | 'status';
+
+type SortDirection = 'asc' | 'desc';
+
+const SortableHeader = ({
+    label,
+    column,
+    sortBy,
+    sortDirection,
+    onSort,
+    align = 'left',
+}: {
+    label: ReactNode;
+    column: ArticleSortKey;
+    sortBy: ArticleSortKey;
+    sortDirection: SortDirection;
+    onSort: (column: ArticleSortKey, direction: SortDirection) => void;
+    align?: 'left' | 'right';
+}) => (
+    <th className={`px-2 py-3 font-semibold ${align === 'right' ? 'text-right' : 'text-left'}`}>
+        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+            <span className="truncate">{label}</span>
+            <span className="inline-flex shrink-0 items-center">
+                <Tooltip title={t('inventory.articles.sortAscending')}>
+                    <button
+                        type="button"
+                        aria-label={t('inventory.articles.sortAscending')}
+                        aria-pressed={sortBy === column && sortDirection === 'asc'}
+                        onClick={() => onSort(column, 'asc')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowUp size={10} />
+                    </button>
+                </Tooltip>
+                <Tooltip title={t('inventory.articles.sortDescending')}>
+                    <button
+                        type="button"
+                        aria-label={t('inventory.articles.sortDescending')}
+                        aria-pressed={sortBy === column && sortDirection === 'desc'}
+                        onClick={() => onSort(column, 'desc')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowDown size={10} />
+                    </button>
+                </Tooltip>
+            </span>
+        </div>
+    </th>
+);
 
 // Ürün / malzeme tip etiketleri — envanter kalemleri bu ikiye ayrılır, süreçler ortaktır.
 const ITEM_TYPE_LABEL = (): Record<ItemType, string> => ({
@@ -116,9 +170,10 @@ export const Articles = () => {
     useLanguageRefresh();
     const navigate = useNavigate();
     const { permissions } = useAuthStore();
-    const canManage = permissions.length === 0
-        || permissions.includes('inventory.articles.create')
-        || permissions.includes('inventory.articles.update');
+    const hasImplicitPermissions = permissions.length === 0;
+    const canCreate = hasImplicitPermissions || permissions.includes('inventory.articles.create');
+    const canUpdate = hasImplicitPermissions || permissions.includes('inventory.articles.update');
+    const canDelete = hasImplicitPermissions || permissions.includes('inventory.articles.delete');
 
     const {
         articlesPageItems,
@@ -130,13 +185,18 @@ export const Articles = () => {
 
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('');
     // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı) — sunucuda daraltır.
     const [codeFilter, setCodeFilter] = useState('');
     const [nameFilter, setNameFilter] = useState('');
     const [barcodeFilter, setBarcodeFilter] = useState('');
-    const [debouncedColumns, setDebouncedColumns] = useState({ code: '', name: '', barcode: '' });
-    const [scannerOpen, setScannerOpen] = useState(false);
+    const [debouncedColumns, setDebouncedColumns] = useState({
+        code: '',
+        name: '',
+        barcode: '',
+    });
+    const [sortBy, setSortBy] = useState<ArticleSortKey>('createdAt');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+    const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 15;
 
@@ -157,13 +217,13 @@ export const Articles = () => {
                     name: nameFilter.trim(),
                     barcode: barcodeFilter.trim(),
                 };
-                return prev.code === next.code && prev.name === next.name && prev.barcode === next.barcode
+                return JSON.stringify(prev) === JSON.stringify(next)
                     ? prev
                     : next;
             });
         }, 300);
         return () => clearTimeout(id);
-    }, [codeFilter, nameFilter, barcodeFilter]);
+    }, [barcodeFilter, codeFilter, nameFilter]);
 
     // Ürünler sayfa sayfa (15) sunucudan çekilir — tüm katalog tek seferde yüklenmez.
     // Filtre değişimi + sayfa sıfırlama TEK efekte toplanır: filtre değiştiğinde
@@ -171,7 +231,12 @@ export const Articles = () => {
     // reset efekti, eski sayfa + yeni filtreyle gereksiz bir ara istek çıkarıyordu.
     const filterKeyRef = useRef<string | null>(null);
     useEffect(() => {
-        const filterKey = JSON.stringify([debouncedSearch, statusFilter, debouncedColumns]);
+        const filterKey = JSON.stringify([
+            debouncedSearch,
+            debouncedColumns,
+            sortBy,
+            sortDirection,
+        ]);
         const filtersChanged = filterKeyRef.current !== null && filterKeyRef.current !== filterKey;
         filterKeyRef.current = filterKey;
         if (filtersChanged && page !== 1) {
@@ -182,31 +247,56 @@ export const Articles = () => {
             page,
             pageSize: PAGE_SIZE,
             search: debouncedSearch || undefined,
-            status: statusFilter || undefined,
             itemType: 'PRODUCT',
             code: debouncedColumns.code || undefined,
             name: debouncedColumns.name || undefined,
             barcode: debouncedColumns.barcode || undefined,
+            sortBy,
+            sortDirection,
         });
-    }, [page, debouncedSearch, statusFilter, debouncedColumns, fetchArticlesPage]);
-
-    const handleScanResult = (code: string) => {
-        setScannerOpen(false);
-        setSearch(code);
-        toast.success(t('inventory.articles.serialScanned', { code }));
-    };
+    }, [
+        page,
+        debouncedSearch,
+        debouncedColumns,
+        sortBy,
+        sortDirection,
+        fetchArticlesPage,
+    ]);
 
     const reloadCurrentPage = () => {
         void fetchArticlesPage({
             page,
             pageSize: PAGE_SIZE,
             search: debouncedSearch || undefined,
-            status: statusFilter || undefined,
             itemType: 'PRODUCT',
             code: debouncedColumns.code || undefined,
             name: debouncedColumns.name || undefined,
             barcode: debouncedColumns.barcode || undefined,
+            sortBy,
+            sortDirection,
         });
+    };
+
+    const handleSort = (column: ArticleSortKey, direction: SortDirection) => {
+        setSortBy(column);
+        setSortDirection(direction);
+    };
+
+    const updateStatus = async (id: string, status: ArticleStatus) => {
+        setStatusUpdatingId(id);
+        try {
+            await articleApi.update(id, {
+                status,
+                ...(status === 'ACTIVE' ? { isActive: true } : {}),
+                ...(status === 'INACTIVE' ? { isActive: false } : {}),
+            });
+            reloadCurrentPage();
+            toast.success(t('inventory.articles.statusUpdated'));
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || t('inventory.articles.statusUpdateFailed'));
+        } finally {
+            setStatusUpdatingId(null);
+        }
     };
 
     const paged = articlesPageItems;
@@ -217,29 +307,34 @@ export const Articles = () => {
 
     return (
         <div>
+            <InventoryListHeader
+                title={t('inventory.articles.title')}
+                action={canCreate && (
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        icon={<Plus size={16} />}
+                        onClick={() => navigate('/inventory/articles/new')}
+                        className="!h-10 !px-4 !text-[13px] !font-semibold"
+                    >
+                        {t('auto.yeni_urun')}
+                    </Button>
+                )}
+            />
             <Card
                 className="border-0 rounded-none"
                 noPadding
             >
-                {/* Üst çubuk: filtreler solda (arama + tarama + tüm durumlar), sayfalama sağda — tek satır.
-                    Chrome-less: kart/şerit yok, yalnızca kontroller kendi arka planını taşır. */}
-                <div className="shrink-0 overflow-x-auto pb-2">
-                    <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
-                        <div className="flex shrink-0 items-center gap-2 pr-1">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
-                                <Package size={13} />
-                            </span>
-                            <h3 className="whitespace-nowrap text-[14px] font-semibold text-slate-900">{t('auto.urun_listesi')}</h3>
-                        </div>
-                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
-                        {/* Tek satır arama: kod / barkod / seri kodu / genel kod — hepsi aynı alandan. */}
-                        <div className="relative shrink-0">
-                            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                {/* Üst çubuk — üç sayfada birebir aynı: arama (esner) + sıralama (sabit) + sayfalama (sağda). */}
+                <div className="px-3 py-3">
+                    <div className="flex w-full flex-nowrap items-center gap-3">
+                        <div className="relative w-[240px] min-w-0 shrink">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={t('auto.ara_kod_ad_barkod')}
-                                className="h-8 w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-7 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
                             />
                             {search && (
                                 <button
@@ -253,94 +348,74 @@ export const Articles = () => {
                                 </button>
                             )}
                         </div>
-                        <button
-                            onClick={() => setScannerOpen(true)}
-                            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-300 bg-white px-2.5 text-[11px] font-medium text-blue-700 transition-colors"
-                            title={t('auto.seri_kodu_ile_urun_bul')}
-                        >
-                            <Camera size={12} />
-                            <span>{t('auto.seri_kod_tara')}</span>
-                        </button>
-                        <div className="relative w-[148px] shrink-0">
+                        <div className="w-[200px] shrink-0">
                             <Select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                value={`${sortBy}:${sortDirection}`}
+                                onChange={(event) => {
+                                    const [column, direction] = event.target.value.split(':') as [ArticleSortKey, SortDirection];
+                                    handleSort(column, direction);
+                                }}
+                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                aria-label={t('inventory.articles.sortOrder')}
                             >
-                                <option value="">{t('auto.tum_durumlar')}</option>
-                                <option value="ACTIVE">{t('common.active')}</option>
-                                <option value="INACTIVE">{t('common.inactive')}</option>
-                                <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
-                                <option value="IN_PRODUCTION">{t('inventory.articles.statusProduction')}</option>
+                                {sortBy !== 'createdAt' && (
+                                    <option value={`${sortBy}:${sortDirection}`}>{t('inventory.articles.sortOrder')}</option>
+                                )}
+                                <option value="createdAt:desc">{t('inventory.articles.newestFirst')}</option>
+                                <option value="createdAt:asc">{t('inventory.articles.oldestFirst')}</option>
                             </Select>
                         </div>
-                    </div>
-
-                    {/* Sayfalama sağda: yatay kaydırırken sayılar hep sağda görünür kalır. */}
-                    <div className="ml-auto flex shrink-0 items-center gap-3">
-                        <span className="font-mono text-[11.5px] text-slate-500">
-                            {rangeFrom}-{rangeTo} / {articlesTotal}
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                disabled={pageSafe <= 1}
-                                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                aria-label={t('common.back')}
-                            >
-                                <ChevronLeft size={14} />
-                            </button>
-                            <span className="px-1 font-mono text-[11.5px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
-                            <button
-                                type="button"
-                                disabled={pageSafe >= totalPages}
-                                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                aria-label={t('common.next')}
-                            >
-                                <ChevronRight size={14} />
-                            </button>
+                        <div className="ml-auto flex shrink-0 items-center gap-3">
+                            <span className="font-mono text-[12px] text-slate-500">
+                                {rangeFrom}-{rangeTo} / {articlesTotal}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    disabled={pageSafe <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.back')}
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
+                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                                <button
+                                    type="button"
+                                    disabled={pageSafe >= totalPages}
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.next')}
+                                >
+                                    <ChevronRight size={14} />
+                                </button>
+                            </div>
                         </div>
-                        {canManage && (
-                            <Button
-                                variant="primary"
-                                size="lg"
-                                icon={<Plus size={16} />}
-                                onClick={() => navigate('/inventory/articles/new')}
-                                className="!h-9 !px-4 !text-[13px] !font-semibold"
-                            >
-                                {t('auto.yeni_urun')}
-                            </Button>
-                        )}
                     </div>
                 </div>
-                </div>
 
-                <div className="bg-white">
-                    <table data-column-lines className="min-w-[1240px] w-full table-fixed text-[12.5px]">
+                <div className="w-full overflow-hidden bg-white">
+                    <table className="w-full table-fixed text-[13px] [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
                         <colgroup>
-                            <col style={{ width: 132 }} />
-                            <col style={{ width: 300 }} />
-                            <col style={{ width: 190 }} />
-                            <col style={{ width: 156 }} />
-                            <col style={{ width: 112 }} />
-                            <col style={{ width: 122 }} />
-                            <col style={{ width: 70 }} />
-                            <col style={{ width: 116 }} />
-                            <col style={{ width: 90 }} />
+                            <col style={{ width: '10%' }} />
+                            <col style={{ width: '24%' }} />
+                            <col style={{ width: '15%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '10%' }} />
+                            <col style={{ width: '12%' }} />
+                            <col style={{ width: '7%' }} />
+                            <col style={{ width: '9%' }} />
                         </colgroup>
-                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[10.5px] text-[#86868B] bg-slate-50 border-b border-slate-200 uppercase tracking-[0.08em] shadow-[0_1px_0_0_rgb(226_232_240)]">
+                        <thead className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 text-[12px] uppercase tracking-[0.08em] text-[#86868B]">
                             <tr>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.stok_kodu')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.urun_adi')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.barkod_seri_no')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.satis_fiyati')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.mevcut')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.min_kritik')}</th>
-                                <th className="px-3 py-2 text-center font-semibold">{'Stock'}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
+                                <SortableHeader label={t('auto.stok_kodu')} column="articleCode" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                                <SortableHeader label={t('auto.urun_adi')} column="name" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                                <SortableHeader label={t('auto.barkod_seri_no')} column="barcode" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                                <SortableHeader label={t('auto.satis_fiyati')} column="salePrice" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                                <SortableHeader label={t('auto.mevcut')} column="totalQuantity" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                                <SortableHeader label={t('auto.min_kritik')} column="minStockLevel" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} align="right" />
+                                <th className="px-2 py-3 text-center font-semibold">{'Stock'}</th>
+                                <th className="px-2 py-3 text-right font-semibold">{t('common.actions')}</th>
                             </tr>
                             {/* Kolon bazlı filtre satırı — kod/ad/barkod sunucuda daraltır,
                                 durum seçicisi üstteki durum filtresiyle aynı state'i paylaşır. */}
@@ -369,44 +444,31 @@ export const Articles = () => {
                                         className={ARTICLE_FILTER_CONTROL}
                                     />
                                 </th>
-                                <th className="px-2 py-1.5" />
-                                <th className="px-2 py-1.5" />
-                                <th className="px-2 py-1.5" />
-                                <th className="px-2 py-1.5" />
-                                <th className="px-2 py-1.5 font-normal">
-                                    <select
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                        className={ARTICLE_FILTER_CONTROL}
-                                    >
-                                        <option value="">{t('common.all')}</option>
-                                        <option value="ACTIVE">{t('common.active')}</option>
-                                        <option value="INACTIVE">{t('common.inactive')}</option>
-                                        <option value="IN_SUPPLY">{t('inventory.articles.statusSupply')}</option>
-                                        <option value="IN_PRODUCTION">{t('inventory.articles.statusProduction')}</option>
-                                    </select>
-                                </th>
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
                                 <th className="px-2 py-1.5" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {articlesPageLoading && Array.from({ length: 6 }).map((_, i) => (
                                 <tr key={`article-skeleton-${i}`}>
-                                    {Array.from({ length: 9 }).map((__, j) => (
+                                    {Array.from({ length: 8 }).map((__, j) => (
                                         <td key={j} className="px-3 py-2">
-                                            <Skeleton className={`${j === 7 ?"h-5 w-16 rounded-full" :"h-4 w-full max-w-[120px]"} ${j >= 3 && j <= 5 ? 'ml-auto' : ''} bg-slate-100`} />
+                                            <Skeleton className={`h-4 w-full max-w-[120px] ${j >= 3 && j <= 5 ? 'ml-auto' : ''} bg-slate-100`} />
                                         </td>
                                     ))}
                                 </tr>
                             ))}
                             {!articlesPageLoading && articlesTotal === 0 && (
                                 <tr>
-                                    <td colSpan={9}>
+                                    <td colSpan={8}>
                                         <EmptyState
                                             icon={<Package size={32} />}
                                             title={t('auto.urun_yok')}
                                             description={t('auto.ilk_urununuzu_ekleyerek_baslayin')}
-                                            action={canManage && (
+                                            action={canCreate && (
                                                 <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/inventory/articles/new')}>{t('auto.yeni_urun')}</Button>
                                             )}
                                         />
@@ -417,7 +479,7 @@ export const Articles = () => {
                                 const isCritical = a.criticalStockLevel > 0 && a.totalQuantity <= a.criticalStockLevel;
                                 const isBelowMin = a.minStockLevel > 0 && a.totalQuantity <= a.minStockLevel;
                                 return (
-                                    <tr key={a.id} className="group hover:bg-slate-50/60 cursor-pointer transition-colors" onClick={() => navigate(`/inventory/articles/${a.id}`)}>
+                                    <tr key={a.id} className="group cursor-pointer transition-colors hover:bg-slate-100" onClick={() => navigate(`/inventory/articles/${a.id}`)}>
                                         <td className="truncate px-3 py-2 font-mono text-[11.5px] text-slate-700">{a.articleCode}</td>
                                         <td className="px-3 py-2">
                                             <div className="flex min-w-0 items-center gap-1.5">
@@ -436,7 +498,7 @@ export const Articles = () => {
                                             <div className="mt-0.5 truncate text-[10.5px] text-slate-400">{t('auto.ort_maliyet')}{fmtMoney(articleUnitCost(a))}</div>
                                         </td>
                                         <td className="px-3 py-2 text-right font-mono whitespace-nowrap">
-                                            <span className={isBelowMin ?"text-rose-700 font-semibold" : isCritical ?"text-amber-700 font-semibold" : 'text-slate-800'}>
+                                            <span className={isCritical ? "text-rose-700 font-semibold" : isBelowMin ? "text-amber-700 font-semibold" : 'text-slate-800'}>
                                                 {fmtNumber(a.totalQuantity)} {a.unit}
                                             </span>
                                             {(isCritical || isBelowMin) && (
@@ -446,43 +508,67 @@ export const Articles = () => {
                                         <td className="px-3 py-2 text-right font-mono text-[11.5px] text-slate-500 whitespace-nowrap">
                                             {fmtNumber(a.minStockLevel)} / {fmtNumber(a.criticalStockLevel)}
                                         </td>
-                                        <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/inventory/movements?item=${a.id}`)}
-                                                className="inline-flex items-center justify-center rounded p-1 transition-colors hover:bg-slate-100"
-                                                style={{ color: BRAND }}
-                                                title="Open in Stock Movements"
-                                            >
-                                                <ChevronSelectorVertical size={16} />
-                                            </button>
+                                        <td className="px-2 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <Tooltip title={t('inventory.articles.openStockMovements')}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate(`/inventory/movements?item=${a.id}`)}
+                                                    className="inline-flex items-center justify-center rounded p-1 transition-colors hover:bg-slate-100"
+                                                    style={{ color: BRAND }}
+                                                    aria-label={t('inventory.articles.openStockMovements')}
+                                                >
+                                                    <ChevronSelectorVertical size={16} />
+                                                </button>
+                                            </Tooltip>
                                         </td>
-                                        <td className="px-3 py-2 whitespace-nowrap">
-                                            <StatusChip variant={STATUS_VARIANT[a.status]}>
-                                                {getStatusLabel()[a.status]}
-                                            </StatusChip>
-                                        </td>
-                                        <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                            <div className="inline-flex items-center gap-1">
-                                                {canManage && (
-                                                    <>
+                                        <td className="px-1.5 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                            <div className="inline-flex items-center gap-0.5">
+                                                {canUpdate && (
+                                                    <Tooltip title={a.status === 'INACTIVE' ? t('inventory.articles.setActive') : t('inventory.articles.setInactive')}>
                                                         <button
+                                                            type="button"
+                                                            disabled={statusUpdatingId === a.id}
+                                                            onClick={() => void updateStatus(a.id, a.status === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE')}
+                                                            className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#272f67] disabled:opacity-40"
+                                                            aria-label={a.status === 'INACTIVE' ? t('inventory.articles.setActive') : t('inventory.articles.setInactive')}
+                                                        >
+                                                            {a.status === 'INACTIVE' ? <CheckCircle size={13} /> : <XCircle size={13} />}
+                                                        </button>
+                                                    </Tooltip>
+                                                )}
+                                                {canUpdate && a.status === 'IN_PRODUCTION' && (
+                                                    <Tooltip title={t('inventory.articles.removeFromProduction')}>
+                                                        <button
+                                                            type="button"
+                                                            disabled={statusUpdatingId === a.id}
+                                                            onClick={() => void updateStatus(a.id, 'ACTIVE')}
+                                                            className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#272f67] disabled:opacity-40"
+                                                            aria-label={t('inventory.articles.removeFromProduction')}
+                                                        >
+                                                            <PackageX size={13} />
+                                                        </button>
+                                                    </Tooltip>
+                                                )}
+                                                {canDelete && (
+                                                    <Tooltip title={t('inventory.articles.moveToTrash')}>
+                                                        <button
+                                                            type="button"
                                                             onClick={async () => {
-                                                                if (!confirm(t('auto.delete_article_confirm', { name: a.name }))) return;
+                                                                if (!confirm(t('inventory.articles.moveToTrashConfirm', { name: a.name }))) return;
                                                                 try {
+                                                                    // Store drops the row from the current page in place — no reload.
                                                                     await deleteArticle(a.id);
-                                                                    reloadCurrentPage();
-                                                                    toast.success(t('auto.urun_silindi'));
-                                                                } catch (e: any) {
-                                                                    toast.error(e.response?.data?.error ||t('auto.silinemedi'));
+                                                                    toast.success(t('inventory.articles.movedToTrash'));
+                                                                } catch (error: any) {
+                                                                    toast.error(error.response?.data?.error || t('auto.silinemedi'));
                                                                 }
                                                             }}
-                                                            className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
-                                                            title={t('common.delete')}
+                                                            className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-rose-600"
+                                                            aria-label={t('inventory.articles.moveToTrash')}
                                                         >
-                                                            <Trash2 size={12} />
+                                                            <Trash2 size={13} />
                                                         </button>
-                                                    </>
+                                                    </Tooltip>
                                                 )}
                                                 <ChevronRight size={13} className="text-slate-400" />
                                             </div>
@@ -494,15 +580,6 @@ export const Articles = () => {
                     </table>
                 </div>
             </Card>
-
-            {/* Barcode Scanner Modal */}
-            {scannerOpen && (
-                <BarcodeScannerModal
-                    mode="serial"
-                    onClose={() => setScannerOpen(false)}
-                    onScan={handleScanResult}
-                />
-            )}
         </div>
     );
 };
@@ -754,7 +831,7 @@ const ArticleFormCard: React.FC<{
                                             <button
                                                 type="button"
                                                 onClick={() => { setScannerMode('serial'); setScannerOpen(true); }}
-                                                className="flex h-8 w-8 items-center justify-center shrink-0 rounded border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                                                className="flex h-8 w-8 items-center justify-center shrink-0 rounded border border-blue-300 bg-blue-50 text-blue-700 hover:bg-slate-100 transition-colors"
                                                 title={t('auto.kamera_ile_seri_kod_tara')}
                                             >
                                                 <Camera size={14} />
@@ -779,7 +856,7 @@ const ArticleFormCard: React.FC<{
                                     <button
                                         type="button"
                                         onClick={() => setForm({ ...form, imageUrl: null })}
-                                        className="absolute top-1.5 right-1.5 p-1 bg-white/90 rounded shadow-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                                        className="absolute top-1.5 right-1.5 p-1 bg-white/90 rounded shadow-sm text-rose-600 hover:bg-slate-100 transition-colors"
                                     >
                                         <X size={12} />
                                     </button>

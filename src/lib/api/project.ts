@@ -3,6 +3,19 @@ import type { AppointmentDto, MailSettingDto, ProjectAddonRequestDto, ProjectDto
 import type { PersonLite } from '../../types/maintenance';
 
 export type SalesOrderMode = 'PROJECT_NEW' | 'PROJECT_EXISTING' | 'PROJECT_ADDON' | 'INVOICE';
+export type ProjectDetailScope =
+    | 'overview'
+    | 'details'
+    | 'planning'
+    | 'fieldReports'
+    | 'generalReport'
+    | 'delivery'
+    | 'signatures'
+    | 'expenses'
+    | 'materials'
+    | 'overtime'
+    | 'billing'
+    | 'addons';
 
 export interface SalesOrderDto {
     id: string;
@@ -75,8 +88,10 @@ export const projectApi = {
         return res.data;
     },
 
-    getById: async (id: string): Promise<ProjectDto> => {
-        const res = await apiClient.get(`/projects/${id}`);
+    getById: async (id: string, view?: ProjectDetailScope): Promise<ProjectDto> => {
+        const res = await apiClient.get(`/projects/${id}`, {
+            params: view ? { view } : undefined,
+        });
         return res.data;
     },
 
@@ -273,12 +288,16 @@ export const projectApi = {
         await apiClient.delete(`/projects/expenses/${expenseId}`);
     },
 
-    materials: async (): Promise<ProjectMaterial[]> => {
+    materials: async (options: { compact?: boolean } = {}): Promise<ProjectMaterial[]> => {
         try {
-            const res = await apiClient.get('/projects/materials');
+            const res = await apiClient.get('/projects/materials', {
+                params: options.compact ? { view: 'picker' } : undefined,
+            });
             return res.data;
         } catch {
-            const res = await apiClient.get('/inventory/materials');
+            const res = await apiClient.get('/inventory/materials', {
+                params: options.compact ? { view: 'picker' } : undefined,
+            });
             return res.data;
         }
     },

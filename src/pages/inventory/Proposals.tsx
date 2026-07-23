@@ -55,7 +55,7 @@ export const Proposals = () => {
                 ) : (
                     <div className="divide-y divide-slate-100">
                         {proposals.map((p) => (
-                            <div key={p.id} className="px-4 py-3 hover:bg-slate-50/60">
+                            <div key={p.id} className="px-4 py-3 hover:bg-slate-100">
                                 <div className="flex items-start gap-3">
                                     {p.article?.imageUrl ? (
                                         <img src={p.article.imageUrl} alt="" className="w-12 h-12 rounded object-cover border border-slate-200" />

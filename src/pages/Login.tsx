@@ -7,8 +7,10 @@ import AntInput, { type InputRef } from 'antd/es/input';
 import { Button } from '@/components/ui-shared/Button';
 import { LanguageSwitcher } from '@/components/ui-shared/LanguageSwitcher';
 import { Snowflake } from '@/components/ui-shared/Snowflake';
-import offitecLogo from '../assets/images/offitec.png';
-import offitecLogoDark from '../assets/images/darkmode.png';
+import offitecLogo from '../assets/images/offitec-1x.webp';
+import offitecLogo2x from '../assets/images/offitec-2x.webp';
+import offitecLogoDark from '../assets/images/darkmode-1x.webp';
+import offitecLogoDark2x from '../assets/images/darkmode-2x.webp';
 import { apiClient } from '../lib/axios';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
@@ -98,13 +100,14 @@ export const Login = () => {
         try {
             setLoading(true);
             const response = await apiClient.post('/auth/login', { email, password });
-            const { token, employee } = response.data;
+            // Tokens arrive as HttpOnly cookies; the body only carries the employee.
+            const { employee } = response.data;
 
-            if (!token || !employee) {
+            if (!employee) {
                 throw new Error(response.data?.error || response.data?.message || t('auth.errorMissingData'));
             }
 
-            login(token, employee);
+            login(employee);
             await fetchProfile();
             toast.success(t('auth.successLogin'));
         } catch (error: any) {
@@ -132,7 +135,15 @@ export const Login = () => {
     return (
         <main className="ofi-login2 grid min-h-screen place-items-center px-6">
             {/* Navy logo, top-left */}
-            <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec ERP" className="absolute left-6 top-6 z-10 h-8 w-auto object-contain sm:left-8 sm:top-8" />
+            <img
+                src={isDarkMode ? offitecLogoDark : offitecLogo}
+                srcSet={`${isDarkMode ? offitecLogoDark : offitecLogo} 96w, ${isDarkMode ? offitecLogoDark2x : offitecLogo2x} 180w`}
+                sizes="96px"
+                alt="Offitec ERP"
+                width={96}
+                height={38}
+                className="absolute left-6 top-6 z-10 h-8 w-auto object-contain sm:left-8 sm:top-8"
+            />
 
             {/* Big detailed snowflake, right */}
             <Snowflake className="ofi-login2__flake" />

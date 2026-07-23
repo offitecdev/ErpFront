@@ -15,11 +15,12 @@ import {
 import { toast } from 'sonner';
 
 import { StockModuleHeader } from '../../components/layout/PageHeader';
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Input, Select } from '../../components/ui-shared/Field';
-import { StatusChip } from '../../components/ui-shared/StatusBadge';
+import { Skeleton } from '../../components/ui-shared/Skeleton';
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectMaterial } from '../../types/project';
@@ -54,6 +55,8 @@ const canManageMaterials = (permissions: string[]) =>
     || permissions.includes('inventory.articles.update');
 
 const materialInputClass = t('auto.h_8_px_2_5_py_1_text_12_5px');
+const MATERIAL_FILTER_CONTROL =
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
 
 export const ExtraMaterials = () => {
     const navigate = useNavigate();
@@ -63,7 +66,9 @@ export const ExtraMaterials = () => {
     const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('');
+    const [codeFilter, setCodeFilter] = useState('');
+    const [nameFilter, setNameFilter] = useState('');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
 
@@ -84,17 +89,27 @@ export const ExtraMaterials = () => {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return materials.filter((m) => {
-            if (statusFilter === 'ACTIVE' && !m.isActive) return false;
-            if (statusFilter === 'INACTIVE' && m.isActive) return false;
+        const codeQuery = codeFilter.trim().toLowerCase();
+        const nameQuery = nameFilter.trim().toLowerCase();
+        const matches = materials.filter((m) => {
+            if (codeQuery && !(m.serialId || '').toLowerCase().includes(codeQuery)) return false;
+            if (nameQuery && !m.name.toLowerCase().includes(nameQuery)) return false;
             if (!q) return true;
             return m.name.toLowerCase().includes(q) || (m.serialId || '').toLowerCase().includes(q);
         });
-    }, [materials, search, statusFilter]);
+        // Newest ↔ oldest by real creation date (createdAt added to the Material table).
+        const directionFactor = sortDirection === 'asc' ? 1 : -1;
+        return matches.sort((left, right) => {
+            const leftTime = left.createdAt ? new Date(left.createdAt).getTime() : 0;
+            const rightTime = right.createdAt ? new Date(right.createdAt).getTime() : 0;
+            const comparison = leftTime - rightTime;
+            return comparison === 0 ? left.id.localeCompare(right.id) : comparison * directionFactor;
+        });
+    }, [codeFilter, materials, nameFilter, search, sortDirection]);
 
     useEffect(() => {
         setPage(1);
-    }, [search, statusFilter]);
+    }, [codeFilter, nameFilter, search, sortDirection]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const pageSafe = Math.min(page, totalPages);
@@ -107,50 +122,57 @@ export const ExtraMaterials = () => {
 
     return (
         <div>
+            <InventoryListHeader
+                title={t('nav.materials')}
+                action={canManage && (
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        icon={<PackagePlus size={16} />}
+                        onClick={() => navigate('/inventory/extra-materials/new')}
+                        className="!h-10 !px-4 !text-[13px] !font-semibold"
+                    >
+                        {t('auto.yeni_malzeme')}
+                    </Button>
+                )}
+            />
             <Card className="border-0 rounded-none" noPadding>
-                <div className="shrink-0 overflow-x-auto pb-2">
-                    <div className="flex min-w-max w-full flex-nowrap items-center gap-3 px-3 py-2">
-                        <div className="flex shrink-0 items-center gap-2 pr-1">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#272f67]">
-                                <PackagePlus size={13} />
-                            </span>
-                            <h3 className="whitespace-nowrap text-[14px] font-semibold text-slate-900">{t('auto.malzeme_listesi')}</h3>
-                        </div>
-                        <div className="flex shrink-0 flex-nowrap items-center gap-2">
-                            <div className="relative shrink-0">
-                                <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder={t('auto.ara_kod_ad_barkod')}
-                                    className="h-8 w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 pl-6 pr-7 text-[12px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                                />
-                                {search && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSearch('')}
-                                        aria-label={t('common.clear')}
-                                        title={t('common.clear')}
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-                                    >
-                                        <X size={12} />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="relative w-[148px] shrink-0">
-                                <Select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                {/* Filtre + sayfalama — tek satır, tam genişlik, yatay kaydırma yok. */}
+                <div className="px-3 py-3">
+                    <div className="flex w-full flex-nowrap items-center gap-3">
+                        <div className="relative w-[240px] min-w-0 shrink">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={t('auto.ara_kod_ad_barkod')}
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                            />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch('')}
+                                    aria-label={t('common.clear')}
+                                    title={t('common.clear')}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
                                 >
-                                    <option value="">{t('auto.tum_durumlar')}</option>
-                                    <option value="ACTIVE">{t('common.active')}</option>
-                                    <option value="INACTIVE">{t('common.inactive')}</option>
-                                </Select>
-                            </div>
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="w-[200px] shrink-0">
+                            <Select
+                                value={sortDirection}
+                                onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')}
+                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                aria-label={t('inventory.articles.sortOrder')}
+                            >
+                                <option value="desc">{t('inventory.articles.newestFirst')}</option>
+                                <option value="asc">{t('inventory.articles.oldestFirst')}</option>
+                            </Select>
                         </div>
                         <div className="ml-auto flex shrink-0 items-center gap-3">
-                            <span className="font-mono text-[11.5px] text-slate-500">
+                            <span className="font-mono text-[12px] text-slate-500">
                                 {rangeFrom}-{rangeTo} / {filtered.length}
                             </span>
                             <div className="flex items-center gap-1">
@@ -158,64 +180,83 @@ export const ExtraMaterials = () => {
                                     type="button"
                                     disabled={pageSafe <= 1}
                                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                                     aria-label={t('common.back')}
                                 >
                                     <ChevronLeft size={14} />
                                 </button>
-                                <span className="px-1 font-mono text-[11.5px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
+                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
                                 <button
                                     type="button"
                                     disabled={pageSafe >= totalPages}
                                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    className="flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                                     aria-label={t('common.next')}
                                 >
                                     <ChevronRight size={14} />
                                 </button>
                             </div>
-                            {canManage && (
-                                <Button
-                                    variant="primary"
-                                    size="lg"
-                                    icon={<PackagePlus size={16} />}
-                                    onClick={() => navigate('/inventory/extra-materials/new')}
-                                    className="!h-9 !px-4 !text-[13px] !font-semibold"
-                                >
-                                    {t('auto.yeni_malzeme')}
-                                </Button>
-                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="bg-white">
-                    <table className="min-w-[980px] w-full table-fixed text-[12.5px]">
+                    <table className="w-full table-fixed text-[12.5px] [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
                         <colgroup>
-                            <col style={{ width: 64 }} />
-                            <col style={{ width: 150 }} />
-                            <col style={{ width: 280 }} />
-                            <col style={{ width: 150 }} />
-                            <col style={{ width: 120 }} />
-                            <col style={{ width: 116 }} />
-                            <col style={{ width: 100 }} />
+                            <col style={{ width: '7%' }} />
+                            <col style={{ width: '18%' }} />
+                            <col style={{ width: '34%' }} />
+                            <col style={{ width: '18%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '10%' }} />
                         </colgroup>
-                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[10.5px] text-[#86868B] bg-slate-50 border-b border-slate-200 uppercase tracking-[0.08em] shadow-[0_1px_0_0_rgb(226_232_240)]">
+                        <thead className="sticky top-0 z-10 whitespace-nowrap text-[11.5px] text-[#86868B] bg-slate-50 uppercase tracking-[0.08em]">
                             <tr>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.gorsel')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.stok_kodu')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('auto.malzeme')}</th>
-                                <th className="px-3 py-2.5 text-right font-semibold">{'Satış Fiyatı'}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('auto.mevcut')}</th>
-                                <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                                <th className="px-3 py-2 text-right font-semibold">{t('common.actions')}</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.gorsel')}</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.stok_kodu')}</th>
+                                <th className="px-3 py-2.5 text-left font-semibold">{t('auto.malzeme')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('auto.satis_fiyati')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('auto.mevcut')}</th>
+                                <th className="px-3 py-2.5 text-right font-semibold">{t('common.actions')}</th>
+                            </tr>
+                            <tr data-filter-row>
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2 font-normal">
+                                    <input
+                                        value={codeFilter}
+                                        onChange={(event) => setCodeFilter(event.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={MATERIAL_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2 font-normal">
+                                    <input
+                                        value={nameFilter}
+                                        onChange={(event) => setNameFilter(event.target.value)}
+                                        placeholder={`${t('common.filter')}...`}
+                                        className={MATERIAL_FILTER_CONTROL}
+                                    />
+                                </th>
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
+                                <th className="px-2 py-2" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {loading && <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">{t('common.loading')}</td></tr>}
+                            {loading && Array.from({ length: 6 }).map((_, i) => (
+                                <tr key={`material-skeleton-${i}`}>
+                                    {Array.from({ length: 6 }).map((__, j) => (
+                                        <td key={j} className="px-3 py-2">
+                                            {j === 0
+                                                ? <Skeleton className="h-10 w-10 rounded-lg bg-slate-100" />
+                                                : <Skeleton className={`h-4 w-full max-w-[120px] ${j >= 3 ? 'ml-auto' : ''} bg-slate-100`} />}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
                             {!loading && filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={7}>
+                                    <td colSpan={6}>
                                         <div className="flex min-h-[150px] flex-col items-center justify-center px-4 py-6 text-center">
                                             <div className="mb-2 flex size-10 items-center justify-center rounded-md bg-slate-100 text-slate-400">
                                                 <PackagePlus size={22} />
@@ -230,7 +271,7 @@ export const ExtraMaterials = () => {
                                 </tr>
                             )}
                             {!loading && paged.map((material) => (
-                                <tr key={material.id} className="group cursor-pointer transition-colors hover:bg-slate-50/60" onClick={() => navigate(`/inventory/extra-materials/${material.id}/edit`)}>
+                                <tr key={material.id} className="group cursor-pointer transition-colors hover:bg-slate-100" onClick={() => navigate(`/inventory/extra-materials/${material.id}/edit`)}>
                                     <td className="px-3 py-2">
                                         {material.imageUrl ? (
                                             <img src={material.imageUrl} alt={material.name} className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
@@ -244,23 +285,19 @@ export const ExtraMaterials = () => {
                                     <td className="truncate px-3 py-2 font-medium text-slate-800 group-hover:text-[#272f67]">{material.name}</td>
                                     <td className="px-3 py-2 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">{fmtMoney(material.unitCost)}</td>
                                     <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtNumber(material.stockQuantity)}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                        <StatusChip variant={material.isActive ? 'active' : 'passive'}>
-                                            {material.isActive ? t('common.active') : t('common.inactive')}
-                                        </StatusChip>
-                                    </td>
                                     <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="inline-flex items-center gap-1">
                                             <button
-                                                className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                                                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-rose-600 disabled:opacity-40"
                                                 title={t('common.delete')}
                                                 disabled={!canManage}
                                                 onClick={async () => {
                                                     if (!confirm(t('auto.delete_material_confirm', { name: material.name }))) return;
                                                     try {
                                                         await projectApi.deleteMaterial(material.id);
+                                                        // Remove just this row from local state — no full-list reload.
+                                                        setMaterials((prev) => prev.filter((m) => m.id !== material.id));
                                                         toast.success(t('auto.malzeme_silindi'));
-                                                        await load();
                                                     } catch (e: any) {
                                                         toast.error(e.response?.data?.error ||t('auto.malzeme_silinemedi'));
                                                     }
@@ -473,10 +510,10 @@ const ExtraMaterialFormPage = ({ mode }: { mode: 'create' | 'edit' }) => {
 
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     <section className="rounded-md border border-slate-200 bg-white p-3 shadow-xs">
-                        <div className="mb-3 text-[11px] font-semibold uppercase text-slate-500">{'Satış Fiyatı'}</div>
+                        <div className="mb-3 text-[11px] font-semibold uppercase text-slate-500">{t('auto.satis_fiyati')}</div>
                         <div className="max-w-lg space-y-2">
                             {/* Malzemelerde yalnızca satış fiyatı girilir (unitCost alanında saklanır). */}
-                            <MaterialInfoRow label={'Satış Fiyatı'}>
+                            <MaterialInfoRow label={t('auto.satis_fiyati')}>
                                 <div className="max-w-[150px]">
                                     <Input size="sm" className={materialInputClass} type="number" min={0} value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) || 0 })} />
                                 </div>

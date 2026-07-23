@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
@@ -37,17 +37,31 @@ import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
 import { Modal } from '../../components/ui-shared/Modal';
-import { tenderApi } from '../../lib/api/tender';
 import { localizeTenderNumber } from '../../utils/tenderNumber';
 import type { TenderListItem } from '../../types/tender';
 import { customerApi } from '../../lib/api/customer';
-import { ContactsTab, AddressesTab } from './CustomerEntityTabs';
-import { CustomerProductDiscounts } from './CustomerProductDiscounts';
-import { OrdersTab, BillingTab } from './CustomerOrdersBilling';
-import { CustomerReports } from './CustomerReports';
 import { CUSTOMER_TYPE_OPTIONS, CUSTOMER_LANGUAGE_OPTIONS, CUSTOMER_STATUS_OPTIONS, DEFAULT_CUSTOMER_TYPE, DEFAULT_CUSTOMER_STATUS, getCustomerTypeLabel, getCustomerLanguageLabel, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
 
 import { t as i18nT } from '@/i18n/translate';
+
+const ContactsTab = lazy(() =>
+    import('./CustomerEntityTabs').then((module) => ({ default: module.ContactsTab }))
+);
+const AddressesTab = lazy(() =>
+    import('./CustomerEntityTabs').then((module) => ({ default: module.AddressesTab }))
+);
+const CustomerProductDiscounts = lazy(() =>
+    import('./CustomerProductDiscounts').then((module) => ({ default: module.CustomerProductDiscounts }))
+);
+const OrdersTab = lazy(() =>
+    import('./CustomerOrdersBilling').then((module) => ({ default: module.OrdersTab }))
+);
+const BillingTab = lazy(() =>
+    import('./CustomerOrdersBilling').then((module) => ({ default: module.BillingTab }))
+);
+const CustomerReports = lazy(() =>
+    import('./CustomerReports').then((module) => ({ default: module.CustomerReports }))
+);
 
 interface CustomerDashboardDto {
     id: string;
@@ -151,7 +165,13 @@ const fmtMoney = (v?: number | null) =>
 const activityActor = (activity: ActivityDto) =>
     activity.employeeName || activity.employeeEmail || activity.employeeId;
 
+const apiErrorMessage = (error: unknown, fallback: string): string => {
+    const message = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+    return typeof message === 'string' && message ? message : fallback;
+};
+
 type CustomerTabId = 'profile' | 'contacts' | 'locations' | 'discounts' | 'offers' | 'orders' | 'billing' | 'projects' | 'reports' | 'notes' | 'activities';
+const DASHBOARD_DETAIL_TABS: CustomerTabId[] = ['contacts', 'locations', 'notes', 'activities'];
 
 interface EditForm {
     companyName: string;
@@ -193,6 +213,57 @@ const toEditForm = (d: CustomerDashboardDto): EditForm => ({
     status: d.status ?? DEFAULT_CUSTOMER_STATUS,
 });
 
+// React StrictMode mounts effects twice in development. Reusing an in-flight
+// request prevents that diagnostic remount from doubling the two slowest
+// customer-detail calls while preserving a fresh request after it settles.
+const dashboardRequests = new Map<string, Promise<CustomerDashboardDto>>();
+const tenderRequests = new Map<string, Promise<TenderListItem[]>>();
+
+const loadCustomerDashboard = (customerId: string, summaryOnly = false): Promise<CustomerDashboardDto> => {
+    const requestKey = `${customerId}:${summaryOnly ? 'summary' : 'full'}`;
+    const pending = dashboardRequests.get(requestKey);
+    if (pending) return pending;
+
+    const request = apiClient
+        .get<CustomerDashboardDto>(`/customers/${customerId}/dashboard`, {
+            params: summaryOnly ? { summary: true } : undefined,
+        })
+        .then((response) => response.data);
+    dashboardRequests.set(requestKey, request);
+    void request.finally(() => {
+        if (dashboardRequests.get(requestKey) === request) dashboardRequests.delete(requestKey);
+    }).catch(() => undefined);
+    return request;
+};
+
+const loadCustomerTenders = (customerId: string): Promise<TenderListItem[]> => {
+    const pending = tenderRequests.get(customerId);
+    if (pending) return pending;
+
+    // Keep this request local and small. Importing the full tender API module
+    // made every tender editor method part of Vite's development request chain.
+    const request = apiClient
+        .get('/tenders', { params: { customerId } })
+        .then((response) => Array.isArray(response.data) ? response.data : response.data.items ?? []);
+    tenderRequests.set(customerId, request);
+    void request.finally(() => {
+        if (tenderRequests.get(customerId) === request) tenderRequests.delete(customerId);
+    }).catch(() => undefined);
+    return request;
+};
+
+const DeferredTabFallback = () => (
+    <div className="space-y-2 rounded-lg border border-slate-100 bg-white p-6" role="status" aria-label={i18nT('common.loading')}>
+        {[1, 2, 3].map((row) => (
+            <div key={row} className="h-10 animate-pulse rounded-md bg-slate-50" />
+        ))}
+    </div>
+);
+
+const DeferredTab = ({ children }: { children: React.ReactNode }) => (
+    <Suspense fallback={<DeferredTabFallback />}>{children}</Suspense>
+);
+
 export const CustomerDashboard = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -200,6 +271,9 @@ export const CustomerDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [tenders, setTenders] = useState<TenderListItem[]>([]);
     const [activeCustomerTab, setActiveCustomerTab] = useState<CustomerTabId>('profile');
+    const [detailsCustomerId, setDetailsCustomerId] = useState<string | null>(null);
+    const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null);
+    const [detailsErrorId, setDetailsErrorId] = useState<string | null>(null);
 
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState<EditForm>({
@@ -240,12 +314,11 @@ export const CustomerDashboard = () => {
         if (!id) return;
         try {
             setRefreshing(true);
-            const [dashRes, tendersRes] = await Promise.all([
-                apiClient.get(`/customers/${id}/dashboard`),
-                tenderApi.list({ customerId: id }).catch(() => []),
-            ]);
-            setData(dashRes.data);
-            setTenders(tendersRes);
+            const dashboardPromise = loadCustomerDashboard(id);
+            void loadCustomerTenders(id).then(setTenders).catch(() => setTenders([]));
+            setData(await dashboardPromise);
+            setDetailsCustomerId(id);
+            setDetailsErrorId(null);
         } catch {
             toast.error(i18nT('crm.customers.errorLoadCustomer'));
         } finally {
@@ -254,27 +327,78 @@ export const CustomerDashboard = () => {
     };
 
     useEffect(() => {
-        let mounted = true;
-        (async () => {
-            if (!id) return;
-            try {
+        let cancelled = false;
+        if (!id) return;
+
+        const loadingTimer = window.setTimeout(() => {
+            if (!cancelled) {
                 setLoading(true);
-                const [dashRes, tendersRes] = await Promise.all([
-                    apiClient.get(`/customers/${id}/dashboard`),
-                    tenderApi.list({ customerId: id }).catch(() => []),
-                ]);
-                if (mounted) {
-                    setData(dashRes.data);
-                    setTenders(tendersRes);
-                }
-            } catch {
-                if (mounted) toast.error(i18nT('crm.customers.errorLoadCustomer'));
-            } finally {
-                if (mounted) setLoading(false);
+                setActiveCustomerTab('profile');
             }
-        })();
-        return () => { mounted = false; };
+        }, 0);
+
+        // The company name is the page's LCP element. Do not hold it behind the
+        // independent tender request; tender KPIs fill in as soon as they arrive.
+        void loadCustomerDashboard(id, true)
+            .then((dashboard) => {
+                if (!cancelled) setData(dashboard);
+            })
+            .catch(() => {
+                if (!cancelled) toast.error(i18nT('crm.customers.errorLoadCustomer'));
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        void loadCustomerTenders(id)
+            .then((rows) => {
+                if (!cancelled) setTenders(rows);
+            })
+            .catch(() => {
+                if (!cancelled) setTenders([]);
+            });
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(loadingTimer);
+        };
     }, [id]);
+
+    const detailsLoaded = detailsCustomerId === id;
+    const detailsLoading = detailsLoadingId === id;
+    const detailsFailed = detailsErrorId === id;
+
+    const loadDashboardDetails = async () => {
+        if (!id || detailsLoaded || detailsLoading) return;
+        setDetailsLoadingId(id);
+        setDetailsErrorId(null);
+        try {
+            const dashboard = await loadCustomerDashboard(id);
+            setData(dashboard);
+            setDetailsCustomerId(id);
+        } catch {
+            setDetailsErrorId(id);
+            toast.error(i18nT('crm.customers.errorLoadCustomer'));
+        } finally {
+            setDetailsLoadingId((current) => current === id ? null : current);
+        }
+    };
+
+    const selectCustomerTab = (tabId: CustomerTabId) => {
+        setActiveCustomerTab(tabId);
+        if (DASHBOARD_DETAIL_TABS.includes(tabId)) void loadDashboardDetails();
+    };
+
+    const dashboardDetailsPlaceholder = detailsFailed ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-rose-100 bg-white px-6 py-10 text-center">
+            <span className="text-[13px] text-slate-500">{i18nT('crm.customers.errorLoadCustomer')}</span>
+            <Button variant="secondary" size="sm" icon={<RefreshIcon size={12} />} onClick={() => void loadDashboardDetails()}>
+                {i18nT('common.refresh')}
+            </Button>
+        </div>
+    ) : (
+        <DeferredTabFallback />
+    );
 
     if (loading) {
         return (
@@ -308,8 +432,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.customer_updated'));
             setEditing(false);
             await fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || i18nT('crm.customer_update_error'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.customer_update_error')));
         } finally {
             setSavingProfile(false);
         }
@@ -321,8 +445,8 @@ export const CustomerDashboard = () => {
             await apiClient.delete(`/customers/${id}`);
             toast.success(i18nT('crm.customer_deleted'));
             navigate('/crm/customers');
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || i18nT('crm.customer_delete_error'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.customer_delete_error')));
             setDeleting(false);
             setConfirmDelete(false);
         }
@@ -337,8 +461,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.customers.successNoteAdded'));
             setNoteForm({ noteType: 'internal', noteText: '', isHighlight: false });
             fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error ||i18nT('crm.customers.errorNoteAdd'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.customers.errorNoteAdd')));
         } finally {
             setSavingNote(false);
         }
@@ -352,8 +476,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.customers.successActivityAdded'));
             setActivityForm({ activityType: 'Meeting', description: '' });
             fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error ||i18nT('crm.customers.errorActivityAdd'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.customers.errorActivityAdd')));
         } finally {
             setSavingActivity(false);
         }
@@ -374,8 +498,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.noteUpdated'));
             setEditingNoteId(null);
             await fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || i18nT('crm.customers.errorNoteAdd'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.customers.errorNoteAdd')));
         } finally {
             setSavingNoteEdit(false);
         }
@@ -388,8 +512,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.noteDeleted'));
             setConfirmDeleteNoteId(null);
             await fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || i18nT('common.error'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('common.error')));
         }
     };
 
@@ -407,8 +531,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.activityUpdated'));
             setEditingActivityId(null);
             await fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || i18nT('crm.customers.errorActivityAdd'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.customers.errorActivityAdd')));
         } finally {
             setSavingActivityEdit(false);
         }
@@ -421,8 +545,8 @@ export const CustomerDashboard = () => {
             toast.success(i18nT('crm.activityDeleted'));
             setConfirmDeleteActivityId(null);
             await fetchData();
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || i18nT('common.error'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('common.error')));
         }
     };
 
@@ -432,16 +556,16 @@ export const CustomerDashboard = () => {
 
     const customerTabs: { id: CustomerTabId; label: string; count?: number }[] = [
         { id: 'profile', label: i18nT('crm.profil') },
-        { id: 'contacts', label: i18nT('crm.tab_contacts'), count: data.contacts?.length ?? 0 },
-        { id: 'locations', label: i18nT('crm.tab_locations'), count: data.locations?.length ?? 0 },
+        { id: 'contacts', label: i18nT('crm.tab_contacts'), count: detailsLoaded ? data.contacts?.length ?? 0 : undefined },
+        { id: 'locations', label: i18nT('crm.tab_locations'), count: detailsLoaded ? data.locations?.length ?? 0 : undefined },
         { id: 'discounts', label: i18nT('crm.tab_productDiscounts') },
         { id: 'offers', label: i18nT('crm.offers'), count: tenders.length },
         { id: 'orders', label: i18nT('crm.tab_orders') },
         { id: 'billing', label: i18nT('crm.tab_billing') },
         { id: 'projects', label: i18nT('nav.projects'), count: projectTenders.length },
         { id: 'reports', label: i18nT('crm.tab_reports') },
-        { id: 'notes', label: i18nT('crm.internal_notes'), count: data.notes?.length ?? 0 },
-        { id: 'activities', label: i18nT('crm.activities_label'), count: data.activities?.length ?? 0 },
+        { id: 'notes', label: i18nT('crm.internal_notes'), count: detailsLoaded ? data.notes?.length ?? 0 : undefined },
+        { id: 'activities', label: i18nT('crm.activities_label'), count: detailsLoaded ? data.activities?.length ?? 0 : undefined },
     ];
 
     return (
@@ -476,7 +600,11 @@ export const CustomerDashboard = () => {
                 <KPI label={i18nT('crm.active_tenders')} value={`${tenders.length}`} icon={<FileSpreadsheet size={14} />} />
                 <KPI label={i18nT('crm.approved_export_exported')} value={`${approvedTenders}`} icon={<Activity size={14} />} accent="text-emerald-700" />
                 <KPI label={i18nT('crm.total_hacim')} value={fmtMoney(totalTenderValue)} icon={<DollarSign size={14} />} primary />
-                <KPI label={i18nT('crm.notes_activities')} value={`${(data.notes?.length ?? 0)} / ${(data.activities?.length ?? 0)}`} icon={<FileText size={14} />} />
+                <KPI
+                    label={i18nT('crm.notes_activities')}
+                    value={detailsLoaded ? `${data.notes?.length ?? 0} / ${data.activities?.length ?? 0}` : '—'}
+                    icon={<FileText size={14} />}
+                />
             </div>
 
             {/* Tab bar — switches content instantly, no scrolling */}
@@ -488,7 +616,7 @@ export const CustomerDashboard = () => {
                             <button
                                 key={tab.id}
                                 type="button"
-                                onClick={() => setActiveCustomerTab(tab.id)}
+                                onClick={() => selectCustomerTab(tab.id)}
                                 className={`relative -mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-3.5 py-3 text-sm font-semibold transition-colors ${
                                     active
                                         ?"border-brand text-brand-secondary"
@@ -652,27 +780,41 @@ export const CustomerDashboard = () => {
 
             {/* ---- CONTACTS (Kontaktpersonen) ---- */}
             {activeCustomerTab === 'contacts' && id && (
-                <ContactsTab customerId={id} items={data.contacts ?? []} onChanged={fetchData} />
+                detailsLoaded ? (
+                    <DeferredTab>
+                        <ContactsTab customerId={id} items={data.contacts ?? []} onChanged={fetchData} />
+                    </DeferredTab>
+                ) : dashboardDetailsPlaceholder
             )}
 
             {/* ---- LOCATIONS (Standorte) ---- */}
             {activeCustomerTab === 'locations' && id && (
-                <AddressesTab customerId={id} items={data.locations ?? []} onChanged={fetchData} />
+                detailsLoaded ? (
+                    <DeferredTab>
+                        <AddressesTab customerId={id} items={data.locations ?? []} onChanged={fetchData} />
+                    </DeferredTab>
+                ) : dashboardDetailsPlaceholder
             )}
 
             {/* ---- PRODUCT DISCOUNTS (Produktrabatte) ---- */}
             {activeCustomerTab === 'discounts' && id && (
-                <CustomerProductDiscounts customerId={id} />
+                <DeferredTab>
+                    <CustomerProductDiscounts customerId={id} />
+                </DeferredTab>
             )}
 
             {/* ---- ORDERS (Aufträge) ---- */}
             {activeCustomerTab === 'orders' && id && (
-                <OrdersTab customerId={id} />
+                <DeferredTab>
+                    <OrdersTab customerId={id} />
+                </DeferredTab>
             )}
 
             {/* ---- BILLING (Rechnungen) ---- */}
             {activeCustomerTab === 'billing' && id && (
-                <BillingTab customerId={id} />
+                <DeferredTab>
+                    <BillingTab customerId={id} />
+                </DeferredTab>
             )}
 
             {/* ---- OFFERS ---- */}
@@ -779,11 +921,14 @@ export const CustomerDashboard = () => {
 
             {/* ---- REPORTS (Field / General / Delivery) ---- */}
             {activeCustomerTab === 'reports' && id && (
-                <CustomerReports customerId={id} />
+                <DeferredTab>
+                    <CustomerReports customerId={id} />
+                </DeferredTab>
             )}
 
             {/* ---- NOTES ---- */}
             {activeCustomerTab === 'notes' && (
+                detailsLoaded ? (
                 <Card
                     title={i18nT('crm.internal_notes')}
                     description={i18nT('crm.internal_notes_hint')}
@@ -893,10 +1038,12 @@ export const CustomerDashboard = () => {
                         </div>
                     )}
                 </Card>
+                ) : dashboardDetailsPlaceholder
             )}
 
             {/* ---- ACTIVITIES ---- */}
             {activeCustomerTab === 'activities' && (
+                detailsLoaded ? (
                 <Card
                     title={i18nT('crm.zaman_cizelgesi')}
                     description={i18nT('crm.customer_timeline_description')}
@@ -993,6 +1140,7 @@ export const CustomerDashboard = () => {
                         </ol>
                     )}
                 </Card>
+                ) : dashboardDetailsPlaceholder
             )}
 
             {/* Delete confirmation */}

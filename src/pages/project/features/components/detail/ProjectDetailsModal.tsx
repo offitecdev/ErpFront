@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
+
 import { X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import { projectApi } from '@/lib/api/project';
 import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import type { ProjectDto } from '@/types/project';
 
@@ -32,6 +35,23 @@ export const ProjectDetailsModal = ({
     onClose: () => void;
 }) => {
     const { flow, items, loading } = useProjectFlowSummary(project);
+    const [agendaProject, setAgendaProject] = useState(project);
+    const [agendaLoading, setAgendaLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        projectApi.getById(project.id, 'details')
+            .then((detail) => {
+                if (!cancelled) setAgendaProject(detail);
+            })
+            .catch(() => {
+                if (!cancelled) setAgendaProject(project);
+            })
+            .finally(() => {
+                if (!cancelled) setAgendaLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [project]);
 
     const rows: Array<{ label: string; value: number; total?: boolean }> = [
         { label: t('auto.siparis_tutari'), value: totals.orderBudget },
@@ -71,7 +91,9 @@ export const ProjectDetailsModal = ({
                     {/* Agenda and costs sit side by side once there is room for it. */}
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <Section title={t('projects.details.agenda')}>
-                            <ProjectAgendaCard project={project} />
+                            {agendaLoading
+                                ? <div className="h-44 animate-pulse rounded-xl bg-slate-100" />
+                                : <ProjectAgendaCard project={agendaProject} />}
                         </Section>
 
                         <Section title={t('projects.details.costBreakdown')}>

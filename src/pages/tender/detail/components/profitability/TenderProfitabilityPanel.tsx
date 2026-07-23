@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
     ChevronLeft,
     ChevronRight,
@@ -40,6 +41,8 @@ const rowPreviewText = (row: SimpleTenderLine) => {
     return row.position.shortDescription?.trim() || '';
 };
 
+const PROFITABILITY_PAGE_SIZE = 8;
+
 export const TenderProfitabilityPanel = ({
     open,
     onToggleOpen,
@@ -53,6 +56,26 @@ export const TenderProfitabilityPanel = ({
     onSelectRow,
 }: TenderProfitabilityPanelProps) => {
     const fmtMoney = useMoneyFormat();
+    const [page, setPage] = useState(1);
+    const pageCount = Math.max(1, Math.ceil(rows.length / PROFITABILITY_PAGE_SIZE));
+    const effectivePage = Math.min(page, pageCount);
+    const pageRows = rows.slice(
+        (effectivePage - 1) * PROFITABILITY_PAGE_SIZE,
+        effectivePage * PROFITABILITY_PAGE_SIZE,
+    );
+
+    useEffect(() => {
+        if (page > pageCount) setPage(pageCount);
+    }, [page, pageCount]);
+
+    useEffect(() => {
+        if (!selectedId) return;
+        const selectedIndex = rows.findIndex((row) => row.id === selectedId);
+        if (selectedIndex < 0) return;
+        const selectedPage = Math.floor(selectedIndex / PROFITABILITY_PAGE_SIZE) + 1;
+        setPage((current) => current === selectedPage ? current : selectedPage);
+    }, [rows, selectedId]);
+
     if (!open) {
         return (
             <div className="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-3 2xl:flex-col 2xl:justify-start">
@@ -175,9 +198,36 @@ export const TenderProfitabilityPanel = ({
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
                     <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.profit_loss_akisi')}</span>
-                    {rows.length > 0 && (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{rows.length}</span>
-                    )}
+                    <div className="flex items-center gap-1">
+                        {rows.length > 0 && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{rows.length}</span>
+                        )}
+                        {pageCount > 1 && (
+                            <>
+                                <button
+                                    type="button"
+                                    aria-label={t('common.onceki')}
+                                    disabled={effectivePage === 1}
+                                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                                >
+                                    <ChevronLeft size={13} />
+                                </button>
+                                <span className="min-w-8 text-center text-[10px] font-semibold tabular-nums text-slate-500">
+                                    {effectivePage}/{pageCount}
+                                </span>
+                                <button
+                                    type="button"
+                                    aria-label={t('common.sonraki')}
+                                    disabled={effectivePage === pageCount}
+                                    onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                                >
+                                    <ChevronRight size={13} />
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
                 {rows.length === 0 ? (
                     <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center">
@@ -186,7 +236,7 @@ export const TenderProfitabilityPanel = ({
                     </div>
                 ) : (
                     <div className="max-h-[520px] space-y-1.5 overflow-y-auto pr-1">
-                        {rows.map((row) => {
+                        {pageRows.map((row) => {
                             const rowProfit = row.result >= 0;
                             const rowMargin = row.revenue > 0 ? Math.min(100, Math.max(0, (row.result / row.revenue) * 100)) : 0;
                             const active = selectedId === row.id;
@@ -195,7 +245,7 @@ export const TenderProfitabilityPanel = ({
                                     key={row.id}
                                     type="button"
                                     onClick={() => onSelectRow(row.id)}
-                                    className={`flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2.5 text-left transition-all ${active ? 'border-[#1f2654]/30 bg-[#1f2654]/[0.04] ring-1 ring-[#1f2654]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                                    className={`flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2.5 text-left ${active ? 'border-[#1f2654]/30 bg-[#1f2654]/[0.04] ring-1 ring-[#1f2654]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                                 >
                                     {row.label && (
                                         <span className={`mt-0.5 inline-flex h-5 min-w-[22px] shrink-0 items-center justify-center rounded-md px-1 font-mono text-[10.5px] font-semibold ${active ? 'bg-[#1f2654] text-white' : 'bg-slate-100 text-slate-500'}`}>

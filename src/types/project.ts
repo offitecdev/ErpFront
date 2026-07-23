@@ -23,6 +23,7 @@ export interface ProjectMaterial {
     criticalStockLevel?: number;
     imageUrl?: string | null;
     isActive: boolean;
+    createdAt?: string;
 }
 
 export interface AppointmentDto {

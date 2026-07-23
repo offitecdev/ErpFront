@@ -28,8 +28,8 @@ export const CompletionBars = memo(({ bars, animateKey }: { bars: CompletionBar[
                         {/* Wide column so it reads as a bar chart, not a line. */}
                         <div className="relative h-28 w-full max-w-11 overflow-hidden rounded-md bg-slate-100 dark:bg-white/10">
                             <span
-                                className={`absolute inset-x-0 bottom-0 rounded-t-md transition-[height] duration-700 ease-out ${bar.colorClass}`}
-                                style={{ height: grown ? `${clamped}%` : '0%' }}
+                                className={`absolute inset-0 origin-bottom transform-gpu rounded-md transition-transform duration-700 ease-out ${bar.colorClass}`}
+                                style={{ transform: `scaleY(${grown ? clamped / 100 : 0})` }}
                             />
                         </div>
                         <span className="truncate text-center text-[9.5px] font-semibold uppercase tracking-wide text-slate-400">{bar.label}</span>

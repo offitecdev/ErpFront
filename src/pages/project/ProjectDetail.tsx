@@ -1,20 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Briefcase01 as BriefcaseBusiness } from '@/components/icons/antIconCompat';
 
-import { Button } from '../../components/ui-shared/Button';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { Modal } from '../../components/ui-shared/Modal';
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectSalesOrder } from '../../types/project';
-import { ProjectProcessModal } from './ProjectProcessModal';
 import { ProjectTopNav } from './features/components/detail/ProjectTopNav';
 import { ProjectDetailHeader } from './features/components/detail/ProjectDetailHeader';
 import { renderProjectSection } from './features/components/detail/ProjectSectionRenderer';
-import { ProjectDetailsModal } from './features/components/detail/ProjectDetailsModal';
-import { CustomerContactModal } from './features/components/detail/CustomerContactModal';
 import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import { useProjectDetailData } from './features/hooks/useProjectDetailData';
 import { getProjectDisplayOrders } from './features/utils/projectOrderScope';
@@ -28,12 +23,25 @@ import { type ProjectDetailView, viewForSection } from './features/types/project
 
 import { t } from '@/i18n/translate';
 
+const LazyProjectProcessModal = lazy(() =>
+    import('./ProjectProcessModal').then((module) => ({ default: module.ProjectProcessModal })),
+);
+const LazyProjectDetailsModal = lazy(() =>
+    import('./features/components/detail/ProjectDetailsModal').then((module) => ({ default: module.ProjectDetailsModal })),
+);
+const LazyCustomerContactModal = lazy(() =>
+    import('./features/components/detail/CustomerContactModal').then((module) => ({ default: module.CustomerContactModal })),
+);
+const LazyProjectDeleteOrderModal = lazy(() =>
+    import('./features/components/detail/ProjectDeleteOrderModal').then((module) => ({ default: module.ProjectDeleteOrderModal })),
+);
+
 export const ProjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user, permissions } = useAuthStore();
-    const { project, materials, mailSettings, loading, loadError, load } = useProjectDetailData(id);
     const [activeView, setActiveView] = useState<ProjectDetailView>({ section: 'overview' });
+    const { project, materials, mailSettings, loading, sectionLoading, loadError, load } = useProjectDetailData(id, activeView);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [showComplete, setShowComplete] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
@@ -62,16 +70,6 @@ export const ProjectDetail = () => {
         [project, selectedOrder, selectedOrderIsPrimary, salesOrders],
     );
 
-    useEffect(() => {
-        if (!salesOrders.length) {
-            setSelectedOrderId(null);
-            return;
-        }
-        if (!selectedOrderId || !salesOrders.some((order) => order.id === selectedOrderId)) {
-            setSelectedOrderId(salesOrders[0].id);
-        }
-    }, [salesOrders, selectedOrderId]);
-
     const canManageOrders = permissions.includes('projects.manage');
 
     // Deleting a main order cascades to its addon orders (backend removes them and
@@ -95,8 +93,9 @@ export const ProjectDetail = () => {
             if (selectedOrderId === orderToDelete.id) setSelectedOrderId(null);
             setOrderToDelete(null);
             await load(true);
-        } catch (e: any) {
-            toast.error(e.response?.data?.error || t('projects.orderDeleteFailed'));
+        } catch (error: unknown) {
+            const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+            toast.error(message || t('projects.orderDeleteFailed'));
         } finally {
             setDeletingOrder(false);
         }
@@ -166,7 +165,12 @@ export const ProjectDetail = () => {
                 addonAttention={addonAttention}
             />
             <div className="min-w-0 rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs md:p-6">
-                {renderProjectSection({
+                {sectionLoading ? (
+                    <div className="space-y-3" aria-busy="true">
+                        <div className="h-10 animate-pulse rounded-md bg-slate-100" />
+                        <div className="h-64 animate-pulse rounded-md bg-slate-100" />
+                    </div>
+                ) : renderProjectSection({
                     view: activeView,
                     project,
                     order: selectedOrder,
@@ -188,52 +192,41 @@ export const ProjectDetail = () => {
             </div>
 
             {showComplete && (
-                <ProjectProcessModal
-                    project={project}
-                    mode="complete"
-                    onClose={() => setShowComplete(false)}
-                    onCompleted={() => {
-                        setShowComplete(false);
-                        void load(true);
-                    }}
-                />
+                <Suspense fallback={null}>
+                    <LazyProjectProcessModal
+                        project={project}
+                        mode="complete"
+                        onClose={() => setShowComplete(false)}
+                        onCompleted={() => {
+                            setShowComplete(false);
+                            void load(true);
+                        }}
+                    />
+                </Suspense>
             )}
 
             {showDetails && (
-                <ProjectDetailsModal project={project} totals={projectTotals} onClose={() => setShowDetails(false)} />
+                <Suspense fallback={null}>
+                    <LazyProjectDetailsModal project={project} totals={projectTotals} onClose={() => setShowDetails(false)} />
+                </Suspense>
             )}
 
-            <CustomerContactModal project={project} open={showContact} onClose={() => setShowContact(false)} />
+            {showContact && (
+                <Suspense fallback={null}>
+                    <LazyCustomerContactModal project={project} open onClose={() => setShowContact(false)} />
+                </Suspense>
+            )}
 
             {orderToDelete && (
-                <Modal
-                    open
-                    width="sm"
-                    title={t('projects.deleteOrderTitle')}
-                    onClose={() => { if (!deletingOrder) setOrderToDelete(null); }}
-                    closeOnBackdrop={!deletingOrder}
-                    footer={(
-                        <>
-                            <Button variant="ghost" onClick={() => setOrderToDelete(null)} disabled={deletingOrder}>
-                                {t('common.cancel')}
-                            </Button>
-                            <Button variant="danger" onClick={confirmDeleteOrder} loading={deletingOrder}>
-                                {t('common.delete')}
-                            </Button>
-                        </>
-                    )}
-                >
-                    <p className="text-[13px] text-slate-600">
-                        {t(
-                            orderToDelete.parentSalesOrderId
-                                ? 'projects.deleteAddonConfirm'
-                                : orderToDeleteHasAddons
-                                    ? 'projects.detail.deleteMainCascadeConfirm'
-                                    : 'projects.deleteMainConfirm',
-                            { orderNumber: localizeTenderNumbersInText(orderToDelete.orderNumber) },
-                        )}
-                    </p>
-                </Modal>
+                <Suspense fallback={null}>
+                    <LazyProjectDeleteOrderModal
+                        order={orderToDelete}
+                        hasAddons={orderToDeleteHasAddons}
+                        deleting={deletingOrder}
+                        onClose={() => setOrderToDelete(null)}
+                        onConfirm={() => { void confirmDeleteOrder(); }}
+                    />
+                </Suspense>
             )}
         </div>
     );

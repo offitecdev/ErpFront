@@ -207,7 +207,7 @@ const LocationNodeView: React.FC<{ node: TreeNode; level: number }> = ({ node, l
     const color = TYPE_COLOR[node.locationType];
     return (
         <div className={level > 0 ? 'ml-3 border-l border-dashed border-slate-200 pl-3' : ''}>
-            <div className="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50">
+            <div className="group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-100">
                 <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${color.badge}`}>{TYPE_ICON[node.locationType]}</span>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

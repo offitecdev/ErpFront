@@ -4,6 +4,8 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { LuTable2 as MdTableChart } from '@/components/icons/lucideLocal';
 import {
+    ChevronLeft,
+    ChevronRight,
     File05 as FileText,
     FileDownload02 as FileDown,
     Package,
@@ -21,7 +23,6 @@ import { customerApi, type CustomerLocationDto } from '../../lib/api/customer';
 import type { PositionDto, TenderChangeLog, TenderDocumentDto } from '../../types/tender';
 
 import TenderCreate from './TenderCreate';
-import { TenderLogsPanel } from './detail/TenderLogsPanel';
 import {
     STATUS_VARIANT,
     buildTree,
@@ -45,6 +46,7 @@ import {
     DEFAULT_VAT,
     SECTION_SCHEMA_STORAGE_KEY,
     EMPTY_CHATTER_SUMMARY,
+    LINE_PAGE_SIZE,
     lineActionButtonClass,
 } from './detail/utils/tenderDetail.constants';
 import { getLineKind } from './detail/utils/tenderCalculation.utils';
@@ -79,22 +81,11 @@ import { TenderDetailLoadingSkeleton } from './detail/components/TenderDetailLoa
 import { TenderDetailHeader } from './detail/components/TenderDetailHeader';
 import { TenderQuoteTopBar } from './detail/components/TenderQuoteTopBar';
 import { TenderWorkspaceTabs } from './detail/components/TenderWorkspaceTabs';
-import { TenderProductPickerModal } from './detail/components/product/TenderProductPickerModal';
-import { TenderManualProductModal } from './detail/components/product/TenderManualProductModal';
 import { TenderLineTable } from './detail/components/lines/TenderLineTable';
-import { TenderBulkDeleteModal } from './detail/components/bulk/TenderBulkDeleteModal';
-import { TenderBulkDiscountModal } from './detail/components/bulk/TenderBulkDiscountModal';
 import { TenderCustomerSection } from './detail/components/customer/TenderCustomerSection';
-import { TenderCustomerCreateModal } from './detail/components/customer/TenderCustomerCreateModal';
 import { TenderAddressPicker, TenderBillingAddressRow } from './detail/components/address/TenderAddressSection';
-import { TenderAddressCreateModal } from './detail/components/address/TenderAddressCreateModal';
 import { TenderAddressTypeRow, type TenderAddressType } from './detail/components/address/TenderAddressTypeRow';
 import { TenderProfitabilityPanel } from './detail/components/profitability/TenderProfitabilityPanel';
-import { TenderDocumentPreviewModal } from './detail/components/documents/TenderDocumentPreviewModal';
-import { TenderOrderDecisionModal } from './detail/components/order/TenderOrderDecisionModal';
-import { UnsavedChangesModal } from './detail/components/UnsavedChangesModal';
-import { DeleteOfferModal } from './detail/components/modals/DeleteOfferModal';
-import { ProjectCreatedModal } from './detail/components/ProjectCreatedModal';
 import { useUnsavedChangesGuard } from './detail/hooks/useUnsavedChangesGuard';
 import { renderDetailLines, splitAddress, valueOrBlank } from './detail/components/info/TenderDetailInfoRows';
 import { TenderPriceSummary } from './detail/components/info/TenderPriceSummary';
@@ -109,6 +100,42 @@ const LazyExportModal = lazy(() =>
 );
 const LazyTenderTechnicianTab = lazy(() =>
     import('./detail/TenderTechnicianTab').then((mod) => ({ default: mod.TenderTechnicianTab }))
+);
+const LazyTenderLogsPanel = lazy(() =>
+    import('./detail/TenderLogsPanel').then((mod) => ({ default: mod.TenderLogsPanel }))
+);
+const LazyTenderProductPickerModal = lazy(() =>
+    import('./detail/components/product/TenderProductPickerModal').then((mod) => ({ default: mod.TenderProductPickerModal }))
+);
+const LazyTenderManualProductModal = lazy(() =>
+    import('./detail/components/product/TenderManualProductModal').then((mod) => ({ default: mod.TenderManualProductModal }))
+);
+const LazyTenderBulkDeleteModal = lazy(() =>
+    import('./detail/components/bulk/TenderBulkDeleteModal').then((mod) => ({ default: mod.TenderBulkDeleteModal }))
+);
+const LazyTenderBulkDiscountModal = lazy(() =>
+    import('./detail/components/bulk/TenderBulkDiscountModal').then((mod) => ({ default: mod.TenderBulkDiscountModal }))
+);
+const LazyTenderCustomerCreateModal = lazy(() =>
+    import('./detail/components/customer/TenderCustomerCreateModal').then((mod) => ({ default: mod.TenderCustomerCreateModal }))
+);
+const LazyTenderAddressCreateModal = lazy(() =>
+    import('./detail/components/address/TenderAddressCreateModal').then((mod) => ({ default: mod.TenderAddressCreateModal }))
+);
+const LazyTenderDocumentPreviewModal = lazy(() =>
+    import('./detail/components/documents/TenderDocumentPreviewModal').then((mod) => ({ default: mod.TenderDocumentPreviewModal }))
+);
+const LazyTenderOrderDecisionModal = lazy(() =>
+    import('./detail/components/order/TenderOrderDecisionModal').then((mod) => ({ default: mod.TenderOrderDecisionModal }))
+);
+const LazyUnsavedChangesModal = lazy(() =>
+    import('./detail/components/UnsavedChangesModal').then((mod) => ({ default: mod.UnsavedChangesModal }))
+);
+const LazyProjectCreatedModal = lazy(() =>
+    import('./detail/components/ProjectCreatedModal').then((mod) => ({ default: mod.ProjectCreatedModal }))
+);
+const LazyDeleteOfferModal = lazy(() =>
+    import('./detail/components/modals/DeleteOfferModal').then((mod) => ({ default: mod.DeleteOfferModal }))
 );
 
 const LazyPanelFallback = () => (
@@ -175,6 +202,7 @@ export const TenderDetail = () => {
     const [customerForm, setCustomerForm] = useState({ companyName: '', mainEmail: '', mainPhone: '', address: '' });
     const [customerSaving, setCustomerSaving] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [linePage, setLinePage] = useState(1);
     const {
         productPickerOpen,
         setProductPickerOpen,
@@ -220,11 +248,14 @@ export const TenderDetail = () => {
         documentSaving,
         setDocumentSaving,
         documentInputRef,
-        loadTenderChatterSummary,
         loadTenderChatter,
         handleOpenLogs,
         handleCloseLogs,
     } = useTenderChatter({ activeTenderId: detail?.tender.id || id, isCreatingTender });
+    const handleOpenTenderLogs = () => {
+        handleOpenLogs();
+        if (id && id !== 'new') void fetchActivities(id);
+    };
     const [localPositions, setLocalPositions] = useState<PositionDto[]>([]);
     const {
         pendingAddrId,
@@ -324,11 +355,16 @@ export const TenderDetail = () => {
     useEffect(() => {
         if (id) {
             resetStaging();
+            setLinePage(1);
             setCreatedProjectId(null);
             setTenderDocuments([]);
             setChatterSummary(EMPTY_CHATTER_SUMMARY);
             setNoteText('');
-            useTenderStore.setState({ logs: [], detail: isCreatingTender ? null : useTenderStore.getState().detail });
+            useTenderStore.setState({
+                logs: [],
+                activities: [],
+                detail: isCreatingTender ? null : useTenderStore.getState().detail,
+            });
         }
         if (!id || isCreatingTender) {
             setLogsLoaded(false);
@@ -363,8 +399,13 @@ export const TenderDetail = () => {
     const tree = useMemo(() => buildTree(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const simpleRows = useMemo(() => buildSimpleTenderLines(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const displayRows = simpleRows;
-    // The quote lines load all at once now (no pagination) — text-only rows are light.
-    const pagedRows = displayRows;
+    const linePageCount = Math.max(1, Math.ceil(displayRows.length / LINE_PAGE_SIZE));
+    const effectiveLinePage = Math.min(linePage, linePageCount);
+    const lineRowOffset = (effectiveLinePage - 1) * LINE_PAGE_SIZE;
+    const pagedRows = useMemo(
+        () => displayRows.slice(lineRowOffset, lineRowOffset + LINE_PAGE_SIZE),
+        [displayRows, lineRowOffset],
+    );
     const grandTotal = useMemo(() => simpleRows.reduce((sum, row) => sum + row.total, 0), [simpleRows]);
     // Offer footer figures: average line discount, direct discount, net/VAT/gross.
     const pricingSummary = useMemo(
@@ -406,24 +447,24 @@ export const TenderDetail = () => {
     const { registerCellHandle, navigateCell } = useTenderLineKeyboardNavigation(pagedRows);
 
     useEffect(() => {
+        if (linePage > linePageCount) setLinePage(linePageCount);
+    }, [linePage, linePageCount]);
+
+    useEffect(() => {
+        if (!selectedId) return;
+        const selectedIndex = displayRows.findIndex((row) => row.id === selectedId);
+        if (selectedIndex < 0) return;
+        const selectedPage = Math.floor(selectedIndex / LINE_PAGE_SIZE) + 1;
+        setLinePage((current) => current === selectedPage ? current : selectedPage);
+    }, [displayRows, selectedId]);
+
+    useEffect(() => {
         setSelectedRowIds((prev) => {
             const validIds = new Set(simpleRows.map((row) => row.id));
             const next = Object.fromEntries(Object.entries(prev).filter(([rowId, checked]) => checked && validIds.has(rowId)));
             return Object.keys(next).length === Object.keys(prev).length ? prev : next;
         });
     }, [simpleRows]);
-
-    useEffect(() => {
-        if (!id || detail?.tender.id !== id) return;
-
-        const timer = window.setTimeout(() => {
-            fetchActivities(id);
-            void loadTenderChatterSummary();
-        }, 100);
-        return () => window.clearTimeout(timer);
-    }, [id, detail?.tender.id, fetchActivities, loadTenderChatterSummary]);
-
-
     // Guards against leaving with unsaved changes: shows our custom modal for
     // in-app navigation (menu switch / links / Back button) and falls back to the
     // browser's native prompt only for a hard refresh or tab close.
@@ -1170,7 +1211,7 @@ export const TenderDetail = () => {
     return (
         <div>
             <TenderQuoteTopBar
-                onOpenLogs={handleOpenLogs}
+                onOpenLogs={handleOpenTenderLogs}
                 onDeleteOffer={() => setDeleteOfferOpen(true)}
                 canSave={canEditTenderMeta}
                 saving={savingAll}
@@ -1220,23 +1261,27 @@ export const TenderDetail = () => {
                 </div>
             </div>
 
-            <TenderLogsPanel
-                open={chatterOpen}
-                onClose={handleCloseLogs}
-                timelineItems={timelineItems}
-                logsLoading={logsLoading}
-                canManage={canManage}
-                noteText={noteText}
-                onNoteTextChange={setNoteText}
-                noteSaving={noteSaving}
-                onSubmitNote={handleSubmitNote}
-                documentInputRef={documentInputRef}
-                documentSaving={documentSaving}
-                onSubmitDocument={handleSubmitDocument}
-                documentsLoading={documentsLoading}
-                tenderDocuments={tenderDocuments}
-                renderDocumentTile={renderDocumentTile}
-            />
+            {chatterOpen && (
+                <Suspense fallback={null}>
+                    <LazyTenderLogsPanel
+                        open
+                        onClose={handleCloseLogs}
+                        timelineItems={timelineItems}
+                        logsLoading={logsLoading}
+                        canManage={canManage}
+                        noteText={noteText}
+                        onNoteTextChange={setNoteText}
+                        noteSaving={noteSaving}
+                        onSubmitNote={handleSubmitNote}
+                        documentInputRef={documentInputRef}
+                        documentSaving={documentSaving}
+                        onSubmitDocument={handleSubmitDocument}
+                        documentsLoading={documentsLoading}
+                        tenderDocuments={tenderDocuments}
+                        renderDocumentTile={renderDocumentTile}
+                    />
+                </Suspense>
+            )}
 
             <TenderWorkspaceTabs
                 workspaceTab={workspaceTab}
@@ -1271,6 +1316,8 @@ export const TenderDetail = () => {
                 <div className="overflow-x-auto">
                     <TenderLineTable
                         pagedRows={pagedRows}
+                        rowOffset={lineRowOffset}
+                        totalRowCount={displayRows.length}
                         isEmpty={simpleRows.length === 0}
                         isDraft={isDraft}
                         canManage={canManage}
@@ -1295,6 +1342,39 @@ export const TenderDetail = () => {
                         onOpenProductPicker={openProductPicker}
                     />
                 </div>
+                {linePageCount > 1 && (
+                    <nav
+                        aria-label={t('common.pagination')}
+                        className="flex items-center justify-between border-t border-slate-100 px-3 py-2"
+                    >
+                        <span className="text-[11.5px] font-medium tabular-nums text-slate-500">
+                            {lineRowOffset + 1}–{Math.min(lineRowOffset + LINE_PAGE_SIZE, displayRows.length)} / {displayRows.length}
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                aria-label={t('common.onceki')}
+                                disabled={effectiveLinePage === 1}
+                                onClick={() => setLinePage((page) => Math.max(1, page - 1))}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <ChevronLeft size={14} />
+                            </button>
+                            <span className="min-w-14 text-center text-[11.5px] font-semibold tabular-nums text-slate-600">
+                                {effectiveLinePage} / {linePageCount}
+                            </span>
+                            <button
+                                type="button"
+                                aria-label={t('common.sonraki')}
+                                disabled={effectiveLinePage === linePageCount}
+                                onClick={() => setLinePage((page) => Math.min(linePageCount, page + 1))}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+                    </nav>
+                )}
                 {/* Bottom of the quote: discount on the price, amount excl. VAT,
                     VAT amount and the final total — inside the same card. */}
                 <TenderPriceSummary
@@ -1347,7 +1427,9 @@ export const TenderDetail = () => {
                 </Suspense>
             )}
 
-            <TenderOrderDecisionModal
+            {orderDecisionOpen && (
+            <Suspense fallback={null}>
+            <LazyTenderOrderDecisionModal
                 open={orderDecisionOpen}
                 onClose={() => setOrderDecisionOpen(false)}
                 loading={orderDecisionLoading}
@@ -1365,8 +1447,12 @@ export const TenderDetail = () => {
                 selectedProject={selectedExistingProject}
                 onSelectProject={setSelectedExistingProject}
             />
+            </Suspense>
+            )}
 
-            <TenderProductPickerModal
+            {productPickerOpen && (
+            <Suspense fallback={null}>
+            <LazyTenderProductPickerModal
                 open={productPickerOpen}
                 onClose={() => {
                     setProductPickerOpen(false);
@@ -1396,24 +1482,36 @@ export const TenderDetail = () => {
                     );
                 }}
             />
+            </Suspense>
+            )}
 
-            <TenderManualProductModal
+            {manualProductOpen && (
+            <Suspense fallback={null}>
+            <LazyTenderManualProductModal
                 open={manualProductOpen}
                 onClose={() => setManualProductOpen(false)}
                 manualProduct={manualProduct}
                 onChange={setManualProduct}
                 onSubmit={handleCreateManualProduct}
             />
+            </Suspense>
+            )}
 
-            <TenderBulkDeleteModal
+            {bulkDeleteOpen && (
+            <Suspense fallback={null}>
+            <LazyTenderBulkDeleteModal
                 open={bulkDeleteOpen}
                 onClose={() => setBulkDeleteOpen(false)}
                 loading={bulkActionLoading}
                 selectedRows={selectedRows}
                 onConfirm={handleBulkDelete}
             />
+            </Suspense>
+            )}
 
-            <TenderBulkDiscountModal
+            {bulkDiscountOpen && (
+            <Suspense fallback={null}>
+            <LazyTenderBulkDiscountModal
                 open={bulkDiscountOpen}
                 onClose={() => setBulkDiscountOpen(false)}
                 loading={bulkActionLoading}
@@ -1422,11 +1520,17 @@ export const TenderDetail = () => {
                 onValueChange={setBulkDiscountValue}
                 onConfirm={handleBulkDiscount}
             />
+            </Suspense>
+            )}
 
-            <TenderDocumentPreviewModal
+            {documentPreview && (
+            <Suspense fallback={null}>
+            <LazyTenderDocumentPreviewModal
                 document={documentPreview}
                 onClose={() => setDocumentPreview(null)}
             />
+            </Suspense>
+            )}
 
             {exportOpen && (
                 <Suspense fallback={null}>
@@ -1443,50 +1547,69 @@ export const TenderDetail = () => {
             )}
 
             {/* Inline "+ add address" popup (installation / billing / customer) */}
-            <TenderAddressCreateModal
-                open={addrModalOpen}
-                onClose={() => setAddrModalOpen(false)}
-                saving={addrSaving}
-                target={addrTarget}
-                onTargetChange={setAddrTarget}
-                form={addrForm}
-                onFormChange={setAddrForm}
-                onSubmit={submitAddrModal}
-            />
+            {addrModalOpen && (
+                <Suspense fallback={null}>
+                    <LazyTenderAddressCreateModal
+                        open
+                        onClose={() => setAddrModalOpen(false)}
+                        saving={addrSaving}
+                        target={addrTarget}
+                        onTargetChange={setAddrTarget}
+                        form={addrForm}
+                        onFormChange={setAddrForm}
+                        onSubmit={submitAddrModal}
+                    />
+                </Suspense>
+            )}
 
-       
-            <TenderCustomerCreateModal
-                open={customerModalOpen}
-                onClose={() => setCustomerModalOpen(false)}
-                saving={customerSaving}
-                form={customerForm}
-                onChange={setCustomerForm}
-                onSubmit={submitCustomerModal}
-            />
+            {customerModalOpen && (
+                <Suspense fallback={null}>
+                    <LazyTenderCustomerCreateModal
+                        open
+                        onClose={() => setCustomerModalOpen(false)}
+                        saving={customerSaving}
+                        form={customerForm}
+                        onChange={setCustomerForm}
+                        onSubmit={submitCustomerModal}
+                    />
+                </Suspense>
+            )}
 
             {/* Custom "unsaved changes" prompt shown when leaving via menu / links / Back. */}
-            <UnsavedChangesModal
-                open={navGuard.isOpen}
-                saving={savingAll}
-                onSave={handleGuardSave}
-                onDiscard={navGuard.proceed}
-                onCancel={navGuard.cancel}
-            />
+            {navGuard.isOpen && (
+                <Suspense fallback={null}>
+                    <LazyUnsavedChangesModal
+                        open
+                        saving={savingAll}
+                        onSave={handleGuardSave}
+                        onDiscard={navGuard.proceed}
+                        onCancel={navGuard.cancel}
+                    />
+                </Suspense>
+            )}
 
             {/* "Project created successfully" popup with go-to / stay choices. */}
-            <ProjectCreatedModal
-                open={!!projectCreatedModalId}
-                onGoToProject={goToCreatedProject}
-                onStay={dismissProjectCreated}
-            />
+            {projectCreatedModalId && (
+                <Suspense fallback={null}>
+                    <LazyProjectCreatedModal
+                        open
+                        onGoToProject={goToCreatedProject}
+                        onStay={dismissProjectCreated}
+                    />
+                </Suspense>
+            )}
 
             {/* Destructive "are you sure?" confirmation for deleting the offer. */}
-            <DeleteOfferModal
-                open={deleteOfferOpen}
-                deleting={deletingOffer}
-                onConfirm={() => void handleDeleteOffer()}
-                onCancel={() => setDeleteOfferOpen(false)}
-            />
+            {deleteOfferOpen && (
+                <Suspense fallback={null}>
+                    <LazyDeleteOfferModal
+                        open
+                        deleting={deletingOffer}
+                        onConfirm={() => void handleDeleteOffer()}
+                        onCancel={() => setDeleteOfferOpen(false)}
+                    />
+                </Suspense>
+            )}
 
         </div>
     );

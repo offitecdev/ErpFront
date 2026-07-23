@@ -2,9 +2,9 @@ import { memo, useEffect, useRef, useState } from 'react';
 import AntInput, { type InputRef } from 'antd/es/input';
 import InputNumber from 'antd/es/input-number';
 
-import { RichTextMarkdownEditor, INLINE_INPUT_FONT_FAMILY } from '../TenderRichText';
 import type { NumberField, TextField } from '../types/tenderDetail.types';
 
+const INLINE_INPUT_FONT_FAMILY = "'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 type InlineCellNavProps = {
     positionId: string;
@@ -93,11 +93,17 @@ BufferedTextInput.displayName = 'BufferedTextInput';
 const toNumberDraft = (value: number | null | undefined) =>
     value != null && Number(value) > 0 ? Number(value) : null;
 
-// When auto-fit is on, wait this long after the last keystroke before resizing —
-// so the font stays put while typing and only settles once the user pauses.
-const AUTOFIT_DEBOUNCE_MS = 300;
+// Choose the size from the formatted value length. This avoids DOM measurement
+// and layout thrashing while preserving the compact amount-column treatment.
 const AUTOFIT_BASE_PX = 11.5;
 const AUTOFIT_MIN_PX = 9;
+const fitNumberInputFontPx = (value: number | null) => {
+    const length = value == null ? 0 : String(value).length;
+    if (length <= 8) return AUTOFIT_BASE_PX;
+    if (length <= 10) return 10.5;
+    if (length <= 12) return 9.5;
+    return AUTOFIT_MIN_PX;
+};
 
 export const BufferedNumberInput = memo(({
     ariaLabel,
@@ -125,33 +131,14 @@ export const BufferedNumberInput = memo(({
     autoFit?: boolean;
 } & InlineCellNavProps) => {
     const [draft, setDraft] = useState<number | null>(() => toNumberDraft(value));
-    const [autoFitPx, setAutoFitPx] = useState<number | null>(null);
     const focusedRef = useRef(false);
     const skipCommitRef = useRef(false);
     // antd's InputNumber ref exposes { focus, blur, nativeElement }; typed loosely
     // so we can reach the underlying <input> for select-all on keyboard navigation.
     const inputRef = useRef<any>(null);
 
-    // After the user pauses, measure the real text overflow and step the font
-    // down just enough to fit — the CSS var below then persists the size across
-    // antd re-renders.
-    useEffect(() => {
-        if (!autoFit) return;
-        const timer = window.setTimeout(() => {
-            const inputEl = inputRef.current?.nativeElement?.querySelector?.('input') as HTMLInputElement | null;
-            if (!inputEl) return;
-            const restore = inputEl.style.fontSize;
-            let px = AUTOFIT_BASE_PX;
-            inputEl.style.fontSize = `${px}px`;
-            while (px > AUTOFIT_MIN_PX && inputEl.scrollWidth > inputEl.clientWidth + 1) {
-                px -= 0.5;
-                inputEl.style.fontSize = `${px}px`;
-            }
-            inputEl.style.fontSize = restore;
-            setAutoFitPx(px);
-        }, AUTOFIT_DEBOUNCE_MS);
-        return () => window.clearTimeout(timer);
-    }, [draft, autoFit]);
+    // Length-based sizing is deterministic and does not read layout after writes.
+    const autoFitPx = autoFit ? fitNumberInputFontPx(draft) : null;
 
     useEffect(() => {
         if (!focusedRef.current) setDraft(toNumberDraft(value));
@@ -228,27 +215,3 @@ export const BufferedNumberInput = memo(({
     );
 });
 BufferedNumberInput.displayName = 'BufferedNumberInput';
-
-
-export const InlineDescriptionEditor = memo(({
-    positionId,
-    value,
-    minHeight,
-    commit,
-}: {
-    positionId: string;
-    value: string;
-    minHeight: number;
-    commit: (positionId: string, value: string) => void;
-}) => (
-    <RichTextMarkdownEditor
-        value={value}
-        onChange={(next) => commit(positionId, next)}
-        commitOnBlur
-        minHeight={minHeight}
-        variant="inline"
-        placeholder=""
-        className="w-full"
-    />
-));
-InlineDescriptionEditor.displayName = 'InlineDescriptionEditor';

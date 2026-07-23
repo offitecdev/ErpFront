@@ -23,9 +23,31 @@ export interface TenderListFilter {
     customerId?: string;
     status?: 'Draft' | 'Approved' | 'Exported';
     search?: string;
+    // Kolon bazlı filtreler + sıralama (Ürünler listesindeki desenle aynı) — sunucuda daraltır.
+    tenderNumber?: string;
+    customerName?: string;
+    creatorName?: string;
+    // İki durumlu iş akışı (taslak / sipariş) ve e-posta gönderim durumu.
+    orderState?: 'draft' | 'order';
+    mailSent?: 'yes' | 'no';
+    sortBy?: 'tenderNumber' | 'customerName' | 'status' | 'createdAt';
+    sortDirection?: 'asc' | 'desc';
     page?: number;
     pageSize?: number;
 }
+
+const applyTenderFilterParams = (params: URLSearchParams, filter: TenderListFilter) => {
+    if (filter.customerId) params.set('customerId', filter.customerId);
+    if (filter.status) params.set('status', filter.status);
+    if (filter.search) params.set('search', filter.search);
+    if (filter.tenderNumber) params.set('tenderNumber', filter.tenderNumber);
+    if (filter.customerName) params.set('customerName', filter.customerName);
+    if (filter.creatorName) params.set('creatorName', filter.creatorName);
+    if (filter.orderState) params.set('orderState', filter.orderState);
+    if (filter.mailSent) params.set('mailSent', filter.mailSent);
+    if (filter.sortBy) params.set('sortBy', filter.sortBy);
+    if (filter.sortDirection) params.set('sortDirection', filter.sortDirection);
+};
 
 export interface PaginatedResult<T> {
     items: T[];
@@ -38,9 +60,7 @@ export interface PaginatedResult<T> {
 export const tenderApi = {
     list: async (filter: TenderListFilter = {}): Promise<TenderListItem[]> => {
         const params = new URLSearchParams();
-        if (filter.customerId) params.set('customerId', filter.customerId);
-        if (filter.status) params.set('status', filter.status);
-        if (filter.search) params.set('search', filter.search);
+        applyTenderFilterParams(params, filter);
         if (filter.page) params.set('page', String(filter.page));
         if (filter.pageSize) params.set('pageSize', String(filter.pageSize));
         const res = await apiClient.get(`/tenders${params.toString() ? '?' + params : ''}`);
@@ -49,9 +69,7 @@ export const tenderApi = {
 
     listPaged: async (filter: TenderListFilter = {}): Promise<PaginatedResult<TenderListItem>> => {
         const params = new URLSearchParams();
-        if (filter.customerId) params.set('customerId', filter.customerId);
-        if (filter.status) params.set('status', filter.status);
-        if (filter.search) params.set('search', filter.search);
+        applyTenderFilterParams(params, filter);
         params.set('page', String(filter.page ?? 1));
         params.set('pageSize', String(filter.pageSize ?? 10));
         const res = await apiClient.get(`/tenders?${params.toString()}`);

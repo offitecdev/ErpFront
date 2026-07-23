@@ -43,6 +43,8 @@ interface InventoryState {
         code?: string;
         name?: string;
         barcode?: string;
+        sortBy?: string;
+        sortDirection?: 'asc' | 'desc';
     }) => Promise<void>;
 
     createArticle: (data: Partial<InventoryArticle>) => Promise<InventoryArticle>;
@@ -114,10 +116,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     articlesPageItems: [],
     articlesTotal: 0,
     articlesPageLoading: false,
-    fetchArticlesPage: async ({ page, pageSize = 15, search, status, itemType, code, name, barcode }) => {
+    fetchArticlesPage: async (params) => {
         set({ articlesPageLoading: true });
         try {
-            const res = await inventoryApi.articlesSummaryPaged({ page, pageSize, search, status, itemType, code, name, barcode });
+            const res = await inventoryApi.articlesSummaryPaged({ pageSize: 15, ...params });
             set({ articlesPageItems: res.items, articlesTotal: res.total });
         } finally {
             set({ articlesPageLoading: false });
@@ -135,7 +137,13 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     },
     deleteArticle: async (id) => {
         await articleApi.delete(id);
-        set({ articles: get().articles.filter((a) => a.id !== id) });
+        // Drop the row from every in-memory list (full + current page) so the table
+        // updates in place — no page refetch/reload needed.
+        set({
+            articles: get().articles.filter((a) => a.id !== id),
+            articlesPageItems: get().articlesPageItems.filter((a) => a.id !== id),
+            articlesTotal: Math.max(0, get().articlesTotal - 1),
+        });
     },
 
     balances: [],

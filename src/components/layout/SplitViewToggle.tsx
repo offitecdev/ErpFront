@@ -6,6 +6,7 @@ import { useSplitView } from './SplitViewContext';
 type SplitViewToggleProps = {
     /** Called when the mode is armed — the host collapses the side menu. */
     onEnter?: () => void;
+    onExit?: () => void;
     className?: string;
 };
 
@@ -15,7 +16,7 @@ type SplitViewToggleProps = {
  * (left) pane; the next page picked from the side menu opens on the right.
  * Turning it off restores the single-page view (the left page remains).
  */
-export const SplitViewToggle: React.FC<SplitViewToggleProps> = ({ onEnter, className = '' }) => {
+export const SplitViewToggle: React.FC<SplitViewToggleProps> = ({ onEnter, onExit, className = '' }) => {
     const { t } = useTranslation();
     const { splitMode, enterSplit, exitSplit } = useSplitView();
 
@@ -27,7 +28,8 @@ export const SplitViewToggle: React.FC<SplitViewToggleProps> = ({ onEnter, class
             title={splitMode ? t('nav.closeSplitView') : t('nav.splitView')}
             onClick={() => {
                 if (splitMode) {
-                    exitSplit();
+                    if (onExit) onExit();
+                    else exitSplit();
                 } else {
                     enterSplit();
                     onEnter?.();

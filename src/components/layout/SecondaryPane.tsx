@@ -16,6 +16,11 @@ import {
 import { hrefFor } from '../../lib/navLink';
 import { useAuthStore } from '../../store/authStore';
 
+type SecondaryPaneProps = {
+    onClose?: () => void;
+    onOpenFullPage?: (path: string) => void;
+};
+
 /**
  * The secondary (right) screen of dual-screen mode, rendered as a same-origin
  * iframe running the app in a bare "pane" shell (MainLayout detects the iframe
@@ -27,7 +32,7 @@ import { useAuthStore } from '../../store/authStore';
  * no pane-level horizontal scrolling, and navigation that starts in the pane
  * stays in the pane because it is a real, independent browsing context.
  */
-export const SecondaryPane: React.FC = () => {
+export const SecondaryPane: React.FC<SecondaryPaneProps> = ({ onClose, onOpenFullPage }) => {
     const { t } = useTranslation();
     const { secondaryPath, secondaryCurrentPath, secondaryNonce, reportSecondaryLocation, exitSplit } = useSplitView();
     // SecondaryPane lives in the main window — this is the MAIN router's
@@ -36,14 +41,10 @@ export const SecondaryPane: React.FC = () => {
     const selectedTenantId = useAuthStore((s) => s.selectedTenantId);
 
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [paneReady, setPaneReady] = useState(false);
+    const [loadedPaneKey, setLoadedPaneKey] = useState<string | null>(null);
 
     const paneKey = `${secondaryNonce}|${secondaryPath || ''}|${selectedTenantId || ''}`;
-
-    // Show the loading veil again whenever the pane target changes.
-    useEffect(() => {
-        setPaneReady(false);
-    }, [paneKey]);
+    const paneReady = loadedPaneKey === paneKey;
 
     // Follow the pane's internal navigation (same-origin read) so swap and
     // "open full page" track the page actually on screen, not just the one the
@@ -121,13 +122,20 @@ export const SecondaryPane: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => { const target = shownPath; exitSplit(); navigate(target); }}
+                        onClick={() => {
+                            const target = shownPath;
+                            if (onOpenFullPage) onOpenFullPage(target);
+                            else {
+                                exitSplit();
+                                navigate(target);
+                            }
+                        }}
                         className="text-[11px] font-medium text-slate-400 hover:text-sky-600 transition-colors dark:text-white/50 dark:hover:text-white"
                     >
                         {t('nav.openFullPage')}
                     </button>
                     <button
-                        onClick={exitSplit}
+                        onClick={onClose || exitSplit}
                         className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-700 transition-colors dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
                         title={t('nav.closeSplitView')}
                         aria-label={t('nav.closeSplitView')}
@@ -156,7 +164,7 @@ export const SecondaryPane: React.FC = () => {
                     src={hrefFor(secondaryPath)}
                     title={paneTitle}
                     onLoad={() => {
-                        setPaneReady(true);
+                        setLoadedPaneKey(paneKey);
                         // Hand keyboard focus to the pane so arrow keys and other
                         // shortcuts work in it right away, without a click first.
                         try { iframeRef.current?.contentWindow?.focus(); } catch { /* noop */ }
