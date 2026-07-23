@@ -253,7 +253,14 @@
         "hours": "sa",
         "minutes": "dk",
         "hm": "{{h}} sa {{m}} dk",
-        "mOnly": "{{m}} dk"
+        "mOnly": "{{m}} dk",
+        "sortNewest": "En yeniden eskiye",
+        "sortOldest": "En eskiden yeniye",
+        "sortAscending": "Artan sırala",
+        "sortDescending": "Azalan sırala",
+        "sortOrder": "Sıralama",
+        "sortNameAsc": "Ad (A→Z)",
+        "sortNameDesc": "Ad (Z→A)"
     },
     "language": {
         "title": "Dil",
@@ -859,7 +866,15 @@
         "statusActive": "Aktif",
         "statusOnHold": "Beklemede",
         "statusCompleted": "Tamamlandı",
-        "statusCancelled": "İptal"
+        "statusCancelled": "İptal",
+        "titleCombined": "Projeler ve Siparişler",
+        "projectsTab": "Projeler",
+        "ordersTab": "Siparişler",
+        "ordersSearch": "Sipariş no veya müşteri ara",
+        "orderPartial": "Kısmen faturalandı",
+        "orderBilled": "Faturalandı",
+        "listColTechnical": "Teknik",
+        "listColBilling": "Fatura"
     },
     "settings": {
         "pdf": {
@@ -1355,7 +1370,10 @@
         "tekliften_kaldirildi": "Tekliften kaldırıldı.",
         "urunu_tekliften_kaldirilsin_mi": "Ürün tekliften kaldırılsın mı?",
         "verisi_indirildi": "{{format}} verisi indirildi.",
-        "yeni_versiyon_olusturuldu": "Yeni versiyon oluşturuldu."
+        "yeni_versiyon_olusturuldu": "Yeni versiyon oluşturuldu.",
+        "import_from_excel": "Excel'den içe aktar",
+        "mail_sent": "Gönderildi",
+        "mail_not_sent": "Gönderilmedi"
     },
     "auto": {
         "0_ise_hareket_yok": "0 ise hareket yok",
@@ -1904,6 +1922,7 @@
         "yonetici_onayi_verildi": "Yönetici onayı verildi.",
         "yonetici_onayi_verilemedi": "Yönetici onayı verilemedi.",
         "yuksek": "Yüksek",
-        "zorunlu_kontrol_maddelerini_tamamlayin": "Zorunlu kontrol maddelerini tamamlayın."
+        "zorunlu_kontrol_maddelerini_tamamlayin": "Zorunlu kontrol maddelerini tamamlayın.",
+        "alis_fiyati": "Alış fiyatı"
     }
 }

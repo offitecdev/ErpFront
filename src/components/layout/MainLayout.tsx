@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LuMoon, LuSun } from '@/components/icons/lucideLocal';
@@ -29,21 +29,24 @@ import {
 import { getRoleProfile } from '../../lib/access';
 import { useGuardedNavigate } from '../../store/navGuardStore';
 import { hrefFor, isModifiedClick } from '../../lib/navLink';
-import Badge from 'antd/es/badge';
-import AntSelect from 'antd/es/select';
-import Switch from 'antd/es/switch';
 import { SlidePanel } from './SlidePanel';
 import { AppSidebar, type QuickCreateItem } from './AppSidebar';
 import { WorkspaceTabsProvider, WorkspaceTabLauncher, WorkspaceTabStrip } from './WorkspaceTabs';
 import { SplitViewProvider, useSplitView, SPLIT_PANE_WINDOW_NAME } from './SplitViewContext';
 import { SplitViewToggle } from './SplitViewToggle';
 import { SecondaryPane } from './SecondaryPane';
+import { PrimaryPane } from './PrimaryPane';
 import { PaneErrorBoundary } from './PaneErrorBoundary';
 import { notificationApi, type NotificationDto } from '../../lib/api/notifications';
-import { GlobalAlertStack } from '../alerts/GlobalAlertStack';
 import { LanguageSwitcher } from '../ui-shared/LanguageSwitcher';
-import offitecLogo from '../../assets/images/offitec.png';
-import offitecLogoDark from '../../assets/images/darkmode.png';
+import offitecLogo from '../../assets/images/offitec-1x.webp';
+import offitecLogo2x from '../../assets/images/offitec-2x.webp';
+import offitecLogoDark from '../../assets/images/darkmode-1x.webp';
+import offitecLogoDark2x from '../../assets/images/darkmode-2x.webp';
+
+const LazyGlobalAlertStack = React.lazy(() =>
+    import('../alerts/GlobalAlertStack').then((module) => ({ default: module.GlobalAlertStack })),
+);
 
 /* ── Menü Tipleri ── */
 type MenuLeaf = { key: string; label: string; permission?: string; hideForTechnician?: boolean; technicianOnly?: boolean };
@@ -303,6 +306,28 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
 const IS_SPLIT_PANE = typeof window !== 'undefined' && window.name === SPLIT_PANE_WINDOW_NAME;
 
 /* ── İç Layout ── */
+const DeferredGlobalAlertStack: React.FC<{
+    onCountChange: (count: number) => void;
+    onArchived: () => void;
+}> = ({ onCountChange, onArchived }) => {
+    const [isReady, setIsReady] = useState(false);
+
+    useEffect(() => {
+        // Alerts aggregate several large API lists and use the animation runtime.
+        // Keep both the module download and its requests outside the detail LCP.
+        const timer = window.setTimeout(() => setIsReady(true), 8000);
+        return () => window.clearTimeout(timer);
+    }, []);
+
+    if (!isReady) return null;
+
+    return (
+        <React.Suspense fallback={null}>
+            <LazyGlobalAlertStack onCountChange={onCountChange} onArchived={onArchived} />
+        </React.Suspense>
+    );
+};
+
 const MainLayoutInner: React.FC = () => {
     const navigate = useNavigate();
     // Menu / tab switches use this so leaving a tender with unsaved changes prompts
@@ -335,6 +360,21 @@ const MainLayoutInner: React.FC = () => {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const searchOverlayInputRef = useRef<HTMLInputElement>(null);
     const pageScrollRef = useRef<HTMLDivElement>(null);
+    const primaryRoute = location.pathname + location.search;
+    const [primaryLocation, setPrimaryLocation] = useState({
+        entryPath: primaryRoute,
+        currentPath: primaryRoute,
+    });
+    const primaryCurrentPath = primaryLocation.entryPath === primaryRoute
+        ? primaryLocation.currentPath
+        : primaryRoute;
+    const reportPrimaryLocation = useCallback((path: string) => {
+        setPrimaryLocation((current) => (
+            current.entryPath === primaryRoute && current.currentPath === path
+                ? current
+                : { entryPath: primaryRoute, currentPath: path }
+        ));
+    }, [primaryRoute]);
     const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
     const projectModuleEnabled = selectedTenant?.isProjectModuleEnabled !== false;
     const roleProfile = useMemo(() => getRoleProfile(user), [user]);
@@ -399,12 +439,21 @@ const MainLayoutInner: React.FC = () => {
                 'table:not([role="grid"]):not([data-unstyled-table]) > thead',
             );
 
-            headers.forEach((header) => {
+            // Read every geometry value first, then update attributes. Mixing an
+            // attribute write with the next geometry read forced a new layout
+            // for each table.
+            const measurements = Array.from(headers, (header) => {
                 const table = header.closest('table');
-                if (!table) return;
+                if (!table) return { header, isStuck: false };
                 const tableRect = table.getBoundingClientRect();
-                const isStuck = tableRect.top < scrollportTop
-                    && tableRect.bottom > scrollportTop + header.offsetHeight;
+                const headerHeight = header.getBoundingClientRect().height;
+                return {
+                    header,
+                    isStuck: tableRect.top < scrollportTop
+                        && tableRect.bottom > scrollportTop + headerHeight,
+                };
+            });
+            measurements.forEach(({ header, isStuck }) => {
                 header.toggleAttribute('data-scroll-stuck', isStuck);
             });
         };
@@ -413,16 +462,12 @@ const MainLayoutInner: React.FC = () => {
             animationFrame = window.requestAnimationFrame(updateStickyTableHeaders);
         };
 
-        scheduleUpdate();
         scroller.addEventListener('scroll', scheduleUpdate, { passive: true });
         window.addEventListener('resize', scheduleUpdate);
-        const contentObserver = new MutationObserver(scheduleUpdate);
-        contentObserver.observe(scroller, { childList: true, subtree: true });
 
         return () => {
             scroller.removeEventListener('scroll', scheduleUpdate);
             window.removeEventListener('resize', scheduleUpdate);
-            contentObserver.disconnect();
             if (animationFrame) window.cancelAnimationFrame(animationFrame);
             scroller.querySelectorAll('[data-scroll-stuck]').forEach((header) => {
                 header.removeAttribute('data-scroll-stuck');
@@ -538,10 +583,21 @@ const MainLayoutInner: React.FC = () => {
     };
 
     const canSwapPanes = isSplit && !!secondaryPath;
+    const handleExitSplit = () => {
+        const target = primaryCurrentPath || primaryRoute;
+        exitSplit();
+        if (target !== primaryRoute) guardedNavigate(target);
+    };
+
+    const handleOpenSecondaryFullPage = (path: string) => {
+        exitSplit();
+        guardedNavigate(path);
+    };
+
     const handleSwapPanes = () => {
         const rightPath = secondaryCurrentPath || secondaryPath;
         if (!rightPath) return;
-        const leftPath = location.pathname + location.search;
+        const leftPath = primaryCurrentPath || primaryRoute;
         guardedNavigate(rightPath);
         openSecondary(leftPath);
     };
@@ -723,18 +779,29 @@ const MainLayoutInner: React.FC = () => {
                                 the menu width so the icons align with its edge. */}
                             <div
                                 style={!isMobile && sidebarPinnedOpen ? { width: MAIN_SIDEBAR_WIDTH } : undefined}
-                                className={`flex shrink-0 items-center gap-1.5 pl-3 pr-2 transition-[width] duration-300 ease-in-out`}
+                                className="flex shrink-0 items-center gap-1.5 pl-3 pr-2"
                             >
                                 <a
                                     href={hrefFor('/')}
                                     onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
                                     className={`flex h-9 min-w-0 items-center ${!isMobile && sidebarPinnedOpen ? 'flex-1' : ''}`}
                                 >
-                                    <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec Heating Cooling" width={360} height={143} decoding="async" fetchPriority="high" className="h-8 w-auto max-w-[120px] object-contain" />
+                                    <img
+                                        src={isDarkMode ? offitecLogoDark : offitecLogo}
+                                        srcSet={`${isDarkMode ? offitecLogoDark : offitecLogo} 96w, ${isDarkMode ? offitecLogoDark2x : offitecLogo2x} 180w`}
+                                        sizes="96px"
+                                        alt="Offitec Heating Cooling"
+                                        width={96}
+                                        height={38}
+                                        decoding="async"
+                                        fetchPriority="high"
+                                        className="h-8 w-auto max-w-[120px] object-contain"
+                                    />
                                 </a>
                                 {/* Dual-screen toggle — arming it collapses the menu. */}
                                 <SplitViewToggle
                                     onEnter={() => setSidebarPinnedOpen(false)}
+                                    onExit={handleExitSplit}
                                     className="hidden size-8 shrink-0 lg:flex"
                                 />
                                 <WorkspaceTabLauncher className="hidden lg:block" />
@@ -750,19 +817,27 @@ const MainLayoutInner: React.FC = () => {
                     <div className="flex items-center gap-1">
                         {tenants.length > 0 && (
                             <div className="mr-2 hidden items-center sm:flex">
-                                <AntSelect
+                                <label className="relative block">
+                                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
+                                        <BankOutlined size={13} />
+                                    </span>
+                                    <select
                                     value={selectedTenantId || undefined}
-                                    onChange={(value: string) => setSelectedTenant(value)}
-                                    className="offitec-tenant-select"
-                                    style={{ width: 190, height: 36 }}
-                                    size="middle"
-                                    prefix={<BankOutlined style={{ fontSize: 13, color: '#64748b' }} />}
+                                    onChange={(event) => setSelectedTenant(event.target.value)}
+                                    className="h-9 w-[190px] appearance-none rounded-lg border border-slate-200 bg-white py-0 pl-8 pr-8 text-[13px] font-medium text-slate-700 outline-none hover:border-slate-300 focus:border-[#272f67] focus:ring-2 focus:ring-[#272f67]/10 dark:border-white/10 dark:bg-[#151616] dark:text-slate-200"
                                     title={t('nav.modules')}
-                                    options={tenants.map((tenant) => ({
-                                        value: tenant.id,
-                                        label: tenant.parentTenantId ? `  ${tenant.tenantName}` : tenant.tenantName,
-                                    }))}
-                                />
+                                    aria-label={t('nav.modules')}
+                                    >
+                                        {tenants.map((tenant) => (
+                                            <option key={tenant.id} value={tenant.id}>
+                                                {tenant.parentTenantId ? `  ${tenant.tenantName}` : tenant.tenantName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[10px] text-slate-400" aria-hidden="true">
+                                        ▾
+                                    </span>
+                                </label>
                             </div>
                         )}
 
@@ -789,9 +864,12 @@ const MainLayoutInner: React.FC = () => {
                             className="relative flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
                             aria-label={t('nav.notifications')}
                         >
-                            <Badge count={unreadNotificationCount + alertCount} size="small" offset={[-2, 2]}>
-                                <BellOutlined style={{ fontSize: 16 }} />
-                            </Badge>
+                            <BellOutlined size={16} />
+                            {unreadNotificationCount + alertCount > 0 && (
+                                <span className="absolute right-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-white dark:ring-[#08090a]">
+                                    {unreadNotificationCount + alertCount > 99 ? '99+' : unreadNotificationCount + alertCount}
+                                </span>
+                            )}
                         </button>
                         <LanguageSwitcher />
                         <div className="relative" ref={dropdownRef}>
@@ -821,12 +899,18 @@ const MainLayoutInner: React.FC = () => {
                                             ? <LuSun size={13} className="text-slate-400" />
                                             : <LuMoon size={13} className="text-slate-400" />}
                                         <span className="flex-1 text-left">{t('common.darkMode', { defaultValue: 'Dark mode' })}</span>
-                                        <Switch
-                                            size="small"
-                                            checked={isDarkMode}
-                                            onChange={toggleTheme}
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={isDarkMode}
+                                            onClick={toggleTheme}
                                             aria-label={t('common.darkMode', { defaultValue: 'Dark mode' })}
-                                        />
+                                            className={`relative h-5 w-9 shrink-0 rounded-full ${isDarkMode ? 'bg-[#e6cf9e]' : 'bg-slate-300'}`}
+                                        >
+                                            <span
+                                                className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform duration-150 ${isDarkMode ? 'translate-x-4' : 'translate-x-0'}`}
+                                            />
+                                        </button>
                                     </div>
                                     <div className="my-1 border-t border-secondary" />
                                     <button
@@ -918,13 +1002,20 @@ const MainLayoutInner: React.FC = () => {
                     <div
                         ref={pageScrollRef}
                         style={isSplit && !isMobile ? { width: `${splitRatio}%` } : undefined}
-                        className={`overflow-auto px-[var(--page-gutter)] ${isResizingPanes ? '' : 'transition-all duration-200'} ${isSplit
-                            ? 'flex-1 py-5 [--page-gutter:1rem] lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70'
-                            : 'flex-1 py-5 [--page-gutter:1rem] sm:[--page-gutter:1.5rem] lg:py-6 lg:[--page-gutter:2rem]'}`}
+                        className={`${isSplit && !isMobile
+                            ? `min-w-0 flex-1 overflow-hidden lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70 ${isResizingPanes ? 'pointer-events-none select-none' : ''}`
+                            : 'flex-1 overflow-auto px-[var(--page-gutter)] py-5 [--page-gutter:1rem] sm:[--page-gutter:1.5rem] lg:py-6 lg:[--page-gutter:2rem]'}`}
                     >
-                        <PaneErrorBoundary resetKey={location.pathname + location.search}>
-                            <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
-                        </PaneErrorBoundary>
+                        {isSplit && !isMobile ? (
+                            <PrimaryPane
+                                path={primaryRoute}
+                                onLocationChange={reportPrimaryLocation}
+                            />
+                        ) : (
+                            <PaneErrorBoundary resetKey={primaryRoute}>
+                                <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
+                            </PaneErrorBoundary>
+                        )}
                     </div>
 
                     {/* Divider: drag anywhere on the strip to resize the two screens;
@@ -954,7 +1045,7 @@ const MainLayoutInner: React.FC = () => {
                                 <button
                                     type="button"
                                     onPointerDown={(e) => e.stopPropagation()}
-                                    onClick={exitSplit}
+                                    onClick={handleExitSplit}
                                     title={t('nav.closeSplitView')}
                                     aria-label={t('nav.closeSplitView')}
                                     className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
@@ -970,7 +1061,10 @@ const MainLayoutInner: React.FC = () => {
                         swallow pointer events, or the drag would stick. */}
                     {isSplit && (
                         <div className={`hidden lg:block lg:min-w-0 lg:flex-1 overflow-hidden ${isResizingPanes ? 'pointer-events-none select-none' : ''}`}>
-                            <SecondaryPane />
+                            <SecondaryPane
+                                onClose={handleExitSplit}
+                                onOpenFullPage={handleOpenSecondaryFullPage}
+                            />
                         </div>
                     )}
                 </main>
@@ -1040,7 +1134,7 @@ const MainLayoutInner: React.FC = () => {
 
             {/* App-level urgent alerts (top-right page-turn deck, 10-day snooze).
                 Dismissed cards are archived into the notification list. */}
-            <GlobalAlertStack
+            <DeferredGlobalAlertStack
                 onCountChange={setAlertCount}
                 onArchived={() => {
                     notificationApi.list({ limit: 40 })

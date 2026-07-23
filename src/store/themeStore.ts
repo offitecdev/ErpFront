@@ -3,6 +3,12 @@ import { create } from 'zustand';
 type ThemeMode = 'light' | 'dark';
 
 const STORAGE_KEY = 'theme';
+let darkStylesPromise: Promise<unknown> | null = null;
+
+const ensureDarkStyles = () => {
+    darkStylesPromise ??= import('../styles/dark.css');
+    return darkStylesPromise;
+};
 
 const getInitialMode = (): ThemeMode => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -39,17 +45,20 @@ interface ThemeState {
 
 const initialMode = getInitialMode();
 // Apply as early as the store module is first imported to minimise the flash.
+if (initialMode === 'dark') void ensureDarkStyles();
 applyTheme(initialMode);
 
 export const useThemeStore = create<ThemeState>((set) => ({
     isDarkMode: initialMode === 'dark',
     setDarkMode: (value: boolean) => {
+        if (value) void ensureDarkStyles();
         applyTheme(value ? 'dark' : 'light');
         set({ isDarkMode: value });
     },
     toggleTheme: () =>
         set((state) => {
             const next = !state.isDarkMode;
+            if (next) void ensureDarkStyles();
             applyTheme(next ? 'dark' : 'light');
             return { isDarkMode: next };
         }),
@@ -64,6 +73,7 @@ if (typeof window !== 'undefined') {
         if (event.key !== STORAGE_KEY) return;
         const mode = event.newValue === 'dark' ? 'dark' : 'light';
         if (useThemeStore.getState().isDarkMode === (mode === 'dark')) return;
+        if (mode === 'dark') void ensureDarkStyles();
         applyTheme(mode);
         useThemeStore.setState({ isDarkMode: mode === 'dark' });
     });

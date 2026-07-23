@@ -54,13 +54,18 @@ const redirectToLogin = () => {
 
 export const apiClient = axios.create({
     baseURL: resolveApiUrl(configuredApiUrl || defaultApiUrl),
+    // Auth travels as HttpOnly cookies set by the server — JS never touches
+    // tokens. withCredentials makes the browser attach them.
+    withCredentials: true,
 });
 
-// Request Interceptor: Token'ı ekle
 apiClient.interceptors.request.use((config) => {
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-    if (token && token !== 'undefined' && token !== 'null') {
-        config.headers.Authorization = `Bearer ${token}`;
+    // CSRF double-submit: echo the JS-readable csrf cookie back as a header.
+    // The server compares them on cookie-authenticated mutations; a cross-site
+    // attacker can't read our cookies, so they can't forge this header.
+    const csrfToken = document.cookie.match(/(?:^|;\s*)ofi_csrf=([^;]+)/)?.[1];
+    if (csrfToken) {
+        config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken);
     }
 
     const selectedTenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
@@ -73,13 +78,43 @@ apiClient.interceptors.request.use((config) => {
     return config;
 });
 
+// Silent refresh: the access cookie only lives 15 minutes. On a 401 we try
+// once to renew the cookie pair via the refresh cookie and replay the failed
+// request; only when that also fails is the user logged out. Single-flight so
+// parallel 401s share one refresh call (the refresh token rotates on use).
+let refreshPromise: Promise<boolean> | null = null;
+
+const refreshSession = async (): Promise<boolean> => {
+    try {
+        // Plain axios: apiClient's own interceptors must not run for this call.
+        // The server reads the refresh cookie and answers with fresh cookies.
+        await axios.post(`${apiClient.defaults.baseURL}/auth/refresh`, null, { withCredentials: true });
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 apiClient.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
+    async (error) => {
+        const status = error.response?.status;
+        const config = error.config || {};
+        const url: string = config.url || '';
+        const isAuthEndpoint = url.startsWith('/auth/login') || url.startsWith('/auth/refresh') || url.startsWith('/auth/logout');
+
+        if (status === 401 && !config._retry && !isAuthEndpoint) {
+            config._retry = true;
+            if (!refreshPromise) {
+                refreshPromise = refreshSession().finally(() => { refreshPromise = null; });
+            }
+            if (await refreshPromise) {
+                return apiClient(config);
+            }
             useAuthStore.getState().logout();
             redirectToLogin();
         }
+
         return Promise.reject(error);
     }
 );

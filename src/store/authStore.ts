@@ -18,15 +18,28 @@ export interface TenantOption {
     isProjectModuleEnabled: boolean;
 }
 
+// Tokens live exclusively in HttpOnly cookies set by the server — JavaScript
+// never sees or stores them (XSS can't exfiltrate what it can't read). The
+// only thing persisted here is a non-sensitive marker telling the app it is
+// worth attempting a profile fetch on startup.
+const HAS_SESSION_KEY = 'ofi_has_session';
+
+// One-time cleanup of the pre-cookie era storage keys.
+for (const storage of [localStorage, sessionStorage]) {
+    storage.removeItem('token');
+    storage.removeItem('refreshToken');
+}
+
+export const hasSessionHint = () => localStorage.getItem(HAS_SESSION_KEY) === '1';
+
 interface AuthState {
     user: User | null;
-    token: string | null;
     tenants: TenantOption[];
     selectedTenantId: string | null;
     permissions: string[];
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (token: string, user: User) => void;
+    login: (user: User) => void;
     logout: () => void;
     fetchProfile: () => Promise<void>;
     setSelectedTenant: (tenantId: string) => void;
@@ -34,27 +47,24 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
     user: null,
-    token: sessionStorage.getItem('token') || localStorage.getItem('token'),
     tenants: [],
     selectedTenantId: sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId'),
     permissions: [],
-    isAuthenticated: !!(sessionStorage.getItem('token') || localStorage.getItem('token')),
-    isLoading: !!(sessionStorage.getItem('token') || localStorage.getItem('token')),
+    isAuthenticated: hasSessionHint(),
+    isLoading: hasSessionHint(),
 
-    login: (token, user) => {
-        // Persist to localStorage as well as sessionStorage so a page opened in a
-        // new tab (which starts with empty sessionStorage) stays authenticated.
-        sessionStorage.setItem('token', token);
-        localStorage.setItem('token', token);
-        set({ token, user, isAuthenticated: true });
+    login: (user) => {
+        localStorage.setItem(HAS_SESSION_KEY, '1');
+        set({ user, isAuthenticated: true });
     },
 
     logout: () => {
-        sessionStorage.removeItem('token');
+        // The server owns the HttpOnly cookies, so it must clear them.
+        apiClient.post('/auth/logout').catch(() => undefined);
+        localStorage.removeItem(HAS_SESSION_KEY);
         sessionStorage.removeItem('selectedTenantId');
-        localStorage.removeItem('token');
         localStorage.removeItem('selectedTenantId');
-        set({ user: null, token: null, tenants: [], selectedTenantId: null, permissions: [], isAuthenticated: false });
+        set({ user: null, tenants: [], selectedTenantId: null, permissions: [], isAuthenticated: false });
     },
 
     fetchProfile: async () => {
@@ -79,19 +89,19 @@ export const useAuthStore = create<AuthState>((set) => ({
                 sessionStorage.setItem('selectedTenantId', selectedTenantId);
                 localStorage.setItem('selectedTenantId', selectedTenantId);
             }
-            
-            set({ 
-                user: userRes.data, 
+
+            localStorage.setItem(HAS_SESSION_KEY, '1');
+            set({
+                user: userRes.data,
                 tenants,
                 selectedTenantId,
                 permissions: permRes.data.permissions,
                 isAuthenticated: true
             });
         } catch (error) {
-            sessionStorage.removeItem('token');
+            localStorage.removeItem(HAS_SESSION_KEY);
             sessionStorage.removeItem('selectedTenantId');
-            localStorage.removeItem('token');
-            set({ user: null, token: null, tenants: [], selectedTenantId: null, permissions: [], isAuthenticated: false });
+            set({ user: null, tenants: [], selectedTenantId: null, permissions: [], isAuthenticated: false });
         } finally {
             set({ isLoading: false });
         }

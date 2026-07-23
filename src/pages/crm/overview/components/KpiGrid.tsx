@@ -53,7 +53,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ stats, filters }) => {
     );
 
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 2xl:gap-5">
             <KpiCard
                 label={t('crmOverview.kpi.openOffers', { defaultValue: 'Açık teklifler' })}
                 icon={<Briefcase01 size={17} />}

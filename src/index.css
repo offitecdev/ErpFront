@@ -1,8 +1,4 @@
 @import "./styles/globals.css";
-/* Dark-mode retrofit overrides — imported after globals/theme so its
-   rules come later in the cascade and win against the light defaults. */
-@import "./styles/dark.css";
-
 
 @custom-variant dark (&:is(.dark *));
 
@@ -317,11 +313,6 @@ main table:not([role="grid"]):not([data-unstyled-table]) td:last-child,
 [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) th:last-child,
 [role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) td:last-child {
   padding-right: 1.5rem !important;
-}
-
-main table:not([role="grid"]):not([data-unstyled-table]) tbody tr,
-[role="dialog"] table:not([role="grid"]):not([data-unstyled-table]) tbody tr {
-  transition: background-color 100ms ease-linear;
 }
 
 main table:not([role="grid"]):not([data-unstyled-table]) tbody tr:hover,
@@ -954,15 +945,6 @@ select option:checked {
   font-weight: 700 !important;
 }
 
-.offitec-tenant-select .ant-select-selector {
-  padding-left: 11px !important;
-}
-
-.offitec-tenant-select .ant-select-prefix {
-  margin-inline-end: 6px !important;
-  color: #64748b !important;
-}
-
 @theme inline {
   --font-heading: var(--font-display);
   --font-sans: var(--font-body);
@@ -1486,11 +1468,11 @@ main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th 
   /* Yatay iz: hücre 1rem + alanın kendi 0.5rem (px-2) iç boşluğu = 1.5rem —
      filtre metni kolon adlarıyla tam hizalı; odak zemini ise 8px içeriden
      yumuşak kenarlı bir şerit olarak belirir. */
-  padding: 6px 1rem !important;
+  padding: 8px 1rem !important;
   background: #ffffff !important;
   border-top: 0 !important;
   /* Gövde satır ayraçlarıyla aynı ton — filtre satırı sıradan bir satır gibi ayrılır */
-  border-bottom: 1px solid #f0efee !important;
+  border-bottom: 0 !important;
   border-radius: 0 !important;
   text-transform: none !important;
   letter-spacing: normal !important;
@@ -1526,7 +1508,7 @@ main table[data-column-lines] td:not(:first-child) {
   border-left: 1px solid #e2e8f0;
 }
 main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:not(:first-child) {
-  border-left: 1px solid #e2e8f0;
+  border-left: 0;
 }
 
 .dark main table[data-column-lines] th:not(:first-child),

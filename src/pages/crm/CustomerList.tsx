@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
+    ArrowDown,
+    ArrowUp,
     Building02 as Building2,
     ChevronLeft,
     ChevronRight,
@@ -15,9 +17,10 @@ import {
     SearchLg as Search,
     X as XIcon,
 } from '@/components/icons/antIconCompat';
+import Tooltip from 'antd/es/tooltip';
 
 import { apiClient } from '../../lib/axios';
-import { PageHeader } from '../../components/layout/PageHeader';
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
@@ -38,6 +41,65 @@ interface CustomerRow {
     isActive: boolean;
 }
 
+// Filtre satırı kontrolü — Teklifler/Ürünler listesindeki desenle aynı: alan hücreyle
+// bütünleşik, odaklanınca yumuşak kenarlı soluk bir zemin belirir.
+const CUSTOMER_FILTER_CONTROL =
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
+
+// Not: Customer modelinde createdAt yok — sıralama yalnızca ad/VAT/durum kolonlarınadır.
+type CustomerSortKey = 'companyName' | 'vatNumber' | 'status';
+type SortDirection = 'asc' | 'desc';
+
+const SortableHeader = ({
+    label,
+    column,
+    sortBy,
+    sortDirection,
+    onSort,
+    align = 'left',
+}: {
+    label: ReactNode;
+    column: CustomerSortKey;
+    sortBy: CustomerSortKey;
+    sortDirection: SortDirection;
+    onSort: (column: CustomerSortKey, direction: SortDirection) => void;
+    align?: 'left' | 'right' | 'center';
+}) => (
+    <th className={`px-4 py-2.5 font-semibold ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
+        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
+            <span className="truncate">{label}</span>
+            <span className="inline-flex shrink-0 items-center">
+                <Tooltip title={t('common.sortAscending')}>
+                    <button
+                        type="button"
+                        aria-label={t('common.sortAscending')}
+                        aria-pressed={sortBy === column && sortDirection === 'asc'}
+                        onClick={() => onSort(column, 'asc')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowUp size={10} />
+                    </button>
+                </Tooltip>
+                <Tooltip title={t('common.sortDescending')}>
+                    <button
+                        type="button"
+                        aria-label={t('common.sortDescending')}
+                        aria-pressed={sortBy === column && sortDirection === 'desc'}
+                        onClick={() => onSort(column, 'desc')}
+                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
+                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
+                        }`}
+                    >
+                        <ArrowDown size={10} />
+                    </button>
+                </Tooltip>
+            </span>
+        </div>
+    </th>
+);
+
 export const CustomerList = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -46,7 +108,20 @@ export const CustomerList = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
+
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı) — sunucuda daraltır.
+    const [companyFilter, setCompanyFilter] = useState('');
+    const [vatFilter, setVatFilter] = useState('');
+    const [emailFilter, setEmailFilter] = useState('');
+    const [debouncedColumns, setDebouncedColumns] = useState({ companyName: '', vatNumber: '', email: '' });
+    const [statusFilter, setStatusFilter] = useState('');
+    const [sortBy, setSortBy] = useState<CustomerSortKey>('companyName');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+    const [reloadTick, setReloadTick] = useState(0);
+    const PAGE_SIZE = 15;
+
     // `?create=1` (CRM overview quick action) lands with the form already open.
     const [showForm, setShowForm] = useState(() => new URLSearchParams(location.search).has('create'));
     const [submitting, setSubmitting] = useState(false);
@@ -71,40 +146,81 @@ export const CustomerList = () => {
         country: '',
         status: DEFAULT_CUSTOMER_STATUS,
     });
-    const pageSize = 10;
 
-    const fetchCustomers = async (nextPage = page, nextSearch = search) => {
-        try {
-            setLoading(true);
-            const params = new URLSearchParams({ page: String(nextPage), pageSize: String(pageSize) });
-            const q = nextSearch.trim();
-            if (q) params.set('search', q);
-            const res = await apiClient.get(`/customers?${params.toString()}`);
-            if (Array.isArray(res.data)) {
-                setCustomers(res.data || []);
-                setTotal(res.data?.length || 0);
-                setTotalPages(1);
-                setPage(1);
-            } else {
-                setCustomers(res.data.items || []);
-                setTotal(res.data.total || 0);
-                setTotalPages(res.data.totalPages || 1);
-                setPage(res.data.page || nextPage);
-            }
-        } catch {
-            toast.error(t('crm.customers.errorLoad'));
-            setCustomers([]);
-            setTotal(0);
-            setTotalPages(1);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Sunucu taraflı arama — tuş vuruşlarını debounce et.
     useEffect(() => {
-        const t = window.setTimeout(() => fetchCustomers(1, search), 250);
-        return () => window.clearTimeout(t);
+        const id = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+        return () => clearTimeout(id);
     }, [search]);
+
+    // Kolon filtreleri de debounce edilir; değer değişmediyse önceki nesne korunur.
+    useEffect(() => {
+        const id = setTimeout(() => {
+            setDebouncedColumns((prev) => {
+                const next = {
+                    companyName: companyFilter.trim(),
+                    vatNumber: vatFilter.trim(),
+                    email: emailFilter.trim(),
+                };
+                return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+            });
+        }, 300);
+        return () => clearTimeout(id);
+    }, [companyFilter, vatFilter, emailFilter]);
+
+    // Filtre değişimi + sayfa sıfırlama TEK efekte toplanır: filtre değiştiğinde
+    // sayfa > 1 ise önce sayfa sıfırlanır ve o tur fetch atlanır. reloadTick
+    // filtre anahtarına dâhil DEĞİL — kayıt eklendikten sonra sayfayı sıfırlamadan yeniler.
+    const filterKeyRef = useRef<string | null>(null);
+    useEffect(() => {
+        const filterKey = JSON.stringify([debouncedSearch, debouncedColumns, statusFilter, sortBy, sortDirection]);
+        const filtersChanged = filterKeyRef.current !== null && filterKeyRef.current !== filterKey;
+        filterKeyRef.current = filterKey;
+        if (filtersChanged && page !== 1) {
+            setPage(1);
+            return;
+        }
+
+        let cancelled = false;
+        (async () => {
+            try {
+                setLoading(true);
+                const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+                if (debouncedSearch) params.set('search', debouncedSearch);
+                if (debouncedColumns.companyName) params.set('companyName', debouncedColumns.companyName);
+                if (debouncedColumns.vatNumber) params.set('vatNumber', debouncedColumns.vatNumber);
+                if (debouncedColumns.email) params.set('email', debouncedColumns.email);
+                if (statusFilter) params.set('status', statusFilter);
+                params.set('sortBy', sortBy);
+                params.set('sortDirection', sortDirection);
+                const res = await apiClient.get(`/customers?${params.toString()}`);
+                if (cancelled) return;
+                if (Array.isArray(res.data)) {
+                    setCustomers(res.data || []);
+                    setTotal(res.data?.length || 0);
+                    setTotalPages(1);
+                } else {
+                    setCustomers(res.data.items || []);
+                    setTotal(res.data.total || 0);
+                    setTotalPages(res.data.totalPages || 1);
+                }
+            } catch {
+                if (cancelled) return;
+                toast.error(t('crm.customers.errorLoad'));
+                setCustomers([]);
+                setTotal(0);
+                setTotalPages(1);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [page, debouncedSearch, debouncedColumns, statusFilter, sortBy, sortDirection, reloadTick]);
+
+    const handleSort = (column: CustomerSortKey, direction: SortDirection) => {
+        setSortBy(column);
+        setSortDirection(direction);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -126,7 +242,8 @@ export const CustomerList = () => {
             });
             setSubmitAttempted(false);
             setShowForm(false);
-            fetchCustomers(1, search);
+            setPage(1);
+            setReloadTick((n) => n + 1);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('crm.customers.errorAdd'));
         } finally {
@@ -134,37 +251,26 @@ export const CustomerList = () => {
         }
     };
 
+    const totalPagesSafe = Math.max(1, totalPages);
+    const pageSafe = Math.min(page, totalPagesSafe);
+    const rangeFrom = total === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
+    const rangeTo = Math.min(pageSafe * PAGE_SIZE, total);
+
     return (
         <div>
-            <PageHeader
-                breadcrumb="CRM"
+            <InventoryListHeader
                 title={t('nav.customerList')}
-                description={t('crm.customers.description')}
-                actions={
-                    <>
-                        <div className="relative">
-                            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                value={search}
-                                onChange={(e) => {
-                                    setPage(1);
-                                    setSearch(e.target.value);
-                                }}
-                                placeholder={t('crm.customers.search')}
-                                className="pl-7 pr-2.5 py-1.5 text-[12.5px] border border-slate-200 rounded bg-slate-50/80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10 focus:border-blue-400 w-[200px]"
-                            />
-                        </div>
-                        <Button
-                            variant={showForm ? 'secondary' : 'primary'}
-                            icon={showForm ? <XIcon size={13} /> : <Plus size={13} />}
-                            onClick={() => {
-                                setSubmitAttempted(false);
-                                setShowForm(!showForm);
-                            }}
-                        >
-                            {showForm ?t('common.close') :t('crm.customers.newCustomer')}
-                        </Button>
-                    </>
+                action={
+                    <Button
+                        variant={showForm ? 'secondary' : 'primary'}
+                        icon={showForm ? <XIcon size={13} /> : <Plus size={13} />}
+                        onClick={() => {
+                            setSubmitAttempted(false);
+                            setShowForm(!showForm);
+                        }}
+                    >
+                        {showForm ?t('common.close') :t('crm.customers.newCustomer')}
+                    </Button>
                 }
             />
 
@@ -287,57 +393,179 @@ export const CustomerList = () => {
                 </Card>
             )}
 
-            <Card
-                title={t('crm.customers.tableTitle', { count: total })}
-                icon={<Building2 size={13} />}
-                noPadding
-            >
-                {loading ? (
-                    <div className="px-6 py-10 animate-pulse space-y-3">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="h-12 rounded-md bg-slate-50 border border-slate-100" />
-                        ))}
+            <Card noPadding>
+                {/* Üst çubuk — arama (esner) + sıralama + sayfalama (sağda).
+                    Durum filtresi kolon filtre satırındadır. */}
+                <div className="px-3 py-3">
+                    <div className="flex w-full flex-wrap items-center gap-3">
+                        <div className="relative w-[240px] min-w-0 shrink">
+                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={t('crm.customers.search')}
+                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                            />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch('')}
+                                    aria-label={t('common.clear')}
+                                    title={t('common.clear')}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                >
+                                    <XIcon size={12} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="w-[200px] shrink-0">
+                            <Select
+                                value={`${sortBy}:${sortDirection}`}
+                                onChange={(event) => {
+                                    const [column, direction] = event.target.value.split(':') as [CustomerSortKey, SortDirection];
+                                    handleSort(column, direction);
+                                }}
+                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
+                                aria-label={t('common.sortOrder')}
+                            >
+                                {sortBy !== 'companyName' && (
+                                    <option value={`${sortBy}:${sortDirection}`}>{t('common.sortOrder')}</option>
+                                )}
+                                <option value="companyName:asc">{t('common.sortNameAsc')}</option>
+                                <option value="companyName:desc">{t('common.sortNameDesc')}</option>
+                            </Select>
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-3">
+                            <span className="font-mono text-[12px] text-slate-500">
+                                {rangeFrom}-{rangeTo} / {total}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    disabled={pageSafe <= 1}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.back')}
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
+                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPagesSafe}</span>
+                                <button
+                                    type="button"
+                                    disabled={pageSafe >= totalPagesSafe}
+                                    onClick={() => setPage((p) => Math.min(totalPagesSafe, p + 1))}
+                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label={t('common.next')}
+                                >
+                                    <ChevronRight size={14} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                ) : customers.length === 0 ? (
-                    <EmptyState
-                        icon={<Building2 size={32} />}
-                        title={t('crm.customers.noCustomers')}
-                        description={search ?t('crm.customers.noCustomersSearch') :t('crm.customers.noCustomersEmpty')}
-                        action={
-                            !search && (
-                                <Button variant="primary" icon={<Plus size={13} />} onClick={() => { setSubmitAttempted(false); setShowForm(true); }}>{t('crm.customers.addFirst')}</Button>
-                            )
-                        }
-                    />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-[13px] text-left">
+                </div>
+
+                <div className="overflow-x-auto">
+                        <table className="w-full table-fixed text-[13px] text-left [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
+                            <colgroup>
+                                <col style={{ width: '28%' }} />
+                                <col style={{ width: '15%' }} />
+                                <col style={{ width: '25%' }} />
+                                <col style={{ width: '16%' }} />
+                                <col style={{ width: '16%' }} />
+                            </colgroup>
                             <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                                 <tr>
-                                    <th className="px-4 py-2.5 font-semibold">{t('common.company')}</th>
-                                    <th className="px-4 py-2.5 font-semibold">{t('crm.customers.vatNumber')}</th>
+                                    <SortableHeader label={t('common.company')} column="companyName" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                                    <SortableHeader label={t('crm.customers.vatNumber')} column="vatNumber" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                                     <th className="px-4 py-2.5 font-semibold">{t('crm.customers.colContact')}</th>
-                                    <th className="px-4 py-2.5 font-semibold">{t('common.status')}</th>
+                                    <SortableHeader label={t('common.status')} column="status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                                     <th className="px-4 py-2.5 font-semibold text-right">{t('common.actions')}</th>
+                                </tr>
+                                {/* Kolon bazlı filtre satırı — şirket / VAT / e-posta metinle, durum seçiciyle daraltır. */}
+                                <tr data-filter-row className="bg-white border-b border-slate-100">
+                                    <th className="px-2 py-1.5 font-normal">
+                                        <input
+                                            value={companyFilter}
+                                            onChange={(e) => setCompanyFilter(e.target.value)}
+                                            placeholder={`${t('common.filter')}...`}
+                                            className={CUSTOMER_FILTER_CONTROL}
+                                        />
+                                    </th>
+                                    <th className="px-2 py-1.5 font-normal">
+                                        <input
+                                            value={vatFilter}
+                                            onChange={(e) => setVatFilter(e.target.value)}
+                                            placeholder={`${t('common.filter')}...`}
+                                            className={CUSTOMER_FILTER_CONTROL}
+                                        />
+                                    </th>
+                                    <th className="px-2 py-1.5 font-normal">
+                                        <input
+                                            value={emailFilter}
+                                            onChange={(e) => setEmailFilter(e.target.value)}
+                                            placeholder={`${t('common.filter')}...`}
+                                            className={CUSTOMER_FILTER_CONTROL}
+                                        />
+                                    </th>
+                                    <th className="px-2 py-1.5 font-normal">
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            aria-label={t('common.status')}
+                                            className={CUSTOMER_FILTER_CONTROL}
+                                        >
+                                            <option value="">{t('common.all')}</option>
+                                            {CUSTOMER_STATUS_OPTIONS.map((o) => (
+                                                <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
+                                            ))}
+                                        </select>
+                                    </th>
+                                    <th className="px-2 py-2" />
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {customers.map((c) => (
+                                {loading && (
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                                            <div className="mx-auto max-w-sm animate-pulse space-y-2">
+                                                <div className="h-3 bg-slate-100 rounded" />
+                                                <div className="h-3 bg-slate-100 rounded w-2/3 mx-auto" />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!loading && customers.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5}>
+                                            <EmptyState
+                                                icon={<Building2 size={32} />}
+                                                title={t('crm.customers.noCustomers')}
+                                                description={debouncedSearch ?t('crm.customers.noCustomersSearch') :t('crm.customers.noCustomersEmpty')}
+                                                action={
+                                                    !debouncedSearch && (
+                                                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => { setSubmitAttempted(false); setShowForm(true); }}>{t('crm.customers.addFirst')}</Button>
+                                                    )
+                                                }
+                                            />
+                                        </td>
+                                    </tr>
+                                )}
+                                {!loading && customers.map((c) => (
                                     <tr
                                         key={c.id}
                                         className="cursor-pointer transition-colors hover:bg-slate-50/80 active:bg-slate-100"
                                         onClick={() => navigate(`/crm/customers/${c.id}`)}
                                     >
                                         <td className="px-4 py-2.5">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-8 h-8 rounded bg-blue-50 text-blue-700 flex items-center justify-center font-semibold text-[12px]">
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                                <div className="w-8 h-8 shrink-0 rounded bg-blue-50 text-blue-700 flex items-center justify-center font-semibold text-[12px]">
                                                     {c.companyName.slice(0, 2).toUpperCase()}
                                                 </div>
-                                                <div>
-                                                    <div className="font-semibold text-slate-900">{c.companyName}</div>
+                                                <div className="min-w-0">
+                                                    <div className="truncate font-semibold text-slate-900">{c.companyName}</div>
                                                     {c.address && (
                                                         <div className="text-[11.5px] text-slate-400 flex items-center gap-1 mt-0.5">
-                                                            <MapPin size={10} />{c.address}
+                                                            <MapPin size={10} className="shrink-0" /><span className="truncate">{c.address}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -346,8 +574,8 @@ export const CustomerList = () => {
                                         <td className="px-4 py-2.5 text-[12px] text-slate-600">
                                             {c.vatNumber ? (
                                                 <div className="flex items-center gap-1.5 font-mono">
-                                                    <Hash size={10} className="text-slate-300" />
-                                                    {c.vatNumber}
+                                                    <Hash size={10} className="text-slate-300 shrink-0" />
+                                                    <span className="truncate">{c.vatNumber}</span>
                                                 </div>
                                             ) : (
                                                 <span className="text-slate-300">—</span>
@@ -355,12 +583,12 @@ export const CustomerList = () => {
                                         </td>
                                         <td className="px-4 py-2.5 text-[12.5px]">
                                             <div className="flex items-center gap-1.5 text-slate-700">
-                                                <Mail size={11} className="text-slate-400" />
-                                                {c.mainEmail || <span className="text-slate-300">—</span>}
+                                                <Mail size={11} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">{c.mainEmail || <span className="text-slate-300">—</span>}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5 text-slate-500 text-[11.5px] mt-0.5">
-                                                <Phone size={11} className="text-slate-400" />
-                                                {c.mainPhone || <span className="text-slate-300">—</span>}
+                                                <Phone size={11} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">{c.mainPhone || <span className="text-slate-300">—</span>}</span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5">
@@ -380,61 +608,8 @@ export const CustomerList = () => {
                                 ))}
                             </tbody>
                         </table>
-                        {totalPages > 1 && (
-                            <PaginationBar
-                                page={page}
-                                totalPages={totalPages}
-                                total={total}
-                                onPage={(p) => fetchCustomers(p, search)}
-                            />
-                        )}
                     </div>
-                )}
             </Card>
         </div>
     );
 };
-
-const pageWindow = (page: number, totalPages: number) => {
-    const start = Math.max(1, Math.min(page - 2, totalPages - 4));
-    return Array.from({ length: Math.min(5, totalPages) }, (_, i) => start + i);
-};
-
-const PaginationBar: React.FC<{
-    page: number;
-    totalPages: number;
-    total: number;
-    onPage: (page: number) => void;
-}> = ({ page, totalPages, total, onPage }) => (
-    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-[12px]">
-        <span className="text-slate-500">{t('common.total')} {total} {t('crm.record')}</span>
-        <div className="inline-flex items-center gap-1">
-            <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => onPage(page - 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-            >
-                <ChevronLeft size={14} />
-            </button>
-            {pageWindow(page, totalPages).map((p) => (
-                <button
-                    key={p}
-                    type="button"
-                    onClick={() => onPage(p)}
-                    className={`h-8 min-w-8 rounded-md border px-2 font-medium transition-colors active:bg-slate-100 ${p === page ?"border-blue-700 bg-blue-700 text-white" :"border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
-                >
-                    {p}
-                </button>
-            ))}
-            <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => onPage(page + 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-            >
-                <ChevronRight size={14} />
-            </button>
-        </div>
-    </div>
-);

@@ -75,6 +75,8 @@ export const inventoryApi = {
         code?: string;
         name?: string;
         barcode?: string;
+        sortBy?: string;
+        sortDirection?: 'asc' | 'desc';
     }): Promise<ArticleListPage> => {
         const query = new URLSearchParams();
         query.set('page', String(params.page ?? 1));
@@ -86,6 +88,8 @@ export const inventoryApi = {
         if (params.code) query.set('code', params.code);
         if (params.name) query.set('name', params.name);
         if (params.barcode) query.set('barcode', params.barcode);
+        if (params.sortBy) query.set('sortBy', params.sortBy);
+        if (params.sortDirection) query.set('sortDirection', params.sortDirection);
         const res = await apiClient.get(`/inventory/articles/summary/paged?${query.toString()}`);
         return res.data;
     },

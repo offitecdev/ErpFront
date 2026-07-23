@@ -13,6 +13,7 @@ import {
     Sliders02 as SlidersHorizontal,
 } from '@/components/icons/antIconCompat';
 
+import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
@@ -328,6 +329,8 @@ export const Movements = () => {
 
     return (
         <div>
+            <InventoryListHeader title={t('nav.movements')} />
+
             {/* Seçili kalem her zaman görünür. */}
             {selected && (
                 <div className="mb-4 flex items-center gap-3 rounded-md border border-emerald-200/60 bg-emerald-50/60 p-2.5">
@@ -393,7 +396,7 @@ export const Movements = () => {
                                                         key={`${item.kind}-${item.id}`}
                                                         type="button"
                                                         onClick={() => selectItem(item)}
-                                                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                                                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-100 border-b border-slate-50 last:border-0"
                                                     >
                                                         {item.imageUrl ? (
                                                             <img src={item.imageUrl} alt="" className="w-8 h-8 rounded object-cover border border-slate-200" />
@@ -429,7 +432,7 @@ export const Movements = () => {
                                                 className={`flex flex-col items-center gap-1 py-2 rounded text-[10.5px] font-medium border ${
                                                     form.movementType === mt
                                                         ? 'border-blue-700 bg-blue-50 text-blue-800'
-                                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                                                 }`}
                                             >
                                                 {MOVEMENT_ICON[mt]}

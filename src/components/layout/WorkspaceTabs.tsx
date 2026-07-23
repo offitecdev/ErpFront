@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGuardedNavigate } from '../../store/navGuardStore';
@@ -244,9 +244,9 @@ export const WorkspaceTabStrip: React.FC = () => {
     const stripRef = useRef<HTMLDivElement>(null);
 
     // Show only the tabs that fully fit the available width; hide the overflow.
-    // We measure the real DOM nodes (they are `shrink-0`, so each has an intrinsic
-    // width) and toggle `display` inline — no scrolling, no arrows.
-    useLayoutEffect(() => {
+    // `visibility` keeps every tab's intrinsic width measurable, avoiding the
+    // old display:none -> display -> geometry-read forced-layout cycle.
+    useEffect(() => {
         const strip = stripRef.current;
         if (!strip) return;
 
@@ -254,12 +254,16 @@ export const WorkspaceTabStrip: React.FC = () => {
             const kids = Array.from(strip.children) as HTMLElement[];
             const available = strip.clientWidth;
             const gap = 4; // matches gap-1 (0.25rem)
-            // Reveal everything first so measurement reflects natural widths.
-            kids.forEach((kid) => { kid.style.display = ''; });
+            const widths = kids.map((kid) => kid.getBoundingClientRect().width);
             let used = 0;
-            kids.forEach((kid) => {
-                used += (used > 0 ? gap : 0) + kid.offsetWidth;
-                if (used > available) kid.style.display = 'none';
+            const visible = widths.map((width) => {
+                used += (used > 0 ? gap : 0) + width;
+                return used <= available;
+            });
+            // Batch all writes after all geometry reads. Hiding a child before
+            // measuring the next one caused a forced layout per overflow tab.
+            kids.forEach((kid, index) => {
+                kid.style.visibility = visible[index] ? '' : 'hidden';
             });
         };
 

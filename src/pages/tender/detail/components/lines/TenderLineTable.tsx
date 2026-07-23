@@ -1,4 +1,5 @@
 
+import { lazy, Suspense } from 'react';
 import {
     ChevronDown,
     ChevronUp,
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui-shared/Button';
 import { Checkbox } from '@/components/ui-shared/Checkbox';
 import { t } from '@/i18n/translate';
 
-import { richTextToHtml } from '../../TenderRichText';
+import { richTextToHtml } from '../../utils/markdown.utils';
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import type {
     ManualProductForm,
@@ -28,12 +29,18 @@ import {
 } from '../../utils/tenderDetail.constants';
 import { cleanImportedProductDescription } from '../../utils/tenderLine.utils';
 import { AutoFitAmount } from '../common/AutoFitAmount';
-import { BufferedTextInput, InlineDescriptionEditor } from '../TenderLineInputs';
+import { BufferedTextInput } from '../TenderLineInputs';
 import { TenderLineHeaderCell } from './TenderLineTableHeader';
 import { TenderLinePriceInput } from './TenderLinePriceInput';
 
+const LazyInlineDescriptionEditor = lazy(() =>
+    import('../InlineDescriptionEditor').then((mod) => ({ default: mod.InlineDescriptionEditor })),
+);
+
 type TenderLineTableProps = {
     pagedRows: SimpleTenderLine[];
+    rowOffset: number;
+    totalRowCount: number;
     isEmpty: boolean;
     isDraft: boolean;
     canManage: boolean;
@@ -60,6 +67,8 @@ type TenderLineTableProps = {
 
 export const TenderLineTable = ({
     pagedRows,
+    rowOffset,
+    totalRowCount,
     isEmpty,
     isDraft,
     canManage,
@@ -145,7 +154,7 @@ export const TenderLineTable = ({
                         <tr
                             key={stableRowKeys.get(row.id) ?? row.id}
                             onClick={() => onSelectRow(row.id)}
-                            className={`group border-b border-slate-100 transition-colors ${isSelected ? 'bg-[#1f2654]/[0.045]' : row.kind === 'TITLE' ? 'bg-slate-50/70' : 'hover:bg-slate-50/60'}`}
+                            className={`group border-b border-slate-100 ${isSelected ? 'bg-[#1f2654]/[0.045]' : row.kind === 'TITLE' ? 'bg-slate-50/70' : 'hover:bg-slate-50/60'}`}
                         >
                             <td className="px-1.5 py-1.5 text-center align-top">
                                 <div className="flex flex-col items-center gap-1">
@@ -162,7 +171,7 @@ export const TenderLineTable = ({
                                                 type="button"
                                                 aria-label={t('tenders.move_up')}
                                                 title={t('tenders.move_up')}
-                                                disabled={rowIndex === 0}
+                                                disabled={rowOffset + rowIndex === 0}
                                                 onClick={(event) => { event.stopPropagation(); onMoveRow(row.id, 'up'); }}
                                                 className="inline-flex h-4 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                                             >
@@ -172,7 +181,7 @@ export const TenderLineTable = ({
                                                 type="button"
                                                 aria-label={t('tenders.move_down')}
                                                 title={t('tenders.move_down')}
-                                                disabled={rowIndex === pagedRows.length - 1}
+                                                disabled={rowOffset + rowIndex === totalRowCount - 1}
                                                 onClick={(event) => { event.stopPropagation(); onMoveRow(row.id, 'down'); }}
                                                 className="inline-flex h-4 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                                             >
@@ -228,12 +237,14 @@ export const TenderLineTable = ({
                                         {isDescription && (
                                             <div className="flex min-w-0 flex-col gap-2">
                                                 {isDraft ? (
-                                                    <InlineDescriptionEditor
-                                                        positionId={row.id}
-                                                        value={position.longDescription || ''}
-                                                        minHeight={82}
-                                                        commit={commitLongDescription}
-                                                    />
+                                                    <Suspense fallback={<div className="min-h-[82px] rounded bg-slate-50" />}>
+                                                        <LazyInlineDescriptionEditor
+                                                            positionId={row.id}
+                                                            value={position.longDescription || ''}
+                                                            minHeight={82}
+                                                            commit={commitLongDescription}
+                                                        />
+                                                    </Suspense>
                                                 ) : position.longDescription ? (
                                                     <div
                                                         className="rich-text-preview text-[12.5px] leading-5 text-slate-700 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_li]:pl-0.5"
@@ -247,12 +258,14 @@ export const TenderLineTable = ({
                                 {isProduct && (
                                     <div className="mt-2 flex min-w-0 flex-col gap-2">
                                         {isDraft ? (
-                                            <InlineDescriptionEditor
-                                                positionId={row.id}
-                                                value={visibleLongDescription}
-                                                minHeight={132}
-                                                commit={commitLongDescription}
-                                            />
+                                            <Suspense fallback={<div className="min-h-[132px] rounded bg-slate-50" />}>
+                                                <LazyInlineDescriptionEditor
+                                                    positionId={row.id}
+                                                    value={visibleLongDescription}
+                                                    minHeight={132}
+                                                    commit={commitLongDescription}
+                                                />
+                                            </Suspense>
                                         ) : visibleLongDescription ? (
                                             <div
                                                 className="rich-text-preview text-[12.5px] leading-5 text-slate-700 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-0.5 [&_li]:pl-0.5"

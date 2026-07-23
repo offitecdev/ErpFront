@@ -4,7 +4,7 @@ import ConfigProvider from 'antd/es/config-provider';
 import antdTheme from 'antd/es/theme';
 import { AlertCircle, CheckCircle, XClose as CloseOutlined } from './components/icons/antIconCompat';
 import { AppRouter } from './routes/AppRouter';
-import { useAuthStore } from './store/authStore';
+import { useAuthStore, hasSessionHint } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
 import i18n from './i18n';
 
@@ -85,8 +85,9 @@ function App() {
     const [languageVersion, setLanguageVersion] = useState(0);
 
     useEffect(() => {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (token) {
+        // Auth cookies are HttpOnly (invisible to JS); a non-sensitive marker
+        // tells us whether a session likely exists and a profile fetch is worth it.
+        if (hasSessionHint()) {
             fetchProfile();
 
             // Start direct tender visits in parallel with profile validation.
@@ -120,7 +121,7 @@ function App() {
             theme={{
                 algorithm: isDarkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
                 token: {
-                    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+                    fontFamily: '"Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
                     borderRadius: 10,
                     borderRadiusXS: 10,
                     borderRadiusSM: 10,

@@ -253,7 +253,14 @@
         "hours": "h",
         "minutes": "min",
         "hm": "{{h}}h {{m}}min",
-        "mOnly": "{{m}}min"
+        "mOnly": "{{m}}min",
+        "sortNewest": "Newest first",
+        "sortOldest": "Oldest first",
+        "sortAscending": "Sort ascending",
+        "sortDescending": "Sort descending",
+        "sortOrder": "Sort order",
+        "sortNameAsc": "Name (A→Z)",
+        "sortNameDesc": "Name (Z→A)"
     },
     "language": {
         "title": "Language",
@@ -859,7 +866,15 @@
         "statusActive": "Active",
         "statusOnHold": "On Hold",
         "statusCompleted": "Completed",
-        "statusCancelled": "Cancelled"
+        "statusCancelled": "Cancelled",
+        "titleCombined": "Projects & Orders",
+        "projectsTab": "Projects",
+        "ordersTab": "Orders",
+        "ordersSearch": "Search order no or customer",
+        "orderPartial": "Partially billed",
+        "orderBilled": "Fully billed",
+        "listColTechnical": "Technical",
+        "listColBilling": "Billing"
     },
     "settings": {
         "pdf": {
@@ -1355,7 +1370,10 @@
         "tekliften_kaldirildi": "Removed from offer.",
         "urunu_tekliften_kaldirilsin_mi": "Remove product from the offer?",
         "verisi_indirildi": "{{format}} data downloaded.",
-        "yeni_versiyon_olusturuldu": "New version created."
+        "yeni_versiyon_olusturuldu": "New version created.",
+        "import_from_excel": "Import from Excel",
+        "mail_sent": "Sent",
+        "mail_not_sent": "Not sent"
     },
     "auto": {
         "0_ise_hareket_yok": "No movement if 0",
@@ -1904,6 +1922,7 @@
         "yonetici_onayi_verildi": "Manager approval granted.",
         "yonetici_onayi_verilemedi": "Manager approval could not be granted.",
         "yuksek": "High",
-        "zorunlu_kontrol_maddelerini_tamamlayin": "Complete the required checklist items."
+        "zorunlu_kontrol_maddelerini_tamamlayin": "Complete the required checklist items.",
+        "alis_fiyati": "Purchase price"
     }
 }

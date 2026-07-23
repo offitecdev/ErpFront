@@ -253,7 +253,14 @@
         "hours": "Std.",
         "minutes": "Min.",
         "hm": "{{h}} Std. {{m}} Min.",
-        "mOnly": "{{m}} Min."
+        "mOnly": "{{m}} Min.",
+        "sortNewest": "Neueste zuerst",
+        "sortOldest": "Älteste zuerst",
+        "sortAscending": "Aufsteigend sortieren",
+        "sortDescending": "Absteigend sortieren",
+        "sortOrder": "Sortierung",
+        "sortNameAsc": "Name (A→Z)",
+        "sortNameDesc": "Name (Z→A)"
     },
     "language": {
         "title": "Sprache",
@@ -859,7 +866,15 @@
         "statusActive": "In Bearbeitung",
         "statusOnHold": "Wartet auf Übergabe",
         "statusCompleted": "Abgeschlossen",
-        "statusCancelled": "Storniert"
+        "statusCancelled": "Storniert",
+        "titleCombined": "Projekte & Aufträge",
+        "projectsTab": "Projekte",
+        "ordersTab": "Aufträge",
+        "ordersSearch": "Auftragsnr. oder Kunde suchen",
+        "orderPartial": "Teilweise verrechnet",
+        "orderBilled": "Verrechnet",
+        "listColTechnical": "Technik",
+        "listColBilling": "Verr."
     },
     "settings": {
         "pdf": {
@@ -1355,7 +1370,10 @@
         "tekliften_kaldirildi": "Aus dem Angebot entfernt.",
         "urunu_tekliften_kaldirilsin_mi": "Produkt aus dem Angebot entfernen?",
         "verisi_indirildi": "{{format}}-Daten heruntergeladen.",
-        "yeni_versiyon_olusturuldu": "Neue Version erstellt."
+        "yeni_versiyon_olusturuldu": "Neue Version erstellt.",
+        "import_from_excel": "Aus Excel importieren",
+        "mail_sent": "Gesendet",
+        "mail_not_sent": "Nicht gesendet"
     },
     "auto": {
         "0_ise_hareket_yok": "Keine Bewegung bei 0",
@@ -1904,6 +1922,7 @@
         "yonetici_onayi_verildi": "Managerfreigabe erteilt.",
         "yonetici_onayi_verilemedi": "Managerfreigabe konnte nicht erteilt werden.",
         "yuksek": "Hoch",
-        "zorunlu_kontrol_maddelerini_tamamlayin": "Vervollständigen Sie die erforderlichen Prüfpunkte."
+        "zorunlu_kontrol_maddelerini_tamamlayin": "Vervollständigen Sie die erforderlichen Prüfpunkte.",
+        "alis_fiyati": "Einkaufspreis"
     }
 }

@@ -78,6 +78,7 @@ export interface ArticleListItem {
     minStockLevel: number;
     criticalStockLevel: number;
     totalQuantity: number;
+    createdAt: string;
 }
 
 // Stok hareketi ekranı için tek ürünün yalın canlı stok bilgisi. Depo/lokasyon

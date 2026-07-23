@@ -1,4 +1,4 @@
-import type React from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 
 import { PackagePlus } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
@@ -7,18 +7,54 @@ import type { MailSettingDto, ProjectDto, ProjectMaterial, ProjectSalesOrder } f
 
 import type { calculateTotals } from '../../utils/projectTotals';
 import type { ProjectDetailView } from '../../types/projectDetailNavigation';
-import { DeliveryReportsTab } from '../../projects/components/delivery/DeliveryReportsTab';
-import { ProjectSignaturesTab } from '../../../ProjectSignaturesTab';
-import { ProjectPositionsTab } from '../../../ProjectPositionsTab';
-import { BookingSection } from './booking/BookingSection';
 import { ProjectOverviewTab } from './tabs/ProjectOverviewTab';
-import { AddonOrderOverview } from './tabs/AddonOrderOverview';
-import { BillingTab } from './tabs/BillingTab';
-import { CreateAddonOrderTab } from './tabs/CreateAddonOrderTab';
-import { CostsTab } from './tabs/CostsTab';
-import { GeneralReportTab } from './tabs/GeneralReportTab';
-import { MaterialsTab } from './tabs/MaterialsTab';
-import { ReportsTab } from './tabs/ReportsTab';
+
+const LazyDeliveryReportsTab = lazy(() =>
+    import('../../projects/components/delivery/DeliveryReportsTab').then((module) => ({ default: module.DeliveryReportsTab })),
+);
+const LazyProjectSignaturesTab = lazy(() =>
+    import('../../../ProjectSignaturesTab').then((module) => ({ default: module.ProjectSignaturesTab })),
+);
+const LazyProjectPositionsTab = lazy(() =>
+    import('../../../ProjectPositionsTab').then((module) => ({ default: module.ProjectPositionsTab })),
+);
+const LazyBookingSection = lazy(() =>
+    import('./booking/BookingSection').then((module) => ({ default: module.BookingSection })),
+);
+const LazyAddonOrderOverview = lazy(() =>
+    import('./tabs/AddonOrderOverview').then((module) => ({ default: module.AddonOrderOverview })),
+);
+const LazyBillingTab = lazy(() =>
+    import('./tabs/BillingTab').then((module) => ({ default: module.BillingTab })),
+);
+const LazyCreateAddonOrderTab = lazy(() =>
+    import('./tabs/CreateAddonOrderTab').then((module) => ({ default: module.CreateAddonOrderTab })),
+);
+const LazyCostsTab = lazy(() =>
+    import('./tabs/CostsTab').then((module) => ({ default: module.CostsTab })),
+);
+const LazyGeneralReportTab = lazy(() =>
+    import('./tabs/GeneralReportTab').then((module) => ({ default: module.GeneralReportTab })),
+);
+const LazyMaterialsTab = lazy(() =>
+    import('./tabs/MaterialsTab').then((module) => ({ default: module.MaterialsTab })),
+);
+const LazyReportsTab = lazy(() =>
+    import('./tabs/ReportsTab').then((module) => ({ default: module.ReportsTab })),
+);
+
+const deferredSection = (content: ReactNode) => (
+    <Suspense
+        fallback={(
+            <div className="space-y-3" aria-busy="true">
+                <div className="h-10 animate-pulse rounded-md bg-slate-100" />
+                <div className="h-64 animate-pulse rounded-md bg-slate-100" />
+            </div>
+        )}
+    >
+        {content}
+    </Suspense>
+);
 
 // Single place that maps the workflow navigation (section + subSection) to the
 // content components. The leaf components themselves stay navigation-agnostic.
@@ -42,7 +78,7 @@ export type RenderSectionArgs = {
     onOrderCreated: (orderId: string) => Promise<void>;
 };
 
-export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode => {
+export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
     const {
         view, project, order, orders, isPrimary, isAddon, totals, materials,
         mailSettings, userEmail, awaitingAppointments, addonAttention, canCreateAddon,
@@ -55,10 +91,12 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
     // is not applicable, so the navigation stays visible with an explanatory state.
     if (isAddon) {
         if (view.section === 'overview' && order) {
-            return <AddonOrderOverview project={project} order={order} isPrimary={isPrimary} totals={totals} />;
+            return deferredSection(
+                <LazyAddonOrderOverview project={project} order={order} isPrimary={isPrimary} totals={totals} />,
+            );
         }
         if (view.section === 'billing') {
-            return <BillingTab project={project} orders={orders} onReload={onReload} />;
+            return deferredSection(<LazyBillingTab project={project} orders={orders} onReload={onReload} />);
         }
         return (
             <EmptyState
@@ -84,10 +122,10 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
                 />
             );
         case 'positions':
-            return <ProjectPositionsTab project={project} />;
+            return deferredSection(<LazyProjectPositionsTab project={project} />);
         case 'planning':
-            return (
-                <BookingSection
+            return deferredSection(
+                <LazyBookingSection
                     project={project}
                     order={order}
                     isPrimary={isPrimary}
@@ -96,35 +134,47 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
                     userEmail={userEmail}
                     onSaved={onReload}
                     leaf={view.subSection === 'appointmentMail' ? 'mail' : 'schedule'}
-                />
+                />,
             );
         case 'field':
             if (view.subSection === 'generalReport') {
-                return <GeneralReportTab project={project} onGoFieldReports={goFieldReports} />;
+                return deferredSection(
+                    <LazyGeneralReportTab project={project} onGoFieldReports={goFieldReports} />,
+                );
             }
             if (view.subSection === 'delivery') {
-                return <DeliveryReportsTab project={project} order={order} />;
+                return deferredSection(<LazyDeliveryReportsTab project={project} order={order} />);
             }
             if (view.subSection === 'signatures') {
-                return <ProjectSignaturesTab project={project} order={order} isPrimary={isPrimary} />;
+                return deferredSection(
+                    <LazyProjectSignaturesTab project={project} order={order} isPrimary={isPrimary} />,
+                );
             }
-            return <ReportsTab project={project} order={order} isPrimary={isPrimary} materials={materials} onSaved={onReload} />;
+            return deferredSection(
+                <LazyReportsTab
+                    project={project}
+                    order={order}
+                    isPrimary={isPrimary}
+                    materials={materials}
+                    onSaved={onReload}
+                />,
+            );
         case 'costs':
             if (view.subSection === 'materials') {
-                return (
-                    <MaterialsTab
+                return deferredSection(
+                    <LazyMaterialsTab
                         project={project}
                         order={order}
                         isPrimary={isPrimary}
                         materials={materials}
                         onSaved={onReload}
                         onGoFieldReports={goFieldReports}
-                    />
+                    />,
                 );
             }
             if (view.subSection === 'overtime') {
-                return (
-                    <BookingSection
+                return deferredSection(
+                    <LazyBookingSection
                         project={project}
                         order={order}
                         isPrimary={isPrimary}
@@ -133,22 +183,29 @@ export const renderProjectSection = (args: RenderSectionArgs): React.ReactNode =
                         userEmail={userEmail}
                         onSaved={onReload}
                         leaf="overtime"
-                    />
+                    />,
                 );
             }
-            return <CostsTab project={project} order={order} isPrimary={isPrimary} onGoFieldReports={goFieldReports} />;
+            return deferredSection(
+                <LazyCostsTab
+                    project={project}
+                    order={order}
+                    isPrimary={isPrimary}
+                    onGoFieldReports={goFieldReports}
+                />,
+            );
         case 'billing':
-            return <BillingTab project={project} orders={orders} onReload={onReload} />;
+            return deferredSection(<LazyBillingTab project={project} orders={orders} onReload={onReload} />);
         case 'addons':
-            return (
-                <CreateAddonOrderTab
+            return deferredSection(
+                <LazyCreateAddonOrderTab
                     project={project}
                     order={order}
                     orders={orders}
                     canCreate={canCreateAddon}
                     onChanged={onReload}
                     onCreated={onOrderCreated}
-                />
+                />,
             );
         default:
             return null;

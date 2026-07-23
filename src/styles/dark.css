@@ -233,6 +233,15 @@ html.dark body,
 .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
 .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--ofi-d-border) !important; }
 
+/* Inventory tables (Articles / ExtraMaterials / Suppliers) draw their vertical
+   column dividers with arbitrary-variant utilities `[&_th]:border-slate-200`
+   and `[&_td]:border-slate-200`. These compile to a DESCENDANT selector
+   (`.…border-slate-200 th`), which the `.dark .border-slate-200` blanket remap
+   above never matches — so the dividers stayed at near-white slate-200 and read
+   as bright white lines in dark mode. Dim them to the shared subtle border. */
+.dark .\[\&_th\]\:border-slate-200 th,
+.dark .\[\&_td\]\:border-slate-200 td { border-color: var(--ofi-d-border) !important; }
+
 /* Coloured accent text (profit/loss, tags) — muted, not exaggerated */
 .dark .text-emerald-950, .dark .text-emerald-900, .dark .text-emerald-800,
 .dark .text-emerald-700, .dark .text-emerald-600,
@@ -669,9 +678,6 @@ html.dark body,
 .dark .offitec-sidebar-menu.ant-menu-inline-collapsed .ant-menu-submenu-selected > .ant-menu-submenu-title .ant-menu-item-icon,
 .dark .offitec-sidebar-menu-popup .ant-menu-item-selected .ant-menu-title-content { color: var(--ofi-d-text) !important; }
 .dark .offitec-sidebar-menu-popup .ant-menu { background: var(--ofi-d-surface-2) !important; }
-
-/* Tenant select prefix icon */
-.dark .offitec-tenant-select .ant-select-prefix { color: var(--ofi-d-wheat) !important; }
 
 /* Status cards and warning callouts get a quiet wheat tint in dark mode. */
 .dark .bg-amber-400\/10,
