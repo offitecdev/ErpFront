@@ -158,7 +158,7 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
                 <div className="px-3 py-3">
                     <div className="ml-auto w-full max-w-sm space-y-1 text-[12.5px]">
                         <div className="flex items-center justify-between gap-3">
-                            <span className="text-slate-500">{t('tenders.direct_discount')}</span>
+                            <span className="text-slate-500">{(detail.tender.directDiscountLabel || '').trim() || t('tenders.direct_discount')}</span>
                             <span className="flex items-center gap-2">
                                 {summary.directDiscountAmount > 0 && (
                                     <span className="tabular-nums text-rose-600">−{fmtMoney(summary.directDiscountAmount)}</span>

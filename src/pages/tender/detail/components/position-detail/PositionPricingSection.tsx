@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import { Field, Input } from '../../../../../components/ui-shared/Field';
 import type { CostInput } from '../../../../../types/tender';
 import { fmtVatRate } from '../../tenderDetailUtils';
+import { parseInlineNumber } from '../../utils/tenderLine.utils';
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { AutoFitAmount } from '../common/AutoFitAmount';
 import { t } from '@/i18n/translate';
@@ -14,6 +15,22 @@ type PositionPricing = {
     discount: number;
     taxRate: number;
 };
+
+const LINE_DISCOUNT_MODE_KEY = 'offitec:tender-detail:line-discount-mode';
+type LineDiscountMode = 'percent' | 'amount';
+
+const readStoredLineDiscountMode = (): LineDiscountMode => {
+    try {
+        return localStorage.getItem(LINE_DISCOUNT_MODE_KEY) === 'amount' ? 'amount' : 'percent';
+    } catch {
+        return 'percent';
+    }
+};
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+// Amount → percent conversions keep 6 decimals so the recomputed amount lands
+// back on the typed value to the cent; displays still round to 2.
+const round6 = (value: number) => Math.round(value * 1e6) / 1e6;
 
 export const PositionPricingSection: React.FC<{
     isDraft: boolean;
@@ -47,6 +64,30 @@ export const PositionPricingSection: React.FC<{
     saving,
 }) => {
     const fmtMoney = useMoneyFormat();
+    // The discount is stored as a percentage of the unit price; "amount" mode
+    // lets the user type an absolute per-unit amount (capped at the unit price)
+    // which is converted to its percentage equivalent on entry.
+    const [discountMode, setDiscountMode] = useState<LineDiscountMode>(readStoredLineDiscountMode);
+    const switchDiscountMode = (next: LineDiscountMode) => {
+        setDiscountMode(next);
+        try {
+            localStorage.setItem(LINE_DISCOUNT_MODE_KEY, next);
+        } catch {
+            /* persistence is best-effort */
+        }
+    };
+    // Draft so the % field can stay live-committing while accepting "12,5" or
+    // "12.5" as typed text (a number input would render the browser locale's
+    // decimal comma, clashing with the app-wide de-CH dot formatting).
+    const [discountPctDraft, setDiscountPctDraft] = useState<string | null>(null);
+    const commitDiscountAmount = (raw: string) => {
+        const amount = parseInlineNumber(raw, pricing.unitPrice);
+        updatePricing({ discount: pricing.unitPrice > 0 ? round6((amount / pricing.unitPrice) * 100) : 0 });
+    };
+    const discountModeButtonClass = (active: boolean) =>
+        `rounded px-1.5 py-0.5 text-[10.5px] font-semibold transition-colors ${
+            active ? 'bg-[#1f2654] text-white' : 'text-slate-500 hover:bg-white hover:text-[#1f2654]'
+        }`;
     return (
     <div className="border border-slate-200/70 rounded-md p-3 bg-white space-y-2.5">
         <div className="flex items-center justify-between">
@@ -103,15 +144,62 @@ export const PositionPricingSection: React.FC<{
                 </>
             )}
             <Field label={t('tenders.discount')} className="sm:col-span-2">
-                <Input
-                    type="number"
-                    step="0.1"
-                    min={0}
-                    max={100}
-                    value={pricing.discount}
-                    onChange={(e) => updatePricing({ discount: parseFloat(e.target.value) || 0 })}
-                    disabled={!isDraft}
-                />
+                <div className="flex items-center gap-1.5">
+                    {discountMode === 'percent' ? (
+                        <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={discountPctDraft ?? (pricing.discount ? String(round2(pricing.discount)) : '')}
+                            onChange={(e) => {
+                                setDiscountPctDraft(e.target.value);
+                                updatePricing({ discount: parseInlineNumber(e.target.value, 100) });
+                            }}
+                            onBlur={() => setDiscountPctDraft(null)}
+                            disabled={!isDraft}
+                        />
+                    ) : (
+                        <Input
+                            key={`amt-${pricing.discount}-${pricing.unitPrice}`}
+                            type="text"
+                            inputMode="decimal"
+                            defaultValue={pricing.discount > 0 ? String(round2((pricing.unitPrice * pricing.discount) / 100)) : ''}
+                            onBlur={(e) => {
+                                // Untouched field → nothing to commit (display is rounded).
+                                if (e.target.value !== e.target.defaultValue) commitDiscountAmount(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    (e.target as HTMLInputElement).blur();
+                                }
+                            }}
+                            disabled={!isDraft}
+                        />
+                    )}
+                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
+                        <button
+                            type="button"
+                            title={t('tenders.discount_mode_percent')}
+                            aria-pressed={discountMode === 'percent'}
+                            onClick={() => switchDiscountMode('percent')}
+                            className={discountModeButtonClass(discountMode === 'percent')}
+                        >
+                            %
+                        </button>
+                        <button
+                            type="button"
+                            title={t('tenders.discount_mode_amount_unit')}
+                            aria-pressed={discountMode === 'amount'}
+                            onClick={() => switchDiscountMode('amount')}
+                            className={discountModeButtonClass(discountMode === 'amount')}
+                        >
+                            {t('tenders.discount_mode_amount_short')}
+                        </button>
+                    </span>
+                </div>
+                {discountMode === 'amount' && pricing.discount > 0 && (
+                    <div className="mt-1 text-[10.5px] tabular-nums text-slate-400">= {round2(pricing.discount)}%</div>
+                )}
             </Field>
             {!isArticle && (
                 <Field label={t('tenders.additional_cost')}>

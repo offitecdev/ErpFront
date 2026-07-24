@@ -35,7 +35,9 @@ const HEADER_HEIGHT = 64; // matches the fixed header (h-16)
 const ROW_IDLE = 'text-black/85 hover:bg-[#eef1fa] hover:text-black dark:text-white/85 dark:hover:bg-white/8 dark:hover:text-white';
 const ROW_ACTIVE = 'bg-black/8 text-black dark:bg-white/10 dark:text-white dark:ring-1 dark:ring-inset dark:ring-white/10';
 const DOT_IDLE = 'bg-black/25 dark:bg-white/30';
-const DOT_ACTIVE = 'bg-black dark:bg-white';
+// Seçili satırda nokta gösterilmez — satır zaten arka plan vurgusuyla belli olur.
+// Boşluk (size-1.5) korunur ki metin, komşu satırlarla hizalı kalsın.
+const DOT_ACTIVE = 'bg-transparent';
 const ICON_IDLE = 'dark:text-[#e6cf9e]/70';
 const ICON_ACTIVE = 'dark:text-[#e6cf9e]';
 const PANEL_BG = 'bg-[#FBFBFA] dark:bg-[#151616]';

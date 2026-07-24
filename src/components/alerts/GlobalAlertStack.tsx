@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -225,6 +225,13 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
             .then(onArchived);
     };
 
+    // The deck builds up asynchronously (offers, orders, meetings arrive at
+    // different times), so the "total" is the largest deck size seen so far —
+    // dismissing cards counts down (10/10 → 9/10 → …) without shrinking it.
+    const deckTotalRef = useRef(0);
+    if (alerts.length > deckTotalRef.current) deckTotalRef.current = alerts.length;
+    const deckTotal = deckTotalRef.current;
+
     if (alerts.length === 0) return null;
     const visible = alerts.slice(0, 3);
 
@@ -294,7 +301,7 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
                                     <span />
                                 )}
                                 <span className="text-[11px] font-semibold tabular-nums text-[#101322]/50 dark:text-white/50">
-                                    {alerts.length > 1 ? `1 / ${alerts.length}` : ''}
+                                    {deckTotal > 1 ? `${alerts.length} / ${deckTotal}` : ''}
                                 </span>
                             </div>
                         </motion.div>
