@@ -32,6 +32,8 @@ export interface TenderListItem {
     currency?: string | null;
     // Document-level direct discount (%) applied to the net total.
     directDiscount?: number | null;
+    // Optional custom display name for the direct discount (e.g. "Winteraktion").
+    directDiscountLabel?: string | null;
     sourceStatus?: string | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;

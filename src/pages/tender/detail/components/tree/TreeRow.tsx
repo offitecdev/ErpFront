@@ -67,8 +67,8 @@ export const TreeRow: React.FC<{
     const displayDescription = node.shortDescription?.trim() || '';
     // SECTION → font-semibold (bölüm başlığı gibi); TITLE → direkt bold başlık (line-through yok)
     const titleClass = getTreeRowTitleClass(rowType, level, isSectionRow, isRootSection);
-    const inlineInputClass = "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right font-mono text-[11px] text-slate-700 outline-none transition-colors hover:border-slate-200 focus:border-blue-400 focus:bg-white";
-    const inlineTextInputClass = "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-left text-[11px] text-slate-600 outline-none transition-colors hover:border-slate-200 focus:border-blue-400 focus:bg-white";
+    const inlineInputClass = "w-full rounded border border-slate-200/70 bg-transparent px-1 py-0.5 text-right font-mono text-[11px] text-slate-700 outline-none transition-colors hover:border-slate-300 focus:border-blue-400 focus:bg-white";
+    const inlineTextInputClass = "w-full rounded border border-slate-200/70 bg-transparent px-1 py-0.5 text-left text-[11px] text-slate-600 outline-none transition-colors hover:border-slate-300 focus:border-blue-400 focus:bg-white";
     const actionButtonClass = t('tenders.inline_flex_h_7_items_center_gap_1_rounded_borde');
     const headingButtonClass = (active: boolean) =>
         `inline-flex h-6 min-w-6 items-center justify-center rounded border px-1 text-[11px] font-semibold transition-colors ${

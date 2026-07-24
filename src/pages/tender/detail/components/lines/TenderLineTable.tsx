@@ -22,11 +22,11 @@ import type {
     TextField,
 } from '../../types/tenderDetail.types';
 import {
-    DEFAULT_TENDER_LINE_COLUMN_WIDTHS,
     INLINE_NAME_INPUT_CLASS,
     INLINE_TITLE_INPUT_CLASS,
     lineActionButtonClass,
 } from '../../utils/tenderDetail.constants';
+import { useTenderLineColumnWidths, type ResizableLineColumn } from '../../hooks/useTenderLineColumnWidths';
 import { cleanImportedProductDescription } from '../../utils/tenderLine.utils';
 import { AutoFitAmount } from '../common/AutoFitAmount';
 import { BufferedTextInput } from '../TenderLineInputs';
@@ -94,24 +94,31 @@ export const TenderLineTable = ({
 }: TenderLineTableProps) => {
     // Row totals follow the offer's selected currency (symbol-only display).
     const fmtMoney = useMoneyFormat();
-    const fixedLineColumnStyle = (key: TenderLineColumnKey) => ({ width: DEFAULT_TENDER_LINE_COLUMN_WIDTHS[key] });
+    // Numeric column widths are user-resizable (drag the header borders) and
+    // persisted; the description column flexes to absorb whatever they free up.
+    const { widths, setColRef, startResize, resetColumn } = useTenderLineColumnWidths();
+    const fixedLineColumnStyle = (key: TenderLineColumnKey) => ({ width: widths[key] });
+    const resizeProps = (key: ResizableLineColumn) => ({
+        onResizeStart: (event: React.PointerEvent) => startResize(key, event),
+        onResizeReset: () => resetColumn(key),
+    });
 
     const canReorder = isDraft && canManage;
 
-    // The numeric columns are fixed (~578px); the description column takes the
-    // rest. 860px keeps it usable on laptops without forcing the whole card
-    // into horizontal scroll the way the old 1160px minimum did.
+    // The numeric columns are fixed (~578px by default); the description column
+    // takes the rest. 860px keeps it usable on laptops without forcing the
+    // whole card into horizontal scroll the way the old 1160px minimum did.
     return (
         <table data-tender-detail-table className="min-w-[860px] w-full table-fixed text-[12px]">
             <colgroup>
                 <col style={fixedLineColumnStyle('select')} />
                 <col />
-                <col style={fixedLineColumnStyle('quantity')} />
-                <col style={fixedLineColumnStyle('unit')} />
-                <col style={fixedLineColumnStyle('unitPrice')} />
-                <col style={fixedLineColumnStyle('discount')} />
-                <col style={fixedLineColumnStyle('taxRate')} />
-                <col style={fixedLineColumnStyle('total')} />
+                <col ref={setColRef('quantity')} style={fixedLineColumnStyle('quantity')} />
+                <col ref={setColRef('unit')} style={fixedLineColumnStyle('unit')} />
+                <col ref={setColRef('unitPrice')} style={fixedLineColumnStyle('unitPrice')} />
+                <col ref={setColRef('discount')} style={fixedLineColumnStyle('discount')} />
+                <col ref={setColRef('taxRate')} style={fixedLineColumnStyle('taxRate')} />
+                <col ref={setColRef('total')} style={fixedLineColumnStyle('total')} />
             </colgroup>
             <thead className="border-b border-slate-200 bg-slate-50 text-[10.5px] uppercase tracking-wider text-slate-500">
                 <tr>
@@ -126,12 +133,12 @@ export const TenderLineTable = ({
                         />
                     </th>
                     <TenderLineHeaderCell label={t('nav.articles')} align="left" className="!border-l-0 px-3" />
-                    <TenderLineHeaderCell label={t('common.quantity')} noTruncate />
-                    <TenderLineHeaderCell label={t('tenders.unit')} />
-                    <TenderLineHeaderCell label={sectionSchemaOpen ?t('tenders.unit_price') :t('tenders.unit_price')} />
-                    <TenderLineHeaderCell label={sectionSchemaOpen ?t('tenders.ind') :t('common.discount')} />
-                    <TenderLineHeaderCell label="KDV" />
-                    <TenderLineHeaderCell label={t('common.amount')} />
+                    <TenderLineHeaderCell label={t('common.quantity')} noTruncate {...resizeProps('quantity')} />
+                    <TenderLineHeaderCell label={t('tenders.unit')} {...resizeProps('unit')} />
+                    <TenderLineHeaderCell label={sectionSchemaOpen ?t('tenders.unit_price') :t('tenders.unit_price')} {...resizeProps('unitPrice')} />
+                    <TenderLineHeaderCell label={sectionSchemaOpen ?t('tenders.ind') :t('common.discount')} {...resizeProps('discount')} />
+                    <TenderLineHeaderCell label="KDV" {...resizeProps('taxRate')} />
+                    <TenderLineHeaderCell label={t('common.amount')} {...resizeProps('total')} />
                 </tr>
             </thead>
             <tbody>
@@ -290,7 +297,7 @@ export const TenderLineTable = ({
                                         navCol="unit"
                                         registerCell={registerCell}
                                         onArrowNav={onArrowNav}
-                                        className="w-full min-w-0 rounded-md border border-transparent bg-transparent text-right text-[11.5px] text-slate-700 transition-colors hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
+                                        className="w-full min-w-0 rounded-md !border !border-solid !border-slate-200/70 bg-transparent text-right text-[11.5px] text-slate-700 transition-colors hover:!border-slate-300 hover:bg-white focus:!border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
                                     />
                                 ) : (
                                     <span className="block text-right text-[11.5px] text-slate-600">{isProduct ? position.unit : ''}</span>

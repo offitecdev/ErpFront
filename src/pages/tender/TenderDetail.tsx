@@ -1380,7 +1380,9 @@ export const TenderDetail = () => {
                 <TenderPriceSummary
                     summary={pricingSummary}
                     canEdit={canEditTenderMeta}
+                    discountLabel={detail?.tender.directDiscountLabel}
                     onDirectDiscountChange={(value) => handleTenderMetaChange({ directDiscount: value })}
+                    onDiscountLabelChange={(value) => handleTenderMetaChange({ directDiscountLabel: value })}
                 />
                         </Card>
                     </div>

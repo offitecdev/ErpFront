@@ -123,6 +123,7 @@ export const tenderApi = {
         priceList?: string | null;
         currency?: string | null;
         directDiscount?: number | null;
+        directDiscountLabel?: string | null;
     }): Promise<TenderListItem> => {
         try {
             const res = await apiClient.patch(`/tenders/${id}/meta`, input);
