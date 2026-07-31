@@ -1,31 +1,42 @@
 /* ═══════════════════════════════════════════════════════════════
-   DARK MODE RETROFIT — single flat palette
-   page #08090a · cards/tables #151616 · hover #232326
-   No blue. Accent = wheat. Primary buttons white with black text.
+   DARK MODE — warm charcoal + gold
+   page #0f1113 · cards/tables #17191c · headers #1d2024 · hover #2a2e34
+   The surfaces are lifted off pure black and carry a slight warm cast, so
+   panels separate from the page by luminance instead of by borders alone —
+   that is what reads as depth rather than as a void.
+   Accent is a real gold (#d48f16 for fills, lightened to #e2a33c for text,
+   which pure #d48f16 is too dark to carry on these surfaces). No blue.
    Scoped under `.dark`; light mode untouched.
 ═══════════════════════════════════════════════════════════════ */
 
 .dark {
-  --ofi-d-bg: #08090a;          /* page background */
-  --ofi-d-surface: #151616;     /* cards / tables / charts / structures */
-  --ofi-d-surface-2: #151616;   /* table headers */
-  --ofi-d-surface-3: #1b1c1c;   /* wells / subtle raised */
-  --ofi-d-hover: #232326;       /* every hover (incl. loading rows) */
-  --ofi-d-glass: rgba(21, 22, 22, 0.72); /* frosted overlays only */
-  --ofi-d-border: rgba(255, 255, 255, 0.12);
-  --ofi-d-border-strong: rgba(255, 255, 255, 0.22);
-  --ofi-d-text: #ffffff;        /* primary text */
-  --ofi-d-text-2: #e9ebf0;      /* secondary */
-  --ofi-d-text-3: #c4c9d2;      /* tertiary */
-  --ofi-d-text-4: #aab0bb;      /* muted */
-  --ofi-d-wheat: #e6cf9e;       /* accent (replaces all blue) */
-  --ofi-d-wheat-strong: #f0dcae;
-  --ofi-d-wheat-soft: rgba(230, 207, 158, 0.14);
-  --ofi-d-wheat-softer: rgba(230, 207, 158, 0.08);
-  --ofi-d-wheat-border: rgba(230, 207, 158, 0.34);
+  --ofi-d-bg: #0f1113;          /* page background */
+  --ofi-d-surface: #17191c;     /* cards / tables / charts / structures */
+  --ofi-d-surface-2: #1d2024;   /* table headers */
+  --ofi-d-surface-3: #22242a;   /* wells / subtle raised */
+  --ofi-d-hover: #2b2721;       /* every hover — warm, gold-cast */
+  --ofi-d-hover-strong: #35301f; /* pressed / selected rows */
+  --ofi-d-glass: rgba(23, 25, 28, 0.78); /* frosted overlays only */
+  /* Borders carry the same warm cast as the surfaces, so a hairline never
+     reads as a cold grey line laid over a warm panel. */
+  --ofi-d-border: rgba(255, 246, 232, 0.11);
+  --ofi-d-border-strong: rgba(255, 246, 232, 0.2);
+  --ofi-d-text: #f7f8fa;        /* primary text */
+  --ofi-d-text-2: #e3e6ec;      /* secondary */
+  --ofi-d-text-3: #bec4cf;      /* tertiary */
+  --ofi-d-text-4: #99a0ac;      /* muted */
+  /* Accent. `wheat` is the readable text/icon tone; `solid` is the saturated
+     fill used behind dark text on buttons and badges. */
+  --ofi-d-wheat: #e2a33c;
+  --ofi-d-wheat-strong: #f2bb5c;
+  --ofi-d-wheat-solid: #d48f16;
+  --ofi-d-on-accent: #140f05;   /* text sitting on a gold fill */
+  --ofi-d-wheat-soft: rgba(212, 143, 22, 0.16);
+  --ofi-d-wheat-softer: rgba(212, 143, 22, 0.09);
+  --ofi-d-wheat-border: rgba(212, 143, 22, 0.42);
   /* muted profit / loss — not exaggerated */
-  --ofi-d-pos: #9ad3b4;
-  --ofi-d-neg: #e2a0a8;
+  --ofi-d-pos: #8fd0ae;
+  --ofi-d-neg: #e69aa4;
 }
 
 /*
@@ -54,13 +65,13 @@ html.dark body,
   color: var(--ofi-d-text);
 }
 .dark ::selection {
-  background: rgba(230, 207, 158, 0.28);
+  background: rgba(212, 143, 22, 0.28);
   color: var(--ofi-d-text);
 }
-.dark ::-webkit-scrollbar-thumb { background: #2a2b2e; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #36373b; }
+.dark ::-webkit-scrollbar-thumb { background: #32363d; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #414751; }
 
-/* ── Cards / structures → solid #151616 ── */
+/* ── Cards / structures → solid #17191c ── */
 .dark .bg-white,
 .dark .bg-slate-50,
 .dark .bg-slate-50\/50,
@@ -103,7 +114,7 @@ html.dark body,
   background:
     radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.32), transparent 40%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.11)),
-    rgba(230, 207, 158, 0.12) !important;
+    rgba(212, 143, 22, 0.12) !important;
   border-color: rgba(255, 255, 255, 0.32) !important;
   color: var(--ofi-d-text) !important;
   -webkit-text-fill-color: var(--ofi-d-text) !important;
@@ -116,7 +127,7 @@ html.dark body,
   background:
     radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.38), transparent 40%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.27), rgba(255, 255, 255, 0.14)),
-    rgba(230, 207, 158, 0.15) !important;
+    rgba(212, 143, 22, 0.15) !important;
   border-color: rgba(255, 255, 255, 0.42) !important;
 }
 /* selected / light-blue backgrounds → subtle neutral */
@@ -131,30 +142,30 @@ html.dark body,
 .dark .bg-\[\#1a2361\],
 .dark .bg-brand-solid,
 .dark .ant-btn-primary {
-  background: var(--ofi-d-wheat) !important;
-  border-color: var(--ofi-d-wheat) !important;
-  color: #08090a !important;
-  -webkit-text-fill-color: #08090a !important;
-  box-shadow: 0 0 0 1px rgba(230, 207, 158, 0.18) !important;
+  background: var(--ofi-d-wheat-solid) !important;
+  border-color: var(--ofi-d-wheat-solid) !important;
+  color: var(--ofi-d-on-accent) !important;
+  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
+  box-shadow: 0 0 0 1px rgba(212, 143, 22, 0.28) !important;
 }
 .dark .bg-\[\#272f67\] *,
 .dark .bg-\[\#1f2654\] *,
 .dark .bg-\[\#1a2361\] *,
 .dark .bg-brand-solid *,
 .dark .ant-btn-primary * {
-  color: #08090a !important;
-  -webkit-text-fill-color: #08090a !important;
+  color: var(--ofi-d-on-accent) !important;
+  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
 }
 .dark .ant-btn-primary:hover {
   background: var(--ofi-d-wheat-strong) !important;
   border-color: var(--ofi-d-wheat-strong) !important;
-  color: #08090a !important;
+  color: var(--ofi-d-on-accent) !important;
 }
 .dark .ant-btn-primary:disabled,
 .dark .ant-btn-primary[disabled] {
-  background: #2a2b2e !important;
+  background: #2a2e34 !important;
   border-color: transparent !important;
-  color: #7c818c !important;
+  color: #7c828e !important;
 }
 
 /* ── Borders ── */
@@ -258,7 +269,7 @@ html.dark body,
 .dark .shadow-sm, .dark .shadow, .dark .shadow-md,
 .dark .shadow-lg, .dark .shadow-xl { --tw-shadow-color: rgba(0, 0, 0, 0.5); }
 
-/* ── Hover — everything resolves to #232326 ── */
+/* ── Hover — everything resolves to #2a2e34 ── */
 .dark .hover\:bg-slate-50:hover,
 .dark .hover\:bg-slate-50\/40:hover,
 .dark .hover\:bg-slate-50\/60:hover,
@@ -425,8 +436,8 @@ html.dark body,
 .dark .ant-slider .ant-slider-track,
 .dark .ant-slider .ant-slider-handle::after,
 .dark .ant-progress .ant-progress-bg {
-  background: var(--ofi-d-wheat) !important;
-  border-color: var(--ofi-d-wheat) !important;
+  background: var(--ofi-d-wheat-solid) !important;
+  border-color: var(--ofi-d-wheat-solid) !important;
 }
 
 /* ── AntD: tables ── */
@@ -472,7 +483,7 @@ html.dark body,
   background-color: var(--ofi-d-wheat) !important;
   border-color: var(--ofi-d-wheat) !important;
 }
-.dark .ant-checkbox-checked .ant-checkbox-inner::after { border-color: #08090a !important; }
+.dark .ant-checkbox-checked .ant-checkbox-inner::after { border-color: var(--ofi-d-on-accent) !important; }
 .dark .ant-radio-checked .ant-radio-inner { border-color: var(--ofi-d-wheat) !important; }
 .dark .ant-radio-checked .ant-radio-inner::after { background-color: var(--ofi-d-wheat) !important; }
 .dark .ant-switch.ant-switch-checked { background: var(--ofi-d-wheat) !important; }
@@ -515,10 +526,10 @@ html.dark body,
 }
 
 /* ── Installation report detail — surface hierarchy (see index.css) ──
-   The blanket `.bg-white / .bg-slate-50 / .bg-slate-100 → #151616` rule above
+   The blanket `.bg-white / .bg-slate-50 / .bg-slate-100 → #17191c` rule above
    flattens this screen into a single tone and strips every shadow, so the
    layers are rebuilt here on their own class names. Depth runs
-   canvas (#08090a, recessed) < shell (#151616) < panel (#1b1c1c, raised),
+   canvas (#0f1113, recessed) < shell (#17191c) < panel (#23262b, raised),
    which is why the shell reads as lifted off the page and the panels read as
    lifted off the shell — the same order as light mode. */
 .dark .ofi-rep-shell {
@@ -602,7 +613,7 @@ html.dark body,
   background: var(--ofi-d-surface-3) !important;
   color: var(--ofi-d-wheat) !important;
 }
-/* Loading overlays / skeleton resolve to #232326, never blue */
+/* Loading overlays / skeleton resolve to the shared hover tone, never blue */
 .dark .ant-spin-container::after { background: rgba(8, 9, 10, 0.6) !important; }
 .dark .ant-skeleton-content .ant-skeleton-title,
 .dark .ant-skeleton-content .ant-skeleton-paragraph > li,
@@ -652,7 +663,7 @@ html.dark body,
 .dark .offitec-sidebar-menu .ant-menu-item:hover,
 .dark .offitec-sidebar-menu .ant-menu-submenu-title:hover,
 .dark .offitec-sidebar-menu-popup .ant-menu-item:hover {
-  /* Plain #232326 is nearly indistinguishable from the near-black sidebar, so
+  /* Plain #2a2e34 is nearly indistinguishable from the sidebar surface, so
      hover uses a clearly lighter translucent white (glass) — visible without
      shouting over the label text. */
   background: rgba(255, 255, 255, 0.1) !important;
@@ -696,8 +707,8 @@ html.dark body,
 /* Calendar "today" badge: solid accent circle needs dark text on the gold fill
    (the generic `.dark .text-white` flip would leave white-on-gold). */
 .dark .ofi-cal-today {
-  background: var(--ofi-d-wheat) !important;
-  color: #08090a !important;
+  background: var(--ofi-d-wheat-solid) !important;
+  color: var(--ofi-d-on-accent) !important;
 }
 
 /* ── Toasts ── */
@@ -711,3 +722,257 @@ html.dark body,
 .dark .offitec-toast-title { color: var(--ofi-d-text) !important; }
 .dark .offitec-toaster [data-description],
 .dark .offitec-toast-description { color: var(--ofi-d-text-3) !important; }
+
+/* ── Quote detail: header bands and money columns ──
+   index.css paints these with light navy tints (#f1f5fd / #f4f7fd / #e4ecfb).
+   On dark they would read as bright bands, so they resolve to the shared dark
+   surfaces here — the two money columns keep a one-step lift over the rows
+   around them, which is what made them legible in light mode too. */
+.dark table[data-tender-detail-table] th {
+  background: var(--ofi-d-surface-2) !important;
+  border-bottom-color: var(--ofi-d-border) !important;
+  color: var(--ofi-d-text-3) !important;
+}
+
+.dark table[data-tender-detail-table] th:nth-child(5),
+.dark table[data-tender-detail-table] th:nth-child(8) {
+  background: var(--ofi-d-surface-3) !important;
+  color: var(--ofi-d-text-2) !important;
+}
+
+.dark table[data-tender-detail-table] td:nth-child(5),
+.dark table[data-tender-detail-table] td:nth-child(8) {
+  background: var(--ofi-d-surface-3) !important;
+}
+
+.dark table[data-tender-detail-table] tbody tr:hover td:nth-child(5),
+.dark table[data-tender-detail-table] tbody tr:hover td:nth-child(8) {
+  background: var(--ofi-d-hover) !important;
+}
+
+/* Card headers and section (TITLE) rows carry the same light navy tint. */
+.dark .bg-\[\#f1f5fd\] { background-color: var(--ofi-d-surface-2) !important; }
+.dark .hover\:bg-\[\#e9effb\]:hover { background-color: var(--ofi-d-hover) !important; }
+.dark .bg-\[\#e8eefb\] { background-color: var(--ofi-d-hover-strong) !important; }
+/* NOTE: `.bg-[#1f2654]` is deliberately NOT restyled here. The brand-surface
+   rule near the top of this file already resolves it to a solid gold fill with
+   dark text, and that applies app-wide — a second rule down here would win by
+   source order and quietly flatten every primary button in the product. */
+
+/* Accent-tinted focus rings: the brand navy ring is invisible on dark, and a
+   neutral white ring reads as a glitch next to gold controls. */
+.dark .focus\:ring-\[\#1f2654\]\/15:focus,
+.dark .focus\:ring-\[\#1f2654\]\/10:focus,
+.dark .focus\:ring-\[\#1f2654\]\/20:focus {
+  --tw-ring-color: rgba(212, 143, 22, 0.30) !important;
+}
+.dark .focus\:border-\[\#1f2654\]:focus { border-color: var(--ofi-d-wheat) !important; }
+
+/* Hover on the quote's own tinted money columns follows the same warm step. */
+.dark table[data-tender-detail-table] tbody tr:hover td {
+  background-color: var(--ofi-d-hover) !important;
+}
+
+/* ── Text selection & caret ──
+   The browser default is blue, and index.css paints the light-mode selection
+   navy (`.ant-input::selection`) — neither belongs on a dark, gold-accented UI.
+   This is the solid button gold with dark text rather than a translucent wash,
+   so a selection inside an input is unmistakable at any surface tint.
+
+   Inputs and textareas are listed explicitly: a bare `::selection` descendant
+   rule loses to index.css's element-specific `.ant-input::selection`. The
+   `::-moz-selection` variants must be their own rule — Firefox drops an entire
+   selector list if one entry is a pseudo-element it does not know. */
+.dark ::selection,
+.dark input::selection,
+.dark textarea::selection,
+.dark .ant-input::selection,
+.dark .ant-input-affix-wrapper input::selection,
+.dark .ant-input-password input::selection {
+  background: var(--ofi-d-wheat-solid);
+  color: var(--ofi-d-on-accent);
+}
+.dark ::-moz-selection,
+.dark input::-moz-selection,
+.dark textarea::-moz-selection {
+  background: var(--ofi-d-wheat-solid);
+  color: var(--ofi-d-on-accent);
+}
+
+/* The caret follows the accent too, so the insertion point is visible against
+   the dark field instead of being a near-black line on a near-black box. */
+.dark input,
+.dark textarea,
+.dark [contenteditable="true"] {
+  caret-color: var(--ofi-d-wheat);
+}
+
+/* Chrome paints autofilled fields with its own pale background and near-black
+   text, which reads as a bright blue-white block in dark mode. The inset shadow
+   is the only way to repaint it. */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--ofi-d-text) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--ofi-d-surface-3) inset !important;
+  caret-color: var(--ofi-d-wheat);
+}
+
+/* ── Quote workspace tabs ──
+   The active tab's light fill (#eef2fb) has no entry in the tint remap above,
+   so on dark it stayed a near-white block. It is repainted in the accent gold —
+   the same value as the primary buttons and the text selection — with dark text
+   on top, which is what makes the selected tab unmistakable here.
+
+   `button.ofi-quote-tab-active` is (0,2,1): one step above the blanket
+   `.dark .text-[#1f2654]` remap (0,2,0) that would otherwise force the label
+   white, which is unreadable on gold. */
+.dark button.ofi-quote-tab-active,
+.dark button.ofi-quote-tab-active:hover {
+  background-color: var(--ofi-d-wheat-solid) !important;
+  border-bottom-color: var(--ofi-d-wheat-strong) !important;
+  color: var(--ofi-d-on-accent) !important;
+  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
+}
+
+/* The count badge sits INSIDE that gold fill, and its own `bg-[#1f2654]` would
+   also resolve to gold — gold on gold, i.e. invisible. Invert it instead. */
+.dark button.ofi-quote-tab-active .ofi-quote-tab-badge {
+  background-color: var(--ofi-d-on-accent) !important;
+  border-color: transparent !important;
+  color: var(--ofi-d-wheat) !important;
+  -webkit-text-fill-color: var(--ofi-d-wheat) !important;
+}
+
+/* Idle tabs: quiet until hovered, then a soft wash of the same gold rather than
+   a neutral grey, so the whole strip stays in one colour family. */
+.dark button.ofi-quote-tab:not(.ofi-quote-tab-active):not(:disabled):hover {
+  background-color: var(--ofi-d-wheat-softer) !important;
+  border-bottom-color: var(--ofi-d-wheat-border) !important;
+  color: var(--ofi-d-wheat) !important;
+}
+
+/* Primary-button hover. The resting state is repainted gold by the brand-surface
+   rule near the top of this file, but `hover:bg-[#2a3470]` had no dark
+   counterpart — so hovering a gold button flipped it back to navy mid-interaction.
+   Hover lifts to the brighter gold instead. */
+.dark .hover\:bg-\[\#2a3470\]:hover {
+  background-color: var(--ofi-d-wheat-strong) !important;
+  color: var(--ofi-d-on-accent) !important;
+}
+
+/* ── Popup option rows: customer names, products, select options ──
+   Light mode paints the hovered row brand navy via `hover:bg-[#1f2654]`. That
+   is a hover VARIANT class, so the blanket `.dark .bg-[#1f2654]` remap near the
+   top of this file never matched it — these rows stayed navy while every other
+   accent surface moved to gold. `[data-active]` covers the keyboard-highlighted
+   row in QuoteSelect, which is painted by state rather than by :hover. */
+.dark .ofi-option-row:hover,
+.dark .ofi-option-row[data-active='true'] {
+  background-color: var(--ofi-d-wheat-solid) !important;
+}
+
+/* The descendant rule is what actually flips the label: the row's text colour
+   comes from a child <span>, and `group-hover:!text-white` would otherwise put
+   white on gold. */
+.dark .ofi-option-row:hover,
+.dark .ofi-option-row:hover *,
+.dark .ofi-option-row[data-active='true'],
+.dark .ofi-option-row[data-active='true'] * {
+  color: var(--ofi-d-on-accent) !important;
+  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
+}
+
+/* Icon buttons that ride along inside a hovered row (e.g. the product row's
+   "open article" tag) need a tint that reads against the gold fill. */
+.dark .ofi-option-row:hover button:hover {
+  background-color: rgba(20, 15, 5, 0.18) !important;
+}
+
+/* Slate hovers the block above missed — the header's icon buttons and the
+   customer field's clear chip. Left unmapped they flashed a light grey. */
+.dark .hover\:bg-slate-200:hover,
+.dark .hover\:bg-slate-200\/70:hover,
+.dark .hover\:bg-slate-300:hover,
+.dark .hover\:bg-slate-400:hover {
+  background-color: var(--ofi-d-hover) !important;
+}
+
+/* ── Appointment schedule bottom sheet: raised surface so the pop-up stands
+   off the flattened page (see the .ofi-* layering pattern). ── */
+.dark .ofi-sheet {
+  background: var(--ofi-d-surface-3) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 -20px 56px rgba(0, 0, 0, 0.65) !important;
+}
+.dark .ofi-sheet-backdrop {
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ── Reports sheet: the orange accent family. The sheet gets an orange top
+   hairline; the "+" actions, nav arrows and PDF glyphs all glow orange
+   instead of the light theme's navy. ── */
+.dark .ofi-reports-sheet {
+  border-top: 2px solid rgba(251, 146, 60, 0.55) !important;
+}
+.dark .ofi-rs-nav { color: rgba(255, 255, 255, 0.7) !important; }
+.dark .ofi-rs-nav:hover:not(:disabled) {
+  background: rgba(251, 146, 60, 0.14) !important;
+  color: #fdba74 !important;
+}
+.dark .ofi-rs-plus {
+  background: transparent !important;
+  border-color: rgba(251, 146, 60, 0.45) !important;
+  color: #fdba74 !important;
+}
+.dark .ofi-rs-plus:hover:not(:disabled) {
+  background: rgba(251, 146, 60, 0.12) !important;
+  border-color: #fb923c !important;
+  color: #fb923c !important;
+}
+.dark .ofi-rs-pdf,
+.dark .ofi-rs-iconbtn {
+  background: transparent !important;
+  border-color: rgba(251, 146, 60, 0.45) !important;
+  color: #fdba74 !important;
+}
+.dark .ofi-rs-pdf:hover,
+.dark .ofi-rs-iconbtn:hover:not(:disabled) {
+  background: rgba(251, 146, 60, 0.12) !important;
+  border-color: #fb923c !important;
+  color: #fb923c !important;
+}
+.dark .ofi-rs-pdf-dim {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Calendar entry labels: wheat for this order's plans (never blue), muted
+   green/neutral fills for the rest. */
+.dark .ofi-cal-chip-mine { background: var(--ofi-d-wheat-solid) !important; color: #141414 !important; }
+.dark .ofi-cal-chip-mine:hover { background: var(--ofi-d-wheat-strong) !important; }
+.dark .ofi-cal-chip-done { background: rgba(16, 185, 129, 0.28) !important; color: #6ee7b7 !important; }
+.dark .ofi-cal-chip-done:hover { background: rgba(16, 185, 129, 0.38) !important; }
+.dark .ofi-cal-chip-other { background: rgba(255, 255, 255, 0.12) !important; color: rgba(255, 255, 255, 0.75) !important; }
+.dark .ofi-cal-chip-other:hover { background: rgba(255, 255, 255, 0.18) !important; }
+.dark .ofi-cal-chip-cancelled { background: rgba(255, 255, 255, 0.06) !important; color: rgba(255, 255, 255, 0.4) !important; }
+
+/* ── Envanter modülü tabloları (data-inv-table) ── */
+.dark table[data-inv-table] th {
+  background: var(--ofi-d-surface-2);
+  color: rgba(255, 246, 232, 0.82);
+  border-bottom-color: var(--ofi-d-border);
+}
+.dark table[data-inv-table] td {
+  border-bottom-color: var(--ofi-d-border);
+  color: rgba(255, 246, 232, 0.85);
+}
+.dark table[data-inv-table] tbody tr:last-child td {
+  border-bottom-color: transparent;
+}
+.dark table[data-inv-table] tr[data-filter-row] th {
+  background: var(--ofi-d-surface);
+  border-bottom-color: var(--ofi-d-border);
+}

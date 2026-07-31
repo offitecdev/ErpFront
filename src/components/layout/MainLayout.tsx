@@ -25,12 +25,22 @@ import {
     Building05 as TeamOutlined,
     Home01 as HomeOutlined,
     XClose as CloseOutlined,
+    DotsVertical,
 } from '../icons/antIconCompat';
-import { getRoleProfile } from '../../lib/access';
+import {
+    ADMIN_PERMISSION_NAMES,
+    PERMISSION_TO_MODULE,
+    isMenuSectionEnabled,
+    isModuleKeyEnabled,
+    isPermissionModuleEnabled,
+    menuSectionModule,
+    moduleForPath,
+} from '../../lib/moduleCatalog';
+import { useModuleAccess } from '../../lib/useEnabledModules';
 import { useGuardedNavigate } from '../../store/navGuardStore';
 import { hrefFor, isModifiedClick } from '../../lib/navLink';
 import { SlidePanel } from './SlidePanel';
-import { AppSidebar, type QuickCreateItem } from './AppSidebar';
+import { AppSidebar, SIDEBAR_RAIL_WIDTH, SIDEBAR_PANEL_WIDTH, type QuickCreateItem } from './AppSidebar';
 import { WorkspaceTabsProvider, WorkspaceTabLauncher, WorkspaceTabStrip } from './WorkspaceTabs';
 import { SplitViewProvider, useSplitView, SPLIT_PANE_WINDOW_NAME } from './SplitViewContext';
 import { SplitViewToggle } from './SplitViewToggle';
@@ -39,17 +49,12 @@ import { PrimaryPane } from './PrimaryPane';
 import { PaneErrorBoundary } from './PaneErrorBoundary';
 import { notificationApi, type NotificationDto } from '../../lib/api/notifications';
 import { LanguageSwitcher } from '../ui-shared/LanguageSwitcher';
-import offitecLogo from '../../assets/images/offitec-1x.webp';
-import offitecLogo2x from '../../assets/images/offitec-2x.webp';
-import offitecLogoDark from '../../assets/images/darkmode-1x.webp';
-import offitecLogoDark2x from '../../assets/images/darkmode-2x.webp';
-
-const LazyGlobalAlertStack = React.lazy(() =>
-    import('../alerts/GlobalAlertStack').then((module) => ({ default: module.GlobalAlertStack })),
-);
+import { InstallAppButton } from '../ui-shared/InstallAppButton';
 
 /* ── Menü Tipleri ── */
-type MenuLeaf = { key: string; label: string; permission?: string; hideForTechnician?: boolean; technicianOnly?: boolean };
+/** `module`: explicit module tag for leaves that belong to a different module
+    than their section (e.g. fieldwork pages inside the projects group). */
+type MenuLeaf = { key: string; label: string; permission?: string; module?: string };
 type MenuIcon = React.ComponentType<any>;
 type ModuleLauncherItem = {
     id: string;
@@ -75,13 +80,8 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.home',
         icon: HomeOutlined,
     },
-    {
-        type: 'single',
-        key: '/attendance',
-        path: '/attendance',
-        label: 'nav.attendance',
-        icon: ClockCircleOutlined,
-    },
+    // Mesai (/attendance) is hidden from the menu while the page is reworked.
+    // The route still resolves for anyone opening the URL directly.
     {
         type: 'single',
         key: '/calendar',
@@ -98,7 +98,8 @@ const MENU_SECTIONS: MenuSection[] = [
             { key: '/employees', label: 'nav.employeeList' },
             { key: '/attendance-records', label: 'nav.attendanceRecords', permission: 'attendance.read' },
             { key: '/attendance-settings', label: 'nav.attendanceQR', permission: 'tenants.update' },
-            { key: '/roles', label: 'nav.roleManagement' },
+            // Role management is an admin surface: visible only with roles.manage.
+            { key: '/roles', label: 'nav.roleManagement', permission: 'roles.manage' },
         ],
     },
     {
@@ -107,7 +108,8 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.crm',
         icon: ContactsOutlined,
         items: [
-            { key: '/crm/overview', label: 'nav.crmOverview', permission: 'crm.customers.view' },
+            // Genel Bakış (/crm/overview) is hidden from the menu while the
+            // dashboard is reworked; the route itself still resolves.
             { key: '/crm/customers', label: 'nav.customerList', permission: 'crm.customers.view' },
             { key: '/crm/tenders', label: 'nav.tenderManagement', permission: 'tenders.view' },
         ],
@@ -119,12 +121,8 @@ const MENU_SECTIONS: MenuSection[] = [
         feature: 'projects',
         icon: FundProjectionScreenOutlined,
         items: [
-            { key: '/projects', label: 'nav.projectManagement', permission: 'projects.view', hideForTechnician: true },
-            { key: '/projects/flow', label: 'nav.projectFlow', permission: 'projects.view', hideForTechnician: true },
-            { key: '/crm/my-orders', label: 'nav.myOrders', permission: 'crm.customers.view', hideForTechnician: true },
-            { key: '/projects/installation/tasks', label: 'nav.installationTasks', permission: 'projects.report', technicianOnly: true },
-            { key: '/projects/installation/delivery', label: 'nav.deliveryReports', permission: 'projects.report', technicianOnly: true },
-            { key: '/settings/mail', label: 'nav.mailSettings', permission: 'mail.manage', hideForTechnician: true },
+            { key: '/projects', label: 'nav.projectManagement', permission: 'projects.view' },
+            { key: '/crm/my-orders', label: 'nav.myOrders', permission: 'crm.customers.view' },
         ],
     },
     {
@@ -133,11 +131,11 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.inventory',
         icon: InboxOutlined,
         items: [
-            { key: '/inventory/movements', label: 'nav.movements', permission: 'inventory.transfer', hideForTechnician: true },
-            { key: '/inventory/articles', label: 'nav.articles', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory/extra-materials', label: 'nav.materials', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory/suppliers', label: 'nav.suppliers', permission: 'inventory.view', hideForTechnician: true },
-            { key: '/inventory', label: 'nav.inventoryDashboard', permission: 'inventory.view', hideForTechnician: true },
+            { key: '/inventory/articles', label: 'nav.articles', permission: 'inventory.view' },
+            { key: '/inventory/materials', label: 'nav.materials', permission: 'inventory.view' },
+            { key: '/inventory/stock', label: 'nav.stock', permission: 'inventory.view' },
+            { key: '/inventory/orders', label: 'nav.inventoryOrders', permission: 'inventory.view' },
+            { key: '/inventory/suppliers', label: 'nav.suppliers', permission: 'inventory.view' },
         ],
     },
     {
@@ -157,12 +155,11 @@ const MENU_SECTIONS: MenuSection[] = [
         label: 'nav.maintenance',
         icon: CalendarOutlined,
         items: [
-            { key: '/maintenance', label: 'nav.maintenanceDashboard', permission: 'maintenance.contracts.manage', hideForTechnician: true },
-            { key: '/maintenance/contracts', label: 'nav.contracts', permission: 'maintenance.contracts.manage', hideForTechnician: true },
-            { key: '/maintenance/tasks', label: 'nav.maintenanceTasks', permission: 'maintenance.contracts.manage', hideForTechnician: true },
-            { key: '/maintenance/technician/tasks', label: 'nav.technicianTasks', permission: 'maintenance.tasks.manage', technicianOnly: true },
-            { key: '/maintenance/tasks?view=reports', label: 'nav.maintenanceReports', permission: 'maintenance.reports.manage', hideForTechnician: true },
-            { key: '/maintenance/regie', label: 'nav.regie', permission: 'regie.calls.manage', hideForTechnician: true },
+            { key: '/maintenance', label: 'nav.maintenanceDashboard', permission: 'maintenance.contracts.manage' },
+            { key: '/maintenance/contracts', label: 'nav.contracts', permission: 'maintenance.contracts.manage' },
+            { key: '/maintenance/tasks', label: 'nav.maintenanceTasks', permission: 'maintenance.contracts.manage' },
+            { key: '/maintenance/tasks?view=reports', label: 'nav.maintenanceReports', permission: 'maintenance.reports.manage' },
+            { key: '/maintenance/regie', label: 'nav.regie', permission: 'regie.calls.manage' },
         ],
     },
 
@@ -173,8 +170,7 @@ const MENU_SECTIONS: MenuSection[] = [
         feature: 'projects',
         icon: ServiceReportsOutlined,
         items: [
-            { key: '/services/reports', label: 'nav.serviceReports', permission: 'projects.view', hideForTechnician: true },
-            { key: '/services/reports', label: 'nav.serviceReports', permission: 'projects.report', technicianOnly: true },
+            { key: '/services/reports', label: 'nav.serviceReports', permission: 'projects.view' },
         ],
     },
     {
@@ -184,20 +180,16 @@ const MENU_SECTIONS: MenuSection[] = [
         icon: SettingOutlined,
         items: [
             { key: '/settings/pdf', label: 'nav.pdfSettings' },
-            { key: '/settings/checklists', label: 'nav.checklistSettings', hideForTechnician: true },
+            // Mail and checklists are project features (their routes sit behind
+            // the project-module guard), so the leaves follow the projects module.
+            { key: '/settings/mail', label: 'nav.mailSettings', permission: 'mail.manage', module: 'projects' },
+            { key: '/settings/checklists', label: 'nav.checklistSettings', module: 'projects' },
+            // Company categories map companies onto module bundles: an admin
+            // surface that no category may hide (module 'administration').
+            { key: '/settings/company-categories', label: 'nav.companyCategories', permission: 'roles.manage', module: 'administration' },
         ],
     },
 ];
-
-MENU_SECTIONS.forEach((section) => {
-    if (section.type !== 'group' || section.key !== 'projects') return;
-    section.items.forEach((item) => {
-        if (item.key === '/projects/installation/tasks') {
-            item.permission = undefined;
-            item.label = 'nav.technicianInstallations';
-        }
-    });
-});
 
 const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
     {
@@ -306,25 +298,75 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
 const IS_SPLIT_PANE = typeof window !== 'undefined' && window.name === SPLIT_PANE_WINDOW_NAME;
 
 /* ── İç Layout ── */
-const DeferredGlobalAlertStack: React.FC<{
-    onCountChange: (count: number) => void;
-    onArchived: () => void;
-}> = ({ onCountChange, onArchived }) => {
-    const [isReady, setIsReady] = useState(false);
+/** Header three-dot quick-create — moved out of the sidebar; sits beside the
+    split-view toggle and the "+" tab launcher. */
+const HeaderQuickCreate: React.FC<{
+    items: QuickCreateItem[];
+    onSelect: (item: QuickCreateItem) => void;
+    className?: string;
+}> = ({ items, onSelect, className = '' }) => {
+    const { t } = useTranslation();
+    const [open, setOpen] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // Alerts aggregate several large API lists and use the animation runtime.
-        // Keep both the module download and its requests outside the detail LCP.
-        const timer = window.setTimeout(() => setIsReady(true), 8000);
-        return () => window.clearTimeout(timer);
-    }, []);
+        if (!open) return;
+        const onDown = (e: MouseEvent) => {
+            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+    }, [open]);
 
-    if (!isReady) return null;
+    if (!items.length) return null;
 
     return (
-        <React.Suspense fallback={null}>
-            <LazyGlobalAlertStack onCountChange={onCountChange} onArchived={onArchived} />
-        </React.Suspense>
+        <div ref={rootRef} className={`relative shrink-0 ${className}`}>
+            <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                title={t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}
+                aria-label={t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}
+                onClick={() => setOpen((v) => !v)}
+                className={`inline-flex size-9 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${open
+                    ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg'
+                    : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
+                    }`}
+            >
+                <DotsVertical size={18} className="rotate-90" />
+            </button>
+
+            {open && (
+                <div
+                    role="menu"
+                    className="absolute left-0 top-11 z-[60] w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl"
+                >
+                    <p className="px-3 pb-1.5 pt-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
+                        {t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}
+                    </p>
+                    <div className="grid gap-0.5">
+                        {items.map((qi) => {
+                            const QIcon = qi.icon;
+                            return (
+                                <button
+                                    key={qi.id}
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => { onSelect(qi); setOpen(false); }}
+                                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:text-white/85 dark:hover:bg-white/10 dark:hover:text-white"
+                                >
+                                    <QIcon size={16} className={`shrink-0 dark:!text-[#e6cf9e]/80 ${qi.iconClassName || ''}`} />
+                                    <span className="min-w-0 flex-1 truncate">{qi.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -344,11 +386,16 @@ const MainLayoutInner: React.FC = () => {
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
     const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+    // Server-side unread total for the active company — the fetched list is
+    // capped, so counting it locally undercounts the badge.
+    const [unreadCount, setUnreadCount] = useState(0);
     const [notificationsLoading, setNotificationsLoading] = useState(false);
-    // Live urgent-alert count from the floating alert deck; mirrored on the bell badge.
-    const [alertCount, setAlertCount] = useState(0);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
+    // The header calendar entry is parked while the module is being rebuilt: it
+    // still reacts to hover/focus/click, but the only outcome is the note that
+    // explains why. 'tap' opens are auto-dismissed, 'hover' ones follow the cursor.
+    const [calendarTip, setCalendarTip] = useState<'hover' | 'tap' | null>(null);
     const SIDEBAR_OPEN_STORAGE_KEY = "offitec:sidebar-open";
     const [sidebarPinnedOpen, setSidebarPinnedOpen] = useState(() => {
         if (typeof window === 'undefined') return false;
@@ -375,20 +422,52 @@ const MainLayoutInner: React.FC = () => {
                 : { entryPath: primaryRoute, currentPath: path }
         ));
     }, [primaryRoute]);
-    const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
-    const projectModuleEnabled = selectedTenant?.isProjectModuleEnabled !== false;
-    const roleProfile = useMemo(() => getRoleProfile(user), [user]);
-    const visibleMenuSections = useMemo(
-        () => MENU_SECTIONS.filter((section) => section.feature !== 'projects' || projectModuleEnabled),
-        [projectModuleEnabled]
-    );
+    // Effective module set (company category ∩ the role's package) — shared with
+    // the dashboard tiles so the sidebar and Home can never disagree.
+    const { projectModuleEnabled, packageModules, enabledModules } = useModuleAccess();
+    const visibleMenuSections = useMemo(() => {
+        return MENU_SECTIONS.flatMap((section): MenuSection[] => {
+            if (section.feature === 'projects' && !projectModuleEnabled) return [];
+            if (section.type === 'single') {
+                return isMenuSectionEnabled(section.key, enabledModules) ? [section] : [];
+            }
+            // A leaf with its own module tag follows that module (fieldwork pages
+            // live inside the projects/maintenance groups); untagged leaves follow
+            // the section's module. Empty groups disappear entirely.
+            const sectionEnabled = isMenuSectionEnabled(section.key, enabledModules);
+            const sectionModule = menuSectionModule(section.key);
+            const items = section.items.flatMap((item): MenuLeaf[] => {
+                const visible = item.module
+                    ? isModuleKeyEnabled(item.module, enabledModules)
+                    : sectionEnabled;
+                if (!visible) return [];
+                // The role's package decides which pages a person sees — the
+                // role's permissions then only matter inside
+                // the page. So a leaf whose module is in the package shows even
+                // without the permission. Admin pages (roles.manage & co.) never bypass.
+                const leafModule = item.module ?? sectionModule;
+                if (packageModules && leafModule && packageModules.has(leafModule)
+                    && item.permission && !ADMIN_PERMISSION_NAMES.has(item.permission)) {
+                    return [{ ...item, permission: undefined }];
+                }
+                return [item];
+            });
+            if (!items.length) return [];
+            return [{ ...section, items }];
+        });
+    }, [projectModuleEnabled, enabledModules, packageModules]);
     const moduleLauncherItems = useMemo(() => {
         return MODULE_LAUNCHER_ITEMS.filter((item) => {
-            const hasPermission = !item.permission || permissions.includes(item.permission);
             const featureEnabled = item.feature !== 'projects' || projectModuleEnabled;
-            return hasPermission && featureEnabled;
+            if (!featureEnabled || !isPermissionModuleEnabled(item.permission, enabledModules)) return false;
+            if (!item.permission || permissions.includes(item.permission)) return true;
+            // Same package bypass as the sidebar: the role's package grants
+            // the page, the role's permissions govern actions inside it.
+            const moduleKey = PERMISSION_TO_MODULE.get(item.permission);
+            return Boolean(packageModules && moduleKey && packageModules.has(moduleKey)
+                && !ADMIN_PERMISSION_NAMES.has(item.permission));
         });
-    }, [permissions, projectModuleEnabled]);
+    }, [permissions, projectModuleEnabled, enabledModules, packageModules]);
     const activeLocale = useMemo(() => {
         const language = i18n.resolvedLanguage || i18n.language || 'tr';
         if (language.startsWith('de')) return 'de-DE';
@@ -509,8 +588,16 @@ const MainLayoutInner: React.FC = () => {
     useEffect(() => {
         // The pane iframe shows no bell — don't duplicate the polling.
         if (!user?.id || IS_SPLIT_PANE) return;
+        // Notifications belong to exactly one company: drop the previous
+        // company's list/badge immediately on switch instead of letting stale
+        // rows linger until (or if) the refetch lands.
+        setNotifications([]);
+        setUnreadCount(0);
         notificationApi.list({ unreadOnly: true, limit: 20 })
             .then(setNotifications)
+            .catch(() => undefined);
+        notificationApi.unreadCount()
+            .then(setUnreadCount)
             .catch(() => undefined);
     }, [user?.id, selectedTenantId]);
 
@@ -547,8 +634,23 @@ const MainLayoutInner: React.FC = () => {
         }
     }, [location.pathname, navigate, projectModuleEnabled]);
 
+    // Company category guard: leaving a page whose module the active company's
+    // category disables (e.g. after a company switch) lands back on Home.
+    useEffect(() => {
+        if (!enabledModules) return;
+        const moduleKey = moduleForPath(location.pathname);
+        if (moduleKey && !isModuleKeyEnabled(moduleKey, enabledModules)) navigate('/');
+    }, [location.pathname, navigate, enabledModules]);
+
+    // Tap-opened notes have no pointer to leave, so they time out instead.
+    useEffect(() => {
+        if (calendarTip !== 'tap') return;
+        const timer = window.setTimeout(() => setCalendarTip(null), 2600);
+        return () => window.clearTimeout(timer);
+    }, [calendarTip]);
+
     const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase();
-    const unreadNotificationCount = notifications.filter((notification) => !notification.isRead).length;
+    const unreadNotificationCount = unreadCount;
 
     const activeUrl = useMemo(() => {
         const current = location.pathname + location.search;
@@ -646,9 +748,14 @@ const MainLayoutInner: React.FC = () => {
         guardedNavigate(item.path);
     };
 
-    const MAIN_SIDEBAR_WIDTH = 256;
-    const COLLAPSED_SIDEBAR_WIDTH = 72;
-    const visibleWidth = sidebarPinnedOpen ? MAIN_SIDEBAR_WIDTH : COLLAPSED_SIDEBAR_WIDTH;
+    // Rail is always visible; pinning adds the flush submenu panel beside it.
+    const visibleWidth = sidebarPinnedOpen
+        ? SIDEBAR_RAIL_WIDTH + SIDEBAR_PANEL_WIDTH
+        : SIDEBAR_RAIL_WIDTH;
+
+    // Montaj (teknisyen) ekranları panelin İÇİNDE ama yan barsız çalışır:
+    // uygulama başlığı aynen kalır, sol rail ve mobil çekmece hiç çizilmez.
+    const hideSidebar = location.pathname.startsWith('/montage');
 
     // ── Secondary-pane shell: just the page, full width of the iframe ──
     if (IS_SPLIT_PANE) {
@@ -661,9 +768,13 @@ const MainLayoutInner: React.FC = () => {
             >
                 <div
                     ref={pageScrollRef}
-                    // `--page-gutter` is the page's horizontal padding; full-bleed
-                    // children (e.g. the tender top bar) negate it to reach the edge.
-                    className="h-full overflow-auto px-[var(--page-gutter)] py-4 [--page-gutter:1rem] sm:[--page-gutter:1.25rem]"
+                    // Marks the real scrollport so a page can freeze it while an
+                    // overlay is open (see usePageScrollLock).
+                    data-page-scrollport
+                    // `--page-gutter` / `--page-pad-y` publish this scrollport's own
+                    // padding, so a full-bleed child (e.g. the quote header) can
+                    // negate it and reach the container's real edge on both axes.
+                    className="h-full overflow-auto px-[var(--page-gutter)] py-[var(--page-pad-y)] [--page-gutter:1rem] [--page-pad-y:1rem] sm:[--page-gutter:1.25rem]"
                 >
                     <PaneErrorBoundary resetKey={location.pathname + location.search}>
                         <Outlet key={selectedTenantId || user?.tenantId || 'default'} />
@@ -675,21 +786,29 @@ const MainLayoutInner: React.FC = () => {
 
     return (
         <div
-            className="min-h-screen bg-[#f6f8fb] font-sans text-[#1D1D1F] lg:flex"
-            // Live sidebar width, published as an inheritable CSS variable so any
-            // viewport-fixed descendant can align its left edge to the content
-            // column in every sidebar state — collapsed (72px) or pinned open
-            // (256px). Page-level bars should prefer `sticky` + `--page-gutter`
-            // (see TenderQuoteTopBar): a fixed bar spans the whole window and so
-            // overlays the second screen in split view.
-            style={{ '--app-shell-inset': `${visibleWidth}px` } as React.CSSProperties}
+            // `lg:h-screen` caps the shell at the viewport so the content column
+            // (the `overflow-auto` div inside <main>) is the real scrollport on
+            // desktop — without it the whole body scrolled and every `sticky`
+            // bar scoped to the column (e.g. TenderDetailHeader) never pinned.
+            // `--app-shell-inset` / `--app-header-height` let a page pin a bar with
+            // `position: fixed` flush against the content column: left edge at the
+            // live sidebar width (0 below lg, where the rail is hidden; 84px rail /
+            // 316px with the pinned submenu panel — keep in sync with
+            // SIDEBAR_RAIL_WIDTH / SIDEBAR_PANEL_WIDTH) and top edge under the
+            // fixed app header (h-16). In split view pages run inside iframes, so a
+            // fixed bar stays confined to its own pane; the pane shell publishes
+            // inset 0 and no header offset (see TenderDetailHeader).
+            // The shell carries the same #f6f8fb canvas as the content column, so
+            // header + sidebar + page read as one continuous surface and only the
+            // page's own white cards lift off it. (dark.css maps #f6f8fb to the
+            // dark page background, so the same holds there.)
+            className={`min-h-screen font-sans text-[#1D1D1F] lg:flex lg:h-screen [--app-shell-inset:0px] [--app-header-height:4rem] ${hideSidebar ? 'bg-white dark:bg-[#0f1114] lg:[--app-shell-inset:0px]' : sidebarPinnedOpen ? 'bg-[#f6f8fb] lg:[--app-shell-inset:316px]' : 'bg-[#f6f8fb] lg:[--app-shell-inset:84px]'}`}
         >
             {/* ── Sidebar (Evernote-style rail: hover-peek, flyout side-tabs, no footer) ── */}
-            <AppSidebar
+            {!hideSidebar && <AppSidebar
                 variant="desktop"
-                sections={MENU_SECTIONS}
+                sections={visibleMenuSections}
                 activeUrl={activeUrl}
-                roleProfile={roleProfile}
                 permissions={permissions}
                 projectModuleEnabled={projectModuleEnabled}
                 onNavigate={handleSidebarNavigate}
@@ -701,10 +820,10 @@ const MainLayoutInner: React.FC = () => {
                     const item = moduleLauncherItems.find((m) => m.id === qi.id);
                     if (item) handleModuleSelect(item);
                 }}
-            />
+            />}
 
             {/* ── Mobile sidebar drawer ── */}
-            <div
+            {!hideSidebar && <div
                 className={`fixed inset-0 z-[80] lg:hidden ${isMobileSidebarOpen ? '' : 'pointer-events-none'}`}
                 aria-hidden={!isMobileSidebarOpen}
             >
@@ -712,26 +831,30 @@ const MainLayoutInner: React.FC = () => {
                     onClick={() => setIsMobileSidebarOpen(false)}
                     className={`absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity duration-200 ${isMobileSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
                 />
+                {/* Phone: a drawer that leaves a strip of the page visible to tap
+                    on. Tablet (sm and up): a fixed 320px sheet — a percentage
+                    would keep growing with the screen for no gain. The bottom
+                    safe-area inset keeps the last menu row clear of the iOS
+                    home indicator. */}
                 <div
-                    className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col bg-[#f6f8fb] shadow-2xl transition-transform duration-200 ease-out ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                    className={`absolute inset-y-0 left-0 flex w-[86%] max-w-[300px] flex-col bg-white shadow-2xl transition-transform duration-200 ease-out sm:w-[320px] sm:max-w-[320px] ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 >
                     <div className="flex h-14 items-center justify-between border-b border-slate-200/60 px-4">
-                        <img src={isDarkMode ? offitecLogoDark : offitecLogo} alt="Offitec" width={360} height={143} decoding="async" fetchPriority="high" className="h-8 w-auto object-contain" />
+                        <img src="/fav4.svg" alt="Offitec" width={32} height={32} decoding="async" fetchPriority="high" className="size-8" />
                         <button
                             type="button"
                             aria-label={t('common.close')}
                             onClick={() => setIsMobileSidebarOpen(false)}
-                            className="flex size-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-[#d3e3fd]"
+                            className="flex size-10 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-[#d3e3fd]"
                         >
                             <CloseOutlined size={18} />
                         </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto py-1">
+                    <div className="flex-1 overflow-y-auto py-1 pb-[env(safe-area-inset-bottom)]">
                         <AppSidebar
                             variant="mobile"
-                            sections={MENU_SECTIONS}
+                            sections={visibleMenuSections}
                             activeUrl={activeUrl}
-                            roleProfile={roleProfile}
                             permissions={permissions}
                             projectModuleEnabled={projectModuleEnabled}
                             onNavigate={(path) => { guardedNavigate(path); setIsMobileSidebarOpen(false); }}
@@ -746,65 +869,61 @@ const MainLayoutInner: React.FC = () => {
                         />
                     </div>
                 </div>
-            </div>
+            </div>}
 
             {/* Placeholder for sidebar space — animates in step with the sidebar width */}
-            <div
+            {!hideSidebar && <div
                 style={{ paddingLeft: visibleWidth }}
                 className="invisible hidden transition-[padding-left] duration-300 ease-in-out lg:sticky lg:top-0 lg:bottom-0 lg:left-0 lg:block"
-            />
+            />}
 
             {/* ── Ana İçerik ── */}
             <div className="flex min-w-0 flex-1 flex-col pt-16">
 
-                {/* Header */}
-                <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between bg-[#f6f8fb] pr-3 pl-0 sm:pr-5">
+                {/* Header — the top slice of the shell. Same canvas colour as the
+                    rail and the content column, so the three meet without a seam.
+                    Montage keeps its own white shell. */}
+                <header className={`fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between pl-2 pr-3 sm:pr-5 ${hideSidebar ? 'bg-white dark:bg-[#0f1114]' : 'bg-[#f6f8fb] lg:left-[84px]'}`}>
                     <WorkspaceTabsProvider userId={user?.id}>
                         <div className="flex min-w-0 flex-1 items-center">
-                            {/* Mobile drawer opener — the desktop header has no hamburger;
-                                the sidebar's own chevron pins/collapses it. */}
-                            <button
+                            {/* Mobile drawer opener — desktop has the always-visible rail. */}
+                            {!hideSidebar && <button
                                 type="button"
                                 aria-label={t('nav.sidebarPin')}
                                 aria-pressed={isMobileSidebarOpen}
                                 onClick={() => setIsMobileSidebarOpen((open) => !open)}
-                                className="ml-1 flex size-9 shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd] lg:hidden"
+                                className="ml-1 flex size-10 shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd] lg:hidden"
                             >
                                 <MenuOutlined size={18} />
-                            </button>
+                            </button>}
 
-                            {/* ── Brand cluster: the logo stays fixed in the header at all
-                                times (independent of the sidebar), with the split toggle and
-                                "+" beside it. When the menu is open the cluster spans exactly
-                                the menu width so the icons align with its edge. */}
-                            <div
-                                style={!isMobile && sidebarPinnedOpen ? { width: MAIN_SIDEBAR_WIDTH } : undefined}
-                                className="flex shrink-0 items-center gap-1.5 pl-3 pr-2"
+                            {/* Brand icon — mobile only; on desktop it lives atop the rail. */}
+                            <a
+                                href={hrefFor('/')}
+                                aria-label="Offitec"
+                                onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
+                                className={`ml-1 mr-1 flex size-9 shrink-0 items-center justify-center ${hideSidebar ? '' : 'lg:hidden'}`}
                             >
-                                <a
-                                    href={hrefFor('/')}
-                                    onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
-                                    className={`flex h-9 min-w-0 items-center ${!isMobile && sidebarPinnedOpen ? 'flex-1' : ''}`}
-                                >
-                                    <img
-                                        src={isDarkMode ? offitecLogoDark : offitecLogo}
-                                        srcSet={`${isDarkMode ? offitecLogoDark : offitecLogo} 96w, ${isDarkMode ? offitecLogoDark2x : offitecLogo2x} 180w`}
-                                        sizes="96px"
-                                        alt="Offitec Heating Cooling"
-                                        width={96}
-                                        height={38}
-                                        decoding="async"
-                                        fetchPriority="high"
-                                        className="h-8 w-auto max-w-[120px] object-contain"
-                                    />
-                                </a>
-                                {/* Dual-screen toggle — arming it collapses the menu. */}
+                                <img src="/fav4.svg" alt="Offitec" width={32} height={32} decoding="async" fetchPriority="high" className="size-8" />
+                            </a>
+
+                            {/* ── Header tools: split view, "+" tab launcher, quick create ── */}
+                            <div className="flex shrink-0 items-center gap-1.5 pl-1 pr-2">
+                                {/* Dual-screen toggle — arming it collapses the menu panel. */}
                                 <SplitViewToggle
                                     onEnter={() => setSidebarPinnedOpen(false)}
                                     onExit={handleExitSplit}
-                                    className="hidden size-8 shrink-0 lg:flex"
+                                    className="hidden size-9 shrink-0 lg:flex"
                                 />
                                 <WorkspaceTabLauncher className="hidden lg:block" />
+                                <HeaderQuickCreate
+                                    items={quickCreateItems}
+                                    onSelect={(qi) => {
+                                        const item = moduleLauncherItems.find((m) => m.id === qi.id);
+                                        if (item) handleModuleSelect(item);
+                                    }}
+                                    className="hidden lg:block"
+                                />
                             </div>
 
                             {/* ── Middle: workspace tabs ── */}
@@ -815,6 +934,17 @@ const MainLayoutInner: React.FC = () => {
                     </WorkspaceTabsProvider>
 
                     <div className="flex items-center gap-1">
+                        {/* Global search — moved from the sidebar to the header. */}
+                        <button
+                            type="button"
+                            onClick={() => setIsSearchOverlayOpen(true)}
+                            className="mr-1 flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
+                            aria-label={t('nav.search')}
+                            title={t('nav.search')}
+                        >
+                            <SearchOutlined size={17} />
+                        </button>
+
                         {tenants.length > 0 && (
                             <div className="mr-2 hidden items-center sm:flex">
                                 <label className="relative block">
@@ -841,33 +971,52 @@ const MainLayoutInner: React.FC = () => {
                             </div>
                         )}
 
-                        <a
-                            href={hrefFor('/calendar')}
-                            onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/calendar'); }}
-                            className={`mr-1 inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold shadow-xs transition-colors ${location.pathname === '/calendar'
-                                ? 'border-[#272f67] bg-[#272f67] text-white'
-                                : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654]'
-                                }`}
-                            title={t('nav.calendar')}
-                            aria-label={t('nav.calendar')}
-                        >
-                            <CalendarOutlined style={{ fontSize: 16 }} />
-                            <span className="hidden sm:inline">{t('nav.calendar')}</span>
-                        </a>
+                        <div className="relative mr-1">
+                            <button
+                                type="button"
+                                onClick={() => setCalendarTip((tip) => (tip === 'tap' ? null : 'tap'))}
+                                onMouseEnter={() => setCalendarTip((tip) => tip ?? 'hover')}
+                                onMouseLeave={() => setCalendarTip((tip) => (tip === 'hover' ? null : tip))}
+                                onFocus={() => setCalendarTip((tip) => tip ?? 'hover')}
+                                onBlur={() => setCalendarTip(null)}
+                                className="inline-flex h-9 select-none items-center gap-2 rounded-full border border-slate-200/80 bg-slate-100 px-3 text-[13px] font-semibold text-slate-400 shadow-xs transition-colors hover:border-slate-300 hover:bg-slate-200 hover:text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-slate-400"
+                                aria-label={t('nav.calendar')}
+                                aria-disabled="true"
+                                aria-describedby={calendarTip ? 'calendar-dev-tip' : undefined}
+                            >
+                                <CalendarOutlined style={{ fontSize: 16 }} />
+                                <span className="hidden sm:inline">{t('nav.calendar')}</span>
+                            </button>
+
+                            {calendarTip && (
+                                <div
+                                    id="calendar-dev-tip"
+                                    role="status"
+                                    className="absolute left-1/2 top-full z-[80] mt-2 w-max max-w-[220px] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-center text-[11.5px] font-medium leading-4 text-white shadow-lg animate-in fade-in duration-150 dark:bg-black"
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        className="absolute -top-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-slate-900 dark:bg-black"
+                                    />
+                                    {t('nav.calendarUnderDevelopment')}
+                                </div>
+                            )}
+                        </div>
 
                         <button
                             onClick={async () => {
                                 setIsNotificationPanelOpen(true);
                                 await notificationApi.markAllRead().catch(() => { });
                                 setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
+                                setUnreadCount(0);
                             }}
                             className="relative flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
                             aria-label={t('nav.notifications')}
                         >
                             <BellOutlined size={16} />
-                            {unreadNotificationCount + alertCount > 0 && (
+                            {unreadNotificationCount > 0 && (
                                 <span className="absolute right-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-white dark:ring-[#08090a]">
-                                    {unreadNotificationCount + alertCount > 99 ? '99+' : unreadNotificationCount + alertCount}
+                                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
                                 </span>
                             )}
                         </button>
@@ -894,6 +1043,7 @@ const MainLayoutInner: React.FC = () => {
                                     <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-secondary transition-colors hover:bg-brand-primary_alt hover:text-brand-secondary">
                                         <SettingOutlined style={{ fontSize: 13 }} className="text-slate-400" /> {t('nav.settingsMenu')}
                                     </button>
+                                    <InstallAppButton variant="menu" />
                                     <div className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-secondary">
                                         {isDarkMode
                                             ? <LuSun size={13} className="text-slate-400" />
@@ -998,13 +1148,20 @@ const MainLayoutInner: React.FC = () => {
                 )}
 
                 {/* Page content */}
-                <main ref={mainRef} className="relative flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#f6f8fb]">
+                {/* `min-h-0` lets <main> shrink to the viewport-capped column
+                    instead of growing with its content (flex min-height:auto),
+                    which is what hands the scrolling to the inner column. */}
+                {/* The content canvas — same colour as the header and rail, with no
+                    corner or seam borders, so the whole shell is one surface. */}
+                <main ref={mainRef} className={`relative flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden ${hideSidebar ? 'bg-white dark:bg-[#0f1114]' : 'bg-[#f6f8fb]'}`}>
                     <div
                         ref={pageScrollRef}
+                        // See the pane branch above — lets a page freeze the scrollport.
+                        data-page-scrollport
                         style={isSplit && !isMobile ? { width: `${splitRatio}%` } : undefined}
                         className={`${isSplit && !isMobile
                             ? `min-w-0 flex-1 overflow-hidden lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70 ${isResizingPanes ? 'pointer-events-none select-none' : ''}`
-                            : 'flex-1 overflow-auto px-[var(--page-gutter)] py-5 [--page-gutter:1rem] sm:[--page-gutter:1.5rem] lg:py-6 lg:[--page-gutter:2rem]'}`}
+                            : 'flex-1 overflow-auto px-[var(--page-gutter)] py-[var(--page-pad-y)] [--page-gutter:1rem] [--page-pad-y:1.25rem] sm:[--page-gutter:1.5rem] lg:[--page-gutter:2rem] lg:[--page-pad-y:1.5rem]'}`}
                     >
                         {isSplit && !isMobile ? (
                             <PrimaryPane
@@ -1085,6 +1242,7 @@ const MainLayoutInner: React.FC = () => {
                             onClick={async () => {
                                 await notificationApi.markAllRead();
                                 setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
+                                setUnreadCount(0);
                             }}
                         >
                             {t('nav.markAllRead')}
@@ -1110,6 +1268,7 @@ const MainLayoutInner: React.FC = () => {
                                         if (!notification.isRead) {
                                             await notificationApi.markRead(notification.id).catch(() => undefined);
                                             setNotifications((rows) => rows.map((row) => row.id === notification.id ? { ...row, isRead: true } : row));
+                                            setUnreadCount((count) => Math.max(0, count - 1));
                                         }
                                         if (notification.linkUrl) {
                                             setIsNotificationPanelOpen(false);
@@ -1131,17 +1290,6 @@ const MainLayoutInner: React.FC = () => {
                     )}
                 </div>
             </SlidePanel>
-
-            {/* App-level urgent alerts (top-right page-turn deck, 10-day snooze).
-                Dismissed cards are archived into the notification list. */}
-            <DeferredGlobalAlertStack
-                onCountChange={setAlertCount}
-                onArchived={() => {
-                    notificationApi.list({ limit: 40 })
-                        .then(setNotifications)
-                        .catch(() => undefined);
-                }}
-            />
         </div>
     );
 };

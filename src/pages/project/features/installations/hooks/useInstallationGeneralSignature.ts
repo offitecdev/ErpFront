@@ -29,6 +29,7 @@ export const useInstallationGeneralSignature = ({
             // customer signature request: no email, no technician notification.
             await signatureApi.create({
                 reportType: 'GENERAL',
+                reportId: selected.salesOrder?.id || null,
                 projectId: selected.project?.id || null,
                 title: `${selected.salesOrder?.orderNumber || selected.project?.projectName || ''} - ${t('projects.general.button')}`,
                 snapshot: buildGeneralSnapshot(selected, deliveryReports),

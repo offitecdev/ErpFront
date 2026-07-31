@@ -81,7 +81,7 @@ type ToolbarProps = {
 const FormatToolbar: React.FC<ToolbarProps> = ({ exec, active, compact = false }) => {
     const [menu, setMenu] = useState<'color' | 'heading' | null>(null);
     const toolbarRef = useRef<HTMLDivElement>(null);
-    const baseBtn = 'flex h-7 min-w-7 items-center justify-center rounded-[3px] px-0.5 antialiased transition-colors hover:bg-[#f1f1f1] dark:hover:bg-white/10';
+    const baseBtn = 'flex h-7 min-w-7 items-center justify-center rounded-[2px] px-0.5 antialiased transition-colors hover:bg-[#f1f1f1] dark:hover:bg-white/10';
     const stateBtn = (on: boolean) => `${baseBtn} ${on ? '!bg-transparent !text-[#4d64ff] hover:!bg-transparent dark:!text-[#e5b63f] dark:hover:!bg-transparent' : '!text-black dark:!text-white'}`;
     const menuPosition = compact ? 'bottom-[calc(100%+10px)]' : 'top-[calc(100%+10px)]';
 
@@ -132,7 +132,7 @@ const FormatToolbar: React.FC<ToolbarProps> = ({ exec, active, compact = false }
                 </button>
 
                 {menu === 'color' && (
-                    <div role="menu" className={`absolute left-0 z-50 w-[340px] rounded-lg border border-[#dedede] bg-white p-3.5 text-[#3d3d3d] shadow-[0_8px_28px_rgba(0,0,0,0.16)] dark:border-[#454545] dark:bg-[#1b1b1b] dark:text-white ${menuPosition}`}>
+                    <div role="menu" className={`absolute left-0 z-50 w-[340px] rounded-[2px] border border-[#dedede] bg-white p-3.5 text-[#3d3d3d] shadow-[0_8px_28px_rgba(0,0,0,0.16)] dark:border-[#454545] dark:bg-[#1b1b1b] dark:text-white ${menuPosition}`}>
                         <div className="mb-2 text-[11px] font-semibold tracking-[0.12em] text-[#65564f]">HIGHLIGHT</div>
                         <div className="mb-4 flex items-center gap-3">
                             <button type="button" aria-label="Vurguyu kaldır" className={`flex h-8 w-8 items-center justify-center rounded-full ${colorKey(active.highlightColor) === 'transparent' ? 'ring-4 ring-[#e5b63f]' : ''}`} onClick={() => run({ cmd: 'hiliteColor', value: 'transparent' })}>
@@ -151,7 +151,7 @@ const FormatToolbar: React.FC<ToolbarProps> = ({ exec, active, compact = false }
                         </div>
 
                         <div className="mb-2 text-[11px] font-semibold tracking-[0.12em] text-[#65564f]">TEXT COLOR</div>
-                        <button type="button" className="mb-2 flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#d7d7d7] text-[15px] shadow-sm hover:bg-[#f6f6f6] dark:border-[#4b4b4b] dark:hover:bg-white/10" onClick={() => run({ cmd: 'foreColor', value: DEFAULT_TEXT_COLOR })}>
+                        <button type="button" className="mb-2 flex h-10 w-full items-center justify-center gap-2 rounded-[2px] border border-[#d7d7d7] text-[15px] shadow-sm hover:bg-[#f6f6f6] dark:border-[#4b4b4b] dark:hover:bg-white/10" onClick={() => run({ cmd: 'foreColor', value: DEFAULT_TEXT_COLOR })}>
                             <span className="h-4 w-4 rounded-full border border-[#c8c8c8]" style={{ background: 'linear-gradient(135deg, #fff 0 49%, #202124 50% 100%)' }} />
                             Auto
                         </button>
@@ -161,7 +161,7 @@ const FormatToolbar: React.FC<ToolbarProps> = ({ exec, active, compact = false }
                                     key={color}
                                     type="button"
                                     aria-label={`Yazı rengi ${color}`}
-                                    className={`flex h-10 items-center justify-center rounded-md text-[20px] hover:bg-[#f2f2f2] dark:hover:bg-white/10 ${sameColor(active.textColor, color) ? 'bg-[#e5b63f] ring-1 ring-[#d9aa34]' : ''}`}
+                                    className={`flex h-10 items-center justify-center rounded-[2px] text-[20px] hover:bg-[#f2f2f2] dark:hover:bg-white/10 ${sameColor(active.textColor, color) ? 'bg-[#e5b63f] ring-1 ring-[#d9aa34]' : ''}`}
                                     style={{ color: sameColor(active.textColor, color) ? '#111111' : color, textShadow: color === '#ffffff' && !sameColor(active.textColor, color) ? '0 0 1px #555' : undefined }}
                                     onClick={() => run({ cmd: 'foreColor', value: color })}
                                 >
@@ -201,7 +201,7 @@ const FormatToolbar: React.FC<ToolbarProps> = ({ exec, active, compact = false }
                             <button
                                 key={value}
                                 type="button"
-                                className={`flex h-9 w-full shrink-0 items-center gap-2 rounded-[4px] px-2.5 text-left text-[14px] font-medium leading-none hover:bg-[#f0f0f0] dark:hover:bg-white/10 ${active.heading === value ? 'bg-[#eeeeee] text-[#5b61ff] dark:bg-white/10 dark:text-[#e5b63f]' : 'text-[#272727] dark:text-white'}`}
+                                className={`flex h-9 w-full shrink-0 items-center gap-2 rounded-[2px] px-2.5 text-left text-[14px] font-medium leading-none hover:bg-[#f0f0f0] dark:hover:bg-white/10 ${active.heading === value ? 'bg-[#eeeeee] text-[#5b61ff] dark:bg-white/10 dark:text-[#e5b63f]' : 'text-[#272727] dark:text-white'}`}
                                 onClick={() => run({ cmd: 'formatBlock', value })}
                             >
                                 <span className="w-6 shrink-0 text-[16px] font-normal leading-none">{mark}</span>
@@ -527,7 +527,7 @@ export const RichTextMarkdownEditor: React.FC<{
 
     // Inline TenderDetail fields and the boxed mail editor intentionally share
     // one surface treatment. Only their internal padding differs.
-    const sharedFrameClass = 'rounded-[4px] border border-slate-300 bg-white shadow-xs transition-colors hover:border-slate-400 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-200 dark:border-[#444] dark:bg-[#171717] dark:hover:border-[#666] dark:focus-within:border-[#e5b63f] dark:focus-within:ring-[#e5b63f]/20';
+    const sharedFrameClass = 'rounded-[2px] border border-slate-300 bg-white shadow-xs transition-colors hover:border-slate-400 focus-within:border-slate-400 focus-within:ring-1 focus-within:ring-slate-200 dark:border-[#444] dark:bg-[#171717] dark:hover:border-[#666] dark:focus-within:border-[#e5b63f] dark:focus-within:ring-[#e5b63f]/20';
     const frameClass = `${sharedFrameClass} ${isInline ? 'px-2 py-1' : ''} ${className}`;
 
     const editorClass = `block w-full cursor-text select-text resize-none border-0 bg-transparent text-[13px] leading-6 text-black caret-black outline-none [user-select:text] whitespace-pre-wrap break-words dark:text-white dark:caret-white [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_h1]:my-1 [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:leading-7 [&_h2]:my-1 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:leading-7 [&_h3]:my-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:leading-6 [&_h4]:my-1 [&_h4]:text-[14px] [&_h4]:font-semibold [&_h4]:leading-6 ${isInline ? 'px-0 py-0.5' : 'px-3 py-2'}`;
@@ -541,13 +541,13 @@ export const RichTextMarkdownEditor: React.FC<{
             data-notranslate="true"
         >
             {!isInline && (
-                <div className="mb-1.5 ml-1 w-fit rounded-[4px] border border-[#dedede] bg-white shadow-[0_1px_5px_rgba(0,0,0,0.08)] dark:border-[#454545] dark:bg-[#171717]">
+                <div className="mb-1.5 ml-1 w-fit rounded-[2px] border border-[#dedede] bg-white shadow-[0_1px_5px_rgba(0,0,0,0.08)] dark:border-[#454545] dark:bg-[#171717]">
                     <FormatToolbar exec={exec} active={active} />
                 </div>
             )}
             {bubble && (
                 <div
-                    className="absolute z-40 rounded-[4px] border border-[#dedede] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.14)] dark:border-[#454545] dark:bg-[#171717]"
+                    className="absolute z-40 rounded-[2px] border border-[#dedede] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.14)] dark:border-[#454545] dark:bg-[#171717]"
                     style={{ top: bubble.top, left: bubble.left }}
                     onMouseDown={(event) => event.preventDefault()}
                 >

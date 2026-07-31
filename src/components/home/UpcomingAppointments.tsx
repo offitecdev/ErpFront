@@ -17,6 +17,7 @@ import { projectApi } from '../../lib/api/project';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import { tenderApi } from '../../lib/api/tender';
 import { useAuthStore } from '../../store/authStore';
+import { useModuleAccess } from '../../lib/useEnabledModules';
 import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 type UpcomingCategory = 'assembly' | 'maintenance' | 'offer' | 'deadline';
@@ -76,6 +77,7 @@ export const UpcomingAppointments = ({
     const navigate = useNavigate();
     const permissions = useAuthStore((state) => state.permissions);
     const userId = useAuthStore((state) => state.user?.id);
+    const { isModuleEnabled } = useModuleAccess();
 
     const [items, setItems] = useState<UpcomingItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -89,9 +91,15 @@ export const UpcomingAppointments = ({
     const canAllMaintenance = has('maintenance.contracts.manage');
     const canMyMaintenance = has('maintenance.tasks.manage') || has('maintenance.reports.manage');
     const canTenders = has('tenders.view');
-    const shouldLoadAssembly = !enabledCategories || enabledCategories.has('assembly');
-    const shouldLoadMaintenance = !enabledCategories || enabledCategories.has('maintenance');
-    const shouldLoadTenders = !enabledCategories || enabledCategories.has('offer') || enabledCategories.has('deadline');
+    // Offers/deadlines are CRM pages: when the company category or the role's
+    // package switches CRM off they must not surface here either (the row links
+    // into /crm/tenders, which the module guard would bounce).
+    const shouldLoadAssembly = (!enabledCategories || enabledCategories.has('assembly'))
+        && isModuleEnabled('projects');
+    const shouldLoadMaintenance = (!enabledCategories || enabledCategories.has('maintenance'))
+        && isModuleEnabled('maintenance');
+    const shouldLoadTenders = (!enabledCategories || enabledCategories.has('offer') || enabledCategories.has('deadline'))
+        && isModuleEnabled('crm');
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -99,10 +107,15 @@ export const UpcomingAppointments = ({
         const start = today.format('YYYY-MM-DD');
         const end = today.add(WINDOW_DAYS, 'day').format('YYYY-MM-DD');
 
+        // 'calendar' view: the widget only renders the customer name, order number
+        // and the assigned technicians, all of which the trimmed grid include
+        // carries. Without it the default include ships the whole project graph
+        // (tender material trees, reports with base64 images, expenses) for every
+        // appointment in a 30-day window.
         const appointmentSource = shouldLoadAssembly && canAllOrders
-            ? projectApi.listAppointments(start, end)
+            ? projectApi.listAppointments(start, end, { calendar: true })
             : shouldLoadAssembly && canMyInstallations
-                ? projectApi.listMyInstallations(start, end)
+                ? projectApi.listMyInstallations(start, end, { calendar: true })
                 : null;
         const maintenanceSource = shouldLoadMaintenance && canAllMaintenance
             ? maintenanceApi.listTasks(start, end)

@@ -117,7 +117,7 @@
 .ofi-login2 .ofi-login2__input.ant-input-affix-wrapper,
 .ofi-login2 .ofi-login2__input.ant-input {
     height: 52px;
-    border-radius: 12px;
+    border-radius: 3px;
     background: var(--l2-field-bg);
     border: 1px solid var(--l2-field-border);
     box-shadow: none;
@@ -147,7 +147,7 @@
 
 /* ---- Primary button: red accent from the logo ---- */
 .ofi-login2 .ofi-login2__btn {
-    border-radius: 12px;
+    border-radius: 3px;
     background: var(--l2-red);
     border: none;
     color: #fff;
@@ -179,7 +179,7 @@
 .ofi-login2 .ofi-login2__btn:hover:not(:disabled) svg { transform: translateX(2px); }
 .ofi-login2 .ofi-login2__btn svg { transition: transform 0.18s ease; }
 
-/* ---- First-entry guide and resource shortcuts ---- */
+/* ---- Resource shortcuts (bottom-left dock) ---- */
 .ofi-login2__resource-dock {
     position: absolute;
     left: clamp(16px, 2.5vw, 32px);
@@ -198,45 +198,20 @@
     align-items: center;
     gap: 10px;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.42);
-    border-radius: 8px;
+    border: 1px solid rgba(15, 28, 69, 0.10);
+    border-radius: 3px;
     padding: 10px 12px;
     color: var(--l2-text);
     text-decoration: none;
-    background: rgba(255, 255, 255, 0.28);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.50),
-        0 10px 24px rgba(15, 28, 69, 0.08);
-    -webkit-backdrop-filter: blur(8px) saturate(1.18);
-    backdrop-filter: blur(8px) saturate(1.18);
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(15, 28, 69, 0.08);
     animation: ofi-resource-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
     transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 
-.ofi-login2__resource-card::after {
-    content: none;
-}
-
 .ofi-login2__resource-card:hover {
-    border-color: rgba(255, 255, 255, 0.58);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.66),
-        0 11px 26px rgba(15, 28, 69, 0.10);
-}
-
-.ofi-login2__resource-card--manual {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12)),
-        rgba(191, 219, 254, 0.72);
-    border-color: rgba(59, 130, 246, 0.46);
-}
-
-.ofi-login2__resource-card--prototype {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12)),
-        rgba(254, 215, 170, 0.74);
-    border-color: rgba(249, 115, 22, 0.48);
-    animation-delay: 70ms;
+    border-color: rgba(15, 28, 69, 0.20);
+    box-shadow: 0 10px 24px rgba(15, 28, 69, 0.11);
 }
 
 .ofi-login2__resource-icon {
@@ -245,14 +220,10 @@
     height: 40px;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.34);
-    -webkit-backdrop-filter: blur(6px) saturate(1.12);
-    backdrop-filter: blur(6px) saturate(1.12);
+    border-radius: 3px;
+    background: rgba(26, 35, 97, 0.08);
+    color: var(--l2-navy-2);
 }
-
-.ofi-login2__resource-card--manual .ofi-login2__resource-icon { color: #2563eb; }
-.ofi-login2__resource-card--prototype .ofi-login2__resource-icon { color: #ea580c; }
 
 .ofi-login2__resource-copy {
     display: grid;
@@ -284,302 +255,171 @@
     color: currentColor;
 }
 
-.ofi-login2__guide-layer {
+/* ---- Production-prototype prompt: one solid card, no glass ---- */
+.ofi-login2__proto-layer {
     position: fixed;
     inset: 0;
     z-index: 30;
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: clamp(84px, 11vh, 120px) 20px 24px;
-    background: transparent;
-}
-
-.ofi-login2__guide-panel {
-    position: relative;
-    width: min(760px, calc(100vw - 32px));
-    overflow: hidden;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    border-radius: 14px;
-    padding: 26px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.08)),
-        rgba(255, 255, 255, 0.16);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.74),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.18),
-        0 34px 92px rgba(15, 23, 42, 0.22);
-    -webkit-backdrop-filter: blur(7px) saturate(1.16);
-    backdrop-filter: blur(7px) saturate(1.16);
-}
-
-.ofi-login2__guide-panel::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent 42%);
+    padding: clamp(84px, 12vh, 140px) 20px 24px;
+    /* Not a modal: the page stays usable, only the panel captures clicks. */
     pointer-events: none;
 }
 
-.ofi-login2__guide-close {
+.ofi-login2__proto-panel {
+    pointer-events: auto;
+    position: relative;
+    width: min(720px, calc(100vw - 32px));
+    border: 1px solid rgba(15, 28, 69, 0.10);
+    border-radius: 4px;
+    padding: 40px 44px 32px;
+    background: #ffffff;
+    box-shadow: 0 20px 56px rgba(15, 28, 69, 0.16);
+}
+
+.ofi-login2__proto-close {
     position: absolute;
-    top: 14px;
-    right: 14px;
-    z-index: 2;
+    top: 12px;
+    right: 12px;
     display: inline-flex;
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.36);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.44);
-    color: var(--l2-text);
-    cursor: pointer;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-    -webkit-backdrop-filter: blur(14px) saturate(1.5);
-    backdrop-filter: blur(14px) saturate(1.5);
-    transition: background 0.12s ease;
-}
-
-.ofi-login2__guide-close:hover {
-    background: rgba(255, 255, 255, 0.64);
-}
-
-.ofi-login2__guide-badge {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    border: 0;
-    padding: 0;
+    border: none;
+    border-radius: 2px;
     background: transparent;
-    color: #64748b;
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.ofi-login2__guide-panel h2 {
-    position: relative;
-    z-index: 1;
-    max-width: 620px;
-    margin: 16px 46px 0 0;
-    background: none;
-    color: var(--l2-text);
-    font-size: 30px;
-    font-weight: 800;
-    line-height: 1.08;
-}
-
-.ofi-login2__guide-lead {
-    position: relative;
-    z-index: 1;
-    max-width: 620px;
-    margin: 10px 0 0;
     color: var(--l2-sub);
-    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ofi-login2__proto-close:hover {
+    background: rgba(15, 28, 69, 0.06);
+    color: var(--l2-text);
+}
+
+.ofi-login2__proto-icon {
+    display: inline-flex;
+    width: 58px;
+    height: 58px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    background: rgba(26, 35, 97, 0.08);
+    color: var(--l2-navy-2);
+}
+
+.ofi-login2__proto-panel h2 {
+    margin: 20px 38px 0 0;
+    color: var(--l2-text);
+    font-size: 27px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.ofi-login2__proto-panel p {
+    margin: 9px 0 0;
+    color: var(--l2-sub);
+    font-size: 15.5px;
     line-height: 1.6;
 }
 
-.ofi-login2__guide-grid {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-    margin-top: 20px;
-}
-
-.ofi-login2__guide-card {
-    position: relative;
-    display: grid;
-    min-height: 202px;
-    align-content: start;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.42);
-    border-radius: 12px;
-    padding: 18px;
-    color: var(--l2-text);
-    text-decoration: none;
-    background: rgba(255, 255, 255, 0.24);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.48),
-        0 10px 24px rgba(15, 23, 42, 0.07);
-    -webkit-backdrop-filter: blur(8px) saturate(1.16);
-    backdrop-filter: blur(8px) saturate(1.16);
-    transition: border-color 0.14s ease, box-shadow 0.14s ease;
-}
-
-.ofi-login2__guide-card:hover {
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.62),
-        0 11px 26px rgba(15, 23, 42, 0.09);
-}
-
-.ofi-login2__guide-card--manual {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12)),
-        rgba(191, 219, 254, 0.72);
-    border-color: rgba(59, 130, 246, 0.46);
-}
-
-.ofi-login2__guide-card--prototype {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.12)),
-        rgba(254, 215, 170, 0.74);
-    border-color: rgba(249, 115, 22, 0.48);
-}
-
-.ofi-login2__guide-card-icon {
-    display: inline-flex;
-    width: 48px;
-    height: 48px;
+.ofi-login2__proto-cta {
+    display: flex;
+    width: 100%;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.34);
-    -webkit-backdrop-filter: blur(6px) saturate(1.12);
-    backdrop-filter: blur(6px) saturate(1.12);
+    gap: 9px;
+    margin-top: 28px;
+    border-radius: 3px;
+    padding: 17px 22px;
+    background: #1a2361;
+    color: #ffffff;
+    font-size: 17px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    transition: background 0.14s ease;
 }
 
-.ofi-login2__guide-card--manual .ofi-login2__guide-card-icon { color: #2563eb; }
-.ofi-login2__guide-card--prototype .ofi-login2__guide-card-icon { color: #ea580c; }
+.ofi-login2__proto-cta:hover { background: #141d52; }
+.ofi-login2__proto-cta svg { flex-shrink: 0; transition: transform 0.16s ease; }
+.ofi-login2__proto-cta:hover svg { transform: translateX(2px); }
 
-.ofi-login2__guide-card-kicker {
-    margin-top: 15px;
+/* Release date, fine print under the CTA. */
+.ofi-login2__proto-date {
+    display: block;
+    margin-top: 16px;
     color: var(--l2-sub);
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    text-align: center;
 }
 
-.ofi-login2__guide-card strong {
-    margin-top: 5px;
-    color: var(--l2-text);
-    font-size: 16px;
-    line-height: 1.25;
-}
-
-.ofi-login2__guide-card > span:not(.ofi-login2__guide-card-icon):not(.ofi-login2__guide-card-kicker) {
-    margin-top: 9px;
+/* Rights/demo notice, finest print at the very bottom of the panel. */
+.ofi-login2__proto-rights {
+    display: block;
+    margin-top: 6px;
     color: var(--l2-sub);
-    font-size: 13px;
-    line-height: 1.45;
+    opacity: 0.75;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: center;
 }
-
-.ofi-login2__guide-card em {
-    display: inline-flex;
-    width: max-content;
-    max-width: 100%;
-    align-items: center;
-    gap: 6px;
-    margin-top: 18px;
-    color: #475569;
-    font-size: 13px;
-    font-style: normal;
-    font-weight: 800;
-}
-
-.ofi-login2__guide-card--manual em { color: #1d4ed8; }
-.ofi-login2__guide-card--prototype em { color: #c2410c; }
 
 
 .dark .ofi-login2__resource-card {
-    border-color: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.14);
     color: #f8fafc;
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 12px 30px rgba(0, 0, 0, 0.24);
+    background: #141d52;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
 }
 
-.dark .ofi-login2__resource-card--manual {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
-        rgba(30, 64, 175, 0.46);
-    border-color: rgba(96, 165, 250, 0.44);
+.dark .ofi-login2__resource-card:hover {
+    border-color: rgba(255, 255, 255, 0.24);
 }
 
-.dark .ofi-login2__resource-card--prototype {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
-        rgba(154, 52, 18, 0.48);
-    border-color: rgba(251, 146, 60, 0.46);
+.dark .ofi-login2__resource-icon {
+    background: rgba(159, 199, 245, 0.14);
+    color: #9fc7f5;
 }
 
-.dark .ofi-login2__resource-card--manual .ofi-login2__resource-icon,
-.dark .ofi-login2__guide-card--manual .ofi-login2__guide-card-icon {
+/* Dark mode: navy panel with the app's gold accent (#e6cf9e). */
+.dark .ofi-login2__proto-panel {
+    border-color: rgba(230, 207, 158, 0.28);
+    background: #141d52;
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.50);
+}
+
+.dark .ofi-login2__proto-close:hover {
     background: rgba(255, 255, 255, 0.08);
-    color: #bfdbfe;
-}
-
-.dark .ofi-login2__resource-card--prototype .ofi-login2__resource-icon,
-.dark .ofi-login2__guide-card--prototype .ofi-login2__guide-card-icon {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fed7aa;
-}
-
-.dark .ofi-login2__guide-layer {
-    background: transparent;
-}
-
-.dark .ofi-login2__guide-panel {
-    border-color: rgba(255, 255, 255, 0.12);
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-        rgba(14, 19, 34, 0.28);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.14),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-        0 34px 96px rgba(0, 0, 0, 0.56);
-    -webkit-backdrop-filter: blur(7px) saturate(1.14);
-    backdrop-filter: blur(7px) saturate(1.14);
-}
-
-.dark .ofi-login2__guide-close {
-    border-color: rgba(255, 255, 255, 0.18);
-    background: rgba(255, 255, 255, 0.10);
-    color: var(--l2-text);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.dark .ofi-login2__guide-badge {
-    color: #cbd5e1;
-}
-
-.dark .ofi-login2__guide-panel h2 {
-    background: none;
     color: #ffffff;
 }
 
-.dark .ofi-login2__guide-card {
-    color: #f8fafc;
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.10),
-        0 11px 28px rgba(0, 0, 0, 0.22);
+.dark .ofi-login2__proto-icon {
+    background: rgba(230, 207, 158, 0.14);
+    color: #e6cf9e;
 }
 
-.dark .ofi-login2__guide-card--manual {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
-        rgba(30, 64, 175, 0.46);
-    border-color: rgba(96, 165, 250, 0.44);
+/* !important: dark.css paints every plain <a> wheat/gold in dark mode, which
+   made this label gold-on-gold (invisible). Navy text must win. */
+.dark .ofi-login2__proto-cta {
+    background: #e6cf9e;
+    color: #0b1340 !important;
 }
 
-.dark .ofi-login2__guide-card--prototype {
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
-        rgba(154, 52, 18, 0.48);
-    border-color: rgba(251, 146, 60, 0.46);
-}
+.dark .ofi-login2__proto-cta:hover { background: #f0ddb4; color: #0b1340 !important; }
 
-.dark .ofi-login2__resource-card:hover .ofi-login2__resource-action,
-.dark .ofi-login2__guide-card em {
+.dark .ofi-login2__proto-date { color: rgba(230, 207, 158, 0.72); }
+
+.dark .ofi-login2__resource-card:hover .ofi-login2__resource-action {
     color: #e2e8f0;
 }
-
-.dark .ofi-login2__guide-card--manual em { color: #bfdbfe; }
-.dark .ofi-login2__guide-card--prototype em { color: #fed7aa; }
 
 @keyframes ofi-resource-in {
     from { opacity: 0; transform: translateY(6px); }
@@ -592,7 +432,6 @@
         right: 14px;
         bottom: 14px;
         width: auto;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .ofi-login2__resource-card {
@@ -611,28 +450,13 @@
     .ofi-login2__resource-kicker { font-size: 10px; }
     .ofi-login2__resource-title { font-size: 12px; }
 
-    .ofi-login2__guide-layer {
+    .ofi-login2__proto-layer {
         align-items: center;
         padding: 20px 14px 92px;
     }
 
-    .ofi-login2__guide-panel {
-        max-height: min(680px, calc(100vh - 122px));
-        overflow-y: auto;
-        padding: 22px 16px 16px;
-    }
-
-    .ofi-login2__guide-panel h2 {
-        margin-right: 36px;
-        font-size: 25px;
-    }
-
-    .ofi-login2__guide-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .ofi-login2__guide-card {
-        min-height: 172px;
+    .ofi-login2__proto-panel {
+        padding: 20px 18px 18px;
     }
 }
 
@@ -641,8 +465,7 @@
     .ofi-login2::before,
     .ofi-login2__enter,
     .ofi-login2__resource-card,
-    .ofi-login2__resource-card::after,
-    .ofi-login2__guide-panel::before { animation: none; }
+    .ofi-login2__resource-card::after { animation: none; }
     .ofi-login2__flake { animation: none; opacity: 0.18; transform: scale(1); }
     .dark .ofi-login2__flake { opacity: 0.24; }
 }

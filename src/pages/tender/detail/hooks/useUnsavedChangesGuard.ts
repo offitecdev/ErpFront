@@ -4,6 +4,17 @@ import { useNavGuardStore } from '../../../../store/navGuardStore';
 
 type Proceed = () => void;
 
+type UnsavedChangesGuardOptions = {
+    /**
+     * When set, an intercepted exit does not ask first: the modal opens in its
+     * "Saving..." state, this callback persists everything, and on success the
+     * navigation continues by itself. Used for a tender's initial entry right
+     * after creation. Resolving/throwing false falls back to the regular
+     * save / discard prompt so the user is never stuck.
+     */
+    autoSave?: (() => Promise<boolean>) | null;
+};
+
 /**
  * Intercepts attempts to leave the current page while `when` is true (there are
  * unsaved changes) and routes them through a custom confirmation modal instead
@@ -17,11 +28,13 @@ type Proceed = () => void;
  * A real page refresh or tab close still triggers the browser's own native
  * dialog (`beforeunload`) — browsers do not allow a custom modal there.
  */
-export const useUnsavedChangesGuard = (when: boolean) => {
+export const useUnsavedChangesGuard = (when: boolean, options?: UnsavedChangesGuardOptions) => {
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
+    const [autoSaving, setAutoSaving] = useState(false);
     const pendingRef = useRef<Proceed | null>(null);
     const whenRef = useRef(when);
+    const autoSaveRef = useRef(options?.autoSave ?? null);
     // Set while we intentionally navigate, so our own interceptors don't re-block.
     const bypassRef = useRef(false);
     // Ensures the Back-button sentinel history entry is pushed at most once.
@@ -30,6 +43,45 @@ export const useUnsavedChangesGuard = (when: boolean) => {
     useEffect(() => {
         whenRef.current = when;
     }, [when]);
+
+    useEffect(() => {
+        autoSaveRef.current = options?.autoSave ?? null;
+    });
+
+    // Discard: continue to the pending destination without saving.
+    const proceed = useCallback(() => {
+        const fn = pendingRef.current;
+        pendingRef.current = null;
+        setIsOpen(false);
+        setAutoSaving(false);
+        bypassRef.current = true;
+        fn?.();
+        window.setTimeout(() => {
+            bypassRef.current = false;
+        }, 200);
+    }, []);
+
+    // Route an intercepted exit through the modal — or, in auto-save mode
+    // (initial entry), run the save immediately with the modal showing only
+    // its "Saving..." state and continue on success. A failed auto-save drops
+    // back to the regular save / discard buttons.
+    const openPrompt = useCallback((proceedFn: Proceed) => {
+        pendingRef.current = proceedFn;
+        setIsOpen(true);
+        const autoSave = autoSaveRef.current;
+        if (!autoSave) return;
+        setAutoSaving(true);
+        void (async () => {
+            let saved = false;
+            try {
+                saved = await autoSave();
+            } catch {
+                saved = false;
+            }
+            if (saved) proceed();
+            else setAutoSaving(false);
+        })();
+    }, [proceed]);
 
     // Native dialog for a real unload (refresh / tab close). This is the only
     // exit a custom modal cannot replace, per browser security rules.
@@ -68,12 +120,11 @@ export const useUnsavedChangesGuard = (when: boolean) => {
 
             event.preventDefault();
             event.stopPropagation();
-            pendingRef.current = () => navigate(url.pathname + url.search);
-            setIsOpen(true);
+            openPrompt(() => navigate(url.pathname + url.search));
         };
         document.addEventListener('click', onClick, true);
         return () => document.removeEventListener('click', onClick, true);
-    }, [navigate]);
+    }, [navigate, openPrompt]);
 
     // Intercept the browser Back / Forward buttons. A single sentinel history
     // entry is pushed the first time the page becomes dirty, so the first Back
@@ -92,27 +143,14 @@ export const useUnsavedChangesGuard = (when: boolean) => {
             if (!whenRef.current || bypassRef.current) return;
             // Re-push so we stay put while the modal decides what to do.
             window.history.pushState(null, '', window.location.href);
-            pendingRef.current = () => {
+            openPrompt(() => {
                 bypassRef.current = true;
                 window.history.go(-2);
-            };
-            setIsOpen(true);
+            });
         };
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
-    }, []);
-
-    // Discard: continue to the pending destination without saving.
-    const proceed = useCallback(() => {
-        const fn = pendingRef.current;
-        pendingRef.current = null;
-        setIsOpen(false);
-        bypassRef.current = true;
-        fn?.();
-        window.setTimeout(() => {
-            bypassRef.current = false;
-        }, 200);
-    }, []);
+    }, [openPrompt]);
 
     // Stay: dismiss the modal and cancel the pending navigation.
     const cancel = useCallback(() => {
@@ -126,9 +164,8 @@ export const useUnsavedChangesGuard = (when: boolean) => {
             proceedFn();
             return;
         }
-        pendingRef.current = proceedFn;
-        setIsOpen(true);
-    }, []);
+        openPrompt(proceedFn);
+    }, [openPrompt]);
 
     // Expose our intercept globally so programmatic navigations that don't render
     // an anchor — the top workspace tabs and the sidebar switch pages via
@@ -139,5 +176,5 @@ export const useUnsavedChangesGuard = (when: boolean) => {
         return () => setGuard(null);
     }, [attempt, setGuard]);
 
-    return { isOpen, proceed, cancel, attempt };
+    return { isOpen, autoSaving, proceed, cancel, attempt };
 };

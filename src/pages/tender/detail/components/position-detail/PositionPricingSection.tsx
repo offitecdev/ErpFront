@@ -89,7 +89,7 @@ export const PositionPricingSection: React.FC<{
             active ? 'bg-[#1f2654] text-white' : 'text-slate-500 hover:bg-white hover:text-[#1f2654]'
         }`;
     return (
-    <div className="border border-slate-200/70 rounded-md p-3 bg-white space-y-2.5">
+    <div className="border border-slate-200/70 rounded-[2px] p-3 bg-white space-y-2.5">
         <div className="flex items-center justify-between">
             <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.line_price')}</h4>
             <span className="text-[10px] text-slate-400">{t('tenders.tabloya_yansir')}</span>
@@ -176,7 +176,7 @@ export const PositionPricingSection: React.FC<{
                             disabled={!isDraft}
                         />
                     )}
-                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
+                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-[2px] bg-slate-100 p-0.5">
                         <button
                             type="button"
                             title={t('tenders.discount_mode_percent')}

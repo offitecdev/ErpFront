@@ -30,6 +30,13 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
     const panelRef = useRef<HTMLElement>(null);
     const titleId = useId();
 
+    // onClose çoğu çağrı yerinde satır içi ok fonksiyonudur (her render'da yeni
+    // referans). Efektin bağımlılığı olsaydı her tuş vuruşunda temizlik +
+    // yeniden kurulum çalışır, odak input'tan panele geri çalınırdı — yazmak
+    // imkânsız hâle gelirdi. Bu yüzden ref üzerinden okunur.
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
     useEffect(() => {
         if (!open) return;
 
@@ -41,7 +48,7 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                onClose();
+                onCloseRef.current();
                 return;
             }
             if (event.key !== 'Tab' || !panelRef.current) return;
@@ -72,7 +79,7 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
             document.removeEventListener('keydown', handleKeyDown);
             previouslyFocused?.focus();
         };
-    }, [onClose, open]);
+    }, [open]);
 
     if (!open) return null;
 

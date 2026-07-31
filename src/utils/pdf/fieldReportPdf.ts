@@ -18,6 +18,8 @@ import { localizeTenderNumber } from '../tenderNumber';
 export interface FieldReportOptions {
     appointment?: { startTime?: string | null; endTime?: string | null } | null;
     preparedBy?: string;
+    /** 'blob' returns the PDF for in-app preview instead of downloading it. */
+    output?: 'download' | 'blob';
 }
 
 // ── Sayfa geometrisi (A4, mm) — sablon.pdf antetine göre güvenli alan ─────────
@@ -828,7 +830,11 @@ export const exportFieldReportPdf = async (project: ProjectDto, report: any, opt
         console.error('PDF background merge failed:', err);
     }
 
+    if (options.output === 'blob') {
+        return new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
+    }
     const safeName = clean(project.projectName).replace(/[\\/:*?"<>|]/g, '-').slice(0, 80) || 'proje';
     const dateLabel = dateShort(reportWorkDate(report)).replace(/[^0-9-]/g, '');
     downloadPdf(finalBytes, `${safeName}-saha-raporu-${dateLabel}.pdf`);
+    return null;
 };

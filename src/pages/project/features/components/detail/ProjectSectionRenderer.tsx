@@ -9,12 +9,6 @@ import type { calculateTotals } from '../../utils/projectTotals';
 import type { ProjectDetailView } from '../../types/projectDetailNavigation';
 import { ProjectOverviewTab } from './tabs/ProjectOverviewTab';
 
-const LazyDeliveryReportsTab = lazy(() =>
-    import('../../projects/components/delivery/DeliveryReportsTab').then((module) => ({ default: module.DeliveryReportsTab })),
-);
-const LazyProjectSignaturesTab = lazy(() =>
-    import('../../../ProjectSignaturesTab').then((module) => ({ default: module.ProjectSignaturesTab })),
-);
 const LazyProjectPositionsTab = lazy(() =>
     import('../../../ProjectPositionsTab').then((module) => ({ default: module.ProjectPositionsTab })),
 );
@@ -32,9 +26,6 @@ const LazyCreateAddonOrderTab = lazy(() =>
 );
 const LazyCostsTab = lazy(() =>
     import('./tabs/CostsTab').then((module) => ({ default: module.CostsTab })),
-);
-const LazyGeneralReportTab = lazy(() =>
-    import('./tabs/GeneralReportTab').then((module) => ({ default: module.GeneralReportTab })),
 );
 const LazyMaterialsTab = lazy(() =>
     import('./tabs/MaterialsTab').then((module) => ({ default: module.MaterialsTab })),
@@ -137,19 +128,9 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
                 />,
             );
         case 'field':
-            if (view.subSection === 'generalReport') {
-                return deferredSection(
-                    <LazyGeneralReportTab project={project} onGoFieldReports={goFieldReports} />,
-                );
-            }
-            if (view.subSection === 'delivery') {
-                return deferredSection(<LazyDeliveryReportsTab project={project} order={order} />);
-            }
-            if (view.subSection === 'signatures') {
-                return deferredSection(
-                    <LazyProjectSignaturesTab project={project} order={order} isPrimary={isPrimary} />,
-                );
-            }
+            // Consolidated "Reports" area: the appointment lists, field/general/
+            // delivery reports and signatures all open as popups inside one tab,
+            // so every legacy sub-section lands on the same hub.
             return deferredSection(
                 <LazyReportsTab
                     project={project}

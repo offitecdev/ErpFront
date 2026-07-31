@@ -40,8 +40,11 @@ const TAB_CATALOG: TabDefinition[] = [
     { id: 'projects', labelKey: 'nav.projectManagement', path: '/projects', icon: ProjectsIcon },
     { id: 'orders', labelKey: 'nav.myOrders', path: '/crm/my-orders', icon: OrdersIcon },
     { id: 'articles', labelKey: 'nav.articles', path: '/inventory/articles', icon: ProductsIcon },
-    { id: 'movements', labelKey: 'nav.movements', path: '/inventory/movements', icon: MovementsIcon },
-    { id: 'inventory', labelKey: 'nav.inventoryDashboard', path: '/inventory', icon: StockPanelIcon },
+    { id: 'materials', labelKey: 'nav.materials', path: '/inventory/materials', icon: ProductsIcon },
+    { id: 'stock', labelKey: 'nav.stock', path: '/inventory/stock', icon: StockPanelIcon },
+    // 'orders' kimliği CRM'in "Siparişlerim" sekmesine ait — bu yüzden inventoryOrders.
+    { id: 'inventoryOrders', labelKey: 'nav.inventoryOrders', path: '/inventory/orders', icon: OrdersIcon },
+    { id: 'movements', labelKey: 'nav.movements', path: '/inventory/stock/movements', icon: MovementsIcon },
 ];
 
 const CATALOG_BY_ID = new Map(TAB_CATALOG.map((item) => [item.id, item]));

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { ArticleListItem } from '@/types/inventory';
+import type { ArticleQuickPick } from '@/types/inventory';
 import { inventoryApi } from '@/lib/api/inventory';
 
 import { PRODUCT_PICKER_PAGE_SIZE } from '../utils/tenderDetail.constants';
@@ -15,7 +15,7 @@ export const useTenderProductPicker = () => {
     const [productSearch, setProductSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [productPickerPage, setProductPickerPage] = useState(1);
-    const [pickerItems, setPickerItems] = useState<ArticleListItem[]>([]);
+    const [pickerItems, setPickerItems] = useState<ArticleQuickPick[]>([]);
     const [pickerTotal, setPickerTotal] = useState(0);
     const [pickerLoading, setPickerLoading] = useState(false);
 
@@ -36,13 +36,13 @@ export const useTenderProductPicker = () => {
         let cancelled = false;
         setPickerLoading(true);
         inventoryApi
-            .articlesSummaryPaged({
+            // Lean feed: the picker lists names and copies name / description /
+            // unit / price onto the line. Stock levels, barcodes, category and
+            // status are never read here, so they are never fetched.
+            .articlesQuickPick({
                 page: productPickerPage,
                 pageSize: PRODUCT_PICKER_PAGE_SIZE,
                 search: debouncedSearch || undefined,
-                // Include the one extra text field needed to stage a complete row;
-                // this avoids a second article-detail request after selection.
-                includeDescription: true,
             })
             .then((res) => {
                 if (cancelled) return;

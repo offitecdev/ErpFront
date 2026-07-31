@@ -10,8 +10,6 @@ import {
     Building03 as ContactsOutlined,
     Calendar as CalendarOutlined,
     FileCheck02 as ServiceReportsOutlined,
-    Clock as ClockCircleOutlined,
-    Clipboard,
     Package as InboxOutlined,
     Truck01 as CarOutlined,
     Building05 as TeamOutlined,
@@ -20,6 +18,8 @@ import {
 
 import { useAuthStore } from '../store/authStore';
 import { getRoleProfile, isKeyAllowedForProfile } from '../lib/access';
+import { moduleForPath } from '../lib/moduleCatalog';
+import { useModuleAccess } from '../lib/useEnabledModules';
 import AnalogClock from '../components/home/AnalogClock';
 import UpcomingAppointments from '../components/home/UpcomingAppointments';
 
@@ -36,8 +36,7 @@ type Tile = {
 
 const TILES: Tile[] = [
     { key: '/calendar', labelKey: 'nav.calendar', defaultLabel: 'Takvim', descKey: 'home.tiles.calendar', defaultDesc: 'Randevular ve planlama', icon: CalendarOutlined },
-    { key: '/projects/installation/tasks', labelKey: 'nav.technicianInstallations', defaultLabel: 'Cihaz Montajı', descKey: 'home.tiles.installation', defaultDesc: 'Montaj görevlerim', icon: Clipboard, feature: 'projects' },
-    { key: '/attendance', labelKey: 'nav.attendance', defaultLabel: 'Mesai', descKey: 'home.tiles.attendance', defaultDesc: 'Giriş / çıkış kaydı', icon: ClockCircleOutlined },
+    // Mesai (/attendance) is hidden here too, matching the sidebar.
     { key: '/crm/customers', labelKey: 'nav.customerList', defaultLabel: 'Müşteriler', descKey: 'home.tiles.customers', defaultDesc: 'CRM müşteri listesi', icon: ContactsOutlined, permission: 'crm.customers.view' },
     { key: '/crm/tenders', labelKey: 'nav.tenderManagement', defaultLabel: 'Teklifler', descKey: 'home.tiles.tenders', defaultDesc: 'Teklif yönetimi', icon: FundProjectionScreenOutlined, permission: 'tenders.view' },
     { key: '/inventory/articles', labelKey: 'nav.articles', defaultLabel: 'Ürünler', descKey: 'home.tiles.articles', defaultDesc: 'Ürün / stok kartları', icon: InboxOutlined, permission: 'inventory.view' },
@@ -52,21 +51,26 @@ const TILES: Tile[] = [
 export const Home = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { user, permissions, tenants, selectedTenantId } = useAuthStore();
+    const user = useAuthStore((state) => state.user);
+    const { projectModuleEnabled, isModuleEnabled, canSeePermissionItem } = useModuleAccess();
 
     const profile = useMemo(() => getRoleProfile(user), [user]);
-    const projectModuleEnabled = useMemo(() => {
-        const tenant = tenants.find((tnt) => tnt.id === selectedTenantId);
-        return tenant?.isProjectModuleEnabled !== false;
-    }, [tenants, selectedTenantId]);
 
     const tiles = useMemo(() => {
         return TILES.filter((tile) => {
             if (tile.feature === 'projects' && !projectModuleEnabled) return false;
+            // A tile is a shortcut into a route, so it lives and dies with the
+            // module that owns that route: a module switched off by the company
+            // category or missing from the role's package would bounce the click
+            // straight back here (MainLayout's redirect guard), so the tile must
+            // not be offered at all. This gate comes FIRST — it outranks both the
+            // role profile and the raw permission list.
+            if (!isModuleEnabled(moduleForPath(tile.key) ?? undefined)) return false;
             if (profile !== 'full') return isKeyAllowedForProfile(profile, tile.key);
-            return !tile.permission || permissions.includes(tile.permission);
+            // Same package-grants-pages rule as the sidebar.
+            return canSeePermissionItem(tile.permission);
         });
-    }, [permissions, profile, projectModuleEnabled]);
+    }, [profile, projectModuleEnabled, isModuleEnabled, canSeePermissionItem]);
 
     const firstName = user?.firstName?.trim() || t('home.there', { defaultValue: 'orada' });
     const hour = dayjs().hour();

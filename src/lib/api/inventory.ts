@@ -5,6 +5,7 @@ import type {
     ArticleStockSummary,
     ArticleStockInfo,
     ArticleListPage,
+    ArticleQuickPickPage,
     StockBalanceRow,
     StockMovementRow,
     PurchaseProposalRow,
@@ -19,6 +20,21 @@ import type {
     SupplyRequestStatus,
     CreateSupplyRequestInput,
     ItemType,
+    MovementListPage,
+    MovementListQuery,
+    SupplierSearchItem,
+    BulkArticleItemInput,
+    BulkArticlesResult,
+    BulkMovementItemInput,
+    BulkMovementsResult,
+    PurchaseOrderRow,
+    PurchaseOrderListPage,
+    PurchaseOrderListQuery,
+    PurchaseOrderStatus,
+    CreatePurchaseOrderInput,
+    UpdatePurchaseOrderInput,
+    SendPurchaseOrderMailInput,
+    SendPurchaseOrderMailResult,
 } from '../../types/inventory';
 
 export const inventoryApi = {
@@ -94,6 +110,28 @@ export const inventoryApi = {
         return res.data;
     },
 
+    /**
+     * Product picker feed. Returns ONLY the fields that end up on a quote line —
+     * id, name, description, unit, price — instead of the full article record
+     * (code, category, barcodes, status, stock levels, created date) plus the
+     * stock-balance JOIN behind `totalQuantity`. None of that is shown in the
+     * picker, and none of it is copied onto the line.
+     */
+    articlesQuickPick: async (params: {
+        page?: number;
+        pageSize?: number;
+        search?: string;
+    }): Promise<ArticleQuickPickPage> => {
+        const query = new URLSearchParams();
+        query.set('page', String(params.page ?? 1));
+        query.set('pageSize', String(params.pageSize ?? 15));
+        query.set('lean', 'true');
+        query.set('includeDescription', 'true');
+        if (params.search) query.set('search', params.search);
+        const res = await apiClient.get(`/inventory/articles/summary/paged?${query.toString()}`);
+        return res.data;
+    },
+
     // Tek ürünün yalın canlı stok bilgisi (sayaç + ortalama maliyet). Depo/lokasyon,
     // tedarikçi listesi ve görsel çekilmez — stok hareketi sonrası hızlı yenileme için.
     getArticleStock: async (id: string): Promise<ArticleStockInfo> => {
@@ -125,6 +163,44 @@ export const inventoryApi = {
 
     getMovements: async (articleId: string): Promise<StockMovementRow[]> => {
         const res = await apiClient.get(`/inventory/movements/${articleId}`);
+        return res.data;
+    },
+
+    // Tüm stok hareketleri — sayfalı, genel arama + kolon filtreleri.
+    listMovements: async (params: MovementListQuery): Promise<MovementListPage> => {
+        const query = new URLSearchParams();
+        query.set('page', String(params.page ?? 1));
+        query.set('pageSize', String(params.pageSize ?? 20));
+        if (params.search) query.set('search', params.search);
+        if (params.code) query.set('code', params.code);
+        if (params.name) query.set('name', params.name);
+        if (params.description) query.set('description', params.description);
+        if (params.type) query.set('type', params.type);
+        if (params.dateFrom) query.set('dateFrom', params.dateFrom);
+        if (params.dateTo) query.set('dateTo', params.dateTo);
+        const res = await apiClient.get(`/inventory/movements?${query.toString()}`);
+        return res.data;
+    },
+
+    // Toplu ürün/malzeme ekleme (tablo / Excel içe aktarımı). Mükerrer kodlar
+    // satır bazında reddedilir. `itemType` ekranın türünü belirtir (PRODUCT/MATERIAL).
+    bulkCreateArticles: async (items: BulkArticleItemInput[], itemType?: ItemType): Promise<BulkArticlesResult> => {
+        const res = await apiClient.post('/inventory/articles/bulk', { items, itemType });
+        return res.data;
+    },
+
+    // Toplu stok hareketi (giriş/çıkış). Satır bazında hata döner.
+    bulkCreateMovements: async (items: BulkMovementItemInput[]): Promise<BulkMovementsResult> => {
+        const res = await apiClient.post('/inventory/movements/bulk', { items });
+        return res.data;
+    },
+
+    // Tedarikçi seçici için yalın arama (ilk 10 kayıt).
+    searchSuppliers: async (q: string, limit = 10): Promise<SupplierSearchItem[]> => {
+        const query = new URLSearchParams();
+        if (q) query.set('q', q);
+        query.set('limit', String(limit));
+        const res = await apiClient.get(`/inventory/suppliers/search?${query.toString()}`);
         return res.data;
     },
 
@@ -208,6 +284,64 @@ export const supplyApi = {
 
     deleteRequest: async (id: string): Promise<void> => {
         await apiClient.delete(`/inventory/supply/requests/${id}`);
+    },
+};
+
+// Satın Alma Siparişleri (Purchase Orders) — tek sipariş = tek tedarikçi.
+export const purchaseOrdersApi = {
+    list: async (params: PurchaseOrderListQuery): Promise<PurchaseOrderListPage> => {
+        const query = new URLSearchParams();
+        query.set('page', String(params.page ?? 1));
+        query.set('pageSize', String(params.pageSize ?? 20));
+        if (params.search) query.set('search', params.search);
+        if (params.status) query.set('status', params.status);
+        if (params.supplierId) query.set('supplierId', params.supplierId);
+        if (params.reference) query.set('reference', params.reference);
+        if (params.quote) query.set('quote', params.quote);
+        if (params.project) query.set('project', params.project);
+        if (params.supplier) query.set('supplier', params.supplier);
+        if (params.dateFrom) query.set('dateFrom', params.dateFrom);
+        if (params.dateTo) query.set('dateTo', params.dateTo);
+        const res = await apiClient.get(`/inventory/purchase-orders?${query.toString()}`);
+        return res.data;
+    },
+
+    get: async (id: string): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.get(`/inventory/purchase-orders/${id}`);
+        return res.data;
+    },
+
+    // Çoklu tedarikçi seçiminde tedarikçi başına bir sipariş oluşur.
+    create: async (orders: CreatePurchaseOrderInput[]): Promise<{ createdCount: number; orders: PurchaseOrderRow[] }> => {
+        const res = await apiClient.post('/inventory/purchase-orders', { orders });
+        return res.data;
+    },
+
+    // Ad değişikliği durumu etkilemez; mail sonrası içerik değişikliği UPDATED yapar.
+    update: async (id: string, patch: UpdatePurchaseOrderInput): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.patch(`/inventory/purchase-orders/${id}`, patch);
+        return res.data;
+    },
+
+    // Elle durum değişikliği (PENDING ↔ TO_BE_STOCKED).
+    setStatus: async (id: string, status: Extract<PurchaseOrderStatus, 'PENDING' | 'TO_BE_STOCKED'>): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.patch(`/inventory/purchase-orders/${id}/status`, { status });
+        return res.data;
+    },
+
+    sendMail: async (id: string, input: SendPurchaseOrderMailInput): Promise<SendPurchaseOrderMailResult> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/send-mail`, input);
+        return res.data;
+    },
+
+    // Stok aktarımı tamamlandığında StockPage tarafından çağrılır.
+    markStocked: async (id: string): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/mark-stocked`);
+        return res.data;
+    },
+
+    remove: async (id: string): Promise<void> => {
+        await apiClient.delete(`/inventory/purchase-orders/${id}`);
     },
 };
 

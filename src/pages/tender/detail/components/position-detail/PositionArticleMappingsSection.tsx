@@ -79,7 +79,7 @@ export const PositionArticleMappingsSection: React.FC<{
 
         {/* Currently bound articles */}
         {position.articleMappings && position.articleMappings.length > 0 && (
-            <div className="border border-slate-200/70 rounded-md bg-white">
+            <div className="border border-slate-200/70 rounded-[2px] bg-white">
                 <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
                     <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.linked_products')}{position.articleMappings.length})
                     </h4>

@@ -259,7 +259,7 @@ export const TreeRowDescriptionCell = ({
                             <img
                                 src={node.imageUrl}
                                 alt=""
-                                className="mb-2 h-20 w-32 rounded-md border border-slate-200 bg-white object-cover"
+                                className="mb-2 h-20 w-32 rounded-[2px] border border-slate-200 bg-white object-cover"
                             />
                         )}
                         <RichTextMarkdownEditor
@@ -272,7 +272,7 @@ export const TreeRowDescriptionCell = ({
                     </div>
                 ) : node.longDescription ? (
                     <div
-                        className={`${isInlineContentRow ?"min-h-[150px] w-full max-w-none rounded-md border border-slate-200 bg-white px-3 py-2 shadow-xs" :"flex max-w-[640px] items-start gap-1 px-1 py-0.5"} ${isDraft && !node.isArticleMapping ?"cursor-text hover:border-slate-300 hover:bg-white" : ''}`}
+                        className={`${isInlineContentRow ?"min-h-[150px] w-full max-w-none rounded-[2px] border border-slate-200 bg-white px-3 py-2 shadow-xs" :"flex max-w-[640px] items-start gap-1 px-1 py-0.5"} ${isDraft && !node.isArticleMapping ?"cursor-text hover:border-slate-300 hover:bg-white" : ''}`}
                         onClick={(e) => {
                             if (!isDraft || node.isArticleMapping) return;
                             e.stopPropagation();
@@ -283,7 +283,7 @@ export const TreeRowDescriptionCell = ({
                             <img
                                 src={node.imageUrl}
                                 alt=""
-                                className="mb-2 h-20 w-32 rounded-md border border-slate-200 bg-white object-cover"
+                                className="mb-2 h-20 w-32 rounded-[2px] border border-slate-200 bg-white object-cover"
                             />
                         )}
                         <span
@@ -293,7 +293,7 @@ export const TreeRowDescriptionCell = ({
                     </div>
                 ) : isInlineContentRow ? (
                     <div
-                        className={`min-h-[150px] w-full max-w-none rounded-md border border-slate-200 bg-white px-3 py-2 text-[12.5px] text-slate-400 shadow-xs ${isDraft ?"cursor-text hover:border-slate-300" : ''}`}
+                        className={`min-h-[150px] w-full max-w-none rounded-[2px] border border-slate-200 bg-white px-3 py-2 text-[12.5px] text-slate-400 shadow-xs ${isDraft ?"cursor-text hover:border-slate-300" : ''}`}
                         onClick={(e) => {
                             if (!isDraft) return;
                             e.stopPropagation();
@@ -304,7 +304,7 @@ export const TreeRowDescriptionCell = ({
                             <img
                                 src={node.imageUrl}
                                 alt=""
-                                className="mb-2 h-20 w-32 rounded-md border border-slate-200 bg-white object-cover"
+                                className="mb-2 h-20 w-32 rounded-[2px] border border-slate-200 bg-white object-cover"
                             />
                         )}{t('tenders.line_content_yazin')}</div>
                 ) : null}

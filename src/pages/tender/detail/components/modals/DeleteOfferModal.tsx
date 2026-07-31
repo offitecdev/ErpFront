@@ -38,7 +38,7 @@ export const DeleteOfferModal: React.FC<DeleteOfferModalProps> = ({
             destroyOnHidden
         >
             <div className="flex items-start gap-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-[2px] bg-rose-50 text-rose-600">
                     <AlertTriangle size={22} />
                 </div>
                 <div className="min-w-0 flex-1">

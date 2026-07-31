@@ -6,6 +6,7 @@ import { Modal } from '../ui-shared/Modal';
 import { Button } from '../ui-shared/Button';
 import { Field, Input } from '../ui-shared/Field';
 import { billingApi } from '../../lib/api/billing';
+import { stageStatus } from '../../lib/paymentSchedule';
 import type { BillingSummaryDto, InvoiceBillingType } from '../../types/billing';
 
 export type BillingTarget = {
@@ -128,6 +129,43 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                             <div className="text-[11px] text-emerald-600">%{remainingPercent}</div>
                         </div>
                     </div>
+
+                    {/* Payment schedule strip (orders with a plan only): done
+                        stages are muted, the next one is a one-click preset for
+                        the partial mode. Free percent entry stays available —
+                        the schedule guides, it does not lock. */}
+                    {target?.type === 'order' && summary?.paymentStages?.length ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {summary.paymentStages.map((stagePercent, index) => {
+                                const status = stageStatus(summary.paymentStages!, summary.billedPercent)[index];
+                                const isNext = status === 'next' && !!summary.nextStage;
+                                return (
+                                    <button
+                                        key={index}
+                                        type="button"
+                                        disabled={!isNext}
+                                        title={isNext && summary.nextStage
+                                            ? t('billing.billNextStage', { n: index + 1, percent: summary.nextStage.suggestedPercent })
+                                            : status === 'done' ? t('billing.stageDone') : undefined}
+                                        onClick={() => {
+                                            if (!isNext || !summary.nextStage) return;
+                                            setMode('PARTIAL');
+                                            setPercent(summary.nextStage.suggestedPercent);
+                                        }}
+                                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold tabular-nums transition-colors ${
+                                            status === 'done'
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                                                : isNext
+                                                    ? 'cursor-pointer border-[#272f67] bg-[#272f67] text-white hover:bg-[#1f2654]'
+                                                    : 'border-slate-200 bg-slate-50 text-slate-400'
+                                        }`}
+                                    >
+                                        {status === 'done' ? '✓ ' : ''}{t('billing.stageOf', { n: index + 1, total: summary.paymentStages!.length })} · {stagePercent}%
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
 
                     {fullyBilled ? (
                         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">

@@ -1,11 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-    ArrowDown,
-    ArrowUp,
-    Building02 as Building2,
-    ChevronLeft,
     ChevronRight,
     Eye,
     Hash01 as Hash,
@@ -13,23 +9,21 @@ import {
     MarkerPin01 as MapPin,
     Phone,
     Plus,
-    Save01 as Save,
-    SearchLg as Search,
     X as XIcon,
 } from '@/components/icons/antIconCompat';
-import Tooltip from 'antd/es/tooltip';
 
-import { apiClient } from '../../lib/axios';
+import { getShared } from '../../lib/axios';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
-import { Card } from '../../components/ui-shared/Card';
-import { Button } from '../../components/ui-shared/Button';
-import { Field, Input, Select } from '../../components/ui-shared/Field';
-import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { CUSTOMER_TYPE_OPTIONS, CUSTOMER_LANGUAGE_OPTIONS, CUSTOMER_STATUS_OPTIONS, DEFAULT_CUSTOMER_TYPE, DEFAULT_CUSTOMER_STATUS, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
+import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { CUSTOMER_STATUS_OPTIONS, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
+import { CustomerCreateModal } from './CustomerCreateModal';
 
 import { t } from '@/i18n/translate';
 
+// Sunucudan `fields=list` ile istenen daraltılmış satır — tablonun çizdiği
+// kolonların birebir karşılığı. Buraya alan eklemek backend'deki
+// CUSTOMER_LIST_SELECT'e de eklemeyi gerektirir.
 interface CustomerRow {
     id: string;
     companyName: string;
@@ -38,67 +32,14 @@ interface CustomerRow {
     mainPhone?: string | null;
     address?: string | null;
     status?: string | null;
-    isActive: boolean;
 }
 
-// Filtre satırı kontrolü — Teklifler/Ürünler listesindeki desenle aynı: alan hücreyle
-// bütünleşik, odaklanınca yumuşak kenarlı soluk bir zemin belirir.
-const CUSTOMER_FILTER_CONTROL =
-    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
+// Sunucu sayfalı zarf döner; eski çağıranlarla uyum için düz dizi de kabul edilir.
+type CustomerListResponse = CustomerRow[] | { items?: CustomerRow[]; total?: number; totalPages?: number };
 
 // Not: Customer modelinde createdAt yok — sıralama yalnızca ad/VAT/durum kolonlarınadır.
 type CustomerSortKey = 'companyName' | 'vatNumber' | 'status';
 type SortDirection = 'asc' | 'desc';
-
-const SortableHeader = ({
-    label,
-    column,
-    sortBy,
-    sortDirection,
-    onSort,
-    align = 'left',
-}: {
-    label: ReactNode;
-    column: CustomerSortKey;
-    sortBy: CustomerSortKey;
-    sortDirection: SortDirection;
-    onSort: (column: CustomerSortKey, direction: SortDirection) => void;
-    align?: 'left' | 'right' | 'center';
-}) => (
-    <th className={`px-4 py-2.5 font-semibold ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
-        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
-            <span className="truncate">{label}</span>
-            <span className="inline-flex shrink-0 items-center">
-                <Tooltip title={t('common.sortAscending')}>
-                    <button
-                        type="button"
-                        aria-label={t('common.sortAscending')}
-                        aria-pressed={sortBy === column && sortDirection === 'asc'}
-                        onClick={() => onSort(column, 'asc')}
-                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
-                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
-                        }`}
-                    >
-                        <ArrowUp size={10} />
-                    </button>
-                </Tooltip>
-                <Tooltip title={t('common.sortDescending')}>
-                    <button
-                        type="button"
-                        aria-label={t('common.sortDescending')}
-                        aria-pressed={sortBy === column && sortDirection === 'desc'}
-                        onClick={() => onSort(column, 'desc')}
-                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
-                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
-                        }`}
-                    >
-                        <ArrowDown size={10} />
-                    </button>
-                </Tooltip>
-            </span>
-        </div>
-    </th>
-);
 
 export const CustomerList = () => {
     const navigate = useNavigate();
@@ -111,6 +52,9 @@ export const CustomerList = () => {
 
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+    // Arama önerileri — ayrı bir istek atmaz; listenin zaten çektiği satırlardan
+    // türetilir (aşağıdaki `suggestions`).
+    const [suggestOpen, setSuggestOpen] = useState(false);
     // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı) — sunucuda daraltır.
     const [companyFilter, setCompanyFilter] = useState('');
     const [vatFilter, setVatFilter] = useState('');
@@ -122,30 +66,8 @@ export const CustomerList = () => {
     const [reloadTick, setReloadTick] = useState(0);
     const PAGE_SIZE = 15;
 
-    // `?create=1` (CRM overview quick action) lands with the form already open.
+    // `?create=1` (CRM overview quick action) lands with the modal already open.
     const [showForm, setShowForm] = useState(() => new URLSearchParams(location.search).has('create'));
-    const [submitting, setSubmitting] = useState(false);
-    const [submitAttempted, setSubmitAttempted] = useState(false);
-
-    const [form, setForm] = useState({
-        companyName: '',
-        customerType: DEFAULT_CUSTOMER_TYPE,
-        vatNumber: '',
-        priceList: '',
-        mainEmail: '',
-        mainPhone: '',
-        mobilePhone: '',
-        website: '',
-        language: '',
-        responsibleFirstName: '',
-        responsibleLastName: '',
-        addressName: '',
-        address: '',
-        postalCode: '',
-        city: '',
-        country: '',
-        status: DEFAULT_CUSTOMER_STATUS,
-    });
 
     // Sunucu taraflı arama — tuş vuruşlarını debounce et.
     useEffect(() => {
@@ -193,7 +115,10 @@ export const CustomerList = () => {
                 if (statusFilter) params.set('status', statusFilter);
                 params.set('sortBy', sortBy);
                 params.set('sortDirection', sortDirection);
-                const res = await apiClient.get(`/customers?${params.toString()}`);
+                // Gövde tablonun kolonlarıyla sınırlı (bkz. CustomerRow).
+                params.set('fields', 'list');
+                // getShared: StrictMode'un çift koşan efekti tek HTTP isteğine iner.
+                const res = await getShared<CustomerListResponse>(`/customers?${params.toString()}`);
                 if (cancelled) return;
                 if (Array.isArray(res.data)) {
                     setCustomers(res.data || []);
@@ -217,399 +142,238 @@ export const CustomerList = () => {
         return () => { cancelled = true; };
     }, [page, debouncedSearch, debouncedColumns, statusFilter, sortBy, sortDirection, reloadTick]);
 
-    const handleSort = (column: CustomerSortKey, direction: SortDirection) => {
-        setSortBy(column);
-        setSortDirection(direction);
-    };
+    // Öneriler tablonun mevcut satırlarından türetilir — ayrı bir istek yok.
+    // Sunucu `debouncedSearch` ile zaten daralttı; burada canlı `search` ile
+    // bir kez daha süzmek, debounce beklenirken listeyi anında daraltır.
+    const suggestions = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const rows = q
+            ? customers.filter((c) =>
+                c.companyName.toLowerCase().includes(q)
+                || (c.mainEmail || '').toLowerCase().includes(q)
+                || (c.vatNumber || '').toLowerCase().includes(q))
+            : customers;
+        return rows.slice(0, 10);
+    }, [customers, search]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSubmitAttempted(true);
-        if (!form.companyName.trim()) {
-            toast.error(t('crm.customers.companyNameRequired'));
-            return;
-        }
-        try {
-            setSubmitting(true);
-            await apiClient.post('/customers', form);
-            toast.success(t('crm.customers.successAdd'));
-            setForm({
-                companyName: '', customerType: DEFAULT_CUSTOMER_TYPE, vatNumber: '', priceList: '',
-                mainEmail: '', mainPhone: '', mobilePhone: '', website: '', language: '',
-                responsibleFirstName: '', responsibleLastName: '',
-                addressName: '', address: '', postalCode: '', city: '', country: '',
-                status: DEFAULT_CUSTOMER_STATUS,
-            });
-            setSubmitAttempted(false);
-            setShowForm(false);
-            setPage(1);
-            setReloadTick((n) => n + 1);
-        } catch (e: any) {
-            toast.error(e.response?.data?.error ||t('crm.customers.errorAdd'));
-        } finally {
-            setSubmitting(false);
-        }
+    // Ürün listesiyle aynı davranış: aynı kolona tıklandıkça asc/desc döner.
+    const toggleSort = (column: CustomerSortKey) => {
+        setSortDirection(sortBy === column && sortDirection === 'asc' ? 'desc' : 'asc');
+        setSortBy(column);
     };
 
     const totalPagesSafe = Math.max(1, totalPages);
     const pageSafe = Math.min(page, totalPagesSafe);
-    const rangeFrom = total === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
-    const rangeTo = Math.min(pageSafe * PAGE_SIZE, total);
+    const hasFilters = Boolean(debouncedSearch || debouncedColumns.companyName || debouncedColumns.vatNumber || debouncedColumns.email || statusFilter);
 
     return (
-        <div>
+        <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
                 title={t('nav.customerList')}
                 action={
-                    <Button
-                        variant={showForm ? 'secondary' : 'primary'}
-                        icon={showForm ? <XIcon size={13} /> : <Plus size={13} />}
-                        onClick={() => {
-                            setSubmitAttempted(false);
-                            setShowForm(!showForm);
-                        }}
+                    <button
+                        type="button"
+                        onClick={() => setShowForm(!showForm)}
+                        className={showForm
+                            ? 'flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10'
+                            : 'flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]'}
                     >
+                        {showForm ? <XIcon size={14} /> : <Plus size={14} />}
                         {showForm ?t('common.close') :t('crm.customers.newCustomer')}
-                    </Button>
+                    </button>
                 }
             />
 
-            {/* Inline add form (NOT a popup/modal) */}
-            {showForm && (
-                <Card
-                    title={t('crm.customers.newCustomer')}
-                    description={t('crm.customers.newCustomerDesc')}
-                    icon={<Plus size={13} />}
-                    className="mb-4"
-                >
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {submitAttempted && !form.companyName.trim() && (
-                            <div className="md:col-span-3 flex flex-wrap items-center gap-2 rounded-md border border-utility-yellow-200 bg-warning-primary px-3 py-2 text-[12px] text-warning-primary">
-                                <StatusChip variant="warning">{t('common.required')}</StatusChip>
-                                <span className="font-medium">{t('crm.customers.requiredFieldWarning')}</span>
-                            </div>
-                        )}
-                        <Field label={t('crm.customers.companyName')} required className="md:col-span-2" error={submitAttempted && !form.companyName.trim() ?t('crm.customers.companyNameRequired') : null}>
-                            <Input
-                                value={form.companyName}
-                                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                                placeholder={t('crm.customers.companyNamePlaceholder')}
-                            />
-                        </Field>
-                        <Field label={t('crm.customers.customerType')}>
-                            <Select
-                                value={form.customerType}
-                                onChange={(e) => setForm({ ...form, customerType: e.target.value })}
-                            >
-                                {CUSTOMER_TYPE_OPTIONS.map((o) => (
-                                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-                                ))}
-                            </Select>
-                        </Field>
-                        <Field label={t('common.status')}>
-                            <Select
-                                value={form.status}
-                                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                            >
-                                {CUSTOMER_STATUS_OPTIONS.map((o) => (
-                                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-                                ))}
-                            </Select>
-                        </Field>
-                        <Field label={t('crm.customers.vatNumber')}>
-                            <Input value={form.vatNumber}
-                                onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.customers.pricelist')}>
-                            <Input value={form.priceList}
-                                onChange={(e) => setForm({ ...form, priceList: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.customers.language')}>
-                            <Select
-                                value={form.language}
-                                onChange={(e) => setForm({ ...form, language: e.target.value })}
-                            >
-                                <option value="">{t('common.select')}</option>
-                                {CUSTOMER_LANGUAGE_OPTIONS.map((o) => (
-                                    <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-                                ))}
-                            </Select>
-                        </Field>
-                        <Field label={t('common.email')}>
-                            <Input type="email" value={form.mainEmail}
-                                onChange={(e) => setForm({ ...form, mainEmail: e.target.value })} />
-                        </Field>
-                        <Field label={t('common.phone')}>
-                            <Input value={form.mainPhone}
-                                onChange={(e) => setForm({ ...form, mainPhone: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.customers.mobilePhone')}>
-                            <Input value={form.mobilePhone}
-                                onChange={(e) => setForm({ ...form, mobilePhone: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.customers.website')}>
-                            <Input value={form.website}
-                                onChange={(e) => setForm({ ...form, website: e.target.value })}
-                                placeholder="https://" />
-                        </Field>
-                        <Field label={t('crm.customers.responsibleEmployee')}>
-                            <div className="flex gap-2">
-                                <Input value={form.responsibleFirstName}
-                                    onChange={(e) => setForm({ ...form, responsibleFirstName: e.target.value })}
-                                    placeholder={t('crm.customers.responsibleFirstName')} />
-                                <Input value={form.responsibleLastName}
-                                    onChange={(e) => setForm({ ...form, responsibleLastName: e.target.value })}
-                                    placeholder={t('crm.customers.responsibleLastName')} />
-                            </div>
-                        </Field>
-                        <div className="md:col-span-3 mt-1 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
-                            <MapPin size={11} /> {t('crm.locationPrimary')}
-                        </div>
-                        <Field label={t('crm.locationName')} className="md:col-span-3">
-                            <Input value={form.addressName}
-                                onChange={(e) => setForm({ ...form, addressName: e.target.value })} />
-                        </Field>
-                        <Field label={t('common.address')} className="md:col-span-3">
-                            <Input value={form.address}
-                                onChange={(e) => setForm({ ...form, address: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.postalCode')}>
-                            <Input value={form.postalCode}
-                                onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.city')}>
-                            <Input value={form.city}
-                                onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                        </Field>
-                        <Field label={t('crm.country')}>
-                            <Input value={form.country}
-                                onChange={(e) => setForm({ ...form, country: e.target.value })} />
-                        </Field>
-                        <div className="md:col-span-3 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                            <Button variant="secondary" type="button" onClick={() => { setSubmitAttempted(false); setShowForm(false); }}>{t('common.cancel')}</Button>
-                            <Button variant="primary" type="submit" loading={submitting} icon={<Save size={13} />}>{t('crm.customers.saveCustomer')}</Button>
-                        </div>
-                    </form>
-                </Card>
-            )}
+            {/* Anlegen läuft über ein Fenster (CustomerCreateModal) — das
+                aufklappende Formular an dieser Stelle ist entfallen. */}
+            <CustomerCreateModal
+                open={showForm}
+                onClose={() => setShowForm(false)}
+                onCreated={() => { setPage(1); setReloadTick((n) => n + 1); }}
+            />
 
-            <Card noPadding>
-                {/* Üst çubuk — arama (esner) + sıralama + sayfalama (sağda).
-                    Durum filtresi kolon filtre satırındadır. */}
-                <div className="px-3 py-3">
-                    <div className="flex w-full flex-wrap items-center gap-3">
-                        <div className="relative w-[240px] min-w-0 shrink">
-                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={t('crm.customers.search')}
-                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                            />
-                            {search && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearch('')}
-                                    aria-label={t('common.clear')}
-                                    title={t('common.clear')}
-                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-                                >
-                                    <XIcon size={12} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="w-[200px] shrink-0">
-                            <Select
-                                value={`${sortBy}:${sortDirection}`}
-                                onChange={(event) => {
-                                    const [column, direction] = event.target.value.split(':') as [CustomerSortKey, SortDirection];
-                                    handleSort(column, direction);
-                                }}
-                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                                aria-label={t('common.sortOrder')}
-                            >
-                                {sortBy !== 'companyName' && (
-                                    <option value={`${sortBy}:${sortDirection}`}>{t('common.sortOrder')}</option>
-                                )}
-                                <option value="companyName:asc">{t('common.sortNameAsc')}</option>
-                                <option value="companyName:desc">{t('common.sortNameDesc')}</option>
-                            </Select>
-                        </div>
-                        <div className="ml-auto flex shrink-0 items-center gap-3">
-                            <span className="font-mono text-[12px] text-slate-500">
-                                {rangeFrom}-{rangeTo} / {total}
-                            </span>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    disabled={pageSafe <= 1}
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                    aria-label={t('common.back')}
-                                >
-                                    <ChevronLeft size={14} />
-                                </button>
-                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPagesSafe}</span>
-                                <button
-                                    type="button"
-                                    disabled={pageSafe >= totalPagesSafe}
-                                    onClick={() => setPage((p) => Math.min(totalPagesSafe, p + 1))}
-                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                    aria-label={t('common.next')}
-                                >
-                                    <ChevronRight size={14} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-[13px] text-left [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
-                            <colgroup>
-                                <col style={{ width: '28%' }} />
-                                <col style={{ width: '15%' }} />
-                                <col style={{ width: '25%' }} />
-                                <col style={{ width: '16%' }} />
-                                <col style={{ width: '16%' }} />
-                            </colgroup>
-                            <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
-                                <tr>
-                                    <SortableHeader label={t('common.company')} column="companyName" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                    <SortableHeader label={t('crm.customers.vatNumber')} column="vatNumber" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                    <th className="px-4 py-2.5 font-semibold">{t('crm.customers.colContact')}</th>
-                                    <SortableHeader label={t('common.status')} column="status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                    <th className="px-4 py-2.5 font-semibold text-right">{t('common.actions')}</th>
-                                </tr>
-                                {/* Kolon bazlı filtre satırı — şirket / VAT / e-posta metinle, durum seçiciyle daraltır. */}
-                                <tr data-filter-row className="bg-white border-b border-slate-100">
-                                    <th className="px-2 py-1.5 font-normal">
-                                        <input
-                                            value={companyFilter}
-                                            onChange={(e) => setCompanyFilter(e.target.value)}
-                                            placeholder={`${t('common.filter')}...`}
-                                            className={CUSTOMER_FILTER_CONTROL}
-                                        />
-                                    </th>
-                                    <th className="px-2 py-1.5 font-normal">
-                                        <input
-                                            value={vatFilter}
-                                            onChange={(e) => setVatFilter(e.target.value)}
-                                            placeholder={`${t('common.filter')}...`}
-                                            className={CUSTOMER_FILTER_CONTROL}
-                                        />
-                                    </th>
-                                    <th className="px-2 py-1.5 font-normal">
-                                        <input
-                                            value={emailFilter}
-                                            onChange={(e) => setEmailFilter(e.target.value)}
-                                            placeholder={`${t('common.filter')}...`}
-                                            className={CUSTOMER_FILTER_CONTROL}
-                                        />
-                                    </th>
-                                    <th className="px-2 py-1.5 font-normal">
-                                        <select
-                                            value={statusFilter}
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                            aria-label={t('common.status')}
-                                            className={CUSTOMER_FILTER_CONTROL}
-                                        >
-                                            <option value="">{t('common.all')}</option>
-                                            {CUSTOMER_STATUS_OPTIONS.map((o) => (
-                                                <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-                                            ))}
-                                        </select>
-                                    </th>
-                                    <th className="px-2 py-2" />
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {loading && (
-                                    <tr>
-                                        <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                                            <div className="mx-auto max-w-sm animate-pulse space-y-2">
-                                                <div className="h-3 bg-slate-100 rounded" />
-                                                <div className="h-3 bg-slate-100 rounded w-2/3 mx-auto" />
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!loading && customers.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5}>
-                                            <EmptyState
-                                                icon={<Building2 size={32} />}
-                                                title={t('crm.customers.noCustomers')}
-                                                description={debouncedSearch ?t('crm.customers.noCustomersSearch') :t('crm.customers.noCustomersEmpty')}
-                                                action={
-                                                    !debouncedSearch && (
-                                                        <Button variant="primary" icon={<Plus size={13} />} onClick={() => { setSubmitAttempted(false); setShowForm(true); }}>{t('crm.customers.addFirst')}</Button>
-                                                    )
-                                                }
-                                            />
-                                        </td>
-                                    </tr>
-                                )}
-                                {!loading && customers.map((c) => (
-                                    <tr
-                                        key={c.id}
-                                        className="cursor-pointer transition-colors hover:bg-slate-50/80 active:bg-slate-100"
-                                        onClick={() => navigate(`/crm/customers/${c.id}`)}
-                                    >
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex min-w-0 items-center gap-2.5">
-                                                <div className="w-8 h-8 shrink-0 rounded bg-blue-50 text-blue-700 flex items-center justify-center font-semibold text-[12px]">
+            {/* Üst çubuk — ürün listesiyle aynı: genel arama + durum seçici. */}
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-64">
+                    <SearchBox
+                        value={search}
+                        onChange={setSearch}
+                        placeholder={t('crm.customers.search')}
+                        onFocus={() => setSuggestOpen(true)}
+                        onBlur={() => setSuggestOpen(false)}
+                        onKeyDown={(e) => { if (e.key === 'Escape') setSuggestOpen(false); }}
+                    />
+                    {suggestOpen && (
+                        // Öneri paneli — mousedown'da preventDefault, tıklama input blur'undan
+                        // önce paneli kapatmasın diye (blur listeyi gizler, click kaybolurdu).
+                        <div
+                            onMouseDown={(e) => e.preventDefault()}
+                            className="absolute left-0 top-full z-20 mt-1 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-white/15 dark:bg-slate-900"
+                        >
+                            {loading && suggestions.length === 0 ? (
+                                <div className="px-3 py-2.5 text-[12px] text-slate-400">{t('common.loading')}</div>
+                            ) : suggestions.length === 0 ? (
+                                <div className="px-3 py-2.5 text-[12px] text-slate-400">{t('crm.customers.noCustomersSearch')}</div>
+                            ) : (
+                                <ul className="max-h-80 overflow-y-auto py-1">
+                                    {suggestions.map((c) => (
+                                        <li key={c.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setSuggestOpen(false); navigate(`/crm/customers/${c.id}`); }}
+                                                className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-white/5"
+                                            >
+                                                <div className="flex size-6 shrink-0 items-center justify-center rounded bg-blue-50 text-[10px] font-semibold text-blue-700">
                                                     {c.companyName.slice(0, 2).toUpperCase()}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="truncate font-semibold text-slate-900">{c.companyName}</div>
-                                                    {c.address && (
-                                                        <div className="text-[11.5px] text-slate-400 flex items-center gap-1 mt-0.5">
-                                                            <MapPin size={10} className="shrink-0" /><span className="truncate">{c.address}</span>
-                                                        </div>
+                                                    <div className="truncate text-[12.5px] font-medium text-slate-800 dark:text-white">{c.companyName}</div>
+                                                    {(c.mainEmail || c.vatNumber) && (
+                                                        <div className="truncate text-[11px] text-slate-400">{c.mainEmail || c.vatNumber}</div>
                                                     )}
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-[12px] text-slate-600">
-                                            {c.vatNumber ? (
-                                                <div className="flex items-center gap-1.5 font-mono">
-                                                    <Hash size={10} className="text-slate-300 shrink-0" />
-                                                    <span className="truncate">{c.vatNumber}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-slate-300">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-[12.5px]">
-                                            <div className="flex items-center gap-1.5 text-slate-700">
-                                                <Mail size={11} className="text-slate-400 shrink-0" />
-                                                <span className="truncate">{c.mainEmail || <span className="text-slate-300">—</span>}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-slate-500 text-[11.5px] mt-0.5">
-                                                <Phone size={11} className="text-slate-400 shrink-0" />
-                                                <span className="truncate">{c.mainPhone || <span className="text-slate-300">—</span>}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            <StatusChip variant={getCustomerStatusOption(c.status).variant}>
-                                                {getCustomerStatusLabel(c.status)}
-                                            </StatusChip>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => navigate(`/crm/customers/${c.id}`)}
-                                                className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100"
-                                            >
-                                                <Eye size={12} />{t('common.detail')}<ChevronRight size={11} />
                                             </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-            </Card>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                    aria-label={t('common.status')}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                >
+                    <option value="">{t('common.all')}</option>
+                    {CUSTOMER_STATUS_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
+                    ))}
+                </select>
+            </div>
+
+            <SectionCard title={`${t('nav.customerList')} (${total})`}>
+                <table data-inv-table data-unstyled-table className="w-full">
+                    <thead>
+                        <tr>
+                            {/* Kolon başlıkları KISA `col*` anahtarlarından gelir. Başlık
+                                şeridi `white-space: nowrap` (bkz. index.css) ve tablo
+                                `table-layout: fixed`: uzun ad "Steueridentifikationsnummer"
+                                tek parça olduğu için sarılamaz, hücreden taşar ve yandaki
+                                "Kontakt" başlığının üstüne binerdi. Kolon da bir tık geniş —
+                                başlıklar arasında gözle görülür boşluk kalsın. */}
+                            <SortableTh label={t('common.company')} sortKey="companyName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
+                            <SortableTh label={t('crm.customers.colTax')} sortKey="vatNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-44 text-left" />
+                            <th className="w-64 text-left">{t('crm.customers.colContact')}</th>
+                            <SortableTh label={t('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-36 text-left" />
+                            <th className="w-28 text-right" />
+                        </tr>
+                        {/* Kolon bazlı filtre satırı — şirket / VAT / e-posta metinle daraltır. */}
+                        <tr data-filter-row>
+                            <th className="pb-1.5">
+                                <input
+                                    value={companyFilter}
+                                    onChange={(e) => setCompanyFilter(e.target.value)}
+                                    placeholder={`${t('common.filter')}...`}
+                                    className={FILTER_INPUT_CLASS}
+                                />
+                            </th>
+                            <th className="pb-1.5">
+                                <input
+                                    value={vatFilter}
+                                    onChange={(e) => setVatFilter(e.target.value)}
+                                    placeholder={`${t('common.filter')}...`}
+                                    className={FILTER_INPUT_CLASS}
+                                />
+                            </th>
+                            <th className="pb-1.5">
+                                <input
+                                    value={emailFilter}
+                                    onChange={(e) => setEmailFilter(e.target.value)}
+                                    placeholder={`${t('common.filter')}...`}
+                                    className={FILTER_INPUT_CLASS}
+                                />
+                            </th>
+                            <th colSpan={2} />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(loading || customers.length === 0) && (
+                            <TableStateRow
+                                colSpan={5}
+                                loading={loading}
+                                emptyText={hasFilters ?t('crm.customers.noCustomersSearch') :t('crm.customers.noCustomersEmpty')}
+                            />
+                        )}
+                        {!loading && customers.map((c) => (
+                            <tr
+                                key={c.id}
+                                className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                                onClick={() => navigate(`/crm/customers/${c.id}`)}
+                            >
+                                <td>
+                                    <div className="flex min-w-0 items-center gap-2.5">
+                                        <div className="flex size-8 shrink-0 items-center justify-center rounded bg-blue-50 text-[12px] font-semibold text-blue-700">
+                                            {c.companyName.slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="truncate font-semibold text-slate-900 dark:text-white">{c.companyName}</div>
+                                            {c.address && (
+                                                <div className="mt-0.5 flex items-center gap-1 text-[11.5px] text-slate-400">
+                                                    <MapPin size={10} className="shrink-0" /><span className="truncate">{c.address}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">
+                                    {c.vatNumber ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <Hash size={10} className="shrink-0 text-slate-300" />
+                                            <span className="truncate">{c.vatNumber}</span>
+                                        </div>
+                                    ) : (
+                                        <span className="text-slate-300 dark:text-white/30">—</span>
+                                    )}
+                                </td>
+                                <td>
+                                    <div className="flex items-center gap-1.5 text-[12.5px] text-slate-700 dark:text-white/80">
+                                        <Mail size={11} className="shrink-0 text-slate-400" />
+                                        <span className="truncate">{c.mainEmail || <span className="text-slate-300 dark:text-white/30">—</span>}</span>
+                                    </div>
+                                    <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-slate-500 dark:text-white/60">
+                                        <Phone size={11} className="shrink-0 text-slate-400" />
+                                        <span className="truncate">{c.mainPhone || <span className="text-slate-300 dark:text-white/30">—</span>}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <StatusChip variant={getCustomerStatusOption(c.status).variant}>
+                                        {getCustomerStatusLabel(c.status)}
+                                    </StatusChip>
+                                </td>
+                                <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                        onClick={() => navigate(`/crm/customers/${c.id}`)}
+                                        className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100 dark:text-sky-300 dark:hover:bg-sky-500/15"
+                                    >
+                                        <Eye size={12} />{t('common.detail')}<ChevronRight size={11} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="border-t border-slate-200 dark:border-white/10">
+                    <Pager
+                        page={pageSafe}
+                        totalPages={totalPagesSafe}
+                        total={total}
+                        pageSize={PAGE_SIZE}
+                        onPage={setPage}
+                    />
+                </div>
+            </SectionCard>
         </div>
     );
 };

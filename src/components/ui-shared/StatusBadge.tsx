@@ -1,7 +1,9 @@
 import React from 'react';
 import Tag from 'antd/es/tag';
 
-type Variant = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger' | 'neutral' | 'order';
+// Exportiert, damit Aufrufer ihre Status-→-Variante-Tabellen typisieren können,
+// statt die Zuordnung auf `never` zu casten.
+export type Variant = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger' | 'neutral' | 'order';
 
 interface StatusBadgeProps {
     variant?: Variant;

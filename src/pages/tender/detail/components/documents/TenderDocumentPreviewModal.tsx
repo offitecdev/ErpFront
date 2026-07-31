@@ -25,13 +25,13 @@ export const TenderDocumentPreviewModal = ({ document, onClose }: TenderDocument
                 download={document.fileName}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border border-[#1f2654] bg-[#1f2654] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#151a3b]"
+                className="inline-flex items-center gap-2 rounded-[2px] border border-[#1f2654] bg-[#1f2654] px-3 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#151a3b]"
             >
                 <FileDown size={14} />{t('common.download')}</a>
         )}
     >
         {document && (
-            <div className="flex min-h-[320px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 p-2">
+            <div className="flex min-h-[320px] items-center justify-center rounded-[2px] border border-slate-200 bg-slate-50 p-2">
                 {isPreviewableDocument(document) ? (
                     <img
                         src={document.fileUrl}

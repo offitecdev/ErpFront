@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { List } from '@/components/icons/antIconCompat';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { TableStateRow } from '../../components/ui-shared/TableKit';
 
 import { tenderApi } from '../../lib/api/tender';
 import type { ProjectDto } from '../../types/project';
@@ -13,6 +14,7 @@ import { DEFAULT_VAT } from '../tender/detail/utils/tenderDetail.constants';
 import { buildSimpleTenderLines } from '../tender/detail/utils/tenderLine.utils';
 import { lineNetTotal } from '../tender/detail/utils/tenderCalculation.utils';
 import { computeTenderPricingSummary, formatDiscountPercent } from '../tender/detail/utils/tenderPricing.utils';
+import { discountDisplayName, seedTotalDiscounts } from '../tender/detail/utils/tenderDiscounts.utils';
 import { formatMoney, toCurrencyCode } from '../../utils/currency';
 
 import { t } from '@/i18n/translate';
@@ -68,8 +70,8 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
     );
     const productRows = useMemo(() => rows.filter((row) => row.kind === 'PRODUCT'), [rows]);
     const summary = useMemo(
-        () => computeTenderPricingSummary(rows, fallbackTaxRate, detail?.tender.directDiscount),
-        [rows, fallbackTaxRate, detail?.tender.directDiscount],
+        () => computeTenderPricingSummary(rows, fallbackTaxRate, detail ? seedTotalDiscounts(detail.tender) : []),
+        [rows, fallbackTaxRate, detail],
     );
 
     const currency = toCurrencyCode(detail?.tender.currency);
@@ -97,32 +99,25 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
             ) : undefined}
         >
             <div className="overflow-x-auto">
-                <table className="w-full text-[12.5px]">
-                    <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
+                <table data-inv-table data-unstyled-table className="w-full">
+                    <thead>
                         <tr>
-                            <th className="px-3 py-2 text-left font-semibold">{t('nav.articles')}</th>
-                            <th className="px-3 py-2 text-right font-semibold">{t('common.quantity')}</th>
-                            <th className="px-3 py-2 text-left font-semibold">{t('tenders.unit')}</th>
-                            <th className="px-3 py-2 text-right font-semibold">{t('tenders.unit_price')}</th>
-                            <th className="px-3 py-2 text-right font-semibold">{t('common.discount')}</th>
-                            <th className="px-3 py-2 text-right font-semibold">{t('common.tax')}</th>
-                            <th className="px-3 py-2 text-right font-semibold">{t('common.amount')}</th>
+                            <th className="text-left">{t('nav.articles')}</th>
+                            <th className="w-28 text-right">{t('common.quantity')}</th>
+                            <th className="w-24 text-left">{t('tenders.unit')}</th>
+                            <th className="w-32 text-right">{t('tenders.unit_price')}</th>
+                            <th className="w-24 text-right">{t('common.discount')}</th>
+                            <th className="w-24 text-right">{t('common.tax')}</th>
+                            <th className="w-36 text-right">{t('common.amount')}</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {loading && Array.from({ length: 5 }).map((_, i) => (
-                            <tr key={i}>
-                                <td colSpan={COLUMN_COUNT} className="px-3 py-3">
-                                    <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
-                                </td>
-                            </tr>
-                        ))}
-                        {!loading && productRows.length === 0 && (
-                            <tr>
-                                <td colSpan={COLUMN_COUNT} className="px-3 py-10 text-center text-[12px] text-slate-400">
-                                    {t('tenders.tender_line_not_found')}
-                                </td>
-                            </tr>
+                    <tbody>
+                        {(loading || productRows.length === 0) && (
+                            <TableStateRow
+                                colSpan={COLUMN_COUNT}
+                                loading={loading}
+                                emptyText={t('tenders.tender_line_not_found')}
+                            />
                         )}
                         {!loading && productRows.map((row) => {
                             const { position } = row;
@@ -130,20 +125,20 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
                             const discount = Number(position.discount || 0);
                             const taxRate = Number(position.taxRate ?? fallbackTaxRate);
                             return (
-                                <tr key={row.id} className="hover:bg-slate-50/70">
-                                    <td className="px-3 py-2 text-slate-700">
+                                <tr key={row.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
+                                    <td className="text-slate-800 dark:text-white">
                                         {position.shortDescription || '—'}
                                     </td>
-                                    <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700">{fmtQuantity(position.quantity)}</td>
-                                    <td className="px-3 py-2 text-slate-600">{position.unit || '—'}</td>
-                                    <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-700">
+                                    <td className="text-right font-mono text-[13px] tabular-nums text-slate-700 dark:text-white/80">{fmtQuantity(position.quantity)}</td>
+                                    <td className="text-slate-500 dark:text-white/60">{position.unit || '—'}</td>
+                                    <td className="text-right font-mono text-[13px] tabular-nums text-slate-700 dark:text-white/80">
                                         {unitPrice != null ? fmtMoney(unitPrice) : '—'}
                                     </td>
-                                    <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-600">
+                                    <td className="text-right font-mono text-[13px] tabular-nums text-slate-500 dark:text-white/60">
                                         {discount > 0 ? formatDiscountPercent(discount) : '—'}
                                     </td>
-                                    <td className="px-3 py-2 text-right font-mono tabular-nums text-slate-600">{formatDiscountPercent(taxRate)}</td>
-                                    <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-slate-900">
+                                    <td className="text-right font-mono text-[13px] tabular-nums text-slate-500 dark:text-white/60">{formatDiscountPercent(taxRate)}</td>
+                                    <td className="text-right font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
                                         {fmtMoney(lineNetTotal(position))}
                                     </td>
                                 </tr>
@@ -155,28 +150,32 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
 
             {/* Offer amount footer — same figures as the offer's price summary, read-only. */}
             {!loading && detail && (
-                <div className="px-3 py-3">
-                    <div className="ml-auto w-full max-w-sm space-y-1 text-[12.5px]">
-                        <div className="flex items-center justify-between gap-3">
-                            <span className="text-slate-500">{(detail.tender.directDiscountLabel || '').trim() || t('tenders.direct_discount')}</span>
-                            <span className="flex items-center gap-2">
-                                {summary.directDiscountAmount > 0 && (
-                                    <span className="tabular-nums text-rose-600">−{fmtMoney(summary.directDiscountAmount)}</span>
-                                )}
-                                <span className="font-medium tabular-nums text-slate-700">{formatDiscountPercent(summary.directDiscount)}</span>
-                            </span>
+                <div className="border-t border-slate-200 px-4 py-3 dark:border-white/10">
+                    <div className="ml-auto w-full max-w-sm space-y-1 text-[13px]">
+                        {/* Every document-level discount, named, in the order it
+                            was applied — read-only mirror of the offer footer. */}
+                        {summary.discounts.map((entry, index) => (
+                            <div key={`${entry.name}-${index}`} className="flex items-center justify-between gap-3">
+                                <span className="text-slate-500 dark:text-white/60">{discountDisplayName(entry, index)}</span>
+                                <span className="flex items-center gap-2">
+                                    {entry.amount > 0 && (
+                                        <span className="tabular-nums text-rose-600">−{fmtMoney(entry.amount)}</span>
+                                    )}
+                                    <span className="font-medium tabular-nums text-slate-700 dark:text-white/80">{formatDiscountPercent(entry.percent)}</span>
+                                </span>
+                            </div>
+                        ))}
+                        <div className="flex items-center justify-between">
+                            <span className="text-slate-500 dark:text-white/60">{t('tenders.subtotal_excl_vat')}</span>
+                            <span className="font-mono font-medium tabular-nums text-slate-800 dark:text-white">{fmtMoney(summary.netTotal)}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <span className="text-slate-500">{t('tenders.subtotal_excl_vat')}</span>
-                            <span className="font-mono font-medium tabular-nums text-slate-800">{fmtMoney(summary.netTotal)}</span>
+                            <span className="text-slate-500 dark:text-white/60">{t('tenders.vat_amount')}</span>
+                            <span className="font-mono font-medium tabular-nums text-slate-800 dark:text-white">{fmtMoney(summary.vatTotal)}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-slate-500">{t('tenders.vat_amount')}</span>
-                            <span className="font-mono font-medium tabular-nums text-slate-800">{fmtMoney(summary.vatTotal)}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-t border-slate-200 pt-1">
-                            <span className="font-semibold text-slate-700">{t('tenders.total_incl_vat')}</span>
-                            <span className="font-mono text-[13.5px] font-bold tabular-nums text-slate-900">{fmtMoney(summary.grossTotal)}</span>
+                        <div className="flex items-center justify-between border-t border-slate-200 pt-1 dark:border-white/10">
+                            <span className="font-semibold text-slate-700 dark:text-white/80">{t('tenders.total_incl_vat')}</span>
+                            <span className="font-mono text-[13.5px] font-bold tabular-nums text-slate-900 dark:text-white">{fmtMoney(summary.grossTotal)}</span>
                         </div>
                     </div>
                 </div>

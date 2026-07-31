@@ -1,31 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import {
-    ArrowDown,
-    ArrowUp,
     Briefcase01 as BriefcaseBusiness,
     CalendarCheck01 as CalendarClock,
-    ChevronLeft,
-    ChevronRight,
     Plus,
-    SearchLg as Search,
-    X as XIcon,
 } from '@/components/icons/antIconCompat';
-import Tooltip from 'antd/es/tooltip';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Button } from '../../components/ui-shared/Button';
-import { Card } from '../../components/ui-shared/Card';
-import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
-import { Select } from '../../components/ui-shared/Field';
-import { StatusChip } from '../../components/ui-shared/StatusBadge';
+import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
-import { orderBillingLines, orderBillingTotals } from '../../lib/orderBillingTotals';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
 import type { ProjectDto, ProjectStatus } from '../../types/project';
-import type { MyOrderDto } from '../../types/billing';
 import { ProjectStatusBadge } from './features/components/common/ProjectStatusBadge';
 import { getStatusLabel } from './features/utils/projectFormatters';
 
@@ -40,173 +27,16 @@ const money = (value: number) =>
 // keep rendering their own badge — they are just not offered as filters.
 const FILTERABLE_STATUSES: ProjectStatus[] = ['ACTIVE', 'SPECIALLY_CLOSED', 'COMPLETED'];
 
-// Filtre satırı kontrolü — Teklifler/Ürünler listesindeki desenle aynı.
-const LIST_FILTER_CONTROL =
-    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
-
-const TABLE_BORDERS =
-    '[&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0';
-
+type ProjectSortKey = 'projectName' | 'customer' | 'budget' | 'status' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
-
-// Ortak sıralanabilir başlık (Teklifler listesindeki desenle aynı) — sıralama
-// anahtarı serbest metin olduğundan hem proje hem sipariş tablosunda kullanılır.
-const SortableHeader = ({
-    label,
-    column,
-    sortBy,
-    sortDirection,
-    onSort,
-    align = 'left',
-}: {
-    label: ReactNode;
-    column: string;
-    sortBy: string;
-    sortDirection: SortDirection;
-    onSort: (column: string, direction: SortDirection) => void;
-    align?: 'left' | 'right' | 'center';
-}) => (
-    <th className={`px-3 py-2 font-semibold ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
-        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
-            <span className="truncate">{label}</span>
-            <span className="inline-flex shrink-0 items-center">
-                <Tooltip title={t('common.sortAscending')}>
-                    <button
-                        type="button"
-                        aria-label={t('common.sortAscending')}
-                        aria-pressed={sortBy === column && sortDirection === 'asc'}
-                        onClick={() => onSort(column, 'asc')}
-                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
-                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
-                        }`}
-                    >
-                        <ArrowUp size={10} />
-                    </button>
-                </Tooltip>
-                <Tooltip title={t('common.sortDescending')}>
-                    <button
-                        type="button"
-                        aria-label={t('common.sortDescending')}
-                        aria-pressed={sortBy === column && sortDirection === 'desc'}
-                        onClick={() => onSort(column, 'desc')}
-                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
-                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
-                        }`}
-                    >
-                        <ArrowDown size={10} />
-                    </button>
-                </Tooltip>
-            </span>
-        </div>
-    </th>
-);
-
-// Ortak üst çubuk — arama (esner) + sıralama + sayfalama (sağda). Durum/özel
-// filtreler her tablonun kolon filtre satırındadır.
-const ListToolbar = ({
-    search,
-    onSearch,
-    searchPlaceholder,
-    sortValue,
-    onSortChange,
-    sortOptions,
-    total,
-    page,
-    totalPages,
-    onPage,
-}: {
-    search: string;
-    onSearch: (value: string) => void;
-    searchPlaceholder: string;
-    sortValue: string;
-    onSortChange: (value: string) => void;
-    sortOptions: { value: string; label: string }[];
-    total: number;
-    page: number;
-    totalPages: number;
-    onPage: (updater: (p: number) => number) => void;
-}) => {
-    const PAGE_SIZE = 15;
-    const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-    const rangeTo = Math.min(page * PAGE_SIZE, total);
-    const isDefaultSort = sortOptions.some((o) => o.value === sortValue);
-    return (
-        <div className="px-3 py-3">
-            <div className="flex w-full flex-wrap items-center gap-3">
-                <div className="relative w-[240px] min-w-0 shrink">
-                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        value={search}
-                        onChange={(e) => onSearch(e.target.value)}
-                        placeholder={searchPlaceholder}
-                        className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                    />
-                    {search && (
-                        <button
-                            type="button"
-                            onClick={() => onSearch('')}
-                            aria-label={t('common.clear')}
-                            title={t('common.clear')}
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-                        >
-                            <XIcon size={12} />
-                        </button>
-                    )}
-                </div>
-                <div className="w-[200px] shrink-0">
-                    <Select
-                        value={sortValue}
-                        onChange={(e) => onSortChange(e.target.value)}
-                        className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                        aria-label={t('common.sortOrder')}
-                    >
-                        {!isDefaultSort && <option value={sortValue}>{t('common.sortOrder')}</option>}
-                        {sortOptions.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                    </Select>
-                </div>
-                <div className="ml-auto flex shrink-0 items-center gap-3">
-                    <span className="font-mono text-[12px] text-slate-500">{rangeFrom}-{rangeTo} / {total}</span>
-                    <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            disabled={page <= 1}
-                            onClick={() => onPage((p) => Math.max(1, p - 1))}
-                            className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label={t('common.back')}
-                        >
-                            <ChevronLeft size={14} />
-                        </button>
-                        <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{page} / {totalPages}</span>
-                        <button
-                            type="button"
-                            disabled={page >= totalPages}
-                            onClick={() => onPage((p) => Math.min(totalPages, p + 1))}
-                            className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label={t('common.next')}
-                        >
-                            <ChevronRight size={14} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const SORT_NEW_OLD = () => [
-    { value: 'createdAt:desc', label: t('common.sortNewest') },
-    { value: 'createdAt:asc', label: t('common.sortOldest') },
-];
 
 /** Technical / invoicing progress across all of a project's orders — the plain
  *  figure, no progress bar. */
 const PercentCell = ({ percent }: { percent?: number }) => {
-    if (percent === undefined) return <span className="text-slate-300">—</span>;
+    if (percent === undefined) return <span className="text-slate-300 dark:text-white/30">—</span>;
     const clamped = Math.max(0, Math.min(100, Math.round(percent)));
     return (
-        <span className={`font-mono text-[12.5px] font-semibold tabular-nums ${clamped >= 100 ? 'text-emerald-600' : 'text-slate-700'}`}>
+        <span className={`font-mono text-[12.5px] font-semibold tabular-nums ${clamped >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-white/80'}`}>
             {clamped}%
         </span>
     );
@@ -215,9 +45,7 @@ const PercentCell = ({ percent }: { percent?: number }) => {
 const projectCustomerName = (p: ProjectDto) => p.customer?.companyName || p.customerId || '';
 const projectTenderNo = (p: ProjectDto) => (p.tender?.tenderNumber ? localizeTenderNumber(p.tender.tenderNumber) : (p.tenderId || ''));
 
-/* ────────────────────────── Projects tab ────────────────────────── */
-
-const ProjectsTable = () => {
+export const Projects = () => {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<ProjectDto[]>([]);
     const [loading, setLoading] = useState(true);
@@ -226,11 +54,13 @@ const ProjectsTable = () => {
     const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.list>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.list>>; invoices: Awaited<ReturnType<typeof billingApi.listInvoices>> } | null>(null);
 
     const [search, setSearch] = useState('');
+    // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı).
     const [nameFilter, setNameFilter] = useState('');
     const [customerFilter, setCustomerFilter] = useState('');
     const [tenderFilter, setTenderFilter] = useState('');
+    // Durum seçici üst çubukta — müşteri/teklif listeleriyle aynı desen.
     const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
-    const [sortBy, setSortBy] = useState('createdAt');
+    const [sortBy, setSortBy] = useState<ProjectSortKey>('createdAt');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 15;
@@ -274,7 +104,11 @@ const ProjectsTable = () => {
 
     useEffect(() => { void load(); }, []);
 
-    const handleSort = (column: string, direction: SortDirection) => { setSortBy(column); setSortDirection(direction); };
+    // Müşteri listesiyle aynı davranış: aynı kolona tıklandıkça asc/desc döner.
+    const toggleSort = (column: ProjectSortKey) => {
+        setSortDirection(sortBy === column && sortDirection === 'asc' ? 'desc' : 'asc');
+        setSortBy(column);
+    };
 
     useEffect(() => { setPage(1); }, [search, nameFilter, customerFilter, tenderFilter, statusFilter, sortBy, sortDirection]);
 
@@ -313,92 +147,70 @@ const ProjectsTable = () => {
     const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
     const hasActiveFilters = Boolean(search || nameFilter || customerFilter || tenderFilter || statusFilter);
-    const clearFilters = () => { setSearch(''); setNameFilter(''); setCustomerFilter(''); setTenderFilter(''); setStatusFilter(''); };
 
     return (
-        <Card noPadding>
-            <ListToolbar
-                search={search}
-                onSearch={setSearch}
-                searchPlaceholder={t('projects.searchPlaceholder')}
-                sortValue={`${sortBy}:${sortDirection}`}
-                onSortChange={(v) => { const [c, d] = v.split(':') as [string, SortDirection]; handleSort(c, d); }}
-                sortOptions={SORT_NEW_OLD()}
-                total={total}
-                page={pageSafe}
-                totalPages={totalPages}
-                onPage={setPage}
-            />
+        <div className="flex w-full flex-col gap-4">
+            <InventoryListHeader title={t('nav.projects')} />
 
-            <div className="overflow-x-auto">
-                <table className={`w-full table-fixed text-[12.5px] ${TABLE_BORDERS}`}>
-                    <colgroup>
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '11%' }} />
-                        <col style={{ width: '11%' }} />
-                        <col style={{ width: '7%' }} />
-                        <col style={{ width: '11%' }} />
-                        <col style={{ width: '10%' }} />
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '7%' }} />
-                    </colgroup>
-                    <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
+            {/* Üst çubuk — müşteri listesiyle aynı: genel arama + durum seçici. */}
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="w-64">
+                    <SearchBox
+                        value={search}
+                        onChange={setSearch}
+                        placeholder={t('projects.searchPlaceholder')}
+                    />
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as ProjectStatus | '')}
+                    aria-label={t('common.status')}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                >
+                    <option value="">{t('auto.tum_durumlar')}</option>
+                    {FILTERABLE_STATUSES.map((key) => (
+                        <option key={key} value={key}>{getStatusLabel()[key]}</option>
+                    ))}
+                </select>
+            </div>
+
+            <SectionCard title={`${t('nav.projects')} (${total})`}>
+                <table data-inv-table data-unstyled-table className="w-full">
+                    <thead>
                         <tr>
-                            <SortableHeader label={t('nav.projects')} column="projectName" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label={t('nav.quickActionsGroup.customers')} column="customer" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                            <th className="px-3 py-2 text-left font-semibold">{t('auto.teklif')}</th>
-                            <SortableHeader label={t('auto.butce')} column="budget" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                            <th className="px-3 py-2 text-right font-semibold">{t('auto.rapor')}</th>
-                            <th className="px-3 py-2 text-left font-semibold">{t('auto.randevu')}</th>
-                            <SortableHeader label={t('common.status')} column="status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                            <th className="px-3 py-2 text-left font-semibold">{t('projects.listColTechnical')}</th>
-                            <th className="px-3 py-2 text-left font-semibold">{t('projects.listColBilling')}</th>
+                            <SortableTh label={t('nav.projects')} sortKey="projectName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
+                            <SortableTh label={t('nav.quickActionsGroup.customers')} sortKey="customer" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-40 text-left" />
+                            <th className="w-28 text-left">{t('auto.teklif')}</th>
+                            <SortableTh label={t('auto.butce')} sortKey="budget" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-28 text-right" />
+                            <th className="w-16 text-right">{t('auto.rapor')}</th>
+                            <th className="w-28 text-left">{t('auto.randevu')}</th>
+                            <SortableTh label={t('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-32 text-left" />
+                            <th className="w-20 text-left">{t('projects.listColTechnical')}</th>
+                            <th className="w-24 text-left">{t('projects.listColBilling')}</th>
                         </tr>
-                        <tr data-filter-row className="bg-white border-b border-slate-100">
-                            <th className="px-2 py-1.5 font-normal">
-                                <input value={nameFilter} onChange={(e) => setNameFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={LIST_FILTER_CONTROL} />
+                        {/* Kolon bazlı filtre satırı — proje / müşteri / teklif no metinle daraltır. */}
+                        <tr data-filter-row>
+                            <th className="pb-1.5">
+                                <input value={nameFilter} onChange={(e) => setNameFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={FILTER_INPUT_CLASS} />
                             </th>
-                            <th className="px-2 py-1.5 font-normal">
-                                <input value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={LIST_FILTER_CONTROL} />
+                            <th className="pb-1.5">
+                                <input value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={FILTER_INPUT_CLASS} />
                             </th>
-                            <th className="px-2 py-1.5 font-normal">
-                                <input value={tenderFilter} onChange={(e) => setTenderFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={LIST_FILTER_CONTROL} />
+                            <th className="pb-1.5">
+                                <input value={tenderFilter} onChange={(e) => setTenderFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={FILTER_INPUT_CLASS} />
                             </th>
-                            <th className="px-2 py-2" />
-                            <th className="px-2 py-2" />
-                            <th className="px-2 py-2" />
-                            <th className="px-2 py-1.5 font-normal">
-                                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | '')} aria-label={t('common.status')} className={LIST_FILTER_CONTROL}>
-                                    <option value="">{t('auto.tum_durumlar')}</option>
-                                    {FILTERABLE_STATUSES.map((key) => (
-                                        <option key={key} value={key}>{getStatusLabel()[key]}</option>
-                                    ))}
-                                </select>
-                            </th>
-                            <th className="px-2 py-2" />
-                            <th className="px-2 py-2" />
+                            <th colSpan={6} />
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {loading && Array.from({ length: 5 }).map((_, i) => (
-                            <tr key={i}><td colSpan={9} className="px-3 py-3"><div className="h-4 w-full animate-pulse rounded bg-slate-100" /></td></tr>
-                        ))}
-                        {!loading && paged.length === 0 && (
-                            <tr>
-                                <td colSpan={9}>
-                                    <div className="px-4 py-6">
-                                        <EmptyState
-                                            icon={<BriefcaseBusiness size={32} />}
-                                            title={t('auto.proje_yok')}
-                                            description={hasActiveFilters ?t('auto.secili_filtrelere_uygun_proje_bulunamadi_arama_v') :t('auto.onayli_teklif_uzerinden_proje_olusturabilirsiniz')}
-                                            action={hasActiveFilters ? (
-                                                <Button variant="secondary" size="sm" icon={<XIcon size={13} />} onClick={clearFilters}>{t('auto.filtreleri_temizle')}</Button>
-                                            ) : undefined}
-                                        />
-                                    </div>
-                                </td>
-                            </tr>
+                    <tbody>
+                        {(loading || paged.length === 0) && (
+                            <TableStateRow
+                                colSpan={9}
+                                loading={loading}
+                                emptyText={hasActiveFilters
+                                    ?t('auto.secili_filtrelere_uygun_proje_bulunamadi_arama_v')
+                                    :t('auto.onayli_teklif_uzerinden_proje_olusturabilirsiniz')}
+                            />
                         )}
                         {!loading && paged.map((project) => {
                             const bookedAll = (project.appointments || [])
@@ -406,277 +218,66 @@ const ProjectsTable = () => {
                                 .sort((a, b) => dayjs(a.startTime).valueOf() - dayjs(b.startTime).valueOf());
                             const booked = bookedAll.find((a) => dayjs(a.startTime).isAfter(dayjs())) || bookedAll[bookedAll.length - 1];
                             return (
-                                <tr key={project.id} className="cursor-pointer hover:bg-slate-50/70" onClick={() => navigate(`/projects/${project.id}`)}>
-                                    <td className="px-3 py-2">
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="truncate font-medium text-slate-800">{localizeTenderNumbersInText(project.projectName)}</span>
-                                            {addonMap[project.id] > 0 && (
-                                                <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
-                                                    <Plus size={9} />{t('projects.complete.addonCount', { count: addonMap[project.id] })}
-                                                </span>
-                                            )}
+                                <tr
+                                    key={project.id}
+                                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                                    onClick={() => navigate(`/projects/${project.id}`)}
+                                >
+                                    <td>
+                                        <div className="flex min-w-0 items-center gap-2.5">
+                                            <div className="flex size-8 shrink-0 items-center justify-center rounded bg-blue-50 text-blue-700 dark:bg-sky-500/15 dark:text-sky-300">
+                                                <BriefcaseBusiness size={14} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <span className="truncate font-semibold text-slate-900 dark:text-white">{localizeTenderNumbersInText(project.projectName)}</span>
+                                                    {addonMap[project.id] > 0 && (
+                                                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
+                                                            <Plus size={9} />{t('projects.complete.addonCount', { count: addonMap[project.id] })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="mt-0.5 text-[11.5px] text-slate-400">{dayjs(project.createdAt).format('DD.MM.YYYY')}</div>
+                                            </div>
                                         </div>
-                                        <div className="text-[11px] text-slate-400">{dayjs(project.createdAt).format('DD.MM.YYYY')}</div>
                                     </td>
-                                    <td className="px-3 py-2 text-slate-600"><span className="block truncate">{project.customer?.companyName || project.customerId}</span></td>
-                                    <td className="px-3 py-2 font-mono text-[11.5px] text-slate-500"><span className="block truncate">{project.tender?.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : (project.tenderId || '-')}</span></td>
-                                    <td className="px-3 py-2 text-right font-mono">{money(project.plannedBudget)}</td>
-                                    <td className="px-3 py-2 text-right font-mono">{project._count?.reports || 0}</td>
-                                    <td className="px-3 py-2">
+                                    <td className="text-[13px] text-slate-700 dark:text-white/80">
+                                        <span className="block truncate">{project.customer?.companyName || project.customerId}</span>
+                                    </td>
+                                    <td className="font-mono text-[12px] text-slate-500 dark:text-white/60">
+                                        <span className="block truncate">{project.tender?.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : (project.tenderId || '—')}</span>
+                                    </td>
+                                    <td className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{money(project.plannedBudget)}</td>
+                                    <td className="text-right font-mono text-[13px] text-slate-600 dark:text-white/70">{project._count?.reports || 0}</td>
+                                    <td>
                                         {booked ? (
-                                            <span className={`inline-flex items-center gap-1.5 ${dayjs(booked.startTime).isAfter(dayjs()) ? 'text-[#272f67]' : 'text-slate-500'}`}>
+                                            <span className={`inline-flex items-center gap-1.5 ${dayjs(booked.startTime).isAfter(dayjs()) ? 'text-[#272f67] dark:text-sky-300' : 'text-slate-500 dark:text-white/60'}`}>
                                                 <CalendarClock size={12} className="shrink-0" />
                                                 <span>
-                                                    <span className="block font-medium leading-tight">{dayjs(booked.startTime).format('DD.MM.YYYY')}</span>
+                                                    <span className="block text-[12.5px] font-medium leading-tight">{dayjs(booked.startTime).format('DD.MM.YYYY')}</span>
                                                     <span className="block text-[11px] leading-tight text-slate-400">{dayjs(booked.startTime).format('HH:mm')}</span>
                                                 </span>
                                             </span>
-                                        ) : <span className="text-slate-300">—</span>}
+                                        ) : <span className="text-slate-300 dark:text-white/30">—</span>}
                                     </td>
-                                    <td className="px-3 py-2"><ProjectStatusBadge status={project.status} /></td>
-                                    <td className="px-3 py-2"><PercentCell percent={flowMap[project.id]?.technicalPercent} /></td>
-                                    <td className="px-3 py-2"><PercentCell percent={flowMap[project.id]?.billingPercent} /></td>
+                                    <td><ProjectStatusBadge status={project.status} /></td>
+                                    <td><PercentCell percent={flowMap[project.id]?.technicalPercent} /></td>
+                                    <td><PercentCell percent={flowMap[project.id]?.billingPercent} /></td>
                                 </tr>
                             );
                         })}
                     </tbody>
                 </table>
-            </div>
-        </Card>
-    );
-};
-
-/* ────────────────────────── Orders tab ────────────────────────── */
-
-type OrderBillingState = 'notBilled' | 'partial' | 'billed';
-
-const orderTotals = (order: MyOrderDto) => orderBillingTotals(orderBillingLines(order));
-const orderBillingState = (percent: number): OrderBillingState => (percent <= 0 ? 'notBilled' : percent >= 100 ? 'billed' : 'partial');
-
-const billingChipVariant = (percent: number): 'active' | 'warning' | 'info' => (percent >= 100 ? 'active' : percent <= 0 ? 'warning' : 'info');
-const billingChipLabel = (percent: number) => (percent <= 0 ? t('crm.faturalanmadi') : t('crm.partially_billed', { percent: Math.round(percent) }));
-
-const orderCustomerName = (o: MyOrderDto) => o.customer?.companyName || o.customerId || '';
-const orderProjectName = (o: MyOrderDto) => o.project?.projectName || '';
-
-const OrdersTable = () => {
-    const navigate = useNavigate();
-    const [orders, setOrders] = useState<MyOrderDto[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    const [search, setSearch] = useState('');
-    const [orderNoFilter, setOrderNoFilter] = useState('');
-    const [customerFilter, setCustomerFilter] = useState('');
-    const [projectFilter, setProjectFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'' | OrderBillingState>('');
-    const [sortBy, setSortBy] = useState('createdAt');
-    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-    const [page, setPage] = useState(1);
-    const PAGE_SIZE = 15;
-
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            setLoading(true);
-            try {
-                const list = await myOrdersApi.list();
-                if (!cancelled) setOrders(list);
-            } catch (e: any) {
-                if (!cancelled) toast.error(e.response?.data?.error ||t('crm.orders_yuklenemedi'));
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, []);
-
-    const handleSort = (column: string, direction: SortDirection) => { setSortBy(column); setSortDirection(direction); };
-
-    useEffect(() => { setPage(1); }, [search, orderNoFilter, customerFilter, projectFilter, statusFilter, sortBy, sortDirection]);
-
-    // Faturalama tutarları/yüzdesi tüm satırlarda bir kez hesaplanır (filtre + sıralama girdisi).
-    const rows = useMemo(
-        () => orders.map((o) => ({ order: o, totals: orderTotals(o) })),
-        [orders],
-    );
-
-    const filtered = useMemo(() => {
-        const s = search.trim().toLowerCase();
-        const of = orderNoFilter.trim().toLowerCase();
-        const cf = customerFilter.trim().toLowerCase();
-        const pf = projectFilter.trim().toLowerCase();
-        let list = rows.filter(({ order, totals }) => {
-            if (statusFilter && orderBillingState(totals.percent) !== statusFilter) return false;
-            const no = (order.orderNumber || '').toLowerCase();
-            const cust = orderCustomerName(order).toLowerCase();
-            const proj = orderProjectName(order).toLowerCase();
-            if (s && !(no.includes(s) || cust.includes(s) || proj.includes(s))) return false;
-            if (of && !no.includes(of)) return false;
-            if (cf && !cust.includes(cf)) return false;
-            if (pf && !proj.includes(pf)) return false;
-            return true;
-        });
-        const dir = sortDirection === 'asc' ? 1 : -1;
-        list = [...list].sort((a, b) => {
-            switch (sortBy) {
-                case 'orderNumber': return dir * (a.order.orderNumber || '').localeCompare(b.order.orderNumber || '');
-                case 'customer': return dir * orderCustomerName(a.order).localeCompare(orderCustomerName(b.order));
-                case 'total': return dir * (a.totals.total - b.totals.total);
-                default: return dir * (dayjs(a.order.createdAt).valueOf() - dayjs(b.order.createdAt).valueOf());
-            }
-        });
-        return list;
-    }, [rows, search, orderNoFilter, customerFilter, projectFilter, statusFilter, sortBy, sortDirection]);
-
-    const total = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const pageSafe = Math.min(page, totalPages);
-    const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
-
-    const hasActiveFilters = Boolean(search || orderNoFilter || customerFilter || projectFilter || statusFilter);
-    const clearFilters = () => { setSearch(''); setOrderNoFilter(''); setCustomerFilter(''); setProjectFilter(''); setStatusFilter(''); };
-
-    return (
-        <Card noPadding>
-            <ListToolbar
-                search={search}
-                onSearch={setSearch}
-                searchPlaceholder={t('projects.ordersSearch')}
-                sortValue={`${sortBy}:${sortDirection}`}
-                onSortChange={(v) => { const [c, d] = v.split(':') as [string, SortDirection]; handleSort(c, d); }}
-                sortOptions={SORT_NEW_OLD()}
-                total={total}
-                page={pageSafe}
-                totalPages={totalPages}
-                onPage={setPage}
-            />
-
-            <div className="overflow-x-auto">
-                <table className={`w-full table-fixed text-[12.5px] ${TABLE_BORDERS}`}>
-                    <colgroup>
-                        <col style={{ width: '16%' }} />
-                        <col style={{ width: '18%' }} />
-                        <col style={{ width: '18%' }} />
-                        <col style={{ width: '14%' }} />
-                        <col style={{ width: '12%' }} />
-                        <col style={{ width: '11%' }} />
-                        <col style={{ width: '11%' }} />
-                    </colgroup>
-                    <thead className="border-b border-slate-100 bg-slate-50/60 text-[10.5px] uppercase tracking-wider text-slate-500">
-                        <tr>
-                            <SortableHeader label={t('crm.order_no')} column="orderNumber" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label={t('nav.quickActionsGroup.customers')} column="customer" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                            <th className="px-3 py-2 text-left font-semibold">{t('nav.projects')}</th>
-                            <th className="px-3 py-2 text-left font-semibold">{t('common.status')}</th>
-                            <SortableHeader label={t('common.total')} column="total" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} align="right" />
-                            <th className="px-3 py-2 text-right font-semibold">{t('billing.billed')}</th>
-                            <th className="px-3 py-2 text-right font-semibold">{t('billing.remaining')}</th>
-                        </tr>
-                        <tr data-filter-row className="bg-white border-b border-slate-100">
-                            <th className="px-2 py-1.5 font-normal">
-                                <input value={orderNoFilter} onChange={(e) => setOrderNoFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={LIST_FILTER_CONTROL} />
-                            </th>
-                            <th className="px-2 py-1.5 font-normal">
-                                <input value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={LIST_FILTER_CONTROL} />
-                            </th>
-                            <th className="px-2 py-1.5 font-normal">
-                                <input value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={LIST_FILTER_CONTROL} />
-                            </th>
-                            <th className="px-2 py-1.5 font-normal">
-                                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as '' | OrderBillingState)} aria-label={t('common.status')} className={LIST_FILTER_CONTROL}>
-                                    <option value="">{t('common.all')}</option>
-                                    <option value="notBilled">{t('crm.faturalanmadi')}</option>
-                                    <option value="partial">{t('projects.orderPartial')}</option>
-                                    <option value="billed">{t('projects.orderBilled')}</option>
-                                </select>
-                            </th>
-                            <th className="px-2 py-2" />
-                            <th className="px-2 py-2" />
-                            <th className="px-2 py-2" />
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {loading && Array.from({ length: 5 }).map((_, i) => (
-                            <tr key={i}><td colSpan={7} className="px-3 py-3"><div className="h-4 w-full animate-pulse rounded bg-slate-100" /></td></tr>
-                        ))}
-                        {!loading && paged.length === 0 && (
-                            <tr>
-                                <td colSpan={7}>
-                                    <div className="px-4 py-6">
-                                        <EmptyState
-                                            icon={<BriefcaseBusiness size={32} />}
-                                            title={t('crm.order_not_found')}
-                                            description={hasActiveFilters ?t('auto.secili_filtrelere_uygun_proje_bulunamadi_arama_v') :t('crm.no_goruntulenecek_bir_order_yet')}
-                                            action={hasActiveFilters ? (
-                                                <Button variant="secondary" size="sm" icon={<XIcon size={13} />} onClick={clearFilters}>{t('auto.filtreleri_temizle')}</Button>
-                                            ) : undefined}
-                                        />
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                        {!loading && paged.map(({ order, totals }) => {
-                            const addons = order.addonSalesOrders || [];
-                            return (
-                                <tr key={order.id} className="cursor-pointer hover:bg-slate-50/70" onClick={() => navigate(`/crm/my-orders/${order.id}`)}>
-                                    <td className="px-3 py-2">
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="truncate font-semibold text-slate-800">{localizeTenderNumbersInText(order.orderNumber)}</span>
-                                            {addons.length > 0 && (
-                                                <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
-                                                    <Plus size={9} />{t('crm.additionalOrdersCount', { count: addons.length })}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="text-[11px] text-slate-400">{dayjs(order.createdAt).format('DD.MM.YYYY')}</div>
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-600"><span className="block truncate">{order.customer?.companyName || t('crm.customer_not_found')}</span></td>
-                                    <td className="px-3 py-2 text-slate-600"><span className="block truncate">{order.project?.projectName || <span className="text-slate-300">—</span>}</span></td>
-                                    <td className="px-3 py-2">
-                                        <StatusChip variant={billingChipVariant(totals.percent)}>{billingChipLabel(totals.percent)}</StatusChip>
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">{money(totals.total)}</td>
-                                    <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-600">{money(totals.billed)}</td>
-                                    <td className="px-3 py-2 text-right font-mono font-semibold text-amber-600">{money(totals.remaining)}</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </Card>
-    );
-};
-
-/* ────────────────────────── Page shell (tabs) ────────────────────────── */
-
-export const Projects = () => {
-    const [tab, setTab] = useState<'projects' | 'orders'>('projects');
-    const tabButton = (key: 'projects' | 'orders', label: string) => (
-        <button
-            type="button"
-            onClick={() => setTab(key)}
-            aria-pressed={tab === key}
-            className={`rounded-md px-3 py-1.5 text-[13px] font-semibold transition-colors ${
-                tab === key ? 'bg-white text-[#272f67] shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-        >
-            {label}
-        </button>
-    );
-
-    return (
-        <div>
-            <InventoryListHeader
-                title={t('nav.projects')}
-                action={
-                    <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-                        {tabButton('projects', t('projects.projectsTab'))}
-                        {tabButton('orders', t('projects.ordersTab'))}
-                    </div>
-                }
-            />
-            {tab === 'projects' ? <ProjectsTable /> : <OrdersTable />}
+                <div className="border-t border-slate-200 dark:border-white/10">
+                    <Pager
+                        page={pageSafe}
+                        totalPages={totalPages}
+                        total={total}
+                        pageSize={PAGE_SIZE}
+                        onPage={setPage}
+                    />
+                </div>
+            </SectionCard>
         </div>
     );
 };

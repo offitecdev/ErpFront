@@ -26,6 +26,12 @@ export const notificationApi = {
         return res.data;
     },
 
+    /** Server-side unread count for the active company (badge figure). */
+    unreadCount: async (): Promise<number> => {
+        const res = await apiClient.get('/notifications/unread-count');
+        return Number(res.data?.count) || 0;
+    },
+
     markRead: async (id: string): Promise<NotificationDto> => {
         const res = await apiClient.patch(`/notifications/${id}/read`);
         return res.data;

@@ -19,6 +19,7 @@ export type InstallationView = 'field' | 'materials' | 'expenses' | 'overtime' |
 
 type ExpenseRow = { expenseType: string; amount: number; description: string };
 type MaterialRow = { materialId: string; quantity: number; description: string };
+type InstallationInitialSection = 'work' | 'general';
 
 const isoWeekStart = (value: string) => {
     const date = dayjs(value);
@@ -57,12 +58,18 @@ const emptyMaterialRow = (): MaterialRow => ({ materialId: '', quantity: 1, desc
  * field report draft (persisted to localStorage), the delivery reports backing
  * the general report, the active task view, and the "Finish & Send" save.
  */
-export const useInstallationDetail = (appointmentId?: string) => {
+export const useInstallationDetail = (
+    appointmentId?: string,
+    options: { initialSection?: InstallationInitialSection } = {},
+) => {
+    const initialSection = options.initialSection || 'work';
     const [weekAnchor, setWeekAnchor] = useState(dayjs().format('YYYY-MM-DD'));
     const [appointments, setAppointments] = useState<InstallationAppointment[]>([]);
     const [selected, setSelected] = useState<InstallationAppointment | null>(null);
     const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
     const [loading, setLoading] = useState(true);
+    const [expenseLoading, setExpenseLoading] = useState(false);
+    const [materialLoading, setMaterialLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [operations, setOperations] = useState<string[]>(['']);
     const [technicalNotes, setTechnicalNotes] = useState('');
@@ -91,18 +98,38 @@ export const useInstallationDetail = (appointmentId?: string) => {
     // Guards against out-of-order responses: only the newest load may write state,
     // so a slow early (wrong-tenant/empty) response can't clobber a good one.
     const loadSeq = useRef(0);
+    const loadedExpenseAppointment = useRef<string | null>(null);
+    const loadedMaterialAppointment = useRef<string | null>(null);
+    const loadingExpenseAppointment = useRef<string | null>(null);
+    const loadingMaterialAppointment = useRef<string | null>(null);
 
     const load = useCallback(async () => {
         const seq = ++loadSeq.current;
         setLoading(true);
         try {
             const rows = appointmentId
-                ? [await projectApi.getMyInstallation(appointmentId)]
+                ? [await projectApi.getMyInstallation(appointmentId, initialSection)]
                 : await projectApi.listMyInstallations(weekStart.format('YYYY-MM-DD'), weekStart.add(6, 'day').format('YYYY-MM-DD'));
             if (seq !== loadSeq.current) return;
             setAppointments(rows as InstallationAppointment[]);
             setSelected((current) => {
-                if (appointmentId) return rows[0] as InstallationAppointment || null;
+                if (appointmentId) {
+                    const next = rows[0] as InstallationAppointment | undefined;
+                    if (!next) return null;
+                    if (current?.id !== next.id || initialSection === 'general') return next;
+                    return {
+                        ...next,
+                        salesOrder: {
+                            ...next.salesOrder,
+                            ...(current.salesOrder?.tender ? { tender: current.salesOrder.tender } : {}),
+                        },
+                        project: {
+                            ...next.project,
+                            ...(current.project?.tender ? { tender: current.project.tender } : {}),
+                            ...(current.project?.expenses ? { expenses: current.project.expenses } : {}),
+                        },
+                    } as InstallationAppointment;
+                }
                 if (current) return (rows as InstallationAppointment[]).find((row) => row.id === current.id) || rows[0] as InstallationAppointment || null;
                 return rows[0] as InstallationAppointment || null;
             });
@@ -112,14 +139,8 @@ export const useInstallationDetail = (appointmentId?: string) => {
             setAppointments([]);
             setSelected(null);
         }
-        try {
-            const mats = await projectApi.materials();
-            if (seq === loadSeq.current) setMaterials(mats);
-        } catch {
-            if (seq === loadSeq.current) setMaterials([]);
-        }
         if (seq === loadSeq.current) setLoading(false);
-    }, [appointmentId, weekStart]);
+    }, [appointmentId, initialSection, weekStart]);
 
     const reloadAll = useCallback(() => { void load(); setReloadKey((key) => key + 1); }, [load]);
 
@@ -133,10 +154,87 @@ export const useInstallationDetail = (appointmentId?: string) => {
 
     // Delivery reports for the order back the general-report preview button.
     useEffect(() => {
+        if (initialSection !== 'general') {
+            setDeliveryReports([]);
+            return;
+        }
         const projectId = selected?.project?.id;
         if (!projectId) { setDeliveryReports([]); return; }
         deliveryReportApi.list({ projectId }).then(setDeliveryReports).catch(() => setDeliveryReports([]));
-    }, [selected?.project?.id, reloadKey]);
+    }, [initialSection, selected?.project?.id, reloadKey]);
+
+    const loadExpenses = useCallback(async () => {
+        const id = selected?.id || appointmentId;
+        if (!id || loadedExpenseAppointment.current === id || loadingExpenseAppointment.current === id) return;
+        loadingExpenseAppointment.current = id;
+        setExpenseLoading(true);
+        try {
+            const payload = await projectApi.getMyInstallation(id, 'expenses') as any;
+            const rows = Array.isArray(payload.expenses) ? payload.expenses : [];
+            setSelected((current) => current?.id === id
+                ? {
+                    ...current,
+                    project: { ...current.project, expenses: rows },
+                } as InstallationAppointment
+                : current);
+            setExpenseRows((current) => {
+                const hasDraft = current.some((row) => Number(row.amount) > 0 || row.description.trim());
+                if (hasDraft || !rows.length) return current;
+                return rows.map((row: any) => ({
+                    expenseType: row.expenseType || 'DiÄŸer',
+                    amount: Number(row.amount || 0),
+                    description: row.description || '',
+                }));
+            });
+            loadedExpenseAppointment.current = id;
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || t('projects.montajlar_yuklenemedi'));
+        } finally {
+            if (loadingExpenseAppointment.current === id) {
+                loadingExpenseAppointment.current = null;
+                setExpenseLoading(false);
+            }
+        }
+    }, [appointmentId, selected?.id]);
+
+    const loadMaterials = useCallback(async () => {
+        const id = selected?.id || appointmentId;
+        if (!id || loadedMaterialAppointment.current === id || loadingMaterialAppointment.current === id) return;
+        loadingMaterialAppointment.current = id;
+        setMaterialLoading(true);
+        try {
+            const [payload, catalogue] = await Promise.all([
+                projectApi.getMyInstallation(id, 'materials') as Promise<any>,
+                projectApi.materials({ compact: true }).catch(() => [] as ProjectMaterial[]),
+            ]);
+            setMaterials(catalogue);
+            setSelected((current) => current?.id === id
+                ? {
+                    ...current,
+                    salesOrder: { ...current.salesOrder, ...payload.salesOrder },
+                    project: { ...current.project, ...payload.project },
+                } as InstallationAppointment
+                : current);
+            const extraMaterials = Array.isArray(payload.extraMaterials) ? payload.extraMaterials : [];
+            setMaterialRows((current) => {
+                const hasDraft = current.some((row) => Boolean(row.materialId) || row.description.trim());
+                if (hasDraft || !extraMaterials.length) return current;
+                return extraMaterials.map((row: any) => ({
+                    materialId: row.materialId || '',
+                    quantity: Number(row.quantity || 0),
+                    description: row.description || '',
+                }));
+            });
+            loadedMaterialAppointment.current = id;
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || t('projects.malzemeler_yuklenemedi'));
+        } finally {
+            if (loadingMaterialAppointment.current === id) {
+                loadingMaterialAppointment.current = null;
+                setMaterialLoading(false);
+            }
+        }
+    }, [appointmentId, selected?.id]);
 
     const selectedReport = findReport(selected);
     // The technician can finish until the appointment is actually COMPLETED — an attached
@@ -158,7 +256,7 @@ export const useInstallationDetail = (appointmentId?: string) => {
     useEffect(() => {
         const completed = selected?.status === 'COMPLETED';
         const localDraft = !completed ? loadInstallationDraft(selected?.id) : null;
-        const reportSeed = !completed && selectedReport
+        const reportSeed = selectedReport
             ? { operations: operationItems(selectedReport), technicalNotes: selectedReport.technicalNotes || '', reportImages: reportImageUrls(selectedReport) }
             : null;
         const content = localDraft || reportSeed;
@@ -231,6 +329,8 @@ export const useInstallationDetail = (appointmentId?: string) => {
         selected: isStale ? null : selected,
         materials,
         loading: loading || isStale,
+        expenseLoading,
+        materialLoading,
         saving,
         operations,
         setOperations,
@@ -251,6 +351,8 @@ export const useInstallationDetail = (appointmentId?: string) => {
         setView,
         capturedSignature,
         setCapturedSignature,
+        loadExpenses,
+        loadMaterials,
         reloadAll,
         submit,
     };

@@ -23,6 +23,7 @@ import {
 } from '../../lib/orderBillingTotals';
 import { deliveryReportApi, signatureApi, type DeliveryReportDto, type SignatureRequestDto } from '../../lib/api/project';
 import type { MyOrderDetailDto } from '../../types/billing';
+import { OrderPaymentTab } from './components/OrderPaymentTab';
 
 import { t } from '@/i18n/translate';
 import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
@@ -60,12 +61,17 @@ const BillingEntry = ({
     busy,
     onBill,
     registerInput,
+    nextStage,
+    stageCount,
 }: {
     orderId: string;
     remainingPercent: number;
     busy: boolean;
     onBill: (orderId: string, raw: string) => void;
     registerInput: (el: HTMLInputElement | null) => void;
+    /** Payment-schedule suggestion — empty submit bills this instead of the remainder. */
+    nextStage?: { index: number; percent: number; suggestedPercent: number } | null;
+    stageCount?: number;
 }) => {
     const remaining = Math.round(Math.max(0, remainingPercent));
     const localRef = useRef<HTMLInputElement | null>(null);
@@ -79,13 +85,21 @@ const BillingEntry = ({
     }
     return (
         <div className="flex shrink-0 items-center gap-2">
+            {nextStage && stageCount ? (
+                <span
+                    className="whitespace-nowrap rounded bg-[#272f67]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#272f67]"
+                    title={t('billing.billNextStage', { n: nextStage.index + 1, percent: nextStage.suggestedPercent })}
+                >
+                    {t('billing.stageOf', { n: nextStage.index + 1, total: stageCount })}
+                </span>
+            ) : null}
             <input
                 ref={(el) => { localRef.current = el; registerInput(el); }}
                 type="number"
                 min={1}
                 max={remaining}
                 defaultValue=""
-                placeholder={`%${remaining}`}
+                placeholder={`%${nextStage ? nextStage.suggestedPercent : remaining}`}
                 aria-label={t('projects.detail.colPercent')}
                 className={`${inputClass} h-9 w-20 px-2.5 text-right text-sm`}
                 onKeyDown={(e) => { if (e.key === 'Enter') onBill(orderId, localRef.current?.value || ''); }}
@@ -104,7 +118,7 @@ const BillingEntry = ({
     );
 };
 
-type TabKey = 'addons' | 'quotation' | 'billing';
+type TabKey = 'addons' | 'quotation' | 'billing' | 'payment';
 
 interface StageItem { label: string; meta?: string; done: boolean }
 interface Stage { key: string; label: string; completed: boolean; items: StageItem[] }
@@ -172,6 +186,7 @@ const TabBar = ({ tab, onSelect, orderCount }: { tab: TabKey; onSelect: (t: TabK
         { key: 'addons', label: t('nav.myOrders'), badge: orderCount },
         { key: 'quotation', label: t('projects.complete.tabQuotation') },
         { key: 'billing', label: t('projects.complete.tabBilling') },
+        { key: 'payment', label: t('billing.paymentScheduleTab') },
     ];
     return (
         <div className="mb-4 flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
@@ -231,7 +246,8 @@ export const MyOrderDetail = () => {
         void load();
     }, [load]);
 
-    // Empty input → FULL (the whole remainder); a number → PARTIAL of that share.
+    // Empty input → next schedule stage when one exists, else FULL (the whole
+    // remainder); a number → PARTIAL of that share.
     const billOrder = useCallback(async (orderId: string, raw: string) => {
         const target = orderId === order?.id
             ? order?.billingSummary
@@ -239,7 +255,12 @@ export const MyOrderDetail = () => {
         const remaining = Math.round(Math.max(0, target?.remainingPercent ?? 100));
         if (remaining <= 0) return;
         const trimmed = raw.trim();
-        const percent = trimmed ? Math.min(remaining, Math.max(0, Number(trimmed) || 0)) : remaining;
+        const suggested = target?.nextStage?.suggestedPercent ?? null;
+        const percent = trimmed
+            ? Math.min(remaining, Math.max(0, Number(trimmed) || 0))
+            : suggested != null
+                ? Math.min(remaining, suggested)
+                : remaining;
         if (percent <= 0) {
             toast.error(t('billing.maxPercent', { percent: remaining }));
             return;
@@ -248,8 +269,8 @@ export const MyOrderDetail = () => {
         try {
             await billingApi.createInvoice({
                 salesOrderId: orderId,
-                billingType: trimmed && percent < remaining ? 'PARTIAL' : 'FULL',
-                percent: trimmed && percent < remaining ? percent : undefined,
+                billingType: percent < remaining ? 'PARTIAL' : 'FULL',
+                percent: percent < remaining ? percent : undefined,
             });
             const input = percentInputRefs.current[orderId];
             if (input) input.value = '';
@@ -436,6 +457,8 @@ export const MyOrderDetail = () => {
                                                         busy={billingId === line.id}
                                                         onBill={billOrder}
                                                         registerInput={(el) => { percentInputRefs.current[line.id] = el; }}
+                                                        nextStage={line.summary?.nextStage ?? null}
+                                                        stageCount={line.summary?.paymentStages?.length ?? 0}
                                                     />
                                                 </div>
                                             </td>
@@ -661,6 +684,8 @@ export const MyOrderDetail = () => {
                     </Card>
                 </div>
             )}
+
+            {tab === 'payment' && <OrderPaymentTab order={order} onChanged={() => { void load(); }} />}
 
             {activeStage && <StageDetailModal stage={activeStage} onClose={() => setActiveStage(null)} />}
         </div>

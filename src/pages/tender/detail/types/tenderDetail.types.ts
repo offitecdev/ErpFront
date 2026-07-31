@@ -6,7 +6,7 @@ export type NumberField = 'quantity' | 'unitPrice' | 'discount' | 'taxRate';
 
 export type InlinePositionPatch = Pick<
     Partial<PositionDto>,
-    'quantity' | 'unit' | 'unitPrice' | 'discount' | 'taxRate' | 'shortDescription' | 'longDescription' | 'rowType' | 'imageUrl' | 'displayOrder'
+    'quantity' | 'unit' | 'unitPrice' | 'discount' | 'discounts' | 'taxRate' | 'shortDescription' | 'longDescription' | 'rowType' | 'imageUrl' | 'displayOrder' | 'sourceArticleId'
 >;
 
 export type ProductSource = {
@@ -33,6 +33,16 @@ export type ManualProductForm = {
     taxRate: number;
     description: string;
     imageUrl: string;
+};
+
+// Per-row profit/loss figures shown behind the icon in the amount column.
+export type TenderLineProfit = {
+    revenue: number;
+    cost: number;
+    result: number;
+    resultRate: number;
+    unitCost: number;
+    costSource: string;
 };
 
 export type SimpleTenderLine = {
@@ -65,15 +75,23 @@ export type CustomerOption = {
     segment?: string | null;
     mainEmail?: string | null;
     mainPhone?: string | null;
+    /**
+     * Adres AYRI BİLEŞENLER: `address` = sokak + bina no, `addressSupplement` =
+     * adres eki / daire. `addressName` posta adresinin parçası değil, kaydın
+     * etiketidir. Teklifin adres yuvası bu bileşenlerden `formatLocationAddress`
+     * ile iki satıra indirgenerek doldurulur.
+     */
     addressName?: string | null;
     address?: string | null;
+    addressSupplement?: string | null;
     postalCode?: string | null;
     city?: string | null;
+    state?: string | null;
     country?: string | null;
     taxNumber?: string | null;
 };
 
-export type TenderLineColumnKey = 'select' | 'description' | 'quantity' | 'unit' | 'unitPrice' | 'discount' | 'taxRate' | 'total';
+export type TenderLineColumnKey = 'pos' | 'description' | 'quantity' | 'unit' | 'unitPrice' | 'discount' | 'taxRate' | 'total' | 'profit';
 
 export type TenderSettingsTabKey = 'mail' | 'schedule' | 'overtime' | 'materials';
-export type TenderWorkspaceTabKey = 'lines' | TenderSettingsTabKey | 'technician' | 'assets';
+export type TenderWorkspaceTabKey = 'lines' | TenderSettingsTabKey | 'pdf' | 'payment';

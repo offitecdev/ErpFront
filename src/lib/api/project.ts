@@ -1,5 +1,5 @@
 import { apiClient } from '../axios';
-import type { AppointmentDto, MailSettingDto, ProjectAddonRequestDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
+import type { AppointmentDto, MailSettingDto, MontageOrdersPageDto, MontageReportOrderDetailDto, MontageReportOrdersPageDto, MontageReportResourcesDto, ProjectAddonRequestDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
 import type { PersonLite } from '../../types/maintenance';
 
 export type SalesOrderMode = 'PROJECT_NEW' | 'PROJECT_EXISTING' | 'PROJECT_ADDON' | 'INVOICE';
@@ -203,8 +203,51 @@ export const projectApi = {
     // `calendar: true` asks the backend for the trimmed grid payload (no report /
     // material / tender trees); the popup then fetches full detail on click via
     // getMyInstallationDetail. Other callers omit it and keep the rich payload.
-    listMyInstallations: async (start: string, end: string, opts: { calendar?: boolean } = {}): Promise<AppointmentDto[]> => {
-        const res = await apiClient.get('/projects/technician/installations', { params: { start, end, ...(opts.calendar ? { view: 'calendar' } : {}) } });
+    // Sayfalı montaj listesi: yalnızca tablo kolonları (düz satır DTO'ları) —
+    // pop-up/iş ekranı verileri açıldıklarında kendi uçlarından yüklenir.
+    listMontageOrdersPage: async (
+        mode: 'active' | 'completed',
+        page: number,
+        start: string,
+        end: string,
+        pageSize = 10,
+    ): Promise<MontageOrdersPageDto> => {
+        const res = await apiClient.get('/projects/technician/installations', {
+            params: { start, end, view: 'montage-page', mode, page, pageSize },
+        });
+        return res.data;
+    },
+
+    listMontageReportOrdersPage: async (filter: {
+        page: number;
+        search?: string;
+    }): Promise<MontageReportOrdersPageDto> => {
+        const res = await apiClient.get('/projects/technician/reports', {
+            params: { ...filter, pageSize: 10 },
+        });
+        return res.data;
+    },
+
+    getMyMontageReportOrder: async (salesOrderId: string): Promise<MontageReportOrderDetailDto> => {
+        const res = await apiClient.get(`/projects/technician/report-orders/${salesOrderId}`);
+        return res.data;
+    },
+
+    getMyMontageReport: async (reportId: string): Promise<any> => {
+        const res = await apiClient.get(`/projects/technician/reports/${reportId}`);
+        return res.data;
+    },
+
+    getMyMontageReportResources: async (reportId: string): Promise<MontageReportResourcesDto> => {
+        const res = await apiClient.get(`/projects/technician/reports/${reportId}/resources`);
+        return res.data;
+    },
+
+    listMyInstallations: async (start: string, end: string, opts: { calendar?: boolean; montage?: boolean } = {}): Promise<AppointmentDto[]> => {
+        // 'montage': satır + durum alanlarından ibaret hafif liste (rapor
+        // görselleri/imza blobları yok) — montaj tabloları bununla açılır.
+        const view = opts.calendar ? 'calendar' : opts.montage ? 'montage' : undefined;
+        const res = await apiClient.get('/projects/technician/installations', { params: { start, end, ...(view ? { view } : {}) } });
         return res.data;
     },
 
@@ -226,8 +269,13 @@ export const projectApi = {
         return res.data;
     },
 
-    getMyInstallation: async (appointmentId: string): Promise<AppointmentDto> => {
-        const res = await apiClient.get(`/projects/technician/installations/${appointmentId}`);
+    getMyInstallation: async (
+        appointmentId: string,
+        section: 'work' | 'expenses' | 'materials' | 'general' = 'work',
+    ): Promise<AppointmentDto> => {
+        const res = await apiClient.get(`/projects/technician/installations/${appointmentId}`, {
+            params: { section },
+        });
         return res.data;
     },
 
@@ -353,7 +401,8 @@ export const mailApi = {
         return res.data;
     },
 
-    saveSettings: async (input: Partial<MailSettingDto> & { smtpPassword?: string }) => {
+    // smtpPassword: undefined/atlanmış = kayıtlı şifreye dokunma, null = sil.
+    saveSettings: async (input: Partial<MailSettingDto> & { smtpPassword?: string | null }): Promise<MailSettingDto> => {
         const res = await apiClient.put('/mail/settings', input);
         return res.data;
     },
@@ -518,6 +567,12 @@ export interface SignatureRequestDto {
     link: string;
 }
 
+export interface SignatureRequestDetailDto extends SignatureRequestDto {
+    snapshot: SignatureSnapshot;
+    signatureBase64: string | null;
+    updatedAt: string;
+}
+
 export type SignatureRequestInput = {
     reportType: SignatureReportType;
     reportId?: string | null;
@@ -548,6 +603,14 @@ export const signatureApi = {
     },
     create: async (input: SignatureRequestInput): Promise<SignatureRequestDto & { emailed: boolean; notified: boolean }> => {
         const res = await apiClient.post('/signature-requests', input);
+        return res.data;
+    },
+    getOne: async (id: string): Promise<SignatureRequestDetailDto> => {
+        const res = await apiClient.get(`/signature-requests/${id}`);
+        return res.data;
+    },
+    sign: async (id: string, signatureBase64: string): Promise<SignatureRequestDetailDto> => {
+        const res = await apiClient.patch(`/signature-requests/${id}/sign`, { signatureBase64 });
         return res.data;
     },
     remove: async (id: string): Promise<void> => {

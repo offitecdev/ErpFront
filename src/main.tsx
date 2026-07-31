@@ -4,7 +4,14 @@ import './styles/fonts.css'
 import './index.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
+import { initInstallPrompt } from './lib/pwa/installPrompt'
+import { registerServiceWorker } from './lib/pwa/registerServiceWorker'
 import App from './App.tsx'
+
+// PWA: capture `beforeinstallprompt` before any component mounts (the browser
+// fires it once, very early), then install the service worker after load.
+initInstallPrompt()
+registerServiceWorker()
 
 // Start translations and the app together. Protected routes paint their
 // loading shell while the profile and locale chunks resolve, so waiting here

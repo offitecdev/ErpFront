@@ -26,6 +26,87 @@ export interface ProjectMaterial {
     createdAt?: string;
 }
 
+/** Sayfalı montaj listesinin düz satırı — yalnızca tablo kolonları. */
+export interface MontageOrderListItem {
+    id: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    projectId: string | null;
+    salesOrderId: string | null;
+    orderNumber: string;
+    projectName: string;
+    customerName: string;
+    fieldReportId: string | null;
+    signed: boolean;
+}
+
+export interface MontageOrdersPageDto {
+    items: MontageOrderListItem[];
+    total: number;
+    totalPages: number;
+    page: number;
+    pageSize: number;
+}
+
+export interface MontageReportOrderListItem {
+    salesOrderId: string;
+    orderNumber: string;
+    projectId: string | null;
+    projectName: string;
+    customerName: string;
+    fieldReportCount: number;
+    latestReportDate: string | null;
+}
+
+export interface MontageReportOrdersPageDto {
+    items: MontageReportOrderListItem[];
+    total: number;
+    totalPages: number;
+    page: number;
+    pageSize: number;
+}
+
+export interface MontageReportOrderDetailDto {
+    order: Pick<MontageReportOrderListItem, 'salesOrderId' | 'orderNumber' | 'projectId' | 'projectName' | 'customerName'>;
+    fieldReports: Array<{
+        id: string;
+        appointmentId: string | null;
+        reportDate: string;
+        workDate: string;
+        isSigned: boolean;
+        appointment: { id: string; startTime: string; endTime: string } | null;
+        employee: { firstName: string; lastName: string } | null;
+    }>;
+    deliveryReport: { id: string; isSigned: boolean; createdAt: string; checklistName: string | null } | null;
+    generalReport: { id: string; status: string; createdAt: string } | null;
+    createAppointmentId: string | null;
+}
+
+export interface MontageReportResourcesDto {
+    usedMaterials: Array<{
+        id: string;
+        quantity: number;
+        costAtTime: number;
+        article: { articleCode: string; name: string; unit: string } | null;
+        material: { name: string } | null;
+    }>;
+    extraMaterials: Array<{
+        id: string;
+        quantity: number;
+        unitPrice: number;
+        description: string | null;
+        material: { name: string } | null;
+    }>;
+    expenses: Array<{
+        id: string;
+        expenseType: string;
+        amount: number;
+        description: string | null;
+        expenseDate: string;
+    }>;
+}
+
 export interface AppointmentDto {
     id: string;
     tenantId: string;
@@ -156,5 +237,9 @@ export interface MailSettingDto {
     smtpPort: number;
     smtpSecure: boolean;
     smtpUser?: string | null;
+    /** Tenant e-posta imzası — sınırlı HTML; gönderilen maillerin sonuna eklenir. */
+    signatureHtml?: string | null;
+    /** İmza görseli (PNG/JPG data URI, ≤ 2 MB); mailde CID'li inline ek olarak gider. */
+    signatureImage?: string | null;
     hasPassword?: boolean;
 }

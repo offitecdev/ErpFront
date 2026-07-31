@@ -1,10 +1,12 @@
 ﻿import { jsPDF } from 'jspdf';
+import { fitAddressBlock } from './addressBlock';
 import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
 import { localizeTenderNumber } from '../tenderNumber';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
+import { drawRichText, parseRichTextParagraphs } from './richTextPdf';
 
 // Arial yerine metrik olarak özdeş, Türkçe karakter destekli Arimo gömülür.
 import arialBoldUrl from '../../assets/fonts/ARIALBD.ttf?url';
@@ -61,6 +63,14 @@ export interface TenderPdfData {
     qrBillEnabled?: boolean;
     /** PDF dili (indirmeden önce seçilir). Varsayılan: Almanca. */
     lang?: PdfLang;
+    /**
+     * Optional content blocks, all independent. `coverLetter` and `closingNote`
+     * are rich HTML (bold / italic / colour); `closingImage` is a data URI.
+     * Omitted or empty means the document renders exactly as it did before.
+     */
+    coverLetter?: string | null;
+    closingNote?: string | null;
+    closingImages?: string[] | null;
 }
 
 /** İndirim uygulanmış toplam özeti (ekrandaki `TenderPricingSummary` ile aynı). */
@@ -69,6 +79,14 @@ export interface TenderPdfTotals {
     discountPercent: number;
     /** Toplam indirim tutarı (net üzerinden). 0 ise indirim satırı gizlenir. */
     discountAmount: number;
+    /** Doğrudan iskonto için özel görünen ad (modern şablon çizer). */
+    discountLabel?: string | null;
+    /** İkinci (sıralı) iskonto — yalnızca modern şablon çizer. */
+    extraDiscountPercent?: number;
+    extraDiscountAmount?: number;
+    extraDiscountLabel?: string | null;
+    totalDiscountAmount?: number;
+    combinedDiscountPercent?: number;
     /** İndirim sonrası net tutar (KDV hariç). */
     netTotal: number;
     /** İndirim sonrası KDV tutarı. */
@@ -331,6 +349,90 @@ export type TenderPdfProgress =
     | { stage: 'finalize' }
     | { stage: 'download' };
 
+
+/** True once the rich HTML holds something other than empty markup. */
+const hasRichContent = (value?: string | null) =>
+    Boolean(value && value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim());
+
+/**
+ * Draws a rich-text block on a page of its own. Used for the cover letter,
+ * which is a letter and therefore owns its page; the closing note shares the
+ * last content page instead (see appendClosingBlocks).
+ */
+const drawRichTextBlock = (doc: jsPDF, html?: string | null) => {
+    if (!hasRichContent(html)) return;
+    doc.addPage();
+    drawRichTextFlow(doc, html as string, HEADER_RESERVED_TOP_REST);
+};
+
+/** Shared layout for both blocks: same column, font and page-break behaviour. */
+const drawRichTextFlow = (doc: jsPDF, html: string, startY: number): number =>
+    drawRichText(doc, parseRichTextParagraphs(html), {
+        x: T_X0,
+        y: startY,
+        maxWidth: T_X1 - T_X0,
+        fontFamily: FONT,
+        fontSize: FS_BASE + 0.5,
+        lineHeight: LH_BODY + 0.6,
+        defaultColor: COLOR_TEXT,
+        maxY: PAGE_H - FOOTER_RESERVED_BOTTOM,
+        onOverflow: () => {
+            doc.addPage();
+            return HEADER_RESERVED_TOP_REST;
+        },
+    });
+
+/**
+ * Closing note followed by the closing image, in that order — the image is the
+ * sign-off (a signature, a stamp, a photo) and belongs under the text.
+ *
+ * The note continues on the totals page when there is room for a few lines,
+ * rather than always claiming a fresh page for two sentences.
+ */
+const appendClosingBlocks = async (doc: jsPDF, data: TenderPdfData, contentY: number) => {
+    const hasNote = hasRichContent(data.closingNote);
+    const images = data.closingImages ?? [];
+    if (!hasNote && images.length === 0) return;
+
+    const bottom = PAGE_H - FOOTER_RESERVED_BOTTOM;
+    // Continue below the totals block when this page still has usable room;
+    // otherwise start a fresh one rather than crowding the summary.
+    let y = contentY;
+    if (y + 24 > bottom) {
+        doc.addPage();
+        y = HEADER_RESERVED_TOP_REST;
+    } else {
+        y += 10;
+    }
+
+    if (hasNote) {
+        y = drawRichTextFlow(doc, data.closingNote as string, y);
+        y += 3;
+    }
+
+    // Images follow the text, each scaled into the text column and flowed onto
+    // further pages as needed.
+    for (const image of images) {
+        try {
+            const properties = doc.getImageProperties(image);
+            const maxWidth = T_X1 - T_X0;
+            const maxHeight = 90;
+            const ratio = Math.min(maxWidth / properties.width, maxHeight / properties.height);
+            const width = properties.width * ratio;
+            const height = properties.height * ratio;
+            if (y + height > bottom) {
+                doc.addPage();
+                y = HEADER_RESERVED_TOP_REST;
+            }
+            doc.addImage(image, image.includes('image/png') ? 'PNG' : 'JPEG', T_X0, y, width, height, undefined, 'FAST');
+            y += height + 4;
+        } catch (err) {
+            // One corrupt data URI must not take the whole export down with it.
+            console.error('Closing image could not be embedded:', err);
+        }
+    }
+};
+
 export async function buildTenderPdfBytes(
     data: TenderPdfData,
     settings: PdfCompanySettings,
@@ -346,6 +448,11 @@ export async function buildTenderPdfBytes(
 
     // ── SAYFA 1: Kapak & Giriş ───────────────────────────────────────────────
     drawCoverPage(doc, data, settings, L);
+
+    // ── Optional: Anschreiben / cover letter on its own page ────────────────
+    // Drawn before the table so it lands on page 2, immediately after the cover.
+    // Everything after it simply shifts one page down.
+    drawRichTextBlock(doc, data.coverLetter);
 
     // ── SAYFA 2+: Ürünler & Tablo ───────────────────────────────────────────
     doc.addPage();
@@ -385,6 +492,14 @@ export async function buildTenderPdfBytes(
         y += 8;
     }
     drawTotals(doc, y, data, settings, fmt, L);
+    // Where the totals block ended — the closing note continues from here when
+    // the page still has room, instead of always claiming a new one.
+    const contentBottomY = y + totalsBlockHeight;
+
+    // ── Optional: Schlusstext & Schlussbild ─────────────────────────────────
+    // Both close the document, so they go after the totals and before the QR
+    // page (which must stay last — it is the payment slip).
+    await appendClosingBlocks(doc, data, contentBottomY);
 
     // ── QR Fatura (Swiss QR-Bill) ───────────────────────────────────────────
     if (data.qrBillEnabled === true) {
@@ -490,7 +605,8 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
         rYy += 4.8;
     }
     if (data.customerAddress) {
-        const addr = doc.splitTextToSize(data.customerAddress, rW);
+        // Adres bloğu EN FAZLA iki satırdır (taşarsa üç) — bkz. `addressBlock.ts`.
+        const addr = fitAddressBlock(doc, data.customerAddress, rW);
         doc.text(addr, rX, rYy);
         rYy += addr.length * 4.8;
     }

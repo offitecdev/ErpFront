@@ -1,17 +1,55 @@
+import { EMPTY_ADDRESS, addressParts } from '../../../../components/ui-shared/addressForm';
+import type { AddressFormValue } from '../../../../components/ui-shared/addressForm';
+import { formatAddressLines } from '../../../../utils/address';
 import type { CustomerLocationDto } from '../../../../lib/api/customer';
 
+export type TenderAddressTarget = 'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER';
 
+/**
+ * "+ adres ekle" formu. Adres AYRI BILESENLERLE girilir (`AddressFormValue`) —
+ * "Adres" diye tek bir serbest metin alani YOKTUR. `name` yalnizca kaydin liste
+ * etiketidir (or. "Montaj yeri"), posta adresinin parcasi degildir.
+ *
+ * Tip ve bos deger BURADA yasar: pencerenin kendisi `lazy()` ile yuklendigi icin
+ * o dosyadan bir sabit import etmek parcayi ana pakete geri cekerdi.
+ */
+export type TenderAddressCreateForm = AddressFormValue & {
+    name: string;
+};
+
+export const EMPTY_TENDER_ADDRESS_FORM: TenderAddressCreateForm = { name: '', ...EMPTY_ADDRESS };
+
+/**
+ * Teklifin "+ musteri ekle" penceresinin formu. Adres yine AYRI BILESENLERDIR —
+ * teklif arayuzunde de tek bir "Adres" alani yoktur.
+ */
+export type TenderCustomerCreateForm = AddressFormValue & {
+    companyName: string;
+    mainEmail: string;
+    mainPhone: string;
+};
+
+export const EMPTY_TENDER_CUSTOMER_FORM: TenderCustomerCreateForm = {
+    companyName: '',
+    mainEmail: '',
+    mainPhone: '',
+    ...EMPTY_ADDRESS,
+};
+
+
+/**
+ * Adres bileşenleri → teklifin adres yuvasında saklanan metin. Sonuç EN FAZLA
+ * İKİ SATIRDIR (`utils/address.ts` / `formatAddressLines`): sokak + bina no
+ * (+ adres eki) ilk satır, PLZ + şehir (+ eyalet, ülke) ikinci satır. Aynı
+ * anlamı taşıyan ikinci bir satır asla yazılmaz; teklif PDF'i bu metni satır
+ * satır basar.
+ *
+ * `name` (kaydın liste etiketi) posta adresinin parçası DEĞİLDİR — yalnızca
+ * hiçbir bileşen girilmediğinde yedek olarak kullanılır: adres yuvası boş
+ * kalırsa sipariş oluşturma engellenir.
+ */
 export const formatLocationAddress = (loc: CustomerLocationDto): string => {
-    const cityLine = [loc.postalCode, loc.city].map((part) => String(part || '').trim()).filter(Boolean).join(' ');
-    const formatted = [loc.address, cityLine, loc.country]
-        .map((part) => String(part || '').trim())
-        .filter(Boolean)
-        .join('\n');
-    // Locations can be saved with only a name (street/postal/city/country are all
-    // optional). Without this fallback such a location formats to an empty string,
-    // which the tender then stores as an empty delivery/billing address (coerced to
-    // null by the backend) — blocking order creation even though an address was
-    // clearly picked. Fall back to the name so a selected location is never blank.
+    const formatted = formatAddressLines(addressParts(loc)).join('\n');
     return formatted || String(loc.name || '').trim();
 };
 

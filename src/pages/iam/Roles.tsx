@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Edit01 as Edit, Plus, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
+import { ChevronDown, Edit01 as Edit, Plus, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
 import { apiClient } from '../../lib/axios';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
@@ -9,6 +9,8 @@ import { Field, Input } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
+import { useAuthStore } from '../../store/authStore';
+import { MODULE_ACTION_LABELS, MODULE_CATALOG, blockedPermissionNames, isModuleAvailable, type EnabledModules, type ModuleAction } from '../../lib/moduleCatalog';
 
 import { t } from '@/i18n/translate';
 
@@ -17,11 +19,17 @@ type RoleRow = {
     roleName: string;
     userCount?: number;
     permissions?: string[];
+    /** Module package of the role; null/empty = every module the company category allows. */
+    moduleKeys?: string[] | null;
 };
 
 type PermissionRow = { id: string; permissionName: string };
 
+const ACTION_ORDER: ModuleAction[] = ['read', 'write', 'delete'];
+
 export const Roles: React.FC = () => {
+    const tenants = useAuthStore((s) => s.tenants);
+    const selectedTenantId = useAuthStore((s) => s.selectedTenantId);
     const [roles, setRoles] = useState<RoleRow[]>([]);
     const [permissions, setPermissions] = useState<PermissionRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -29,7 +37,38 @@ export const Roles: React.FC = () => {
     const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
     const [roleName, setRoleName] = useState('');
     const [permissionIds, setPermissionIds] = useState<string[]>([]);
+    const [moduleKeys, setModuleKeys] = useState<string[]>([]);
+    const [expandedModule, setExpandedModule] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+
+    const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) || null;
+    const companyProfile = selectedTenant?.moduleProfile || null;
+
+    // Only the modules the active company's category enables can be granted —
+    // no category on the company means every module is available. The
+    // administration module is always available (admins must never lock
+    // themselves out of role/user management).
+    const enabledModules = useMemo<EnabledModules>(
+        () => (Array.isArray(companyProfile?.moduleKeys) ? new Set(companyProfile!.moduleKeys) : null),
+        [companyProfile],
+    );
+    const visibleModules = useMemo(
+        () => MODULE_CATALOG.filter((moduleDef) => isModuleAvailable(moduleDef, enabledModules)),
+        [enabledModules],
+    );
+
+    const permissionIdByName = useMemo(
+        () => new Map(permissions.map((perm) => [perm.permissionName, perm.id])),
+        [permissions],
+    );
+
+    /** Permission ids behind one module action (only ones that exist server-side). */
+    const actionPermissionIds = (moduleKey: string, action: ModuleAction): string[] => {
+        const moduleDef = MODULE_CATALOG.find((m) => m.key === moduleKey);
+        return (moduleDef?.actions[action] || [])
+            .map((name) => permissionIdByName.get(name))
+            .filter((id): id is string => Boolean(id));
+    };
 
     const fetchData = async () => {
         try {
@@ -47,7 +86,7 @@ export const Roles: React.FC = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [selectedTenantId]);
 
     const openModal = (role?: RoleRow) => {
         if (role) {
@@ -58,11 +97,14 @@ export const Roles: React.FC = () => {
                     .filter((p) => role.permissions?.includes(p.permissionName))
                     .map((p) => p.id)
             );
+            setModuleKeys(Array.isArray(role.moduleKeys) ? [...role.moduleKeys] : []);
         } else {
             setEditingRoleId(null);
             setRoleName('');
             setPermissionIds([]);
+            setModuleKeys([]);
         }
+        setExpandedModule(null);
         setModalOpen(true);
     };
 
@@ -73,7 +115,21 @@ export const Roles: React.FC = () => {
         }
         setSaving(true);
         try {
-            const payload = { roleName: roleName.trim(), permissionIds };
+            // A pre-existing role may still carry permissions of modules the
+            // company's category has since disabled — drop them, the backend
+            // rejects the whole save otherwise.
+            const blockedNames = blockedPermissionNames(enabledModules);
+            const blockedIds = new Set(
+                permissions.filter((perm) => blockedNames.has(perm.permissionName)).map((perm) => perm.id),
+            );
+            const payload = {
+                roleName: roleName.trim(),
+                permissionIds: permissionIds.filter((id) => !blockedIds.has(id)),
+                // Empty selection = no restriction (backend stores null). Keys of
+                // modules the category has since disabled are dropped too.
+                moduleKeys: moduleKeys.filter((key) =>
+                    visibleModules.some((moduleDef) => moduleDef.key === key)),
+            };
             if (editingRoleId) {
                 await apiClient.patch(`/roles/${editingRoleId}`, payload);
                 toast.success(t('iam.roles.successUpdate'));
@@ -101,16 +157,32 @@ export const Roles: React.FC = () => {
         }
     };
 
-    const togglePermission = (id: string) => {
-        setPermissionIds((prev) => prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]);
+    const isActionChecked = (moduleKey: string, action: ModuleAction): boolean => {
+        const ids = actionPermissionIds(moduleKey, action);
+        return ids.length > 0 && ids.every((id) => permissionIds.includes(id));
     };
+
+    const toggleAction = (moduleKey: string, action: ModuleAction) => {
+        const ids = actionPermissionIds(moduleKey, action);
+        if (!ids.length) return;
+        setPermissionIds((prev) => {
+            const checked = ids.every((id) => prev.includes(id));
+            if (checked) return prev.filter((id) => !ids.includes(id));
+            return [...new Set([...prev, ...ids])];
+        });
+    };
+
+    const moduleGrantCount = (moduleKey: string): number =>
+        ACTION_ORDER.filter((action) => isActionChecked(moduleKey, action)).length;
 
     return (
         <div>
             <PageHeader
                 breadcrumb="Personel"
                 title={t('nav.roleManagement')}
-                description={t('iam.roles.description')}
+                description={companyProfile
+                    ? `${t('iam.roles.companyCategory', { defaultValue: 'Şirket kategorisi' })}: ${companyProfile.profileNumber} · ${companyProfile.name}`
+                    : t('iam.roles.description')}
                 actions={<Button variant="primary" icon={<Plus size={13} />} onClick={() => openModal()}>{t('iam.roles.newRole')}</Button>}
             />
 
@@ -162,19 +234,85 @@ export const Roles: React.FC = () => {
                     <Field label={t('iam.roles.colRoleName')} required>
                         <Input value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder={t('iam.roles.roleNamePlaceholder')} />
                     </Field>
-                    <Field label={t('iam.roles.permissions')}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto border border-slate-200 rounded-md p-2">
-                            {permissions.map((perm) => (
+                    <Field label={t('iam.roles.modulePackage', { defaultValue: 'Modül paketi (erişilebilen sayfalar)' })}>
+                        {/* Accessible pages live here — on the ROLE, not on the
+                            individual employee. For THE SELECTED ENTITY: roles are
+                            shared across the company tree, but each company
+                            configures which pages the role opens for itself. Nothing
+                            selected = every module the company's category allows. */}
+                        <div className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-2 sm:grid-cols-2">
+                            {visibleModules.map((moduleDef) => (
                                 <Checkbox
-                                    key={perm.id}
-                                    label={perm.permissionName}
+                                    key={moduleDef.key}
+                                    label={t(moduleDef.labelKey, { defaultValue: moduleDef.labelDefault })}
                                     size="sm"
-                                    isSelected={permissionIds.includes(perm.id)}
-                                    onChange={() => togglePermission(perm.id)}
+                                    isSelected={moduleKeys.includes(moduleDef.key)}
+                                    onChange={() => setModuleKeys((prev) => prev.includes(moduleDef.key)
+                                        ? prev.filter((key) => key !== moduleDef.key)
+                                        : [...prev, moduleDef.key])}
                                     className="rounded-lg px-2 py-1.5 hover:bg-brand-primary_alt"
                                 />
                             ))}
                         </div>
+                        <p className="mt-1.5 text-[11.5px] text-slate-500">
+                            {t('iam.roles.modulePackageScope', {
+                                defaultValue: 'Bu paket yalnızca seçili şirket için geçerlidir: {{company}}. Diğer şirketlerdeki paketi, üstteki şirket seçiciyi değiştirip aynı rolü düzenleyerek ayarlayın.',
+                                company: selectedTenant?.tenantName ?? '—',
+                            })}{' '}
+                            {t('iam.roles.modulePackageHint', { defaultValue: 'Hiçbiri seçilmezse bu roldeki personel, şirket kategorisinin izin verdiği tüm modülleri görür. Personel formunda tanımlanan kişisel paket bu paketi geçersiz kılar.' })}
+                        </p>
+                    </Field>
+                    <Field label={t('iam.roles.permissions')}>
+                        {/* Module accordion: pick a module, then grant plain
+                            read / write / delete instead of raw permission codes. */}
+                        <div className="max-h-[360px] space-y-1.5 overflow-y-auto rounded-md border border-slate-200 p-2">
+                            {visibleModules.map((moduleDef) => {
+                                const availableActions = ACTION_ORDER.filter(
+                                    (action) => actionPermissionIds(moduleDef.key, action).length > 0,
+                                );
+                                if (!availableActions.length) return null;
+                                const expanded = expandedModule === moduleDef.key;
+                                const grantedCount = moduleGrantCount(moduleDef.key);
+                                return (
+                                    <div key={moduleDef.key} className="rounded-lg border border-slate-200/80">
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-brand-primary_alt"
+                                            onClick={() => setExpandedModule(expanded ? null : moduleDef.key)}
+                                        >
+                                            <span className="text-[13px] font-semibold text-slate-900">
+                                                {t(moduleDef.labelKey, { defaultValue: moduleDef.labelDefault })}
+                                            </span>
+                                            <span className="flex items-center gap-2">
+                                                {grantedCount > 0 && (
+                                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10.5px] font-bold text-emerald-800">
+                                                        {grantedCount}/{availableActions.length}
+                                                    </span>
+                                                )}
+                                                <ChevronDown size={14} className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                                            </span>
+                                        </button>
+                                        {expanded && (
+                                            <div className="flex flex-wrap gap-2 border-t border-slate-100 px-3 py-2.5">
+                                                {availableActions.map((action) => (
+                                                    <Checkbox
+                                                        key={action}
+                                                        label={t(MODULE_ACTION_LABELS[action].labelKey, { defaultValue: MODULE_ACTION_LABELS[action].labelDefault })}
+                                                        size="sm"
+                                                        isSelected={isActionChecked(moduleDef.key, action)}
+                                                        onChange={() => toggleAction(moduleDef.key, action)}
+                                                        className="rounded-lg px-2 py-1.5 hover:bg-brand-primary_alt"
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-1.5 text-[11.5px] text-slate-500">
+                            {t('iam.roles.moduleHint', { defaultValue: 'Yetkiler modül bazında verilir: bir modülü açın ve okuma / yazma / silme seçin. Sadece şirketin kategorisine dahil modüller listelenir.' })}
+                        </p>
                     </Field>
                 </div>
             </Modal>

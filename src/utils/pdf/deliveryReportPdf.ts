@@ -431,9 +431,11 @@ export interface DeliveryReportPdfParams {
     project?: ProjectDto | null;
     fieldImages?: Array<{ imageData: string }>;
     preparedBy?: string;
+    /** 'blob' returns the PDF for in-app preview instead of downloading it. */
+    output?: 'download' | 'blob';
 }
 
-export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [], preparedBy = '' }: DeliveryReportPdfParams) => {
+export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [], preparedBy = '', output }: DeliveryReportPdfParams) => {
     const settings = usePdfSettingsStore.getState().settings;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     await registerFonts(doc);
@@ -473,7 +475,11 @@ export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [
         console.error('PDF background merge failed:', err);
     }
 
+    if (output === 'blob') {
+        return new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
+    }
     const safeName = (clean(project?.projectName) || 'teslim').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80);
     const dateLabel = dateShort(report.createdAt).replace(/[^0-9-]/g, '');
     downloadPdf(finalBytes, `${safeName}-teslim-raporu-${dateLabel}.pdf`);
+    return null;
 };

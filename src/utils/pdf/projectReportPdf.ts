@@ -17,6 +17,8 @@ export interface ProjectGeneralReportOptions {
     startDate?: string;
     endDate?: string;
     preparedBy?: string;
+    /** 'blob' returns the PDF for in-app preview instead of downloading it. */
+    output?: 'download' | 'blob';
 }
 
 // ── Sayfa geometrisi (A4, mm) — sablon.pdf antetine göre güvenli alan ─────────
@@ -967,7 +969,7 @@ const saveReport = async (
     project: ProjectDto,
     reports: any[],
     kind: ReportKind,
-    options: { startDate?: string; endDate?: string; preparedBy?: string } = {}
+    options: { startDate?: string; endDate?: string; preparedBy?: string; output?: 'download' | 'blob' } = {}
 ) => {
     const settings = usePdfSettingsStore.getState().settings;
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
@@ -1030,18 +1032,21 @@ const saveReport = async (
         console.error('PDF background merge failed:', err);
     }
 
+    if (options.output === 'blob') {
+        return new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
+    }
     const safeName = clean(project.projectName).replace(/[\\/:*?"<>|]/g, '-').slice(0, 80) || 'proje';
     const lastReportDate = dateKey(reportDate(filteredReports[filteredReports.length - 1]));
     const suffix = kind === 'general'
         ? `genel-rapor-${lastReportDate || today}`
         : `saha-raporu-${filteredReportDate}`;
     downloadPdf(finalBytes, `${safeName}-${suffix}.pdf`);
+    return null;
 };
 
 export const exportProjectReportPdf = async (project: ProjectDto, report: any) => {
     await saveReport(project, [report], 'daily');
 };
 
-export const exportProjectGeneralReportPdf = async (project: ProjectDto, options: ProjectGeneralReportOptions = {}) => {
-    await saveReport(project, project.reports || [], 'general', options);
-};
+export const exportProjectGeneralReportPdf = async (project: ProjectDto, options: ProjectGeneralReportOptions = {}) =>
+    saveReport(project, project.reports || [], 'general', options);

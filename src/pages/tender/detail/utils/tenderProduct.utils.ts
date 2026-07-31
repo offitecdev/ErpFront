@@ -55,3 +55,20 @@ export const buildProductDefaults = (
 });
 
 export const createTempPositionId = () => `local-position-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+/**
+ * The offer's closing images are stored as a JSON array of data URIs in one
+ * LONGTEXT column. Parsing is tolerant: a legacy single URI, malformed JSON or
+ * a null all resolve to an empty list rather than breaking the panel.
+ */
+export const parseClosingImages = (raw?: string | null): string[] => {
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map((item) => String(item)).filter(Boolean);
+    } catch {
+        // Not JSON — treat a bare data URI as a single image.
+        if (raw.startsWith('data:')) return [raw];
+    }
+    return [];
+};

@@ -1,4 +1,4 @@
-import type { BillingSummaryDto, MyOrderAddonDto, MyOrderDto } from '../types/billing';
+import type { MyOrderDto, MyOrderListAddonDto, OrderBillingFiguresDto } from '../types/billing';
 
 /**
  * Single source of truth for an order group's billing figures, shared by the
@@ -15,11 +15,17 @@ import type { BillingSummaryDto, MyOrderAddonDto, MyOrderDto } from '../types/bi
  * guarantees the identity `billed + remaining === total`, and an over-invoiced
  * group shows a negative remainder instead of silently swallowing it.
  */
-export type OrderBillingLine = {
+/**
+ * `S` is whatever summary the caller's feed actually carries. The money helpers
+ * below only ever read `baseAmount` / `billedAmount`, so the My Orders list can
+ * pass the two-figure list summary, while the order detail page keeps the full
+ * `BillingSummaryDto` (invoices, payment stages) on its lines.
+ */
+export type OrderBillingLine<S extends OrderBillingFiguresDto = OrderBillingFiguresDto> = {
     id: string;
     orderNumber: string;
     isAddon: boolean;
-    summary: BillingSummaryDto | null | undefined;
+    summary: S | null | undefined;
     /** The order's own contract value, used when no summary came back. */
     totalAmount: number;
 };
@@ -51,11 +57,12 @@ export const sharePercent = (billed: number, total: number) =>
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 /** Flattens a main order and its additional orders into billing lines. */
-export const orderBillingLines = (
-    order: Pick<MyOrderDto, 'id' | 'orderNumber' | 'totalAmount' | 'billingSummary'> & {
-        addonSalesOrders?: MyOrderAddonDto[] | null;
+export const orderBillingLines = <S extends OrderBillingFiguresDto = OrderBillingFiguresDto>(
+    order: Pick<MyOrderDto, 'id' | 'orderNumber' | 'totalAmount'> & {
+        billingSummary?: S | null;
+        addonSalesOrders?: Array<Omit<MyOrderListAddonDto, 'billingSummary'> & { billingSummary?: S | null }> | null;
     },
-): OrderBillingLine[] => [
+): OrderBillingLine<S>[] => [
     {
         id: order.id,
         orderNumber: order.orderNumber,

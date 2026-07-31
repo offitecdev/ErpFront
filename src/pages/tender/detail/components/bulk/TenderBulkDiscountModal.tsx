@@ -48,7 +48,7 @@ export const TenderBulkDiscountModal = ({
         <div className="space-y-3">
             {/* Frosted panel: the rate is the one thing this dialog is about, so
                 it gets the whole card — oversized numeric field, unit baked in. */}
-            <div className="ofi-glass-panel rounded-xl border border-white/70 bg-white/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 backdrop-blur-md backdrop-saturate-150">
+            <div className="ofi-glass-panel rounded-[2px] border border-white/70 bg-white/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_2px_rgba(15,23,42,0.06)] ring-1 ring-slate-900/5 backdrop-blur-md backdrop-saturate-150">
                 <label
                     htmlFor="bulk-discount-rate"
                     className="block text-[10.5px] font-semibold uppercase tracking-wider text-slate-500"
@@ -89,7 +89,7 @@ export const TenderBulkDiscountModal = ({
             {/* Scope readout — quiet by default, amber when nothing is eligible
                 (the confirm button is disabled in that case, so say why). */}
             <div
-                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${
+                className={`flex items-center justify-between rounded-[2px] border px-3.5 py-2.5 ${
                     eligibleCount === 0
                         ? 'border-amber-200/80 bg-amber-50/70'
                         : 'border-slate-200/70 bg-slate-50/70'

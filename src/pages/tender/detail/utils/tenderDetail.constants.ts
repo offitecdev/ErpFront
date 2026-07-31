@@ -4,28 +4,60 @@ import type { TenderLineColumnKey } from '../types/tenderDetail.types';
 export const DEFAULT_VAT = 8.1;
 export const SECTION_SCHEMA_STORAGE_KEY = 'offitec:tender-detail:section-schema-open';
 export const EMPTY_CHATTER_SUMMARY: TenderChatterSummary = { noteCount: 0, documentCount: 0, logCount: 0 };
+// Every column except the description is fixed-width; the description takes
+// whatever is left over (no <col width>, so it absorbs the remainder) and the
+// table scrolls horizontally below TENDER_LINE_TABLE_MIN_WIDTH.
+// Widths follow what each column actually has to hold: quantities are two
+// digits, percentages three, while prices and totals get the room to stay
+// readable. Profit / loss is a single icon.
 export const DEFAULT_TENDER_LINE_COLUMN_WIDTHS: Record<TenderLineColumnKey, number> = {
-    select: 34,
-    description: 720,
-    quantity: 88,
-    unit: 88,
-    unitPrice: 96,
-    discount: 84,
-    taxRate: 84,
-    total: 104,
+    // Reorder arrows (16px) plus the position number, which doubles as the
+    // selection checkbox — sized so neither ever clips at the cell padding.
+    pos: 70,
+    description: 240,
+    quantity: 58,
+    unit: 66,
+    unitPrice: 116,
+    // Holds the percentage AND the stacked-discount square next to it.
+    discount: 86,
+    taxRate: 64,
+    total: 130,
+    profit: 46,
 };
+
+// Smallest width the table may shrink to before the wrapper starts scrolling
+// horizontally. It is the sum of the FIXED columns plus a modest floor for the
+// description — using the description's full preferred width here demanded ~80px
+// more than the table actually needs and put a horizontal scrollbar on screens
+// that could display every column comfortably.
+const DESCRIPTION_MIN_WIDTH = 160;
+export const TENDER_LINE_TABLE_MIN_WIDTH = Object.entries(DEFAULT_TENDER_LINE_COLUMN_WIDTHS)
+    .reduce((total, [key, width]) => total + (key === 'description' ? DESCRIPTION_MIN_WIDTH : width), 0);
 
 export const LINE_PAGE_SIZE = 10;
 export const PRODUCT_PICKER_PAGE_SIZE = 15;
 export const lineActionButtonClass = '!border-slate-200 !bg-white !text-slate-700 transition-colors hover:!border-[#1f2654] hover:!bg-slate-50 hover:!text-[#1f2654]';
 
 
-// Resting border is faintly visible so an empty cell still reads as editable.
-// The !important modifiers are required to beat antd's borderless-variant
-// styles, which are injected at runtime and would otherwise zero the border.
+// Native <input> classes (the inline cells no longer use Ant Design): the font
+// size is fixed — long values scroll inside the input instead of rescaling.
+// Number cells read as real inputs (white field, visible border, 12px digits)
+// so the prices stand out from the surrounding text.
+// `tabular-nums` is what makes a column of figures readable: every digit takes
+// the same width, so decimal points line up down the column even while a cell
+// is being typed into.
+// Transparent by default so the tinted money columns show through the field;
+// it fills white only while hovered or focused, which is also what marks it as
+// editable.
 export const INLINE_NUMBER_INPUT_CLASS =
-    'w-full min-w-0 rounded-md !border !border-solid !border-slate-200/70 bg-transparent transition-colors hover:!border-slate-300 hover:bg-white focus-within:!border-[#1f2654] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#1f2654]/10 [&_.ant-input-number-input]:h-auto [&_.ant-input-number-input]:px-1.5 [&_.ant-input-number-input]:py-1 [&_.ant-input-number-input]:text-right [&_.ant-input-number-input]:font-mono [&_.ant-input-number-input]:text-[11.5px] [&_.ant-input-number-input]:leading-tight [&_.ant-input-number-input]:text-slate-700';
+    'h-6 w-full min-w-0 rounded-[3px] border border-solid border-transparent bg-transparent px-1.5 text-right text-[13px] font-medium tabular-nums leading-none text-slate-900 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/15';
+// NOTE: no `truncate` here. It expands to `overflow: hidden`, and on a text
+// <input> that suppresses the browser's own auto-scroll while a selection is
+// being dragged — drag past the right edge and the content cannot follow, so
+// the caret sticks at the boundary while the pointer carries on out of the
+// field. An input already clips its content and never wraps; letting it scroll
+// natively is what makes selecting a long name work.
 export const INLINE_TEXT_INPUT_BASE =
-    'w-full rounded-md border border-transparent bg-transparent transition-colors hover:border-slate-200 hover:bg-slate-50 focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10';
-export const INLINE_TITLE_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[14px] font-semibold text-slate-900`;
-export const INLINE_NAME_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[13px] font-medium text-slate-900`;
+    'w-full rounded-[3px] border border-transparent bg-transparent px-2 py-1 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-300 hover:bg-slate-50 focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/15';
+export const INLINE_TITLE_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[14.5px] font-semibold text-[#1f2654]`;
+export const INLINE_NAME_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[13.5px] font-medium text-slate-900`;

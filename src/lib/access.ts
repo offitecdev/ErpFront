@@ -40,9 +40,19 @@ export const getRoleProfile = (user: AnyUser): RoleProfile => {
     return 'full';
 };
 
+/**
+ * Accounts that use the montage workspace as their sole landing surface.
+ * Role detection is the normal rule; the named production account is kept as
+ * an explicit fallback because its legacy role label is not consistent across
+ * tenants.
+ */
+export const isMontageTechnician = (user: AnyUser): boolean =>
+    user?.email?.trim().toLowerCase() === 'hans@offitec.com'
+    || getRoleProfile(user) === 'technician';
+
 
 export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]> = {
-    technician: ['/', '/calendar', '/projects/installation/tasks', '/projects/installation/delivery'],
+    technician: ['/', '/calendar', '/montage', '/projects/installation/tasks', '/projects/installation/delivery'],
     projectOfficer: [
         '/',
         '/calendar',
@@ -50,13 +60,15 @@ export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]
         '/crm/customers',
         '/crm/tenders',
         '/inventory/articles',
+        '/inventory/materials',
         '/inventory/suppliers',
-        '/inventory/extra-materials',
-        '/inventory/locations',
+        '/inventory/stock',
+        '/inventory/stock/movements',
+        '/inventory/orders',
+        '/inventory/orders/new',
         '/projects',
         '/projects/installation/delivery',
         '/crm/my-orders',
-        '/inventory/movements',
         '/inventory',
         '/services/reports',
     ],

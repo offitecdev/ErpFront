@@ -48,41 +48,64 @@ export interface BillingSummaryInvoice {
     createdAt: string;
 }
 
-export interface BillingSummaryDto {
+/**
+ * The two figures every billing column is derived from — see
+ * `orderBillingTotals`. The My Orders list gets only these; the order detail
+ * page gets the full `BillingSummaryDto`.
+ */
+export interface OrderBillingFiguresDto {
     baseAmount: number;
-    billedPercent: number;
     billedAmount: number;
+}
+
+export interface BillingSummaryDto extends OrderBillingFiguresDto {
+    billedPercent: number;
     remainingPercent: number;
     remainingAmount: number;
+    /** Order-level payment schedule (percent array); null when free-form. */
+    paymentStages?: number[] | null;
+    /** Derived next stage to bill; null when done or no schedule. */
+    nextStage?: { index: number; percent: number; suggestedPercent: number } | null;
     invoices: BillingSummaryInvoice[];
 }
 
-export interface MyOrderAddonDto {
+/** An additional order as the My Orders list needs it: label + billing figures. */
+export interface MyOrderListAddonDto {
     id: string;
     orderNumber: string;
+    totalAmount: number;
+    billingSummary?: OrderBillingFiguresDto | null;
+}
+
+/**
+ * One row of `GET /sales-orders/my-orders`.
+ *
+ * A list shape on purpose — the endpoint selects the table's own columns and
+ * the sub-orders under them, nothing more. Anything richer (order type/status,
+ * payment schedule, tender/project/creator relations, the invoice breakdown)
+ * lives on `MyOrderDetailDto` and is only fetched when a single order is opened.
+ */
+export interface MyOrderDto {
+    id: string;
+    orderNumber: string;
+    totalAmount: number;
+    createdAt: string;
+    /** Kept so the project screens can group this feed by project. */
+    projectId?: string | null;
+    customer?: { id: string; companyName: string } | null;
+    addonSalesOrders?: MyOrderListAddonDto[];
+    billingSummary?: OrderBillingFiguresDto | null;
+}
+
+/** An additional order on the detail page — the full row plus its own summary. */
+export interface MyOrderAddonDto extends MyOrderListAddonDto {
     orderType: string;
     status: string;
     revisionNumber?: number | null;
-    totalAmount: number;
     createdAt: string;
     orderDate?: string | null;
-    billingSummary?: BillingSummaryDto | null;
-}
-
-export interface MyOrderDto {
-    id: string;
-    tenantId: string;
-    orderNumber: string;
-    orderType: string;
-    status: string;
-    totalAmount: number;
-    createdAt: string;
-    customerId?: string | null;
-    projectId?: string | null;
-    customer?: { id: string; companyName: string; mainEmail?: string | null; mainPhone?: string | null } | null;
-    project?: { id: string; projectName: string; status: ProjectStatus; plannedBudget?: number; actualCost?: number } | null;
-    createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
-    addonSalesOrders?: MyOrderAddonDto[];
+    /** JSON percent array copied from the tender (e.g. "[30,20,10,40]"). */
+    paymentStages?: string | null;
     billingSummary?: BillingSummaryDto | null;
 }
 
@@ -110,12 +133,27 @@ export interface MyOrderCostSummary {
 }
 
 export interface MyOrderDetailDto extends MyOrderDto {
+    tenantId: string;
+    orderType: string;
+    status: string;
+    /** JSON percent array copied from the tender (e.g. "[30,20,10,40]"). */
+    paymentStages?: string | null;
+    customerId?: string | null;
+    customer?: { id: string; companyName: string; mainEmail?: string | null; mainPhone?: string | null; address?: string | null } | null;
+    createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
+    addonSalesOrders?: MyOrderAddonDto[];
+    billingSummary?: BillingSummaryDto | null;
     parentSalesOrder?: { id: string; orderNumber: string } | null;
-    project?: (MyOrderDto['project'] & {
+    project?: {
+        id: string;
+        projectName: string;
+        status: ProjectStatus;
+        plannedBudget?: number;
+        actualCost?: number;
         startDate?: string | null;
         endDate?: string | null;
         phases?: Array<{ id: string; phaseName: string; progressPercentage: number; isCompleted: boolean }>;
-    }) | null;
+    } | null;
     reports?: MyOrderReportDto[];
     expenses?: Array<{ id: string; expenseType: string; amount: number; description?: string | null; expenseDate: string }>;
     extraMaterials?: Array<{ id: string; quantity: number; unitPrice: number; description?: string | null; addedAt: string; material?: { id: string; name: string; serialId: string } | null }>;

@@ -1,4 +1,4 @@
-import { apiClient } from '../axios';
+import { apiClient, getShared } from '../axios';
 import type {
     TenderListItem,
     TenderDetailDto,
@@ -34,6 +34,9 @@ export interface TenderListFilter {
     sortDirection?: 'asc' | 'desc';
     page?: number;
     pageSize?: number;
+    // 'list' → sunucu yalnızca liste tablosunun kolonlarını döner. Tam gövdeye
+    // ihtiyaç duyan çağıranlar (uyarı yığını, PDF yolları) bunu göndermez.
+    fields?: 'list';
 }
 
 const applyTenderFilterParams = (params: URLSearchParams, filter: TenderListFilter) => {
@@ -47,6 +50,7 @@ const applyTenderFilterParams = (params: URLSearchParams, filter: TenderListFilt
     if (filter.mailSent) params.set('mailSent', filter.mailSent);
     if (filter.sortBy) params.set('sortBy', filter.sortBy);
     if (filter.sortDirection) params.set('sortDirection', filter.sortDirection);
+    if (filter.fields) params.set('fields', filter.fields);
 };
 
 export interface PaginatedResult<T> {
@@ -72,7 +76,8 @@ export const tenderApi = {
         applyTenderFilterParams(params, filter);
         params.set('page', String(filter.page ?? 1));
         params.set('pageSize', String(filter.pageSize ?? 10));
-        const res = await apiClient.get(`/tenders?${params.toString()}`);
+        // getShared: StrictMode'un çift koşan efekti tek HTTP isteğine iner.
+        const res = await getShared<PaginatedResult<TenderListItem> | TenderListItem[]>(`/tenders?${params.toString()}`);
         if (Array.isArray(res.data)) {
             return { items: res.data, total: res.data.length, page: 1, pageSize: res.data.length || 10, totalPages: 1 };
         }
@@ -124,6 +129,14 @@ export const tenderApi = {
         currency?: string | null;
         directDiscount?: number | null;
         directDiscountLabel?: string | null;
+        extraDiscount?: number | null;
+        extraDiscountLabel?: string | null;
+        /** Stacked document discounts as JSON — see `tenderDiscounts.utils.ts`. */
+        totalDiscounts?: string | null;
+        paymentStages?: string | null;
+        coverLetter?: string | null;
+        closingNote?: string | null;
+        closingImages?: string | null;
     }): Promise<TenderListItem> => {
         try {
             const res = await apiClient.patch(`/tenders/${id}/meta`, input);

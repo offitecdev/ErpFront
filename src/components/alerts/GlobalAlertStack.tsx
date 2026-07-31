@@ -1,18 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, ArrowRight, Building03, Calendar, Clock, User01, X } from '@/components/icons/antIconCompat';
-import { useAuthStore } from '../../store/authStore';
+import { ArrowRight, Building03, Calendar, Clock, User01, X } from '@/components/icons/antIconCompat';
 import { notificationApi } from '../../lib/api/notifications';
-import { tenderApi } from '../../lib/api/tender';
-import { projectApi, type SalesOrderDto } from '../../lib/api/project';
 import { meetingApi, meetingParticipantName, type MeetingActivityDto } from '../../lib/api/meetings';
-import type { TenderListItem } from '../../types/tender';
-import { formatMoney, toCurrencyCode } from '../../utils/currency';
-import { localizeTenderNumber } from '../../utils/tenderNumber';
-import { criticalOffers, daysUntilExpiry } from '../../pages/crm/overview/overviewShared';
+import { onIdle } from '../../lib/utils/onIdle';
 
 interface AlertRow {
     icon: React.ReactNode;
@@ -73,79 +67,42 @@ const TONE: Record<AlertItem['tone'], { card: string; chip: string }> = {
 
 /**
  * App-level page-turn alert deck, TOP-RIGHT, mounted once in MainLayout: shows
- * urgent items (expiring / stuck offers, imminent meetings & tasks) when the
+ * urgent items (imminent meetings & tasks) when the
  * app opens. X flips the card away and snoozes that alert for 10 days; the
  * live count is mirrored onto the notification bell badge.
  */
 export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChange, onArchived }) => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
-    const permissions = useAuthStore((s) => s.permissions);
-    const canSeeOffers = permissions.includes('tenders.view');
 
-    const [tenders, setTenders] = useState<TenderListItem[]>([]);
-    const [orders, setOrders] = useState<SalesOrderDto[]>([]);
     const [meetings, setMeetings] = useState<MeetingActivityDto[]>([]);
     const [snoozes, setSnoozes] = useState<Record<string, number>>(readSnoozes);
+    // Cards the user flipped away this session — keeps the "x / y" counter's
+    // total stable while the live alert list shrinks.
+    const [dismissedCount, setDismissedCount] = useState(0);
 
-    // MainLayout loads this entire module after the detail page's LCP window.
-    // Yield once more before starting the aggregate requests.
+    // This app-level component must not fetch whole business collections. Offer
+    // alerts previously loaded every tender and every sales order on every page,
+    // including inventory. Keep only the small, time-bounded meeting request;
+    // offer data is loaded by CRM pages when those pages are actually opened.
     useEffect(() => {
         let cancelled = false;
-        const timer = window.setTimeout(() => {
-            if (canSeeOffers) {
-                tenderApi.list().then((rows) => !cancelled && setTenders(Array.isArray(rows) ? rows : [])).catch(() => undefined);
-                projectApi.listSalesOrders().then((rows) => !cancelled && setOrders(Array.isArray(rows) ? rows : [])).catch(() => undefined);
-            }
+        const cancelIdle = onIdle(() => {
+            if (cancelled) return;
             meetingApi
                 .list(dayjs().subtract(1, 'hour').toISOString(), dayjs().add(24, 'hour').toISOString())
                 .then((rows) => !cancelled && setMeetings(Array.isArray(rows) ? rows : []))
                 .catch(() => undefined);
-        }, 250);
+        }, 4000);
         return () => {
             cancelled = true;
-            window.clearTimeout(timer);
+            cancelIdle();
         };
-    }, [canSeeOffers]);
+    }, []);
 
     const alerts = useMemo<AlertItem[]>(() => {
         const active = (id: string) => !(snoozes[id] && APP_OPENED_AT - snoozes[id] < SNOOZE_MS);
         const out: AlertItem[] = [];
-
-        for (const { tender, reason } of criticalOffers(tenders, orders)) {
-            const id = `offer-${tender.id}-${reason}`;
-            if (!active(id)) continue;
-            const reasonMap = {
-                expiring: { key: 'crmOverview.agenda.reasonExpiring', label: 'Teklif süresi doluyor', tone: 'rose' as const },
-                notConverted: { key: 'crmOverview.agenda.reasonNotConverted', label: 'Siparişe dönüştürülmedi', tone: 'amber' as const },
-                staleDraftMail: { key: 'crmOverview.agenda.reasonStaleDraft', label: '10+ gündür taslakta', tone: 'amber' as const },
-            }[reason];
-            const days = daysUntilExpiry(tender);
-            const rows: AlertRow[] = [];
-            if (tender.customerName) rows.push({ icon: <Building03 size={13} />, text: tender.customerName });
-            if (tender.grandTotal) {
-                rows.push({ icon: <ArrowRight size={13} />, text: formatMoney(tender.grandTotal, toCurrencyCode(tender.currency)) });
-            }
-            if (tender.validUntil && days !== null) {
-                rows.push({
-                    icon: <Clock size={13} />,
-                    text:
-                        days < 0
-                            ? t('crmOverview.agenda.expired', { defaultValue: 'Süresi doldu' })
-                            : `${dayjs(tender.validUntil).format('DD MMM YYYY')} · ${t('crmOverview.agenda.daysLeft', { count: days, defaultValue: '{{count}} gün kaldı' })}`,
-                });
-            }
-            out.push({
-                id,
-                tone: reasonMap.tone,
-                icon: <AlertTriangle size={15} />,
-                tagKey: reasonMap.key,
-                tagDefault: reasonMap.label,
-                title: localizeTenderNumber(tender.tenderNumber, i18n.language),
-                rows,
-                navigateTo: `/crm/tenders/${tender.id}`,
-            });
-        }
 
         for (const meeting of meetings) {
             const id = `meeting-${meeting.id}`;
@@ -176,7 +133,7 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
         }
 
         return out;
-    }, [tenders, orders, meetings, snoozes, i18n.language, t]);
+    }, [meetings, snoozes]);
 
     useEffect(() => {
         onCountChange(alerts.length);
@@ -211,26 +168,29 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
             .catch(() => undefined);
 
     const dismiss = (alert: AlertItem) => {
+        setDismissedCount((count) => count + 1);
         snooze([alert.id]);
-        void archive(alert).then(onArchived);
+        // Closing a card is an acknowledgement — archive it read so the bell
+        // badge drops instead of trading an alert for a fresh unread.
+        void archive(alert, true).then(onArchived);
     };
 
     // The big circle below the deck: archive everything as read + mark the whole
     // notification list read in one tap.
     const dismissAll = () => {
         const all = [...alerts];
+        setDismissedCount((count) => count + all.length);
         snooze(all.map((a) => a.id));
         void Promise.all(all.map((a) => archive(a, true)))
             .then(() => notificationApi.markAllRead().catch(() => undefined))
             .then(onArchived);
     };
 
-    // The deck builds up asynchronously (offers, orders, meetings arrive at
-    // different times), so the "total" is the largest deck size seen so far —
-    // dismissing cards counts down (10/10 → 9/10 → …) without shrinking it.
-    const deckTotalRef = useRef(0);
-    if (alerts.length > deckTotalRef.current) deckTotalRef.current = alerts.length;
-    const deckTotal = deckTotalRef.current;
+    // Deck total = live alerts + cards dismissed this session. Deriving it from
+    // the dismiss actions (rather than "largest deck seen") keeps transient
+    // over-counts out: while the sales orders are still loading, offers briefly
+    // look "not converted" and the deck can spike far above its settled size.
+    const deckTotal = alerts.length + dismissedCount;
 
     if (alerts.length === 0) return null;
     const visible = alerts.slice(0, 3);
