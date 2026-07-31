@@ -44,7 +44,7 @@ export const BookingSection = ({
     return (
         <div>
             {!leaf && <SubTabs tabs={getBookingSubTabs()} activeTab={mode} onSelectTab={setMode} />}
-            {activeMode === 'schedule' && <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} onSaved={onSaved} />}
+            {activeMode === 'schedule' && <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
             {activeMode === 'mail' && <MailTab project={project} order={order} settings={settings} userEmail={userEmail} />}
             {activeMode === 'signature' && <SignatureRequestTab project={project} order={order} isPrimary={isPrimary} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
             {activeMode === 'overtime' && <OvertimeTab project={project} order={order} isPrimary={isPrimary} onSaved={onSaved} />}

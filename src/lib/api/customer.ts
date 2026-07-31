@@ -16,9 +16,16 @@ export interface CustomerLocationDto {
     customerId?: string;
     name: string;
     kind?: string;
+    /**
+     * Adres AYRI BİLEŞENLER: `address` = sokak + bina no, `addressSupplement` =
+     * adres eki / daire. Birleşik bir "adres" alanı yoktur; `name` yalnızca
+     * kaydın liste etiketidir. Gösterim `formatAddressLines()` ile 2 satıra iner.
+     */
     address?: string | null;
+    addressSupplement?: string | null;
     city?: string | null;
     postalCode?: string | null;
+    state?: string | null;
     country?: string | null;
     phone?: string | null;
     email?: string | null;
@@ -36,6 +43,20 @@ export interface CustomerProductDiscountDto {
     discount: number;
     articleCode?: string | null;
     articleName?: string | null;
+    /** Listenpreis des Artikels und der daraus errechnete Nettopreis — kommen mit der Liste, kein Extra-Request. */
+    salePrice?: number | null;
+    netPrice?: number | null;
+    unit?: string | null;
+}
+
+/** Zähler + Summen für das "Allgemein"-Band der Kundenübersicht. */
+export interface CustomerOverviewStatsDto {
+    tenderCount: number;
+    projectCount: number;
+    orderCount: number;
+    orderTotal: number;
+    invoicedTotal: number;
+    outstandingTotal: number;
 }
 
 export interface CustomerOrderDto {
@@ -45,6 +66,8 @@ export interface CustomerOrderDto {
     status: string;
     totalAmount: number;
     createdAt: string;
+    /** Ratenplan als JSON-Prozentliste (z. B. "[30,30,40]"); null = frei verrechenbar. */
+    paymentStages?: string | null;
     customerId?: string | null;
     projectId?: string | null;
     parentSalesOrderId?: string | null;
@@ -96,4 +119,18 @@ export const customerApi = {
         apiClient.patch(`/customers/${customerId}/product-discounts/${discountId}`, body).then(r => r.data),
     deleteProductDiscount: (customerId: string, discountId: string) =>
         apiClient.delete(`/customers/${customerId}/product-discounts/${discountId}`),
+    /**
+     * Die ganze Preisliste in einem Request speichern; die Antwort IST die neue
+     * Liste, also kein Nachladen per GET. Ersetzt das alte "ein POST + ein
+     * voller GET pro Zeile".
+     */
+    bulkSaveProductDiscounts: (
+        customerId: string,
+        body: { upserts: Array<{ articleId: string; discount: number }>; deleteIds: string[] },
+    ): Promise<CustomerProductDiscountDto[]> =>
+        apiClient.post(`/customers/${customerId}/product-discounts/bulk`, body).then(r => r.data),
+
+    // Übersicht: nur Aggregate (Zähler/Summen), keine Datensätze.
+    getOverviewStats: (customerId: string): Promise<CustomerOverviewStatsDto> =>
+        apiClient.get(`/customers/${customerId}/overview-stats`).then(r => r.data),
 };

@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
 
 import { Plus } from '@/components/icons/antIconCompat';
-import { Checkbox } from '@/components/ui-shared/Checkbox';
-import { Select } from '@/components/ui-shared/Field';
 import { t } from '@/i18n/translate';
 import type { CustomerLocationDto } from '@/lib/api/customer';
 
 import { addressesEqual, formatLocationAddress, locationOptionLabel } from '../../utils/tenderAddress.utils';
+import { PlainCheckbox } from '../common/PlainUi';
+import { QuoteSelect } from '../common/QuoteSelect';
 
 const tinyMetaSpinner = (
     <span
@@ -60,26 +60,25 @@ export const TenderAddressPicker = ({
     return (
         <div className="space-y-1">
             <div className="flex items-center gap-1.5">
-                <Select
-                    size="sm"
-                    value={selectedId}
-                    // Stay interactive while saving (the inline spinner signals
-                    // progress) so the picker never shows the disabled
-                    // "not-allowed" cursor; only block until a customer is set.
-                    disabled={!hasCustomer}
-                    onChange={(event) => {
-                        const id = event.target.value;
-                        // Select the item instantly, before the save round-trips.
-                        onSelectPending(id || null);
-                        const loc = locations.find((item) => item.id === id);
-                        onPick(loc ? formatLocationAddress(loc) : null);
-                    }}
-                >
-                    <option value="">{locationsLoading ? t('common.loading') : (locations.length ? t('common.select') :t('tenders.address_info_not_found'))}</option>
-                    {locations.map((loc) => (
-                        <option key={loc.id} value={loc.id}>{locationOptionLabel(loc)}</option>
-                    ))}
-                </Select>
+                <div className="min-w-0 flex-1">
+                    <QuoteSelect
+                        ariaLabel={t('crm.addAddressTitle')}
+                        value={selectedId}
+                        // Stay interactive while saving (the inline spinner signals
+                        // progress) so the picker never shows the disabled
+                        // "not-allowed" cursor; only block until a customer is set.
+                        disabled={!hasCustomer}
+                        loadingLabel={locationsLoading ? t('common.loading') : undefined}
+                        placeholder={locations.length ? t('common.select') : t('tenders.address_info_not_found')}
+                        options={locations.map((loc) => ({ value: loc.id, label: locationOptionLabel(loc) }))}
+                        onChange={(id) => {
+                            // Select the item instantly, before the save round-trips.
+                            onSelectPending(id || null);
+                            const loc = locations.find((item) => item.id === id);
+                            onPick(loc ? formatLocationAddress(loc) : null);
+                        }}
+                    />
+                </div>
                 {loading ? tinyMetaSpinner : null}
                 <button
                     type="button"
@@ -87,15 +86,15 @@ export const TenderAddressPicker = ({
                     disabled={!hasCustomer}
                     title={t('crm.addAddressTitle')}
                     aria-label={t('crm.addAddressTitle')}
-                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200/80 bg-white/60 text-slate-500 ring-1 ring-slate-900/5 backdrop-blur-md transition-colors hover:border-[#1f2654] hover:bg-white hover:text-[#1f2654] disabled:opacity-40"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654] disabled:opacity-40"
                 >
                     <Plus size={13} />
                 </button>
             </div>
-            {/* Frosted read-back of the picked address, so the selection stays
+            {/* Quiet read-back of the picked address, so the selection stays
                 visible without competing with the control above it. */}
             {displayValue ? (
-                <div className="ofi-glass-panel rounded-lg border border-slate-200/60 bg-white/50 px-3 py-1.5 text-[12px] leading-5 text-slate-600 ring-1 ring-slate-900/5 backdrop-blur-md backdrop-saturate-150">
+                <div className="rounded-[2px] border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-[1.45] text-slate-600">
                     {renderLines(displayValue)}
                 </div>
             ) : null}
@@ -116,12 +115,15 @@ type TenderBillingAddressRowProps = {
 // address and its own picker is hidden (no duplicate entry).
 export const TenderBillingAddressRow = ({ sameAsInstallation, onSameAsInstallationChange, billingPicker, label }: TenderBillingAddressRowProps) => (
     <div className="space-y-1.5">
-        <Checkbox
-            label={label}
-            size="sm"
-            isSelected={sameAsInstallation}
-            onChange={onSameAsInstallationChange}
-        />
+        <label className="flex h-8 cursor-pointer items-center gap-2 text-[12px] font-medium text-slate-600">
+            <PlainCheckbox
+                size="sm"
+                isSelected={sameAsInstallation}
+                onChange={onSameAsInstallationChange}
+                aria-label={label}
+            />
+            {label}
+        </label>
         {!sameAsInstallation && billingPicker}
     </div>
 );

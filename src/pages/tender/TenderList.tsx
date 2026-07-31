@@ -1,31 +1,25 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
-    ArrowDown,
-    ArrowRight,
-    ArrowUp,
     Building02 as Building2,
-    ChevronLeft,
+    CheckCircle,
     ChevronRight,
+    Eye,
     File05 as FileSpreadsheet,
     Plus,
-    SearchLg as Search,
     UploadCloud02 as Upload,
-    X,
     XClose,
 } from '@/components/icons/antIconCompat';
-import Tooltip from 'antd/es/tooltip';
 
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
-import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
-import { Field, Select } from '../../components/ui-shared/Field';
+import { Field } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { BlockingDialog } from '../../components/ui-shared/BlockingDialog';
+import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 
 import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
@@ -34,20 +28,12 @@ import { formatMoney, toCurrencyCode } from '../../utils/currency';
 import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 import { t as i18nT } from '@/i18n/translate';
-import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
-import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
-
 // İş akışı iki durumludur: sipariş (projeye bağlı ya da kaynağı satış siparişi)
 // veya taslak (diğer her şey). Ham Draft/Approved/Exported durumları listede
-// "taslak" altında toplanır.
-const isOrderTender = (tender: TenderListItem) =>
-    Boolean(tender.projectId) || isSourceSalesOrder(tender.sourceStatus);
-
-const tenderStatusLabel = (tender: TenderListItem) =>
-    isOrderTender(tender) ?i18nT('crm.tenders.statusOrdered') :i18nT('crm.tenders.statusDraft');
-
-const tenderStatusVariant = (tender: TenderListItem): 'passive' | 'order' =>
-    isOrderTender(tender) ? 'order' : 'passive';
+// "taslak" altında toplanır. Aynı mantık müşteri detayındaki teklif reiterinde
+// de kullanıldığından ortak yardımcıya taşındı.
+import { tenderStatusLabel, tenderStatusVariant } from './detail/utils/tenderStatus.utils';
+import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 
 const tenderCreatorName = (tender: TenderListItem) =>
     tender.createdByName || tender.createdByEmail || tender.createdByEmployeeId || '—';
@@ -63,63 +49,8 @@ const initialsFromName = (value?: string | null) => {
 const fmtMoney = (v?: number | null, currency?: string | null) =>
     typeof v === 'number' ? formatMoney(v, toCurrencyCode(currency)) : '—';
 
-// Filtre satırı kontrolü — Ürünler listesindeki desenle aynı: alan hücreyle bütünleşik,
-// odaklanınca yumuşak kenarlı soluk bir zemin belirir.
-const TENDER_FILTER_CONTROL =
-    'h-10 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:bg-slate-100 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10';
-
 type TenderSortKey = 'tenderNumber' | 'customerName' | 'status' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
-
-const SortableHeader = ({
-    label,
-    column,
-    sortBy,
-    sortDirection,
-    onSort,
-    align = 'left',
-}: {
-    label: ReactNode;
-    column: TenderSortKey;
-    sortBy: TenderSortKey;
-    sortDirection: SortDirection;
-    onSort: (column: TenderSortKey, direction: SortDirection) => void;
-    align?: 'left' | 'right' | 'center';
-}) => (
-    <th className={`px-4 py-2.5 font-semibold ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}>
-        <div className={`flex min-w-0 items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
-            <span className="truncate">{label}</span>
-            <span className="inline-flex shrink-0 items-center">
-                <Tooltip title={i18nT('common.sortAscending')}>
-                    <button
-                        type="button"
-                        aria-label={i18nT('common.sortAscending')}
-                        aria-pressed={sortBy === column && sortDirection === 'asc'}
-                        onClick={() => onSort(column, 'asc')}
-                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
-                            sortBy === column && sortDirection === 'asc' ? 'text-[#272f67]' : 'text-slate-400'
-                        }`}
-                    >
-                        <ArrowUp size={10} />
-                    </button>
-                </Tooltip>
-                <Tooltip title={i18nT('common.sortDescending')}>
-                    <button
-                        type="button"
-                        aria-label={i18nT('common.sortDescending')}
-                        aria-pressed={sortBy === column && sortDirection === 'desc'}
-                        onClick={() => onSort(column, 'desc')}
-                        className={`flex size-4 items-center justify-center rounded transition-colors hover:bg-slate-200 ${
-                            sortBy === column && sortDirection === 'desc' ? 'text-[#272f67]' : 'text-slate-400'
-                        }`}
-                    >
-                        <ArrowDown size={10} />
-                    </button>
-                </Tooltip>
-            </span>
-        </div>
-    </th>
-);
 
 export const TenderList = () => {
     useLanguageRefresh();
@@ -144,7 +75,7 @@ export const TenderList = () => {
         customerName: '',
         creatorName: '',
     });
-    // İki durumlu filtre (taslak / sipariş) ve e-posta gönderim filtresi.
+    // İki durumlu filtre (taslak / sipariş) ve e-posta gönderim filtresi — üst çubukta.
     const [orderState, setOrderState] = useState<'' | 'draft' | 'order'>('');
     const [mailSent, setMailSent] = useState<'' | 'yes' | 'no'>('');
     const [sortBy, setSortBy] = useState<TenderSortKey>('createdAt');
@@ -210,6 +141,9 @@ export const TenderList = () => {
             creatorName: debouncedColumns.creatorName || undefined,
             sortBy,
             sortDirection,
+            // Gövde tablonun kolonlarıyla sınırlı — tam teklif kaydı LONGTEXT
+            // coverLetter/closingNote/closingImages alanlarını da taşıyor.
+            fields: 'list',
         });
     }, [
         page,
@@ -222,9 +156,10 @@ export const TenderList = () => {
         fetchList,
     ]);
 
-    const handleSort = (column: TenderSortKey, direction: SortDirection) => {
+    // Müşteri listesiyle aynı davranış: aynı kolona tıklandıkça asc/desc döner.
+    const toggleSort = (column: TenderSortKey) => {
+        setSortDirection(sortBy === column && sortDirection === 'asc' ? 'desc' : 'asc');
         setSortBy(column);
-        setSortDirection(direction);
     };
 
     const handleImportUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -265,11 +200,17 @@ export const TenderList = () => {
 
     const totalPages = Math.max(1, listTotalPages);
     const pageSafe = Math.min(listPage, totalPages);
-    const rangeFrom = listTotal === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE + 1;
-    const rangeTo = Math.min(pageSafe * PAGE_SIZE, listTotal);
+    const hasFilters = Boolean(
+        debouncedSearch
+        || debouncedColumns.tenderNumber
+        || debouncedColumns.customerName
+        || debouncedColumns.creatorName
+        || orderState
+        || mailSent,
+    );
 
     return (
-        <div>
+        <div className="flex w-full flex-col gap-4">
             <BlockingDialog
                 open={importing}
                 title={i18nT('tenders.import_csving')}
@@ -289,248 +230,171 @@ export const TenderList = () => {
                 }
             />
 
-            <Card noPadding>
-                {/* Üst çubuk — arama (esner) + sıralama + sayfalama (sağda).
-                    Durum ve e-posta filtreleri kolon filtre satırındadır. */}
-                <div className="px-3 py-3">
-                    <div className="flex w-full flex-wrap items-center gap-3">
-                        <div className="relative w-[240px] min-w-0 shrink">
-                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={i18nT('tenders.tender_no')}
-                                className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-7 text-[13px] transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                            />
-                            {search && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearch('')}
-                                    aria-label={i18nT('common.clear')}
-                                    title={i18nT('common.clear')}
-                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-                                >
-                                    <X size={12} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="w-[200px] shrink-0">
-                            <Select
-                                value={`${sortBy}:${sortDirection}`}
-                                onChange={(event) => {
-                                    const [column, direction] = event.target.value.split(':') as [TenderSortKey, SortDirection];
-                                    handleSort(column, direction);
-                                }}
-                                className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-700/10"
-                                aria-label={i18nT('common.sortOrder')}
-                            >
-                                {sortBy !== 'createdAt' && (
-                                    <option value={`${sortBy}:${sortDirection}`}>{i18nT('common.sortOrder')}</option>
-                                )}
-                                <option value="createdAt:desc">{i18nT('common.sortNewest')}</option>
-                                <option value="createdAt:asc">{i18nT('common.sortOldest')}</option>
-                            </Select>
-                        </div>
-                        <div className="ml-auto flex shrink-0 items-center gap-3">
-                            <span className="font-mono text-[12px] text-slate-500">
-                                {rangeFrom}-{rangeTo} / {listTotal}
-                            </span>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    disabled={pageSafe <= 1}
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                    aria-label={i18nT('common.back')}
-                                >
-                                    <ChevronLeft size={14} />
-                                </button>
-                                <span className="px-1 font-mono text-[12px] tabular-nums text-slate-500">{pageSafe} / {totalPages}</span>
-                                <button
-                                    type="button"
-                                    disabled={pageSafe >= totalPages}
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    className="flex size-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                                    aria-label={i18nT('common.next')}
-                                >
-                                    <ChevronRight size={14} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            {/* Üst çubuk — müşteri listesiyle aynı: genel arama + durum ve e-posta seçicileri. */}
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="w-64">
+                    <SearchBox
+                        value={search}
+                        onChange={setSearch}
+                        placeholder={i18nT('tenders.tender_no')}
+                    />
                 </div>
+                <select
+                    value={orderState}
+                    onChange={(event) => setOrderState(event.target.value as '' | 'draft' | 'order')}
+                    aria-label={i18nT('common.status')}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                >
+                    <option value="">{i18nT('tenders.all_statuler')}</option>
+                    <option value="draft">{i18nT('crm.tenders.statusDraft')}</option>
+                    <option value="order">{i18nT('crm.tenders.statusOrdered')}</option>
+                </select>
+                <select
+                    value={mailSent}
+                    onChange={(event) => setMailSent(event.target.value as '' | 'yes' | 'no')}
+                    aria-label={i18nT('tenders.mail')}
+                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                >
+                    <option value="">{i18nT('common.all')}</option>
+                    <option value="yes">{i18nT('tenders.mail_sent')}</option>
+                    <option value="no">{i18nT('tenders.mail_not_sent')}</option>
+                </select>
+            </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full table-fixed text-[12.5px] text-left [&_th]:border-r [&_th]:border-slate-200 [&_td]:border-r [&_td]:border-slate-200 [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0">
-                        <colgroup>
-                            <col style={{ width: '13%' }} />
-                            <col style={{ width: '19%' }} />
-                            <col style={{ width: '7%' }} />
-                            <col style={{ width: '13%' }} />
-                            <col style={{ width: '15%' }} />
-                            <col style={{ width: '11%' }} />
-                            <col style={{ width: '12%' }} />
-                            <col style={{ width: '10%' }} />
-                        </colgroup>
-                        <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
-                            <tr>
-                                <SortableHeader label={i18nT('tenders.tender_no')} column="tenderNumber" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                <SortableHeader label={i18nT('nav.quickActionsGroup.customers')} column="customerName" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                <th className="px-4 py-2.5 font-semibold text-center">{i18nT('tenders.versiyon')}</th>
-                                <SortableHeader label={i18nT('common.status')} column="status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('tenders.olusturan')}</th>
-                                <th className="px-4 py-2.5 font-semibold text-right">{i18nT('common.amount')}</th>
-                                <SortableHeader label={i18nT('tenders.olusturma')} column="createdAt" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
-                                <th className="px-4 py-2.5 font-semibold text-center">{i18nT('tenders.mail')}</th>
-                            </tr>
-                            {/* Kolon bazlı filtre satırı — teklif no / müşteri / oluşturan metinle,
-                                durum (taslak/sipariş) ve e-posta (gönderildi/gönderilmedi) seçicilerle daraltır. */}
-                            <tr data-filter-row className="bg-white border-b border-slate-100">
-                                <th className="px-2 py-1.5 font-normal">
-                                    <input
-                                        value={tenderNoFilter}
-                                        onChange={(e) => setTenderNoFilter(e.target.value)}
-                                        placeholder={`${i18nT('common.filter')}...`}
-                                        className={TENDER_FILTER_CONTROL}
-                                    />
-                                </th>
-                                <th className="px-2 py-1.5 font-normal">
-                                    <input
-                                        value={customerFilter}
-                                        onChange={(e) => setCustomerFilter(e.target.value)}
-                                        placeholder={`${i18nT('common.filter')}...`}
-                                        className={TENDER_FILTER_CONTROL}
-                                    />
-                                </th>
-                                <th className="px-2 py-2" />
-                                <th className="px-2 py-1.5 font-normal">
-                                    <select
-                                        value={orderState}
-                                        onChange={(e) => setOrderState(e.target.value as '' | 'draft' | 'order')}
-                                        aria-label={i18nT('common.status')}
-                                        className={TENDER_FILTER_CONTROL}
+            <SectionCard title={`${i18nT('crm.tenders.tableTitle')} (${listTotal})`}>
+                <table data-inv-table data-unstyled-table className="w-full">
+                    <thead>
+                        <tr>
+                            <SortableTh label={i18nT('tenders.tender_no')} sortKey="tenderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
+                            <SortableTh label={i18nT('nav.quickActionsGroup.customers')} sortKey="customerName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-56 text-left" />
+                            <SortableTh label={i18nT('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-32 text-left" />
+                            <th className="w-44 text-left">{i18nT('tenders.olusturan')}</th>
+                            <th className="w-36 text-right">{i18nT('common.amount')}</th>
+                            <SortableTh label={i18nT('tenders.olusturma')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-40 text-left" />
+                            <th className="w-20 text-center">{i18nT('tenders.mail')}</th>
+                            <th className="w-28 text-right" />
+                        </tr>
+                        {/* Kolon bazlı filtre satırı — teklif no / müşteri / oluşturan metinle daraltır. */}
+                        <tr data-filter-row>
+                            <th className="pb-1.5">
+                                <input
+                                    value={tenderNoFilter}
+                                    onChange={(e) => setTenderNoFilter(e.target.value)}
+                                    placeholder={`${i18nT('common.filter')}...`}
+                                    className={FILTER_INPUT_CLASS}
+                                />
+                            </th>
+                            <th className="pb-1.5">
+                                <input
+                                    value={customerFilter}
+                                    onChange={(e) => setCustomerFilter(e.target.value)}
+                                    placeholder={`${i18nT('common.filter')}...`}
+                                    className={FILTER_INPUT_CLASS}
+                                />
+                            </th>
+                            <th />
+                            <th className="pb-1.5">
+                                <input
+                                    value={creatorFilter}
+                                    onChange={(e) => setCreatorFilter(e.target.value)}
+                                    placeholder={`${i18nT('common.filter')}...`}
+                                    className={FILTER_INPUT_CLASS}
+                                />
+                            </th>
+                            <th colSpan={4} />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(loadingList || list.length === 0) && (
+                            <TableStateRow
+                                colSpan={8}
+                                loading={loadingList}
+                                emptyText={hasFilters ?i18nT('crmOverview.picker.empty') :i18nT('tenders.no_tenders_yet')}
+                            />
+                        )}
+                        {!loadingList && list.map((t) => (
+                            <tr
+                                key={t.id}
+                                className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                                onClick={() => navigate(`/crm/tenders/${t.id}`)}
+                            >
+                                <td>
+                                    <div className="flex min-w-0 items-center gap-2.5">
+                                        <div className="flex size-8 shrink-0 items-center justify-center rounded bg-blue-50 text-blue-700 dark:bg-sky-500/15 dark:text-sky-300">
+                                            <FileSpreadsheet size={14} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="truncate font-semibold text-slate-900 dark:text-white">{localizeTenderNumber(t.tenderNumber)}</div>
+                                            <div className="mt-0.5 font-mono text-[11.5px] text-slate-400">v{t.version}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="flex min-w-0 items-center gap-1.5 text-[13px] text-slate-700 dark:text-white/80">
+                                        <Building2 size={11} className="shrink-0 text-slate-400" />
+                                        <span className="truncate">{t.customerName || <span className="text-slate-300 dark:text-white/30">—</span>}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <StatusChip variant={tenderStatusVariant(t)}>
+                                        {tenderStatusLabel(t)}
+                                    </StatusChip>
+                                </td>
+                                <td>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/70">
+                                            {initialsFromName(tenderCreatorName(t))}
+                                        </span>
+                                        <span className="truncate text-[12.5px] text-slate-700 dark:text-white/80">
+                                            {tenderCreatorName(t)}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">
+                                    {fmtMoney(t.grandTotal, t.currency)}
+                                </td>
+                                <td className="text-[12.5px] text-slate-500 dark:text-white/60">
+                                    {dayjs(t.createdAt).format('DD.MM.YYYY HH:mm')}
+                                </td>
+                                <td className="text-center">
+                                    {t.offerMailSentAt ? (
+                                        <span
+                                            className="inline-flex items-center justify-center text-emerald-600 dark:text-emerald-400"
+                                            title={`${i18nT('tenders.mail')} · ${dayjs(t.offerMailSentAt).format('DD.MM.YYYY HH:mm')}`}
+                                        >
+                                            <CheckCircle size={15} />
+                                        </span>
+                                    ) : (
+                                        <span
+                                            className="inline-flex items-center justify-center text-slate-300 dark:text-white/30"
+                                            title={i18nT('tenders.mail')}
+                                        >
+                                            <XClose size={15} />
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                        onClick={() => navigate(`/crm/tenders/${t.id}`)}
+                                        className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100 dark:text-sky-300 dark:hover:bg-sky-500/15"
                                     >
-                                        <option value="">{i18nT('tenders.all_statuler')}</option>
-                                        <option value="draft">{i18nT('crm.tenders.statusDraft')}</option>
-                                        <option value="order">{i18nT('crm.tenders.statusOrdered')}</option>
-                                    </select>
-                                </th>
-                                <th className="px-2 py-1.5 font-normal">
-                                    <input
-                                        value={creatorFilter}
-                                        onChange={(e) => setCreatorFilter(e.target.value)}
-                                        placeholder={`${i18nT('common.filter')}...`}
-                                        className={TENDER_FILTER_CONTROL}
-                                    />
-                                </th>
-                                <th className="px-2 py-2" />
-                                <th className="px-2 py-2" />
-                                <th className="px-2 py-1.5 font-normal">
-                                    <select
-                                        value={mailSent}
-                                        onChange={(e) => setMailSent(e.target.value as '' | 'yes' | 'no')}
-                                        aria-label={i18nT('tenders.mail')}
-                                        className={TENDER_FILTER_CONTROL}
-                                    >
-                                        <option value="">{i18nT('common.all')}</option>
-                                        <option value="yes">{i18nT('tenders.mail_sent')}</option>
-                                        <option value="no">{i18nT('tenders.mail_not_sent')}</option>
-                                    </select>
-                                </th>
+                                        <Eye size={12} />{i18nT('common.detail')}<ChevronRight size={11} />
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loadingList && (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
-                                        <div className="mx-auto max-w-sm animate-pulse space-y-2">
-                                            <div className="h-3 bg-slate-100 rounded" />
-                                            <div className="h-3 bg-slate-100 rounded w-2/3 mx-auto" />
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                            {!loadingList && list.length === 0 && (
-                                <tr>
-                                    <td colSpan={8}>
-                                        <EmptyState
-                                            icon={<FileSpreadsheet size={32} />}
-                                            title={i18nT('tenders.no_tenders_yet')}
-                                            description={i18nT('tenders.crb_sia_451_dosyasini_import_aktarin_veya_sifirdan')}
-                                            action={
-                                                canManage && (
-                                                    <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/crm/tenders/new')}>{i18nT('tenders.new_tender')}</Button>
-                                                )
-                                            }
-                                        />
-                                    </td>
-                                </tr>
-                            )}
-                            {!loadingList && list.map((t) => (
-                                <tr
-                                    key={t.id}
-                                    className="hover:bg-slate-50/60 cursor-pointer transition-colors"
-                                    onClick={() => navigate(`/crm/tenders/${t.id}`)}
-                                >
-                                    <td className="px-4 py-2.5 font-semibold text-slate-900">
-                                        <div className="flex items-center gap-1.5">
-                                            <FileSpreadsheet size={13} className="text-[#272f67] shrink-0" />
-                                            <span className="truncate">{localizeTenderNumber(t.tenderNumber)}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-slate-700">
-                                        <div className="flex items-center gap-1.5">
-                                            <Building2 size={11} className="text-slate-400 shrink-0" />
-                                            <span className="truncate">{t.customerName || '—'}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-center text-slate-600 font-mono text-[11.5px]">
-                                        v{t.version}
-                                    </td>
-                                    <td className="px-4 py-2.5">
-                                        <StatusChip variant={tenderStatusVariant(t)}>
-                                            {tenderStatusLabel(t)}
-                                        </StatusChip>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-slate-600">
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-600">
-                                                {initialsFromName(tenderCreatorName(t))}
-                                            </span>
-                                            <span className="truncate text-[12px] font-medium text-slate-700">
-                                                {tenderCreatorName(t)}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-2.5 text-right font-semibold text-slate-900 font-mono">
-                                        {fmtMoney(t.grandTotal, t.currency)}
-                                    </td>
-                                    <td className="px-4 py-2.5 text-slate-500 text-[12px]">
-                                        {dayjs(t.createdAt).format("DD.MM.YYYY HH:mm")}
-                                    </td>
-                                    <td className="px-4 py-2.5 text-center">
-                                        {t.offerMailSentAt ? (
-                                            <span
-                                                className="inline-flex items-center justify-center text-emerald-600"
-                                                title={`${i18nT('tenders.mail')} · ${dayjs(t.offerMailSentAt).format("DD.MM.YYYY HH:mm")}`}
-                                            >
-                                                <ArrowRight size={16} />
-                                            </span>
-                                        ) : (
-                                            <span
-                                                className="inline-flex items-center justify-center text-slate-300"
-                                                title={i18nT('tenders.mail')}
-                                            >
-                                                <XClose size={16} />
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="border-t border-slate-200 dark:border-white/10">
+                    <Pager
+                        page={pageSafe}
+                        totalPages={totalPages}
+                        total={listTotal}
+                        pageSize={PAGE_SIZE}
+                        onPage={setPage}
+                    />
                 </div>
-            </Card>
+            </SectionCard>
 
             {/* Excel'den içe aktarma (Odoo satış siparişi CSV) — sipariş kayıtları oluşturur. */}
             <Modal

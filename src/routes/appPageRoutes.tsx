@@ -1,41 +1,21 @@
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import type { LazyExoticComponent } from 'react';
 import { Route, Navigate } from 'react-router-dom';
-import { PageSkeleton } from '../components/ui-shared/PageSkeleton';
 import { useAuthStore } from '../store/authStore';
+import { isProjectModuleEnabledForTenant } from '../lib/moduleCatalog';
+import { lazyNamed, page } from './routeHelpers';
+import type { RouteComponent } from './routeHelpers';
+import { TechnicianBridge } from './montageRoutes';
 
 /* ── Shared page-route table ──
    Rendered by AppRouter inside MainLayout, and again by the split view's
    secondary pane inside its own MemoryRouter — so navigation that starts in
-   the right pane (list → detail, query views) stays in the right pane. */
+   the right pane (list → detail, query views) stays in the right pane.
 
-type RouteComponent = ComponentType<Record<string, never>>;
+   `lazyNamed`/`page` routeHelpers'ta yaşar (buradan yeniden dışa aktarılır):
+   montageRoutes da onları kullanır ve buradan alsaydı iki dosya arasında
+   modül döngüsü oluşurdu. */
 
-const CHUNK_RELOAD_KEY = 'offitec:chunk-reload-attempted';
-
-const isChunkLoadError = (error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error || '');
-    return /Failed to fetch dynamically imported module|dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
-};
-
-export const lazyNamed = (
-    loader: () => Promise<unknown>,
-    exportName: string
-): LazyExoticComponent<RouteComponent> =>
-    lazy<RouteComponent>(() =>
-        loader()
-            .then((mod) => {
-                sessionStorage.removeItem(CHUNK_RELOAD_KEY);
-                return { default: (mod as Record<string, RouteComponent>)[exportName] };
-            })
-            .catch((error) => {
-                if (isChunkLoadError(error) && sessionStorage.getItem(CHUNK_RELOAD_KEY) !== '1') {
-                    sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
-                    window.location.reload();
-                    return new Promise<never>(() => undefined);
-                }
-                throw error;
-            })
-    );
+export { lazyNamed, page } from './routeHelpers';
 
 const Roles = lazyNamed(() => import('../pages/iam/Roles'), 'Roles');
 const Employees = lazyNamed(() => import('../pages/iam/Employees'), 'Employees');
@@ -51,19 +31,16 @@ const MyOrderDetail = lazyNamed(() => import('../pages/crm/MyOrderDetail'), 'MyO
 const TenderList = lazyNamed(() => import('../pages/tender/TenderList'), 'TenderList');
 const TenderDetail = lazyNamed(() => import('../pages/tender/TenderDetail'), 'TenderDetail');
 const TenderReport = lazyNamed(() => import('../pages/tender/TenderReport'), 'TenderReport');
-const SupplyRequests = lazyNamed(() => import('../pages/inventory/SupplyRequests'), 'SupplyRequests');
-const Articles = lazyNamed(() => import('../pages/inventory/Articles'), 'Articles');
-const ArticleCreate = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleCreate');
-const ArticleDetail = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleDetail');
-const ArticleEdit = lazyNamed(() => import('../pages/inventory/Articles'), 'ArticleEdit');
-const ExtraMaterials = lazyNamed(() => import('../pages/inventory/ExtraMaterials'), 'ExtraMaterials');
-const ExtraMaterialCreate = lazyNamed(() => import('../pages/inventory/ExtraMaterials'), 'ExtraMaterialCreate');
-const ExtraMaterialEdit = lazyNamed(() => import('../pages/inventory/ExtraMaterials'), 'ExtraMaterialEdit');
-const Locations = lazyNamed(() => import('../pages/inventory/Locations'), 'Locations');
-const Movements = lazyNamed(() => import('../pages/inventory/Movements'), 'Movements');
-const Proposals = lazyNamed(() => import('../pages/inventory/Proposals'), 'Proposals');
-const Suppliers = lazyNamed(() => import('../pages/inventory/Suppliers'), 'Suppliers');
-const SupplierDetail = lazyNamed(() => import('../pages/inventory/Suppliers'), 'SupplierDetail');
+// Yeni tablo tabanlı envanter modülü — eski sayfalar pages/inventory_old altında arşivlendi.
+const ProductsPage = lazyNamed(() => import('../pages/inventory/ProductsPage'), 'ProductsPage');
+const ProductCreatePage = lazyNamed(() => import('../pages/inventory/ProductCreatePage'), 'ProductCreatePage');
+const MaterialsPage = lazyNamed(() => import('../pages/inventory/MaterialsPage'), 'MaterialsPage');
+const MaterialCreatePage = lazyNamed(() => import('../pages/inventory/MaterialCreatePage'), 'MaterialCreatePage');
+const StockPage = lazyNamed(() => import('../pages/inventory/StockPage'), 'StockPage');
+const StockMovementsPage = lazyNamed(() => import('../pages/inventory/StockMovementsPage'), 'StockMovementsPage');
+const SuppliersPage = lazyNamed(() => import('../pages/inventory/SuppliersPage'), 'SuppliersPage');
+const OrdersPage = lazyNamed(() => import('../pages/inventory/OrdersPage'), 'OrdersPage');
+const OrderCreatePage = lazyNamed(() => import('../pages/inventory/OrderCreatePage'), 'OrderCreatePage');
 const Shipments = lazyNamed(() => import('../pages/logistics/Shipments'), 'Shipments');
 const ShipmentCreate = lazyNamed(() => import('../pages/logistics/ShipmentCreate'), 'ShipmentCreate');
 const MaintenanceDashboard = lazyNamed(() => import('../pages/maintenance/MaintenanceDashboard'), 'MaintenanceDashboard');
@@ -71,26 +48,15 @@ const MaintenanceContracts = lazyNamed(() => import('../pages/maintenance/Mainte
 const MaintenanceContractCreate = lazyNamed(() => import('../pages/maintenance/MaintenanceContracts'), 'MaintenanceContractCreate');
 const MaintenanceTasks = lazyNamed(() => import('../pages/maintenance/MaintenanceTasks'), 'MaintenanceTasks');
 const RegieOperations = lazyNamed(() => import('../pages/maintenance/RegieOperations'), 'RegieOperations');
-const MaintenanceTechnician = lazyNamed(() => import('../pages/maintenance/MaintenanceTechnician'), 'MaintenanceTechnician');
 const PdfSettings = lazyNamed(() => import('../pages/settings/PdfSettings'), 'PdfSettings');
+const CompanyCategories = lazyNamed(() => import('../pages/settings/CompanyCategories'), 'CompanyCategories');
 const MailSettings = lazyNamed(() => import('../pages/settings/MailSettings'), 'MailSettings');
 const ChecklistSettings = lazyNamed(() => import('../pages/settings/ChecklistSettings'), 'ChecklistSettings');
 const Projects = lazyNamed(() => import('../pages/project/Projects'), 'Projects');
-const ProjectFlow = lazyNamed(() => import('../pages/project/ProjectFlow'), 'ProjectFlow');
 const ProjectDetail = lazyNamed(() => import('../pages/project/ProjectDetail'), 'ProjectDetail');
-const ProjectInstallation = lazyNamed(() => import('../pages/project/ProjectInstallation'), 'ProjectInstallation');
-const TechnicianDeliveryReports = lazyNamed(() => import('../pages/project/features/installations/components/TechnicianDeliveryReports'), 'TechnicianDeliveryReports');
 const ServiceReports = lazyNamed(() => import('../pages/services/ServiceReports'), 'ServiceReports');
 const ServiceReportAdd = lazyNamed(() => import('../pages/services/ServiceReportAdd'), 'ServiceReportAdd');
 const UnifiedCalendar = lazyNamed(() => import('../pages/calendar/UnifiedCalendar'), 'UnifiedCalendar');
-
-const RouteFallback = () => <PageSkeleton />;
-
-export const page = (Component: LazyExoticComponent<RouteComponent>) => (
-    <Suspense fallback={<RouteFallback />}>
-        <Component />
-    </Suspense>
-);
 
 const AttendanceAdminRoute = () => {
     const permissions = useAuthStore((s) => s.permissions);
@@ -100,12 +66,22 @@ const AttendanceAdminRoute = () => {
     return page(AttendanceSettings);
 };
 
+// Company categories are admin territory: mapping companies to module
+// bundles is only for holders of roles.manage.
+const CompanyCategoriesAdminRoute = () => {
+    const permissions = useAuthStore((s) => s.permissions);
+    if (!permissions.includes('roles.manage')) {
+        return <Navigate to="/" replace />;
+    }
+    return page(CompanyCategories);
+};
+
 const ProjectModuleRoute = ({ component }: { component: LazyExoticComponent<RouteComponent> }) => {
     const tenants = useAuthStore((s) => s.tenants);
     const selectedTenantId = useAuthStore((s) => s.selectedTenantId);
     const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId);
 
-    if (selectedTenant && !selectedTenant.isProjectModuleEnabled) {
+    if (!isProjectModuleEnabledForTenant(selectedTenant)) {
         return <Navigate to="/" replace />;
     }
 
@@ -116,7 +92,9 @@ const ProjectModuleRoute = ({ component }: { component: LazyExoticComponent<Rout
     <Routes> element can splice them in — React Router flattens fragments. */
 export const renderAppPageRoutes = () => (
     <>
-        <Route path="/" element={page(Home)} />
+        {/* Technician accounts have one workspace only: the new montage panel.
+            This also makes hans@offitec.com land there immediately after login. */}
+        <Route path="/" element={<TechnicianBridge to="/montage">{page(Home)}</TechnicianBridge>} />
         <Route path="/attendance" element={page(Dashboard)} />
         <Route path="/roles" element={page(Roles)} />
         <Route path="/employees" element={page(Employees)} />
@@ -130,19 +108,21 @@ export const renderAppPageRoutes = () => (
         <Route path="/crm/tenders" element={page(TenderList)} />
         <Route path="/crm/tenders/:id" element={page(TenderDetail)} />
         <Route path="/crm/tenders/:id/report" element={page(TenderReport)} />
-        <Route path="/inventory" element={page(SupplyRequests)} />
-        <Route path="/inventory/articles" element={page(Articles)} />
-        <Route path="/inventory/articles/new" element={page(ArticleCreate)} />
-        <Route path="/inventory/articles/:id" element={page(ArticleDetail)} />
-        <Route path="/inventory/articles/:id/edit" element={page(ArticleEdit)} />
-        <Route path="/inventory/extra-materials" element={page(ExtraMaterials)} />
-        <Route path="/inventory/extra-materials/new" element={page(ExtraMaterialCreate)} />
-        <Route path="/inventory/extra-materials/:id/edit" element={page(ExtraMaterialEdit)} />
-        <Route path="/inventory/locations" element={page(Locations)} />
-        <Route path="/inventory/movements" element={page(Movements)} />
-        <Route path="/inventory/proposals" element={page(Proposals)} />
-        <Route path="/inventory/suppliers" element={page(Suppliers)} />
-        <Route path="/inventory/suppliers/:id" element={page(SupplierDetail)} />
+        <Route path="/inventory" element={<Navigate to="/inventory/articles" replace />} />
+        <Route path="/inventory/articles" element={page(ProductsPage)} />
+        {/* Ürün ekleme artık pop-up değil, kendi sayfası (stok ekranıyla aynı desen). */}
+        <Route path="/inventory/articles/new" element={page(ProductCreatePage)} />
+        {/* Malzemeler: ürünlerle aynı tablo, aynı akış — yalnızca itemType farklı. */}
+        <Route path="/inventory/materials" element={page(MaterialsPage)} />
+        <Route path="/inventory/materials/new" element={page(MaterialCreatePage)} />
+        <Route path="/inventory/stock" element={page(StockPage)} />
+        <Route path="/inventory/stock/movements" element={page(StockMovementsPage)} />
+        {/* Eski yol: hareket girişi artık ortak stok ekranında. */}
+        <Route path="/inventory/movements" element={<Navigate to="/inventory/stock" replace />} />
+        <Route path="/inventory/suppliers" element={page(SuppliersPage)} />
+        {/* Satın alma siparişleri: liste + oluşturma/düzenleme (?id= ile düzenleme). */}
+        <Route path="/inventory/orders" element={page(OrdersPage)} />
+        <Route path="/inventory/orders/new" element={page(OrderCreatePage)} />
         <Route path="/logistics/shipments" element={page(Shipments)} />
         <Route path="/logistics/shipments/new" element={page(ShipmentCreate)} />
         <Route path="/maintenance" element={page(MaintenanceDashboard)} />
@@ -150,24 +130,25 @@ export const renderAppPageRoutes = () => (
         <Route path="/maintenance/contracts/new" element={page(MaintenanceContractCreate)} />
         <Route path="/maintenance/tasks" element={page(MaintenanceTasks)} />
         <Route path="/maintenance/tasks/:taskId" element={page(MaintenanceTasks)} />
-        <Route path="/maintenance/technician" element={<Navigate to="/maintenance/technician/tasks" replace />} />
+        <Route path="/maintenance/technician" element={<Navigate to="/montage" replace />} />
         <Route path="maintenance/technician/calendar" element={<Navigate to="/calendar" replace />} />
-        <Route path="maintenance/technician/tasks" element={page(MaintenanceTechnician)} />
-        <Route path="maintenance/technician/tasks/:taskId" element={page(MaintenanceTechnician)} />
+        <Route path="maintenance/technician/tasks" element={<Navigate to="/montage" replace />} />
+        <Route path="maintenance/technician/tasks/:taskId" element={<Navigate to="/montage" replace />} />
         <Route path="/maintenance/reports" element={<Navigate to="/maintenance/tasks?view=reports" replace />} />
         <Route path="/maintenance/regie" element={page(RegieOperations)} />
         <Route path="/calendar" element={page(UnifiedCalendar)} />
         <Route path="/projects" element={<ProjectModuleRoute component={Projects} />} />
-        <Route path="/projects/flow" element={<ProjectModuleRoute component={ProjectFlow} />} />
-        <Route path="/projects/installation" element={<Navigate to="/projects/installation/tasks" replace />} />
+        <Route path="/projects/flow" element={<Navigate to="/projects" replace />} />
+        <Route path="/projects/installation" element={<Navigate to="/montage" replace />} />
         <Route path="/projects/installation/calendar" element={<Navigate to="/calendar" replace />} />
-        <Route path="/projects/installation/tasks" element={<ProjectModuleRoute component={ProjectInstallation} />} />
-        <Route path="/projects/installation/tasks/:appointmentId" element={<ProjectModuleRoute component={ProjectInstallation} />} />
-        <Route path="/projects/installation/delivery" element={<ProjectModuleRoute component={TechnicianDeliveryReports} />} />
+        <Route path="/projects/installation/tasks" element={<Navigate to="/montage" replace />} />
+        <Route path="/projects/installation/tasks/:appointmentId" element={<Navigate to="/montage" replace />} />
+        <Route path="/projects/installation/delivery" element={<Navigate to="/montage/reports" replace />} />
         <Route path="/projects/:id" element={<ProjectModuleRoute component={ProjectDetail} />} />
         <Route path="/services/reports" element={<ProjectModuleRoute component={ServiceReports} />} />
         <Route path="/services/reports/new" element={<ProjectModuleRoute component={ServiceReportAdd} />} />
         <Route path="/settings/pdf" element={page(PdfSettings)} />
+        <Route path="/settings/company-categories" element={<CompanyCategoriesAdminRoute />} />
         <Route path="/settings/mail" element={<ProjectModuleRoute component={MailSettings} />} />
         <Route path="/settings/checklists" element={<ProjectModuleRoute component={ChecklistSettings} />} />
     </>

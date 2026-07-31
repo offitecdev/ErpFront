@@ -1,243 +1,227 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    ChevronLeft,
-    ChevronRight,
-    Edit01 as EditIcon,
-    Percent01 as PercentIcon,
-    Plus,
-    Save01 as Save,
-    SearchLg as Search,
-    Tag01 as Tag,
-    Trash01 as TrashIcon,
-    X as XIcon,
-} from '@/components/icons/antIconCompat';
+import { Plus, Save01 as Save, Trash01 as TrashIcon, X as XIcon } from '@/components/icons/antIconCompat';
 
-import { Card } from '../../components/ui-shared/Card';
-import { Button } from '../../components/ui-shared/Button';
-import { Input } from '../../components/ui-shared/Field';
-import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { Modal } from '../../components/ui-shared/Modal';
-import { customerApi, type CustomerProductDiscountDto } from '../../lib/api/customer';
-import { inventoryApi } from '../../lib/api/inventory';
-import type { ArticleListItem } from '../../types/inventory';
 import { t as i18nT } from '@/i18n/translate';
+import { customerApi } from '../../lib/api/customer';
+import type { CustomerProductDiscountDto } from '../../lib/api/customer';
+import { inventoryApi } from '../../lib/api/inventory';
+import type { ArticleQuickPick } from '../../types/inventory';
+import { Button } from '../../components/ui-shared/Button';
+import { BottomSheet } from '../inventory/components/BottomSheet';
+import { CELL_INPUT_CLASS, Pager, SearchBox, SectionCard, TableStateRow } from '../../components/ui-shared/TableKit';
 
-const PAGE_SIZE = 10;
+/**
+ * ── PREISLISTE (Produktrabatte) ─────────────────────────────────────────────
+ *
+ * Tabelle mit Listenpreis, Rabatt und Nettopreis. Der Rabatt wird DIREKT in der
+ * Zelle eingegeben — ein Klick genügt, kein Umweg über ein Fenster.
+ *
+ * Gespeichert wird gesammelt: Änderungen sammeln sich lokal an und gehen mit
+ * EINEM Request raus (`bulkSaveProductDiscounts`), dessen Antwort schon die
+ * neue Liste ist. Vorher kostete jede Zeile einen POST plus einen vollständigen
+ * GET — bei zehn Zeilen zwanzig Requests.
+ *
+ * Preise kommen mit der Liste mit (`salePrice`/`netPrice` am Datensatz); der
+ * Artikelwähler benutzt den schlanken Suchpfad ohne Bestands-JOIN.
+ */
 
-const clampDiscount = (raw: string): number | null => {
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return null;
-    return Math.min(100, Math.max(0, n));
+const PAGE_SIZE = 12;
+
+const fmtMoney = (value?: number | null) =>
+    typeof value === 'number'
+        ? new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(value)
+        : '—';
+
+const netOf = (salePrice?: number | null, discount = 0) =>
+    typeof salePrice === 'number' ? Math.round(salePrice * (1 - discount / 100) * 100) / 100 : null;
+
+const apiErrorMessage = (error: unknown, fallback: string): string => {
+    const message = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+    return typeof message === 'string' && message ? message : fallback;
 };
 
-// Side panel: type-ahead paginated product search (id + name only); picking a
-// product reveals a discount input next to it.
-const ProductSearchPanel: React.FC<{
+/* ────────────────────────── Artikelwähler (Tabelle) ────────────────────────── */
+
+/**
+ * Auswahl mehrerer Artikel auf einmal — als von unten aufsteigendes Blatt
+ * (`BottomSheet`), das über das "X" oben rechts geschlossen wird. Inhalt ist
+ * eine Tabelle, keine Kartenliste; der Rabatt wird gleich in der Zeile
+ * mitgegeben und alle Treffer landen zusammen in der Preisliste.
+ */
+const ProductPickerSheet = ({
+    open,
+    existingArticleIds,
+    onClose,
+    onAdd,
+}: {
     open: boolean;
+    existingArticleIds: Set<string>;
     onClose: () => void;
-    existing: CustomerProductDiscountDto[];
-    onSubmit: (article: ArticleListItem, discount: number) => Promise<void>;
-}> = ({ open, onClose, existing, onSubmit }) => {
+    onAdd: (rows: Array<{ article: ArticleQuickPick; discount: number }>) => void;
+}) => {
     const [search, setSearch] = useState('');
     const [debounced, setDebounced] = useState('');
     const [page, setPage] = useState(1);
-    const [items, setItems] = useState<ArticleListItem[]>([]);
+    const [items, setItems] = useState<ArticleQuickPick[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [selected, setSelected] = useState<ArticleListItem | null>(null);
-    const [discountInput, setDiscountInput] = useState('');
-    const [saving, setSaving] = useState(false);
+    const [picked, setPicked] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        if (!open) {
-            setSearch('');
-            setDebounced('');
-            setPage(1);
-            setSelected(null);
-            setDiscountInput('');
-        }
-    }, [open]);
-
-    useEffect(() => {
-        const handle = window.setTimeout(() => {
-            setPage(1);
-            setDebounced(search.trim());
-        }, 300);
-        return () => window.clearTimeout(handle);
+        const timer = window.setTimeout(() => { setDebounced(search); setPage(1); }, 300);
+        return () => window.clearTimeout(timer);
     }, [search]);
 
     useEffect(() => {
         if (!open) return;
         let cancelled = false;
-        (async () => {
-            try {
-                setLoading(true);
-                const res = await inventoryApi.articlesSummaryPaged({ page, pageSize: PAGE_SIZE, search: debounced || undefined });
-                if (!cancelled) {
-                    setItems(res.items ?? []);
-                    setTotal(res.total ?? 0);
-                }
-            } catch {
-                if (!cancelled) {
-                    setItems([]);
-                    setTotal(0);
-                    toast.error(i18nT('crm.productDiscountSearchError'));
-                }
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
+        setLoading(true);
+        inventoryApi.articlesQuickPick({ page, pageSize: PAGE_SIZE, search: debounced || undefined })
+            .then((result) => {
+                if (cancelled) return;
+                setItems(result.items);
+                setTotal(result.total);
+            })
+            .catch(() => { if (!cancelled) { setItems([]); setTotal(0); } })
+            .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [open, page, debounced]);
 
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const existingByArticle = new Map(existing.map((d) => [d.articleId, d.discount]));
+    useEffect(() => {
+        if (!open) { setPicked({}); setSearch(''); setPage(1); }
+    }, [open]);
 
-    const pickArticle = (article: ArticleListItem) => {
-        setSelected(article);
-        const current = existingByArticle.get(article.id);
-        setDiscountInput(current !== undefined ? String(current) : '');
-    };
-
-    const handleSave = async () => {
-        if (!selected) return;
-        const discount = clampDiscount(discountInput);
-        if (discount === null) {
-            toast.error(i18nT('crm.productDiscountInvalid'));
+    const confirm = () => {
+        const rows = Object.entries(picked)
+            .map(([articleId, raw]) => {
+                const article = items.find((item) => item.id === articleId);
+                const discount = Number(String(raw).replace(',', '.'));
+                return article && Number.isFinite(discount) && discount >= 0 && discount <= 100
+                    ? { article, discount }
+                    : null;
+            })
+            .filter((row): row is { article: ArticleQuickPick; discount: number } => row !== null);
+        if (rows.length === 0) {
+            toast.error(i18nT('crm.productDiscountPickNone'));
             return;
         }
-        try {
-            setSaving(true);
-            await onSubmit(selected, discount);
-            setSelected(null);
-            setDiscountInput('');
-        } finally {
-            setSaving(false);
-        }
+        onAdd(rows);
+        onClose();
     };
 
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
     return (
-        <Modal
+        <BottomSheet
             open={open}
             title={i18nT('crm.productDiscountAdd')}
-            description={i18nT('crm.productDiscountAddHint')}
+            subtitle={i18nT('crm.productDiscountPickHint')}
             onClose={onClose}
-            placement="drawer"
-            drawerWidth="md"
+            width={1080}
+            height={720}
+            footer={
+                <>
+                    <span className="text-[12px] text-slate-500 dark:text-white/60">
+                        {`${Object.keys(picked).length} / ${items.length}`}
+                    </span>
+                    <Button variant="primary" icon={<Plus size={13} />} onClick={confirm}>{i18nT('common.add')}</Button>
+                </>
+            }
         >
-            <div className="relative mb-3">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                    autoFocus
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder={i18nT('crm.productDiscountSearchPlaceholder')}
-                    className="w-full pl-8 pr-3 py-2 text-[13px] border border-slate-200 rounded-md bg-slate-50/80 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-700/10 focus:border-blue-400"
-                />
-            </div>
-
-            {loading ? (
-                <div className="animate-pulse space-y-2 py-2">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="h-10 rounded-md bg-slate-50 border border-slate-100" />
-                    ))}
-                </div>
-            ) : items.length === 0 ? (
-                <div className="text-[12.5px] text-slate-400 text-center py-8">
-                    {debounced ? i18nT('crm.productDiscountNoResults') : i18nT('crm.productDiscountTypeToSearch')}
-                </div>
-            ) : (
-                <div className="divide-y divide-slate-100 border border-slate-100 rounded-md">
-                    {items.map((article) => {
-                        const isSelected = selected?.id === article.id;
-                        const existingDiscount = existingByArticle.get(article.id);
-                        return (
-                            <div key={article.id} className={isSelected ? 'bg-blue-50/60' : ''}>
-                                <button
-                                    type="button"
-                                    onClick={() => pickArticle(article)}
-                                    className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-slate-50"
-                                >
-                                    <span className="font-mono text-[11.5px] text-slate-500 w-24 flex-shrink-0 truncate">{article.articleCode}</span>
-                                    <span className="text-[13px] text-slate-800 truncate flex-1">{article.name}</span>
-                                    {existingDiscount !== undefined && !isSelected && (
-                                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 rounded px-1.5 py-0.5 flex-shrink-0">
-                                            {existingDiscount}%
-                                        </span>
-                                    )}
-                                </button>
-                                {isSelected && (
-                                    <div className="flex items-center gap-2 px-3 pb-2.5">
-                                        <PercentIcon size={13} className="text-slate-400 flex-shrink-0" />
-                                        <Input
-                                            autoFocus
+            <div className="space-y-2 p-4">
+                <SearchBox value={search} onChange={setSearch} placeholder={i18nT('crm.productDiscountSearch')} autoFocus />
+                <table data-inv-table data-unstyled-table className="w-full">
+                    <thead>
+                        <tr>
+                            <th className="w-36 text-left">{i18nT('crm.productDiscountColArticle')}</th>
+                            <th className="text-left">{i18nT('common.name')}</th>
+                            <th className="w-32 text-right">{i18nT('crm.listPrice')}</th>
+                            <th className="w-32 text-right">{i18nT('crm.discountPercent')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(loading || items.length === 0) && (
+                            <TableStateRow colSpan={4} loading={loading} emptyText={i18nT('crm.productDiscountEmpty')} />
+                        )}
+                        {!loading && items.map((article) => {
+                            const already = existingArticleIds.has(article.id);
+                            return (
+                                <tr key={article.id} className={already ? 'opacity-50' : 'transition-colors hover:bg-slate-50 dark:hover:bg-white/5'}>
+                                    <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">{article.articleCode || '—'}</td>
+                                    <td className="truncate text-slate-800 dark:text-white/85">{article.name}</td>
+                                    <td className="text-right font-mono tabular-nums">{fmtMoney(article.salePrice)}</td>
+                                    <td className="text-right">
+                                        <input
                                             type="number"
                                             min={0}
                                             max={100}
                                             step="0.1"
-                                            value={discountInput}
-                                            onChange={(e) => setDiscountInput(e.target.value)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleSave(); } }}
-                                            placeholder={i18nT('crm.productDiscountPercent')}
-                                            className="w-28"
+                                            disabled={already}
+                                            value={picked[article.id] ?? ''}
+                                            placeholder={already ? i18nT('crm.alreadyInList') : '0'}
+                                            onChange={(event) => {
+                                                const next = event.target.value;
+                                                setPicked((current) => {
+                                                    const copy = { ...current };
+                                                    if (next === '') delete copy[article.id];
+                                                    else copy[article.id] = next;
+                                                    return copy;
+                                                });
+                                            }}
+                                            className={`${CELL_INPUT_CLASS} text-right`}
                                         />
-                                        <Button variant="primary" size="sm" loading={saving} icon={<Save size={12} />} onClick={() => void handleSave()}>
-                                            {i18nT('common.save')}
-                                        </Button>
-                                        <Button variant="secondary" size="sm" icon={<XIcon size={12} />} onClick={() => setSelected(null)}>
-                                            {i18nT('common.cancel')}
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-3 text-[12px] text-slate-500">
-                    <span>{i18nT('common.total')} {total}</span>
-                    <div className="inline-flex items-center gap-1.5">
-                        <button
-                            type="button"
-                            disabled={page <= 1}
-                            onClick={() => setPage(page - 1)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-                        >
-                            <ChevronLeft size={13} />
-                        </button>
-                        <span className="font-medium text-slate-700">{page} / {totalPages}</span>
-                        <button
-                            type="button"
-                            disabled={page >= totalPages}
-                            onClick={() => setPage(page + 1)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
-                        >
-                            <ChevronRight size={13} />
-                        </button>
-                    </div>
-                </div>
-            )}
-        </Modal>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                <Pager page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+            </div>
+        </BottomSheet>
     );
 };
 
-export const CustomerProductDiscounts: React.FC<{ customerId: string }> = ({ customerId }) => {
-    const [discounts, setDiscounts] = useState<CustomerProductDiscountDto[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [panelOpen, setPanelOpen] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editValue, setEditValue] = useState('');
-    const [savingEdit, setSavingEdit] = useState(false);
-    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-    const [deleting, setDeleting] = useState(false);
+/* ─────────────────────────────── Preisliste ─────────────────────────────── */
 
-    const fetchDiscounts = useCallback(async () => {
+/** Eine Zeile der Preisliste; `id` fehlt bei noch nicht gespeicherten Zeilen. */
+interface DiscountRow {
+    id: string | null;
+    articleId: string;
+    articleCode: string | null;
+    articleName: string | null;
+    salePrice: number | null;
+    discount: number;
+}
+
+const toRow = (dto: CustomerProductDiscountDto): DiscountRow => ({
+    id: dto.id,
+    articleId: dto.articleId,
+    articleCode: dto.articleCode ?? null,
+    articleName: dto.articleName ?? null,
+    salePrice: dto.salePrice ?? null,
+    discount: dto.discount,
+});
+
+export const CustomerProductDiscounts = ({ customerId }: { customerId: string }) => {
+    const [rows, setRows] = useState<DiscountRow[]>([]);
+    const [saved, setSaved] = useState<DiscountRow[]>([]);
+    const [deletedIds, setDeletedIds] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+    const [filter, setFilter] = useState('');
+
+    const load = useCallback(async () => {
+        setLoading(true);
         try {
-            const rows = await customerApi.listProductDiscounts(customerId);
-            setDiscounts(rows);
+            const result = await customerApi.listProductDiscounts(customerId);
+            const mapped = result.map(toRow);
+            setRows(mapped);
+            setSaved(mapped);
+            setDeletedIds([]);
         } catch {
             toast.error(i18nT('crm.productDiscountLoadError'));
         } finally {
@@ -245,164 +229,205 @@ export const CustomerProductDiscounts: React.FC<{ customerId: string }> = ({ cus
         }
     }, [customerId]);
 
-    useEffect(() => {
-        setLoading(true);
-        void fetchDiscounts();
-    }, [fetchDiscounts]);
+    useEffect(() => { void load(); }, [load]);
 
-    const handleUpsert = async (article: ArticleListItem, discount: number) => {
-        try {
-            await customerApi.upsertProductDiscount(customerId, { articleId: article.id, discount });
-            toast.success(i18nT('crm.productDiscountSaved'));
-            await fetchDiscounts();
-        } catch (e: any) {
-            toast.error(e?.response?.data?.error || i18nT('common.error'));
-        }
+    const dirty = useMemo(() => {
+        if (deletedIds.length > 0) return true;
+        if (rows.length !== saved.length) return true;
+        const savedByArticle = new Map(saved.map((row) => [row.articleId, row.discount]));
+        return rows.some((row) => savedByArticle.get(row.articleId) !== row.discount);
+    }, [rows, saved, deletedIds]);
+
+    const setDiscount = (articleId: string, value: number) =>
+        setRows((current) => current.map((row) => (row.articleId === articleId ? { ...row, discount: value } : row)));
+
+    const removeRow = (row: DiscountRow) => {
+        setRows((current) => current.filter((item) => item.articleId !== row.articleId));
+        if (row.id) setDeletedIds((current) => [...current, row.id!]);
     };
 
-    const startEdit = (row: CustomerProductDiscountDto) => {
-        setEditingId(row.id);
-        setEditValue(String(row.discount));
+    const addFromPicker = (picked: Array<{ article: ArticleQuickPick; discount: number }>) => {
+        setRows((current) => [
+            ...picked.map(({ article, discount }) => ({
+                id: null,
+                articleId: article.id,
+                articleCode: article.articleCode ?? null,
+                articleName: article.name,
+                salePrice: article.salePrice ?? null,
+                discount,
+            })),
+            ...current,
+        ]);
     };
 
-    const handleUpdate = async (row: CustomerProductDiscountDto) => {
-        const discount = clampDiscount(editValue);
-        if (discount === null) {
-            toast.error(i18nT('crm.productDiscountInvalid'));
-            return;
-        }
+    /** Alles auf einmal: ein Request, dessen Antwort die neue Liste ist. */
+    const saveAll = async () => {
+        if (!dirty) return;
+        const savedByArticle = new Map(saved.map((row) => [row.articleId, row.discount]));
+        const upserts = rows
+            .filter((row) => savedByArticle.get(row.articleId) !== row.discount)
+            .map((row) => ({ articleId: row.articleId, discount: row.discount }));
         try {
-            setSavingEdit(true);
-            await customerApi.updateProductDiscount(customerId, row.id, { discount });
-            toast.success(i18nT('crm.productDiscountSaved'));
-            setEditingId(null);
-            await fetchDiscounts();
-        } catch (e: any) {
-            toast.error(e?.response?.data?.error || i18nT('common.error'));
+            setSaving(true);
+            const result = await customerApi.bulkSaveProductDiscounts(customerId, { upserts, deleteIds: deletedIds });
+            const mapped = result.map(toRow);
+            setRows(mapped);
+            setSaved(mapped);
+            setDeletedIds([]);
+            setEditingArticleId(null);
+            toast.success(i18nT('crm.productDiscountsSaved'));
+        } catch (error: unknown) {
+            toast.error(apiErrorMessage(error, i18nT('crm.productDiscountSaveError')));
         } finally {
-            setSavingEdit(false);
+            setSaving(false);
         }
     };
 
-    const handleDelete = async () => {
-        if (!confirmDeleteId) return;
-        try {
-            setDeleting(true);
-            await customerApi.deleteProductDiscount(customerId, confirmDeleteId);
-            toast.success(i18nT('crm.productDiscountDeleted'));
-            setConfirmDeleteId(null);
-            await fetchDiscounts();
-        } catch (e: any) {
-            toast.error(e?.response?.data?.error || i18nT('common.error'));
-        } finally {
-            setDeleting(false);
-        }
+    const discard = () => {
+        setRows(saved);
+        setDeletedIds([]);
+        setEditingArticleId(null);
     };
+
+    const visible = useMemo(() => {
+        const needle = filter.trim().toLowerCase();
+        if (!needle) return rows;
+        return rows.filter((row) =>
+            (row.articleCode ?? '').toLowerCase().includes(needle)
+            || (row.articleName ?? '').toLowerCase().includes(needle));
+    }, [rows, filter]);
+
+    const existingArticleIds = useMemo(() => new Set(rows.map((row) => row.articleId)), [rows]);
 
     return (
         <>
-            <Card
-                title={i18nT('crm.tab_productDiscounts')}
-                description={i18nT('crm.productDiscountsHint')}
-                icon={<Tag size={13} />}
-                noPadding
-                actions={
-                    <Button variant="primary" size="sm" icon={<Plus size={11} />} onClick={() => setPanelOpen(true)}>
-                        {i18nT('crm.productDiscountAdd')}
-                    </Button>
+            <SectionCard
+                title={`${i18nT('crm.tab_productDiscounts')} (${rows.length})`}
+                action={
+                    <div className="flex items-center gap-2">
+                        <SearchBox value={filter} onChange={setFilter} placeholder={i18nT('common.search')} className="w-52" />
+                        <Button variant="secondary" size="sm" icon={<Plus size={12} />} onClick={() => setPickerOpen(true)}>
+                            {i18nT('crm.productDiscountAdd')}
+                        </Button>
+                    </div>
                 }
             >
-                {loading ? (
-                    <div className="px-6 py-8 animate-pulse space-y-2">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="h-10 rounded-md bg-slate-50 border border-slate-100" />
-                        ))}
-                    </div>
-                ) : discounts.length === 0 ? (
-                    <EmptyState
-                        icon={<Tag size={28} />}
-                        title={i18nT('crm.productDiscountsEmpty')}
-                        description={i18nT('crm.productDiscountsEmptyHint')}
-                        action={
-                            <Button variant="primary" size="sm" icon={<Plus size={11} />} onClick={() => setPanelOpen(true)}>
-                                {i18nT('crm.productDiscountAdd')}
-                            </Button>
-                        }
-                    />
-                ) : (
-                    <table className="w-full text-[13px] text-left">
-                        <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
-                            <tr>
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('crm.productDiscountColArticle')}</th>
-                                <th className="px-4 py-2.5 font-semibold">{i18nT('crm.productDiscountColName')}</th>
-                                <th className="px-4 py-2.5 font-semibold text-right">{i18nT('crm.productDiscountPercent')}</th>
-                                <th className="px-4 py-2.5 font-semibold text-right">{i18nT('common.actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {discounts.map((row) => (
-                                <tr key={row.id} className="group">
-                                    <td className="px-4 py-2.5 font-mono text-[12px] text-slate-600">{row.articleCode || '—'}</td>
-                                    <td className="px-4 py-2.5 text-slate-800">{row.articleName || row.articleId}</td>
-                                    <td className="px-4 py-2.5 text-right">
-                                        {editingId === row.id ? (
-                                            <div className="inline-flex items-center gap-1.5">
-                                                <Input
-                                                    autoFocus
-                                                    type="number"
-                                                    min={0}
-                                                    max={100}
-                                                    step="0.1"
-                                                    value={editValue}
-                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleUpdate(row); } }}
-                                                    className="w-24 text-right"
-                                                />
-                                                <Button variant="primary" size="sm" loading={savingEdit} icon={<Save size={12} />} onClick={() => void handleUpdate(row)} />
-                                                <Button variant="secondary" size="sm" icon={<XIcon size={12} />} onClick={() => setEditingId(null)} />
-                                            </div>
+                <table data-inv-table data-unstyled-table className="w-full">
+                    <thead>
+                        <tr>
+                            <th className="w-36 text-left">{i18nT('crm.productDiscountColArticle')}</th>
+                            <th className="text-left">{i18nT('common.name')}</th>
+                            {/* Preis, Rabatt und Nettopreis haben je eine eigene, breite
+                                Spalte — der Rabattwert quetscht sich nicht mehr neben
+                                den Preis. */}
+                            <th className="w-36 text-right">{i18nT('crm.listPrice')}</th>
+                            <th className="w-32 text-right">{i18nT('crm.discountPercent')}</th>
+                            <th className="w-36 text-right">{i18nT('crm.netPrice')}</th>
+                            <th className="w-16 text-right" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(loading || visible.length === 0) && (
+                            <TableStateRow colSpan={6} loading={loading} emptyText={i18nT('crm.productDiscountEmpty')} />
+                        )}
+                        {!loading && visible.map((row) => {
+                            const editing = editingArticleId === row.articleId;
+                            const changed = saved.find((item) => item.articleId === row.articleId)?.discount !== row.discount;
+                            return (
+                                <tr
+                                    key={row.articleId}
+                                    className={`group transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${
+                                        changed ? 'bg-amber-50/60 dark:bg-amber-400/5' : ''
+                                    }`}
+                                >
+                                    <td className="font-mono text-[13px] text-slate-500 dark:text-white/60">{row.articleCode || '—'}</td>
+                                    <td className="truncate text-slate-800 dark:text-white/85">{row.articleName || '—'}</td>
+                                    <td className="text-right font-mono text-[13px] tabular-nums text-slate-600 dark:text-white/70">
+                                        {fmtMoney(row.salePrice)}
+                                    </td>
+                                    {/* Ein Klick auf den Rabatt macht ihn zum Eingabefeld. */}
+                                    <td className="text-right" onClick={() => setEditingArticleId(row.articleId)}>
+                                        {editing ? (
+                                            <input
+                                                autoFocus
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                step="0.1"
+                                                value={row.discount}
+                                                onChange={(event) => setDiscount(row.articleId, Number(event.target.value))}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Enter') { event.preventDefault(); void saveAll(); }
+                                                    if (event.key === 'Escape') setEditingArticleId(null);
+                                                }}
+                                                onBlur={() => setEditingArticleId(null)}
+                                                className={`${CELL_INPUT_CLASS} text-right`}
+                                            />
                                         ) : (
-                                            <span className="font-semibold text-blue-700">{row.discount}%</span>
+                                            <span className="cursor-text font-mono text-[13px] font-semibold tabular-nums text-[#1f2654] dark:text-sky-300">
+                                                {row.discount}%
+                                            </span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-2.5 text-right">
-                                        <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button type="button" onClick={() => startEdit(row)} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700" title={i18nT('common.edit')}>
-                                                <EditIcon size={13} />
-                                            </button>
-                                            <button type="button" onClick={() => setConfirmDeleteId(row.id)} className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600" title={i18nT('common.delete')}>
-                                                <TrashIcon size={13} />
-                                            </button>
-                                        </div>
+                                    <td className="text-right font-mono text-[13px] font-bold tabular-nums text-slate-900 dark:text-white">
+                                        {fmtMoney(netOf(row.salePrice, row.discount))}
+                                    </td>
+                                    <td className="text-right">
+                                        <button
+                                            type="button"
+                                            onClick={() => removeRow(row)}
+                                            title={i18nT('common.delete')}
+                                            className="inline-flex size-6 items-center justify-center rounded-[2px] text-slate-300 opacity-0 transition-opacity hover:text-rose-600 group-hover:opacity-100"
+                                        >
+                                            <TrashIcon size={13} />
+                                        </button>
                                     </td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            );
+                        })}
+
+                        {/* Leerzeile: das "+" öffnet den Artikelwähler. */}
+                        <tr className="bg-slate-50/60 dark:bg-white/[0.02]">
+                            <td colSpan={5} className="text-[12.5px] text-slate-400 dark:text-white/40">
+                                {i18nT('crm.productDiscountAddHint')}
+                            </td>
+                            <td className="text-right">
+                                <button
+                                    type="button"
+                                    onClick={() => setPickerOpen(true)}
+                                    title={i18nT('crm.productDiscountAdd')}
+                                    aria-label={i18nT('crm.productDiscountAdd')}
+                                    className="inline-flex size-6 items-center justify-center rounded-[2px] border border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
+                                >
+                                    <Plus size={13} />
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Speichern-Leiste: alle offenen Änderungen gehen in EINEM Request raus. */}
+                {dirty && (
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                        <span className="mr-auto text-[12px] text-slate-500 dark:text-white/60">
+                            {i18nT('crm.unsavedChanges')}
+                        </span>
+                        <Button variant="secondary" size="sm" icon={<XIcon size={12} />} onClick={discard}>
+                            {i18nT('common.cancel')}
+                        </Button>
+                        <Button variant="primary" size="sm" loading={saving} icon={<Save size={12} />} onClick={() => void saveAll()}>
+                            {i18nT('common.save')}
+                        </Button>
+                    </div>
                 )}
-            </Card>
+            </SectionCard>
 
-            <ProductSearchPanel
-                open={panelOpen}
-                onClose={() => setPanelOpen(false)}
-                existing={discounts}
-                onSubmit={handleUpsert}
+            <ProductPickerSheet
+                open={pickerOpen}
+                existingArticleIds={existingArticleIds}
+                onClose={() => setPickerOpen(false)}
+                onAdd={addFromPicker}
             />
-
-            <Modal
-                open={confirmDeleteId !== null}
-                title={i18nT('common.delete')}
-                onClose={() => !deleting && setConfirmDeleteId(null)}
-                width="sm"
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => setConfirmDeleteId(null)} disabled={deleting}>{i18nT('common.cancel')}</Button>
-                        <Button variant="danger" loading={deleting} icon={<TrashIcon size={13} />} onClick={() => void handleDelete()}>{i18nT('common.delete')}</Button>
-                    </>
-                }
-            >
-                <p className="text-[13px] text-slate-600">{i18nT('crm.productDiscountDeleteConfirm')}</p>
-            </Modal>
         </>
     );
 };

@@ -1,4 +1,4 @@
-import { apiClient } from '../axios';
+import { apiClient, getShared } from '../axios';
 import type {
     BillingSummaryDto,
     CreateInvoiceInput,
@@ -39,15 +39,24 @@ export const billingApi = {
 };
 
 export const myOrdersApi = {
+    // getShared: StrictMode'un çift koşan efekti tek HTTP isteğine iner. Aynı
+    // feed'i paralel isteyen proje ekranları da (akış rozetleri, süreç modalı)
+    // tek çağrıyı paylaşır. Cevap paylaşıldığı için çağıranlar diziyi MUTATE
+    // ETMEMELİ — hepsi filter/map/[...].sort ile yeni dizi üretiyor.
     list: async (search?: string): Promise<MyOrderDto[]> => {
         const params = new URLSearchParams();
         if (search) params.set('search', search);
-        const res = await apiClient.get(`/sales-orders/my-orders${params.toString() ? '?' + params : ''}`);
+        const res = await getShared<MyOrderDto[]>(`/sales-orders/my-orders${params.toString() ? '?' + params : ''}`);
         return res.data;
     },
 
     getById: async (id: string): Promise<MyOrderDetailDto> => {
         const res = await apiClient.get(`/sales-orders/${id}`);
+        return res.data;
+    },
+
+    updatePaymentStages: async (id: string, stages: number[] | null): Promise<{ message: string; paymentStages: string | null }> => {
+        const res = await apiClient.patch(`/sales-orders/${id}/payment-stages`, { paymentStages: stages });
         return res.data;
     },
 };

@@ -23,6 +23,7 @@ import type { OfferScheduleSlotDto, TenderMaterialUsageDto } from '@/types/tende
 import type { ProjectMaterial } from '@/types/project';
 import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
+import { parseClosingImages } from '../../utils/tenderProduct.utils';
 import { localizeTenderNumber } from '@/utils/tenderNumber';
 import {
     flattenTenderTreeForPdf,
@@ -32,7 +33,9 @@ import {
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { RichTextMarkdownEditor, looksLikeRichHtml } from '../../TenderRichText';
 import { MailDraftsDrawer } from '../mail/MailDraftsDrawer';
-import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
+// Eski (klasik, sablon.pdf antetli) şablon — geri dönmek için bu satırı aç:
+// import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
+import type { TenderPdfTotals } from '@/utils/pdf/tenderPdfModern';
 
 const bytesToBase64 = (bytes: Uint8Array) => {
     let binary = '';
@@ -212,7 +215,9 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
             const overtimeNote = Number(localOvertimeRate || 0) > 0
                 ? (looksLikeRichHtml(form.message) ? `<br><br>${overtimeNoteText}` : `\n\n${overtimeNoteText}`)
                 : '';
-            const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdf');
+            // Eski (klasik) şablon — geri dönmek için bu satırı aç:
+            // const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdf');
+            const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdfModern');
             const pdfBytes = await buildTenderPdfBytes({
                 tenderNumber: detail.tender.tenderNumber,
                 version: detail.tender.version,
@@ -227,6 +232,10 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 positions: flattenTenderTreeForPdf(tree),
                 grandTotal,
                 totals: pdfTotals ?? null,
+                // The mailed PDF must be the same document as the exported one.
+                coverLetter: detail.tender.coverLetter,
+                closingNote: detail.tender.closingNote,
+                closingImages: parseClosingImages(detail.tender.closingImages),
             }, { ...settings, currency: toCurrencyCode((detail.tender as { currency?: string | null }).currency) });
             const res = await tenderApi.sendOfferMail(tenderId, {
                 ...form,
@@ -290,7 +299,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                 type="button"
                                 title={t('tenders.mail_drafts')}
                                 onClick={() => setDraftsOpen(true)}
-                                className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] font-medium transition-colors ${
+                                className={`flex items-center gap-1.5 rounded-[2px] border px-2 py-1 text-[12px] font-medium transition-colors ${
                                     draftsOpen
                                         ? 'border-blue-700 bg-blue-50 text-blue-700'
                                         : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800'
@@ -315,14 +324,14 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                 placeholder=""
                             />
                         </div>
-                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{t('tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i')}</div>
+                        <div className="rounded-[2px] border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{t('tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i')}</div>
                     </div>
                 )}
 
                 {activeTab === 'schedule' && (
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
                         <div className="xl:col-span-2">
-                            <div className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
+                            <div className="space-y-3 rounded-[2px] border border-slate-200 bg-white p-4">
                                 <Field label={t('common.date')}><Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} /></Field>
                                 <div className="grid grid-cols-2 gap-3">
                                     <Field label={t('common.start')}><Input type="time" value={slotForm.start} onChange={(e) => setSlotForm({ ...slotForm, start: e.target.value })} /></Field>
@@ -340,7 +349,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                             </div>
                         </div>
                         <div className="xl:col-span-3">
-                            <div className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
+                            <div className="divide-y divide-slate-100 rounded-[2px] border border-slate-200 bg-white">
                                 {slots.length === 0 && <div className="px-3 py-10 text-center text-[12px] text-slate-400">{t('tenders.appointment_not_found')}</div>}
                                 {slots.map((slot) => (
                                     <div key={slot.id} className="flex items-center justify-between gap-3 px-4 py-3 text-[12.5px]">
@@ -394,14 +403,14 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                 placeholder="0"
                             />
                         </Field>
-                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">{t('tenders.bu_field_empty_when_empty_ya_da_0_girilirse_15_uze')}</div>
+                        <div className="rounded-[2px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">{t('tenders.bu_field_empty_when_empty_ya_da_0_girilirse_15_uze')}</div>
                         <Button onClick={() => { onOvertimeHourlyRateChange(Math.max(0, Number(localOvertimeRate || 0))); toast.success(t('tenders.fazla_work_saat_ucreti_hazir')); }}>{t('tenders.ucreti_uygula')}</Button>
                     </div>
                 )}
 
                 {activeTab === 'materials' && (
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                        <div className="rounded-md border border-slate-200 bg-white">
+                        <div className="rounded-[2px] border border-slate-200 bg-white">
                             <div className="border-b border-slate-100 px-3 py-2">
                                 <h3 className="text-[12px] font-semibold text-slate-800">{t('tenders.used_materials')}</h3>
                                 <p className="mt-0.5 text-[11px] text-slate-500">{t('tenders.bu_fiyatlar_gorunur_ancak_tender_toplamina_dahil')}</p>
@@ -427,7 +436,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                 </div>
                             )}
                         </div>
-                        <div className="rounded-md border border-slate-200 bg-white">
+                        <div className="rounded-[2px] border border-slate-200 bg-white">
                             <div className="border-b border-slate-100 px-3 py-2">
                                 <h3 className="text-[12px] font-semibold text-slate-800">{t('nav.materials')}</h3>
                                 <p className="mt-0.5 text-[11px] text-slate-500">{t('tenders.material_stock_duser_price_only_info_amacli')}</p>
@@ -447,7 +456,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                     </Select>
                                 </Field>
                                 {selectedTenderMaterial && (
-                                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
+                                    <div className="rounded-[2px] border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
                                         <div className="flex items-center justify-between gap-3">
                                             <span>{selectedTenderMaterial.name}</span>
                                             <span className="font-mono">{fmtMoney(selectedTenderMaterial.unitCost)}</span>
@@ -490,7 +499,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
     if (inline) {
         if (!open) return null;
         return (
-            <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-[2px] border border-slate-200 bg-white p-4 shadow-sm">
                 {content}
             </div>
         );

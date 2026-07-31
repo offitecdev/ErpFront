@@ -133,7 +133,7 @@ export const Dashboard = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => navigate('/projects/installation/tasks')}
+                        onClick={() => navigate('/montage/orders/active')}
                         className="flex items-center justify-between rounded-md border border-slate-200/70 bg-white px-4 py-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
                     >
                         <span>

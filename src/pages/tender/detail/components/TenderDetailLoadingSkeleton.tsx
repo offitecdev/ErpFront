@@ -7,9 +7,9 @@ export const TenderDetailLoadingSkeleton = () => (
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-20 rounded-md border border-slate-100 bg-slate-50" />
+                <div key={i} className="h-20 rounded-[2px] border border-slate-100 bg-slate-50" />
             ))}
         </div>
-        <div className="h-72 rounded-md border border-slate-100 bg-slate-50" />
+        <div className="h-72 rounded-[2px] border border-slate-100 bg-slate-50" />
     </div>
 );

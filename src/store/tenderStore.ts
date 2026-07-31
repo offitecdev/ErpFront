@@ -98,28 +98,33 @@ export const useTenderStore = create<TenderState>((set, get) => ({
     setFilter: (filter) => set({ filter }),
 
     fetchList: async (override) => {
+        // Verilen filtre SAKLANIR. TenderList her turda override geçiyor ama
+        // bunu `filter`a yazan kimse yoktu; `filter` sonsuza dek {} kalıyordu.
+        // İçe aktarma / onaylama / yeni sürüm sonrası mutasyonlar fetchList'i
+        // ARGÜMANSIZ çağırdığından istek {} ile gidiyor, sayfalama düşüyor ve
+        // sunucu tenant'ın BÜTÜN tekliflerini tek cevapta döndürüyordu.
+        if (override) set({ filter: override });
         const filter = override ?? get().filter;
+
+        // Liste her zaman sayfalı çekilir — sayfa/pageSize verilmediyse mevcut
+        // sayfa boyutuna düşülür. "Hepsini getir" yolu bilinçli olarak yok:
+        // bu store yalnızca sayfalı teklif listesini besliyor.
+        const paged = {
+            ...filter,
+            page: filter.page ?? get().listPage,
+            pageSize: filter.pageSize ?? get().listPageSize,
+        };
+
         set({ loadingList: true });
         try {
-            if (filter.page || filter.pageSize) {
-                const res = await tenderApi.listPaged(filter);
-                set({
-                    list: res.items,
-                    listTotal: res.total,
-                    listPage: res.page,
-                    listPageSize: res.pageSize,
-                    listTotalPages: res.totalPages,
-                });
-            } else {
-                const res = await tenderApi.list(filter);
-                set({
-                    list: res,
-                    listTotal: res.length,
-                    listPage: 1,
-                    listPageSize: res.length || 10,
-                    listTotalPages: 1,
-                });
-            }
+            const res = await tenderApi.listPaged(paged);
+            set({
+                list: res.items,
+                listTotal: res.total,
+                listPage: res.page,
+                listPageSize: res.pageSize,
+                listTotalPages: res.totalPages,
+            });
         } finally {
             set({ loadingList: false });
         }

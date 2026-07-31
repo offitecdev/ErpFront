@@ -9,6 +9,17 @@ interface User {
     tenantId: string;
     employeeRoles?: any[];
     roleName?: string;
+    /** Per-entity module packages of the user's role(s), keyed by tenant id —
+        the only source of "pages this person may open". No entry for a tenant =
+        no restriction from the role there. */
+    roleModuleKeysByTenant?: Record<string, string[]>;
+}
+
+export interface TenantModuleProfile {
+    id: string;
+    profileNumber: number;
+    name: string;
+    moduleKeys: string[];
 }
 
 export interface TenantOption {
@@ -16,6 +27,9 @@ export interface TenantOption {
     tenantName: string;
     parentTenantId: string | null;
     isProjectModuleEnabled: boolean;
+    /** Company category ("Numara" profile); null/undefined = all modules enabled. */
+    moduleProfileId?: string | null;
+    moduleProfile?: TenantModuleProfile | null;
 }
 
 // Tokens live exclusively in HttpOnly cookies set by the server — JavaScript

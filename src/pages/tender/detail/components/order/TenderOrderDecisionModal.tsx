@@ -63,7 +63,7 @@ export const TenderOrderDecisionModal = ({
                 <button
                     type="button"
                     onClick={() => onModeChange('PROJECT_NEW')}
-                    className={`rounded-md border px-3 py-3 text-left transition-colors ${mode === 'PROJECT_NEW' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
+                    className={`rounded-[2px] border px-3 py-3 text-left transition-colors ${mode === 'PROJECT_NEW' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
                 >
                     <div className="text-[13px] font-semibold">{t('tenders.project_icin_order_create')}</div>
                     <div className="mt-1 text-[11.5px] text-slate-500">{t('tenders.create_project_or_link_existing')}</div>
@@ -75,7 +75,7 @@ export const TenderOrderDecisionModal = ({
                         onAttachExistingChange(false);
                         onSelectProject(null);
                     }}
-                    className={`rounded-md border px-3 py-3 text-left transition-colors ${mode === 'INVOICE' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
+                    className={`rounded-[2px] border px-3 py-3 text-left transition-colors ${mode === 'INVOICE' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
                 >
                     <div className="text-[13px] font-semibold">{t('tenders.invoice_icin_order_create')}</div>
                     <div className="mt-1 text-[11.5px] text-slate-500">{t('tenders.project_olusturulmaz_crm_order_listesine_duser')}</div>
@@ -83,7 +83,7 @@ export const TenderOrderDecisionModal = ({
             </div>
 
             {mode === 'PROJECT_NEW' && (
-                <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/60 p-3">
+                <div className="space-y-3 rounded-[2px] border border-slate-200 bg-slate-50/60 p-3">
                     <label className="flex items-center gap-2 text-[12px] font-medium text-slate-700">
                         <input
                             type="checkbox"
@@ -107,7 +107,7 @@ export const TenderOrderDecisionModal = ({
                                     placeholder={t('tenders.project_adi_customer_veya_tender_no')}
                                 />
                             </Field>
-                            <div className="max-h-52 overflow-y-auto rounded-md border border-slate-200 bg-white">
+                            <div className="max-h-52 overflow-y-auto rounded-[2px] border border-slate-200 bg-white">
                                 {projectSearchLoading ? (
                                     <div className="px-3 py-4 text-center text-[12px] text-slate-400">{t('tenders.projects_araniyor')}</div>
                                 ) : projectSearchResults.length === 0 ? (

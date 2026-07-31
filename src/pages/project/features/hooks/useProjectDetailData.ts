@@ -12,9 +12,9 @@ const scopeForView = (view: ProjectDetailView): ProjectDetailScope => {
         case 'planning':
             return view.subSection === 'appointmentMail' ? 'overview' : 'planning';
         case 'field':
-            if (view.subSection === 'generalReport') return 'generalReport';
-            if (view.subSection === 'delivery') return 'delivery';
-            if (view.subSection === 'signatures') return 'signatures';
+            // The consolidated Reports hub always runs on the lean fieldReports
+            // read model; PDF preview/download fetch the full 'generalReport'
+            // graph on demand instead of paying for images/signatures up front.
             return 'fieldReports';
         case 'costs':
             if (view.subSection === 'materials') return 'materials';
@@ -34,7 +34,9 @@ const scopeForView = (view: ProjectDetailView): ProjectDetailScope => {
 
 const needsMaterialPicker = (view: ProjectDetailView) =>
     (view.section === 'planning' && view.subSection !== 'appointmentMail')
-    || (view.section === 'field' && (!view.subSection || view.subSection === 'fieldReports'));
+    // The whole Reports hub can open the field-report editor (and its product
+    // picker popup), regardless of which legacy sub-section the URL carries.
+    || view.section === 'field';
 
 const needsMailSettings = (view: ProjectDetailView) =>
     view.section === 'planning' && view.subSection === 'appointmentMail';

@@ -3,6 +3,7 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
 import { MainLayout } from '../components/layout/MainLayout';
 import { lazyNamed, page, renderAppPageRoutes } from './appPageRoutes';
+import { renderMontageRoutes } from './montageRoutes';
 
 const Login = lazyNamed(() => import('../pages/Login'), 'Login');
 const BookingPage = lazyNamed(() => import('../pages/project/BookingPage'), 'BookingPage');
@@ -22,6 +23,9 @@ export const AppRouter = () => {
 
             <Route element={<ProtectedRoute />}>
                 <Route element={<MainLayout />}>
+                    {/* Technician montage screens: inside the panel (app header
+                        stays); MainLayout hides the sidebar on /montage paths. */}
+                    {renderMontageRoutes()}
                     {renderAppPageRoutes()}
                 </Route>
             </Route>

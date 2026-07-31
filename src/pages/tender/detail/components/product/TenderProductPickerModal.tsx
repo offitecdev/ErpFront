@@ -9,7 +9,7 @@ import { Button } from '@/components/ui-shared/Button';
 import { Field, Input } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { t } from '@/i18n/translate';
-import type { ArticleListItem } from '@/types/inventory';
+import type { ArticleQuickPick } from '@/types/inventory';
 
 import { PRODUCT_PICKER_PAGE_SIZE } from '../../utils/tenderDetail.constants';
 
@@ -19,13 +19,13 @@ type TenderProductPickerModalProps = {
     productSearch: string;
     onSearchChange: (value: string) => void;
     loading: boolean;
-    items: ArticleListItem[];
+    items: ArticleQuickPick[];
     total: number;
     currentPage: number;
     onPageChange: (page: number) => void;
     onCreateManualProduct: () => void;
     onCreateStockArticle: () => void;
-    onSelectArticle: (article: ArticleListItem) => void;
+    onSelectArticle: (article: ArticleQuickPick) => void;
 };
 
 export const TenderProductPickerModal = ({
@@ -63,7 +63,7 @@ export const TenderProductPickerModal = ({
                         placeholder={t('tenders.product_name_stock_code_barcode_or_category')}
                     />
                 </Field>
-                <div className="max-h-[520px] overflow-y-auto rounded-md border border-slate-200 bg-white">
+                <div className="max-h-[520px] overflow-y-auto rounded-[2px] border border-slate-200 bg-white">
                     {loading ? (
                         <div className="px-4 py-10 text-center text-[12px] text-slate-400">{t('tenders.productler_loading')}</div>
                     ) : isEmpty ? (
@@ -80,25 +80,39 @@ export const TenderProductPickerModal = ({
                     ) : (
                         <div className="divide-y divide-slate-100">
                             {items.map((article) => (
-                                <div key={article.id} className="group flex items-center gap-2 px-3 py-2 transition-colors hover:bg-[#1f2654]">
-                                    {/* Tag icon opens the product's detail page in a new window. */}
+                                // The whole row selects, padding included — a click that
+                                // highlights the row must never land on a dead zone.
+                                <div
+                                    key={article.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    title={article.name}
+                                    onClick={() => onSelectArticle(article)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            onSelectArticle(article);
+                                        }
+                                    }}
+                                    className="ofi-option-row group flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors hover:bg-[#1f2654]"
+                                >
+                                    {/* Tag icon opens the product's detail page in a new
+                                        window; it must not also select the row. */}
                                     <button
                                         type="button"
-                                        onClick={() => window.open(`/inventory/articles/${article.id}`, '_blank', 'noopener')}
-                                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-colors hover:border-[#1f2654] hover:text-[#1f2654]"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            window.open(`/inventory/articles/${article.id}`, '_blank', 'noopener');
+                                        }}
+                                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-400 transition-colors hover:border-[#1f2654] hover:text-[#1f2654]"
                                         title={t('common.detail')}
                                         aria-label={t('common.detail')}
                                     >
                                         <Tag size={14} />
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => onSelectArticle(article)}
-                                        className="min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] font-medium text-slate-800 transition-colors group-hover:text-white!"
-                                        title={article.name}
-                                    >
+                                    <span className="min-w-0 flex-1 truncate text-left text-[13.5px] font-medium text-slate-800 transition-colors group-hover:!text-white">
                                         {article.name}
-                                    </button>
+                                    </span>
                                 </div>
                             ))}
                         </div>

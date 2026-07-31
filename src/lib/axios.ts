@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../store/authStore';
 
 const productionApiUrl = 'https://demo.offitec.ch/backend/api/v1';
@@ -93,6 +94,30 @@ const refreshSession = async (): Promise<boolean> => {
     } catch {
         return false;
     }
+};
+
+// Single-flight GET: aynı URL için uçuşta olan bir istek varsa ikincisi yeni
+// bir HTTP çağrısı açmaz, aynı promise'i paylaşır. Bunu asıl tetikleyen
+// StrictMode: dev'de efektler iki kez koşuyor ve liste sayfaları aynı isteği
+// iki kez atıyordu (`cancelled` bayrağı yalnızca ikinci cevabı yok sayar,
+// isteği iptal etmez). Aynı veriyi paralel isteyen iki bileşen de tek çağrıya
+// iner. Cevap paylaşıldığı için çağıranlar `response.data`yı MUTATE ETMEMELİ.
+const inFlightGets = new Map<string, Promise<AxiosResponse<unknown>>>();
+
+export const getShared = <T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    // Tenant başlığı cevabı değiştirir — anahtarın parçası olmalı.
+    const tenantKey = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId') || '';
+    const key = `${tenantKey}|${url}|${config?.params ? JSON.stringify(config.params) : ''}`;
+
+    const pending = inFlightGets.get(key);
+    if (pending) return pending as Promise<AxiosResponse<T>>;
+
+
+    const request = apiClient.get<T>(url, config).finally(() => {
+        inFlightGets.delete(key);
+    });
+    inFlightGets.set(key, request);
+    return request;
 };
 
 apiClient.interceptors.response.use(

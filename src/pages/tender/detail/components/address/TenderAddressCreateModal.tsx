@@ -2,17 +2,14 @@ import { Plus } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
 import { Field, Input, Select } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
+import { AddressFields } from '@/components/ui-shared/AddressFields';
 import { t } from '@/i18n/translate';
 
-export type TenderAddressTarget = 'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER';
-
-export type TenderAddressCreateForm = {
-    name: string;
-    address: string;
-    postalCode: string;
-    city: string;
-    country: string;
-};
+// Form tipi ve bos degeri `detail/utils/tenderAddress.utils.ts` icinde yasar —
+// bu dosya `lazy()` ile yuklenir, sabitleri buradan import etmek parcayi ana
+// pakete geri cekerdi.
+export type { TenderAddressCreateForm, TenderAddressTarget } from '../../utils/tenderAddress.utils';
+import type { TenderAddressCreateForm, TenderAddressTarget } from '../../utils/tenderAddress.utils';
 
 type TenderAddressCreateModalProps = {
     open: boolean;
@@ -59,18 +56,9 @@ export const TenderAddressCreateModal = ({
             <Field label={t('crm.locationName')} className="sm:col-span-2">
                 <Input value={form.name} onChange={(e) => onFormChange({ ...form, name: e.target.value })} />
             </Field>
-            <Field label={t('common.address')} className="sm:col-span-2">
-                <Input value={form.address} onChange={(e) => onFormChange({ ...form, address: e.target.value })} />
-            </Field>
-            <Field label={t('crm.postalCode')}>
-                <Input value={form.postalCode} onChange={(e) => onFormChange({ ...form, postalCode: e.target.value })} />
-            </Field>
-            <Field label={t('crm.city')}>
-                <Input value={form.city} onChange={(e) => onFormChange({ ...form, city: e.target.value })} />
-            </Field>
-            <Field label={t('crm.country')} className="sm:col-span-2">
-                <Input value={form.country} onChange={(e) => onFormChange({ ...form, country: e.target.value })} />
-            </Field>
+            <div className="sm:col-span-2">
+                <AddressFields value={form} onChange={(next) => onFormChange({ ...form, ...next })} />
+            </div>
         </div>
     </Modal>
 );

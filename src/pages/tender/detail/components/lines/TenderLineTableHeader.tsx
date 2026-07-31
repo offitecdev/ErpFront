@@ -13,7 +13,7 @@ type TenderLineHeaderCellProps = {
 
 export const TenderLineHeaderCell = ({ label, align = 'right', className, noTruncate, onResizeStart, onResizeReset }: TenderLineHeaderCellProps) => (
     <th
-        className={`relative border-l border-slate-200/70 px-1.5 py-2 font-semibold ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className || ''}`}
+        className={`relative ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className || ''}`}
     >
         <span className={`block ${noTruncate ? 'whitespace-nowrap' : 'truncate'}`}>{label}</span>
         {onResizeStart && (

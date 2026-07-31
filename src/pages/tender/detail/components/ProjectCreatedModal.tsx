@@ -33,7 +33,7 @@ export const ProjectCreatedModal: React.FC<ProjectCreatedModalProps> = ({
             destroyOnHidden
         >
             <div className="flex items-start gap-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-[2px] bg-emerald-50 text-emerald-600">
                     <CheckCircle size={22} />
                 </div>
                 <div className="min-w-0 flex-1">

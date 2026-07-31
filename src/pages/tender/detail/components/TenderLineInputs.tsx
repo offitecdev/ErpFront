@@ -1,10 +1,15 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import AntInput, { type InputRef } from 'antd/es/input';
-import InputNumber from 'antd/es/input-number';
 
 import type { NumberField, TextField } from '../types/tenderDetail.types';
 
 const INLINE_INPUT_FONT_FAMILY = "'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
+
+/**
+ * Tells a cell input to discard its in-progress text and blur WITHOUT
+ * committing. Dispatch it on the input element itself:
+ *   input.dispatchEvent(new CustomEvent(RESET_DRAFT_EVENT))
+ */
+export const RESET_DRAFT_EVENT = 'ofi:reset-draft';
 
 type InlineCellNavProps = {
     positionId: string;
@@ -14,6 +19,9 @@ type InlineCellNavProps = {
     onArrowNav: (col: string, rowIndex: number, dir: 1 | -1) => boolean;
 };
 
+// Plain native <input> (no Ant Design): the value is buffered locally while the
+// cell is focused and committed on blur/Enter. Font size is STATIC — the text
+// never rescales with content length; overflow relies on native input scroll.
 export const BufferedTextInput = memo(({
     ariaLabel,
     value,
@@ -25,17 +33,28 @@ export const BufferedTextInput = memo(({
     navCol,
     registerCell,
     onArrowNav,
+    onDraftChange,
+    autoFocus,
 }: {
     ariaLabel: string;
     value: string;
     className: string;
     field: TextField;
     commit: (positionId: string, field: TextField, value: string) => void;
+    /**
+     * Live draft text plus the input it came from. The article suggestions are
+     * driven from here — while typing, and also on focusing an EMPTY cell, so a
+     * blank row offers the first products straight away. A filled cell stays a
+     * plain text field until the user actually edits it.
+     */
+    onDraftChange?: (value: string, anchor: HTMLInputElement) => void;
+    /** Set on a freshly added row: take focus so the user can type immediately. */
+    autoFocus?: boolean;
 } & InlineCellNavProps) => {
     const [draft, setDraft] = useState(value);
     const focusedRef = useRef(false);
     const skipCommitRef = useRef(false);
-    const inputRef = useRef<InputRef>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!focusedRef.current) setDraft(value);
@@ -43,9 +62,46 @@ export const BufferedTextInput = memo(({
 
     useEffect(() => {
         const key = `${navCol}:${rowIndex}`;
-        registerCell(key, { focus: () => inputRef.current?.focus({ cursor: 'all' }) });
+        registerCell(key, {
+            focus: () => {
+                // preventScroll: arrow-key navigation between cells must move the
+                // caret without the browser scrolling the row into view — that
+                // was what nudged the page up/down on every keystroke.
+                inputRef.current?.focus({ preventScroll: true });
+                inputRef.current?.select();
+            },
+        });
         return () => registerCell(key, null);
     }, [navCol, rowIndex, registerCell]);
+
+    // Runs once per newly added blank row: put the caret in the cell. The
+    // focus handler below then opens the article list — the cell is empty, so
+    // the first products appear without a single keystroke.
+    useEffect(() => {
+        if (!autoFocus) return;
+        inputRef.current?.focus({ preventScroll: true });
+    }, [autoFocus]);
+
+    // Explicit "abandon what was typed" channel for the article combobox.
+    //
+    // When an article is picked, the search text sitting in this cell must be
+    // dropped — the article's own name replaces it. That used to be done by
+    // dispatching a synthetic Escape at the input and relying on the keydown
+    // handler below; a listener added elsewhere on the same element later
+    // stopped Escape from propagating, so the reset silently stopped happening
+    // and the stale search text was committed over the article name on blur.
+    // A dedicated event cannot be intercepted by keyboard handling.
+    useEffect(() => {
+        const input = inputRef.current;
+        if (!input) return;
+        const onResetDraft = () => {
+            skipCommitRef.current = true;
+            setDraft(value);
+            input.blur();
+        };
+        input.addEventListener(RESET_DRAFT_EVENT, onResetDraft);
+        return () => input.removeEventListener(RESET_DRAFT_EVENT, onResetDraft);
+    }, [value]);
 
     const commitDraft = () => {
         focusedRef.current = false;
@@ -58,14 +114,23 @@ export const BufferedTextInput = memo(({
     };
 
     return (
-        <AntInput
+        <input
             ref={inputRef}
+            type="text"
             aria-label={ariaLabel}
-            size="small"
-            variant="borderless"
             value={draft}
-            onFocus={() => { focusedRef.current = true; }}
-            onChange={(event) => setDraft(event.target.value)}
+            onFocus={(event) => {
+                focusedRef.current = true;
+                // A BLANK cell opens the article list on focus — the first
+                // products appear before anything is typed. A filled cell only
+                // takes the caret, so it can be corrected without a panel
+                // appearing over the rows below it.
+                if (!draft.trim()) onDraftChange?.(draft, event.currentTarget);
+            }}
+            onChange={(event) => {
+                setDraft(event.target.value);
+                onDraftChange?.(event.target.value, event.currentTarget);
+            }}
             onBlur={commitDraft}
             onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -91,20 +156,19 @@ export const BufferedTextInput = memo(({
 BufferedTextInput.displayName = 'BufferedTextInput';
 
 const toNumberDraft = (value: number | null | undefined) =>
-    value != null && Number(value) > 0 ? Number(value) : null;
+    value != null && Number(value) > 0 ? String(value) : '';
 
-// Choose the size from the formatted value length. This avoids DOM measurement
-// and layout thrashing while preserving the compact amount-column treatment.
-const AUTOFIT_BASE_PX = 11.5;
-const AUTOFIT_MIN_PX = 9;
-const fitNumberInputFontPx = (value: number | null) => {
-    const length = value == null ? 0 : String(value).length;
-    if (length <= 8) return AUTOFIT_BASE_PX;
-    if (length <= 10) return 10.5;
-    if (length <= 12) return 9.5;
-    return AUTOFIT_MIN_PX;
+// Accept both "1'234,5" and "1234.5" style entries.
+const parseNumberDraft = (raw: string): number => {
+    const normalized = raw.replace(/'/g, '').replace(',', '.').trim();
+    if (!normalized) return 0;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 };
 
+// Native numeric cell input (no Ant Design InputNumber). The draft is kept as
+// the raw typed string while focused and parsed/clamped on commit. Static font
+// size by design — long figures scroll inside the input instead of shrinking.
 export const BufferedNumberInput = memo(({
     ariaLabel,
     value,
@@ -117,7 +181,6 @@ export const BufferedNumberInput = memo(({
     navCol,
     registerCell,
     onArrowNav,
-    autoFit = false,
 }: {
     ariaLabel: string;
     value: number | null | undefined;
@@ -125,20 +188,11 @@ export const BufferedNumberInput = memo(({
     className: string;
     field: NumberField;
     commit: (positionId: string, field: NumberField, value: number) => void;
-    // Shrink the font a notch (down to AUTOFIT_MIN_PX) so a long figure fits the
-    // cell once the user stops typing; native input scroll covers the overflow
-    // past the floor. Used for the unit-price field where a wide amount is common.
-    autoFit?: boolean;
 } & InlineCellNavProps) => {
-    const [draft, setDraft] = useState<number | null>(() => toNumberDraft(value));
+    const [draft, setDraft] = useState<string>(() => toNumberDraft(value));
     const focusedRef = useRef(false);
     const skipCommitRef = useRef(false);
-    // antd's InputNumber ref exposes { focus, blur, nativeElement }; typed loosely
-    // so we can reach the underlying <input> for select-all on keyboard navigation.
-    const inputRef = useRef<any>(null);
-
-    // Length-based sizing is deterministic and does not read layout after writes.
-    const autoFitPx = autoFit ? fitNumberInputFontPx(draft) : null;
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!focusedRef.current) setDraft(toNumberDraft(value));
@@ -148,9 +202,11 @@ export const BufferedNumberInput = memo(({
         const key = `${navCol}:${rowIndex}`;
         registerCell(key, {
             focus: () => {
-                const handle = inputRef.current;
-                handle?.focus?.();
-                handle?.nativeElement?.querySelector?.('input')?.select?.();
+                // preventScroll: arrow-key navigation between cells must move the
+                // caret without the browser scrolling the row into view — that
+                // was what nudged the page up/down on every keystroke.
+                inputRef.current?.focus({ preventScroll: true });
+                inputRef.current?.select();
             },
         });
         return () => registerCell(key, null);
@@ -163,26 +219,22 @@ export const BufferedNumberInput = memo(({
             setDraft(toNumberDraft(value));
             return;
         }
-        const raw = draft == null ? 0 : Math.max(0, draft);
+        const raw = parseNumberDraft(draft);
         const next = max == null ? raw : Math.min(raw, max);
         const current = value != null && Number(value) > 0 ? Number(value) : 0;
-        setDraft(next > 0 ? next : null);
+        setDraft(next > 0 ? String(next) : '');
         if (next !== current) commit(positionId, field, next);
     };
 
     return (
-        <InputNumber
+        <input
             ref={inputRef}
+            type="text"
+            inputMode="decimal"
             aria-label={ariaLabel}
-            size="small"
-            variant="borderless"
-            keyboard={false}
-            min={0}
-            max={max}
-            step={1}
             value={draft}
             onFocus={() => { focusedRef.current = true; }}
-            onChange={(next) => setDraft(next == null ? null : Number(next))}
+            onChange={(event) => setDraft(event.target.value)}
             onBlur={commitDraft}
             onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -200,17 +252,8 @@ export const BufferedNumberInput = memo(({
                 }
             }}
             onClick={(event) => event.stopPropagation()}
-            className={autoFit && autoFitPx != null ? `${className} [&_.ant-input-number-input]:!text-[length:var(--fit-fs)]` : className}
-            style={{
-                width: '100%',
-                fontFamily: INLINE_INPUT_FONT_FAMILY,
-                ...(autoFit && autoFitPx != null ? { ['--fit-fs' as string]: `${autoFitPx}px` } : {}),
-            }}
-            parser={(displayValue) => {
-                const normalized = String(displayValue ?? '').replace(/'/g, '').replace(',', '.');
-                const parsed = Number(normalized);
-                return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-            }}
+            className={className}
+            style={{ fontFamily: INLINE_INPUT_FONT_FAMILY }}
         />
     );
 });

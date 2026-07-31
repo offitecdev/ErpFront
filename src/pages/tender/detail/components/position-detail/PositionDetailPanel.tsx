@@ -437,7 +437,7 @@ export const PositionDetailPanel: React.FC<{
                             saving={saving}
                         />
                         {isArticle && (
-                            <div className="border border-slate-200/70 rounded-md p-3 bg-white space-y-2.5">
+                            <div className="border border-slate-200/70 rounded-[2px] p-3 bg-white space-y-2.5">
                                 <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('tenders.product_islemi')}</h4>
                                 <Button
                                     variant="danger"
@@ -606,7 +606,7 @@ const MetaEditTab: React.FC<{
             <div>
                 <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{t('tenders.gorsel')}</div>
                 <div className="flex items-start gap-3">
-                    <div className="w-20 h-20 border border-slate-200 rounded-md bg-slate-50/60 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-20 h-20 border border-slate-200 rounded-[2px] bg-slate-50/60 flex items-center justify-center overflow-hidden shrink-0">
                         {imageUrl ? (
                             <img src={imageUrl} alt="Satır görseli" className="w-full h-full object-cover" />
                         ) : (
@@ -669,7 +669,7 @@ const MetaEditTab: React.FC<{
                     />
                 ) : longDesc ? (
                     <div
-                        className="rounded-md border border-slate-200 bg-white p-3 text-[13px] leading-6 text-slate-800 [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-7 [&_li]:pl-1"
+                        className="rounded-[2px] border border-slate-200 bg-white p-3 text-[13px] leading-6 text-slate-800 [&_h2]:my-1 [&_h2]:text-[15px] [&_h2]:font-bold [&_h3]:my-1 [&_h3]:text-[13.5px] [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-7 [&_li]:pl-1"
                         dangerouslySetInnerHTML={{ __html: richTextToHtml(longDesc) }}
                     />
                 ) : (

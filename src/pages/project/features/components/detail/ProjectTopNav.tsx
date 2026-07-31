@@ -53,15 +53,12 @@ const getGroups = (): Group[] => [
         ],
     },
     {
+        // Formerly "Saha Operasyonu" — consolidated into a single "Reports"
+        // area; field/general/delivery/signatures all live in its popups now.
         section: 'field',
-        label: () => t('auto.saha_operasyonu'),
+        label: () => t('projects.reportsHub.title'),
         icon: <ClipboardPenLine size={15} />,
-        subs: [
-            { key: 'fieldReports', label: () => t('projects.fieldReport') },
-            { key: 'generalReport', label: () => t('projects.flow.generalReport') },
-            { key: 'delivery', label: () => t('projects.delivery.reportsTab') },
-            { key: 'signatures', label: () => t('nav.signatures') },
-        ],
+        subs: [],
     },
     {
         section: 'costs',
@@ -134,8 +131,12 @@ export const ProjectTopNav = ({
     return (
         <nav
             aria-label="Project workflow"
-            className="mb-4 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-1.5 md:overflow-visible dark:border-white/15 dark:bg-white/5"
+            // Same tab strip as the tender detail workspace (TenderWorkspaceTabs):
+            // underline on the page edge, active tab = filled panel + brand
+            // underline + weight. `ofi-quote-tab*` are the dark.css accent hooks.
+            className="mb-2 min-w-0 overflow-x-auto border-b border-slate-200 md:overflow-visible dark:border-white/15"
         >
+            <div className="flex min-w-max items-center gap-1">
             {groups.map((group) => {
                 const active = activeView.section === group.section;
                 const badge = sectionAttention(group.section);
@@ -152,24 +153,24 @@ export const ProjectTopNav = ({
                             type="button"
                             aria-haspopup={hasSubs || undefined}
                             aria-expanded={hasSubs ? open : undefined}
+                            aria-current={active ? 'page' : undefined}
                             onClick={() => {
                                 onChange(viewForSection(group.section));
                                 setOpenSection(null);
                             }}
                             onFocus={() => hasSubs && openMenu(group.section)}
-                            className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${
+                            className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-[3px] border-b-2 px-3.5 py-2 text-[12.5px] transition-colors ${
                                 active
-                                    ? 'bg-[#272f67] text-white shadow-sm'
-                                    : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-white dark:hover:bg-white/10'
+                                    ? 'ofi-quote-tab-active border-[#1f2654] bg-[#eef2fb] font-bold text-[#1f2654]'
+                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70 dark:hover:text-white'
                             }`}
                         >
-                            <span className="shrink-0">{group.icon}</span>
                             <span>{group.label()}</span>
                             {badge && !active && <AttentionBadge label={badge} />}
                             {hasSubs && (
                                 <ChevronDown
                                     size={13}
-                                    className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${active ? 'text-white/70' : 'text-slate-400'}`}
+                                    className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${active ? 'text-[#1f2654]/70 dark:text-current' : 'text-slate-400'}`}
                                 />
                             )}
                         </button>
@@ -207,6 +208,7 @@ export const ProjectTopNav = ({
                     </div>
                 );
             })}
+            </div>
         </nav>
     );
 };

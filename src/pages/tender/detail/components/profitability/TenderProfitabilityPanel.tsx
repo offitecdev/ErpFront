@@ -78,18 +78,18 @@ export const TenderProfitabilityPanel = ({
 
     if (!open) {
         return (
-            <div className="flex min-h-[104px] items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white p-3 2xl:flex-col 2xl:justify-start">
+            <div className="flex min-h-[104px] items-center justify-between gap-3 rounded-[2px] border border-slate-200/80 bg-white p-3 2xl:flex-col 2xl:justify-start">
                 <button
                     type="button"
                     aria-label={t('tenders.profit_loss_semasini_open')}
                     title={t('tenders.profit_loss_semasini_open')}
                     onClick={() => onToggleOpen(true)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-[2px] border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
                 >
                     <ChevronLeft size={16} />
                 </button>
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-700 2xl:flex-col">
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${result >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-[2px] ${result >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                         {result >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                     </span>
                     <span className="whitespace-nowrap 2xl:[writing-mode:vertical-rl] 2xl:rotate-180">{t('tenders.profit_loss')}</span>
@@ -112,14 +112,14 @@ export const TenderProfitabilityPanel = ({
                     aria-label={t('tenders.profit_loss_semasini_kapat')}
                     title={t('tenders.profit_loss_semasini_kapat')}
                     onClick={() => onToggleOpen(false)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-[2px] border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
                 >
                     <ChevronRight size={15} />
                 </button>
             }
         >
         <div className="space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <div className="rounded-[2px] border border-slate-200 bg-slate-50/70 p-3">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
@@ -131,7 +131,7 @@ export const TenderProfitabilityPanel = ({
                             className={`mt-1 font-mono font-semibold leading-none tracking-tight ${isProfit ? 'text-emerald-700' : 'text-rose-600'}`}
                         />
                     </div>
-                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold tabular-nums ring-1 ring-inset ${isProfit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-rose-50 text-rose-600 ring-rose-200/70'}`}>
+                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-[2px] px-2 py-1 text-[12px] font-semibold tabular-nums ring-1 ring-inset ${isProfit ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-rose-50 text-rose-600 ring-rose-200/70'}`}>
                         {isProfit ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                         {rate.toFixed(1)}%
                     </span>
@@ -149,12 +149,12 @@ export const TenderProfitabilityPanel = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="rounded-[2px] border border-slate-200 bg-white p-3">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.sales')}</div>
                     <AutoFitAmount value={fmtMoney(revenue)} basePx={16} className="mt-1.5 font-mono font-semibold text-slate-900" />
                     <div className="mt-0.5 text-[10px] text-slate-400">{t('tenders.kdv_haric')}</div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="rounded-[2px] border border-slate-200 bg-white p-3">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.cost')}</div>
                     <AutoFitAmount value={fmtMoney(cost)} basePx={16} className="mt-1.5 font-mono font-semibold text-slate-900" />
                     <div className="mt-0.5 text-[10px] text-slate-400">{costShare.toFixed(0)}%</div>
@@ -162,25 +162,25 @@ export const TenderProfitabilityPanel = ({
             </div>
 
             {selectedLine && (
-                <div className="rounded-xl border border-slate-200 bg-white p-3 ring-1 ring-inset ring-[#1f2654]/[0.04]">
+                <div className="rounded-[2px] border border-slate-200 bg-white p-3 ring-1 ring-inset ring-[#1f2654]/[0.04]">
                     <div className="flex items-baseline gap-2">
                         {selectedLine.label && (
-                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-500">{selectedLine.label}</span>
+                            <span className="rounded-[2px] bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-500">{selectedLine.label}</span>
                         )}
                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-slate-800">
                             {rowPreviewText(selectedLine) ||t('tenders.selected_line')}
                         </span>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                        <div className="rounded-lg bg-slate-50 py-1.5">
+                        <div className="rounded-[2px] bg-slate-50 py-1.5">
                             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.sales')}</div>
                             <AutoFitAmount value={fmtMoney(selectedLine.revenue)} basePx={12.5} className="mt-0.5 text-center font-mono font-semibold text-slate-800" />
                         </div>
-                        <div className="rounded-lg bg-slate-50 py-1.5">
+                        <div className="rounded-[2px] bg-slate-50 py-1.5">
                             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t('tenders.cost')}</div>
                             <AutoFitAmount value={fmtMoney(selectedLine.cost)} basePx={12.5} className="mt-0.5 text-center font-mono font-semibold text-slate-800" />
                         </div>
-                        <div className={`rounded-lg py-1.5 ${selectedLine.result >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                        <div className={`rounded-[2px] py-1.5 ${selectedLine.result >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
                             <div className={`text-[10px] font-semibold uppercase tracking-wider ${selectedLine.result >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{t('tenders.profit')}</div>
                             <AutoFitAmount value={fmtMoney(selectedLine.result)} basePx={12.5} className={`mt-0.5 text-center font-mono font-semibold ${selectedLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`} />
                             <div className={`text-[10px] font-semibold ${selectedLine.result >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{selectedLine.resultRate.toFixed(1)}%</div>
@@ -230,7 +230,7 @@ export const TenderProfitabilityPanel = ({
                     </div>
                 </div>
                 {rows.length === 0 ? (
-                    <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center">
+                    <div className="flex flex-col items-center gap-1.5 rounded-[2px] border border-dashed border-slate-200 px-3 py-8 text-center">
                         <ListTree size={18} className="text-slate-300" />
                         <span className="text-[12px] text-slate-400">{t('tenders.no_product_line_for_profit_loss')}</span>
                     </div>
@@ -245,10 +245,10 @@ export const TenderProfitabilityPanel = ({
                                     key={row.id}
                                     type="button"
                                     onClick={() => onSelectRow(row.id)}
-                                    className={`flex w-full items-start gap-2.5 rounded-xl border px-2.5 py-2.5 text-left ${active ? 'border-[#1f2654]/30 bg-[#1f2654]/[0.04] ring-1 ring-[#1f2654]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                                    className={`flex w-full items-start gap-2.5 rounded-[2px] border px-2.5 py-2.5 text-left ${active ? 'border-[#1f2654]/30 bg-[#1f2654]/[0.04] ring-1 ring-[#1f2654]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                                 >
                                     {row.label && (
-                                        <span className={`mt-0.5 inline-flex h-5 min-w-[22px] shrink-0 items-center justify-center rounded-md px-1 font-mono text-[10.5px] font-semibold ${active ? 'bg-[#1f2654] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        <span className={`mt-0.5 inline-flex h-5 min-w-[22px] shrink-0 items-center justify-center rounded-[2px] px-1 font-mono text-[10.5px] font-semibold ${active ? 'bg-[#1f2654] text-white' : 'bg-slate-100 text-slate-500'}`}>
                                             {row.label}
                                         </span>
                                     )}

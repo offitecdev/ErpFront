@@ -13,8 +13,11 @@ import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
 import { useTenderStore } from '@/store/tenderStore';
 import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
+import { parseClosingImages } from '../../utils/tenderProduct.utils';
 import { flattenTenderTreeForPdf } from '../../tenderDetailUtils';
-import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
+// Eski (klasik, sablon.pdf antetli) şablon — geri dönmek için bu satırı aç:
+// import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
+import type { TenderPdfTotals } from '@/utils/pdf/tenderPdfModern';
 
 type PdfLanguage = 'tr' | 'de' | 'en';
 
@@ -88,7 +91,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                     || p.imageUrl
                     || null,
             }));
-            const { exportTenderPdf } = await import('@/utils/pdf/tenderPdf');
+            // Eski (klasik) şablon — geri dönmek için bu satırı aç:
+            // const { exportTenderPdf } = await import('@/utils/pdf/tenderPdf');
+            const { exportTenderPdf } = await import('@/utils/pdf/tenderPdfModern');
             // The offer's own currency wins over the company default so the
             // exported PDF matches what's shown on screen.
             const pdfSettings = {
@@ -110,6 +115,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                     positions,
                     grandTotal,
                     totals: pdfTotals ?? null,
+                    // Optional content blocks — the PDF skips any that are empty.
+                    coverLetter: detail.tender.coverLetter,
+                    closingNote: detail.tender.closingNote,
+                    closingImages: parseClosingImages(detail.tender.closingImages),
                     lang: pdfLang,
                 },
                 pdfSettings,

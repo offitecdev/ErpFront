@@ -39,7 +39,7 @@ export const PositionAdvancedCostSection: React.FC<{
 }) => {
     const fmtMoney = useMoneyFormat();
     return (
-    <details className="border border-slate-200/70 rounded-md bg-white">
+    <details className="border border-slate-200/70 rounded-[2px] bg-white">
         <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-50/60 select-none">{t('tenders.additional_cost_opsiyonel')}</summary>
         <div className="px-3 pb-3 space-y-3">
             <div className="grid grid-cols-2 gap-2.5">
@@ -70,7 +70,7 @@ export const PositionAdvancedCostSection: React.FC<{
                 </Field>
             </div>
 
-            <div className="bg-slate-50/60 border border-slate-200/60 rounded-md p-2.5 space-y-2">
+            <div className="bg-slate-50/60 border border-slate-200/60 rounded-[2px] p-2.5 space-y-2">
                 <div className="flex items-center justify-between text-[12px]">
                     <span className="text-slate-500">{t('tenders.cost_total_without_margin')}</span>
                     <span className="font-mono font-semibold text-slate-700">{fmtMoney(subtotal)}</span>
@@ -100,7 +100,7 @@ export const PositionAdvancedCostSection: React.FC<{
                 )}
             </div>
 
-            <div className="bg-blue-50 border border-blue-200/60 rounded-md p-3 space-y-1.5">
+            <div className="bg-blue-50 border border-blue-200/60 rounded-[2px] p-3 space-y-1.5">
                 <div className="flex items-center justify-between text-[12px]">
                     <span className="text-blue-900">{t('tenders.hesaplanan_total_price_net')}</span>
                     <span className="font-mono font-bold text-blue-900 text-[14px]">{fmtMoney(total)}</span>

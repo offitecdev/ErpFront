@@ -16,6 +16,7 @@ import type {
 } from '../types/tenderDetail.types';
 import { sortPositions, buildSimpleTenderLines } from '../utils/tenderLine.utils';
 import { isInlinePatchConfirmed, normalizeInlinePatchValue } from '../utils/tenderInlinePatch.utils';
+import { deriveLineDiscountPercent } from '../utils/tenderDiscounts.utils';
 import {
     buildProductDefaults,
     createTempPositionId,
@@ -72,6 +73,14 @@ export const useTenderLineStaging = ({
         BILLING: null,
     });
 
+
+    // Latest lines, readable from the stable inline-change callback without
+    // putting `localPositions` in its dependency list (which would hand every
+    // memoized cell input a fresh onCommit on every keystroke).
+    // Written in an effect (not during render): every reader is an event
+    // handler, which always runs after the effects of the render it came from.
+    const localPositionsRef = useRef(localPositions);
+    useEffect(() => { localPositionsRef.current = localPositions; }, [localPositions]);
 
     const pendingPositionPatches = useRef<Record<string, InlinePositionPatch>>({});
     const optimisticPositionIds = useRef<Record<string, string | null>>({});
@@ -136,8 +145,19 @@ export const useTenderLineStaging = ({
     }, []);
 
 
-    const handleInlinePositionChange = useCallback((positionId: string, patch: InlinePositionPatch) => {
+    const handleInlinePositionChange = useCallback((positionId: string, rawPatch: InlinePositionPatch) => {
         if (!id) return;
+        // A stacked discount is stored as a list but PRICED through the single
+        // `discount` percentage, which is a percentage OF THE LINE'S BASE. Move
+        // the quantity or the unit price and that base moves with it, so the
+        // percentage has to be recomputed — otherwise a "CHF 50 off" silently
+        // becomes "CHF 80 off" the moment the quantity changes.
+        const current = localPositionsRef.current.find((position) => position.id === positionId);
+        const touchesBase = rawPatch.quantity !== undefined || rawPatch.unitPrice !== undefined;
+        const derived = current && touchesBase && rawPatch.discounts === undefined && rawPatch.discount === undefined
+            ? deriveLineDiscountPercent({ ...current, ...rawPatch })
+            : null;
+        const patch: InlinePositionPatch = derived == null ? rawPatch : { ...rawPatch, discount: derived };
         const resolvedPositionId = optimisticPositionIds.current[positionId];
         const isPendingCreate = positionId.startsWith('local-position-') && resolvedPositionId === null;
         // Buffer against the temp id while a create is still in flight; once resolved,
@@ -233,6 +253,7 @@ export const useTenderLineStaging = ({
         setSavingAll(true);
         try {
             let hadFailure = false;
+            let failureReason: string | null = null;
             const sentMeta = pendingMeta;
 
    
@@ -329,6 +350,45 @@ export const useTenderLineStaging = ({
                         delete pendingDeletePositions.current[positionId];
                     });
 
+                    // Mirror the persisted unit of work into the store's cached
+                    // detail. Re-opening this tender skips the refetch when the
+                    // cached id matches, and the staging sync effect rebuilds the
+                    // lines from `detail.positions` — with a stale cache the
+                    // just-saved rows disappeared on the next visit.
+                    const cachedState = useTenderStore.getState();
+                    if (cachedState.detail && cachedState.detail.tender.id === id) {
+                        const deletedIdSet = new Set(pendingDeletePositionIds);
+                        const createdPositions: PositionDto[] = [];
+                        tempToServerId.forEach((serverId, tempId) => {
+                            const created = createdByClientId.get(tempId)?.position;
+                            const local = localPositions.find((position) => position.id === tempId);
+                            const base = created ?? local;
+                            if (base) createdPositions.push({ ...base, id: serverId });
+                        });
+                        const cachedIds = new Set(cachedState.detail.positions.map((position) => position.id));
+                        useTenderStore.setState({
+                            detail: {
+                                ...cachedState.detail,
+                                positions: sortPositions([
+                                    ...cachedState.detail.positions
+                                        .filter((position) => !deletedIdSet.has(position.id))
+                                        .map((position) => {
+                                            const updated = updatedById.get(position.id);
+                                            if (!updated) return position;
+                                            return {
+                                                ...position,
+                                                ...updated,
+                                                calculation: updated.calculation ?? position.calculation,
+                                                articleMappings: updated.articleMappings ?? position.articleMappings,
+                                                materialMappings: updated.materialMappings ?? position.materialMappings,
+                                            };
+                                        }),
+                                    ...createdPositions.filter((position) => !cachedIds.has(position.id)),
+                                ]),
+                            },
+                        });
+                    }
+
                     if (pendingMetaCount > 0) {
                         if (!result.updatedTender) {
                             hadFailure = true;
@@ -381,8 +441,12 @@ export const useTenderLineStaging = ({
                         };
                     }));
                     setSelectedId((current) => current ? (tempToServerId.get(current) ?? current) : current);
-                } catch {
+                } catch (error: any) {
                     hadFailure = true;
+                    // Keep the server's reason: a bare "row could not be updated"
+                    // hides which line failed and why (validation, permission, a
+                    // stale field), which makes the failure unreportable.
+                    failureReason = error?.response?.data?.error || error?.message || null;
                     const snapshots = pendingDeletePositionIds
                         .map((positionId) => pendingDeletePositions.current[positionId])
                         .filter((position): position is PositionDto => Boolean(position));
@@ -401,7 +465,11 @@ export const useTenderLineStaging = ({
 
             // Success is signalled by the save button's spinner stopping — no
             // "saved" toast; only failures surface a notification.
-            if (hadFailure) toast.error(t('tenders.line_guncellenemedi'));
+            if (hadFailure) {
+                toast.error(failureReason
+                    ? `${t('tenders.line_guncellenemedi')} ${failureReason}`
+                    : t('tenders.line_guncellenemedi'));
+            }
             return !hadFailure;
         } catch (error: any) {
             toast.error(error.response?.data?.error || t('tenders.tender_info_guncellenemedi'));
@@ -447,8 +515,8 @@ export const useTenderLineStaging = ({
         article?: ProductSource,
         options?: Partial<ManualProductForm>,
         afterRowId?: string,
-    ) => {
-        if (!tender || !isDraft || !canManage) return;
+    ): string | null => {
+        if (!tender || !isDraft || !canManage) return null;
         const simpleRows = buildSimpleTenderLines(localPositions, fallbackTaxRate);
         const isProduct = rowType === 'PRODUCT';
         const titleLike = rowType === 'TITLE';
@@ -475,7 +543,9 @@ export const useTenderLineStaging = ({
             rowType,
             sourceArticleId: isProduct ? (productDefaults?.sourceArticleId ?? null) : null,
             shortDescription: isProduct
-                ? (productDefaults?.shortDescription || articleName || options?.name ||t('tenders.product'))
+                ? (resolvedArticle || options?.name
+                    ? (productDefaults?.shortDescription || articleName || options?.name || t('tenders.product'))
+                    : '')
                 : titleLike
                     ?t('tenders.baslik')
                     : ' ',
@@ -524,6 +594,9 @@ export const useTenderLineStaging = ({
         setLocalPositions((positions) => sortPositions([...positions, optimisticPosition]));
         setSelectedId(optimisticId);
         recomputeDirtyLineIds();
+        // Returned so the caller can focus the new row — an empty product row is
+        // only useful if the cursor lands in its name field.
+        return optimisticId;
     };
 
     // Move a quote line one slot up or down by swapping its displayOrder with the
@@ -556,12 +629,11 @@ export const useTenderLineStaging = ({
         handleInlinePositionChange(target.id, { displayOrder: currentOrder });
     };
 
-    const handleBulkDelete = () => {
-        const simpleRows = buildSimpleTenderLines(localPositions, fallbackTaxRate);
-        const selectedRows = simpleRows.filter((row) => selectedRowIds[row.id]);
-        if (selectedRows.length === 0) return;
-        const rowsToDelete = selectedRows;
-        const deleteIds = new Set(rowsToDelete.map((row) => row.id));
+    // Shared by the per-row trash button and the bulk-delete modal: drops the
+    // rows locally and stages the deletion (persisted on Save).
+    const stageRowDeletion = (rowIds: string[]) => {
+        if (rowIds.length === 0) return;
+        const deleteIds = new Set(rowIds);
         const positionsById = new Map(localPositions.map((position) => [position.id, position]));
 
         setLocalPositions((positions) => positions.filter((position) => !deleteIds.has(position.id)));
@@ -574,15 +646,26 @@ export const useTenderLineStaging = ({
                 delete pendingCreatePayloads.current[rowId];
                 delete optimisticPositionIds.current[rowId];
             } else {
-          
                 pendingDeleteIds.current.add(rowId);
                 const snapshot = positionsById.get(rowId);
                 if (snapshot) pendingDeletePositions.current[rowId] = snapshot;
             }
         });
         recomputeDirtyLineIds();
-        setSelectedRowIds({});
+        setSelectedRowIds((current) => {
+            const next = Object.fromEntries(Object.entries(current).filter(([rowId]) => !deleteIds.has(rowId)));
+            return Object.keys(next).length === Object.keys(current).length ? current : next;
+        });
         setSelectedId((current) => current && deleteIds.has(current) ? null : current);
+    };
+
+    const handleDeleteRow = (rowId: string) => stageRowDeletion([rowId]);
+
+    const handleBulkDelete = () => {
+        const simpleRows = buildSimpleTenderLines(localPositions, fallbackTaxRate);
+        const selectedRows = simpleRows.filter((row) => selectedRowIds[row.id]);
+        if (selectedRows.length === 0) return;
+        stageRowDeletion(selectedRows.map((row) => row.id));
         setBulkDeleteOpen(false);
     };
 
@@ -592,7 +675,10 @@ export const useTenderLineStaging = ({
         const discountEligibleRows = simpleRows.filter((row) => selectedRowIds[row.id] && row.kind === 'PRODUCT');
         if (discountEligibleRows.length === 0) return;
         const nextDiscount = Math.min(100, Math.max(0, bulkDiscountValue || 0));
-        discountEligibleRows.forEach((row) => handleInlinePositionChange(row.id, { discount: nextDiscount }));
+        // A bulk rate REPLACES whatever the line had, including a stacked list —
+        // leaving the JSON behind would make the green badge disagree with the
+        // percentage the bulk action just wrote.
+        discountEligibleRows.forEach((row) => handleInlinePositionChange(row.id, { discount: nextDiscount, discounts: null }));
         setSelectedRowIds({});
         setBulkDiscountOpen(false);
         toast.success(t('tenders.bulk_discount_applied_to_product_lines'));
@@ -616,6 +702,7 @@ export const useTenderLineStaging = ({
         handleSaveAll,
         handleAddRow,
         handleMoveRow,
+        handleDeleteRow,
         handleBulkDelete,
         handleBulkDiscount,
     };

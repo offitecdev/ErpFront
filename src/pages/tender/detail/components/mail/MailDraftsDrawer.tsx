@@ -28,12 +28,12 @@ type MailDraftCardProps = {
 };
 
 const MailDraftCard: React.FC<MailDraftCardProps> = ({ draft, onApply, onEdit, onDelete, deleting }) => (
-    <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="flex items-start gap-2 rounded-[2px] border border-slate-200 bg-white p-3 shadow-sm">
         <button
             type="button"
             title={t('tenders.mail_draft_apply')}
             onClick={() => onApply(draft)}
-            className="mt-0.5 shrink-0 rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-700 transition-colors hover:border-blue-400 hover:bg-blue-100"
+            className="mt-0.5 shrink-0 rounded-[2px] border border-blue-200 bg-blue-50 p-1.5 text-blue-700 transition-colors hover:border-blue-400 hover:bg-blue-100"
         >
             <ArrowLeft size={14} />
         </button>
@@ -237,7 +237,7 @@ export const MailDraftsDrawer: React.FC<MailDraftsDrawerProps> = ({ open, onClos
             ) : loading ? (
                 <div className="py-10 text-center text-[12px] text-slate-400">…</div>
             ) : drafts.length === 0 ? (
-                <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-[12px] text-slate-400">
+                <div className="rounded-[2px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-[12px] text-slate-400">
                     {t('tenders.mail_draft_empty')}
                 </div>
             ) : (

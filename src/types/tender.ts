@@ -34,6 +34,27 @@ export interface TenderListItem {
     directDiscount?: number | null;
     // Optional custom display name for the direct discount (e.g. "Winteraktion").
     directDiscountLabel?: string | null;
+    // Second document-level discount (%) applied sequentially after directDiscount.
+    extraDiscount?: number | null;
+    extraDiscountLabel?: string | null;
+    /**
+     * Document-level discounts as a JSON array of `{name, kind, value}`
+     * (`kind`: PERCENT | AMOUNT), applied SEQUENTIALLY. This is the editable
+     * source of truth; `directDiscount` mirrors the list's combined percentage
+     * so older consumers keep working. See `tenderDiscounts.utils.ts`.
+     */
+    totalDiscounts?: string | null;
+    // Payment schedule as a JSON percent array (e.g. "[30,20,10,40]"), stages sum to 100.
+    paymentStages?: string | null;
+    /**
+     * Optional PDF content blocks. The two texts are rich HTML (bold / italic /
+     * colour); the image is a data URI. Each is independent — an offer may carry
+     * any combination, or none.
+     */
+    coverLetter?: string | null;
+    closingNote?: string | null;
+    /** JSON array of data URIs — several images may close the document. */
+    closingImages?: string | null;
     sourceStatus?: string | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;
@@ -209,7 +230,17 @@ export interface PositionDto {
     unit?: string | null;
     hierarchyLevel: number;
     unitPrice?: number | null;
+    /**
+     * COMBINED effect of `discounts` as one percentage. Kept as the single
+     * pricing input every other screen reads; the modal edits `discounts` and
+     * this column is re-derived from it.
+     */
     discount?: number | null;
+    /**
+     * Up to five stacked line discounts as a JSON array of `{name, kind, value}`
+     * (`kind`: PERCENT | AMOUNT), applied sequentially on quantity × unit price.
+     */
+    discounts?: string | null;
     taxRate?: number | null;
     imageUrl?: string | null;
     calculation?: CalculationItemDto | null;

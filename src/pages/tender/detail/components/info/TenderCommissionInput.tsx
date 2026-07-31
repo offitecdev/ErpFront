@@ -1,5 +1,7 @@
 import { t } from '@/i18n/translate';
 
+import { QUOTE_CONTROL_CLASS } from '../../utils/quoteField.constants';
+
 type TenderCommissionInputProps = {
     value: string;
     onCommit: (value: string | null) => void;
@@ -24,6 +26,6 @@ export const TenderCommissionInput = ({ value, onCommit }: TenderCommissionInput
                 (event.target as HTMLInputElement).blur();
             }
         }}
-        className="w-full max-w-[240px] rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px] text-slate-800 outline-none focus:border-[#1f2654] dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#e6cf9e]"
+        className={`${QUOTE_CONTROL_CLASS} dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#e6cf9e]`}
     />
 );

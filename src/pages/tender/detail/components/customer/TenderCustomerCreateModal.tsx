@@ -2,14 +2,13 @@ import { Plus } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
 import { Field, Input } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
+import { AddressFields } from '@/components/ui-shared/AddressFields';
 import { t } from '@/i18n/translate';
 
-export type TenderCustomerCreateForm = {
-    companyName: string;
-    mainEmail: string;
-    mainPhone: string;
-    address: string;
-};
+// Form tipi ve bos degeri `detail/utils/tenderAddress.utils.ts` icinde yasar —
+// bu pencere `lazy()` ile yuklenir.
+export type { TenderCustomerCreateForm } from '../../utils/tenderAddress.utils';
+import type { TenderCustomerCreateForm } from '../../utils/tenderAddress.utils';
 
 type TenderCustomerCreateModalProps = {
     open: boolean;
@@ -47,9 +46,11 @@ export const TenderCustomerCreateModal = ({ open, onClose, saving, form, onChang
             <Field label={t('common.phone')}>
                 <Input value={form.mainPhone} onChange={(e) => onChange({ ...form, mainPhone: e.target.value })} />
             </Field>
-            <Field label={t('common.address')} className="sm:col-span-2">
-                <Input value={form.address} onChange={(e) => onChange({ ...form, address: e.target.value })} />
-            </Field>
+            {/* Adres: ayri bilesenler — teklif arayuzunde de tek bir "Adres"
+                alani YOKTUR; gosterim iki satira iner. */}
+            <div className="sm:col-span-2">
+                <AddressFields value={form} onChange={(next) => onChange({ ...form, ...next })} />
+            </div>
         </div>
     </Modal>
 );

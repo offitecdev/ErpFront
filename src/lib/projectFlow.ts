@@ -3,11 +3,12 @@ import type { MyOrderDto, InvoiceDto } from '../types/billing';
 import type { DeliveryReportDto, ServiceReportDto, SignatureRequestDto } from './api/project';
 
 /**
- * Shared computation for the Project Flow module.
+ * Shared per-project progress computation (process pop-up, detail badges,
+ * project list).
  *
  * Everything here is derived on the client from bulk list endpoints
  * (projects, sales-orders, delivery-reports, field-reports, invoices,
- * general signatures) so the flow board never needs an N+1 fetch.
+ * general signatures) so callers never need an N+1 fetch.
  */
 
 export type StageState = 'pending' | 'ongoing' | 'completed';
@@ -161,6 +162,3 @@ export const computeProjectFlow = (project: ProjectDto, sources: FlowSources): P
         readyForBilling,
     };
 };
-
-export const buildProjectFlows = (sources: FlowSources): ProjectFlow[] =>
-    sources.projects.map((project) => computeProjectFlow(project, sources));

@@ -3,6 +3,14 @@ import type { CalculationItemDto, PositionArticleMappingDto, PositionMaterialMap
 
 import { t } from '@/i18n/translate';
 
+import {
+    applyDiscounts,
+    discountDisplayName,
+    lineDiscountBase,
+    MAX_LINE_DISCOUNTS,
+    parseDiscountList,
+} from './utils/tenderDiscounts.utils';
+
 export const STATUS_VARIANT: Record<string, 'passive' | 'warning' | 'approved' | 'info'> = {
     Draft: 'passive',
     Approved: 'approved',
@@ -294,6 +302,26 @@ const ownLineNet = (n: TreeNode) => {
     return Math.max(0, n.calculation?.totalCalculatedPrice ?? 0);
 };
 
+/**
+ * The line's stacked discounts resolved against their running base, in the
+ * order they apply. The PDF prints one per line in the discount column — the
+ * rates that were actually negotiated, not their combined equivalent.
+ */
+const pdfLineDiscounts = (node: TreeNode) => {
+    const entries = parseDiscountList(node.discounts, MAX_LINE_DISCOUNTS);
+    if (entries.length === 0) return undefined;
+    const { applied } = applyDiscounts(lineDiscountBase(node), entries);
+    const rows = applied
+        .filter((entry) => entry.amount > 0)
+        .map((entry, index) => ({
+            name: discountDisplayName(entry, index),
+            kind: entry.kind,
+            percent: entry.percent,
+            amount: entry.amount,
+        }));
+    return rows.length > 0 ? rows : undefined;
+};
+
 export const flattenTenderTreeForPdf = (tree: TreeNode[]) => {
     const flatTree: any[] = [];
     let rootIndex = 0;
@@ -334,6 +362,7 @@ export const flattenTenderTreeForPdf = (tree: TreeNode[]) => {
                 npkCode: n.npkCode,
                 imageUrl: n.imageUrl,
                 discount: hasOwnAmount ? (n.discount ?? 0) : undefined,
+                discounts: hasOwnAmount ? pdfLineDiscounts(n) : undefined,
                 taxRate: hasOwnAmount ? effectiveTaxRate : undefined,
                 unitPrice: hasOwnAmount ? n.unitPrice : undefined,
                 lineTotal: hasOwnAmount ? lineTotalWithTax(ownNet, effectiveTaxRate) : undefined,

@@ -40,8 +40,10 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
                 aria-label={t('tenders.tender_settings')}
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className={`inline-flex items-center transition-colors ${
-                    open ? 'text-[#1f2654]' : 'text-slate-500 hover:text-[#1f2654]'
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-[3px] transition-colors ${
+                    open
+                        ? 'bg-[#272f67]/15 text-[#1f2654]'
+                        : 'text-slate-500 hover:bg-[#272f67]/15 hover:text-[#1f2654]'
                 }`}
             >
                 <Settings size={16} />
@@ -50,7 +52,7 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
             {open && (
                 <div
                     role="menu"
-                    className="absolute left-0 top-8 z-50 w-56 rounded-xl bg-primary p-1.5 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2"
+                    className="absolute left-0 top-8 z-50 w-56 rounded-[2px] bg-primary p-1.5 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2"
                 >
                     <div className="border-b border-secondary px-3 py-2">
                         <p className="text-xs font-semibold uppercase tracking-wide text-tertiary">
@@ -64,7 +66,7 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
                             setOpen(false);
                             onDeleteOffer();
                         }}
-                        className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-error-primary transition-colors hover:bg-error-primary"
+                        className="mt-1 flex w-full items-center gap-2 rounded-[2px] px-3 py-2 text-sm font-medium text-error-primary transition-colors hover:bg-error-primary"
                     >
                         <Trash2 size={13} /> {t('tenders.delete_offer')}
                     </button>

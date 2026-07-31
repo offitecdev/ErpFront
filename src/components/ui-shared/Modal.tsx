@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import AntModal from 'antd/es/modal';
 import Drawer from 'antd/es/drawer';
 
+import { BottomSheet } from './BottomSheet';
+
 interface ModalProps {
     open: boolean;
     title: string;
@@ -12,8 +14,11 @@ interface ModalProps {
     width?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
     closeOnBackdrop?: boolean;
     closeOnEscape?: boolean;
-    placement?: 'center' | 'drawer';
+    /** 'sheet' fährt von unten herein und ist quadratisch — siehe BottomSheet. */
+    placement?: 'center' | 'drawer' | 'sheet';
     drawerWidth?: 'md' | 'lg' | 'half' | 'wide';
+    /** Kantenlänge in px, nur für placement="sheet". */
+    sheetSize?: number;
 }
 
 const widthMap = {
@@ -43,6 +48,7 @@ export const Modal: React.FC<ModalProps> = ({
     closeOnEscape = true,
     placement = 'center',
     drawerWidth = 'md',
+    sheetSize,
 }) => {
     useEffect(() => {
         if (!open || closeOnEscape) return;
@@ -52,6 +58,23 @@ export const Modal: React.FC<ModalProps> = ({
         document.addEventListener('keydown', handler, true);
         return () => document.removeEventListener('keydown', handler, true);
     }, [closeOnEscape, open]);
+
+    if (placement === 'sheet') {
+        return (
+            <BottomSheet
+                open={open}
+                title={title}
+                description={description}
+                onClose={onClose}
+                footer={footer}
+                size={sheetSize}
+                closeOnBackdrop={closeOnBackdrop}
+                closeOnEscape={closeOnEscape}
+            >
+                {children}
+            </BottomSheet>
+        );
+    }
 
     if (placement === 'drawer') {
         return (

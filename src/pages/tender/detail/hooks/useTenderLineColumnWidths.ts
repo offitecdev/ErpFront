@@ -5,10 +5,10 @@ import { DEFAULT_TENDER_LINE_COLUMN_WIDTHS } from '../utils/tenderDetail.constan
 
 const STORAGE_KEY = 'offitec:tender-detail:line-col-widths:v1';
 
-export const RESIZABLE_LINE_COLUMNS = ['quantity', 'unit', 'unitPrice', 'discount', 'taxRate', 'total'] as const;
+export const RESIZABLE_LINE_COLUMNS = ['quantity', 'unit', 'unitPrice', 'discount', 'taxRate', 'total', 'profit'] as const;
 export type ResizableLineColumn = (typeof RESIZABLE_LINE_COLUMNS)[number];
 
-const MIN_COL_PX = 56;
+const MIN_COL_PX = 42;
 const MAX_COL_PX = 320;
 
 const clampWidth = (value: number) => Math.round(Math.min(MAX_COL_PX, Math.max(MIN_COL_PX, value)));

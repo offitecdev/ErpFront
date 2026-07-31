@@ -30,7 +30,7 @@ export const SnapshotView = ({ snapshot }: { snapshot: SignatureSnapshot }) => (
         {(snapshot.sections || []).map((section, si) => (
             <div key={si} className="overflow-hidden rounded-lg border border-slate-200">
                 {section.heading && <div className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11.5px] font-semibold text-slate-700">{section.heading}</div>}
-                <table className="w-full table-fixed text-[12px]">
+                <table data-unstyled-table className="w-full table-fixed text-[12px]">
                     <tbody className="divide-y divide-slate-100">
                         {section.rows.map((row, ri) => (
                             <tr key={ri}>

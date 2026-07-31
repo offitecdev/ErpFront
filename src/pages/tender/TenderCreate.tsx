@@ -58,7 +58,10 @@ export const TenderCreate = () => {
         createTender({ tenderNumber, format: 'SIA451', validUntil, customerId })
             .then((created) => {
                 toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
-                navigate(`/crm/tenders/${created.id}`, { replace: true });
+                // `autoSaveOnExit` marks the very first visit after creation:
+                // leaving the detail page then saves automatically instead of
+                // prompting (cleared again by the first successful save).
+                navigate(`/crm/tenders/${created.id}`, { replace: true, state: { autoSaveOnExit: true } });
             })
             .catch(async (error: any) => {
                 const message = String(error.response?.data?.error || '');
@@ -76,7 +79,7 @@ export const TenderCreate = () => {
                             validUntil,
                         });
                         toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
-                        navigate(`/crm/tenders/${created.id}`, { replace: true });
+                        navigate(`/crm/tenders/${created.id}`, { replace: true, state: { autoSaveOnExit: true } });
                         return;
                     } catch (fallbackError: any) {
                         error = fallbackError;

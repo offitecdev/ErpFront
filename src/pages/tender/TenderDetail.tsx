@@ -1,23 +1,21 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { LuTable2 as MdTableChart } from '@/components/icons/lucideLocal';
 import {
-    ChevronLeft,
-    ChevronRight,
     File05 as FileText,
     FileDownload02 as FileDown,
-    Package,
+    Coins01 as CoinsIcon,
 } from '@/components/icons/antIconCompat';
 
-import { Card } from '../../components/ui-shared/Card';
-import { Button } from '../../components/ui-shared/Button';
+import { PlainButton as Button, PlainCard as Card } from './detail/components/common/PlainUi';
 
 import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
 import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
 import { apiClient } from '../../lib/axios';
+import { onIdle } from '../../lib/utils/onIdle';
 import { tenderApi } from '../../lib/api/tender';
 import { customerApi, type CustomerLocationDto } from '../../lib/api/customer';
 import type { PositionDto, TenderChangeLog, TenderDocumentDto } from '../../types/tender';
@@ -33,21 +31,19 @@ import { toCurrencyCode } from '../../utils/currency';
 import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 import { t } from '@/i18n/translate';
+import type { ArticleQuickPick } from '@/types/inventory';
 
 import type {
     ManualProductForm,
+    ProductSource,
     ChatterTimelineItem,
-    DetailInfoRow,
     CustomerOption,
     TenderSettingsTabKey,
     TenderWorkspaceTabKey,
 } from './detail/types/tenderDetail.types';
 import {
     DEFAULT_VAT,
-    SECTION_SCHEMA_STORAGE_KEY,
     EMPTY_CHATTER_SUMMARY,
-    LINE_PAGE_SIZE,
-    lineActionButtonClass,
 } from './detail/utils/tenderDetail.constants';
 import { getLineKind } from './detail/utils/tenderCalculation.utils';
 import { buildSimpleTenderLines } from './detail/utils/tenderLine.utils';
@@ -59,13 +55,18 @@ import {
     inferDocumentType,
 } from './detail/utils/tenderDocument.utils';
 import {
+    EMPTY_TENDER_ADDRESS_FORM,
+    EMPTY_TENDER_CUSTOMER_FORM,
     formatLocationAddress,
     locationKindOf,
+    type TenderAddressCreateForm,
+    type TenderCustomerCreateForm,
 } from './detail/utils/tenderAddress.utils';
-import { emptyManualProduct } from './detail/utils/tenderProduct.utils';
+import { buildProductDefaults, emptyManualProduct, parseClosingImages } from './detail/utils/tenderProduct.utils';
 import { defaultTenderValidUntil } from './detail/utils/tenderDate.utils';
-import { isSourceSalesOrder, formatTenderFormatLabel } from './detail/utils/tenderStatus.utils';
-import { computeTenderPricingSummary, formatDiscountPercent } from './detail/utils/tenderPricing.utils';
+import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
+import { computeTenderPricingSummary } from './detail/utils/tenderPricing.utils';
+import { discountDisplayName, seedTotalDiscounts } from './detail/utils/tenderDiscounts.utils';
 import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 import { useTenderCustomers } from './detail/hooks/useTenderCustomers';
 import { useTenderCustomerLocations } from './detail/hooks/useTenderCustomerLocations';
@@ -79,16 +80,21 @@ import { useTenderOrderDecision } from './detail/hooks/useTenderOrderDecision';
 import { useTenderLineStaging } from './detail/hooks/useTenderLineStaging';
 import { TenderDetailLoadingSkeleton } from './detail/components/TenderDetailLoadingSkeleton';
 import { TenderDetailHeader } from './detail/components/TenderDetailHeader';
-import { TenderQuoteTopBar } from './detail/components/TenderQuoteTopBar';
 import { TenderWorkspaceTabs } from './detail/components/TenderWorkspaceTabs';
 import { TenderLineTable } from './detail/components/lines/TenderLineTable';
+import { RESET_DRAFT_EVENT } from './detail/components/TenderLineInputs';
 import { TenderCustomerSection } from './detail/components/customer/TenderCustomerSection';
+import { TenderCustomerCard, type TenderCardGroup } from './detail/components/customer/TenderCustomerCard';
+import { QuoteDatePicker } from './detail/components/common/QuoteDatePicker';
 import { TenderAddressPicker, TenderBillingAddressRow } from './detail/components/address/TenderAddressSection';
 import { TenderAddressTypeRow, type TenderAddressType } from './detail/components/address/TenderAddressTypeRow';
-import { TenderProfitabilityPanel } from './detail/components/profitability/TenderProfitabilityPanel';
+import { toAddressForm, toAddressPayload } from '@/components/ui-shared/addressForm';
+import { TenderProductSearchDropdown } from './detail/components/product/TenderProductSearchDropdown';
 import { useUnsavedChangesGuard } from './detail/hooks/useUnsavedChangesGuard';
-import { renderDetailLines, splitAddress, valueOrBlank } from './detail/components/info/TenderDetailInfoRows';
+import { usePageScrollLock } from './detail/hooks/usePageScrollLock';
+import { joinAddress, renderDetailLines, splitAddress, valueOrBlank } from './detail/components/info/TenderDetailInfoRows';
 import { TenderPriceSummary } from './detail/components/info/TenderPriceSummary';
+import { TenderPaymentTab } from './detail/components/payment/TenderPaymentTab';
 import { TenderCommissionInput } from './detail/components/info/TenderCommissionInput';
 import { TenderCurrencySelect } from './detail/components/info/TenderCurrencySelect';
 
@@ -98,8 +104,10 @@ const LazyTenderSettingsModal = lazy(() =>
 const LazyExportModal = lazy(() =>
     import('./detail/components/modals/ExportModal').then((mod) => ({ default: mod.ExportModal }))
 );
-const LazyTenderTechnicianTab = lazy(() =>
-    import('./detail/TenderTechnicianTab').then((mod) => ({ default: mod.TenderTechnicianTab }))
+// Lazily loaded: it pulls in the rich-text editor, which must not sit in the
+// quote page's own bundle for a panel most offers never open.
+const LazyTenderPdfContentPanel = lazy(() =>
+    import('./detail/components/pdf/TenderPdfContentPanel').then((mod) => ({ default: mod.TenderPdfContentPanel }))
 );
 const LazyTenderLogsPanel = lazy(() =>
     import('./detail/TenderLogsPanel').then((mod) => ({ default: mod.TenderLogsPanel }))
@@ -115,6 +123,14 @@ const LazyTenderBulkDeleteModal = lazy(() =>
 );
 const LazyTenderBulkDiscountModal = lazy(() =>
     import('./detail/components/bulk/TenderBulkDiscountModal').then((mod) => ({ default: mod.TenderBulkDiscountModal }))
+);
+// Stacked-discount editors: neither is on the quote's critical path, and both
+// pull in the shared list editor — kept out of the page's own bundle.
+const LazyTenderLineDiscountModal = lazy(() =>
+    import('./detail/components/discounts/TenderLineDiscountModal').then((mod) => ({ default: mod.TenderLineDiscountModal }))
+);
+const LazyTenderTotalDiscountModal = lazy(() =>
+    import('./detail/components/discounts/TenderTotalDiscountModal').then((mod) => ({ default: mod.TenderTotalDiscountModal }))
 );
 const LazyTenderCustomerCreateModal = lazy(() =>
     import('./detail/components/customer/TenderCustomerCreateModal').then((mod) => ({ default: mod.TenderCustomerCreateModal }))
@@ -139,7 +155,7 @@ const LazyDeleteOfferModal = lazy(() =>
 );
 
 const LazyPanelFallback = () => (
-    <div className="min-h-[280px] animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
+    <div className="min-h-[280px] animate-pulse rounded-[2px] border border-slate-100 bg-slate-50" />
 );
 
 
@@ -152,7 +168,20 @@ export const TenderDetail = () => {
     const fmtMoney = useMoneyFormat();
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const isCreatingTender = id === 'new';
+    // Initial-entry mode: set by TenderCreate's redirect. While active, leaving
+    // the page auto-saves everything (no button press needed). The first
+    // successful save — manual or automatic — turns it off, so subsequent edits
+    // require the explicit Save button again. The sessionStorage marker keeps
+    // the mode off even when Back/Forward restores the flagged history entry.
+    const initialEntryDoneKey = `tender-initial-entry-done:${id}`;
+    const [autoSaveOnExit, setAutoSaveOnExit] = useState(false);
+    useEffect(() => {
+        const flagged = Boolean((location.state as { autoSaveOnExit?: boolean } | null)?.autoSaveOnExit);
+        setAutoSaveOnExit(flagged && !window.sessionStorage.getItem(initialEntryDoneKey));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
     const { settings: pdfSettings } = usePdfSettingsStore();
     const { permissions, user } = useAuthStore();
     const canManage = permissions.length === 0 || permissions.includes('tenders.manage');
@@ -195,14 +224,13 @@ export const TenderDetail = () => {
     const [addrTarget, setAddrTarget] = useState<'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER'>('INSTALLATION');
     // The quote's single address slot is EITHER Projekt- or Lieferadresse.
     const [tenderAddressType, setTenderAddressType] = useState<TenderAddressType>('INSTALLATION');
-    const [addrForm, setAddrForm] = useState({ name: '', address: '', postalCode: '', city: '', country: '' });
+    const [addrForm, setAddrForm] = useState<TenderAddressCreateForm>(EMPTY_TENDER_ADDRESS_FORM);
     const [addrSaving, setAddrSaving] = useState(false);
     // Quick "+ add customer" popup launched from the tender's customer section.
     const [customerModalOpen, setCustomerModalOpen] = useState(false);
-    const [customerForm, setCustomerForm] = useState({ companyName: '', mainEmail: '', mainPhone: '', address: '' });
+    const [customerForm, setCustomerForm] = useState<TenderCustomerCreateForm>(EMPTY_TENDER_CUSTOMER_FORM);
     const [customerSaving, setCustomerSaving] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [linePage, setLinePage] = useState(1);
     const {
         productPickerOpen,
         setProductPickerOpen,
@@ -215,8 +243,27 @@ export const TenderDetail = () => {
         pickerItems,
         pickerTotal,
         pickerLoading,
-        openProductPicker,
     } = useTenderProductPicker();
+    // Anchored product dropdown (portal overlay). Two modes:
+    //  - 'add':   opened from an "Add Product" button — selecting stages a new row
+    //  - 'combo': opened by clicking a product row's name — selecting swaps that
+    //             row's product in place (Odoo-style combobox)
+    // The article search is always anchored to a row's name cell now — "Add
+    // product" appends a blank row and opens the combobox there, so there is no
+    // longer a second "opened from a button" mode.
+    const [productDropdown, setProductDropdown] = useState<
+        { anchorEl: HTMLElement; rowId: string } | null
+    >(null);
+    // Search text for combo mode — mirrors what the user types into the row's
+    // product name input.
+    const [comboSearch, setComboSearch] = useState('');
+    // Set when the full picker / manual-product modal is reached FROM a row's
+    // combobox. Their result then fills that row instead of appending a new one,
+    // which would otherwise leave the blank row stranded above it.
+    const [comboTargetRowId, setComboTargetRowId] = useState<string | null>(null);
+    // One-shot signal: the table focuses this row's name cell and opens its
+    // article combobox. Cleared as soon as the combobox opens.
+    const [autoFocusProductRowId, setAutoFocusProductRowId] = useState<string | null>(null);
     const [manualProductOpen, setManualProductOpen] = useState(false);
     const [manualProduct, setManualProduct] = useState<ManualProductForm>(() => emptyManualProduct('', fallbackTaxRate));
     const [exportOpen, setExportOpen] = useState(false);
@@ -227,6 +274,10 @@ export const TenderDetail = () => {
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
     const [bulkDiscountOpen, setBulkDiscountOpen] = useState(false);
     const [bulkDiscountValue, setBulkDiscountValue] = useState<number>(0);
+    // Stacked discounts: the product line whose editor is open (null = closed),
+    // and the document-total pop-up behind "Apply discount".
+    const [lineDiscountRowId, setLineDiscountRowId] = useState<string | null>(null);
+    const [totalDiscountOpen, setTotalDiscountOpen] = useState(false);
     // Bulk delete/discount are now staged instantly (persisted on Save), so this
     // never toggles — kept only so the bulk modals keep their (never-busy) state.
     const [bulkActionLoading] = useState(false);
@@ -264,6 +315,7 @@ export const TenderDetail = () => {
         isDirty,
         stableRowKeys,
         resetStaging,
+        handleInlinePositionChange,
         commitTextField,
         commitNumberField,
         commitLongDescription,
@@ -273,6 +325,7 @@ export const TenderDetail = () => {
         handleSaveAll,
         handleAddRow,
         handleMoveRow,
+        handleDeleteRow,
         handleBulkDelete,
         handleBulkDiscount,
     } = useTenderLineStaging({
@@ -290,6 +343,17 @@ export const TenderDetail = () => {
         setBulkDiscountOpen,
         bulkDiscountValue,
     });
+    // Every save funnels through this wrapper so the first successful one ends
+    // the initial-entry auto-save mode (and records it for this session, so a
+    // Back/Forward return to the flagged history entry can't resurrect it).
+    const handleSaveAllTracked = async (): Promise<boolean> => {
+        const ok = await handleSaveAll();
+        if (ok && autoSaveOnExit) {
+            setAutoSaveOnExit(false);
+            window.sessionStorage.setItem(initialEntryDoneKey, '1');
+        }
+        return ok;
+    };
     const {
         projectCreateLoading,
         setCreatedProjectId,
@@ -322,7 +386,7 @@ export const TenderDetail = () => {
         overtimeHourlyRate,
         fetchDetail,
         navigate,
-        saveAll: handleSaveAll,
+        saveAll: handleSaveAllTracked,
     });
     // Customer-specific product discounts: auto-applied when one of the saved
     // articles is added to the quote.
@@ -347,15 +411,10 @@ export const TenderDetail = () => {
     }, [detail?.tender.id]);
     const [workspaceTab, setWorkspaceTab] = useState<TenderWorkspaceTabKey>('lines');
     const [settingsInitialTab, setSettingsInitialTab] = useState<TenderSettingsTabKey>('mail');
-    const [sectionSchemaOpen, setSectionSchemaOpen] = useState(() => {
-        if (typeof window === 'undefined') return true;
-        return window.localStorage.getItem(SECTION_SCHEMA_STORAGE_KEY) !== 'false';
-    });
 
     useEffect(() => {
         if (id) {
             resetStaging();
-            setLinePage(1);
             setCreatedProjectId(null);
             setTenderDocuments([]);
             setChatterSummary(EMPTY_CHATTER_SUMMARY);
@@ -376,6 +435,11 @@ export const TenderDetail = () => {
             const store = useTenderStore.getState();
             if (store.detail?.tender.id !== id || store.loadingDetail) {
                 void fetchDetail(id);
+            } else {
+                // The cached copy renders instantly; still re-sync silently in
+                // the background so a stale cache can never hide lines that
+                // were saved on a previous visit.
+                void fetchDetail(id, true);
             }
             setLogsLoaded(false);
             setChatterOpen(false);
@@ -384,40 +448,50 @@ export const TenderDetail = () => {
     }, [id, isCreatingTender, fetchDetail]);
 
 
+    // Cost basis for the per-row profit/loss icon. This is the page's heaviest
+    // request, so it is fetched only when a row can actually show a figure —
+    // i.e. an article-linked product line exists. It used to fire for ANY draft,
+    // including an empty one, putting a whole stock-article summary on the
+    // critical path of a quote that had nothing to price. Scheduled on idle so
+    // it never competes with the tender's own data for a connection.
     useEffect(() => {
         if (!detail?.tender.id || stockArticlesLoaded || stockArticlesLoading) return;
         const hasProductRows = localPositions.some((position) => getLineKind(position) === 'PRODUCT' && !!position.sourceArticleId);
-        if (!hasProductRows && detail.tender.status !== "Draft") return;
-        const timer = window.setTimeout(() => {
-            // Profitability/cost columns only need prices, not images — keep this
-            // background preload on the slim (image-less) summary.
-            void fetchStockArticles(false, false);
-        }, 250);
-        return () => window.clearTimeout(timer);
-    }, [detail?.tender.id, detail?.tender.status, fetchStockArticles, localPositions, stockArticlesLoaded, stockArticlesLoading]);
+        if (!hasProductRows) return;
+        return onIdle(() => { void fetchStockArticles(false, false); }, 3000);
+    }, [detail?.tender.id, fetchStockArticles, localPositions, stockArticlesLoaded, stockArticlesLoading]);
 
     const tree = useMemo(() => buildTree(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const simpleRows = useMemo(() => buildSimpleTenderLines(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const displayRows = simpleRows;
-    const linePageCount = Math.max(1, Math.ceil(displayRows.length / LINE_PAGE_SIZE));
-    const effectiveLinePage = Math.min(linePage, linePageCount);
-    const lineRowOffset = (effectiveLinePage - 1) * LINE_PAGE_SIZE;
-    const pagedRows = useMemo(
-        () => displayRows.slice(lineRowOffset, lineRowOffset + LINE_PAGE_SIZE),
-        [displayRows, lineRowOffset],
-    );
     const grandTotal = useMemo(() => simpleRows.reduce((sum, row) => sum + row.total, 0), [simpleRows]);
-    // Offer footer figures: average line discount, direct discount, net/VAT/gross.
-    const pricingSummary = useMemo(
-        () => computeTenderPricingSummary(simpleRows, fallbackTaxRate, detail?.tender.directDiscount),
-        [simpleRows, fallbackTaxRate, detail?.tender.directDiscount],
+    // Document-level discount stack. Offers saved before the stack existed are
+    // seeded from the old directDiscount/extraDiscount pair, so nothing that was
+    // already priced changes value just because the editor changed.
+    const documentDiscounts = useMemo(
+        () => (detail ? seedTotalDiscounts(detail.tender) : []),
+        [detail?.tender.totalDiscounts, detail?.tender.directDiscount, detail?.tender.directDiscountLabel,
+            detail?.tender.extraDiscount, detail?.tender.extraDiscountLabel],
     );
-    // PDF toplamları için indirim özeti: indirim satırı yalnızca gerçekten
-    // uygulandıysa çizilir, net/KDV/genel toplam ekrandaki özetle birebir olur.
+    // Offer footer figures: average line discount, document discounts, net/VAT/gross.
+    const pricingSummary = useMemo(
+        () => computeTenderPricingSummary(simpleRows, fallbackTaxRate, documentDiscounts),
+        [simpleRows, fallbackTaxRate, documentDiscounts],
+    );
+    // PDF toplamları için indirim özeti: indirimler adlarıyla, uygulandıkları
+    // sırayla listelenir; net/KDV/genel toplam ekrandaki özetle birebir olur.
     const pdfTotals = useMemo(
         () => ({
-            discountPercent: pricingSummary.directDiscount,
-            discountAmount: pricingSummary.directDiscountAmount,
+            subtotal: pricingSummary.netBeforeDiscounts,
+            discounts: pricingSummary.discounts
+                .filter((entry) => entry.amount > 0)
+                .map((entry, index) => ({
+                    name: discountDisplayName(entry, index),
+                    percent: entry.percent,
+                    amount: entry.amount,
+                })),
+            totalDiscountAmount: pricingSummary.totalDiscountAmount,
+            combinedDiscountPercent: pricingSummary.combinedDiscountPercent,
             netTotal: pricingSummary.netTotal,
             vatTotal: pricingSummary.vatTotal,
             grossTotal: pricingSummary.grossTotal,
@@ -428,35 +502,29 @@ export const TenderDetail = () => {
         () => simpleRows.filter((row) => selectedRowIds[row.id]),
         [simpleRows, selectedRowIds],
     );
-    const selectedLine = useMemo(
-        () => simpleRows.find((row) => row.id === selectedId) ?? null,
-        [simpleRows, selectedId],
+    // Per-row profit/loss for the icon in the amount column (cost from the
+    // slim stock-article summary).
+    const { profitabilityRows } = useTenderProfitability({ stockArticles, displayRows, selectedLine: null });
+    const profitByRowId = useMemo(
+        () => new Map(profitabilityRows.map((row) => [row.id, {
+            revenue: row.revenue,
+            cost: row.cost,
+            result: row.result,
+            resultRate: row.resultRate,
+            unitCost: row.unitCost,
+            costSource: row.costSource,
+        }])),
+        [profitabilityRows],
     );
-    const {
-        profitabilityRows,
-        profitabilityRevenue,
-        profitabilityCost,
-        profitabilityResult,
-        profitabilityRate,
-        selectedProfitabilityLine,
-    } = useTenderProfitability({ stockArticles, displayRows, selectedLine });
+    const lineDiscountRow = useMemo(
+        () => (lineDiscountRowId ? localPositions.find((position) => position.id === lineDiscountRowId) ?? null : null),
+        [lineDiscountRowId, localPositions],
+    );
     const discountEligibleRows = selectedRows.filter((row) => row.kind === 'PRODUCT');
     const allRowsSelected = simpleRows.length > 0 && selectedRows.length === simpleRows.length;
     const someRowsSelected = selectedRows.length > 0;
 
-    const { registerCellHandle, navigateCell } = useTenderLineKeyboardNavigation(pagedRows);
-
-    useEffect(() => {
-        if (linePage > linePageCount) setLinePage(linePageCount);
-    }, [linePage, linePageCount]);
-
-    useEffect(() => {
-        if (!selectedId) return;
-        const selectedIndex = displayRows.findIndex((row) => row.id === selectedId);
-        if (selectedIndex < 0) return;
-        const selectedPage = Math.floor(selectedIndex / LINE_PAGE_SIZE) + 1;
-        setLinePage((current) => current === selectedPage ? current : selectedPage);
-    }, [displayRows, selectedId]);
+    const { registerCellHandle, navigateCell } = useTenderLineKeyboardNavigation(displayRows);
 
     useEffect(() => {
         setSelectedRowIds((prev) => {
@@ -467,12 +535,37 @@ export const TenderDetail = () => {
     }, [simpleRows]);
     // Guards against leaving with unsaved changes: shows our custom modal for
     // in-app navigation (menu switch / links / Back button) and falls back to the
-    // browser's native prompt only for a hard refresh or tab close.
-    const navGuard = useUnsavedChangesGuard(isDirty);
+    // browser's native prompt only for a hard refresh or tab close. During the
+    // initial entry (fresh from TenderCreate) leaving auto-saves instead of asking.
+    const navGuard = useUnsavedChangesGuard(isDirty, {
+        autoSave: autoSaveOnExit ? handleSaveAllTracked : null,
+    });
     const handleGuardSave = async () => {
-        const ok = await handleSaveAll();
+        const ok = await handleSaveAllTracked();
         if (ok) navGuard.proceed();
     };
+
+    // Every overlay on this page freezes the page behind it, so opening one — or
+    // picking a product inside it — can never scroll the quote out from under the
+    // pointer. Keep this list in step with the overlays rendered below.
+    usePageScrollLock(Boolean(
+        productDropdown
+        || productPickerOpen
+        || manualProductOpen
+        || bulkDeleteOpen
+        || bulkDiscountOpen
+        || lineDiscountRowId
+        || totalDiscountOpen
+        || addrModalOpen
+        || customerModalOpen
+        || exportOpen
+        || deleteOfferOpen
+        || orderDecisionOpen
+        || documentPreview
+        || chatterOpen
+        || navGuard.isOpen
+        || projectCreatedModalId,
+    ));
 
 
     if (isCreatingTender) {
@@ -569,7 +662,7 @@ export const TenderDetail = () => {
     // Open the "+ add address" popup, pre-targeted to installation, delivery, billing or the customer.
     const openAddrModal = (target: 'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER') => {
         setAddrTarget(target);
-        setAddrForm({ name: '', address: '', postalCode: '', city: '', country: '' });
+        setAddrForm(EMPTY_TENDER_ADDRESS_FORM);
         setAddrModalOpen(true);
     };
 
@@ -579,8 +672,7 @@ export const TenderDetail = () => {
         const customerId = detail?.tender.customerId;
         if (!customerId) { toast.error(t('tenders.address_info_not_found')); return; }
         const formatted = formatLocationAddress({
-            id: '', name: addrForm.name, address: addrForm.address,
-            postalCode: addrForm.postalCode, city: addrForm.city, country: addrForm.country, isPrimary: false,
+            id: '', name: addrForm.name, isPrimary: false, ...toAddressPayload(addrForm),
         } as CustomerLocationDto);
         try {
             setAddrSaving(true);
@@ -589,15 +681,11 @@ export const TenderDetail = () => {
                 // re-formats consistently wherever the main address is used.
                 await apiClient.patch(`/customers/${customerId}`, {
                     addressName: addrForm.name || null,
-                    address: addrForm.address || null,
-                    postalCode: addrForm.postalCode || null,
-                    city: addrForm.city || null,
-                    country: addrForm.country || null,
+                    ...toAddressPayload(addrForm),
                 });
             } else {
                 await customerApi.addLocation(customerId, {
-                    name: addrForm.name || formatted, address: addrForm.address, postalCode: addrForm.postalCode,
-                    city: addrForm.city, country: addrForm.country, kind: addrTarget,
+                    name: addrForm.name || formatted, kind: addrTarget, ...toAddressPayload(addrForm),
                 });
                 const rows = await customerApi.listLocations(customerId);
                 setCustomerLocations(rows);
@@ -636,26 +724,78 @@ export const TenderDetail = () => {
         });
     };
 
-    const setSectionSchemaOpenPersisted = (open: boolean) => {
-        setSectionSchemaOpen(open);
-        window.localStorage.setItem(SECTION_SCHEMA_STORAGE_KEY, String(open));
-    };
-
     const openManualProduct = () => {
         setManualProduct(emptyManualProduct(productSearch.trim(), fallbackTaxRate));
         setManualProductOpen(true);
     };
 
+    // "Add product" no longer opens a pop-up. It appends a BLANK product row and
+    // hands focus to that row's name cell; the article search then happens in the
+    // row itself, filtering as the user types and offering the create-actions
+    // when nothing matches. `autoFocusProductRowId` is the one-shot signal the
+    // table uses to focus that cell and open its combobox.
+    const addBlankProductRow = (afterRowId?: string) => {
+        const newRowId = handleAddRow('PRODUCT', undefined, undefined, afterRowId);
+        if (newRowId) setAutoFocusProductRowId(newRowId);
+    };
+    const closeProductDropdown = () => {
+        setProductDropdown(null);
+        setProductPickerAfterRowId(undefined);
+    };
+    // The product-name cell is a plain text field with a combobox readout:
+    // focusing a BLANK cell lists the first products straight away, and typing
+    // narrows that list. A product nobody stocks is simply a name that matched
+    // nothing — the list vanishes on its own (the dropdown renders nothing for
+    // an empty result set).
+    const handleRowProductComboInput = (rowId: string, text: string, anchorEl: HTMLInputElement) => {
+        setComboSearch(text);
+        setAutoFocusProductRowId(null);
+        setProductDropdown((current) => (current?.rowId === rowId ? current : { anchorEl, rowId }));
+    };
+    // Writes a product INTO an existing row: name, unit, price, tax, description
+    // and the article link are staged as one inline patch (persisted with Save,
+    // like any other cell edit). Used by the row combobox, by the full picker
+    // when it was opened from a row, and by a manually created product.
+    const fillRowFromProduct = (
+        rowId: string,
+        article: ProductSource,
+        options?: Partial<ManualProductForm>,
+    ) => {
+        const defaults = buildProductDefaults(article, options, fallbackTaxRate);
+        handleInlinePositionChange(rowId, {
+            sourceArticleId: defaults.sourceArticleId ?? null,
+            shortDescription: defaults.shortDescription,
+            longDescription: defaults.longDescription ?? null,
+            unit: defaults.unit,
+            unitPrice: defaults.unitPrice,
+            discount: defaults.discount,
+            taxRate: defaults.taxRate,
+            // Only a manually entered product states its own quantity. Swapping
+            // the article on an existing row must leave the quantity alone.
+            ...(options?.quantity != null ? { quantity: Number(options.quantity) } : {}),
+        });
+    };
+    // Selecting an article from a row's combobox swaps the product in place,
+    // carrying over any customer-specific discount for that article.
+    const swapRowProduct = (rowId: string, article: ArticleQuickPick) => {
+        const customerDiscount = customerDiscountMap[article.id];
+        fillRowFromProduct(
+            rowId,
+            article,
+            customerDiscount !== undefined ? { discount: customerDiscount } : undefined,
+        );
+    };
+
     // "Add new product" opens the full product creation page in a new window,
     // carrying the searched text as ?name= so the name field is pre-filled and
     // the user completes the rest of the card there.
-    const openStockArticleCreate = () => {
-        const name = productSearch.trim();
+    const openStockArticleCreateFor = (name: string) => {
         const query = name ? `?name=${encodeURIComponent(name)}` : '';
         window.open(`/inventory/articles/new${query}`, '_blank', 'noopener');
         setProductPickerOpen(false);
         setProductPickerAfterRowId(undefined);
     };
+    const openStockArticleCreate = () => openStockArticleCreateFor(productSearch.trim());
 
     const handleCreateManualProduct = async () => {
         const name = manualProduct.name.trim();
@@ -666,19 +806,22 @@ export const TenderDetail = () => {
         setManualProductOpen(false);
         setProductPickerOpen(false);
         const afterRowId = productPickerAfterRowId;
-        void handleAddRow(
-            'PRODUCT',
-            {
-                name,
-                description: manualProduct.description,
-                unit: manualProduct.unit,
-                baseCost: 0,
-                salePrice: manualProduct.unitPrice,
-                imageUrl: manualProduct.imageUrl,
-            },
-            manualProduct,
-            afterRowId,
-        );
+        const targetRowId = comboTargetRowId;
+        setComboTargetRowId(null);
+        const article = {
+            name,
+            description: manualProduct.description,
+            unit: manualProduct.unit,
+            baseCost: 0,
+            salePrice: manualProduct.unitPrice,
+            imageUrl: manualProduct.imageUrl,
+        };
+        if (targetRowId) {
+            // Created from a row's combobox — write it into that row.
+            fillRowFromProduct(targetRowId, article, manualProduct);
+        } else {
+            void handleAddRow('PRODUCT', article, manualProduct, afterRowId);
+        }
         setProductPickerAfterRowId(undefined);
     };
 
@@ -697,9 +840,7 @@ export const TenderDetail = () => {
         // address (street / postal + city / country), formatted like a saved
         // location. Falls back to the legacy single-line address for older records.
         const customerAddress = formatLocationAddress({
-            id: '', name: '', address: customer.address ?? '',
-            postalCode: customer.postalCode ?? '', city: customer.city ?? '', country: customer.country ?? '',
-            isPrimary: true,
+            id: '', name: '', isPrimary: true, ...toAddressForm(customer),
         } as CustomerLocationDto) || (customer.address ?? null);
 
         setNewTenderCustomerQuery(customer.companyName);
@@ -752,7 +893,7 @@ export const TenderDetail = () => {
     };
 
     const openCustomerModal = () => {
-        setCustomerForm({ companyName: '', mainEmail: '', mainPhone: '', address: '' });
+        setCustomerForm(EMPTY_TENDER_CUSTOMER_FORM);
         setCustomerModalOpen(true);
     };
    
@@ -764,7 +905,8 @@ export const TenderDetail = () => {
                 companyName: customerForm.companyName.trim(),
                 mainEmail: customerForm.mainEmail.trim() || undefined,
                 mainPhone: customerForm.mainPhone.trim() || undefined,
-                address: customerForm.address.trim() || undefined,
+                // Adres bilesenleri tek tek gonderilir (birlesik alan yok).
+                ...toAddressPayload(customerForm),
             }).then((res) => res.data);
             const option: CustomerOption = {
                 id: created.id,
@@ -773,10 +915,7 @@ export const TenderDetail = () => {
                 mainEmail: created.mainEmail ?? null,
                 mainPhone: created.mainPhone ?? null,
                 addressName: created.addressName ?? null,
-                address: created.address ?? null,
-                postalCode: created.postalCode ?? null,
-                city: created.city ?? null,
-                country: created.country ?? null,
+                ...toAddressForm(created),
                 taxNumber: created.taxNumber ?? null,
             };
             setNewTenderCustomers((prev) => [option, ...prev.filter((item) => item.id !== option.id)]);
@@ -809,39 +948,9 @@ export const TenderDetail = () => {
         ...splitAddress(tender.customerAddress),
     ];
     const commissionNumber = valueOrBlank((tender as any).commissionNumber || (tender as any).commissionNo || (tender as any).referenceNumber);
-    // The currency now has its own row, so it is no longer folded into Preisliste.
-    const priceList = valueOrBlank((tender as any).priceList);
     const currencyCode = toCurrencyCode((tender as any).currency);
-    const tenderFormatLabel = formatTenderFormatLabel(tender.format);
     const tenderValidityValue = tender.validUntil ? dayjs(tender.validUntil).format('YYYY-MM-DD') : minimumTenderValidUntil;
     const tenderValidityLabel = dayjs(tenderValidityValue).format('DD.MM.YYYY');
-    
-    const tenderHeaderMeta = (
-        <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-slate-500">
-            <span className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 font-semibold text-slate-700">
-                {tenderFormatLabel ||t('tenders.sia_451')}
-            </span>
-            {canEditTenderMeta ? (
-                <label className="relative inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 font-medium text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100">
-                    <span className="text-[11px] font-semibold uppercase text-emerald-700">{t('tenders.gecerlilik')}</span>
-                    <span className="font-semibold tabular-nums text-slate-900">{tenderValidityLabel}</span>
-                    <input
-                        aria-label={t('tenders.gecerlilik_tarihi')}
-                        type="date"
-                        value={tenderValidityValue}
-                        min={minimumTenderValidUntil}
-                        onChange={(event) => void handleMetaFieldChange('validity', { validUntil: event.target.value || null })}
-                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    />
-                </label>
-            ) : (
-                <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 font-medium text-emerald-800">
-                    <span className="text-[11px] font-semibold uppercase text-emerald-700">{t('tenders.gecerlilik')}</span>
-                    <span className="font-semibold tabular-nums text-slate-900">{tenderValidityLabel}</span>
-                </span>
-            )}
-        </span>
-    );
     const billingAddressValue = valueOrBlank((tender as any).billingAddress);
     // Projektadresse (installation); legacy tenders stored it in deliveryAddress.
     const installationAddressValue = valueOrBlank((tender as any).installationAddress);
@@ -876,7 +985,9 @@ export const TenderDetail = () => {
         ...customerLocations.filter((loc) => locationKindOf(loc) === 'BILLING'),
     ];
     const sameAsInstallation = !!(tender as any).billingSameAsInstallation;
-    const renderAddressLines = (value: string) => renderDetailLines(splitAddress(value));
+    // An address is one line — "Hofackerstrasse 75, 4132 Muttenz" reads as a
+    // single postal line, not as a stack of fragments split on its commas.
+    const renderAddressLines = (value: string) => renderDetailLines([joinAddress(value)]);
 
     // The single project/delivery address slot: exactly one of the two fields
     // holds the value — picking or toggling always nulls the other side.
@@ -956,46 +1067,78 @@ export const TenderDetail = () => {
         />
     ) : null;
     const internalDeliveryDatePicker = canEditTenderMeta ? (
-        <div className="flex items-center gap-1.5">
-            <input
-                aria-label={t('tenders.lieferdatum_intern')}
-                type="date"
-                value={internalDeliveryDateValue}
-                onChange={(event) => void handleMetaFieldChange('internalDate', { internalDeliveryDate: event.target.value || null })}
-                className="w-full max-w-[180px] rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#1f2654]"
-            />
-        </div>
+        <QuoteDatePicker
+            ariaLabel={t('tenders.lieferdatum_intern')}
+            value={internalDeliveryDateValue}
+            onChange={(value) => void handleMetaFieldChange('internalDate', { internalDeliveryDate: value || null })}
+        />
     ) : null;
-    const tenderDetailLeft: DetailInfoRow[] = [
-        { label:t('tenders.kunde'), content: tenderCustomerPicker, lines: customerLines },
+    const tenderValidityPicker = canEditTenderMeta ? (
+        <QuoteDatePicker
+            ariaLabel={t('tenders.gecerlilik_tarihi')}
+            value={tenderValidityValue}
+            min={minimumTenderValidUntil}
+            onChange={(value) => void handleMetaFieldChange('validity', { validUntil: value || null })}
+        />
+    ) : null;
+    // Quote-level fields grouped by the question they answer: who the quote is
+    // for, on what terms, and where the work / invoice goes.
+    const tenderDetailGroups: TenderCardGroup[] = [
         {
-            label: tenderAddressType === 'DELIVERY' ?t('tenders.lieferadresse') :t('tenders.projektadresse'),
-            content: tenderAddressRowContent,
-            lines: splitAddress(activeAddressValue),
-        },
-        { label:t('tenders.rechnungsadresse'), content: billingRowContent, lines: splitAddress((sameAsInstallation ? activeAddressValue : billingAddressValue) || tender.customerName || '') },
-        { label:t('tenders.lieferdatum_intern'), content: internalDeliveryDatePicker, lines: [internalDeliveryDateValue ? dayjs(internalDeliveryDateValue).format('DD.MM.YYYY') : ''] },
-    ];
-    const tenderDetailRight: DetailInfoRow[] = [
-        { label:t('tenders.auftragsdatum'), lines: [createdAtLabel] },
-        // Preisliste reflects the average of all product-line discounts.
-        { label:t('tenders.preisliste'), lines: [`Ø ${formatDiscountPercent(pricingSummary.averageDiscount)}${priceList ? ` · ${priceList}` : ''}`] },
-        {
-            label:t('tenders.waehrung'),
-            content: canEditTenderMeta
-                ? <TenderCurrencySelect value={currencyCode} onChange={(value) => handleMetaFieldChange('currency', { currency: value })} />
-                : undefined,
-            lines: [currencyCode],
+            key: 'customer',
+            title:t('tenders.kunde'),
+            fields: [
+                { key: 'customer', label:t('crm.customers.companyName'), control: tenderCustomerPicker, lines: customerLines },
+                {
+                    key: 'commission',
+                    label:t('tenders.kommission_nr'),
+                    control: canEditTenderMeta
+                        ? <TenderCommissionInput value={commissionNumber} onCommit={(value) => handleMetaFieldChange('commission', { commissionNumber: value })} />
+                        : undefined,
+                    lines: [commissionNumber],
+                },
+            ],
         },
         {
-            label:t('tenders.kommission_nr'),
-            content: canEditTenderMeta
-                ? <TenderCommissionInput value={commissionNumber} onCommit={(value) => handleMetaFieldChange('commission', { commissionNumber: value })} />
-                : undefined,
-            lines: [commissionNumber],
+            key: 'addresses',
+            title:t('tenders.addresses'),
+            fields: [
+                {
+                    key: 'address',
+                    label: tenderAddressType === 'DELIVERY' ?t('tenders.lieferadresse') :t('tenders.projektadresse'),
+                    control: tenderAddressRowContent,
+                    lines: [joinAddress(activeAddressValue)],
+                },
+                {
+                    key: 'billing',
+                    label:t('tenders.rechnungsadresse'),
+                    control: billingRowContent,
+                    lines: [joinAddress((sameAsInstallation ? activeAddressValue : billingAddressValue) || tender.customerName || '')],
+                },
+            ],
         },
-        { label:t('tenders.subtotal_excl_vat'), content: <span className="font-semibold tabular-nums text-slate-900">{fmtMoney(pricingSummary.netTotal)}</span> },
-        { label:t('tenders.total_incl_vat'), content: <span className="font-semibold tabular-nums text-slate-900">{fmtMoney(pricingSummary.grossTotal)}</span> },
+        {
+            key: 'terms',
+            title:t('tenders.terms'),
+            fields: [
+                { key: 'orderDate', label:t('tenders.auftragsdatum'), lines: [createdAtLabel] },
+                { key: 'validity', label:t('tenders.gecerlilik'), control: tenderValidityPicker, lines: [tenderValidityLabel] },
+                {
+                    key: 'internalDate',
+                    label:t('tenders.lieferdatum_intern'),
+                    control: internalDeliveryDatePicker,
+                    lines: [internalDeliveryDateValue ? dayjs(internalDeliveryDateValue).format('DD.MM.YYYY') : ''],
+                },
+                {
+                    key: 'currency',
+                    label:t('tenders.waehrung'),
+                    control: canEditTenderMeta
+                        ? <TenderCurrencySelect value={currencyCode} onChange={(value) => handleMetaFieldChange('currency', { currency: value })} />
+                        : undefined,
+                    lines: [currencyCode],
+                },
+            ],
+        },
     ];
 
     const priceLogLabels: Record<string, string> = {
@@ -1116,7 +1259,7 @@ export const TenderDetail = () => {
                 <button
                     type="button"
                     onClick={() => setDocumentPreview(document)}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-[2px] border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10"
                     title={document.fileName}
                 >
                     {image ? (
@@ -1135,7 +1278,7 @@ export const TenderDetail = () => {
                     target="_blank"
                     rel="noreferrer"
                     title={t('common.download')}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#1f2654] hover:bg-[#1f2654] hover:text-white"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#1f2654] hover:bg-[#1f2654] hover:text-white"
                 >
                     <FileDown size={14} />
                 </a>
@@ -1210,21 +1353,17 @@ export const TenderDetail = () => {
 
     return (
         <div>
-            <TenderQuoteTopBar
+            <TenderDetailHeader
+                tender={tender}
+                tenderStatusVariant={tenderStatusVariant}
+                tenderStatusLabel={tenderStatusLabel}
                 onOpenLogs={handleOpenTenderLogs}
                 onDeleteOffer={() => setDeleteOfferOpen(true)}
                 canSave={canEditTenderMeta}
                 saving={savingAll}
                 isDirty={isDirty}
-                onSave={() => void handleSaveAll()}
+                onSave={() => void handleSaveAllTracked()}
                 creatorName={creatorName}
-            />
-
-            <TenderDetailHeader
-                tender={tender}
-                tenderStatusVariant={tenderStatusVariant}
-                tenderStatusLabel={tenderStatusLabel}
-                tenderHeaderMeta={tenderHeaderMeta}
                 isDraft={isDraft}
                 canManage={canManage}
                 canExport={canExport}
@@ -1240,26 +1379,10 @@ export const TenderDetail = () => {
                 onApprove={handleApprove}
             />
 
-            <div className="relative z-10 mb-4 rounded-xl border border-slate-200/80 bg-white shadow-sm">
-                <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-slate-100">
-                    <div className="divide-y divide-slate-100 px-4 lg:pr-6">
-                        {tenderDetailLeft.map((item) => (
-                            <div key={item.label} className="grid grid-cols-[112px_minmax(0,1fr)] items-start gap-3 py-2 text-[12.5px]">
-                                <div className="pt-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{item.label}</div>
-                                <div className={`font-medium leading-[1.15rem] text-slate-800 ${item.content ? '' : 'px-3'}`}>{item.content ?? renderDetailLines(item.lines ?? [])}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="divide-y divide-slate-100 px-4 lg:pl-6">
-                        {tenderDetailRight.map((item) => (
-                            <div key={item.label} className="grid grid-cols-[120px_minmax(0,1fr)] items-start gap-3 py-2 text-[12.5px]">
-                                <div className="pt-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{item.label}</div>
-                                <div className={`font-medium leading-[1.15rem] text-slate-800 ${item.content ? '' : 'px-3'}`}>{item.content ?? renderDetailLines(item.lines ?? [])}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+            <TenderCustomerCard
+                groups={tenderDetailGroups}
+                summary={[tender.customerName, tenderValidityLabel].filter(Boolean).join(' · ')}
+            />
 
             {chatterOpen && (
                 <Suspense fallback={null}>
@@ -1287,41 +1410,36 @@ export const TenderDetail = () => {
                 workspaceTab={workspaceTab}
                 onSelectTab={setWorkspaceTab}
                 onOpenSettingsTab={openSettingsTab}
+                lineCount={simpleRows.length}
             />
 
             {workspaceTab === 'lines' ? (
-                <div className={`grid grid-cols-1 gap-3 ${sectionSchemaOpen ?"2xl:grid-cols-[minmax(0,1fr)_335px] min-[1800px]:grid-cols-[minmax(0,1fr)_460px] min-[2200px]:grid-cols-[minmax(0,1fr)_520px]" :"2xl:grid-cols-[minmax(0,1fr)_72px] min-[1800px]:grid-cols-[minmax(0,1fr)_84px]"}`}>
+                <div className="grid grid-cols-1 gap-3">
                     <div className="min-w-0">
                         <Card
                             title={t('tenders.tender_satirlari')}
                             icon={<MdTableChart size={14} />}
                             noPadding
                             actions={
-                                isDraft && canManage ? (
+                                // Add-row actions live at the bottom of the table itself;
+                                // the header only carries the bulk-selection actions.
+                                isDraft && canManage && someRowsSelected ? (
                                     <div className="flex flex-wrap items-center justify-end gap-2">
-                                        <Button size="sm" variant="secondary" icon={<Package size={12} />} onClick={() => openProductPicker(lastRowId)} className={lineActionButtonClass}>{t('tenders.product_add')}</Button>
-                                        <Button size="sm" variant="secondary" onClick={() => handleAddRow('TITLE', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.baslik')}</Button>
-                                        <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={() => handleAddRow('DESCRIPTION', undefined, undefined, lastRowId)} className={lineActionButtonClass}>{t('tenders.description_add')}</Button>
-                                        {someRowsSelected && (
-                                            <>
-                                                <span className="text-[11px] font-medium text-slate-500">{selectedRows.length}{t('tenders.selected')}</span>
-                                                <Button size="sm" variant="secondary" onClick={() => setBulkDiscountOpen(true)}>{t('tenders.bulk_discount')}</Button>
-                                                <Button size="sm" variant="danger" onClick={() => setBulkDeleteOpen(true)}>{t('common.delete')}</Button>
-                                            </>
-                                        )}
+                                        <span className="text-[11px] font-medium text-slate-500">{selectedRows.length}{t('tenders.selected')}</span>
+                                        <Button size="sm" variant="secondary" onClick={() => setBulkDiscountOpen(true)}>{t('tenders.bulk_discount')}</Button>
+                                        <Button size="sm" variant="danger" onClick={() => setBulkDeleteOpen(true)}>{t('common.delete')}</Button>
                                     </div>
                                 ) : null
                             }
             >
-                <div className="overflow-x-auto">
+                {/* Horizontal scrolling only, and only when the columns genuinely
+                    do not fit; the slim bar keeps it from stealing row height. */}
+                <div className="overflow-x-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
                     <TenderLineTable
-                        pagedRows={pagedRows}
-                        rowOffset={lineRowOffset}
-                        totalRowCount={displayRows.length}
+                        rows={displayRows}
                         isEmpty={simpleRows.length === 0}
                         isDraft={isDraft}
                         canManage={canManage}
-                        sectionSchemaOpen={sectionSchemaOpen}
                         fallbackTaxRate={fallbackTaxRate}
                         selectedId={selectedId}
                         selectedRowIds={selectedRowIds}
@@ -1339,77 +1457,68 @@ export const TenderDetail = () => {
                         onArrowNav={navigateCell}
                         onAddRow={handleAddRow}
                         onMoveRow={handleMoveRow}
-                        onOpenProductPicker={openProductPicker}
+                        onDeleteRow={handleDeleteRow}
+                        onAddProductRow={addBlankProductRow}
+                        autoFocusRowId={autoFocusProductRowId}
+                        onProductComboInput={handleRowProductComboInput}
+                        profitByRowId={profitByRowId}
+                        onOpenLineDiscounts={setLineDiscountRowId}
                     />
                 </div>
-                {linePageCount > 1 && (
-                    <nav
-                        aria-label={t('common.pagination')}
-                        className="flex items-center justify-between border-t border-slate-100 px-3 py-2"
-                    >
-                        <span className="text-[11.5px] font-medium tabular-nums text-slate-500">
-                            {lineRowOffset + 1}–{Math.min(lineRowOffset + LINE_PAGE_SIZE, displayRows.length)} / {displayRows.length}
-                        </span>
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                aria-label={t('common.onceki')}
-                                disabled={effectiveLinePage === 1}
-                                onClick={() => setLinePage((page) => Math.max(1, page - 1))}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                <ChevronLeft size={14} />
-                            </button>
-                            <span className="min-w-14 text-center text-[11.5px] font-semibold tabular-nums text-slate-600">
-                                {effectiveLinePage} / {linePageCount}
-                            </span>
-                            <button
-                                type="button"
-                                aria-label={t('common.sonraki')}
-                                disabled={effectiveLinePage === linePageCount}
-                                onClick={() => setLinePage((page) => Math.min(linePageCount, page + 1))}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                <ChevronRight size={14} />
-                            </button>
-                        </div>
-                    </nav>
-                )}
                 {/* Bottom of the quote: discount on the price, amount excl. VAT,
                     VAT amount and the final total — inside the same card. */}
                 <TenderPriceSummary
                     summary={pricingSummary}
                     canEdit={canEditTenderMeta}
-                    discountLabel={detail?.tender.directDiscountLabel}
-                    onDirectDiscountChange={(value) => handleTenderMetaChange({ directDiscount: value })}
-                    onDiscountLabelChange={(value) => handleTenderMetaChange({ directDiscountLabel: value })}
+                    onOpenDiscounts={() => setTotalDiscountOpen(true)}
                 />
                         </Card>
                     </div>
-
-                    <TenderProfitabilityPanel
-                        open={sectionSchemaOpen}
-                        onToggleOpen={setSectionSchemaOpenPersisted}
-                        result={profitabilityResult}
-                        revenue={profitabilityRevenue}
-                        cost={profitabilityCost}
-                        rate={profitabilityRate}
-                        rows={profitabilityRows}
-                        selectedLine={selectedProfitabilityLine}
-                        selectedId={selectedId}
-                        onSelectRow={setSelectedId}
-                    />
                 </div>
-            ) : workspaceTab === 'technician' ? (
-                <Suspense fallback={<LazyPanelFallback />}>
-                    <LazyTenderTechnicianTab
-                        tenderId={tender.id}
-                        projectId={projectId}
-                        hasCustomer={Boolean(tender.customerId)}
-                        canManage={canManage}
-                        onChanged={() => fetchDetail(tender.id, true)}
+            ) : workspaceTab === 'pdf' ? (
+                /* PDF version tab — the optional text/image blocks appended to the
+                   offer's PDF. Their printed position is fixed regardless of where
+                   they are edited: intro text after the cover page, final text and
+                   images after the totals. */
+                <Card title={t('tenders.pdf_content')} icon={<FileText size={14} />}>
+                    <Suspense fallback={<LazyPanelFallback />}>
+                        <LazyTenderPdfContentPanel
+                            canEdit={canEditTenderMeta}
+                            onError={(message) => toast.error(message)}
+                            value={{
+                                coverLetter: tender.coverLetter ?? null,
+                                closingNote: tender.closingNote ?? null,
+                                closingImages: parseClosingImages(tender.closingImages),
+                            }}
+                            // Staged like every other quote field: nothing is sent
+                            // until the user hits Save. The images travel as an
+                            // array and are stored as JSON, so the optimistic copy
+                            // held in the store must be the serialised form too.
+                            onChange={({ closingImages, ...rest }) => handleTenderMetaChange({
+                                ...rest,
+                                // The column stores JSON; the panel works with an
+                                // array. Serialising at this boundary keeps one
+                                // shape on the wire and in the optimistic copy.
+                                ...(closingImages !== undefined
+                                    ? { closingImages: closingImages.length ? JSON.stringify(closingImages) : null }
+                                    : {}),
+                            })}
+                        />
+                    </Suspense>
+                </Card>
+            ) : workspaceTab === 'payment' ? (
+                /* Ödeme planı tab — percentage stages (30/20/10/40) the customer
+                   pays in. Staged like every other quote field: nothing is sent
+                   until the user hits Save; the schedule is copied to the order
+                   at conversion and drives stage-by-stage invoicing there. */
+                <Card title={t('tenders.payment_schedule_tab')} icon={<CoinsIcon size={14} />}>
+                    <TenderPaymentTab
+                        tender={tender}
+                        canEdit={canEditTenderMeta}
+                        grossTotal={pricingSummary.grossTotal}
+                        onMetaChange={(patch) => handleTenderMetaChange(patch)}
                     />
-                </Suspense>
+                </Card>
             ) : (
                 <Suspense fallback={<LazyPanelFallback />}>
                     <LazyTenderSettingsModal
@@ -1452,6 +1561,32 @@ export const TenderDetail = () => {
             </Suspense>
             )}
 
+            {/* Article search, anchored to the row's own name cell. */}
+            {productDropdown && (
+                <TenderProductSearchDropdown
+                    anchorEl={productDropdown.anchorEl}
+                    search={comboSearch}
+                    onClose={closeProductDropdown}
+                    onSelectArticle={(article) => {
+                        // Drop the search text the user typed into the cell before
+                        // staging the swap — otherwise it is still the input's
+                        // draft and gets committed over the article name on blur.
+                        productDropdown.anchorEl.dispatchEvent(new CustomEvent(RESET_DRAFT_EVENT));
+                        swapRowProduct(productDropdown.rowId, article);
+                        setProductDropdown(null);
+                    }}
+                    onOpenAllProducts={(search) => {
+                        // Remember the row so the big picker fills THIS row rather
+                        // than appending a second one next to the blank one.
+                        setComboTargetRowId(productDropdown.rowId);
+                        setProductDropdown(null);
+                        setProductSearch(search);
+                        setProductPickerOpen(true);
+                    }}
+                    onClearSearch={() => setComboSearch('')}
+                />
+            )}
+
             {productPickerOpen && (
             <Suspense fallback={null}>
             <LazyTenderProductPickerModal
@@ -1471,10 +1606,16 @@ export const TenderDetail = () => {
                 onCreateStockArticle={openStockArticleCreate}
                 onSelectArticle={(article) => {
                     const afterRowId = productPickerAfterRowId;
+                    const targetRowId = comboTargetRowId;
                     setProductPickerOpen(false);
                     setProductPickerAfterRowId(undefined);
+                    setComboTargetRowId(null);
                     // The picker page already includes every field needed to stage
                     // the row, so selecting a product performs no second request.
+                    if (targetRowId) {
+                        swapRowProduct(targetRowId, article);
+                        return;
+                    }
                     const customerDiscount = customerDiscountMap[article.id];
                     handleAddRow(
                         'PRODUCT',
@@ -1521,6 +1662,34 @@ export const TenderDetail = () => {
                 value={bulkDiscountValue}
                 onValueChange={setBulkDiscountValue}
                 onConfirm={handleBulkDiscount}
+            />
+            </Suspense>
+            )}
+
+            {/* Per-product discounts. Mounted only while open so each opening
+                seeds a fresh draft from the line's stored list. */}
+            {lineDiscountRow && (
+            <Suspense fallback={null}>
+            <LazyTenderLineDiscountModal
+                open
+                onClose={() => setLineDiscountRowId(null)}
+                position={lineDiscountRow}
+                fallbackTaxRate={fallbackTaxRate}
+                canEdit={isDraft && canManage}
+                onSave={(patch) => handleInlinePositionChange(lineDiscountRow.id, patch)}
+            />
+            </Suspense>
+            )}
+
+            {totalDiscountOpen && detail && (
+            <Suspense fallback={null}>
+            <LazyTenderTotalDiscountModal
+                open
+                onClose={() => setTotalDiscountOpen(false)}
+                tender={detail.tender}
+                summary={pricingSummary}
+                canEdit={canEditTenderMeta}
+                onSave={(patch) => handleTenderMetaChange(patch)}
             />
             </Suspense>
             )}
@@ -1583,6 +1752,7 @@ export const TenderDetail = () => {
                     <LazyUnsavedChangesModal
                         open
                         saving={savingAll}
+                        autoSaving={navGuard.autoSaving}
                         onSave={handleGuardSave}
                         onDiscard={navGuard.proceed}
                         onCancel={navGuard.cancel}
