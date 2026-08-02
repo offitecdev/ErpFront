@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { apiClient } from '../../../lib/axios';
 import { tenderApi } from '../../../lib/api/tender';
 import { projectApi, type SalesOrderDto } from '../../../lib/api/project';
 import { maintenanceApi } from '../../../lib/api/maintenance';
 import { notificationApi, type NotificationDto } from '../../../lib/api/notifications';
 import { meetingApi, type MeetingActivityDto } from '../../../lib/api/meetings';
+import { fetchStaffDirectory } from '../../../lib/api/directory';
 import type { TenderListItem } from '../../../types/tender';
 import type { MaintenanceTaskDto } from '../../../types/maintenance';
 import type { AppointmentDto } from '../../../types/project';
@@ -177,9 +177,8 @@ export const useCrmOverviewData = (
     const loadEmployees = useCallback(() => {
         if (employeesRequested.current) return;
         employeesRequested.current = true;
-        apiClient
-            .get('/employees', { params: { isActive: true, light: 1 } })
-            .then((res) => setEmployees(asArray<EmployeeLite>(res.data)))
+        fetchStaffDirectory()
+            .then((rows) => setEmployees(rows as EmployeeLite[]))
             .catch(() => {
                 // Allow a retry on the next open if the request failed.
                 employeesRequested.current = false;

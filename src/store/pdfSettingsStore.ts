@@ -32,12 +32,19 @@ export interface PdfCompanySettings {
     logoBase64?: string | null;
 }
 
+// Firma adresi: PDF'te TEK satır gönderici olarak basılır —
+// "OffiTec Heating & Cooling, Cores Tower - Hohenrainstrasse 24, 4133 Pratteln".
+// `addressLine1` sokak/bina adı, `addressLine2` kapı numarasıdır; İsviçre QR
+// faturası yapılandırılmış adres ("S") tipinde bu ayrımı bekler.
+/** Der bis v2 vorbelegte Dankestext — nur noch für die Migration relevant. */
+const LEGACY_FOOTER_NOTE = 'Wir bedanken uns für Ihre Anfrage und freuen uns auf eine Zusammenarbeit.';
+
 const DEFAULT_SETTINGS: PdfCompanySettings = {
-    companyName: 'OffiTec Group AG',
-    addressLine1: 'Industriestrasse',
-    addressLine2: '7',
-    postalCode: '8862',
-    city: 'Schübelbach',
+    companyName: 'OffiTec Heating & Cooling',
+    addressLine1: 'Cores Tower - Hohenrainstrasse',
+    addressLine2: '24',
+    postalCode: '4133',
+    city: 'Pratteln',
     country: 'CH',
     iban: 'CH00 0000 0000 0000 0000 0',
     bic: '',
@@ -49,7 +56,9 @@ const DEFAULT_SETTINGS: PdfCompanySettings = {
     vatRate: 8.1,
     currency: 'CHF',
     paymentTerms: 'Zahlbar innert 30 Tagen netto.',
-    footerNote: 'Wir bedanken uns für Ihre Anfrage und freuen uns auf eine Zusammenarbeit.',
+    // Leer: der frühere Dankestext wird nicht mehr gedruckt. Wer eine eigene
+    // Fussnote einträgt, bekommt sie weiterhin auf dem Deckblatt.
+    footerNote: '',
     letterheadBackground: null,
     letterheadBackgroundPdf: null,
     useBundledLetterhead: true,
@@ -72,6 +81,40 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
         }),
         {
             name: 'offitec.pdfSettings',
+            // Ayarlar localStorage'da kalıcıdır: varsayılanı değiştirmek daha önce
+            // uygulamayı açmış kullanıcıyı ETKİLEMEZ — bu yüzden her varsayılan
+            // değişikliği bir sürüm artışı + KORUMALI bir taşıma gerektirir.
+            //   v2: ESKİ varsayılan adresi (Schübelbach) yeni adrese taşır.
+            //   v3: ESKİ varsayılan teşekkür notunu siler.
+            // Her iki adım da yalnızca değer HÂLÂ eski varsayılana eşitse çalışır;
+            // kendi metnini/adresini girmiş olan tenant'a dokunulmaz.
+            version: 3,
+            migrate: (persisted: any, version: number) => {
+                if (!persisted?.settings) return persisted;
+                let s = persisted.settings as PdfCompanySettings;
+
+                if (version < 2) {
+                    const untouched = s.companyName === 'OffiTec Group AG'
+                        && s.addressLine1 === 'Industriestrasse'
+                        && s.city === 'Schübelbach';
+                    if (untouched) {
+                        s = {
+                            ...s,
+                            companyName: DEFAULT_SETTINGS.companyName,
+                            addressLine1: DEFAULT_SETTINGS.addressLine1,
+                            addressLine2: DEFAULT_SETTINGS.addressLine2,
+                            postalCode: DEFAULT_SETTINGS.postalCode,
+                            city: DEFAULT_SETTINGS.city,
+                        };
+                    }
+                }
+
+                if (version < 3 && s.footerNote === LEGACY_FOOTER_NOTE) {
+                    s = { ...s, footerNote: '' };
+                }
+
+                return s === persisted.settings ? persisted : { ...persisted, settings: s };
+            },
         }
     )
 );

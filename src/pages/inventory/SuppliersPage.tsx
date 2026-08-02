@@ -228,12 +228,22 @@ export const SuppliersPage = () => {
                     {formField('inv.suppliers.contactName', 'contactName')}
                     {formField('common.email', 'email')}
                     {formField('common.phone', 'phone')}
-                    {/* Adres: ayrı bileşenler — "Adres" diye tek bir alan yok. */}
+                    {/* Adres: ayrı bileşenler — "Adres" diye tek bir alan yok.
+                        TEDARİKÇİDE YALNIZCA ÜÇ ALAN (kullanıcı isteği 2026-08-02):
+                        sokak, posta kodu, şehir — "Hofackerstrasse 75 / 4132 /
+                        Muttenz". Adres eki, eyalet ve ülke SUNULMAZ; eski
+                        kayıtlarda değer varsa form onu taşımaya ve kaydetmede geri
+                        göndermeye devam eder (gizlemek silmez). */}
                     <div className="sm:col-span-2">
                         <AddressFields
                             value={form}
                             onChange={(next) => setForm((current) => ({ ...current, ...next }))}
                             inputClassName={CELL_INPUT_CLASS}
+                            fields={['address', 'postalCode', 'city']}
+                            // Etiket "Strasse / Nr." DEĞİL düpedüz "Adresse"
+                            // (kullanıcı isteği 2026-08-02) — üç alan:
+                            // Adresse / PLZ / Stadt.
+                            labels={{ address: t('address.sectionTitle') }}
                         />
                     </div>
                 </div>

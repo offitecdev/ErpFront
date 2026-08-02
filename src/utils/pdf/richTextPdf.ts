@@ -23,8 +23,8 @@ export type PdfTextRun = {
     color: [number, number, number] | null;
 };
 
-/** One paragraph — a hard line break starts a new one. */
-type PdfParagraph = PdfTextRun[];
+/** One paragraph — a hard line break starts a new one. `bullet` marks `<li>` items. */
+export type PdfParagraph = { runs: PdfTextRun[]; bullet: boolean };
 
 const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'UL', 'OL', 'BLOCKQUOTE']);
 const BOLD_TAGS = new Set(['B', 'STRONG', 'H1', 'H2', 'H3', 'H4']);
@@ -68,13 +68,15 @@ export const parseRichTextParagraphs = (html: string): PdfParagraph[] => {
     template.innerHTML = html;
 
     const paragraphs: PdfParagraph[] = [];
-    let current: PdfParagraph = [];
+    let current: PdfTextRun[] = [];
+    // Depth of the surrounding <li> nesting — paragraphs closed inside are bullets.
+    let listItemDepth = 0;
 
     const endParagraph = () => {
         // Collapse runs that carry no visible text, so a stray <div></div> does
         // not print as a blank line.
-        if (current.some((run) => run.text.trim())) paragraphs.push(current);
-        else if (current.length) paragraphs.push([]);
+        if (current.some((run) => run.text.trim())) paragraphs.push({ runs: current, bullet: listItemDepth > 0 });
+        else if (current.length) paragraphs.push({ runs: [], bullet: false });
         current = [];
     };
 
@@ -110,6 +112,7 @@ export const parseRichTextParagraphs = (html: string): PdfParagraph[] => {
 
         const isBlock = BLOCK_TAGS.has(node.tagName);
         if (isBlock && current.length) endParagraph();
+        if (node.tagName === 'LI') listItemDepth++;
 
         // Only HTMLElement carries `style`; SVG and friends do not.
         const inline = node instanceof HTMLElement ? node.style : null;
@@ -125,6 +128,7 @@ export const parseRichTextParagraphs = (html: string): PdfParagraph[] => {
         node.childNodes.forEach((child) => visit(child, nextStyle));
 
         if (isBlock) endParagraph();
+        if (node.tagName === 'LI') listItemDepth--;
     };
 
     template.content.childNodes.forEach((child) => visit(child, { bold: false, italic: false, color: null }));
@@ -150,11 +154,64 @@ type DrawRichTextOptions = {
     paragraphGap?: number;
 };
 
+const styleOf = (run: PdfTextRun) =>
+    (run.bold && run.italic ? 'bolditalic' : run.bold ? 'bold' : run.italic ? 'italic' : 'normal');
+
+/** jsPDF has no synthesised bold-italic here; bold is the closer match. */
+export const fontStyleOf = (run: PdfTextRun): 'normal' | 'bold' | 'italic' =>
+    (styleOf(run) === 'bolditalic' ? 'bold' : styleOf(run) as 'normal' | 'bold' | 'italic');
+
+/** One wrapped visual line: style-carrying chunks drawn left to right. */
+export type RichVisualLine = Array<{ run: PdfTextRun; text: string }>;
+
+/** Hanging indent used for bullet paragraphs (the "• " column), in mm. */
+export const BULLET_INDENT = 3.4;
+
+/**
+ * Wraps one paragraph into visual lines, measuring each run in its own font so
+ * a bold word takes the width it will actually occupy — measuring everything
+ * in the regular face makes bold text overflow the column.
+ */
+export const wrapRichParagraph = (
+    doc: jsPDF,
+    runs: PdfTextRun[],
+    maxWidth: number,
+    fontFamily: string,
+    fontSize: number,
+): RichVisualLine[] => {
+    doc.setFontSize(fontSize);
+    const widthOf = (run: PdfTextRun, text: string) => {
+        doc.setFont(fontFamily, fontStyleOf(run));
+        return doc.getTextWidth(text);
+    };
+
+    let line: RichVisualLine = [];
+    let lineWidth = 0;
+    const lines: RichVisualLine[] = [];
+
+    for (const run of runs) {
+        const words = run.text.split(' ').filter((word, index, all) => word !== '' || index === all.length - 1);
+        for (const word of words) {
+            if (!word) continue;
+            const chunk = line.length === 0 ? word : ` ${word}`;
+            const chunkWidth = widthOf(run, chunk);
+            if (lineWidth + chunkWidth > maxWidth && line.length > 0) {
+                lines.push(line);
+                line = [{ run, text: word }];
+                lineWidth = widthOf(run, word);
+            } else {
+                line.push({ run, text: chunk });
+                lineWidth += chunkWidth;
+            }
+        }
+    }
+    if (line.length) lines.push(line);
+    return lines;
+};
+
 /**
  * Draws parsed rich text with word wrapping, returning the Y after the last
- * line. Measures each run in its own font so a bold word takes the width it
- * will actually occupy — measuring everything in the regular face makes bold
- * text overflow the column.
+ * line. Bullet paragraphs get a "• " with a hanging indent.
  */
 export const drawRichText = (
     doc: jsPDF,
@@ -169,50 +226,28 @@ export const drawRichText = (
 
     doc.setFontSize(fontSize);
 
-    const styleOf = (run: PdfTextRun) =>
-        (run.bold && run.italic ? 'bolditalic' : run.bold ? 'bold' : run.italic ? 'italic' : 'normal');
-
-    const widthOf = (run: PdfTextRun, text: string) => {
-        // jsPDF has no synthesised bold-italic here; bold is the closer match.
-        doc.setFont(fontFamily, styleOf(run) === 'bolditalic' ? 'bold' : styleOf(run));
-        return doc.getTextWidth(text);
-    };
-
     for (const paragraph of paragraphs) {
-        if (paragraph.length === 0) {
+        if (paragraph.runs.length === 0) {
             y += lineHeight;
             continue;
         }
 
-        // Wrap into visual lines, carrying each word's style with it.
-        let line: Array<{ run: PdfTextRun; text: string }> = [];
-        let lineWidth = 0;
-        const lines: Array<Array<{ run: PdfTextRun; text: string }>> = [];
+        const indent = paragraph.bullet ? BULLET_INDENT : 0;
+        const lines = wrapRichParagraph(doc, paragraph.runs, maxWidth - indent, fontFamily, fontSize);
 
-        for (const run of paragraph) {
-            const words = run.text.split(' ').filter((word, index, all) => word !== '' || index === all.length - 1);
-            for (const word of words) {
-                if (!word) continue;
-                const chunk = line.length === 0 ? word : ` ${word}`;
-                const chunkWidth = widthOf(run, chunk);
-                if (lineWidth + chunkWidth > maxWidth && line.length > 0) {
-                    lines.push(line);
-                    line = [{ run, text: word }];
-                    lineWidth = widthOf(run, word);
-                } else {
-                    line.push({ run, text: chunk });
-                    lineWidth += chunkWidth;
-                }
-            }
-        }
-        if (line.length) lines.push(line);
-
+        let first = true;
         for (const visualLine of lines) {
             if (y + lineHeight > maxY) y = onOverflow();
-            let cursorX = x;
+            if (paragraph.bullet && first) {
+                doc.setFont(fontFamily, 'normal');
+                const [dr, dg, db] = defaultColor;
+                doc.setTextColor(dr, dg, db);
+                doc.text('•', x, y);
+            }
+            first = false;
+            let cursorX = x + indent;
             for (const { run, text } of visualLine) {
-                const style = styleOf(run);
-                doc.setFont(fontFamily, style === 'bolditalic' ? 'bold' : style);
+                doc.setFont(fontFamily, fontStyleOf(run));
                 const [r, g, b] = run.color ?? defaultColor;
                 doc.setTextColor(r, g, b);
                 doc.text(text, cursorX, y);
@@ -220,7 +255,8 @@ export const drawRichText = (
             }
             y += lineHeight;
         }
-        y += paragraphGap;
+        // Bullet items sit closer together than free paragraphs.
+        y += paragraph.bullet ? paragraphGap * 0.4 : paragraphGap;
     }
 
     doc.setFont(fontFamily, 'normal');

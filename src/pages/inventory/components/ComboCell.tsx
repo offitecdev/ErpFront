@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AnchoredPicker } from './AnchoredPicker';
 import { CELL_INPUT_CLASS } from './primitives';
@@ -9,6 +9,8 @@ export interface ComboOption {
     label: string;
     /** Etiketin sağında küçük gri bilgi (kod, stok, telefon…). */
     meta?: string;
+    /** Grup başlığı: ardışık aynı gruplar tek başlık altında toplanır. */
+    group?: string;
 }
 
 /** Listenin altındaki eylem satırları ("… ürün olarak ekle", "Tüm ürünler …"). */
@@ -43,6 +45,7 @@ export const ComboCell = ({
     emptyText,
     autoFocus,
     inputClassName = '',
+    keepOpenOnSelect = false,
 }: {
     /** Açık/kapalı durum çağıranda durur: veri çekmeyi de o kapatır. */
     open: boolean;
@@ -60,6 +63,9 @@ export const ComboCell = ({
     emptyText?: string;
     autoFocus?: boolean;
     inputClassName?: string;
+    /** Çoklu seçim alanları (CC gibi): seçim listeyi KAPATMAZ, art arda
+        seçilebilsin diye açık kalır. Odak da input'ta durur. */
+    keepOpenOnSelect?: boolean;
 }) => {
     // Vurgulanan satır index yerine ID ile tutulur: liste her yazışta yeniden
     // kurulduğu için index kayardı; kayıt listeden düşerse vurgu kendiliğinden söner.
@@ -81,6 +87,8 @@ export const ComboCell = ({
 
     const pick = (option: ComboOption) => {
         onSelect(option);
+        // Çoklu seçimde liste açık kalır (art arda seçim); odak input'ta durur.
+        if (keepOpenOnSelect) return;
         onOpenChange(false);
         setActiveId(null);
     };
@@ -165,8 +173,16 @@ export const ComboCell = ({
                         <div className="px-2 py-3 text-center text-[12px] text-slate-400 dark:text-white/50">{emptyText}</div>
                     )}
                     {options.map((option, index) => (
+                        <Fragment key={option.id}>
+                        {option.group && option.group !== options[index - 1]?.group && (
+                            <>
+                                {index > 0 && <div className="mx-2 mt-1 h-px bg-[#07145c] dark:bg-[#d48f16]" />}
+                                <div className="px-2 pb-0.5 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">
+                                    {option.group}
+                                </div>
+                            </>
+                        )}
                         <button
-                            key={option.id}
                             type="button"
                             data-item-index={index}
                             title={option.label}
@@ -188,6 +204,7 @@ export const ComboCell = ({
                                 </span>
                             )}
                         </button>
+                        </Fragment>
                     ))}
                 </div>
             </AnchoredPicker>

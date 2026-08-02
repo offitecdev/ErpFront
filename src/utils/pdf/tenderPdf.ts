@@ -1,5 +1,5 @@
 ﻿import { jsPDF } from 'jspdf';
-import { fitAddressBlock } from './addressBlock';
+import { companySenderLine, drawAddressBlockLines } from './addressBlock';
 import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
@@ -592,7 +592,7 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     doc.setFont(FONT, 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(...COLOR_NAVY);
-    const sender = `${s.companyName} - ${s.addressLine1} ${s.addressLine2}, ${s.postalCode} ${s.city}`.replace(/\s+/g, ' ').trim();
+    const sender = companySenderLine(s);
     const senderLines = doc.splitTextToSize(sender, rW);
     doc.text(senderLines, rX, rYy + 3);
     rYy += senderLines.length * 4.6 + 5;
@@ -605,10 +605,9 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
         rYy += 4.8;
     }
     if (data.customerAddress) {
-        // Adres bloğu EN FAZLA iki satırdır (taşarsa üç) — bkz. `addressBlock.ts`.
-        const addr = fitAddressBlock(doc, data.customerAddress, rW);
-        doc.text(addr, rX, rYy);
-        rYy += addr.length * 4.8;
+        // Name / Strasse / "PLZ Ort" — Zeilen bleiben ganz (Punto schrumpft statt
+        // umzubrechen), damit PLZ und Ort immer zusammen auf einer Zeile stehen.
+        rYy = drawAddressBlockLines(doc, data.customerAddress, rX, rYy, rW, 10, 4.8);
     }
     // Customer phone / email are intentionally omitted from the PDF recipient block.
 
@@ -1088,7 +1087,7 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         doc.setFontSize(8);
         doc.text(formatIban(s.iban), x, yy + 3);
         doc.text(s.companyName, x, yy + 7);
-        doc.text(`${s.addressLine1} ${s.addressLine2}`, x, yy + 10.5);
+        doc.text(`${s.addressLine1} ${s.addressLine2}`.replace(/\s+/g, ' ').trim(), x, yy + 10.5);
         doc.text(`${s.postalCode} ${s.city}`, x, yy + 14);
     };
     writeBlock(5, yTop + 12);

@@ -124,13 +124,21 @@ export const ServiceReports = () => {
     const downloadDeliveryPdf = async (row: DeliveryReportDto) => {
         setDelBusyId(row.id);
         try {
-            const project = row.projectId ? await projectApi.getById(row.projectId) : null;
+            // Die Liste trägt den Berichtsinhalt nicht mehr: Checklisten-Antworten
+            // (die Tabelle im PDF) und die Unterschrift kommen erst hier, für
+            // genau diesen einen Bericht. Die Liste behält ihre angereicherten
+            // Labels, deshalb wird der Detailsatz darüber gelegt.
+            const [full, project] = await Promise.all([
+                deliveryReportApi.getOne(row.id),
+                row.projectId ? projectApi.getById(row.projectId) : Promise.resolve(null),
+            ]);
+            const report = { ...row, ...full };
             const { exportDeliveryReportPdf } = await import('../../utils/pdf/deliveryReportPdf');
             await exportDeliveryReportPdf({
-                report: row,
+                report,
                 project,
-                fieldImages: project ? gatherDeliveryImages(project, row) : [],
-                preparedBy: project ? deliveryTechnicianName(project, row) : '',
+                fieldImages: project ? gatherDeliveryImages(project, report) : [],
+                preparedBy: project ? deliveryTechnicianName(project, report) : '',
             });
         } catch (e: any) {
             toast.error(e.response?.data?.error || t('services.toastPdfError'));

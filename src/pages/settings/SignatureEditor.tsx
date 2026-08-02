@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
 import { SIGNATURE_IMAGE_TYPES, SIGNATURE_IMAGE_MAX_BYTES, signatureFileToDataUrl } from './signatureImage';
+import { inlineStyleBlocks, repairInvisibleText } from './signaturePaste';
 
 /**
  * E-posta imzası editörü — Outlook/Word'den kopyalanan imzayı biçimi ve
@@ -37,6 +38,11 @@ const collectImageFiles = async (files: File[]): Promise<string[]> => {
 const sanitizePastedHtml = async (html: string, imageFiles: File[]): Promise<string> => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
 
+    // Renkler <style> bloğunda/sınıflarda tanımlıysa blok atılmadan ÖNCE satır
+    // içine taşınır: mail istemcilerinde stil sayfası yoktur, imza yalnızca
+    // satır içi style ile boyanabilir.
+    inlineStyleBlocks(doc);
+
     doc.querySelectorAll('script,style,link,meta,title,object,embed,iframe,form,input,button,textarea,select').forEach((el) => el.remove());
 
     // Word/Outlook koşullu yorumları dahil tüm yorum düğümleri.
@@ -69,8 +75,23 @@ const sanitizePastedHtml = async (html: string, imageFiles: File[]): Promise<str
         }
     });
 
+    // Koyu temalı bir istemciden kopyalanmış beyaz metinler beyaz kâğıt
+    // üzerinde görünmez kalmasın.
+    repairInvisibleText(doc);
+
     return doc.body.innerHTML;
 };
+
+/**
+ * Uygulamanın genel tablo kabuğu (`main table:not([data-unstyled-table])`)
+ * imzanın kendi hücre dolgusunu, yazı boyutunu ve `bgcolor` koyu zeminlerini
+ * eziyor; imza ekranda mailde göründüğünden bambaşka çıkıyordu. İşaret
+ * yalnızca canlı DOM'a konur — kaydedilen HTML'e sızmaması için `emit`
+ * sırasında geri sökülür.
+ */
+const UNSTYLED_TABLE_ATTR = 'data-unstyled-table';
+const isolateTables = (root: HTMLElement | null) =>
+    root?.querySelectorAll('table').forEach((table) => table.setAttribute(UNSTYLED_TABLE_ATTR, ''));
 
 type SignatureEditorProps = {
     value: string;
@@ -87,11 +108,12 @@ export const SignatureEditor = ({ value, onChange, minHeight = 140 }: SignatureE
         if (!ref.current) return;
         if (value === lastEmitted.current) return;
         ref.current.innerHTML = value;
+        isolateTables(ref.current);
         lastEmitted.current = value;
     }, [value]);
 
     const emit = () => {
-        const html = ref.current?.innerHTML ?? '';
+        const html = (ref.current?.innerHTML ?? '').replaceAll(` ${UNSTYLED_TABLE_ATTR}=""`, '');
         lastEmitted.current = html;
         onChange(html);
     };
@@ -99,6 +121,7 @@ export const SignatureEditor = ({ value, onChange, minHeight = 140 }: SignatureE
     const insertHtmlAtCaret = (html: string) => {
         ref.current?.focus();
         document.execCommand('insertHTML', false, html);
+        isolateTables(ref.current);
         emit();
     };
 
@@ -139,7 +162,7 @@ export const SignatureEditor = ({ value, onChange, minHeight = 140 }: SignatureE
             onBlur={emit}
             onPaste={(event) => { void handlePaste(event); }}
             style={{ minHeight }}
-            className="w-full overflow-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed transition-colors focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-700/10 [&_img]:inline-block [&_img]:max-w-full"
+            className="ofi-mail-signature w-full overflow-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed transition-colors focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-700/10 [&_img]:inline-block [&_img]:max-w-full"
         />
     );
 };

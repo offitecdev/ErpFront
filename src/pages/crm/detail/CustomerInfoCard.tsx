@@ -11,7 +11,6 @@ import {
 import { t as i18nT } from '@/i18n/translate';
 import { apiClient } from '../../../lib/axios';
 import { Button } from '../../../components/ui-shared/Button';
-import { AddressFields, AddressLines } from '../../../components/ui-shared/AddressFields';
 import {
     CUSTOMER_CONTROL_CLASS,
     CUSTOMER_EDITABLE_CLASS,
@@ -159,6 +158,26 @@ export const CustomerInfoCard = ({
         </InfoFieldRow>
     );
 
+    /**
+     * Eine Adresszeile. Alle drei teilen sich den Schlüssel `address`, damit ein
+     * Klick auf eine Zeile den ganzen Block in den Bearbeitungsmodus schaltet.
+     */
+    const addressField = (key: 'address' | 'postalCode' | 'city', label: string) => (
+        <InfoFieldRow key={key} label={label}>
+            {isOpen('address') ? (
+                <input
+                    autoFocus={key === 'address'}
+                    type="text"
+                    value={draft[key]}
+                    onChange={(event) => set({ [key]: event.target.value } as Partial<CustomerInfoValue>)}
+                    className={CUSTOMER_CONTROL_CLASS}
+                />
+            ) : (
+                readValue('address', draft[key])
+            )}
+        </InfoFieldRow>
+    );
+
     const selectField = (
         key: keyof CustomerInfoValue,
         label: string,
@@ -240,23 +259,15 @@ export const CustomerInfoCard = ({
                                 {i18nT('crm.locationPrimary')}
                             </span>
                             {textField('addressName', i18nT('crm.locationName'))}
-                            <InfoFieldRow label={i18nT('address.sectionTitle')}>
-                                {isOpen('address') ? (
-                                    // Eingabe in getrennten Feldern, Anzeige in zwei Zeilen —
-                                    // dieselbe Regel wie überall sonst in der Anwendung.
-                                    <div className="py-1">
-                                        <AddressFields
-                                            value={draft}
-                                            onChange={(next) => set(next)}
-                                            inputClassName={CUSTOMER_CONTROL_CLASS}
-                                        />
-                                    </div>
-                                ) : (
-                                    <button type="button" onClick={() => openField('address')} className={`${CUSTOMER_EDITABLE_CLASS} min-h-8 py-1`}>
-                                        <AddressLines value={draft} maxChars={40} emptyText={i18nT('address.empty')} />
-                                    </button>
-                                )}
-                            </InfoFieldRow>
+                            {/* Die Adresse besteht hier aus GENAU DREI Einträgen —
+                                Adresse / PLZ / Stadt — je eine Zeile, in Anzeige UND
+                                Bearbeitung identisch aufgebaut. Adresszusatz, Kanton und
+                                Land werden im Kundenprofil bewusst nicht geführt.
+                                Ein Klick auf eine der Zeilen öffnet alle drei; gespeichert
+                                wird weiterhin als EIN Block. */}
+                            {addressField('address', i18nT('address.sectionTitle'))}
+                            {addressField('postalCode', i18nT('address.postalCode'))}
+                            {addressField('city', i18nT('address.city'))}
                             <InfoFieldRow label={i18nT('crm.customers.responsibleEmployee')}>
                                 {isOpen('responsible') ? (
                                     <div className="flex gap-2">

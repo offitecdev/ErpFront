@@ -13,13 +13,14 @@
  *    sayfaya itilmez) ve içerik hiçbir zaman alt bilgi bölgesine taşmaz.
  */
 import { jsPDF } from 'jspdf';
-import { fitAddressBlock } from './addressBlock';
+import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from './addressBlock';
 import QRCode from 'qrcode';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
 import { localizeTenderNumber } from '../tenderNumber';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
-import { drawRichText, parseRichTextParagraphs } from './richTextPdf';
+import { BULLET_INDENT, drawRichText, fontStyleOf, parseRichTextParagraphs, wrapRichParagraph } from './richTextPdf';
+import type { RichVisualLine } from './richTextPdf';
 
 // Arial yerine metrik olarak özdeş, Türkçe karakter destekli Arimo gömülür.
 import arialBoldUrl from '../../assets/fonts/ARIALBD.ttf?url';
@@ -41,6 +42,8 @@ export interface TenderPdfData {
     createdByName?: string | null;
     /** Kommission / Komisyon referansı (varsa kapak bilgi kartında gösterilir) */
     commission?: string | null;
+    /** Kundenreferenz — müşterinin verdiği referans (kapak bilgi kartında "Referenz"). */
+    customerReference?: string | null;
     activities?: Array<{ activityType: string; description?: string | null; activityDate: string; employeeName?: string | null }>;
     positions: Array<{
         rowKey?: string;
@@ -117,6 +120,7 @@ export { localizeTenderNumber };
 interface PdfStrings {
     offerNumber: string;
     kommission: string;
+    referenz: string;
     offerDate: string;
     validUntil: string;
     seller: string;
@@ -152,6 +156,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
     tr: {
         offerNumber: 'Teklif Numarası :',
         kommission: 'Komisyon:',
+        referenz: 'Referans:',
         offerDate: 'Teklif Tarihi:',
         validUntil: 'Teklif Bitiş Tarihi:',
         seller: 'Satıcı:',
@@ -185,6 +190,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
     de: {
         offerNumber: 'Angebots-Nr. :',
         kommission: 'Kommission:',
+        referenz: 'Referenz:',
         offerDate: 'Angebotsdatum:',
         validUntil: 'Gültig bis:',
         seller: 'Verkäufer:',
@@ -218,6 +224,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
     en: {
         offerNumber: 'Offer No. :',
         kommission: 'Commission:',
+        referenz: 'Reference:',
         offerDate: 'Offer Date:',
         validUntil: 'Valid Until:',
         seller: 'Salesperson:',
@@ -299,9 +306,17 @@ const LH_TITLE = 4.7;
 const LH_BODY = 4.4;
 const UNIT_GAP = 4.2;
 const IMG_SIZE = 24;      // Ürün görseli — 20 mm küçüktü, 28 mm satırı fazla yükseltti
-const TITLE_IMAGE_GAP = 1.4;
-const IMAGE_DESCRIPTION_GAP = 4.0;
-const TITLE_DESCRIPTION_GAP = 2.0;
+// Satır içeriği HER ZAMAN başlık → paragraf → görsel sırasıyla dizilir; üç blok
+// arasındaki boşluk tek bir değerden gelir. Ölçü, metin bloklarında SATIR
+// ARALIĞINA eklenir (dolayısıyla gözle görülen aralık ~2.8 mm'dir).
+const ROW_BLOCK_GAP = 1.4;
+// Görselin üstünde/altında aynı optik aralığı tutturmak için iki düzeltme:
+//  • ÜSTTE metin bloğu bittiğinde imleç son taban çizgisinin bir SATIR
+//    altındadır; bu pay tek başına fazla geldiği için bir tık geri alınır.
+//  • ALTTA böyle bir pay hiç yoktur; bu sabit olmadan görsel satır ayracına
+//    yapışır.
+const IMAGE_TOP_GAP = -0.9;
+const IMAGE_BOTTOM_GAP = 2.6;
 
 // ── Renk paleti (Offitec lacivert + marka kırmızısı + yumuşak griler) ────────
 const COLOR_TEXT = [30, 32, 40] as const;
@@ -471,12 +486,6 @@ export type TenderPdfProgress =
 const hasRichContent = (value?: string | null) =>
     Boolean(value && value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim());
 
-const drawRichTextBlock = (doc: jsPDF, html?: string | null) => {
-    if (!hasRichContent(html)) return;
-    doc.addPage();
-    drawRichTextFlow(doc, html as string, CONTENT_TOP_REST);
-};
-
 const drawRichTextFlow = (doc: jsPDF, html: string, startY: number): number =>
     drawRichText(doc, parseRichTextParagraphs(html), {
         x: ML,
@@ -545,10 +554,9 @@ export async function buildTenderPdfBytes(
     data = { ...data, tenderNumber: localizeTenderNumber(data.tenderNumber, data.lang ?? 'de') };
 
     // ── SAYFA 1: Kapak & giriş ───────────────────────────────────────────────
+    // Einleitungstext (Anschreiben) artık AYRI SAYFA DEĞİL: başlığın hemen
+    // altında akar, taşarsa kapak devam sayfalarına geçer (kapak içinde çizilir).
     drawCoverPage(doc, data, settings, L);
-
-    // ── Opsiyonel: Anschreiben / ön yazı kendi sayfasında ────────────────────
-    drawRichTextBlock(doc, data.coverLetter);
 
     // ── SAYFA 2+: Pozisyon tablosu ───────────────────────────────────────────
     doc.addPage();
@@ -790,17 +798,22 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
 
     // ── Sol: teklif bilgi kartı (köşe yuvarlatması yok, net kenarlar) ────────
     const cardX = ML;
-    const cardW = 88;
-    const rowH = 8.8;
+    const cardW = 78;
+    // Enge Zeilen: die Karte soll wie eine kompakte Tabelle wirken, nicht wie
+    // eine Liste mit Luft dazwischen.
+    const rowH = 5.6;
+    // Referenz steht DIREKT ÜBER dem Verkäufer — beide gehören zur "wer/woher"
+    // Angabe und werden zusammen gelesen.
     const rows: Array<[string, string, boolean]> = ([
         [L.offerNumber.replace(/\s*:\s*$/, ''), data.tenderNumber, true],
         [L.kommission.replace(/\s*:\s*$/, ''), data.commission || '', false],
         [L.offerDate.replace(/\s*:\s*$/, ''), fmtDateShort(data.createdAt), false],
         [L.validUntil.replace(/\s*:\s*$/, ''), fmtDateShort(data.validUntil), false],
+        [L.referenz.replace(/\s*:\s*$/, ''), data.customerReference || '', false],
         [L.seller.replace(/\s*:\s*$/, ''), data.createdByName || '', false],
     ] as Array<[string, string, boolean]>).filter(([, value]) => value.trim().length > 0);
     const cardY = y0 - 4;
-    const cardH = rows.length * rowH + 4;
+    const cardH = rows.length * rowH + 2.4;
 
     doc.setFillColor(...COLOR_CARD_BG);
     doc.setDrawColor(...COLOR_CARD_BORDER);
@@ -815,38 +828,41 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     doc.setFillColor(...COLOR_NAVY_SOFT);
     doc.rect(cardX, cardY + cardH * 0.76, 1.2, cardH * 0.24, 'F');
 
-    let ry = cardY + 2;
+    let ry = cardY + 1.2;
     rows.forEach(([label, value, emphasize], idx) => {
-        const base = ry + rowH / 2 + 1.5;
+        const base = ry + rowH / 2 + 1.15;
         doc.setFont(FONT, 'normal');
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setTextColor(...COLOR_LABEL);
-        doc.text(label, cardX + 4.5, base);
+        doc.text(label, cardX + 3.5, base);
         doc.setFont(FONT, 'bold');
-        doc.setFontSize(emphasize ? 10.2 : 9.4);
+        // Der Wert wird bei Bedarf verkleinert, damit er in der schmaleren
+        // Karte nicht mit der Beschriftung kollidiert.
+        const labelW = doc.getTextWidth(label);
+        const valueMaxW = cardW - 7 - labelW - 2;
+        doc.setFontSize(emphasize ? 8.6 : 7.8);
+        fitFontSize(doc, value, valueMaxW, emphasize ? 8.6 : 7.8, 5.6);
         if (emphasize) doc.setTextColor(...COLOR_NAVY);
         else doc.setTextColor(...COLOR_TEXT);
-        doc.text(value, cardX + cardW - 4, base, { align: 'right' });
+        doc.text(value, cardX + cardW - 3.5, base, { align: 'right' });
         ry += rowH;
         if (idx < rows.length - 1) {
             doc.setDrawColor(...COLOR_HAIRLINE);
-            doc.setLineWidth(0.15);
-            doc.line(cardX + 4.5, ry + 0.4, cardX + cardW - 4, ry + 0.4);
+            doc.setLineWidth(0.12);
+            doc.line(cardX + 3.5, ry + 0.3, cardX + cardW - 3.5, ry + 0.3);
         }
     });
 
     // ── Sağ: tek satır gönderici + montaj/alıcı adresi ───────────────────────
-    // "OffiTec Group AG - Industriestrasse 7, 8862 Schübelbach" — küçük punto,
-    // tek satır; hemen altında müşterinin (montaj yerinin) adresi.
+    // "OffiTec Heating & Cooling, Cores Tower - Hohenrainstrasse 24, 4133 Pratteln"
+    // — küçük punto, TEK satır (sığmazsa punto küçülür, satır bölünmez); hemen
+    // altında müşterinin (montaj yerinin) adresi.
     const addrX = 112;
     const addrW = MR - addrX;
-    const sender = `${s.companyName} - ${s.addressLine1} ${s.addressLine2}, ${s.postalCode} ${s.city}`
-        .replace(/\s+/g, ' ')
-        .trim();
+    const sender = companySenderLine(s);
     doc.setFont(FONT, 'normal');
-    doc.setFontSize(7.5);
     doc.setTextColor(...COLOR_MUTED);
-    doc.text(sender, addrX, y0);
+    drawFittedSingleLine(doc, sender, addrX, y0, addrW, 7.5, 5.8);
     doc.setDrawColor(...COLOR_HAIRLINE);
     doc.setLineWidth(0.2);
     doc.line(addrX, y0 + 1.6, MR, y0 + 1.6);
@@ -863,10 +879,9 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     if (data.customerAddress) {
         doc.setFont(FONT, 'normal');
         doc.setFontSize(10);
-        // Adres bloğu EN FAZLA iki satırdır (taşarsa üç) — bkz. `addressBlock.ts`.
-        const addrLines = fitAddressBlock(doc, data.customerAddress, addrW);
-        doc.text(addrLines, addrX, addrY);
-        addrY += addrLines.length * 4.9;
+        // Name / Strasse / "PLZ Ort" — jede Zeile bleibt GANZ (schrumpft statt
+        // umzubrechen), damit PLZ und Ort immer auf derselben Zeile stehen.
+        addrY = drawAddressBlockLines(doc, data.customerAddress, addrX, addrY, addrW, 10, 4.9);
     }
     // Müşteri e-postası / telefonu bilinçli olarak PDF'e yazılmaz.
 
@@ -880,16 +895,8 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     doc.setLineWidth(0.8);
     doc.line(ML, yTitle + 2.6, ML + 14, yTitle + 2.6);
 
-    yTitle += 12;
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(...COLOR_TEXT);
-    doc.text(L.greeting, ML, yTitle);
-    yTitle += 6.4;
-
-    const introLines = doc.splitTextToSize(L.intro, CONTENT_W);
-    doc.text(introLines, ML, yTitle, { lineHeightFactor: 1.35 });
-
+    // Ayar notu ÖNCE çizilir: sayfa 1'in altına sabittir; giriş metni taşıp
+    // yeni sayfa açarsa not yine kapak sayfasında kalır.
     if (s.footerNote) {
         doc.setFont(FONT, 'italic');
         doc.setFontSize(8.5);
@@ -897,6 +904,22 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
         const note = doc.splitTextToSize(s.footerNote, CONTENT_W);
         doc.text(note, ML, CONTENT_BOTTOM - 4 - note.length * 4);
         doc.setFont(FONT, 'normal');
+    }
+
+    yTitle += 12;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...COLOR_TEXT);
+
+    if (hasRichContent(data.coverLetter)) {
+        // Kullanıcının (şablondan gelen) giriş metni — "Sehr geehrte …" dahil
+        // metnin kendisidir, bu yüzden kalıp selamlama/giriş cümlesi atlanır.
+        drawRichTextFlow(doc, data.coverLetter as string, yTitle);
+    } else {
+        doc.text(L.greeting, ML, yTitle);
+        yTitle += 6.4;
+        const introLines = doc.splitTextToSize(L.intro, CONTENT_W);
+        doc.text(introLines, ML, yTitle, { lineHeightFactor: 1.35 });
     }
 }
 
@@ -974,6 +997,8 @@ function rowVisualMeta(pos: TenderPdfData['positions'][number]) {
 // atom (satır/görsel) bazında bölünebilir.
 type RowAtom =
     | { kind: 'lines'; lines: string[]; font: 'normal' | 'bold'; size: number; lineH: number; indent: number }
+    // Zengin metin paragrafı: kalın/italik/renk KORUNUR, madde imleri desteklenir.
+    | { kind: 'rich'; lines: RichVisualLine[]; bullet: boolean; size: number; lineH: number }
     | { kind: 'image'; url: string; alias?: string; h: number }
     | { kind: 'gap'; h: number };
 
@@ -1004,15 +1029,25 @@ function looksLikeCatalogCode(line: string): boolean {
     return /^[A-Z0-9][A-Z0-9._/\\#:-]*$/.test(text);
 }
 
-function normalizePdfText(text: string): string {
+/**
+ * `dropCatalogCodes` yalnızca BAŞLIK için açıktır: içe aktarılan tekliflerde
+ * ürün adının altında tek başına duran katalog kodu satırı temizlenir.
+ *
+ * Açıklama metninde ASLA satır atılmaz. Bu filtre "büyük harf + rakam, boşluksuz"
+ * her satırı kod sanıyordu; stoktan gelen açıklamaların "G4G4", "230V", "IP54"
+ * gibi satırları — hatta tamamı böyle olan kısa açıklamalar — bu yüzden PDF'e
+ * hiç yazılmıyordu. Editörden gelen zengin metin zaten bu yoldan geçmediği için
+ * kayıp sadece stoktan/dışa aktarımdan gelen düz metinde görünüyordu.
+ */
+function normalizePdfText(text: string, options?: { dropCatalogCodes?: boolean }): string {
     if (looksLikeRichHtml(text)) text = richHtmlToPlainText(text);
-    return text
+    const lines = text
         .replace(/ /g, ' ')
         .replace(/[‐‑‒–—−]/g, '-')
         .replace(/­/g, '')
         .split(/\r?\n/)
-        .map((line) => normalizeTrackedLetters(line))
-        .filter((line) => !looksLikeCatalogCode(line))
+        .map((line) => normalizeTrackedLetters(line));
+    return (options?.dropCatalogCodes ? lines.filter((line) => !looksLikeCatalogCode(line)) : lines)
         .join('\n')
         .trim();
 }
@@ -1049,6 +1084,28 @@ function buildMarkdownAtoms(doc: jsPDF, rawText: string, maxW: number, fontSize:
     return atoms;
 }
 
+/**
+ * Zengin HTML açıklamayı stilli satır atomlarına çevirir: kalın/italik/renk
+ * korunur, `<li>` maddeleri imli girintiyle yazılır. Başlıklar (H1–H4) parser
+ * tarafından kalın koşuya çevrilir ve GÖVDE puntosunda kalır — başlık ile metin
+ * arasında yalnızca satır aralığı vardır (istenen "minimal spacing").
+ */
+function buildRichAtoms(doc: jsPDF, rawHtml: string, maxW: number, fontSize: number, lineHeight: number): RowAtom[] {
+    const atoms: RowAtom[] = [];
+    for (const paragraph of parseRichTextParagraphs(rawHtml)) {
+        if (paragraph.runs.length === 0) { atoms.push({ kind: 'gap', h: lineHeight * 0.5 }); continue; }
+        const runs = paragraph.runs.map((run) => ({
+            ...run,
+            // PDF fontunda sorun çıkaran karakterler ekran HTML'inden gelebilir.
+            text: run.text.replace(/ /g, ' ').replace(/[‐‑‒–—−]/g, '-').replace(/­/g, ''),
+        }));
+        const indent = paragraph.bullet ? BULLET_INDENT : 0;
+        const lines = wrapRichParagraph(doc, runs, maxW - indent, FONT, fontSize);
+        atoms.push({ kind: 'rich', lines, bullet: paragraph.bullet, size: fontSize, lineH: lineHeight });
+    }
+    return atoms;
+}
+
 function buildRowAtoms(doc: jsPDF, pos: TenderPdfData['positions'][number]): { atoms: RowAtom[]; descX: number; descW: number } {
     const meta = rowVisualMeta(pos);
     const descX = C_DESC + meta.indent;
@@ -1058,28 +1115,38 @@ function buildRowAtoms(doc: jsPDF, pos: TenderPdfData['positions'][number]): { a
     const { text: titleText } = splitPosLabel(pos.shortDescription || '');
     doc.setFont(FONT, meta.titleStyle);
     doc.setFontSize(meta.titleFontSize);
-    const titleLines = doc.splitTextToSize(normalizePdfText(titleText), descW);
+    const titleLines = doc.splitTextToSize(normalizePdfText(titleText, { dropCatalogCodes: true }), descW);
     atoms.push({ kind: 'lines', lines: titleLines, font: meta.titleStyle, size: meta.titleFontSize, lineH: meta.titleLineHeight, indent: 0 });
 
+    if (pos.longDescription) {
+        atoms.push({ kind: 'gap', h: ROW_BLOCK_GAP });
+        // Editörden gelen zengin HTML stiliyle çizilir; içe aktarılmış düz /
+        // markdown-vari metin eski yalın yoldan geçer.
+        if (looksLikeRichHtml(pos.longDescription)) {
+            atoms.push(...buildRichAtoms(doc, pos.longDescription, descW, meta.longFontSize, LH_BODY));
+        } else {
+            atoms.push(...buildMarkdownAtoms(doc, pos.longDescription, descW, meta.longFontSize, LH_BODY));
+        }
+    }
+
+    // Görsel satırın EN SONUNDA durur: başlık → paragraf → görsel. Üstündeki ve
+    // altındaki boşluk, başlık ile paragraf arasındakiyle aynı görünür.
     if (pos.imageUrl) {
-        atoms.push({ kind: 'gap', h: TITLE_IMAGE_GAP });
+        atoms.push({ kind: 'gap', h: IMAGE_TOP_GAP });
         atoms.push({
             kind: 'image',
             url: pos.imageUrl,
             alias: pos.sourceArticleId ? `art-${pos.sourceArticleId}` : undefined,
             h: IMG_SIZE,
         });
-    }
-
-    if (pos.longDescription) {
-        atoms.push({ kind: 'gap', h: pos.imageUrl ? IMAGE_DESCRIPTION_GAP : TITLE_DESCRIPTION_GAP });
-        atoms.push(...buildMarkdownAtoms(doc, pos.longDescription, descW, rowVisualMeta(pos).longFontSize, LH_BODY));
+        atoms.push({ kind: 'gap', h: IMAGE_BOTTOM_GAP });
     }
 
     return { atoms, descX, descW };
 }
 
-const atomHeight = (a: RowAtom) => (a.kind === 'lines' ? a.lines.length * a.lineH : a.h);
+const atomHeight = (a: RowAtom) =>
+    (a.kind === 'lines' || a.kind === 'rich' ? a.lines.length * a.lineH : a.h);
 
 function measureRow(doc: jsPDF, pos: TenderPdfData['positions'][number]): number {
     const { atoms } = buildRowAtoms(doc, pos);
@@ -1217,6 +1284,31 @@ function drawAtomLines(doc: jsPDF, atom: Extract<RowAtom, { kind: 'lines' }>, x:
     return cy;
 }
 
+/** Zengin metin atomunun TEK görsel satırını çizer (stil koşu koşu uygulanır). */
+function drawRichAtomLine(
+    doc: jsPDF,
+    atom: Extract<RowAtom, { kind: 'rich' }>,
+    lineIdx: number,
+    x: number,
+    baseY: number,
+) {
+    doc.setFontSize(atom.size);
+    if (atom.bullet && lineIdx === 0) {
+        doc.setFont(FONT, 'normal');
+        doc.setTextColor(...COLOR_TEXT);
+        doc.text('•', x, baseY);
+    }
+    let cursorX = x + (atom.bullet ? BULLET_INDENT : 0);
+    for (const { run, text } of atom.lines[lineIdx] ?? []) {
+        doc.setFont(FONT, fontStyleOf(run));
+        const [r, g, b] = run.color ?? COLOR_TEXT;
+        doc.setTextColor(r, g, b);
+        doc.text(text, cursorX, baseY);
+        cursorX += doc.getTextWidth(text);
+    }
+    doc.setTextColor(...COLOR_TEXT);
+}
+
 function drawRowHairline(doc: jsPDF, y: number) {
     doc.setDrawColor(...COLOR_HAIRLINE);
     doc.setLineWidth(0.15);
@@ -1251,6 +1343,13 @@ function drawRowAtomic(
                 doc.addImage(atom.url, detectImageFormat(atom.url) as any, descX, cy, IMG_SIZE, IMG_SIZE, atom.alias, 'NONE');
             } catch { /* bozuk görsel satırı düşürmesin */ }
             cy += atom.h;
+            continue;
+        }
+        if (atom.kind === 'rich') {
+            for (let i = 0; i < atom.lines.length; i++) {
+                drawRichAtomLine(doc, atom, i, descX, cy);
+                cy += atom.lineH;
+            }
             continue;
         }
         cy = drawAtomLines(doc, atom, descX, cy);
@@ -1295,6 +1394,14 @@ function drawRowFlowing(
                 doc.addImage(atom.url, detectImageFormat(atom.url) as any, descX, cy, IMG_SIZE, IMG_SIZE, atom.alias, 'NONE');
             } catch { /* bozuk görsel satırı düşürmesin */ }
             cy += atom.h;
+            continue;
+        }
+        if (atom.kind === 'rich') {
+            for (let i = 0; i < atom.lines.length; i++) {
+                if (cy > CONTENT_BOTTOM - 1.5) cy = breakPage();
+                drawRichAtomLine(doc, atom, i, descX, cy);
+                cy += atom.lineH;
+            }
             continue;
         }
         doc.setFont(FONT, atom.font);
@@ -1356,8 +1463,6 @@ function drawTotals(
     const grand = p ? p.grossTotal : data.grandTotal;
     const discounts = (p?.discounts ?? []).filter((entry) => (entry?.amount ?? 0) > 0);
     const subtotal = p?.subtotal ?? net;
-    const totalDiscountAmount = p?.totalDiscountAmount ?? 0;
-    const combinedDiscountPercent = p?.combinedDiscountPercent ?? 0;
 
     const blockX = 116;
     const labelX = blockX + 4;
@@ -1400,13 +1505,9 @@ function drawTotals(
             const label = (entry.percent ?? 0) > 0 ? `${name} ${fmtDiscount(entry.percent!)}` : name;
             totalRow(label, `− ${fmt(entry.amount)}`);
         });
-        // Birden fazla iskonto varsa birleşik etkileri tek satırda özetlenir.
-        if (discounts.length > 1 && totalDiscountAmount > 0) {
-            const label = combinedDiscountPercent > 0
-                ? `${L.totalDiscount} ${fmtDiscount(combinedDiscountPercent)}`
-                : L.totalDiscount;
-            totalRow(label, `− ${fmt(totalDiscountAmount)}`);
-        }
+        // Birleşik iskonto ("Gesamtrabatt %X − CHF Y") özet satırı BİLİNÇLİ OLARAK
+        // yazılmaz: her iskonto zaten kendi satırında, kendi adıyla listeleniyor;
+        // toplamı ayrıca yazmak aynı indirimi iki kez veriyormuş gibi okunuyordu.
     }
     totalRow(L.net, fmt(net));
     totalRow(`${L.vat} ${fmtVatRate(s.vatRate)}`, fmt(vat));
@@ -1505,7 +1606,7 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         doc.setFontSize(8);
         doc.text(formatIban(s.iban), x, yy + 3);
         doc.text(s.companyName, x, yy + 7);
-        doc.text(`${s.addressLine1} ${s.addressLine2}`, x, yy + 10.5);
+        doc.text(`${s.addressLine1} ${s.addressLine2}`.replace(/\s+/g, ' ').trim(), x, yy + 10.5);
         doc.text(`${s.postalCode} ${s.city}`, x, yy + 14);
     };
     writeBlock(5, yTop + 12);

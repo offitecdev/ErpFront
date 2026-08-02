@@ -63,6 +63,7 @@ import {
     type TenderCustomerCreateForm,
 } from './detail/utils/tenderAddress.utils';
 import { buildProductDefaults, emptyManualProduct, parseClosingImages } from './detail/utils/tenderProduct.utils';
+import { attachPdfPositionImages } from './detail/utils/tenderPdfImages.utils';
 import { defaultTenderValidUntil } from './detail/utils/tenderDate.utils';
 import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
 import { computeTenderPricingSummary } from './detail/utils/tenderPricing.utils';
@@ -192,6 +193,7 @@ export const TenderDetail = () => {
         detail,
         loadingDetail,
         fetchDetail,
+        ensurePdfContent,
         stockArticles,
         stockArticlesLoading,
         stockArticlesLoaded,
@@ -218,7 +220,11 @@ export const TenderDetail = () => {
         customerLocations,
         setCustomerLocations,
         customerLocationsLoaded,
-    } = useTenderCustomerLocations({ tenderCustomerId: detail?.tender.customerId });
+    } = useTenderCustomerLocations({
+        tenderCustomerId: detail?.tender.status === 'Draft' && canManage
+            ? detail.tender.customerId
+            : null,
+    });
     // Quick "+ add address" popup launched from the tender's address section.
     const [addrModalOpen, setAddrModalOpen] = useState(false);
     const [addrTarget, setAddrTarget] = useState<'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER'>('INSTALLATION');
@@ -390,7 +396,11 @@ export const TenderDetail = () => {
     });
     // Customer-specific product discounts: auto-applied when one of the saved
     // articles is added to the quote.
-    const { discountMap: customerDiscountMap } = useCustomerProductDiscounts({ customerId: detail?.tender.customerId });
+    const { discountMap: customerDiscountMap } = useCustomerProductDiscounts({
+        customerId: detail?.tender.status === 'Draft' && canManage
+            ? detail.tender.customerId
+            : null,
+    });
     // Default the Projekt- and Lieferadresse to the customer's primary address
     // while they are empty (the user can still pick another one per row).
     useTenderAddressDefaults({
@@ -411,6 +421,18 @@ export const TenderDetail = () => {
     }, [detail?.tender.id]);
     const [workspaceTab, setWorkspaceTab] = useState<TenderWorkspaceTabKey>('lines');
     const [settingsInitialTab, setSettingsInitialTab] = useState<TenderSettingsTabKey>('mail');
+
+    useEffect(() => {
+        if (
+            workspaceTab === 'pdf'
+            && detail?.tender.id
+            && detail.tender.pdfContentDeferred
+        ) {
+            void ensurePdfContent(detail.tender.id).catch((error: any) => {
+                toast.error(error?.response?.data?.error || t('common.error'));
+            });
+        }
+    }, [workspaceTab, detail?.tender.id, detail?.tender.pdfContentDeferred, ensurePdfContent]);
 
     useEffect(() => {
         if (id) {
@@ -456,10 +478,31 @@ export const TenderDetail = () => {
     // it never competes with the tender's own data for a connection.
     useEffect(() => {
         if (!detail?.tender.id || stockArticlesLoaded || stockArticlesLoading) return;
+        if (detail.tender.status !== 'Draft' || !canManage) return;
         const hasProductRows = localPositions.some((position) => getLineKind(position) === 'PRODUCT' && !!position.sourceArticleId);
         if (!hasProductRows) return;
         return onIdle(() => { void fetchStockArticles(false, false); }, 3000);
-    }, [detail?.tender.id, fetchStockArticles, localPositions, stockArticlesLoaded, stockArticlesLoading]);
+    }, [detail?.tender.id, detail?.tender.status, canManage, fetchStockArticles, localPositions, stockArticlesLoaded, stockArticlesLoading]);
+
+    // Read-only orders are the common PDF/export path. Warm their small PDF image
+    // derivatives after the page is interactive, so export never waits for a
+    // legacy multi-megabyte original. The helper de-duplicates an export click
+    // against this in-flight request and keeps the result in the session cache.
+    useEffect(() => {
+        const currentTender = detail?.tender;
+        if (!currentTender?.id) return;
+        const isOrder = Boolean(currentTender.projectId)
+            || isSourceSalesOrder(currentTender.sourceStatus);
+        if (!isOrder || localPositions.length === 0) return;
+        return onIdle(() => {
+            void attachPdfPositionImages(currentTender.id, localPositions);
+        }, 1200);
+    }, [
+        detail?.tender.id,
+        detail?.tender.projectId,
+        detail?.tender.sourceStatus,
+        localPositions,
+    ]);
 
     const tree = useMemo(() => buildTree(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const simpleRows = useMemo(() => buildSimpleTenderLines(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
@@ -948,6 +991,7 @@ export const TenderDetail = () => {
         ...splitAddress(tender.customerAddress),
     ];
     const commissionNumber = valueOrBlank((tender as any).commissionNumber || (tender as any).commissionNo || (tender as any).referenceNumber);
+    const customerReference = valueOrBlank((tender as any).customerReference);
     const currencyCode = toCurrencyCode((tender as any).currency);
     const tenderValidityValue = tender.validUntil ? dayjs(tender.validUntil).format('YYYY-MM-DD') : minimumTenderValidUntil;
     const tenderValidityLabel = dayjs(tenderValidityValue).format('DD.MM.YYYY');
@@ -1096,6 +1140,14 @@ export const TenderDetail = () => {
                         ? <TenderCommissionInput value={commissionNumber} onCommit={(value) => handleMetaFieldChange('commission', { commissionNumber: value })} />
                         : undefined,
                     lines: [commissionNumber],
+                },
+                {
+                    key: 'customerReference',
+                    label:t('tenders.referenz'),
+                    control: canEditTenderMeta
+                        ? <TenderCommissionInput value={customerReference} ariaLabel={t('tenders.referenz')} onCommit={(value) => handleMetaFieldChange('customerReference', { customerReference: value })} />
+                        : undefined,
+                    lines: [customerReference],
                 },
             ],
         },

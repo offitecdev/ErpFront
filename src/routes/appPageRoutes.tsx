@@ -34,13 +34,17 @@ const TenderReport = lazyNamed(() => import('../pages/tender/TenderReport'), 'Te
 // Yeni tablo tabanlı envanter modülü — eski sayfalar pages/inventory_old altında arşivlendi.
 const ProductsPage = lazyNamed(() => import('../pages/inventory/ProductsPage'), 'ProductsPage');
 const ProductCreatePage = lazyNamed(() => import('../pages/inventory/ProductCreatePage'), 'ProductCreatePage');
+const ProductDetailPage = lazyNamed(() => import('../pages/inventory/ProductDetailPage'), 'ProductDetailPage');
 const MaterialsPage = lazyNamed(() => import('../pages/inventory/MaterialsPage'), 'MaterialsPage');
 const MaterialCreatePage = lazyNamed(() => import('../pages/inventory/MaterialCreatePage'), 'MaterialCreatePage');
+const MaterialDetailPage = lazyNamed(() => import('../pages/inventory/MaterialDetailPage'), 'MaterialDetailPage');
 const StockPage = lazyNamed(() => import('../pages/inventory/StockPage'), 'StockPage');
 const StockMovementsPage = lazyNamed(() => import('../pages/inventory/StockMovementsPage'), 'StockMovementsPage');
 const SuppliersPage = lazyNamed(() => import('../pages/inventory/SuppliersPage'), 'SuppliersPage');
 const OrdersPage = lazyNamed(() => import('../pages/inventory/OrdersPage'), 'OrdersPage');
 const OrderCreatePage = lazyNamed(() => import('../pages/inventory/OrderCreatePage'), 'OrderCreatePage');
+// Mal kabul artık pop-up değil, stok ekranı gibi kendi sayfası.
+const OrderReceivePage = lazyNamed(() => import('../pages/inventory/OrderReceivePage'), 'OrderReceivePage');
 const Shipments = lazyNamed(() => import('../pages/logistics/Shipments'), 'Shipments');
 const ShipmentCreate = lazyNamed(() => import('../pages/logistics/ShipmentCreate'), 'ShipmentCreate');
 const MaintenanceDashboard = lazyNamed(() => import('../pages/maintenance/MaintenanceDashboard'), 'MaintenanceDashboard');
@@ -56,7 +60,7 @@ const Projects = lazyNamed(() => import('../pages/project/Projects'), 'Projects'
 const ProjectDetail = lazyNamed(() => import('../pages/project/ProjectDetail'), 'ProjectDetail');
 const ServiceReports = lazyNamed(() => import('../pages/services/ServiceReports'), 'ServiceReports');
 const ServiceReportAdd = lazyNamed(() => import('../pages/services/ServiceReportAdd'), 'ServiceReportAdd');
-const UnifiedCalendar = lazyNamed(() => import('../pages/calendar/UnifiedCalendar'), 'UnifiedCalendar');
+const CalendarPage = lazyNamed(() => import('../pages/calendar/CalendarPage'), 'CalendarPage');
 
 const AttendanceAdminRoute = () => {
     const permissions = useAuthStore((s) => s.permissions);
@@ -112,9 +116,13 @@ export const renderAppPageRoutes = () => (
         <Route path="/inventory/articles" element={page(ProductsPage)} />
         {/* Ürün ekleme artık pop-up değil, kendi sayfası (stok ekranıyla aynı desen). */}
         <Route path="/inventory/articles/new" element={page(ProductCreatePage)} />
+        {/* Detay: listeden satıra tıklayınca açılır; '/new' ile çakışmaması için
+            sabit yol ÖNCE tanımlıdır. */}
+        <Route path="/inventory/articles/:id" element={page(ProductDetailPage)} />
         {/* Malzemeler: ürünlerle aynı tablo, aynı akış — yalnızca itemType farklı. */}
         <Route path="/inventory/materials" element={page(MaterialsPage)} />
         <Route path="/inventory/materials/new" element={page(MaterialCreatePage)} />
+        <Route path="/inventory/materials/:id" element={page(MaterialDetailPage)} />
         <Route path="/inventory/stock" element={page(StockPage)} />
         <Route path="/inventory/stock/movements" element={page(StockMovementsPage)} />
         {/* Eski yol: hareket girişi artık ortak stok ekranında. */}
@@ -123,6 +131,9 @@ export const renderAppPageRoutes = () => (
         {/* Satın alma siparişleri: liste + oluşturma/düzenleme (?id= ile düzenleme). */}
         <Route path="/inventory/orders" element={page(OrdersPage)} />
         <Route path="/inventory/orders/new" element={page(OrderCreatePage)} />
+        {/* Mal kabul: siparişin satırlarını stoğa aktarma ekranı ('/new' sabit
+            yolundan sonra tanımlıdır, :id ile çakışmaz). */}
+        <Route path="/inventory/orders/:id/receive" element={page(OrderReceivePage)} />
         <Route path="/logistics/shipments" element={page(Shipments)} />
         <Route path="/logistics/shipments/new" element={page(ShipmentCreate)} />
         <Route path="/maintenance" element={page(MaintenanceDashboard)} />
@@ -136,7 +147,7 @@ export const renderAppPageRoutes = () => (
         <Route path="maintenance/technician/tasks/:taskId" element={<Navigate to="/montage" replace />} />
         <Route path="/maintenance/reports" element={<Navigate to="/maintenance/tasks?view=reports" replace />} />
         <Route path="/maintenance/regie" element={page(RegieOperations)} />
-        <Route path="/calendar" element={page(UnifiedCalendar)} />
+        <Route path="/calendar" element={page(CalendarPage)} />
         <Route path="/projects" element={<ProjectModuleRoute component={Projects} />} />
         <Route path="/projects/flow" element={<Navigate to="/projects" replace />} />
         <Route path="/projects/installation" element={<Navigate to="/montage" replace />} />

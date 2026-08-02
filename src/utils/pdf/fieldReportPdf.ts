@@ -9,6 +9,7 @@ import { usePdfSettingsStore, type PdfCompanySettings } from '../../store/pdfSet
 import type { ProjectDto } from '../../types/project';
 import { getReportTranslator, type FixedTranslator } from '../../i18n/reportLanguage';
 import { localizeTenderNumber } from '../tenderNumber';
+import { companySenderLine } from './addressBlock';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SAHA RAPORU (Montage-Rapport) — kullanıcı görsellerine birebir uyan, PARASIZ çıktı.
@@ -360,8 +361,7 @@ const drawCoverHeader = (
     doc.setFont(FONT, 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(...COLOR_NAVY);
-    const sender = `${settings.companyName} - ${settings.addressLine1} ${settings.addressLine2}, ${settings.postalCode} ${settings.city}`
-        .replace(/\s+/g, ' ').trim();
+    const sender = companySenderLine(settings);
     const senderLines = doc.splitTextToSize(sender, rW);
     doc.text(senderLines, rX, rYy + 3);
     rYy += senderLines.length * 4.6 + 5;

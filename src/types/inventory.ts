@@ -123,6 +123,73 @@ export interface ArticleStockInfo {
     manualCostValue: number;
 }
 
+/**
+ * Ürün detay ekranının BAŞLIK tablosu — ekranda gerçekten görünen alanlar.
+ * Tedarikçi listesi ve hareket geçmişi burada YOKTUR: ikisi de kendi
+ * uçlarından, yalnızca kullanıcı ilgili düğmeye bastığında yüklenir.
+ */
+export interface ArticleDetail {
+    id: string;
+    articleCode: string;
+    name: string;
+    unit: string;
+    /** Biçimli metin (kalın/italik/madde) — sunucuda dar bir beyaz listeden geçer. */
+    description?: string | null;
+    salePrice: number;
+    itemType: ItemType;
+    /** Görsel binary URL'sinin cache-busting sürümü; base64 bu yanıta girmez. */
+    imageVersion: string;
+    totalQuantity: number;
+    /** Σ(tedarikçi birim maliyeti × adet) / Σ(adet). */
+    averageUnitCost?: number;
+    supplierCount?: number;
+    /** Henüz stoğa alınmamış sipariş satırlarının toplamı — sipariş yoksa 0. */
+    openOrderQuantity?: number;
+}
+
+/** Detay başlığı açılırken paralel hesaplanan, kritik olmayan alanlar. */
+export interface ArticleDetailStats {
+    averageUnitCost: number;
+    supplierCount: number;
+    openOrderQuantity: number;
+}
+
+/**
+ * Detay ekranındaki tek "Kaydet" işleminin gövdesi. Yalnızca DEĞİŞEN alanlar
+ * gönderilir; `imageUrl` yoksa görsel korunur, `null` ise silinir.
+ */
+export interface ArticleDetailPatch {
+    articleCode?: string;
+    name?: string;
+    unit?: string;
+    salePrice?: number;
+    description?: string | null;
+    imageUrl?: string | null;
+}
+
+/** Ürün görseli üst sınırı — sunucudaki denetimle aynı değer. */
+export const ARTICLE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+export const ARTICLE_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
+/** Tedarikçi popup'ındaki tek satır: o tedarikçiden alınan toplam ve ortalaması. */
+export interface ArticleSupplierCostRow {
+    supplierId: string;
+    companyName: string;
+    quantity: number;
+    totalCost: number;
+    averageUnitCost: number;
+    purchaseCount: number;
+    lastPurchaseDate?: string | null;
+    currency: string;
+}
+
+export interface ArticleSuppliersSummary {
+    suppliers: ArticleSupplierCostRow[];
+    totalQuantity: number;
+    totalCost: number;
+    averageUnitCost: number;
+}
+
 export interface ArticleListPage {
     items: ArticleListItem[];
     total: number;
@@ -287,6 +354,8 @@ export interface MovementListPage {
 export interface MovementListQuery {
     page?: number;
     pageSize?: number;
+    /** Tek ürüne daraltır (ürün detayındaki hareketler görünümü). */
+    articleId?: string;
     search?: string;
     code?: string;
     name?: string;
@@ -431,7 +500,29 @@ export interface CreateSupplyRequestInput {
 // --- SATIN ALMA SİPARİŞLERİ (Purchase Orders) ---
 // Tek sipariş = tek tedarikçi; satırlar backend'de JSON snapshot olarak durur.
 
-export type PurchaseOrderStatus = 'PENDING' | 'TO_BE_STOCKED' | 'COMPLETED' | 'UPDATED';
+/**
+ * Sipariş yaşam döngüsü (2026-08-01 genişletildi):
+ * DRAFT (tedarikçi taslağı) → PRICE_REQUEST (fiyat talebi) → AWAITING_CONFIRMATION
+ * (talep maili gönderildi) → PENDING (resmî sipariş) → TO_BE_STOCKED (mal kabul)
+ * → COMPLETED (stoğa aktarıldı). UPDATED: mail sonrası içerik değişikliği.
+ */
+export type PurchaseOrderStatus =
+    | 'DRAFT'
+    /** SİPARİŞ TASLAĞI: fiyatlı, kaydedilmiş ama onaylanmamış — "Kaydet" bunu yazar. */
+    | 'ORDER_DRAFT'
+    | 'PRICE_REQUEST'
+    | 'AWAITING_CONFIRMATION'
+    | 'PENDING'
+    | 'TO_BE_STOCKED'
+    | 'COMPLETED'
+    | 'UPDATED';
+
+/** Satır hesap kipi: AUTO hesaplar, DIRECT gönderileni saklar (eski directCopy),
+ *  SUPPLIER tedarikçi hesabındaki SABİT net birim fiyatla çarpar (indirim kilitli). */
+export type OrderCalcMode = 'AUTO' | 'DIRECT' | 'SUPPLIER';
+
+/** Sipariş KDV kipi: LINE = satır başına oran, TOTAL = tek oran genel toplamda. */
+export type OrderVatMode = 'LINE' | 'TOTAL';
 
 export interface PurchaseOrderItem {
     itemType: ItemType;
@@ -453,6 +544,24 @@ export interface PurchaseOrderItem {
     lineTotal: number;
     /** `lineTotal` uzerinden hesaplanan KDV tutari. */
     lineVat: number;
+    /**
+     * DOGRUDAN KOPYALA ile kaydedildi mi: net fiyat ve satir tutari HESAPLANMADI,
+     * ekranda/Excel'de ne yaziyorsa oyle saklandi. Eski kayitlarda YOKTUR.
+     * Yeni kayitlarda `calcMode: 'DIRECT'` ile birlikte yazilir (geriye uyum).
+     */
+    directCopy?: boolean;
+    /** Satirin hesap kipi — eski kayitlarda yoktur (directCopy'den turetilir). */
+    calcMode?: OrderCalcMode;
+    /**
+     * GOSTERILEN net birim fiyat (tedarikci listesindeki / Excel'deki deger).
+     * `netPrice` hesabin tam duyarlikli tabanidir; Excel'in kendi yuvarlamasi
+     * yuzunden ikisi ayrilabilir (18.98 gorunur, 18.9766… ile carpilir).
+     */
+    displayNetPrice?: number | null;
+    /** Mal kabulde stoga aktarilan miktar (receive endpoint'i yazar). */
+    receivedQuantity?: number;
+    /** Son mal kabul zamani (ISO). */
+    receivedAt?: string | null;
 }
 
 /**
@@ -468,7 +577,7 @@ export interface PurchaseOrderFee {
 export interface PurchaseOrderRow {
     id: string;
     tenantId: string;
-    /** "Auftrag" — sipariş kodu (BE-2026-0001), kullanıcı düzenleyebilir. */
+    /** "Auftrag" — sipariş kodu (AU-2026-001), kullanıcı düzenleyebilir. */
     referenceNumber: string;
     /** Opsiyonel teklif numarası (PDF'te görünür). */
     quoteNumber?: string | null;
@@ -476,6 +585,17 @@ export interface PurchaseOrderRow {
     orderedByName?: string | null;
     /** Tedarik edilen projenin adı (PDF kapak kartında). */
     projectName?: string | null;
+    /**
+     * ALICI ADI ("Empfänger" / z.Hd.) — OPSİYONEL. Doluysa PDF'in alıcı
+     * bloğunda firma adının ALTINDA tek küçük satır olarak basılır.
+     */
+    recipientName?: string | null;
+    /**
+     * ANSCHREIBEN (ön yazı) — PDF'in ilk sayfasında pozisyon tablosundan ÖNCE
+     * basılan hitap + giriş metni (düz metin, satır sonları korunur).
+     * BOŞ/NULL = PDF şablonunun kendi standart metni basılır.
+     */
+    coverLetter?: string | null;
     status: PurchaseOrderStatus;
     supplierId?: string | null;
     supplierName: string;
@@ -486,6 +606,12 @@ export interface PurchaseOrderRow {
     additionalFees: PurchaseOrderFee[];
     itemCount: number;
     currency: string;
+    /** KDV kipi — TOTAL ise `totalVat = (totalNet + totalFees) × orderVatRate`. */
+    vatMode: OrderVatMode;
+    /** TOTAL kipindeki oran (%). */
+    orderVatRate: number;
+    /** TOTAL kipinde seçilen ülke etiketi (yalnızca gösterim). */
+    orderVatCountry?: string | null;
     totalNet: number;
     totalGross: number;
     /** Satır KDV tutarlarının toplamı. */
@@ -537,18 +663,42 @@ export interface PurchaseOrderItemInput {
     discount2?: number;
     discount3?: number;
     vatRate?: number;
+    /**
+     * DOGRUDAN KOPYALA: sunucu net fiyati ve satir tutarini YENIDEN HESAPLAMAZ,
+     * gonderilenleri saklar (bayrak yoksa indirimlerden turetir — eski davranis).
+     */
+    directCopy?: boolean;
+    /** Hesap kipi — verilmezse sunucu directCopy bayragindan turetir. */
+    calcMode?: OrderCalcMode;
+    /** Yalnizca GOSTERIM icin saklanan net fiyat (tutari etkilemez). */
+    displayNetPrice?: number | null;
+    /** Yalnizca `directCopy`/DIRECT ile birlikte anlamlidir: satirin NET tutari. */
+    lineTotal?: number;
+    /** Mal kabul durumu — duzenlemede aynen geri gonderilir ki kaybolmasin. */
+    receivedQuantity?: number;
+    receivedAt?: string | null;
 }
 
 export interface CreatePurchaseOrderInput {
-    /** Boş bırakılırsa sunucu BE-{yıl}-{sıra} üretir. */
+    /** Boş bırakılırsa sunucu AU-{yıl}-{sıra} üretir. */
     referenceNumber?: string | null;
     quoteNumber?: string | null;
     orderedByName?: string | null;
     projectName?: string | null;
+    /** Alıcı adı (Empfänger) — opsiyonel, PDF alıcı bloğunda görünür. */
+    recipientName?: string | null;
+    /** Ön yazı (Anschreiben) — boş/null gönderilirse PDF standart metnini basar. */
+    coverLetter?: string | null;
+    /** Giriş yolları: DRAFT (fiyat talebi taslağı), ORDER_DRAFT (sipariş taslağı),
+     *  PRICE_REQUEST, PENDING (doğrudan onaylanmış sipariş). */
+    status?: Extract<PurchaseOrderStatus, 'DRAFT' | 'ORDER_DRAFT' | 'PRICE_REQUEST' | 'PENDING'>;
     supplierId?: string | null;
     supplierName?: string;
     supplierEmail?: string | null;
     currency?: string;
+    vatMode?: OrderVatMode;
+    orderVatRate?: number;
+    orderVatCountry?: string | null;
     items: PurchaseOrderItemInput[];
     /** Ad + tutar; adı ve tutarı boş olan satırlar sunucuda atılır. */
     additionalFees?: PurchaseOrderFee[];
@@ -559,16 +709,73 @@ export interface UpdatePurchaseOrderInput {
     quoteNumber?: string | null;
     orderedByName?: string | null;
     projectName?: string | null;
+    recipientName?: string | null;
+    coverLetter?: string | null;
     supplierId?: string | null;
     supplierName?: string;
     supplierEmail?: string | null;
     currency?: string;
+    vatMode?: OrderVatMode;
+    orderVatRate?: number;
+    orderVatCountry?: string | null;
     items?: PurchaseOrderItemInput[];
     additionalFees?: PurchaseOrderFee[];
 }
 
+// ── Ön yazı (Anschreiben) taslakları ─────────────────────────────────────────
+// Tenant genelinde paylaşılan metin şablonları: sipariş detayındaki "Taslaklar"
+// penceresinden kaydedilir ve başka siparişlerde tek tıkla uygulanır. Sipariş
+// kaydına DEĞİL tenant'a bağlıdır — teklif tarafındaki `TenderTextTemplate`
+// emsali. Standart metin bu listede DEĞİLDİR: o PDF şablonunda yaşar.
+
+export interface PurchaseOrderTextTemplate {
+    id: string;
+    title: string;
+    content: string | null;
+    createdBy?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PurchaseOrderTextTemplatePage {
+    items: PurchaseOrderTextTemplate[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
+// ── Mal kabul (goods receipt) ────────────────────────────────────────────────
+
+export interface ReceivePurchaseOrderLine {
+    /** Sipariş satırının indeksi (items dizisinde). */
+    index: number;
+    /** Verilmezse satırın KALAN miktarı aktarılır. */
+    quantity?: number;
+    /** Verilmezse siparişteki net birim fiyat maliyet olarak kullanılır. */
+    unitCost?: number;
+}
+
+export interface ReceivePurchaseOrderInput {
+    lines?: ReceivePurchaseOrderLine[];
+    /** "Mal kabulü tamamla": kalan TÜM satırlar aktarılır, sipariş COMPLETED olur. */
+    complete?: boolean;
+}
+
+export interface ReceivePurchaseOrderResult {
+    processedCount: number;
+    received: Array<{ index: number; quantity: number }>;
+    errors: Array<{ index: number; error: string }>;
+    order: PurchaseOrderRow;
+}
+
 export interface SendPurchaseOrderMailInput {
     to?: string;
+    /**
+     * KOPYA (CC) adresleri. `to` yalnızca siparişin TEDARİKÇİSİNE ait bir adres
+     * olabilir (açık relay engeli); CC serbesttir — sunucu biçimi doğrular,
+     * alıcının kendisini eler, tekrarları atar ve 10 adresle sınırlar.
+     */
+    ccEmails?: string[];
     subject: string;
     message?: string;
     attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;

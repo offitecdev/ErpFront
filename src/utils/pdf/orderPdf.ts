@@ -5,6 +5,14 @@
  * içerik farkları:
  *  - Alıcı blok müşteri değil TEDARİKÇİdir; bilgi kartı sipariş no / tarih /
  *    sipariş adı / tedarikçi satırlarını taşır.
+ *  - Gönderici TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — gün içinde
+ *    üç satıra bölünmüştü, geri alındı): "OffiTec Heating & Cooling, Cores Tower
+ *    - Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa sarılmaz, puntosu küçülür.
+ *  - Kapak KARTI teklif belgesindeki DAR TABLONUN aynısıdır (78 mm, 5.6 mm
+ *    satır): Auftrag / Besteller / Datum / Angebots-Nr / Projekt / EMPFÄNGER /
+ *    Lieferant. Alıcı adı sağdaki adres bloğunda DEĞİL bu kartta durur; DURUM
+ *    SATIRI YOKTUR (kısa süre denendi, kullanıcı isteğiyle kaldırıldı).
+ *    `tenderPdfModern` + `priceRequestPdf` ile birlikte güncellenir.
  *  - Giriş metni "sipariş detayları" ifadesidir; kapak sayfasının ALT KISMI
  *    BOŞ bırakılır (footerNote yazılmaz — kullanıcı isteği).
  *  - Satırlar düz listedir (hiyerarşi / ara toplam / görsel / QR fatura yok);
@@ -21,7 +29,7 @@
  *    tutarıyla tek tek listelenir ve genel toplama net olarak girer.
  */
 import { jsPDF } from 'jspdf';
-import { fitAddressBlock } from './addressBlock';
+import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from './addressBlock';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { PurchaseOrderRow } from '../../types/inventory';
 
@@ -61,14 +69,17 @@ interface OrderPdfStrings {
     pageWord: string;
     pageOf: string;
     serialShort: string;
+    /** Kapak kartındaki ALICI ADI satırının etiketi (Empfänger). */
+    recipient: string;
 }
 
 const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
     tr: {
         docTitle: 'Sipariş',
-        // Sipariş numarasının etiketi tüm dillerde Almanca "Auftrag" kalır
-        // (kullanıcı isteği) — numara BE-{yıl}-{sıra} biçimindedir.
-        orderNumber: 'Auftrag',
+        // Sipariş numarasının etiketi ARTIK DİLE GÖRE ÇEVRİLİR (kullanıcı isteği
+        // 2026-08-02 — önceden tüm dillerde Almanca "Auftrag" kalıyordu).
+        // Numara AU-{yıl}-{sıra} biçimindedir (eski kayıtlar BE-{yıl}-{sıra}).
+        orderNumber: 'Sipariş No',
         orderDate: 'Sipariş Tarihi',
         orderedBy: 'Sipariş veren',
         quoteNumber: 'Teklif No',
@@ -94,17 +105,21 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         pageWord: 'Sayfa',
         pageOf: '/',
         serialShort: 'Seri No',
+        recipient: 'Alıcı',
     },
     de: {
-        docTitle: 'Bestellung',
+        // BELGE ALMANCADA "AUFTRAG"DIR (kullanıcı isteği 2026-08-02): başlık
+        // satırı "Auftrag AU-2026-001" olarak basılır. Diğer dillerde belge adı
+        // kendi dilindedir (Sipariş / Purchase Order).
+        docTitle: 'Auftrag',
         orderNumber: 'Auftrag',
-        orderDate: 'Bestelldatum',
+        orderDate: 'Auftragsdatum',
         orderedBy: 'Besteller',
         quoteNumber: 'Angebots-Nr.',
         project: 'Projekt',
         supplier: 'Lieferant',
         greeting: 'Sehr geehrte Damen und Herren',
-        intro: 'Hiermit erhalten Sie die Details unserer Bestellung. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten. Für Terminbestätigung und Rückfragen können Sie auf diese Nachricht antworten.',
+        intro: 'Hiermit erhalten Sie die Details unseres Auftrags. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten. Für Terminbestätigung und Rückfragen können Sie auf diese Nachricht antworten.',
         colPos: 'Pos',
         colDesc: 'Produkt / Material',
         colCode: 'Seriencode',
@@ -123,10 +138,11 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         pageWord: 'Seite',
         pageOf: 'von',
         serialShort: 'Serien-Nr.',
+        recipient: 'Empfänger',
     },
     en: {
         docTitle: 'Purchase Order',
-        orderNumber: 'Auftrag',
+        orderNumber: 'Order no.',
         orderDate: 'Order Date',
         orderedBy: 'Ordered by',
         quoteNumber: 'Quote No.',
@@ -152,6 +168,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         pageWord: 'Page',
         pageOf: 'of',
         serialShort: 'Serial No.',
+        recipient: 'Recipient',
     },
 };
 
@@ -168,6 +185,12 @@ const LOGO_MAX_W = 50;
 const CONTENT_TOP_FIRST = 44;
 const CONTENT_TOP_REST = 38;
 const CONTENT_BOTTOM = 266;
+/**
+ * ÖN YAZI (Anschreiben) kapak sayfasının son bloğudur ve sayfa taşırmamalıdır:
+ * blok ~160 mm'de başlar, satır yüksekliği ~4.8 mm → alt kenara kadar ~22 satır
+ * sığar. 20'de kesilir (emniyet payı); fazlası basılmaz.
+ */
+const COVER_LETTER_MAX_LINES = 20;
 
 // Tablo hizalama noktaları. Pos/açıklama sabit; kalan sütunlar SAĞDAN SOLA
 // sabit genişliklerle yerleşir, böylece çizilmeyen bir sütunun (seri kod, brüt
@@ -615,46 +638,37 @@ function drawPageFooter(doc: jsPDF, page: number, total: number, L: OrderPdfStri
 function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings, L: OrderPdfStrings) {
     const y0 = CONTENT_TOP_FIRST;
 
-    // ── Sol: sipariş bilgi kartı ─────────────────────────────────────────────
-    // Değerler etiketin sağında, sağa yaslı tek satırdır ve sütuna sığacak
-    // şekilde küçültülür. Proje adı uzun olabildiği için `wrap` ile işaretlenir:
-    // punto düşürülür ve gerekirse 2 satıra sarılır — kart yüksekliği ona göre
-    // büyür, metin asla karttan taşmaz.
+    // ── Sol: sipariş bilgi kartı — TEKLİF PDF'İYLE AYNI DAR TABLO ────────────
+    // Kullanıcı isteği 2026-08-02 (son tur): kart teklif belgesindeki kadar DAR
+    // ve sıkışık satırlı olacak. Ölçüler `tenderPdfModern.drawCoverPage` ile
+    // BİREBİR aynıdır — 78 mm genişlik, 5.6 mm satır, 7 pt etiket, sağa yaslı
+    // kalın değer; üçü birlikte güncellenmelidir (teklif + sipariş + talep).
+    // SATIRLAR SARILMAZ: her değer tek satırdır, sığmazsa puntosu küçülür. Proje
+    // adı için kullanılan 2 satıra sarma kaldırıldı (kart artık dar bir tablo).
     const cardX = ML;
-    const cardW = 88;
-    const rowH = 8.8;
-    const valueX = cardX + cardW - 4;
+    const cardW = 78;
+    const rowH = 5.6;
 
-    interface CardRow { label: string; value: string; emphasize?: boolean; wrap?: boolean }
-    const rows: CardRow[] = ([
-        { label: L.orderNumber, value: order.referenceNumber, emphasize: true },
-        { label: L.orderedBy, value: order.orderedByName || '' },
-        { label: L.orderDate, value: fmtDateShort(order.createdAt) },
-        { label: L.quoteNumber, value: order.quoteNumber || '' },
-        { label: L.project, value: order.projectName || '', wrap: true },
-        { label: L.supplier, value: order.supplierName },
-    ] as CardRow[]).filter((row) => row.value.trim().length > 0);
+    // Kartta ADRES YOKTUR: adlar tek satır olarak girer, adres yalnızca sağdaki
+    // alıcı bloğunda görünür. Serbest metindeki satır sonları boşluğa iner.
+    const oneLine = (value: string) => String(value || '').replace(/\s+/g, ' ').trim();
 
-    // Ölçüm: sarılan satırlar için önce satır yüksekliklerini hesapla.
-    const LABEL_W = 26;                     // etiket sütunu
-    const VALUE_W = cardW - LABEL_W - 8.5;  // değerin kullanabileceği genişlik
-    const WRAP_SIZE = 7.6;
-    const WRAP_LH = 3.6;
-    const measured = rows.map((row) => {
-        if (!row.wrap) return { row, lines: [row.value], height: rowH, size: 0 };
-        doc.setFont(FONT, 'bold');
-        doc.setFontSize(WRAP_SIZE);
-        const lines = (doc.splitTextToSize(row.value, VALUE_W) as string[]).slice(0, 2);
-        return {
-            row,
-            lines,
-            height: Math.max(rowH, lines.length * WRAP_LH + 5),
-            size: WRAP_SIZE,
-        };
-    });
+    // ALICI ADI (Empfänger) KARTTADIR — sağdaki adres bloğunda değil (kullanıcı
+    // isteği 2026-08-02). DURUM SATIRI YOKTUR: kısa süre denendi ve kaldırıldı
+    // (kullanıcı isteği) — sipariş durumu iç bilgidir, tedarikçiye giden belgede
+    // yeri yok. Boş alanlar satır açmaz (`filter`).
+    const rows: Array<[string, string, boolean]> = ([
+        [L.orderNumber, order.referenceNumber, true],
+        [L.orderedBy, oneLine(order.orderedByName || ''), false],
+        [L.orderDate, fmtDateShort(order.createdAt), false],
+        [L.quoteNumber, oneLine(order.quoteNumber || ''), false],
+        [L.project, oneLine(order.projectName || ''), false],
+        [L.recipient, oneLine(order.recipientName || ''), false],
+        [L.supplier, oneLine(order.supplierName), false],
+    ] as Array<[string, string, boolean]>).filter(([, value]) => value.trim().length > 0);
 
     const cardY = y0 - 4;
-    const cardH = measured.reduce((sum, entry) => sum + entry.height, 0) + 4;
+    const cardH = rows.length * rowH + 2.4;
 
     doc.setFillColor(...COLOR_CARD_BG);
     doc.setDrawColor(...COLOR_CARD_BORDER);
@@ -668,49 +682,41 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     doc.setFillColor(...COLOR_NAVY_SOFT);
     doc.rect(cardX, cardY + cardH * 0.76, 1.2, cardH * 0.24, 'F');
 
-    let ry = cardY + 2;
-    measured.forEach((entry, idx) => {
-        const { row, lines, height } = entry;
-        const base = ry + rowH / 2 + 1.5;
+    let ry = cardY + 1.2;
+    rows.forEach(([label, value, emphasize], idx) => {
+        const base = ry + rowH / 2 + 1.15;
         doc.setFont(FONT, 'normal');
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setTextColor(...COLOR_LABEL);
-        doc.text(row.label, cardX + 4.5, base);
-
+        doc.text(label, cardX + 3.5, base);
         doc.setFont(FONT, 'bold');
-        if (row.emphasize) doc.setTextColor(...COLOR_NAVY);
+        // Değer, ETİKETİN bıraktığı boşluğa sığdırılır (dar kartta çakışmasın).
+        const labelW = doc.getTextWidth(label);
+        const valueMaxW = cardW - 7 - labelW - 2;
+        doc.setFontSize(emphasize ? 8.6 : 7.8);
+        fitFontSize(doc, value, valueMaxW, emphasize ? 8.6 : 7.8, 5.6);
+        if (emphasize) doc.setTextColor(...COLOR_NAVY);
         else doc.setTextColor(...COLOR_TEXT);
-        if (row.wrap) {
-            doc.setFontSize(WRAP_SIZE);
-            lines.forEach((line, lineIdx) => {
-                doc.text(line, valueX, base + lineIdx * WRAP_LH, { align: 'right' });
-            });
-        } else {
-            const size = row.emphasize ? 10.2 : 9.4;
-            doc.setFontSize(size);
-            // Uzun değerler kartı taşırmasın diye sütuna sığdırılır.
-            fitFontSize(doc, row.value, VALUE_W, size, 6.4);
-            doc.text(row.value, valueX, base, { align: 'right' });
-        }
-
-        ry += height;
-        if (idx < measured.length - 1) {
+        doc.text(value, cardX + cardW - 3.5, base, { align: 'right' });
+        ry += rowH;
+        if (idx < rows.length - 1) {
             doc.setDrawColor(...COLOR_HAIRLINE);
-            doc.setLineWidth(0.15);
-            doc.line(cardX + 4.5, ry + 0.4, cardX + cardW - 4, ry + 0.4);
+            doc.setLineWidth(0.12);
+            doc.line(cardX + 3.5, ry + 0.3, cardX + cardW - 3.5, ry + 0.3);
         }
     });
 
-    // ── Sağ: tek satır gönderici + tedarikçi (alıcı) bloğu ───────────────────
+    // ── Sağ: TEK SATIR gönderici + tedarikçi (alıcı) bloğu ───────────────────
     const addrX = 112;
     const addrW = MR - addrX;
-    const sender = `${s.companyName} - ${s.addressLine1} ${s.addressLine2}, ${s.postalCode} ${s.city}`
-        .replace(/\s+/g, ' ')
-        .trim();
+    // GÖNDERİCİ TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — arada üç
+    // satıra bölünmüştü, geri alındı): "OffiTec Heating & Cooling, Cores Tower -
+    // Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa SARILMAZ, puntosu küçülür
+    // (`companySenderLine` + `drawFittedSingleLine`) — teklif belgesiyle aynı.
+    const sender = companySenderLine(s);
     doc.setFont(FONT, 'normal');
-    doc.setFontSize(7.5);
     doc.setTextColor(...COLOR_MUTED);
-    doc.text(sender, addrX, y0);
+    drawFittedSingleLine(doc, sender, addrX, y0, addrW, 7.5, 5.8);
     doc.setDrawColor(...COLOR_HAIRLINE);
     doc.setLineWidth(0.2);
     doc.line(addrX, y0 + 1.6, MR, y0 + 1.6);
@@ -722,22 +728,20 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     const nameLines = doc.splitTextToSize(order.supplierName, addrW);
     doc.text(nameLines, addrX, addrY);
     addrY += nameLines.length * 5;
+    // ALICI ADI BURADA DEĞİL KARTTA durur (kullanıcı isteği 2026-08-02, son tur:
+    // "adresin üstünde değil, kartta — Status'ün altında"). Sağ blok yalnızca
+    // firma adı + adrestir.
     // Tedarikçi adresi (snapshot) — firma adının hemen altında, mektup bloğu gibi.
     // Snapshot bileşenlerden kurulmuş EN FAZLA 2 satırdır; burada yalnızca blok
     // genişliğine sığdırılır ve taşarsa 3. satıra izin verilir.
     if (order.supplierAddress) {
         doc.setFont(FONT, 'normal');
         doc.setFontSize(10);
-        const addressLines = fitAddressBlock(doc, order.supplierAddress, addrW);
-        doc.text(addressLines, addrX, addrY);
-        addrY += addressLines.length * 4.9;
+        addrY = drawAddressBlockLines(doc, order.supplierAddress, addrX, addrY, addrW, 10, 4.9);
     }
-    if (order.supplierEmail) {
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(10);
-        doc.text(order.supplierEmail, addrX, addrY);
-        addrY += 4.9;
-    }
+    // ALICI BLOĞUNDA E-POSTA YOKTUR (kullanıcı isteği 2026-08-02): firma adının
+    // altında YALNIZCA adres durur — mektup adresi gibi. Tedarikçinin e-postası
+    // zaten mailin alıcısıdır, belgeye basılmasına gerek yok.
 
     // ── Başlık + kısa kırmızı vurgu + resmî hitap + giriş metni ──────────────
     let yTitle = Math.max(addrY, cardY + cardH) + 16;
@@ -753,11 +757,27 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     doc.setFont(FONT, 'normal');
     doc.setFontSize(10);
     doc.setTextColor(...COLOR_TEXT);
-    doc.text(L.greeting, ML, yTitle);
-    yTitle += 6.4;
-
-    const introLines = doc.splitTextToSize(L.intro, CONTENT_W);
-    doc.text(introLines, ML, yTitle, { lineHeightFactor: 1.35 });
+    // ── ÖN YAZI (ANSCHREIBEN) ────────────────────────────────────────────────
+    // Siparişe kendi metni yazılmışsa hitap + giriş metninin YERİNE o basılır
+    // (satır sonları korunur, boş satır paragraf boşluğu olur). Alan boşsa
+    // buradaki STANDART METİN basılır — varsayılan metin belgede yaşar, kayıtta
+    // değil (kullanıcı isteği 2026-08-02), bu yüzden dil değiştirildiğinde
+    // dokunulmamış siparişler de doğru dilde çıkar.
+    const coverLetter = (order.coverLetter || '').trim();
+    if (coverLetter) {
+        const coverLines = coverLetter
+            .split('\n')
+            .flatMap((line) => (line.trim() ? (doc.splitTextToSize(line, CONTENT_W) as string[]) : ['']))
+            // Kapak sayfası taşmasın: fazlası sessizce kırpılır (uzun metin
+            // zaten ön yazı değil, pozisyon açıklamasıdır).
+            .slice(0, COVER_LETTER_MAX_LINES);
+        doc.text(coverLines, ML, yTitle, { lineHeightFactor: 1.35 });
+    } else {
+        doc.text(L.greeting, ML, yTitle);
+        yTitle += 6.4;
+        const introLines = doc.splitTextToSize(L.intro, CONTENT_W);
+        doc.text(introLines, ML, yTitle, { lineHeightFactor: 1.35 });
+    }
 
     // Kapak sayfasının alt kısmı bilinçli olarak boş bırakılır (kullanıcı isteği):
     // teklifteki footerNote bloğu burada YOKTUR.
@@ -959,7 +979,10 @@ function drawRow(
     if (layout.grossR !== null) {
         drawFittedRight(doc, (item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—', layout.grossR, layout.wGross, baseY, 'normal');
     }
-    drawFittedRight(doc, (item.netPrice || 0) > 0 ? fmtUnitPrice(item.netPrice) : '—', layout.netR, layout.wNet, baseY, 'normal');
+    // Net fiyat sütununda TEDARİKÇİ LİSTESİNDEKİ fiyat görünür (varsa);
+    // tutarlar yine hesabın tam duyarlıklı tabanıyla hesaplanmıştır.
+    const shownNet = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
+    drawFittedRight(doc, shownNet > 0 ? fmtUnitPrice(shownNet) : '—', layout.netR, layout.wNet, baseY, 'normal');
     // İndirim, İndirim 2 ve İndirim 3 aynı sütunda ALT ALTA yazılır.
     const discR = layout.discR;
     if (discR !== null) {
@@ -1035,9 +1058,13 @@ function drawTotals(
         totalRow(label, fmt(Number(fee.amount) || 0));
     }
     if (hasVatRow) {
-        totalRow(L.vat, fmt(order.totalVat || 0));
+        // KDV sipariş düzeyinde tek oransa etikete oran da yazılır ("MwSt 8.1%").
+        const rate = order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : 0;
+        totalRow(rate > 0 ? `${L.vat} ${fmtPercent(rate)}` : L.vat, fmt(order.totalVat || 0));
     }
-    const grandTotal = order.totalNet + feesTotal + (hasVatRow ? (order.totalVat || 0) : 0);
+    // Genel toplam İKİ ONDALIĞA yuvarlanır (kullanıcı isteği 2026-08-02):
+    // bileşenler ayrı ayrı yuvarlansa da toplamları kayan nokta artığı taşıyabilir.
+    const grandTotal = Math.round((order.totalNet + feesTotal + (hasVatRow ? (order.totalVat || 0) : 0)) * 100) / 100;
 
     y += 1;
     const bandH = 12;

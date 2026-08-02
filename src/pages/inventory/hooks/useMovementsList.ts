@@ -11,8 +11,12 @@ export interface MovementColumnFilters {
     description: string;
 }
 
-/** Stok hareketleri sayfası: sunucu sayfalı, genel arama + kolon/tip/tarih filtreleri. */
-export const useMovementsList = () => {
+/**
+ * Stok hareketleri: sunucu sayfalı, genel arama + kolon/tip/tarih filtreleri.
+ * `articleId` verilirse liste tek ürüne daraltılır (ürün detayındaki hareketler
+ * görünümü) — sorgu sunucuda daraltılır, tüm hareketler çekilip elenmez.
+ */
+export const useMovementsList = ({ articleId }: { articleId?: string } = {}) => {
     const [items, setItems] = useState<MovementListItem[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -41,6 +45,7 @@ export const useMovementsList = () => {
             .listMovements({
                 page,
                 pageSize: MOVEMENTS_PAGE_SIZE,
+                articleId,
                 search: debouncedSearch || undefined,
                 code: debouncedFilters.code || undefined,
                 name: debouncedFilters.name || undefined,
@@ -59,7 +64,7 @@ export const useMovementsList = () => {
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [page, debouncedSearch, type, dateFrom, dateTo, debouncedFilters, reloadTick]);
+    }, [articleId, page, debouncedSearch, type, dateFrom, dateTo, debouncedFilters, reloadTick]);
 
     const totalPages = useMemo(() => Math.max(1, Math.ceil(total / MOVEMENTS_PAGE_SIZE)), [total]);
 
