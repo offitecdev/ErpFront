@@ -1,9 +1,13 @@
-import { apiClient } from '../axios';
+import { apiClient, getShared } from '../axios';
 import type {
     InventoryLocation,
     InventoryArticle,
     ArticleStockSummary,
     ArticleStockInfo,
+    ArticleDetail,
+    ArticleDetailStats,
+    ArticleDetailPatch,
+    ArticleSuppliersSummary,
     ArticleListPage,
     ArticleQuickPickPage,
     StockBalanceRow,
@@ -31,10 +35,14 @@ import type {
     PurchaseOrderListPage,
     PurchaseOrderListQuery,
     PurchaseOrderStatus,
+    PurchaseOrderTextTemplate,
+    PurchaseOrderTextTemplatePage,
     CreatePurchaseOrderInput,
     UpdatePurchaseOrderInput,
     SendPurchaseOrderMailInput,
     SendPurchaseOrderMailResult,
+    ReceivePurchaseOrderInput,
+    ReceivePurchaseOrderResult,
 } from '../../types/inventory';
 
 export const inventoryApi = {
@@ -139,6 +147,47 @@ export const inventoryApi = {
         return res.data;
     },
 
+    // Ürün detay ekranının başlık tablosu — yalnızca ekranda görünen alanlar.
+    // Tedarikçiler ve hareketler bu yanıtta YOKTUR; kendi uçlarından, ilgili
+    // düğmeye basıldığında yüklenirler.
+    getArticleDetail: async (id: string): Promise<ArticleDetail> => {
+        const res = await getShared<ArticleDetail>(`/inventory/articles/${id}/detail`);
+        return res.data;
+    },
+
+    // Maliyet ve açık sipariş taraması ana başlığı bloke etmez; id bilindiği
+    // için detay isteğiyle aynı anda başlatılır.
+    getArticleDetailStats: async (id: string): Promise<ArticleDetailStats> => {
+        const res = await getShared<ArticleDetailStats>(`/inventory/articles/${id}/detail-stats`);
+        return res.data;
+    },
+
+    // Görsel JSON/base64 yerine binary gelir. `version` değişmez bir cache key'i
+    // oluşturur; aynı kayıt yeniden açıldığında tarayıcı indirme yapmaz.
+    getArticleImage: async (id: string, version: string): Promise<Blob | null> => {
+        const query = new URLSearchParams({ v: version });
+        const res = await getShared<Blob>(`/inventory/articles/${id}/image?${query.toString()}`, {
+            responseType: 'blob',
+        });
+        return res.status === 204 || !res.data || res.data.size === 0 ? null : res.data;
+    },
+
+    // Tedarikçi popup'ı — yalnızca popup açıldığında çağrılır.
+    getArticleSuppliersSummary: async (id: string): Promise<ArticleSuppliersSummary> => {
+        const res = await apiClient.get(`/inventory/articles/${id}/suppliers-summary`);
+        return res.data;
+    },
+
+    /**
+     * Detay ekranındaki "Kaydet" düğmesinin TEK ucu: alanlar, açıklama ve
+     * görsel aynı istekte gider. `imageUrl` alanı hiç gönderilmezse görsel
+     * değişmez; `null` gönderilirse silinir.
+     */
+    saveArticleDetail: async (articleId: string, patch: ArticleDetailPatch): Promise<ArticleDetail> => {
+        const res = await apiClient.patch(`/inventory/articles/${articleId}/detail`, patch);
+        return res.data;
+    },
+
     searchItems: async (q: string): Promise<SearchItem[]> => {
         const res = await apiClient.get(`/inventory/search-items?q=${encodeURIComponent(q)}`);
         return res.data;
@@ -171,6 +220,7 @@ export const inventoryApi = {
         const query = new URLSearchParams();
         query.set('page', String(params.page ?? 1));
         query.set('pageSize', String(params.pageSize ?? 20));
+        if (params.articleId) query.set('articleId', params.articleId);
         if (params.search) query.set('search', params.search);
         if (params.code) query.set('code', params.code);
         if (params.name) query.set('name', params.name);
@@ -183,9 +233,19 @@ export const inventoryApi = {
     },
 
     // Toplu ürün/malzeme ekleme (tablo / Excel içe aktarımı). Mükerrer kodlar
-    // satır bazında reddedilir. `itemType` ekranın türünü belirtir (PRODUCT/MATERIAL).
-    bulkCreateArticles: async (items: BulkArticleItemInput[], itemType?: ItemType): Promise<BulkArticlesResult> => {
-        const res = await apiClient.post('/inventory/articles/bulk', { items, itemType });
+    // satır bazında reddedilir; `overwrite` ile kodu kayıtlı satır hata yerine
+    // mevcut ürünü GÜNCELLER (dosya kazanır — sipariş Excel aktarımı bunu kullanır).
+    // `itemType` ekranın türünü belirtir (PRODUCT/MATERIAL).
+    bulkCreateArticles: async (
+        items: BulkArticleItemInput[],
+        itemType?: ItemType,
+        options?: { overwrite?: boolean },
+    ): Promise<BulkArticlesResult> => {
+        const res = await apiClient.post('/inventory/articles/bulk', {
+            items,
+            itemType,
+            ...(options?.overwrite ? { overwrite: true } : {}),
+        });
         return res.data;
     },
 
@@ -323,9 +383,17 @@ export const purchaseOrdersApi = {
         return res.data;
     },
 
-    // Elle durum değişikliği (PENDING ↔ TO_BE_STOCKED).
-    setStatus: async (id: string, status: Extract<PurchaseOrderStatus, 'PENDING' | 'TO_BE_STOCKED'>): Promise<PurchaseOrderRow> => {
+    // Elle durum değişikliği — COMPLETED dışındaki durumlar arasında serbest
+    // (COMPLETED yalnızca receive/mark-stocked ile yazılır).
+    setStatus: async (id: string, status: Exclude<PurchaseOrderStatus, 'COMPLETED'>): Promise<PurchaseOrderRow> => {
         const res = await apiClient.patch(`/inventory/purchase-orders/${id}/status`, { status });
+        return res.data;
+    },
+
+    // Mal kabul: satırları stoğa aktarır (tek satır / seçili / complete=tamamı).
+    // Stok hareketi + bakiye + siparişin receivedQuantity alanı tek istekte yazılır.
+    receive: async (id: string, input: ReceivePurchaseOrderInput): Promise<ReceivePurchaseOrderResult> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/receive`, input);
         return res.data;
     },
 
@@ -342,6 +410,31 @@ export const purchaseOrdersApi = {
 
     remove: async (id: string): Promise<void> => {
         await apiClient.delete(`/inventory/purchase-orders/${id}`);
+    },
+
+    // ── Ön yazı (Anschreiben) taslakları — tenant geneli, SAYFALI ───────────
+    // Detay penceresindeki "Taslaklar" listesi 15'erli sayfalar hâlinde gelir:
+    // taslak sayısı büyüdükçe pencere tek seferde her şeyi çekmez.
+    listTextTemplates: async (page = 1, pageSize = 15): Promise<PurchaseOrderTextTemplatePage> => {
+        const res = await apiClient.get(`/inventory/purchase-orders/text-templates?page=${page}&pageSize=${pageSize}`);
+        return res.data;
+    },
+
+    createTextTemplate: async (input: { title: string; content: string }): Promise<PurchaseOrderTextTemplate> => {
+        const res = await apiClient.post('/inventory/purchase-orders/text-templates', input);
+        return res.data;
+    },
+
+    updateTextTemplate: async (
+        templateId: string,
+        patch: { title?: string; content?: string },
+    ): Promise<PurchaseOrderTextTemplate> => {
+        const res = await apiClient.patch(`/inventory/purchase-orders/text-templates/${templateId}`, patch);
+        return res.data;
+    },
+
+    deleteTextTemplate: async (templateId: string): Promise<void> => {
+        await apiClient.delete(`/inventory/purchase-orders/text-templates/${templateId}`);
     },
 };
 

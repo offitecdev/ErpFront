@@ -5,6 +5,7 @@ import { Building03, Check, SearchLg, User01 } from '@/components/icons/antIconC
 import { Modal } from '../../../../components/ui-shared/Modal';
 import { Button } from '../../../../components/ui-shared/Button';
 import { apiClient } from '../../../../lib/axios';
+import { fetchStaffDirectory } from '../../../../lib/api/directory';
 import type { MeetingParticipantType } from '../../../../lib/api/meetings';
 import { employeeName, type EmployeeLite } from '../overviewShared';
 
@@ -77,9 +78,8 @@ export const ParticipantPickerModal: React.FC<ParticipantPickerModalProps> = ({ 
 
     useEffect(() => {
         if (!open || employees.length) return;
-        apiClient
-            .get('/employees', { params: { isActive: true, light: 1 } })
-            .then((res) => setEmployees(asRows<EmployeeLite>(res.data)))
+        fetchStaffDirectory()
+            .then((rows) => setEmployees(rows as EmployeeLite[]))
             .catch(() => setEmployees([]));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);

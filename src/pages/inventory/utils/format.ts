@@ -3,6 +3,29 @@
 export const fmtMoney = (value?: number | null): string =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(Number(value) || 0);
 
+/** Birim maliyet: İsviçre Almancası biçiminde nokta ve tam üç ondalık hane. */
+export const fmtUnitCost = (value?: number | null): string =>
+    new Intl.NumberFormat('de-CH', {
+        style: 'currency',
+        currency: 'CHF',
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+    }).format(Number(value) || 0);
+
+/**
+ * TEDARİKÇİ HESABINDAKİ birim fiyat: satır tutarı sabit kalsın diye fiyat TAM
+ * DUYARLIKLA tutulur (56.93 / 3 = 18.9767). İki haneye yuvarlanmış gösterim
+ * "3 × 18.98 = 56.94" gibi okunur ve tutarla çelişirdi; bu yüzden gereken kadar
+ * (en çok 4) ondalık gösterilir.
+ */
+export const fmtUnitPricePrecise = (value?: number | null): string =>
+    new Intl.NumberFormat('de-CH', {
+        style: 'currency',
+        currency: 'CHF',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+    }).format(Number(value) || 0);
+
 /** Para birimi kolonlu kayıtlar (ör. siparişler) için — geçersiz kodda CHF'ye düşer. */
 export const fmtMoneyIn = (value: number | null | undefined, currency?: string | null): string => {
     try {

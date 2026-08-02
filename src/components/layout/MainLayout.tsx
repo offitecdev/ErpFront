@@ -392,10 +392,6 @@ const MainLayoutInner: React.FC = () => {
     const [notificationsLoading, setNotificationsLoading] = useState(false);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
     const [globalSearch, setGlobalSearch] = useState('');
-    // The header calendar entry is parked while the module is being rebuilt: it
-    // still reacts to hover/focus/click, but the only outcome is the note that
-    // explains why. 'tap' opens are auto-dismissed, 'hover' ones follow the cursor.
-    const [calendarTip, setCalendarTip] = useState<'hover' | 'tap' | null>(null);
     const SIDEBAR_OPEN_STORAGE_KEY = "offitec:sidebar-open";
     const [sidebarPinnedOpen, setSidebarPinnedOpen] = useState(() => {
         if (typeof window === 'undefined') return false;
@@ -641,13 +637,6 @@ const MainLayoutInner: React.FC = () => {
         const moduleKey = moduleForPath(location.pathname);
         if (moduleKey && !isModuleKeyEnabled(moduleKey, enabledModules)) navigate('/');
     }, [location.pathname, navigate, enabledModules]);
-
-    // Tap-opened notes have no pointer to leave, so they time out instead.
-    useEffect(() => {
-        if (calendarTip !== 'tap') return;
-        const timer = window.setTimeout(() => setCalendarTip(null), 2600);
-        return () => window.clearTimeout(timer);
-    }, [calendarTip]);
 
     const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase();
     const unreadNotificationCount = unreadCount;
@@ -974,33 +963,18 @@ const MainLayoutInner: React.FC = () => {
                         <div className="relative mr-1">
                             <button
                                 type="button"
-                                onClick={() => setCalendarTip((tip) => (tip === 'tap' ? null : 'tap'))}
-                                onMouseEnter={() => setCalendarTip((tip) => tip ?? 'hover')}
-                                onMouseLeave={() => setCalendarTip((tip) => (tip === 'hover' ? null : tip))}
-                                onFocus={() => setCalendarTip((tip) => tip ?? 'hover')}
-                                onBlur={() => setCalendarTip(null)}
-                                className="inline-flex h-9 select-none items-center gap-2 rounded-full border border-slate-200/80 bg-slate-100 px-3 text-[13px] font-semibold text-slate-400 shadow-xs transition-colors hover:border-slate-300 hover:bg-slate-200 hover:text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-slate-400"
+                                onClick={() => navigate('/calendar')}
+                                className={`inline-flex h-9 select-none items-center gap-2 rounded-full border px-3 text-[13px] font-semibold shadow-xs transition-colors ${
+                                    location.pathname.startsWith('/calendar')
+                                        ? 'border-[#272f67]/20 bg-[#272f67]/[0.08] text-[#272f67] dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e]'
+                                        : 'border-slate-200/80 bg-slate-100 text-slate-700 hover:border-slate-300 hover:bg-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10'
+                                }`}
                                 aria-label={t('nav.calendar')}
-                                aria-disabled="true"
-                                aria-describedby={calendarTip ? 'calendar-dev-tip' : undefined}
+                                aria-current={location.pathname.startsWith('/calendar') ? 'page' : undefined}
                             >
                                 <CalendarOutlined style={{ fontSize: 16 }} />
                                 <span className="hidden sm:inline">{t('nav.calendar')}</span>
                             </button>
-
-                            {calendarTip && (
-                                <div
-                                    id="calendar-dev-tip"
-                                    role="status"
-                                    className="absolute left-1/2 top-full z-[80] mt-2 w-max max-w-[220px] -translate-x-1/2 rounded-md bg-slate-900 px-2.5 py-1.5 text-center text-[11.5px] font-medium leading-4 text-white shadow-lg animate-in fade-in duration-150 dark:bg-black"
-                                >
-                                    <span
-                                        aria-hidden="true"
-                                        className="absolute -top-1 left-1/2 size-2 -translate-x-1/2 rotate-45 bg-slate-900 dark:bg-black"
-                                    />
-                                    {t('nav.calendarUnderDevelopment')}
-                                </div>
-                            )}
                         </div>
 
                         <button

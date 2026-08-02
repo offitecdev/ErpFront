@@ -2,7 +2,7 @@
 // API/veri tipleri src/types/inventory.ts içinde yaşar; burada yalnızca
 // sayfaların ve bileşenlerin kendi satır/sihirbaz modelleri tutulur.
 
-import type { ItemType } from '@/types/inventory';
+import type { ItemType, OrderCalcMode } from '@/types/inventory';
 
 /**
  * Sipariş oluşturma/düzenleme tablosundaki tek taslak satır. Tedarikçi satırda
@@ -26,17 +26,90 @@ export interface DraftOrderRow {
     unit: string;
     quantity: string;
     /**
-     * BRÜT birim fiyat — satırın TEK fiyat girişi. İndirimler bunun üzerine iner;
-     * net birim fiyat ve satır tutarı `computeOrderLine` ile TÜRETİLİR (bu yüzden
-     * taslakta `netPrice` YOKTUR — iki fiyat birbiriyle çelişemesin).
+     * BRÜT birim fiyat — NORMAL kipte satırın TEK fiyat girişi. İndirimler bunun
+     * üzerine iner; net birim fiyat ve satır tutarı `computeOrderLine` ile
+     * TÜRETİLİR. "Doğrudan kopyala" kipinde ise türetme yoktur: aşağıdaki
+     * `netPrice` ve `lineTotal` da elle girilir / dosyadan olduğu gibi gelir.
      */
     grossPrice: string;
-    /** Sıralı indirim yüzdeleri — 2 ve 3 yalnızca kullanıcı açtıysa görünür. */
+    /**
+     * DOĞRUDAN KOPYALA kipinin alanları (kullanıcı isteği 2026-07-31). Normal
+     * kipte ikisi de BOŞ kalır ve kullanılmaz — net fiyat ile satır tutarı
+     * indirimlerden türetilir. Kip açıkken hücreler düzenlenebilir olur ve buraya
+     * yazılan değerler hiçbir hesaba sokulmadan kaydedilir.
+     */
+    netPrice: string;
+    /**
+     * TEDARIKCI kipinde carpimin TAM DUYARLIKLI tabani. `netPrice` ekranda
+     * Excel'deki fiyati gosterir (18.98); tutar ise belgedeki tutardan turetilen
+     * bu tabanla hesaplanir (56.93 / 3 = 18.9766…) — Excel'in kendi yuvarlamasi
+     * ikisini ayirabilir. Bos ise `netPrice` taban kabul edilir.
+     */
+    supplierUnitBase?: string;
+    lineTotal: string;
+    /**
+     * Sıralı indirim yüzdeleri: ana indirim + TEK ek indirim (kullanıcı isteği
+     * 2026-08-02 — "İndirim 3" kaldırıldı). Eski kayıtlardaki üçüncü indirim
+     * yüklenirken ek indirime KATLANIR (tutar korunur), API alanı 0 gider.
+     */
     discount: string;
     discount2: string;
-    discount3: string;
     /** Satır KDV oranı (%) — başlıktan ülkeye göre seçilir. */
     vatRate: string;
+    /**
+     * SATIRIN hesap kipi (kullanıcı isteği 2026-08-02 — satır satır çalışma):
+     * DIRECT (varsayılan) / AUTO / SUPPLIER. Üstteki kip anahtarı SEÇİLİ
+     * satırlara uygular (seçim yoksa yalnızca varsayılanı değiştirir — liste
+     * karışık kipler taşıyabilir); kayıt satır başına saklanır.
+     */
+    calcMode: OrderCalcMode;
+    /**
+     * SATIRA ÖZGÜ seçim (kullanıcı isteği 2026-08-02): satırın sağındaki daire
+     * BOŞ başlar; tıklandıkça D → A → T → boş döngüsüyle satıra ÖZGÜ kip
+     * seçilir. `true` iken toplu (tablo geneli) kip değişimleri bu satırı
+     * ETKİLEMEZ; boşken satır toplu ayarı izler.
+     */
+    modePinned: boolean;
+    /**
+     * Kip DEĞİŞTİRİLİRKEN terk edilen kipin elle girilmiş/sabit değerleri
+     * (net fiyat + satır tutarı) buraya saklanır; aynı kipe GERİ dönüldüğünde
+     * satır ÖNCEKİ hâline döner (kullanıcı isteği 2026-08-02: AUTO'ya girip
+     * çıkmak DIRECT/SUPPLIER değerlerini ezmemeli). AUTO saklanmaz — girdileri
+     * (brüt fiyat + indirimler) zaten satırda durur.
+     */
+    modeStash?: Partial<Record<'DIRECT' | 'SUPPLIER', {
+        netPrice: string;
+        lineTotal: string;
+        /** Tedarikci kipinin tam duyarlikli carpim tabani (varsa). */
+        base?: string;
+        /**
+         * Tutarın YAKALANDIĞI miktar. Birim fiyat tutardan türetilirken bu
+         * kullanılır (tutar / o günkü miktar): aradan miktar değişmişse güncel
+         * miktara bölmek yanlış birim fiyat verirdi.
+         */
+        quantity: string;
+    }>>;
+    /**
+     * SATIRIN İLK (ÖZGÜN) FİYATI — Excel'den içe aktarıldığı ya da kayıttan
+     * yüklendiği andaki hâli. Fiyat kutusunun yanındaki GERİ ÇAĞIR düğmesi
+     * satırı bu değerlere döndürür: kipler arasında gidip gelirken fiyat
+     * değiştiğinde özgün hâle tek tıkla dönülür (kullanıcı isteği 2026-08-02).
+     */
+    origin?: {
+        grossPrice: string;
+        netPrice: string;
+        lineTotal: string;
+        discount: string;
+        discount2: string;
+        calcMode: OrderCalcMode;
+    };
+    /**
+     * MAL KABUL durumu — tabloda sütunu yoktur; mevcut sipariş düzenlenirken
+     * yüklenir ve AYNEN geri gönderilir ki bir düzenleme, satırın stoğa
+     * aktarılmış miktarını sıfırlamasın (receive endpoint'i yazar).
+     */
+    receivedQuantity: number;
+    receivedAt: string | null;
     error?: string | null;
 }
 

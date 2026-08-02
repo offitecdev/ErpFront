@@ -1,6 +1,6 @@
 import { t } from '@/i18n/translate';
 import type { PurchaseOrderRow } from '@/types/inventory';
-import { orderGrandTotal } from './orderPricing';
+import { foldedExtraDiscount, itemDisplayNetPrice, orderGrandTotal } from './orderPricing';
 
 /**
  * Sipariş → Excel dışa aktarımı. `xlsx` yalnızca burada ve içe aktarma
@@ -8,8 +8,9 @@ import { orderGrandTotal } from './orderPricing';
  *
  * Kolonlar sipariş tablosuyla (OrderSheet kalem tablosu / PDF) AYNI SIRADADIR:
  * Ürün / Malzeme · Seri Kod · Miktar · Brüt Fiyat · Net Fiyat · İndirim ·
- * İndirim 2 · İndirim 3 · KDV · Toplam. "Seri No" sütunu YOKTUR (kullanıcı
- * isteği).
+ * İndirim 2 · KDV · Toplam. "Seri No" sütunu YOKTUR (kullanıcı isteği);
+ * "İndirim 3" de kaldırıldı (2026-08-02) — eski kayıtların üçüncü indirimi
+ * İndirim 2 sütununa katlanarak yazılır.
  *
  * ⚠ İNDİRİM VE KDV SÜTUNLARI HER ZAMAN YAZILIR (kullanıcı isteği 2026-07-30).
  * Eskiden yalnızca kayıtta sıfırdan büyük bir değer varsa yazılırlardı; kayıt
@@ -24,7 +25,13 @@ import { orderGrandTotal } from './orderPricing';
 export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> => {
     const XLSX = await import('xlsx');
 
-    const showVat = order.items.some((item) => (item.vatRate ?? 0) > 0);
+    // KDV artık SİPARİŞ DÜZEYİNDEDİR (tek oran, genel toplam üzerinden). Dosya
+    // aynı zamanda içe aktarma şablonu olduğu için oran satır sütununa da
+    // yazılır: geri aktarıldığında ilk dolu oran yine siparişin oranı olur.
+    const orderVatRate = order.vatMode === 'TOTAL' ? (order.orderVatRate ?? 0) : 0;
+    const lineVatRate = (item: PurchaseOrderRow['items'][number]) =>
+        (orderVatRate > 0 ? orderVatRate : (item.vatRate ?? 0));
+    const showVat = (order.totalVat ?? 0) > 0 || orderVatRate > 0 || order.items.some((item) => (item.vatRate ?? 0) > 0);
     const fees = order.additionalFees ?? [];
 
     // Yüzde sütunları SAYI olarak yazılır (10 = %10); başlığa "(%)" eklenir ki
@@ -39,8 +46,11 @@ export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> =
         t('inv.orders.columns.grossPrice'),
         t('inv.orders.columns.netPrice'),
         percentLabel(t('inv.orders.columns.discount')),
+        // TEK ek indirim sütunu (kullanıcı isteği 2026-08-02 — "İndirim 3"
+        // kaldırıldı). Eski kayıtların üçüncü indirimi buraya KATLANIR ki
+        // dosyadaki yüzde satır tutarıyla tutarlı kalsın ve geri içe
+        // aktarıldığında aynı tutarı üretsin.
         percentLabel(t('inv.orders.columns.discount2')),
-        percentLabel(t('inv.orders.columns.discount3')),
         percentLabel(t('inv.orders.columns.vat')),
         t('inv.columns.total'),
     ];
@@ -50,11 +60,10 @@ export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> =
         item.code || '',
         item.quantity,
         item.grossPrice,
-        item.netPrice,
+        itemDisplayNetPrice(item),
         item.discount ?? 0,
-        item.discount2 ?? 0,
-        item.discount3 ?? 0,
-        item.vatRate ?? 0,
+        parseFloat(foldedExtraDiscount(item) || '0'),
+        lineVatRate(item),
         item.lineTotal,
     ]);
 
@@ -81,7 +90,15 @@ export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> =
         totalRow(t('inv.orders.totalNet'), order.totalNet),
         // Ek ücretler: net toplamın altında adıyla ve tutarıyla tek tek.
         ...fees.map((fee) => totalRow(fee.name, fee.amount)),
-        ...(showVat ? [totalRow(t('inv.orders.columns.vat'), order.totalVat ?? 0)] : []),
+        // KDV satırı: oran biliniyorsa etikete yazılır ("KDV 8.1%").
+        ...(showVat
+            ? [totalRow(
+                orderVatRate > 0
+                    ? `${t('inv.orders.columns.vat')} ${orderVatRate}%`
+                    : t('inv.orders.columns.vat'),
+                order.totalVat ?? 0,
+            )]
+            : []),
         // Genel toplam yalnızca net toplamdan farklıysa — ekrandaki tabloyla aynı kural.
         ...(showVat || fees.length > 0
             ? [totalRow(t('inv.orders.grandTotal'), orderGrandTotal(order))]
@@ -89,15 +106,15 @@ export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> =
     ];
 
     const sheet = XLSX.utils.aoa_to_sheet(rows);
-    // Genişlikler başlık sırasıyla: ad, kod, miktar, brüt, net, dört yüzde
-    // sütunu (indirim 1-3 + KDV), toplam.
+    // Genişlikler başlık sırasıyla: ad, kod, miktar, brüt, net, üç yüzde
+    // sütunu (indirim, indirim 2, KDV), toplam.
     sheet['!cols'] = [
         { wch: 40 },
         { wch: 16 },
         { wch: 10 },
         { wch: 12 },
         { wch: 12 },
-        ...Array.from({ length: 4 }, () => ({ wch: 12 })),
+        ...Array.from({ length: 3 }, () => ({ wch: 12 })),
         { wch: 14 },
     ];
     const book = XLSX.utils.book_new();

@@ -4,6 +4,7 @@ import { inventoryApi } from '../lib/api/inventory';
 import type {
     TenderListItem,
     TenderDetailDto,
+    TenderPdfContentDto,
     TenderSummaryReport,
     CostInput,
     ArticleDto,
@@ -27,6 +28,7 @@ interface TenderState {
     detail: TenderDetailDto | null;
     loadingDetail: boolean;
     fetchDetail: (id: string, silent?: boolean) => Promise<void>;
+    ensurePdfContent: (id: string) => Promise<TenderPdfContentDto>;
 
     summary: TenderSummaryReport | null;
     loadingSummary: boolean;
@@ -86,6 +88,8 @@ let stockArticlesRequest: Promise<void> | null = null;
 let stockArticlesRequestHasImages = false;
 let detailRequestId: string | null = null;
 let detailRequest: Promise<void> | null = null;
+let pdfContentRequestId: string | null = null;
+let pdfContentRequest: Promise<TenderPdfContentDto> | null = null;
 
 export const useTenderStore = create<TenderState>((set, get) => ({
     list: [],
@@ -140,8 +144,35 @@ export const useTenderStore = create<TenderState>((set, get) => ({
             // tender detail (they were several MB of base64 and only ever needed
             // for the PDF) — they are fetched on demand at PDF-generation time.
             detailRequestId = id;
-            detailRequest = tenderApi.getById(id, { includeImages: false }).then((detail) => {
-                set({ detail });
+            detailRequest = tenderApi.getById(id, {
+                includeImages: false,
+                includeActivities: false,
+                deferOrderPdfContent: true,
+            }).then((detail) => {
+                set((state) => {
+                    const current = state.detail;
+                    // A silent background refresh must not throw away PDF content
+                    // that was already loaded on demand for the same order.
+                    if (
+                        detail.tender.pdfContentDeferred
+                        && current?.tender.id === detail.tender.id
+                        && current.tender.pdfContentDeferred === false
+                    ) {
+                        return {
+                            detail: {
+                                ...detail,
+                                tender: {
+                                    ...detail.tender,
+                                    coverLetter: current.tender.coverLetter,
+                                    closingNote: current.tender.closingNote,
+                                    closingImages: current.tender.closingImages,
+                                    pdfContentDeferred: false,
+                                },
+                            },
+                        };
+                    }
+                    return { detail };
+                });
             });
             await detailRequest;
         } finally {
@@ -150,6 +181,44 @@ export const useTenderStore = create<TenderState>((set, get) => ({
                 detailRequest = null;
             }
             if (!silent) set({ loadingDetail: false });
+        }
+    },
+    ensurePdfContent: async (id) => {
+        const current = get().detail;
+        if (current?.tender.id === id && !current.tender.pdfContentDeferred) {
+            return {
+                coverLetter: current.tender.coverLetter,
+                closingNote: current.tender.closingNote,
+                closingImages: current.tender.closingImages,
+            };
+        }
+        if (pdfContentRequestId === id && pdfContentRequest) return pdfContentRequest;
+
+        pdfContentRequestId = id;
+        pdfContentRequest = tenderApi.getPdfContent(id).then((content) => {
+            set((state) => {
+                if (state.detail?.tender.id !== id) return {};
+                return {
+                    detail: {
+                        ...state.detail,
+                        tender: {
+                            ...state.detail.tender,
+                            ...content,
+                            pdfContentDeferred: false,
+                        },
+                    },
+                };
+            });
+            return content;
+        });
+
+        try {
+            return await pdfContentRequest;
+        } finally {
+            if (pdfContentRequestId === id) {
+                pdfContentRequestId = null;
+                pdfContentRequest = null;
+            }
         }
     },
 

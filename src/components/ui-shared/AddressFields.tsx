@@ -24,18 +24,35 @@ const AddressField = ({ label, children, className = '' }: { label: string; chil
  * Adres giriş bileşenleri: sokak + bina no, adres eki / daire, PLZ, şehir,
  * eyalet, ülke. İki kolonluk bir ızgara döndürür — çağıran onu kendi form
  * ızgarasının içine tam genişlikte (`col-span-2` / `col-span-3`) yerleştirir.
+ *
+ * `fields` verilirse YALNIZCA o bileşenler çizilir (kullanıcı isteği 2026-08-02:
+ * tedarikçi kaydında sokak + PLZ + şehir DIŞINDA alan istenmiyor). Gizlenen
+ * bileşenler forma yüklenmeye ve kaydetmede geri gönderilmeye DEVAM EDER —
+ * alanı gizlemek eski kayıttaki değeri SİLMEZ.
+ *
+ * `labels` tek tek etiketleri değiştirir. Uygulamanın genel kuralı "Adres diye
+ * TEK bir alan yoktur" olduğu için varsayılan sokak etiketi "Strasse / Nr."dir;
+ * TEDARİKÇİ formunda kullanıcı 2026-08-02'de bunun yerine düpedüz "Adresse"
+ * istedi (Adresse / PLZ / Stadt). Kural yalnızca o çağrı için gevşetilir; CRM ve
+ * teklif formları bileşen etiketlerini korur.
  */
 export const AddressFields = ({
     value,
     onChange,
     inputClassName = DEFAULT_INPUT_CLASS,
     disabled = false,
+    fields,
+    labels,
 }: {
     value: AddressFormValue;
     onChange: (next: AddressFormValue) => void;
     inputClassName?: string;
     disabled?: boolean;
+    fields?: Array<keyof AddressFormValue>;
+    labels?: Partial<Record<keyof AddressFormValue, string>>;
 }) => {
+    const shows = (key: keyof AddressFormValue) => !fields || fields.includes(key);
+    const label = (key: keyof AddressFormValue, fallback: string) => labels?.[key] ?? fallback;
     const input = (key: keyof AddressFormValue) => (
         <input
             value={value[key]}
@@ -47,12 +64,12 @@ export const AddressFields = ({
 
     return (
         <div className="grid gap-3.5 sm:grid-cols-2">
-            <AddressField label={t('address.street')} className="sm:col-span-2">{input('address')}</AddressField>
-            <AddressField label={t('address.supplement')} className="sm:col-span-2">{input('addressSupplement')}</AddressField>
-            <AddressField label={t('address.postalCode')}>{input('postalCode')}</AddressField>
-            <AddressField label={t('address.city')}>{input('city')}</AddressField>
-            <AddressField label={t('address.state')}>{input('state')}</AddressField>
-            <AddressField label={t('address.country')}>{input('country')}</AddressField>
+            {shows('address') && <AddressField label={label('address', t('address.street'))} className="sm:col-span-2">{input('address')}</AddressField>}
+            {shows('addressSupplement') && <AddressField label={label('addressSupplement', t('address.supplement'))} className="sm:col-span-2">{input('addressSupplement')}</AddressField>}
+            {shows('postalCode') && <AddressField label={label('postalCode', t('address.postalCode'))}>{input('postalCode')}</AddressField>}
+            {shows('city') && <AddressField label={label('city', t('address.city'))}>{input('city')}</AddressField>}
+            {shows('state') && <AddressField label={label('state', t('address.state'))}>{input('state')}</AddressField>}
+            {shows('country') && <AddressField label={label('country', t('address.country'))}>{input('country')}</AddressField>}
         </div>
     );
 };

@@ -6,5 +6,10 @@ import { ArticleListView } from './components/ArticleListView';
  * ve metin anahtarları. "Ürün Ekle" ayrı bir tam sayfaya götürür.
  */
 export const ProductsPage = () => (
-    <ArticleListView itemType="PRODUCT" copyPrefix="inv.products" createPath="/inventory/articles/new" />
+    <ArticleListView
+        itemType="PRODUCT"
+        copyPrefix="inv.products"
+        createPath="/inventory/articles/new"
+        detailPath="/inventory/articles"
+    />
 );

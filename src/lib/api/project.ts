@@ -53,14 +53,18 @@ export interface ServiceReportDto {
     overtimeMinutes: number;
     overtimeHourlyRate: number;
     overtimeCost: number;
-    operationsDone: string;
-    technicalNotes?: string | null;
-    customerSignature?: string | null;
     isSigned: boolean;
     hoursApprovedAt?: string | null;
     autoApproved?: boolean;
     project?: { id: string; projectName: string; customer?: { id: string; companyName: string } | null } | null;
     salesOrder?: { id: string; orderNumber: string } | null;
+    // BERICHTSINHALT — NICHT in der Listenantwort (`listAllReports`). Diese
+    // Felder stehen nur am vollen Bericht, den `projectApi.getById(projectId)`
+    // unter `project.reports` mitliefert; genau von dort holt sie die
+    // PDF-Erzeugung. Die Listentabellen zeichnen keines davon.
+    operationsDone?: string;
+    technicalNotes?: string | null;
+    customerSignature?: string | null;
     appointment?: { id: string; startTime: string; endTime: string } | null;
     employee?: { id: string; firstName: string; lastName: string; email: string } | null;
     images?: { id: string }[];
@@ -79,6 +83,22 @@ export type CompleteInstallationInput = {
     images?: string[];
 };
 
+export interface ProjectPickerDto {
+    id: string;
+    projectName: string;
+    status: string;
+    customerId?: string | null;
+    customer?: { id: string; companyName: string } | null;
+    salesOrders: Array<{
+        id: string;
+        orderNumber: string;
+        status: string;
+        orderType?: string | null;
+        parentSalesOrderId?: string | null;
+        totalAmount?: number | null;
+    }>;
+}
+
 export const projectApi = {
     list: async (filter: { status?: ProjectStatus | ''; search?: string } = {}): Promise<ProjectDto[]> => {
         const params = new URLSearchParams();
@@ -86,6 +106,17 @@ export const projectApi = {
         if (filter.search) params.set('search', filter.search);
         const res = await apiClient.get(`/projects${params.toString() ? '?' + params : ''}`);
         return res.data;
+    },
+
+    // Yalın seçim listesi (takvim sihirbazı): proje + sipariş başlıkları.
+    // `take` seçim kutusu için ilk N satırı ister; "tümünü gör" take'siz çağırır.
+    // Zaman aşımı: asılı bir istek sihirbazı sonsuz "yükleniyor"da bırakmasın.
+    listPicker: async (customerId?: string, take?: number): Promise<ProjectPickerDto[]> => {
+        const res = await apiClient.get('/projects', {
+            params: { view: 'picker', ...(customerId ? { customerId } : {}), ...(take ? { take } : {}) },
+            timeout: 15000,
+        });
+        return Array.isArray(res.data) ? res.data : [];
     },
 
     getById: async (id: string, view?: ProjectDetailScope): Promise<ProjectDto> => {
@@ -289,12 +320,12 @@ export const projectApi = {
         return res.data;
     },
 
-    createAppointment: async (id: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string }) => {
+    createAppointment: async (id: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string; ccEmails?: string[] }) => {
         const res = await apiClient.post(`/projects/${id}/appointments`, input);
         return res.data;
     },
 
-    updateAppointment: async (appointmentId: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string }) => {
+    updateAppointment: async (appointmentId: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string; ccEmails?: string[] }) => {
         const res = await apiClient.patch(`/projects/appointments/${appointmentId}`, input);
         return res.data;
     },
@@ -407,7 +438,7 @@ export const mailApi = {
         return res.data;
     },
 
-    send: async (input: { fromEmail?: string; fromName?: string; to: string; subject: string; text?: string; html?: string; attachments?: Array<{ filename: string; contentType: string; contentBase64: string }> }) => {
+    send: async (input: { fromEmail?: string; fromName?: string; to: string; cc?: string[]; subject: string; text?: string; html?: string; attachments?: Array<{ filename: string; contentType: string; contentBase64: string }> }) => {
         const res = await apiClient.post('/mail/send', input);
         return res.data;
     },
@@ -480,9 +511,13 @@ export interface DeliveryReportDto {
     employeeId: string | null;
     checklistTemplateId: string | null;
     checklistName: string | null;
-    responses: DeliveryResponseItem[];
-    notes: string | null;
-    customerSignature: string | null;
+    // BERICHTSINHALT — nur im Detailsatz (`getOne`). Die Liste lässt diese drei
+    // weg: `responses` ist die Checklisten-Tabelle des PDFs und
+    // `customerSignature` ein base64-Bild, beides pro Zeile schnell sehr groß.
+    // Wer sie braucht (PDF-Erzeugung), holt den Bericht einzeln nach.
+    responses?: DeliveryResponseItem[];
+    notes?: string | null;
+    customerSignature?: string | null;
     isSigned: boolean;
     signedAt: string | null;
     sentAt: string | null;

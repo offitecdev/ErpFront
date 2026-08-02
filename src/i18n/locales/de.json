@@ -88,7 +88,6 @@
     "nav": {
         "home": "Startseite",
         "calendar": "Kalender",
-        "calendarUnderDevelopment": "Der Kalender ist in Entwicklung.",
         "attendance": "Zeiterfassung",
         "personnel": "Personal",
         "employeeList": "Mitarbeiterliste",

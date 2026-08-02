@@ -28,6 +28,8 @@ export interface TenderListItem {
     priceList?: string | null;
     paymentTerms?: string | null;
     commissionNumber?: string | null;
+    // Kundenreferenz — the customer-supplied reference ("Referenz" on the PDF).
+    customerReference?: string | null;
     // Currency the offer is denominated in (CHF/EUR/USD/GBP/TRY); symbol-only.
     currency?: string | null;
     // Document-level direct discount (%) applied to the net total.
@@ -55,6 +57,8 @@ export interface TenderListItem {
     closingNote?: string | null;
     /** JSON array of data URIs — several images may close the document. */
     closingImages?: string | null;
+    /** Heavy PDF-only fields were omitted from the initial read-only order load. */
+    pdfContentDeferred?: boolean;
     sourceStatus?: string | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;
@@ -145,6 +149,20 @@ export interface TenderMailDraftDto {
     tenantId: string;
     subject: string;
     message: string | null;
+    createdBy?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+// Tenant-wide reusable intro-text template (Textbaustein) for the offer's
+// Einleitungstext. `isDefault` marks the one pre-filled into new offers.
+export interface TenderTextTemplateDto {
+    id: string;
+    tenantId: string;
+    title: string;
+    /** Rich HTML (bold / italic / bullet lists) — same dialect as coverLetter. */
+    content: string | null;
+    isDefault: boolean;
     createdBy?: string | null;
     createdAt: string;
     updatedAt: string;
@@ -252,6 +270,12 @@ export interface TenderDetailDto {
     tender: TenderListItem;
     positions: PositionDto[];
     activities?: TenderActivity[];
+}
+
+export interface TenderPdfContentDto {
+    coverLetter?: string | null;
+    closingNote?: string | null;
+    closingImages?: string | null;
 }
 
 export interface FinancialSummary {

@@ -27,8 +27,9 @@ export const useArticlesList = (itemType: ItemType) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Durum (aktif/pasif) filtresi kaldırıldı — ürün ve malzemelerde aktiflik
+    // kavramı yok (bkz. ArticleListView).
     const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
     const [filters, setFilters] = useState<ProductColumnFilters>({ code: '', name: '' });
     const [sort, setSort] = useState<ProductSort>({ by: 'createdAt', direction: 'desc' });
 
@@ -36,7 +37,7 @@ export const useArticlesList = (itemType: ItemType) => {
     const debouncedFilters = useDebouncedValue(filters);
 
     // Filtre/arama değişince ilk sayfaya dön.
-    useEffect(() => { setPage(1); }, [itemType, debouncedSearch, status, debouncedFilters]);
+    useEffect(() => { setPage(1); }, [itemType, debouncedSearch, debouncedFilters]);
 
     const [reloadTick, setReloadTick] = useState(0);
     const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
@@ -50,7 +51,6 @@ export const useArticlesList = (itemType: ItemType) => {
                 page,
                 pageSize: PRODUCTS_PAGE_SIZE,
                 search: debouncedSearch || undefined,
-                status: status || undefined,
                 itemType,
                 code: debouncedFilters.code || undefined,
                 name: debouncedFilters.name || undefined,
@@ -67,7 +67,7 @@ export const useArticlesList = (itemType: ItemType) => {
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [itemType, page, debouncedSearch, status, debouncedFilters, sort, reloadTick]);
+    }, [itemType, page, debouncedSearch, debouncedFilters, sort, reloadTick]);
 
     const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PRODUCTS_PAGE_SIZE)), [total]);
 
@@ -79,7 +79,7 @@ export const useArticlesList = (itemType: ItemType) => {
 
     return {
         items, total, totalPages, page, setPage, loading, error,
-        search, setSearch, status, setStatus, filters, setFilters,
+        search, setSearch, filters, setFilters,
         sort, toggleSort, reload,
     };
 };

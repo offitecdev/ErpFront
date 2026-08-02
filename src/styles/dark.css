@@ -976,3 +976,11 @@ html.dark body,
   background: var(--ofi-d-surface);
   border-bottom-color: var(--ofi-d-border);
 }
+
+/* ── Unified calendar chips ── */
+.dark .ofi-ucal-chip--planned { background: #23307f; border-left-color: #f0a83c; color: #fff; }
+.dark .ofi-ucal-chip--done { background: #0c8a60; color: #eafff6; }
+.dark .ofi-ucal-chip--cancelled { background: rgba(255, 255, 255, 0.07); border-left-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.4); }
+.dark .ofi-ucal-chip--meeting { background: #5d4bc4; color: #f1eeff; }
+.dark .ofi-ucal-chip--maintenance { background: #9a4a08; color: #ffedd7; }
+.dark .ofi-ucal-slot:hover { background: rgba(230, 207, 158, 0.1); }

@@ -8,6 +8,7 @@ import defaultLetterheadUrl from '../../assets/docs/sablon.pdf?url';
 import { usePdfSettingsStore, type PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
 import { localizeTenderNumber } from '../tenderNumber';
+import { companySenderLine } from './addressBlock';
 
 type ReportKind = 'daily' | 'general';
 
@@ -459,8 +460,7 @@ const drawCoverHeader = (
     doc.setFont(FONT, 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(...COLOR_NAVY);
-    const sender = `${settings.companyName} - ${settings.addressLine1} ${settings.addressLine2}, ${settings.postalCode} ${settings.city}`
-        .replace(/\s+/g, ' ').trim();
+    const sender = companySenderLine(settings);
     const senderLines = doc.splitTextToSize(sender, rW);
     doc.text(senderLines, rX, rYy + 3);
     rYy += senderLines.length * 4.6 + 5;

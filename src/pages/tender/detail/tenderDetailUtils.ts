@@ -353,6 +353,10 @@ export const flattenTenderTreeForPdf = (tree: TreeNode[]) => {
             const displayLabel = nextDisplayLabel(n);
             flatTree.push({
                 rowKey: n.id,
+                // The bare position id, kept next to `rowKey` because subtotal
+                // rows below get a synthetic `rowKey` that is NOT a position id.
+                // The PDF image fetch looks rows up by this id.
+                id: n.id,
                 sourceArticleId: (n as any).sourceArticleId ?? null,
                 shortDescription: displayLabel ? `${displayLabel} ${n.shortDescription}` : n.shortDescription,
                 longDescription: n.longDescription,

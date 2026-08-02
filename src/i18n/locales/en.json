@@ -88,7 +88,6 @@
     "nav": {
         "home": "Home",
         "calendar": "Calendar",
-        "calendarUnderDevelopment": "The calendar is under development.",
         "attendance": "Attendance",
         "personnel": "Personnel",
         "employeeList": "Employee List",

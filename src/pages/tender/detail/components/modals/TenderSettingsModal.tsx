@@ -24,6 +24,7 @@ import type { ProjectMaterial } from '@/types/project';
 import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
 import { parseClosingImages } from '../../utils/tenderProduct.utils';
+import { attachPdfPositionImages } from '../../utils/tenderPdfImages.utils';
 import { localizeTenderNumber } from '@/utils/tenderNumber';
 import {
     flattenTenderTreeForPdf,
@@ -62,7 +63,7 @@ type TenderSettingsModalProps = {
 };
 
 export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, onClose, tenderId, tree, grandTotal, pdfTotals, initialTab = 'mail', inline = false, hideTabs = false, overtimeHourlyRate, onOvertimeHourlyRateChange, onChanged }) => {
-    const { detail, activities } = useTenderStore();
+    const { detail, activities, ensurePdfContent } = useTenderStore();
     // Prices in the modal (position list, material costs) follow the offer's currency.
     const fmtMoney = useMoneyFormat();
     const { user } = useAuthStore();
@@ -218,9 +219,17 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
             // Eski (klasik) şablon — geri dönmek için bu satırı aç:
             // const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdf');
             const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdfModern');
+            const [positions, pdfContent] = await Promise.all([
+                attachPdfPositionImages(tenderId, flattenTenderTreeForPdf(tree)),
+                ensurePdfContent(tenderId),
+            ]);
             const pdfBytes = await buildTenderPdfBytes({
                 tenderNumber: detail.tender.tenderNumber,
                 version: detail.tender.version,
+                // Mail eki, dışa aktarılan PDF ile aynı belge olmalı — Kommission
+                // ve Referenz dahil.
+                commission: detail.tender.commissionNumber,
+                customerReference: detail.tender.customerReference,
                 createdAt: detail.tender.createdAt,
                 validUntil: detail.tender.validUntil,
                 customerName: detail.tender.customerName || '',
@@ -229,13 +238,13 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 customerPhone: detail.tender.customerPhone,
                 createdByName: detail.tender.createdByName,
                 activities,
-                positions: flattenTenderTreeForPdf(tree),
+                positions,
                 grandTotal,
                 totals: pdfTotals ?? null,
                 // The mailed PDF must be the same document as the exported one.
-                coverLetter: detail.tender.coverLetter,
-                closingNote: detail.tender.closingNote,
-                closingImages: parseClosingImages(detail.tender.closingImages),
+                coverLetter: pdfContent.coverLetter,
+                closingNote: pdfContent.closingNote,
+                closingImages: parseClosingImages(pdfContent.closingImages),
             }, { ...settings, currency: toCurrencyCode((detail.tender as { currency?: string | null }).currency) });
             const res = await tenderApi.sendOfferMail(tenderId, {
                 ...form,

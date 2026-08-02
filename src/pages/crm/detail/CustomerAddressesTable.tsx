@@ -6,7 +6,6 @@ import { t as i18nT } from '@/i18n/translate';
 import { customerApi } from '../../../lib/api/customer';
 import type { CustomerLocationDto } from '../../../lib/api/customer';
 import { Button } from '../../../components/ui-shared/Button';
-import { AddressLines } from '../../../components/ui-shared/AddressFields';
 import { CELL_INPUT_CLASS, SectionCard } from '../../../components/ui-shared/TableKit';
 import { ADDRESS_KIND_OPTIONS, DEFAULT_ADDRESS_KIND, normalizeAddressKind } from './customerDetail.constants';
 import type { AddressKind } from './customerDetail.constants';
@@ -195,9 +194,11 @@ export const CustomerAddressesTable = ({
                     <tr className="bg-slate-100/70 text-slate-500 dark:bg-white/[0.04] dark:text-white/55">
                         <td className="font-semibold">{i18nT('crm.locationPrimary')}</td>
                         <td>{mainAddress.addressName || '—'}</td>
-                        <td colSpan={3}>
-                            <AddressLines value={mainAddress} maxChars={72} emptyText={i18nT('address.empty')} />
-                        </td>
+                        {/* Adresse / PLZ / Stadt in den eigenen Spalten — wie die Zeilen
+                            darunter und wie im Kundenprofil: genau diese drei Einträge. */}
+                        <td>{mainAddress.address || '—'}</td>
+                        <td>{mainAddress.postalCode || '—'}</td>
+                        <td>{mainAddress.city || '—'}</td>
                         <td className="text-right text-[11.5px] uppercase tracking-wide">{i18nT('common.readOnly')}</td>
                     </tr>
 

@@ -6,5 +6,10 @@ import { ArticleListView } from './components/ArticleListView';
  * girer, kod kolonu "Malzeme Kodu" olarak adlandırılır.
  */
 export const MaterialsPage = () => (
-    <ArticleListView itemType="MATERIAL" copyPrefix="inv.materials" createPath="/inventory/materials/new" />
+    <ArticleListView
+        itemType="MATERIAL"
+        copyPrefix="inv.materials"
+        createPath="/inventory/materials/new"
+        detailPath="/inventory/materials"
+    />
 );

@@ -60,10 +60,17 @@ export const AnchoredPicker = ({
         measure();
         window.addEventListener('scroll', schedule, true);
         window.addEventListener('resize', schedule);
+        // Sheets/modals slide in with a transform: a picker opened mid-animation
+        // measures the anchor at its ORIGINAL (off-screen) spot. Re-measure when
+        // any animation/transition settles so the panel snaps to the real place.
+        window.addEventListener('animationend', schedule, true);
+        window.addEventListener('transitionend', schedule, true);
         return () => {
             if (frame) window.cancelAnimationFrame(frame);
             window.removeEventListener('scroll', schedule, true);
             window.removeEventListener('resize', schedule);
+            window.removeEventListener('animationend', schedule, true);
+            window.removeEventListener('transitionend', schedule, true);
         };
     }, [anchorEl, width, maxHeight]);
 

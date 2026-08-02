@@ -2,6 +2,7 @@ import { apiClient, getShared } from '../axios';
 import type {
     TenderListItem,
     TenderDetailDto,
+    TenderPdfContentDto,
     TenderSummaryReport,
     PositionDto,
     CalculationItemDto,
@@ -12,6 +13,7 @@ import type {
     TenderChatterSummary,
     TenderDocumentDto,
     TenderMailDraftDto,
+    TenderTextTemplateDto,
     OfferScheduleSlotDto,
     PositionArticleMappingDto,
     PositionMaterialMappingDto,
@@ -84,24 +86,56 @@ export const tenderApi = {
         return res.data;
     },
 
-    getById: async (id: string, options?: { includeImages?: boolean; light?: boolean }): Promise<TenderDetailDto> => {
+    getById: async (
+        id: string,
+        options?: {
+            includeImages?: boolean;
+            light?: boolean;
+            includeActivities?: boolean;
+            deferOrderPdfContent?: boolean;
+        },
+    ): Promise<TenderDetailDto> => {
         const params = new URLSearchParams();
         if (options?.includeImages) params.set('includeImages', 'true');
         // light=true keeps the response to plain position figures (no article/material
         // mappings, long descriptions or activities) — enough for read-only summaries.
         if (options?.light) params.set('light', 'true');
+        if (options?.includeActivities === false) params.set('includeActivities', 'false');
+        if (options?.deferOrderPdfContent) params.set('deferOrderPdfContent', 'true');
         const res = await apiClient.get(`/tenders/${id}${params.toString() ? '?' + params : ''}`);
+        return res.data;
+    },
+
+    getPdfContent: async (id: string): Promise<TenderPdfContentDto> => {
+        const res = await apiClient.get(`/tenders/${id}/pdf-content`);
         return res.data;
     },
 
     // Fetch ONLY the image URLs needed for the PDF — product images by article id
     // plus per-position uploaded images by position id — instead of re-loading the
     // whole tender detail with every image inlined.
-    getProductImages: async (id: string, articleIds: string[], positionIds: string[] = []): Promise<Array<{ id: string; imageUrl: string | null }>> => {
+    getProductImages: async (
+        id: string,
+        articleIds: string[],
+        positionIds: string[] = [],
+        // Receives 0..1 as the response body arrives, so the PDF overlay can show
+        // real download progress instead of sitting on a fixed number.
+        onProgress?: (fraction: number) => void,
+    ): Promise<Array<{ id: string; imageUrl: string | null }>> => {
         const ids = [...new Set(articleIds.filter(Boolean))];
         const posIds = [...new Set(positionIds.filter(Boolean))];
         if (ids.length === 0 && posIds.length === 0) return [];
-        const res = await apiClient.post(`/tenders/${id}/product-images`, { ids, positionIds: posIds });
+        const res = await apiClient.post(`/tenders/${id}/product-images`, { ids, positionIds: posIds }, {
+            onDownloadProgress: onProgress
+                ? (event) => {
+                    // `total` is present because the API answers with a plain JSON
+                    // body (Content-Length set, no compression middleware). Without
+                    // it there is nothing to scale against, so the bar just holds.
+                    if (!event.total) return;
+                    onProgress(Math.min(1, event.loaded / event.total));
+                }
+                : undefined,
+        });
         return res.data;
     },
 
@@ -125,6 +159,8 @@ export const tenderApi = {
         billingSameAsInstallation?: boolean | null;
         internalDeliveryDate?: string | null;
         commissionNumber?: string | null;
+        /** Kundenreferenz — "Referenz" on the offer PDF. */
+        customerReference?: string | null;
         priceList?: string | null;
         currency?: string | null;
         directDiscount?: number | null;
@@ -436,6 +472,26 @@ export const tenderApi = {
 
     deleteMailDraft: async (draftId: string): Promise<void> => {
         await apiClient.delete(`/tenders/mail-drafts/${draftId}`);
+    },
+
+    // ── Tenant-wide intro-text templates (Textbausteine) ────────────────────
+    listTextTemplates: async (): Promise<TenderTextTemplateDto[]> => {
+        const res = await apiClient.get('/tenders/text-templates');
+        return res.data;
+    },
+
+    createTextTemplate: async (input: { title: string; content: string | null; isDefault?: boolean }): Promise<TenderTextTemplateDto> => {
+        const res = await apiClient.post('/tenders/text-templates', input);
+        return res.data;
+    },
+
+    updateTextTemplate: async (templateId: string, patch: { title?: string; content?: string | null; isDefault?: boolean }): Promise<TenderTextTemplateDto> => {
+        const res = await apiClient.patch(`/tenders/text-templates/${templateId}`, patch);
+        return res.data;
+    },
+
+    deleteTextTemplate: async (templateId: string): Promise<void> => {
+        await apiClient.delete(`/tenders/text-templates/${templateId}`);
     },
 
     sendOfferMail: async (id: string, input: {

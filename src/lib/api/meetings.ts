@@ -21,6 +21,7 @@ export interface MeetingActivityDto {
     kind: MeetingKind;
     title: string;
     notes?: string | null;
+    ccEmails?: string[] | null;
     startTime: string;
     endTime: string;
     customerId?: string | null;
@@ -42,6 +43,7 @@ export interface MeetingActivityInput {
     kind: MeetingKind;
     title: string;
     notes?: string | null;
+    ccEmails?: string[];
     startTime: string;
     endTime: string;
     customerId?: string | null;

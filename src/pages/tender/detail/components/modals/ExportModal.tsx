@@ -8,12 +8,12 @@ import { Button } from '@/components/ui-shared/Button';
 import { Field } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { PdfGeneratingOverlay } from '@/components/pdf/PdfGeneratingOverlay';
-import { tenderApi } from '@/lib/api/tender';
 import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
 import { useTenderStore } from '@/store/tenderStore';
 import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
 import { parseClosingImages } from '../../utils/tenderProduct.utils';
+import { attachPdfPositionImages } from '../../utils/tenderPdfImages.utils';
 import { flattenTenderTreeForPdf } from '../../tenderDetailUtils';
 // Eski (klasik, sablon.pdf antetli) şablon — geri dönmek için bu satırı aç:
 // import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
@@ -28,6 +28,12 @@ const PDF_LANGS: ReadonlyArray<{ code: PdfLanguage; label: string }> = [
     { code: 'de', label: 'Deutsch' },
     { code: 'en', label: 'English' },
 ];
+
+// Stage boundaries on the single 0–100 progress bar. The image download owns a
+// real slice of it (rather than one placeholder tick) so the bar keeps moving
+// while the bytes come in.
+const IMAGES_DONE_PCT = 15;
+const POSITIONS_DONE_PCT = 85;
 
 type ExportModalProps = {
     open: boolean;
@@ -49,7 +55,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
     // so the overlay tracks the download status until it's finished.
     const [pdfProgress, setPdfProgress] = useState<number | null>(null);
     const [pdfLang, setPdfLang] = useState<PdfLanguage>('de');
-    const { detail, activities } = useTenderStore();
+    const { detail, activities, ensurePdfContent } = useTenderStore();
     const { settings } = usePdfSettingsStore();
 
     const handleExport = async () => {
@@ -61,36 +67,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
             // used in this tender (not the whole detail, not duplicates). This
             // is the single biggest cost of generating the PDF.
             setPdfStage(t('tenders.pdf_gorseller_yukleniyor'));
-            setPdfProgress(5);
-            const articleIds = [...new Set(
-                flatPositions.map((p: any) => p.sourceArticleId).filter(Boolean) as string[],
-            )];
-            // Rows without a source article may carry their own uploaded image
-            // (manual products, description rows) — those are stored on the
-            // position and, like article images, only ever fetched for the PDF.
-            const positionIds = flatPositions
-                .filter((p: any) => !p.sourceArticleId && p.id)
-                .map((p: any) => p.id as string);
-            const imageById = new Map<string, string>();
-            if (articleIds.length > 0 || positionIds.length > 0) {
-                try {
-                    const images = await tenderApi.getProductImages(tenderId, articleIds, positionIds);
-                    images.forEach((row) => {
-                        if (row.imageUrl) imageById.set(row.id, row.imageUrl);
-                    });
-                } catch {
-                    /* fall back to an image-less PDF if the image fetch fails */
-                }
-            }
+            setPdfProgress(1);
+            const [positions, pdfContent] = await Promise.all([
+                attachPdfPositionImages(
+                    tenderId,
+                    flatPositions,
+                    // Real byte progress across the image stage's slice of the bar,
+                    // so it advances while the download runs instead of resting on
+                    // a placeholder until the next stage starts.
+                    (fraction) => setPdfProgress(1 + Math.round(fraction * (IMAGES_DONE_PCT - 1))),
+                ),
+                ensurePdfContent(tenderId),
+            ]);
             setPdfStage(t('tenders.pdf_olusturuluyor'));
-            setPdfProgress(10);
-            const positions = flatPositions.map((p: any) => ({
-                ...p,
-                imageUrl: (p.sourceArticleId && imageById.get(p.sourceArticleId))
-                    || imageById.get(p.id)
-                    || p.imageUrl
-                    || null,
-            }));
+            setPdfProgress(IMAGES_DONE_PCT);
             // Eski (klasik) şablon — geri dönmek için bu satırı aç:
             // const { exportTenderPdf } = await import('@/utils/pdf/tenderPdf');
             const { exportTenderPdf } = await import('@/utils/pdf/tenderPdfModern');
@@ -104,6 +94,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                 {
                     tenderNumber: detail.tender.tenderNumber,
                     version: detail.tender.version,
+                    // Kommission / Referenz — girilmişse kapak bilgi kartında satır
+                    // olarak görünür; boşsa kart o satırı hiç çizmez.
+                    commission: detail.tender.commissionNumber,
+                    customerReference: detail.tender.customerReference,
                     createdAt: detail.tender.createdAt,
                     validUntil: detail.tender.validUntil,
                     customerName: detail.tender.customerName || '',
@@ -116,22 +110,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                     grandTotal,
                     totals: pdfTotals ?? null,
                     // Optional content blocks — the PDF skips any that are empty.
-                    coverLetter: detail.tender.coverLetter,
-                    closingNote: detail.tender.closingNote,
-                    closingImages: parseClosingImages(detail.tender.closingImages),
+                    coverLetter: pdfContent.coverLetter,
+                    closingNote: pdfContent.closingNote,
+                    closingImages: parseClosingImages(pdfContent.closingImages),
                     lang: pdfLang,
                 },
                 pdfSettings,
-                // Map pipeline stages onto one 0–100 bar: images ≤10 %,
-                // position layout 10–80 %, finalize (QR/background merge)
-                // 90 %, browser download hand-off 100 %.
+                // Map pipeline stages onto one 0–100 bar: images 1–15 % (driven by
+                // the bytes actually received), position layout 15–85 %, finalize
+                // (QR/background merge) 92 %, browser download hand-off 100 %.
                 (p) => {
                     if (p.stage === 'positions') {
                         setPdfStage(t('tenders.pdf_positions_progress', { done: p.done, total: p.total }));
-                        setPdfProgress(10 + Math.round((p.done / Math.max(1, p.total)) * 70));
+                        setPdfProgress(IMAGES_DONE_PCT + Math.round((p.done / Math.max(1, p.total)) * (POSITIONS_DONE_PCT - IMAGES_DONE_PCT)));
                     } else if (p.stage === 'finalize') {
                         setPdfStage(t('tenders.pdf_finalizing'));
-                        setPdfProgress(90);
+                        setPdfProgress(92);
                     } else {
                         setPdfStage(t('tenders.pdf_downloading'));
                         setPdfProgress(100);
