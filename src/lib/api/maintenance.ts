@@ -1,4 +1,4 @@
-import { apiClient } from '../axios';
+import { apiClient, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import type {
     MaintenanceContractDto,
     MaintenanceAppointmentOptionDto,
@@ -235,7 +235,7 @@ export const maintenanceApi = {
         fromEmail?: string;
         fromName?: string;
     }): Promise<{ message: string; sent: string[] }> => {
-        const res = await apiClient.post(`/maintenance/reports/${reportId}/signature-request`, input);
+        const res = await apiClient.post(`/maintenance/reports/${reportId}/signature-request`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 

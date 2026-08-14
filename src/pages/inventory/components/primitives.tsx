@@ -3,8 +3,10 @@
 export {
     ActionTh,
     CELL_INPUT_CLASS,
+    ColResizeHandle,
     FILTER_INPUT_CLASS,
     Pager,
+    ResizableCols,
     SearchBox,
     SectionCard,
     SortableTh,

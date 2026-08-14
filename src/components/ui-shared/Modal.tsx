@@ -23,10 +23,10 @@ interface ModalProps {
 
 const widthMap = {
     sm: 448,
-    md: 576,
-    lg: 672,
-    xl: 896,
-    full: 1180,
+    md: 640,
+    lg: 760,
+    xl: 960,
+    full: 1280,
 };
 
 const drawerWidthMap = {
@@ -126,6 +126,7 @@ export const Modal: React.FC<ModalProps> = ({
             keyboard={closeOnEscape}
             centered
             destroyOnHidden
+            rootClassName="ofi-system-modal"
         >
             {children}
         </AntModal>

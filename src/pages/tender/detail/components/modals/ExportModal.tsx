@@ -68,7 +68,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
             // is the single biggest cost of generating the PDF.
             setPdfStage(t('tenders.pdf_gorseller_yukleniyor'));
             setPdfProgress(1);
-            const [positions, pdfContent] = await Promise.all([
+            const [positions, pdfContent, pdfModule] = await Promise.all([
                 attachPdfPositionImages(
                     tenderId,
                     flatPositions,
@@ -78,12 +78,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                     (fraction) => setPdfProgress(1 + Math.round(fraction * (IMAGES_DONE_PCT - 1))),
                 ),
                 ensurePdfContent(tenderId),
+                import('@/utils/pdf/tenderPdfModern'),
             ]);
             setPdfStage(t('tenders.pdf_olusturuluyor'));
             setPdfProgress(IMAGES_DONE_PCT);
             // Eski (klasik) şablon — geri dönmek için bu satırı aç:
             // const { exportTenderPdf } = await import('@/utils/pdf/tenderPdf');
-            const { exportTenderPdf } = await import('@/utils/pdf/tenderPdfModern');
+            const { exportTenderPdf } = pdfModule;
             // The offer's own currency wins over the company default so the
             // exported PDF matches what's shown on screen.
             const pdfSettings = {
@@ -111,7 +112,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({ open, onClose, tenderI
                     totals: pdfTotals ?? null,
                     // Optional content blocks — the PDF skips any that are empty.
                     coverLetter: pdfContent.coverLetter,
-                    closingNote: pdfContent.closingNote,
                     closingImages: parseClosingImages(pdfContent.closingImages),
                     lang: pdfLang,
                 },

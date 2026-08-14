@@ -10,7 +10,6 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { useTenderStore } from '../../store/tenderStore';
 
 import { t } from '@/i18n/translate';
-import { localizeTenderNumber } from '@/utils/tenderNumber';
 import { fmtMoney } from './detail/utils/formatters';
 import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 
@@ -75,10 +74,10 @@ export const TenderReport = () => {
     return (
         <div>
             <PageHeader
-                breadcrumb={t('tenders.crm_teklif_rapor', { number: localizeTenderNumber(summary.tenderInfo.tenderNumber) })}
+                breadcrumb={t('tenders.crm_teklif_rapor', { number: summary.tenderInfo.tenderNumber })}
                 title={
                     <span className="flex items-center gap-3">
-                        <span>{t('tenders.report')}{localizeTenderNumber(summary.tenderInfo.tenderNumber)}</span>
+                        <span>{t('tenders.report')}{summary.tenderInfo.tenderNumber}</span>
                         <span className="text-[12px] font-mono text-slate-400">v{summary.tenderInfo.version}</span>
                         <StatusChip variant={STATUS_VARIANT[summary.tenderInfo.status]}>
                             {getStatusLabel()[summary.tenderInfo.status]}

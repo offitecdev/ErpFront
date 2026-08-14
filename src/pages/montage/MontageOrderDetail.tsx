@@ -1,68 +1,170 @@
-import { useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { CheckCircle, Package, Receipt, Send01, Wrench } from '@/components/icons/antIconCompat';
+import { CheckCircle, Send01 } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { SignatureSheet } from '@/components/ui-shared/SignatureSheet';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
-import { useInstallationDetail } from '@/pages/project/features/installations/hooks/useInstallationDetail';
-import { getInstallationUsedMaterials } from '@/pages/project/features/installations/utils/installationMaterials';
+import { useAuthStore } from '@/store/authStore';
+import type { ProjectMaterial } from '@/types/project';
+import {
+    FieldReportEditorView,
+    type FieldReportSaveHandle,
+} from '@/pages/project/features/components/detail/reports/FieldReportEditorView';
+import { findReport, reportImageUrls } from '@/pages/project/features/installations/utils/installationScope';
 import { buildDraftFieldSnapshot, buildFieldSnapshot } from '@/pages/project/features/installations/utils/installationSnapshots';
+import type { SignatureSnapshot } from '@/lib/api/project';
 
 import { BigButton } from './components/BigButton';
-import { ExpenseSection } from './components/ExpenseSection';
-import { MaterialsSection } from './components/MaterialsSection';
 import { MontageHeader } from './components/MontageHeader';
 import { StatusPill } from './components/StatusPill';
-import { WorkSection } from './components/WorkSection';
-import type { MontageMaterialMode, MontageSection } from './types/montage';
 import { dateFmt, timeRange } from './utils/montageFormat';
 import { toMontageOrderRow } from './utils/montageStatus';
 
-/** Section heading in the panel's card style — small navy band above each block. */
-const SectionLoading = () => (
-    <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-[3px] border border-slate-200 bg-white dark:border-white/10 dark:bg-[#17191c]">
-        <span aria-hidden className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-white/15 dark:border-t-amber-400" />
-        <span className="text-[13px] text-slate-500 dark:text-slate-400">{t('common.loading')}</span>
-    </div>
-);
-
 /**
- * One order's work screen — SIMPLE CARD VIEW. The old dashboard (three big
- * section-switcher buttons + auto-opening appointment pop-up) is gone: the
- * summary card sits on top and the Work / Expenses / Materials blocks are
- * stacked cards, all visible at once. Report state (draft autosave, submit)
- * is still the proven useInstallationDetail hook.
+ * One order's work screen. Since the reports unification (user request
+ * 2026-08-13) this renders the SAME field-report editor as the manager's
+ * appointment popup — identical workflow and layout: one flat Kosten table
+ * with direct entry, a change-gated save icon, and one comprehensive save
+ * endpoint where the last save wins. The montage-only extras remain the
+ * signature capture and "Auftrag technisch abschliessen", with the
+ * Gesamtrapport / Abnahme-Rapport buttons NEXT to the signature area.
  */
 export const MontageOrderDetail = () => {
     const { appointmentId } = useParams();
-    const [searchParams] = useSearchParams();
-    const detail = useInstallationDetail(appointmentId);
-    const {
-        selected, materials, loading, saving, operations, setOperations, technicalNotes, setTechnicalNotes,
-        reportImages, setReportImages, expenseRows, setExpenseRows, materialRows, setMaterialRows,
-        usedMaterialRows, setUsedMaterialRows, canFinish, capturedSignature, setCapturedSignature,
-        expenseLoading, materialLoading, loadExpenses, loadMaterials, reloadAll, submit,
-    } = detail;
+    const navigate = useNavigate();
 
-    const [activeSection, setActiveSection] = useState<MontageSection>('work');
-    const [materialMode, setMaterialMode] = useState<MontageMaterialMode>(() =>
-        searchParams.get('mode') === 'extra' ? 'extra' : 'used');
+    const [selected, setSelected] = useState<any | null>(null);
+    const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
+    const [expenses, setExpenses] = useState<any[]>([]);
+    const [extraMaterials, setExtraMaterials] = useState<any[]>([]);
+    const [images, setImages] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [signOpen, setSignOpen] = useState(false);
+    const [signSnapshot, setSignSnapshot] = useState<SignatureSnapshot | null>(null);
     const [signingExisting, setSigningExisting] = useState(false);
+    // Field-report signature captured during creation. It is NOT sent on capture —
+    // it rides along with the report only when "Finish & Send" is clicked.
+    const [capturedSignature, setCapturedSignature] = useState<string | null>(null);
+    /** Editör yalnızca yükleme sonrası taze veriyle KURULUR; her reload yeni kurulumdur. */
+    const [editorEpoch, setEditorEpoch] = useState(0);
+    const editorHandle = useRef<FieldReportSaveHandle | null>(null);
+
+    // Tenant context is set asynchronously by fetchProfile(); gating the fetch on
+    // userId guarantees the tenant header is attached (see useInstallationDetail).
+    const selectedTenantId = useAuthStore((s) => s.selectedTenantId);
+    const userId = useAuthStore((s) => s.user?.id);
+    const loadSeq = useRef(0);
+
+    /**
+     * HER ŞEY baştan yüklenir (kullanıcı isteği — kapsamlı ve hızlı): randevu +
+     * rapor, spesen, zusatzmaterial ve malzeme kataloğu PARALEL dört istekte.
+     * Eski bölüm-bölüm tembel yükleme kalktı; editör tek seferde tam durumla açılır.
+     */
+    const load = useCallback(async () => {
+        if (!appointmentId) return;
+        const seq = ++loadSeq.current;
+        setLoading(true);
+        try {
+            const [work, exp, mat, catalogue] = await Promise.all([
+                projectApi.getMyInstallation(appointmentId, 'work') as Promise<any>,
+                projectApi.getMyInstallation(appointmentId, 'expenses') as Promise<any>,
+                projectApi.getMyInstallation(appointmentId, 'materials') as Promise<any>,
+                projectApi.materials({ compact: true }).catch(() => [] as ProjectMaterial[]),
+            ]);
+            if (seq !== loadSeq.current) return;
+            const expenseRows = Array.isArray(exp.expenses) ? exp.expenses : [];
+            const extraRows = Array.isArray(mat.extraMaterials) ? mat.extraMaterials : [];
+            // Editör ve PDF üretimi PM tarafındaki proje grafiğinin aynısını okur.
+            const merged = {
+                ...work,
+                salesOrder: { ...work.salesOrder, ...mat.salesOrder },
+                project: { ...work.project, ...mat.project, expenses: expenseRows, extraMaterials: extraRows },
+            };
+            setSelected(merged);
+            setMaterials(catalogue);
+            setExpenses(expenseRows);
+            setExtraMaterials(extraRows);
+            const report = findReport(merged);
+            setImages(report ? reportImageUrls(report) : []);
+            setCapturedSignature(null);
+            setEditorEpoch((epoch) => epoch + 1);
+        } catch (error: any) {
+            if (seq !== loadSeq.current) return;
+            toast.error(error.response?.data?.error || t('projects.montajlar_yuklenemedi'));
+            setSelected(null);
+        } finally {
+            if (seq === loadSeq.current) setLoading(false);
+        }
+    }, [appointmentId]);
+
+    useEffect(() => {
+        if (!userId || !selectedTenantId) return;
+        void load();
+    }, [appointmentId, userId, selectedTenantId, load]);
 
     const row = useMemo(() => (selected ? toMontageOrderRow(selected) : null), [selected]);
+    const report = useMemo(() => (selected ? findReport(selected) : null), [selected]);
     const finished = selected?.status === 'COMPLETED';
+    const canFinish = Boolean(selected && !finished && !dayjs().isBefore(dayjs(selected.startTime), 'day'));
     const disabled = Boolean(finished || !canFinish || saving);
-    const quotedMaterials = useMemo(() => (selected ? getInstallationUsedMaterials(selected) : []), [selected]);
 
-    const selectSection = (section: MontageSection) => {
-        if (section === 'expenses') void loadExpenses();
-        if (section === 'materials') void loadMaterials();
-        setActiveSection(section);
+    /**
+     * "Auftrag technisch abschliessen": editörün ANLIK durumu tek çağrıda gider
+     * (`resourceMode: 'replace'`) — rapor gövdesi + tüm kaynaklar sunucudaki
+     * durumu DEĞİŞTİRİR, randevu kapanır. Son kayıt geçerlidir; ayrı ayrı
+     * kaydetmeye gerek yoktur.
+     */
+    const finish = async () => {
+        if (!selected) return;
+        const payload = editorHandle.current?.collect();
+        if (!payload) return;
+        setSaving(true);
+        try {
+            const result = await projectApi.completeInstallation(selected.id, {
+                operationsDoneItems: payload.operationsDoneItems,
+                technicalNotes: payload.technicalNotes,
+                images: payload.images,
+                startedAt: payload.startedAt,
+                endedAt: payload.endedAt,
+                signatureBase64: capturedSignature ?? undefined,
+                resourceMode: 'replace',
+                expenses: payload.expenses,
+                materials: payload.extraMaterials,
+                usedMaterials: payload.usedMaterials,
+            });
+            if (result.overtimeWarning) toast.warning(result.overtimeWarning);
+            toast.success(result.message || t('projects.montaj_tamamlandi'));
+            // Technicians raise an addon-order request; the manager creates the order.
+            if (result.addonRequest) toast.success(t('projects.addonRequestSent'));
+            else if (result.addonOrder) toast.success(t('projects.addonOrderCreated', { orderNumber: result.addonOrder.orderNumber }));
+            setCapturedSignature(null);
+            // Stay on the appointment so the now-sent report shows read-only.
+            void load();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || t('projects.montaj_tamamlanamadi'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const openSignature = () => {
+        if (!selected) return;
+        if (finished && report) {
+            setSignSnapshot(buildFieldSnapshot(selected, report));
+            setSignOpen(true);
+            return;
+        }
+        // İmza anlık form içeriğinin üstüne alınır — geçersiz formda (iş maddesi
+        // yok) collect uyarır ve imza açılmaz.
+        const payload = editorHandle.current?.collect();
+        if (!payload) return;
+        setSignSnapshot(buildDraftFieldSnapshot(selected, payload.operationsDoneItems, payload.technicalNotes, payload.images ?? images));
+        setSignOpen(true);
     };
 
     if (loading) {
@@ -86,109 +188,93 @@ export const MontageOrderDetail = () => {
         <div className="space-y-4">
             <MontageHeader
                 title={`${t('auto.randevu')} · ${dateFmt(row.start)} · ${timeRange(row.start, row.end)}`}
-                subtitle={`${row.customerName} · ${row.projectName} · ${localizeTenderNumbersInText(row.orderNumber)}`}
+                subtitle={`${row.customerName} · ${row.projectName} · ${row.orderNumber}`}
                 backTo={finished ? '/montage/orders/completed' : '/montage/orders/active'}
                 actions={<StatusPill status={row.status} />}
             />
 
-            {/* Summary card: appointment window + the two order-level actions. */}
+            {/* İmza alanı ve yanındaki aksiyonlar: Gesamtrapport ile Abnahme-Rapport
+                imza düğmesinin YANINDA durur (kullanıcı isteği). */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[3px] border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-[#17191c]">
                 <div>
                     <div className="text-[15px] font-bold text-slate-900 dark:text-slate-50">{timeRange(row.start, row.end)}</div>
                     <div className="text-[12.5px] text-slate-500 dark:text-slate-400">{dateFmt(row.start)}</div>
                 </div>
-                {!finished && (
-                    <div className="flex items-center gap-2">
-                        <BigButton tone="navyOutline" icon={capturedSignature ? <CheckCircle size={15} /> : undefined} onClick={() => setSignOpen(true)} disabled={disabled}>
-                            {capturedSignature ? t('montage.signed') : t('signatures.getSignature')}
-                        </BigButton>
-                        <BigButton tone="navy" icon={<Send01 size={15} />} disabled={disabled} onClick={() => void submit()}>
-                            {t('projects.finish_and_send')}
-                        </BigButton>
-                    </div>
-                )}
-                {finished && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {!detail.selectedReport?.isSigned && detail.selectedReport && (
-                            <BigButton tone="navyOutline" onClick={() => setSignOpen(true)} disabled={signingExisting}>
-                                {t('signatures.getSignature')}
+                <div className="flex flex-wrap items-center gap-2">
+                    <BigButton tone="neutral" onClick={() => navigate(`/montage/reports/general/${selected.id}`)}>
+                        {t('projects.reportsHub.generalSection')}
+                    </BigButton>
+                    <BigButton
+                        tone="neutral"
+                        disabled={!selected.project?.id}
+                        onClick={() => navigate(`/montage/reports/delivery/${selected.project.id}?appointmentId=${encodeURIComponent(selected.id)}`)}
+                    >
+                        {t('projects.reportsHub.deliverySection')}
+                    </BigButton>
+                    {!finished && (
+                        <>
+                            <BigButton tone="navyOutline" icon={capturedSignature ? <CheckCircle size={15} /> : undefined} onClick={openSignature} disabled={disabled}>
+                                {capturedSignature ? t('montage.signed') : t('signatures.getSignature')}
                             </BigButton>
-                        )}
-                        <div className="flex items-center gap-2 text-[13.5px] font-semibold text-emerald-700 dark:text-emerald-300">
-                            <CheckCircle size={16} />
-                            {t('montage.status.completed')}
-                        </div>
-                    </div>
-                )}
+                            <BigButton tone="navy" icon={<Send01 size={15} />} disabled={disabled} onClick={() => void finish()}>
+                                {t('projects.finish_and_send')}
+                            </BigButton>
+                        </>
+                    )}
+                    {finished && (
+                        <>
+                            {report && !report.isSigned && (
+                                <BigButton tone="navyOutline" onClick={openSignature} disabled={signingExisting}>
+                                    {t('signatures.getSignature')}
+                                </BigButton>
+                            )}
+                            <div className="flex items-center gap-2 text-[13.5px] font-semibold text-emerald-700 dark:text-emerald-300">
+                                <CheckCircle size={16} />
+                                {t('montage.status.completed')}
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
-            {/* Stacked cards — no section switcher; everything visible at once. */}
-            <div className="grid grid-cols-1 gap-2 rounded-[3px] border border-slate-200 bg-white p-2 sm:grid-cols-3 dark:border-white/10 dark:bg-[#17191c]">
-                <BigButton tone={activeSection === 'work' ? 'navy' : 'neutral'} icon={<Wrench size={15} />} onClick={() => selectSection('work')}>
-                    {t('montage.section.work')}
-                </BigButton>
-                <BigButton tone={activeSection === 'expenses' ? 'navy' : 'neutral'} icon={<Receipt size={15} />} onClick={() => selectSection('expenses')}>
-                    {t('montage.section.expenses')}
-                </BigButton>
-                <BigButton tone={activeSection === 'materials' ? 'navy' : 'neutral'} icon={<Package size={15} />} onClick={() => selectSection('materials')}>
-                    {t('montage.section.materials')}
-                </BigButton>
-            </div>
-
-            {activeSection === 'work' && (
-                <WorkSection
-                    operations={operations}
-                    setOperations={setOperations}
-                    technicalNotes={technicalNotes}
-                    setTechnicalNotes={setTechnicalNotes}
-                    images={reportImages}
-                    setImages={setReportImages}
-                    disabled={disabled}
+            {/* Projektleiter-Popup'taki editörün TA KENDİSİ (kullanıcı isteği —
+                iki yüzeyde birebir aynı akış ve yerleşim). */}
+            <div className="rounded-[3px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#17191c]">
+                <FieldReportEditorView
+                    key={`${selected.id}-${editorEpoch}`}
+                    project={selected.project}
+                    order={selected.salesOrder}
+                    appointment={selected}
+                    report={report}
+                    materials={materials}
+                    existingExpenses={expenses}
+                    existingExtraMaterials={extraMaterials}
+                    images={images}
+                    setImages={setImages}
+                    disabled={finished}
+                    saveHandleRef={editorHandle}
+                    // Editör kayıttan sonra sunucu durumunu kendisi benimser; ayrıca
+                    // tam sayfa yenileme (remount) düzenlemeyi kesintiye uğratırdı.
+                    onSaved={() => {}}
                 />
-            )}
-
-            {activeSection === 'expenses' && (
-                expenseLoading
-                    ? <SectionLoading />
-                    : <ExpenseSection rows={expenseRows} setRows={setExpenseRows} disabled={disabled} />
-            )}
-
-            {activeSection === 'materials' && (
-                materialLoading
-                    ? <SectionLoading />
-                    : (
-                        <MaterialsSection
-                            mode={materialMode}
-                            setMode={setMaterialMode}
-                            usedRows={usedMaterialRows}
-                            setUsedRows={setUsedMaterialRows}
-                            extraRows={materialRows}
-                            setExtraRows={setMaterialRows}
-                            quotedMaterials={quotedMaterials}
-                            materials={materials}
-                            disabled={disabled}
-                        />
-                    )
-            )}
+            </div>
 
             {/* Field-report signature: captured now, sent with "Finish & Send". */}
             <SignatureSheet
                 open={signOpen}
                 title={t('signatures.tabs.field')}
-                snapshot={finished && detail.selectedReport
-                    ? buildFieldSnapshot(selected, detail.selectedReport)
-                    : buildDraftFieldSnapshot(selected, operations, technicalNotes, reportImages)}
+                snapshot={signSnapshot ?? buildDraftFieldSnapshot(selected, [], '', images)}
                 saving={saving || signingExisting}
                 onClose={() => setSignOpen(false)}
                 onSave={async (signature) => {
                     if (!signature) return;
-                    if (finished && detail.selectedReport) {
+                    if (finished && report) {
                         setSigningExisting(true);
                         try {
-                            await projectApi.signReport(detail.selectedReport.id, signature);
+                            await projectApi.signReport(report.id, signature);
                             setSignOpen(false);
                             toast.success(t('signatures.signed'), { position: 'top-center' });
-                            reloadAll();
+                            void load();
                         } catch (error: any) {
                             toast.error(error.response?.data?.error || t('signatures.signError'));
                         } finally {
@@ -201,9 +287,9 @@ export const MontageOrderDetail = () => {
                     toast.success(t('montage.signatureCaptured'), { position: 'top-center' });
                 }}
             />
-            {finished && !detail.selectedReport?.isSigned && (
+            {finished && report && !report.isSigned && (
                 <div className="rounded-[3px] border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-semibold text-[#d30f15] dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
-                    {t('projects.imza_bekliyor')} — <button type="button" className="underline" onClick={reloadAll}>{t('common.refresh')}</button>
+                    {t('projects.imza_bekliyor')} — <button type="button" className="underline" onClick={() => void load()}>{t('common.refresh')}</button>
                 </div>
             )}
         </div>

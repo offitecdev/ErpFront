@@ -2,10 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Check,
-    ChevronDown,
     Package,
     Tag01 as Tag,
-    Trash01,
 } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
@@ -27,8 +25,6 @@ type TenderProductSearchDropdownProps = {
     onSelectArticle: (article: ArticleQuickPick) => void;
     /** "All products" — opens the full product picker pop-up carrying the search text over. */
     onOpenAllProducts: (search: string) => void;
-    /** Trash button: clears the row cell's text. */
-    onClearSearch?: () => void;
 };
 
 // Fixed-position overlay so the list pops OVER the rows below the anchor (like
@@ -65,18 +61,14 @@ export const TenderProductSearchDropdown = ({
     onClose,
     onSelectArticle,
     onOpenAllProducts,
-    onClearSearch,
 }: TenderProductSearchDropdownProps) => {
     const [items, setItems] = useState<ArticleQuickPick[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [style, setStyle] = useState<React.CSSProperties>(() => computeStyle(anchorEl));
     const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
-    // Gold "picked" row: moved with the arrow keys (or the ▼ button), confirmed
-    // with Enter (or the OK button).
+    // Gold "picked" row: moved with the arrow keys, confirmed with Enter (or the
+    // OK button).
     const [activeIndex, setActiveIndex] = useState(-1);
-    // Short trash-bin graphic shown over the list after the trash button clears
-    // the search.
-    const [trashFlash, setTrashFlash] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
 
     const activeIdx = activeIndex >= 0 && activeIndex < items.length ? activeIndex : -1;
@@ -91,17 +83,6 @@ export const TenderProductSearchDropdown = ({
     const confirmActive = () => {
         if (activeIdx >= 0) onSelectArticle(items[activeIdx]);
     };
-    const clearSearch = () => {
-        onClearSearch?.();
-        setActiveIndex(-1);
-        setTrashFlash(true);
-    };
-
-    useEffect(() => {
-        if (!trashFlash) return;
-        const id = setTimeout(() => setTrashFlash(false), 700);
-        return () => clearTimeout(id);
-    }, [trashFlash]);
 
     // Follow the anchor while the page scrolls or resizes (capture catches the
     // inner scroll containers too).
@@ -134,6 +115,7 @@ export const TenderProductSearchDropdown = ({
     // Debounced fetch: first page loads immediately on open, then every
     // keystroke re-queries the server 300ms after typing stops.
     useEffect(() => {
+        const normalizedSearch = search.trim();
         let cancelled = false;
         const id = setTimeout(() => {
             setLoading(true);
@@ -144,7 +126,7 @@ export const TenderProductSearchDropdown = ({
                 .articlesQuickPick({
                     page: 1,
                     pageSize: DROPDOWN_PAGE_SIZE,
-                    search: search.trim() || undefined,
+                    search: normalizedSearch || undefined,
                 })
                 .then((res) => {
                     if (cancelled) return;
@@ -155,7 +137,7 @@ export const TenderProductSearchDropdown = ({
                 })
                 .catch(() => { if (!cancelled) setItems([]); })
                 .finally(() => { if (!cancelled) setLoading(false); });
-        }, search ? 300 : 0);
+        }, normalizedSearch ? 300 : 0);
         return () => { cancelled = true; clearTimeout(id); };
     }, [search]);
 
@@ -228,12 +210,6 @@ export const TenderProductSearchDropdown = ({
             style={style}
             className="relative z-[999] overflow-hidden rounded-[2px] border border-slate-300 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.14)]"
         >
-            {/* Trash-bin graphic flashed briefly after clearing the search. */}
-            {trashFlash && (
-                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/75">
-                    <Trash01 size={44} className="animate-in zoom-in fade-in text-rose-500" />
-                </div>
-            )}
             {/* The spinner only replaces the list on the FIRST load. A refresh
                 keeps the current items on screen and clickable — blanking or
                 disabling them mid-query is what made a click go nowhere. */}
@@ -294,8 +270,11 @@ export const TenderProductSearchDropdown = ({
                     </ul>
                 )}
             </div>
-            {/* Control strip: ▼ moves the gold selection down (scrolls the list),
-                OK confirms it (same as Enter), the trash clears the search. */}
+            {/* Control strip: OK confirms the highlighted row (same as Enter).
+                The ▼ button and the trash button are gone — the arrow keys move
+                the highlight and the row's own text is the search, so a button
+                to scroll the list and a button to erase what was just typed only
+                crowded the panel. */}
             <div className="flex items-center justify-end gap-1 border-t border-slate-200 bg-slate-50 px-2 py-1">
                 {/* Refresh indicator for a query running behind a list that is
                     still on screen and still clickable. */}
@@ -308,17 +287,6 @@ export const TenderProductSearchDropdown = ({
                 )}
                 <button
                     type="button"
-                    aria-label={t('tenders.move_down')}
-                    title={t('tenders.move_down')}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => moveActive(1)}
-                    disabled={loading || items.length === 0}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#1f2654] hover:bg-[#1f2654] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600"
-                >
-                    <ChevronDown size={13} />
-                </button>
-                <button
-                    type="button"
                     aria-label="OK"
                     title="OK (Enter)"
                     onMouseDown={(event) => event.preventDefault()}
@@ -327,16 +295,6 @@ export const TenderProductSearchDropdown = ({
                     className="inline-flex h-6 w-6 items-center justify-center rounded border border-emerald-200 bg-white text-emerald-600 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-emerald-200 disabled:hover:bg-white disabled:hover:text-emerald-600"
                 >
                     <Check size={13} />
-                </button>
-                <button
-                    type="button"
-                    aria-label={t('common.delete')}
-                    title={t('common.delete')}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={clearSearch}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-rose-200 bg-white text-rose-500 transition-colors hover:border-rose-500 hover:bg-rose-500 hover:text-white"
-                >
-                    <Trash01 size={13} />
                 </button>
             </div>
             <div className="border-t border-slate-100 px-2 py-1">

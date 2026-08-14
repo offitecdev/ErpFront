@@ -35,7 +35,7 @@ export const SplitViewToggle: React.FC<SplitViewToggleProps> = ({ onEnter, onExi
                     onEnter?.();
                 }
             }}
-            className={`flex items-center justify-center rounded-full transition-colors ${splitMode
+            className={`ofi-header-icon-button flex items-center justify-center rounded-full transition-colors ${splitMode
                 ? 'bg-[#272f67] text-white shadow-sm'
                 : 'text-slate-700 hover:bg-[#d3e3fd] dark:text-white/80 dark:hover:bg-white/12 dark:hover:text-white'
                 } ${className}`}

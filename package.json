@@ -7,9 +7,9 @@
   "productName": "Offitec ERP",
   "scripts": {
     "dev": "vite",
-    "dev:vite": "vite",
+    "dev:vite": "npm run dev:prod",
     "dev:prod": "npm run build && npm run preview:perf",
-    "dev:hmr": "set VITE_ENABLE_HMR=true&& vite",
+    "dev:hmr": "vite",
     "build": "tsc -b && vite build",
     "build:desktop": "tsc -b && vite build --mode electron",
     "desktop": "npm run build:desktop && electron .",
@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:perf": "vite preview --host 0.0.0.0 --port 5173 --strictPort",
-    "perf": "npm run build && npm run preview:perf"
+    "perf": "npm run build && npm run preview:perf",
+    "perf:local": "set VITE_API_URL=http://localhost:3000/api/v1&& npm run build && npm run preview:perf"
   },
   "build": {
     "appId": "com.offitec.erp",

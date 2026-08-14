@@ -1,4 +1,4 @@
-import type { ArticleDetail, ArticleDetailPatch } from '@/types/inventory';
+import type { ArticleDetail, ArticleDetailPatch, ItemType } from '@/types/inventory';
 import { parseNum } from '../utils/format';
 
 /** Düzenlenebilir alanların taslak hâli — hepsi metin, kaydederken çevrilir. */
@@ -7,6 +7,8 @@ export interface DetailDraft {
     name: string;
     unit: string;
     salePrice: string;
+    /** Ürün/hizmet anahtarı — varsayılan PRODUCT, detaydan değiştirilir. */
+    itemType: ItemType;
     description: string;
 }
 
@@ -16,6 +18,7 @@ export const draftFromDetail = (detail: ArticleDetail): DetailDraft => ({
     name: detail.name,
     unit: detail.unit,
     salePrice: String(detail.salePrice ?? 0),
+    itemType: detail.itemType === 'SERVICE' ? 'SERVICE' : 'PRODUCT',
     description: detail.description ?? '',
 });
 
@@ -46,6 +49,8 @@ export const buildDetailPatch = (
     // Boş bırakılan fiyat 0 sayılır; "1'234.50" gibi yerel biçimler de çözülür.
     const salePrice = parseNum(draft.salePrice) ?? 0;
     if (salePrice !== (detail.salePrice ?? 0)) patch.salePrice = salePrice;
+
+    if (draft.itemType !== (detail.itemType === 'SERVICE' ? 'SERVICE' : 'PRODUCT')) patch.itemType = draft.itemType;
 
     if (draft.description !== (detail.description ?? '')) patch.description = draft.description;
 

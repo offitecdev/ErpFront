@@ -1,6 +1,13 @@
-import { ArticleCreateView } from './components/ArticleCreateView';
+import { ArticleSingleCreateView } from './components/ArticleSingleCreateView';
 
-/** "Ürün Ekle" — tam sayfa toplu ekleme tablosu (pop-up değil). */
+/**
+ * "Ürün Ekle" — TEKLİ ürün oluşturma (detay ekranı düzeninde form).
+ * Toplu tablo ayrı sayfadadır: ProductBulkCreatePage ("Toplu Ürün Ekle").
+ */
 export const ProductCreatePage = () => (
-    <ArticleCreateView itemType="PRODUCT" copyPrefix="inv.bulkProducts" backPath="/inventory/articles" />
+    <ArticleSingleCreateView
+        copyPrefix="inv.newProduct"
+        backPath="/inventory/articles"
+        detailRoot="/inventory/articles"
+    />
 );

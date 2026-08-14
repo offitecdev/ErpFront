@@ -2,7 +2,9 @@ import { memo, useEffect, useRef, useState } from 'react';
 
 import type { NumberField, TextField } from '../types/tenderDetail.types';
 
-const INLINE_INPUT_FONT_FAMILY = "'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
+// Keep in step with --font-body (theme.css); 'sans-serif' alone put the quote
+// line inputs (Einheit, description …) in Arial while the page is Open Sans.
+const INLINE_INPUT_FONT_FAMILY = '"Open Sans", Arial, sans-serif';
 
 /**
  * Tells a cell input to discard its in-progress text and blur WITHOUT
@@ -53,6 +55,7 @@ export const BufferedTextInput = memo(({
 } & InlineCellNavProps) => {
     const [draft, setDraft] = useState(value);
     const focusedRef = useRef(false);
+    const wasFocusedOnPointerDownRef = useRef(false);
     const skipCommitRef = useRef(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -119,13 +122,8 @@ export const BufferedTextInput = memo(({
             type="text"
             aria-label={ariaLabel}
             value={draft}
-            onFocus={(event) => {
+            onFocus={() => {
                 focusedRef.current = true;
-                // A BLANK cell opens the article list on focus — the first
-                // products appear before anything is typed. A filled cell only
-                // takes the caret, so it can be corrected without a panel
-                // appearing over the rows below it.
-                if (!draft.trim()) onDraftChange?.(draft, event.currentTarget);
             }}
             onChange={(event) => {
                 setDraft(event.target.value);
@@ -147,7 +145,17 @@ export const BufferedTextInput = memo(({
                     if (onArrowNav(navCol, rowIndex, 1)) event.preventDefault();
                 }
             }}
-            onClick={(event) => event.stopPropagation()}
+            onPointerDown={() => {
+                // First click selects/focuses the cell. Only a second click on
+                // the already focused product name opens its suggestions.
+                wasFocusedOnPointerDownRef.current = focusedRef.current;
+            }}
+            onClick={(event) => {
+                event.stopPropagation();
+                if (wasFocusedOnPointerDownRef.current) {
+                    onDraftChange?.(draft, event.currentTarget);
+                }
+            }}
             className={className}
             style={{ fontFamily: INLINE_INPUT_FONT_FAMILY }}
         />

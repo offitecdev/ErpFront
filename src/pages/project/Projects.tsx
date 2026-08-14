@@ -8,7 +8,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../hooks/useColumnWidths';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
@@ -17,7 +18,6 @@ import { ProjectStatusBadge } from './features/components/common/ProjectStatusBa
 import { getStatusLabel } from './features/utils/projectFormatters';
 
 import { t } from '@/i18n/translate';
-import { localizeTenderNumber, localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const money = (value: number) =>
     new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(value || 0);
@@ -43,7 +43,7 @@ const PercentCell = ({ percent }: { percent?: number }) => {
 };
 
 const projectCustomerName = (p: ProjectDto) => p.customer?.companyName || p.customerId || '';
-const projectTenderNo = (p: ProjectDto) => (p.tender?.tenderNumber ? localizeTenderNumber(p.tender.tenderNumber) : (p.tenderId || ''));
+const projectTenderNo = (p: ProjectDto) => (p.tender?.tenderNumber ? p.tender.tenderNumber : (p.tenderId || ''));
 
 export const Projects = () => {
     const navigate = useNavigate();
@@ -60,6 +60,12 @@ export const Projects = () => {
     const [tenderFilter, setTenderFilter] = useState('');
     // Durum seçici üst çubukta — müşteri/teklif listeleriyle aynı desen.
     const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
+    // Sürüklenebilir sütunlar; proje adı sütununun genişliği yoktur, kalanı o emer.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:project-list:col-widths:v1',
+        defaults: { customer: 160, tender: 112, budget: 112, report: 64, appointment: 112, status: 128, technical: 80, billing: 96 },
+        minPx: 64,
+    });
     const [sortBy, setSortBy] = useState<ProjectSortKey>('createdAt');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [page, setPage] = useState(1);
@@ -175,18 +181,38 @@ export const Projects = () => {
             </div>
 
             <SectionCard title={`${t('nav.projects')} (${total})`}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <colgroup>
+                        {/* Proje adı: genişliği yok, kalan yeri emer. */}
+                        <col />
+                        <ResizableCols keys={['customer', 'tender', 'budget', 'report', 'appointment', 'status', 'technical', 'billing'] as const} grid={grid} />
+                    </colgroup>
                     <thead>
                         <tr>
                             <SortableTh label={t('nav.projects')} sortKey="projectName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
-                            <SortableTh label={t('nav.quickActionsGroup.customers')} sortKey="customer" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-40 text-left" />
-                            <th className="w-28 text-left">{t('auto.teklif')}</th>
-                            <SortableTh label={t('auto.butce')} sortKey="budget" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-28 text-right" />
-                            <th className="w-16 text-right">{t('auto.rapor')}</th>
-                            <th className="w-28 text-left">{t('auto.randevu')}</th>
-                            <SortableTh label={t('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-32 text-left" />
-                            <th className="w-20 text-left">{t('projects.listColTechnical')}</th>
-                            <th className="w-24 text-left">{t('projects.listColBilling')}</th>
+                            <SortableTh label={t('nav.quickActionsGroup.customers')} sortKey="customer" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('customer')} />
+                            <th className="relative text-left">
+                                {t('auto.teklif')}
+                                <ColResizeHandle {...grid.resizeProps('tender')} />
+                            </th>
+                            <SortableTh label={t('auto.butce')} sortKey="budget" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-right" {...grid.resizeProps('budget')} />
+                            <th className="relative text-right">
+                                {t('auto.rapor')}
+                                <ColResizeHandle {...grid.resizeProps('report')} />
+                            </th>
+                            <th className="relative text-left">
+                                {t('auto.randevu')}
+                                <ColResizeHandle {...grid.resizeProps('appointment')} />
+                            </th>
+                            <SortableTh label={t('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('status')} />
+                            <th className="relative text-left">
+                                {t('projects.listColTechnical')}
+                                <ColResizeHandle {...grid.resizeProps('technical')} />
+                            </th>
+                            <th className="relative text-left">
+                                {t('projects.listColBilling')}
+                                <ColResizeHandle {...grid.resizeProps('billing')} />
+                            </th>
                         </tr>
                         {/* Kolon bazlı filtre satırı — proje / müşteri / teklif no metinle daraltır. */}
                         <tr data-filter-row>
@@ -199,7 +225,14 @@ export const Projects = () => {
                             <th className="pb-1.5">
                                 <input value={tenderFilter} onChange={(e) => setTenderFilter(e.target.value)} placeholder={`${t('common.filter')}...`} className={FILTER_INPUT_CLASS} />
                             </th>
-                            <th colSpan={6} />
+                            {/* Filtresi olmayan sütunlar da kendi (boş) hücrelerini
+                                alır ki sütun çizgileri burada da kesilmesin. */}
+                            <th />
+                            <th />
+                            <th />
+                            <th />
+                            <th />
+                            <th />
                         </tr>
                     </thead>
                     <tbody>
@@ -230,22 +263,38 @@ export const Projects = () => {
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="flex min-w-0 items-center gap-2">
-                                                    <span className="truncate font-semibold text-slate-900 dark:text-white">{localizeTenderNumbersInText(project.projectName)}</span>
+                                                    <span className="truncate font-semibold text-slate-900 dark:text-white">{project.projectName}</span>
                                                     {addonMap[project.id] > 0 && (
                                                         <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
                                                             <Plus size={9} />{t('projects.complete.addonCount', { count: addonMap[project.id] })}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="mt-0.5 text-[11.5px] text-slate-400">{dayjs(project.createdAt).format('DD.MM.YYYY')}</div>
+                                                {/* Proje adı zaten kodun kendisi (PR-2026-10011) — kod
+                                                    burada TEKRARLANMAZ, altta yalnızca tarih durur
+                                                    (kullanıcı isteği). Eski, koddan farklı adlanmış
+                                                    projelerde kod bilgi kaybolmasın diye kalır. */}
+                                                <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-slate-400">
+                                                    {project.projectNumber && project.projectNumber !== project.projectName && (
+                                                        <span className="font-mono font-semibold text-slate-500 dark:text-white/60">{project.projectNumber}</span>
+                                                    )}
+                                                    <span>{dayjs(project.createdAt).format('DD.MM.YYYY')}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="text-[13px] text-slate-700 dark:text-white/80">
                                         <span className="block truncate">{project.customer?.companyName || project.customerId}</span>
+                                        {/* Satır "PR / müşteri / kişi / tarih" diye okunur:
+                                            sorumlu kişi müşterinin altında gösterilir. */}
+                                        {project.manager && (
+                                            <span className="mt-0.5 block truncate text-[11.5px] text-slate-400 dark:text-white/50">
+                                                {project.manager.firstName} {project.manager.lastName}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="font-mono text-[12px] text-slate-500 dark:text-white/60">
-                                        <span className="block truncate">{project.tender?.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : (project.tenderId || '—')}</span>
+                                        <span className="block truncate">{project.tender?.tenderNumber ? project.tender.tenderNumber : (project.tenderId || '—')}</span>
                                     </td>
                                     <td className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{money(project.plannedBudget)}</td>
                                     <td className="text-right font-mono text-[13px] text-slate-600 dark:text-white/70">{project._count?.reports || 0}</td>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type React from 'react';
-import { cx } from '@/lib/utils/cx';
+import clsx from 'clsx';
 
 // Plain TypeScript/Tailwind stand-ins for the Ant-Design-backed ui-shared
 // wrappers (Card / Button / Checkbox), so the quote detail surface renders
@@ -42,7 +42,7 @@ export const PlainButton = ({
         {...rest}
         type={type}
         disabled={disabled || loading}
-        className={cx(
+        className={clsx(
             'inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0',
             BUTTON_VARIANT_CLASS[variant],
             BUTTON_SIZE_CLASS[size],
@@ -81,7 +81,7 @@ export const PlainCard = ({
 }: PlainCardProps) => (
     <section
         data-ui-card
-        className={cx('overflow-hidden rounded-[2px] border border-slate-300 bg-white', className)}
+        className={clsx('overflow-hidden rounded-[2px] border border-slate-300 bg-white', className)}
     >
         {(title || actions) && (
             <div data-ui-card-header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3.5 py-2">
@@ -95,7 +95,7 @@ export const PlainCard = ({
                 {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
             </div>
         )}
-        <div data-ui-card-body className={cx(noPadding ? '' : 'p-4 md:p-5', bodyClassName)}>{children}</div>
+        <div data-ui-card-body className={clsx(noPadding ? '' : 'p-4 md:p-5', bodyClassName)}>{children}</div>
     </section>
 );
 
@@ -137,7 +137,7 @@ export const PlainCheckbox = ({
             onClick={onClick}
             // `ofi-quote-check` overrides the app-wide checkbox rule in index.css,
             // which rounds every checkbox to 10px and pins it to 16px square.
-            className={cx(
+            className={clsx(
                 'ofi-quote-check cursor-pointer accent-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50',
                 size === 'sm' ? 'ofi-quote-check-sm' : '',
                 className,

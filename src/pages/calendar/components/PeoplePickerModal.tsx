@@ -119,7 +119,7 @@ export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, tit
             open={open}
             onClose={onClose}
             title={title ?? (mode === 'cc' ? t('calendar.picker.ccTitle') : t('calendar.picker.participantsTitle'))}
-            width={820}
+            width={980}
             z={150}
             footer={(
                 <div className="flex items-center justify-between gap-3">

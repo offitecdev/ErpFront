@@ -14,11 +14,16 @@ export type DeliveryAppointment = {
 /** A category group of checklist responses, preserving first-seen order. */
 export type DeliveryCategoryGroup = { category: string; items: DeliveryResponseItem[] };
 
-/** Fresh, empty responses derived from a checklist template. */
+/**
+ * Fresh, empty responses derived from a checklist template. Kategorisiz (yeni
+ * DÜZ listeler) maddeler LİSTE ADINI kategori olarak taşır — böylece her
+ * tüketici (montaj ekranı, PDF, imza anlık görüntüsü) alt başlık yerine liste
+ * adını gösterir.
+ */
 export const buildResponses = (tpl: ChecklistTemplateDto): DeliveryResponseItem[] =>
     (Array.isArray(tpl.items) ? tpl.items : []).map((it) => ({
         id: it.id,
-        category: it.category || '',
+        category: it.category || tpl.name || '',
         label: it.label,
         status: null,
         measurement: '',

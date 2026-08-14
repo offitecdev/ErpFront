@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
-import { CalendarCheck01, CalendarPlus01, ChevronLeft, ChevronRight, SearchLg } from '@/components/icons/antIconCompat';
+import { CalendarCheck01, ChevronLeft, ChevronRight, Plus, SearchLg } from '@/components/icons/antIconCompat';
 import { Card } from '@/components/ui-shared/Card';
 import { t } from '@/i18n/translate';
 import { maintenanceApi } from '@/lib/api/maintenance';
 import { meetingApi, meetingParticipantName, type MeetingActivityDto } from '@/lib/api/meetings';
 import { projectApi } from '@/lib/api/project';
 import { getRoleProfile } from '@/lib/access';
-import { localizeTenderNumber, localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { ensureMaintenanceLocale } from '@/pages/maintenance/MaintenanceShared';
@@ -29,6 +28,7 @@ import {
     type CalEvent,
     type CalEventDetail,
     type CalParticipant,
+    type CalStatus,
     type CalendarView,
 } from './calendarShared';
 
@@ -77,7 +77,7 @@ const buildOrderDetail = (appt: any): CalEventDetail => ({
     orderNumber: appt.salesOrder?.orderNumber,
     tenderNumber: (() => {
         const raw = appt.salesOrder?.tender?.tenderNumber ?? appt.project?.tender?.tenderNumber ?? null;
-        return raw ? localizeTenderNumber(raw) : null;
+        return raw ? raw : null;
     })(),
 });
 
@@ -99,6 +99,74 @@ const isAssignedTechnician = (appt: any, userId?: string | null) =>
         appt.assignedTechnician?.id === userId ||
         (appt.technicianAssignments || []).some((assignment: any) => assignment?.technician?.id === userId)
     );
+
+/* Randevu filtre grupları: planlanan / devam eden / geçmiş-tamamlanan.
+   İptal edilenler "geçmiş" grubuna sayılır (ayrı bir kutu açacak kadar nadir). */
+type ApptStatusGroup = 'planned' | 'ongoing' | 'done';
+const apptStatusGroup = (status: CalStatus): ApptStatusGroup =>
+    status === 'planned' || status === 'ongoing' ? status : 'done';
+
+/* Alt filtre çubuğundaki tek kategori yongası. Üzerine GELİNCE (hover) küçük
+   bir panel YUKARI açılır (çubuk sayfanın altında durur) ve görünürlük onay
+   kutularını gösterir; `onCreate` verildiyse yonganın içinde "+" düğmesi o
+   kategorinin oluşturma pop-up'ını açar. */
+const FilterChip = ({ label, swatch, count, dimmed, onCreate, createLabel, children }: {
+    label: string;
+    swatch: string;
+    count: number;
+    /** Kategorinin tüm grupları gizliyken yonga soluk görünür. */
+    dimmed: boolean;
+    onCreate?: () => void;
+    createLabel?: string;
+    children: React.ReactNode;
+}) => (
+    <div className="group relative">
+        <span className={`flex items-center gap-1.5 rounded-md border border-slate-200 py-0.5 pl-2 pr-1 text-[11px] font-semibold dark:border-white/15 ${dimmed ? 'text-slate-400 dark:text-white/40' : 'text-slate-700 dark:text-white/85'}`}>
+            <span className={`h-2.5 w-2.5 rounded-[3px] ${swatch}`} />
+            {label}
+            <span className="text-[10px] font-semibold tabular-nums text-slate-400 dark:text-white/45">{count}</span>
+            {onCreate && (
+                <button
+                    type="button"
+                    aria-label={createLabel}
+                    title={createLabel}
+                    onClick={onCreate}
+                    className="ml-0.5 flex size-5 items-center justify-center rounded bg-[#07145c] text-white transition-colors hover:bg-[#0b1a6e] dark:bg-[#d48f16] dark:text-[#151616] dark:hover:bg-[#f2bb5c]"
+                >
+                    <Plus size={11} />
+                </button>
+            )}
+        </span>
+        {/* `pb-1` köprüsü: yonga ile panel arasında hover kopmasın. */}
+        <div className="absolute bottom-full left-0 z-40 hidden w-60 pb-1 group-hover:block">
+            <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-white/15 dark:bg-[#1d1e1e]">
+                {children}
+            </div>
+        </div>
+    </div>
+);
+
+/* Hover panelindeki tek onay kutusu satırı — durum rengi noktasıyla birlikte. */
+const FilterCheckRow = ({ checked, dot, label, count, onToggle }: {
+    checked: boolean;
+    dot: string;
+    label: string;
+    count: number;
+    onToggle: () => void;
+}) => (
+    <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11.5px] font-medium transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+    >
+        <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border transition-colors ${checked ? 'border-[#07145c] bg-[#07145c] dark:border-[#d48f16] dark:bg-[#d48f16]' : 'border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
+            {checked && <span className="h-1.5 w-1.5 rounded-[1.5px] bg-white dark:bg-[#151616]" />}
+        </span>
+        <span className={`ofi-ucal-dot ${dot}`} />
+        <span className="flex-1 text-slate-700 dark:text-white/85">{label}</span>
+        <span className="text-[10px] font-semibold tabular-nums text-slate-400 dark:text-white/45">{count}</span>
+    </button>
+);
 
 /* The calendar page: Outlook-style left rail (create buttons, mini month,
    filters, today's-events trigger) next to a large day/week/month grid. All
@@ -124,10 +192,16 @@ export const CalendarPage = () => {
     const [view, setView] = useState<CalendarView>('week');
     const [anchor, setAnchor] = useState(() => dayjs());
     const [selectedDay, setSelectedDay] = useState(() => dayjs());
-    const [enabled, setEnabled] = useState<Record<CalCategory, boolean>>(() => ({
-        appointments: true,
+    // Bakım/toplantı görünürlüğü kategori başına tek anahtar; randevular ise
+    // duruma göre ÜÇ grup hâlinde filtrelenir (aşağıdaki apptStatuses).
+    const [enabled, setEnabled] = useState<Record<'meetings' | 'maintenance', boolean>>(() => ({
         maintenance: isTechnician,
         meetings: true,
+    }));
+    const [apptStatuses, setApptStatuses] = useState<Record<ApptStatusGroup, boolean>>(() => ({
+        planned: true,
+        ongoing: true,
+        done: true,
     }));
     const [search, setSearch] = useState('');
     const [events, setEvents] = useState<CalEvent[]>([]);
@@ -187,13 +261,13 @@ export const CalendarPage = () => {
                     id: `appt-${appt.id}`,
                     category: 'appointments',
                     refId: appt.id,
-                    title: customerName || (orderNumber ? t('calendar.order', { number: localizeTenderNumbersInText(orderNumber) }) : t('calendar.orders')),
-                    subtitle: orderNumber ? t('calendar.order', { number: localizeTenderNumbersInText(orderNumber) }) : undefined,
+                    title: customerName || (orderNumber ? t('calendar.order', { number: orderNumber }) : t('calendar.orders')),
+                    subtitle: orderNumber ? t('calendar.order', { number: orderNumber }) : undefined,
                     meta: techs.length ? `${t('calendar.technician')}: ${techs.join(', ')}` : undefined,
                     start: startTime,
                     end: endTime,
                     allDay: false,
-                    status: appointmentCalStatus(appt, endTime),
+                    status: appointmentCalStatus(appt, startTime, endTime),
                     customerId: appt.project?.customer?.id ?? null,
                     customerName: customerName ?? null,
                     projectId: projectId ?? null,
@@ -282,17 +356,31 @@ export const CalendarPage = () => {
     const visibleEvents = useMemo(() => {
         const needle = search.trim().toLowerCase();
         return allEvents.filter((event) => {
-            if (!enabled[event.category]) return false;
+            // Randevular durum grubuna göre, diğer kategoriler tek anahtarla süzülür.
+            if (event.category === 'appointments') {
+                if (!apptStatuses[apptStatusGroup(event.status)]) return false;
+            } else if (!enabled[event.category]) {
+                return false;
+            }
             if (!needle) return true;
             return event.title.toLowerCase().includes(needle)
                 || (event.subtitle || '').toLowerCase().includes(needle)
                 || (event.meta || '').toLowerCase().includes(needle);
         });
-    }, [allEvents, enabled, search]);
+    }, [allEvents, enabled, apptStatuses, search]);
 
     const categoryCounts = useMemo(() => {
         const counts: Record<CalCategory, number> = { appointments: 0, maintenance: 0, meetings: 0 };
         allEvents.forEach((event) => { counts[event.category] += 1; });
+        return counts;
+    }, [allEvents]);
+
+    // Randevu hover panelindeki grup sayaçları (planlanan / devam eden / geçmiş).
+    const apptStatusCounts = useMemo(() => {
+        const counts: Record<ApptStatusGroup, number> = { planned: 0, ongoing: 0, done: 0 };
+        allEvents.forEach((event) => {
+            if (event.category === 'appointments') counts[apptStatusGroup(event.status)] += 1;
+        });
         return counts;
     }, [allEvents]);
 
@@ -354,79 +442,23 @@ export const CalendarPage = () => {
         { key: 'month', label: t('calendar.month') },
     ];
 
-    const filterItems: Array<{ key: CalCategory; label: string; swatch: string }> = [
-        { key: 'appointments', label: t('calendar.appointments'), swatch: 'bg-[#101e6e]' },
-        { key: 'meetings', label: t('calendar.meetings'), swatch: 'bg-[#6d5bd0]' },
-        { key: 'maintenance', label: t('calendar.maintenance'), swatch: 'bg-[#b45309]' },
+    // Randevu hover panelinin satırları — lejant renk noktalarıyla aynı sözleşme.
+    const apptStatusItems: Array<{ key: ApptStatusGroup; label: string; dot: string }> = [
+        { key: 'planned', label: t('calendar.legend.planned'), dot: 'ofi-ucal-dot--planned' },
+        { key: 'ongoing', label: t('calendar.legend.ongoing'), dot: 'ofi-ucal-dot--ongoing' },
+        { key: 'done', label: t('calendar.legend.done'), dot: 'ofi-ucal-dot--done' },
     ];
 
     return (
         <div className="flex w-full flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
                 {/* ── left rail ─────────────────────────────────────────── */}
+                {/* Oluşturma düğmeleri KALDIRILDI (kullanıcı isteği 2026-08-07):
+                    sayfada yalnızca takvim durur; randevu, boş yarım saat
+                    hücresine tıklanarak oluşturulur. Filtreler takvimin ALTINDAKİ
+                    çubuğa taşındı. */}
                 <aside className="flex h-fit flex-col gap-3 xl:sticky xl:top-4">
-                    <div className="flex flex-col gap-2">
-                        {canCreateAppointment && (
-                            <button
-                                type="button"
-                                onClick={() => openWizard({ date: selectedDay })}
-                                className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[#07145c] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#0b1a6e] dark:bg-[#d48f16] dark:text-[#151616] dark:hover:bg-[#f2bb5c]"
-                            >
-                                <CalendarPlus01 size={15} />
-                                {t('calendar.newAppointment')}
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setMeetingOpen(true)}
-                            className="flex h-10 items-center justify-center gap-2 rounded-xl border border-[#E3E7F0] bg-white px-4 text-[13px] font-semibold text-[#07145c] transition-colors hover:bg-[#F7F8FC] dark:border-white/10 dark:bg-white/6 dark:text-[#d48f16] dark:hover:bg-white/10"
-                        >
-                            <CalendarPlus01 size={15} />
-                            {t('calendar.newMeeting')}
-                        </button>
-                    </div>
-
                     <MiniMonth anchor={anchor} selectedDay={selectedDay} now={now} eventsByDay={eventsByDay} onPickDay={pickDay} />
-
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#151616]">
-                        <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/45">{t('calendar.filters')}</h3>
-                        <label className="mb-2 flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 transition-colors focus-within:border-[#07145c]/40 dark:border-white/15 dark:focus-within:border-[#d48f16]/50">
-                            <SearchLg size={13} className="shrink-0 text-slate-400" />
-                            <input
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder={t('calendar.searchPlaceholder')}
-                                className="w-full bg-transparent text-[12.5px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
-                            />
-                        </label>
-                        <div className="space-y-1">
-                            {filterItems.map((item) => {
-                                const active = enabled[item.key];
-                                return (
-                                    <button
-                                        key={item.key}
-                                        type="button"
-                                        onClick={() => setEnabled((current) => ({ ...current, [item.key]: !current[item.key] }))}
-                                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
-                                    >
-                                        <span className={`flex h-4 w-4 items-center justify-center rounded-[5px] transition-colors ${active ? item.swatch : 'border border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
-                                            {active && <span className="h-1.5 w-1.5 rounded-[2px] bg-white" />}
-                                        </span>
-                                        <span className={`flex-1 text-[13px] font-medium ${active ? 'text-slate-800 dark:text-white/90' : 'text-slate-400 dark:text-white/40'}`}>{item.label}</span>
-                                        <span className="rounded-full bg-[#EEF1F7] px-1.5 text-[10.5px] font-semibold tabular-nums text-slate-500 dark:bg-white/10 dark:text-white/60">{categoryCounts[item.key]}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <div className="mt-2 space-y-1 border-t border-slate-100 px-1 pt-2 dark:border-white/10">
-                            <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-white/40">
-                                <span className="ofi-ucal-dot ofi-ucal-dot--planned" />{t('calendar.legend.planned')}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-white/40">
-                                <span className="ofi-ucal-dot ofi-ucal-dot--done" />{t('calendar.legend.done')}
-                            </div>
-                        </div>
-                    </div>
 
                     <button
                         type="button"
@@ -436,6 +468,19 @@ export const CalendarPage = () => {
                         <CalendarCheck01 size={15} />
                         {t('calendar.todaySheet.button')}
                     </button>
+
+                    {/* Takvimde arama — bugünün randevuları düğmesinin ALTINDA
+                        (kullanıcı isteği 2026-08-07; alttaki şerit yalnızca
+                        filtre yongalarına ayrıldı). */}
+                    <label className="flex items-center gap-2 rounded-xl border border-[#E3E7F0] bg-white px-3 py-2 transition-colors focus-within:border-[#07145c]/40 dark:border-white/10 dark:bg-white/6 dark:focus-within:border-[#d48f16]/50">
+                        <SearchLg size={13} className="shrink-0 text-slate-400" />
+                        <input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder={t('calendar.searchPlaceholder')}
+                            className="w-full bg-transparent text-[12.5px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
+                        />
+                    </label>
                 </aside>
 
                 {/* ── big calendar ──────────────────────────────────────── */}
@@ -457,7 +502,7 @@ export const CalendarPage = () => {
                                         key={item.key}
                                         type="button"
                                         onClick={() => setView(item.key)}
-                                        className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors ${view === item.key ? 'bg-white text-[#07145c] shadow-sm dark:bg-white/15 dark:text-white' : 'text-slate-600 hover:text-slate-950 dark:text-white/60 dark:hover:text-white'}`}
+                                        className={`ofi-calendar-view-button ${view === item.key ? 'is-active' : ''}`}
                                     >
                                         {item.label}
                                     </button>
@@ -492,6 +537,66 @@ export const CalendarPage = () => {
                             />
                         )}
                     </Card>
+
+                    {/* ── filtre şeridi ─────────────────────────────────────
+                        Takvimin ALTINDAKİ bölüm yalnızca filtre yongalarına
+                        ayrıldı (kullanıcı isteği 2026-08-07): yonganın üzerine
+                        GELİNCE görünürlük onay kutuları açılır; "+" doğrudan o
+                        kategorinin oluşturma pop-up'ını açar (bakım için henüz
+                        yok). Arama sol raya taşındı. */}
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 dark:border-white/10 dark:bg-[#151616]">
+                        <FilterChip
+                            label={t('calendar.appointments')}
+                            swatch="bg-[#101e6e]"
+                            count={categoryCounts.appointments}
+                            dimmed={!apptStatuses.planned && !apptStatuses.ongoing && !apptStatuses.done}
+                            onCreate={canCreateAppointment ? () => openWizard({ date: selectedDay }) : undefined}
+                            createLabel={t('calendar.newAppointment')}
+                        >
+                            {apptStatusItems.map((item) => (
+                                <FilterCheckRow
+                                    key={item.key}
+                                    checked={apptStatuses[item.key]}
+                                    dot={item.dot}
+                                    label={item.label}
+                                    count={apptStatusCounts[item.key]}
+                                    onToggle={() => setApptStatuses((current) => ({ ...current, [item.key]: !current[item.key] }))}
+                                />
+                            ))}
+                        </FilterChip>
+
+                        <FilterChip
+                            label={t('calendar.meetings')}
+                            swatch="bg-[#6d5bd0]"
+                            count={categoryCounts.meetings}
+                            dimmed={!enabled.meetings}
+                            onCreate={() => setMeetingOpen(true)}
+                            createLabel={t('calendar.newMeeting')}
+                        >
+                            <FilterCheckRow
+                                checked={enabled.meetings}
+                                dot="ofi-ucal-dot--meeting"
+                                label={t('calendar.meetings')}
+                                count={categoryCounts.meetings}
+                                onToggle={() => setEnabled((current) => ({ ...current, meetings: !current.meetings }))}
+                            />
+                        </FilterChip>
+
+                        <FilterChip
+                            label={t('calendar.maintenance')}
+                            swatch="bg-[#b45309]"
+                            count={categoryCounts.maintenance}
+                            dimmed={!enabled.maintenance}
+                        >
+                            <FilterCheckRow
+                                checked={enabled.maintenance}
+                                dot="ofi-ucal-dot--maintenance"
+                                label={t('calendar.maintenance')}
+                                count={categoryCounts.maintenance}
+                                onToggle={() => setEnabled((current) => ({ ...current, maintenance: !current.maintenance }))}
+                            />
+                        </FilterChip>
+                    </div>
                 </div>
             </div>
 
@@ -522,6 +627,7 @@ export const CalendarPage = () => {
                 onSaved={() => void load()}
             />
 
+            {/* Toplantı oluşturma — filtre şeridindeki "+" ile açılır. */}
             <MeetingComposer
                 open={meetingOpen}
                 onClose={() => setMeetingOpen(false)}

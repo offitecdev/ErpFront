@@ -36,16 +36,21 @@ const PANEL_OPEN_DELAY = 200;
 const PANEL_CLOSE_DELAY = 320;
 
 /* ── Mobile (drawer) row palette — unchanged from the previous accordion ── */
-const ROW_IDLE = 'text-black/85 hover:bg-[#eef1fa] hover:text-black dark:text-white/85 dark:hover:bg-white/8 dark:hover:text-white';
+/* Die Ruhefarben stehen bewusst kräftiger als früher: bei 85 % Schwarz auf
+   #FBFBFA verlor die Beschriftung gegen den Untergrund. */
+const ROW_IDLE = 'text-black hover:bg-[#eef1fa] hover:text-black dark:text-white/92 dark:hover:bg-white/8 dark:hover:text-white';
 const ROW_ACTIVE = 'bg-black/8 text-black dark:bg-white/10 dark:text-white dark:ring-1 dark:ring-inset dark:ring-white/10';
-const DOT_IDLE = 'bg-black/25 dark:bg-white/30';
+const DOT_IDLE = 'bg-black/40 dark:bg-white/45';
 const DOT_ACTIVE = 'bg-transparent';
-const ICON_IDLE = 'dark:text-[#e6cf9e]/70';
-const ICON_ACTIVE = 'dark:text-[#e6cf9e]';
+/* Icons tragen im Hellmodus das Markennavy statt der geerbten Textfarbe —
+   das ist der „kräftiger“-Teil: ein farbiges Icon liest sich neben grauem
+   Text sofort als das, was es ist. */
+const ICON_IDLE = 'text-[#272f67] dark:text-[#e6cf9e]/85';
+const ICON_ACTIVE = 'text-[#272f67] dark:text-[#e6cf9e]';
 const PANEL_BG = 'bg-[#FBFBFA] dark:bg-[#151616]';
 
 /* Desktop rail module button (large icon + caption). */
-const RAIL_BTN_IDLE = 'text-black/60 hover:bg-black/4 hover:text-[#1f2654] dark:text-white/65 dark:hover:bg-white/6 dark:hover:text-white';
+const RAIL_BTN_IDLE = 'text-black/75 hover:bg-black/4 hover:text-[#1f2654] dark:text-white/75 dark:hover:bg-white/6 dark:hover:text-white';
 /* The rail now sits on the same canvas as the page, so the selected module
    lifts off it as a white chip instead of the old near-white tint. */
 const RAIL_BTN_ACTIVE = 'bg-white text-[#272f67] shadow-[0_1px_2px_rgba(16,24,40,0.06)] dark:!bg-white/10 dark:text-[#e6cf9e] dark:shadow-none';
@@ -60,6 +65,9 @@ type AppSidebarProps = {
     onNavigate: (path: string) => void;
     /** Pinned-open state, controlled by MainLayout (persisted to localStorage). */
     pinnedOpen: boolean;
+    /** Rail KİLİTLİ dar kalır (takvim + ana sayfa): hover paneli açılmaz,
+        pin tutamacı çizilmez. MainLayout bu sayfalarda pinnedOpen'ı da false yollar. */
+    lockCollapsed?: boolean;
     onTogglePin: () => void;
     onOpenSearch: () => void;
     quickCreateItems: QuickCreateItem[];
@@ -83,6 +91,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     projectModuleEnabled,
     onNavigate,
     pinnedOpen,
+    lockCollapsed = false,
     onTogglePin,
     onOpenSearch,
     quickCreateItems,
@@ -144,6 +153,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         if (closeTimer.current !== null) { window.clearTimeout(closeTimer.current); closeTimer.current = null; }
     };
     const scheduleOpen = (key: string) => {
+        // Kilitli rail'de hover paneli hiç açılmaz (takvim + ana sayfa).
+        if (lockCollapsed) return;
         cancelClose();
         cancelOpen();
         openTimer.current = window.setTimeout(() => setPanelKey(key), PANEL_OPEN_DELAY);
@@ -168,6 +179,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     useEffect(() => {
         if (!pinnedOpen) setPanelKey(null);
     }, [pinnedOpen]);
+
 
     // Mobile drawer: keep the active module's accordion open.
     useEffect(() => {
@@ -212,8 +224,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         onNavigate(path);
     };
 
-    /* Pinned with nothing hovered → show the active module's submenu. */
-    const resolvedPanelKey = panelKey ?? (pinnedOpen ? activeGroupKey : null);
+    /* Pinned with nothing hovered → show the active module's submenu.
+       Kilitli rail'de panel HİÇ çözülmez (hover/tap zaten kapalı; bu, kalan
+       kenar durumları da örter — efektle temizlemeye gerek kalmaz). */
+    const resolvedPanelKey = lockCollapsed ? null : (panelKey ?? (pinnedOpen ? activeGroupKey : null));
     const panelData = resolvedPanelKey ? items.find((i) => i.section.key === resolvedPanelKey) : null;
     const panelVisible = !isMobile && !!panelData && panelData.section.type === 'group';
 
@@ -226,8 +240,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     onClick={onOpenSearch}
                     className="flex min-h-11 w-full items-center gap-2.5 rounded-lg bg-black/6 px-3 py-2.5 text-black/80 transition-colors hover:bg-black/10 hover:text-black dark:bg-white/8 dark:text-white/85 dark:hover:bg-white/12 dark:hover:text-white"
                 >
-                    <SearchOutlined size={18} className={`shrink-0 ${ICON_IDLE}`} />
-                    <span className="text-[13.5px] font-medium">{t('nav.search')}</span>
+                    <SearchOutlined size={19} className={`shrink-0 ${ICON_IDLE}`} />
+                    <span className="text-[14px] font-medium">{t('nav.search')}</span>
                 </button>
 
                 {/* Quick-access bar: three-dot opens the quick-create card */}
@@ -240,8 +254,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                         onClick={() => setQuickCreateOpen((v) => !v)}
                         className={`flex h-11 w-full items-center gap-2 rounded-lg px-3 transition-colors ${quickCreateOpen ? ROW_ACTIVE : ROW_IDLE}`}
                     >
-                        <DotsVertical size={18} className={`shrink-0 rotate-90 ${quickCreateOpen ? ICON_ACTIVE : ICON_IDLE}`} />
-                        <span className="text-[13px] font-semibold">{t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}</span>
+                        <DotsVertical size={19} className={`shrink-0 rotate-90 ${quickCreateOpen ? ICON_ACTIVE : ICON_IDLE}`} />
+                        <span className="text-[14px] font-semibold">{t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}</span>
                     </button>
 
                     {quickCreateOpen && quickCreateItems.length > 0 && (
@@ -249,7 +263,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                             role="menu"
                             className={`absolute left-0 z-[70] mt-1.5 w-60 overflow-hidden rounded-xl border border-[#EAEAEC] ${PANEL_BG} p-1.5 shadow-[0_12px_40px_rgba(16,24,40,0.14)] dark:border-white/10 dark:shadow-black/50`}
                         >
-                            <p className="px-2.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
+                            <p className="px-2.5 pb-1.5 pt-1 text-[14px] font-semibold uppercase tracking-wider text-[#6b7280] dark:text-[#a6acb8]">
                                 {t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}
                             </p>
                             <div className="flex flex-col gap-0.5">
@@ -263,8 +277,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                             onClick={() => { onQuickCreate(qi); setQuickCreateOpen(false); }}
                                             className="flex min-h-11 items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[#eef1fa] dark:hover:bg-[#232326]"
                                         >
-                                            <QIcon size={18} className={`shrink-0 dark:!text-[#e6cf9e]/80 ${qi.iconClassName || 'text-black/70'}`} />
-                                            <span className="truncate text-[13.5px] font-medium text-black dark:text-white">{qi.label}</span>
+                                            <QIcon size={19} className={`shrink-0 dark:!text-[#e6cf9e]/85 ${qi.iconClassName || 'text-[#272f67]'}`} />
+                                            <span className="truncate text-[14px] font-medium text-black dark:text-white">{qi.label}</span>
                                         </button>
                                     );
                                 })}
@@ -292,8 +306,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go(section.path); }}
                                         className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-100 ${active ? `${ROW_ACTIVE} font-semibold` : `${ROW_IDLE} font-medium`}`}
                                     >
-                                        <Icon size={19} className={`shrink-0 ${active ? ICON_ACTIVE : ICON_IDLE}`} />
-                                        <span className="truncate text-[13.5px]">{t(section.label)}</span>
+                                        <Icon size={20} className={`shrink-0 ${active ? ICON_ACTIVE : ICON_IDLE}`} />
+                                        <span className="truncate text-[14px]">{t(section.label)}</span>
                                     </a>
                                 );
                             }
@@ -306,9 +320,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         onClick={() => setOpenGroups((prev) => (prev.includes(section.key) ? prev.filter((k) => k !== section.key) : [...prev, section.key]))}
                                         className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-100 ${ROW_IDLE} font-medium`}
                                     >
-                                        <Icon size={19} className={`shrink-0 ${ICON_IDLE}`} />
-                                        <span className="flex-1 truncate text-[13.5px]">{t(section.label)}</span>
-                                        <ChevronDown size={15} className={`shrink-0 opacity-50 transition-transform duration-150 ${groupOpen ? 'rotate-180' : ''}`} />
+                                        <Icon size={20} className={`shrink-0 ${ICON_IDLE}`} />
+                                        <span className="flex-1 truncate text-[14px]">{t(section.label)}</span>
+                                        <ChevronDown size={16} className={`shrink-0 opacity-70 transition-transform duration-150 ${groupOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {groupOpen && (
@@ -320,7 +334,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                                         key={child.key}
                                                         href={hrefFor(child.key)}
                                                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go(child.key); }}
-                                                        className={`flex min-h-10 items-center gap-2.5 rounded-lg py-2 pl-3 pr-2 text-left text-[13px] transition-colors duration-100 ${active ? `${ROW_ACTIVE} font-semibold` : `${ROW_IDLE} font-medium`}`}
+                                                        className={`flex min-h-10 items-center gap-2.5 rounded-lg py-2 pl-3 pr-2 text-left text-[14px] transition-colors duration-100 ${active ? `${ROW_ACTIVE} font-semibold` : `${ROW_IDLE} font-medium`}`}
                                                     >
                                                         <span className={`size-1.5 shrink-0 rounded-full ${active ? DOT_ACTIVE : DOT_IDLE}`} />
                                                         <span className="truncate">{t(child.label)}</span>
@@ -390,7 +404,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         // its submenu (tapping again closes it), so the
                                         // flyout stays reachable by finger. Single pages
                                         // have no submenu and navigate straight away.
-                                        if (isTouch && !isSingle) {
+                                        // Kilitli rail'de dokunuş da panel açmaz — direkt gider.
+                                        if (isTouch && !isSingle && !lockCollapsed) {
                                             cancelOpen();
                                             cancelClose();
                                             setPanelKey((current) => (current === section.key ? null : section.key));
@@ -402,8 +417,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                     onMouseLeave={cancelOpen}
                                     className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
                                 >
-                                    <Icon size={21} className="shrink-0" />
-                                    <span className="w-full truncate text-[10.5px] font-semibold leading-tight">{t(section.label)}</span>
+                                    <Icon size={23} className="shrink-0" />
+                                    {/* Nicht 14px: die Beschriftung sitzt in einer 84px breiten
+                                        Leiste, dort schneidet schon „Buchhaltung“ bei 12px an. */}
+                                    <span className="w-full truncate text-[12px] font-semibold leading-tight">{t(section.label)}</span>
                                 </a>
                             );
                         })}
@@ -425,7 +442,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     {/* The panel butts straight against the header (top = 64px), so
                         the title starts tight — extra top padding read as a gap. */}
                     <div className="flex items-center justify-between pb-1 pl-5 pr-3 pt-2">
-                        <h2 className="truncate text-[16px] font-bold tracking-tight text-black dark:text-white">
+                        <h2 className="truncate text-[14px] font-bold tracking-tight text-black dark:text-white">
                             {t(panelData.section.label)}
                         </h2>
                         {!pinnedOpen && (
@@ -448,9 +465,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         key={child.key}
                                         href={hrefFor(child.key)}
                                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go(child.key); }}
-                                        className={`group flex items-center rounded-xl px-3.5 py-2.5 text-left text-[13.5px] font-semibold transition-all duration-150 ${active
+                                        className={`group flex items-center rounded-xl px-3.5 py-2.5 text-left text-[14px] font-semibold transition-all duration-150 ${active
                                             ? 'bg-[#272f67] text-white shadow-[0_10px_24px_-12px_rgba(39,47,103,0.55)]'
-                                            : 'text-black/65 hover:translate-x-[3px] hover:bg-[#eef1fa] hover:text-[#1f2654] dark:text-white/70 dark:hover:bg-white/8 dark:hover:text-white'}`}
+                                            : 'text-black/80 hover:translate-x-[3px] hover:bg-[#eef1fa] hover:text-[#1f2654] dark:text-white/80 dark:hover:bg-white/8 dark:hover:text-white'}`}
                                     >
                                         <span className="truncate">{t(child.label)}</span>
                                     </a>
@@ -461,8 +478,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 </div>
             )}
 
-            {/* Pin handle — the chevron-in-a-square riding the card's edge. */}
-            <button
+            {/* Pin handle — the chevron-in-a-square riding the card's edge.
+                Kilitli rail'de çizilmez: pin bu sayfalarda genişletemez, ölü
+                bir düğme bırakmak kafa karıştırırdı. */}
+            {!lockCollapsed && <button
                 ref={handleRef}
                 type="button"
                 aria-label={pinnedOpen ? t('nav.sidebarCollapse') : t('nav.sidebarPin')}
@@ -474,7 +493,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 className="fixed top-1/2 z-[55] hidden -translate-y-1/2 items-center justify-center rounded-lg border border-black/8 bg-white text-black/50 shadow-[0_2px_8px_rgba(16,24,40,0.12)] transition-[left,color,background-color] duration-200 hover:text-[#272f67] dark:border-white/12 dark:text-[#e6cf9e]/80 dark:hover:text-[#f0dcae] lg:flex"
             >
                 <ChevronRight size={isTouch ? 18 : 15} className={`transition-transform duration-200 ${pinnedOpen ? 'rotate-180' : ''}`} />
-            </button>
+            </button>}
         </>
     );
 };

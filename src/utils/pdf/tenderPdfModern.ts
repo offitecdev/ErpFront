@@ -16,7 +16,6 @@ import { jsPDF } from 'jspdf';
 import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from './addressBlock';
 import QRCode from 'qrcode';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
-import { localizeTenderNumber } from '../tenderNumber';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
 import { BULLET_INDENT, drawRichText, fontStyleOf, parseRichTextParagraphs, wrapRichParagraph } from './richTextPdf';
@@ -82,8 +81,33 @@ export interface TenderPdfData {
     lang?: PdfLang;
     /** Opsiyonel içerik blokları — boş olanlar atlanır. */
     coverLetter?: string | null;
-    closingNote?: string | null;
     closingImages?: string[] | null;
+    /**
+     * Belge başlığı ("Rechnung", "Akontorechnung" …). Boşsa teklif başlığı
+     * (L.offerTitle) kullanılır — fatura PDF'leri bu şablonu başlık ve bilgi
+     * kartı satırlarını değiştirerek yeniden kullanır.
+     */
+    docTitle?: string | null;
+    /** Kapak bilgi kartının satırları. Verilirse teklif satırlarının yerine geçer. */
+    infoRows?: Array<{ label: string; value: string; emphasize?: boolean }> | null;
+    /** 'none': kapakta selamlama/giriş kalıbı basılmaz (faturalar için). */
+    introMode?: 'default' | 'none';
+    /**
+     * true: pozisyon tablosu AYRI sayfaya değil, başlığın hemen altına — ilk
+     * sayfaya — çizilir (fatura PDF'i kapak sayfası istemez, doğrudan başlar).
+     */
+    startTableOnFirstPage?: boolean;
+    /** QR fatura borçlusu (Zahlbar durch) — yapılandırılmış adres. */
+    qrDebtor?: {
+        name: string;
+        addressLine1?: string;
+        addressLine2?: string;
+        postalCode?: string;
+        city?: string;
+        country?: string;
+    } | null;
+    /** QR fatura "Zusätzliche Informationen" satırı (ör. fatura numarası). */
+    qrAdditionalInfo?: string | null;
 }
 
 /** Tek bir iskonto satırı — adı, oranı ve para karşılığı. */
@@ -115,7 +139,6 @@ export interface TenderPdfTotals {
 }
 
 export type PdfLang = 'tr' | 'de' | 'en';
-export { localizeTenderNumber };
 
 interface PdfStrings {
     offerNumber: string;
@@ -150,6 +173,9 @@ interface PdfStrings {
     qrCurrency: string;
     qrAmount: string;
     qrReference: string;
+    qrPayableBy: string;
+    qrAdditionalInfo: string;
+    qrAcceptancePoint: string;
 }
 
 const I18N: Record<PdfLang, PdfStrings> = {
@@ -186,6 +212,9 @@ const I18N: Record<PdfLang, PdfStrings> = {
         qrCurrency: 'Currency',
         qrAmount: 'Amount',
         qrReference: 'Reference',
+        qrPayableBy: 'Payable by',
+        qrAdditionalInfo: 'Additional information',
+        qrAcceptancePoint: 'Acceptance point',
     },
     de: {
         offerNumber: 'Angebots-Nr. :',
@@ -220,6 +249,9 @@ const I18N: Record<PdfLang, PdfStrings> = {
         qrCurrency: 'Währung',
         qrAmount: 'Betrag',
         qrReference: 'Referenz',
+        qrPayableBy: 'Zahlbar durch',
+        qrAdditionalInfo: 'Zusätzliche Informationen',
+        qrAcceptancePoint: 'Annahmestelle',
     },
     en: {
         offerNumber: 'Offer No. :',
@@ -254,6 +286,9 @@ const I18N: Record<PdfLang, PdfStrings> = {
         qrCurrency: 'Currency',
         qrAmount: 'Amount',
         qrReference: 'Reference',
+        qrPayableBy: 'Payable by',
+        qrAdditionalInfo: 'Additional information',
+        qrAcceptancePoint: 'Acceptance point',
     },
 };
 
@@ -502,10 +537,14 @@ const drawRichTextFlow = (doc: jsPDF, html: string, startY: number): number =>
         },
     });
 
+/**
+ * Kapanış görselleri (imza, kaşe, fotoğraf) — toplamların altına akar. Eskiden
+ * üstünde bir "Schlusstext" bloğu vardı; o metin tamamen kaldırıldı, geriye
+ * yalnızca görseller kaldı.
+ */
 const appendClosingBlocks = async (doc: jsPDF, data: TenderPdfData, contentY: number) => {
-    const hasNote = hasRichContent(data.closingNote);
     const images = data.closingImages ?? [];
-    if (!hasNote && images.length === 0) return;
+    if (images.length === 0) return;
 
     let y = contentY;
     if (y + 24 > CONTENT_BOTTOM) {
@@ -513,11 +552,6 @@ const appendClosingBlocks = async (doc: jsPDF, data: TenderPdfData, contentY: nu
         y = CONTENT_TOP_REST;
     } else {
         y += 10;
-    }
-
-    if (hasNote) {
-        y = drawRichTextFlow(doc, data.closingNote as string, y);
-        y += 3;
     }
 
     for (const image of images) {
@@ -551,17 +585,23 @@ export async function buildTenderPdfBytes(
     const wave = await loadHeaderWave(WAVE_W, WAVE_H);
     const fmt = fmtMoneyForCurrency(settings.currency);
     const L = I18N[data.lang ?? 'de'];
-    data = { ...data, tenderNumber: localizeTenderNumber(data.tenderNumber, data.lang ?? 'de') };
+    data = { ...data, tenderNumber: data.tenderNumber };
 
     // ── SAYFA 1: Kapak & giriş ───────────────────────────────────────────────
     // Einleitungstext (Anschreiben) artık AYRI SAYFA DEĞİL: başlığın hemen
     // altında akar, taşarsa kapak devam sayfalarına geçer (kapak içinde çizilir).
-    drawCoverPage(doc, data, settings, L);
+    const coverEndY = drawCoverPage(doc, data, settings, L);
 
-    // ── SAYFA 2+: Pozisyon tablosu ───────────────────────────────────────────
-    doc.addPage();
+    // ── Pozisyon tablosu ─────────────────────────────────────────────────────
+    // Faturalar kapak sayfası istemez: tablo başlığın hemen altında, İLK
+    // sayfada başlar. Teklifler eskisi gibi 2. sayfadan devam eder.
     const st: TableState = { y: 0, rowIdx: 0 };
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L);
+    if (data.startTableOnFirstPage && coverEndY + 30 <= CONTENT_BOTTOM) {
+        st.y = drawTableHeader(doc, coverEndY + 6, L);
+    } else {
+        doc.addPage();
+        st.y = drawTableHeader(doc, CONTENT_TOP_REST, L);
+    }
 
     let drawn = 0;
     for (const pos of data.positions) {
@@ -642,7 +682,7 @@ export async function exportTenderPdf(
 ): Promise<void> {
     const finalBytes = await buildTenderPdfBytes(data, settings, onProgress);
     onProgress?.({ stage: 'download' });
-    downloadPdf(finalBytes, `${localizeTenderNumber(data.tenderNumber, data.lang ?? 'de')}.pdf`);
+    downloadPdf(finalBytes, `${data.tenderNumber}.pdf`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -793,7 +833,8 @@ function drawPageFooter(doc: jsPDF, page: number, total: number, L: PdfStrings) 
 // SAYFA 1 — Kapak: gönderici satırı + alıcı (sol), bilgi kartı (sağ)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings) {
+/** Kapak içeriğini çizer; içeriğin bittiği y'yi döndürür (ilk-sayfa tablo başlangıcı için). */
+function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings): number {
     const y0 = CONTENT_TOP_FIRST;
 
     // ── Sol: teklif bilgi kartı (köşe yuvarlatması yok, net kenarlar) ────────
@@ -803,15 +844,20 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     // eine Liste mit Luft dazwischen.
     const rowH = 5.6;
     // Referenz steht DIREKT ÜBER dem Verkäufer — beide gehören zur "wer/woher"
-    // Angabe und werden zusammen gelesen.
-    const rows: Array<[string, string, boolean]> = ([
-        [L.offerNumber.replace(/\s*:\s*$/, ''), data.tenderNumber, true],
-        [L.kommission.replace(/\s*:\s*$/, ''), data.commission || '', false],
-        [L.offerDate.replace(/\s*:\s*$/, ''), fmtDateShort(data.createdAt), false],
-        [L.validUntil.replace(/\s*:\s*$/, ''), fmtDateShort(data.validUntil), false],
-        [L.referenz.replace(/\s*:\s*$/, ''), data.customerReference || '', false],
-        [L.seller.replace(/\s*:\s*$/, ''), data.createdByName || '', false],
-    ] as Array<[string, string, boolean]>).filter(([, value]) => value.trim().length > 0);
+    // Angabe und werden zusammen gelesen. Fatura PDF'leri kendi satırlarını
+    // `infoRows` ile verir; o zaman teklif satırları hiç kullanılmaz.
+    const rows: Array<[string, string, boolean]> = (
+        data.infoRows?.length
+            ? data.infoRows.map((row): [string, string, boolean] => [row.label, row.value || '', Boolean(row.emphasize)])
+            : ([
+                [L.offerNumber.replace(/\s*:\s*$/, ''), data.tenderNumber, true],
+                [L.kommission.replace(/\s*:\s*$/, ''), data.commission || '', false],
+                [L.offerDate.replace(/\s*:\s*$/, ''), fmtDateShort(data.createdAt), false],
+                [L.validUntil.replace(/\s*:\s*$/, ''), fmtDateShort(data.validUntil), false],
+                [L.referenz.replace(/\s*:\s*$/, ''), data.customerReference || '', false],
+                [L.seller.replace(/\s*:\s*$/, ''), data.createdByName || '', false],
+            ] as Array<[string, string, boolean]>)
+    ).filter(([, value]) => value.trim().length > 0);
     const cardY = y0 - 4;
     const cardH = rows.length * rowH + 2.4;
 
@@ -890,7 +936,7 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     doc.setFont(FONT, 'bold');
     doc.setFontSize(16.5);
     doc.setTextColor(...COLOR_NAVY);
-    doc.text(`${L.offerTitle} ${data.tenderNumber}`, ML, yTitle);
+    doc.text(`${data.docTitle || L.offerTitle} ${data.tenderNumber}`, ML, yTitle);
     doc.setDrawColor(...COLOR_RED);
     doc.setLineWidth(0.8);
     doc.line(ML, yTitle + 2.6, ML + 14, yTitle + 2.6);
@@ -914,13 +960,17 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     if (hasRichContent(data.coverLetter)) {
         // Kullanıcının (şablondan gelen) giriş metni — "Sehr geehrte …" dahil
         // metnin kendisidir, bu yüzden kalıp selamlama/giriş cümlesi atlanır.
-        drawRichTextFlow(doc, data.coverLetter as string, yTitle);
-    } else {
+        return drawRichTextFlow(doc, data.coverLetter as string, yTitle);
+    }
+    if (data.introMode !== 'none') {
         doc.text(L.greeting, ML, yTitle);
         yTitle += 6.4;
         const introLines = doc.splitTextToSize(L.intro, CONTENT_W);
         doc.text(introLines, ML, yTitle, { lineHeightFactor: 1.35 });
+        return yTitle + introLines.length * (LH_BODY + 1.5);
     }
+    // introMode 'none': içerik başlığın (kırmızı vurgu çizgisinin) hemen altında biter.
+    return yTitle - 8;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1544,12 +1594,52 @@ function drawTotals(
 // QR Fatura (Swiss QR-Bill) — klasik şablonla birebir; antet/alt bilgi almaz
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * `"Steinrebenstrasse 156\n4153 Reinach"` gibi bir serbest adres bloğunu QR
+ * faturasının beklediği yapılandırılmış alanlara ayırır: "PLZ Ort" satırı posta
+ * kodu + şehir olur, kalan ilk satır sokak satırıdır.
+ */
+function splitPostalAddress(address: string | null | undefined): { line1: string; postalCode: string; city: string } {
+    const lines = (address || '')
+        .split(/\r?\n|,/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    let postalCode = '';
+    let city = '';
+    const rest: string[] = [];
+    for (const line of lines) {
+        const m = line.match(/^(?:CH[-\s])?(\d{4,6})\s+(.+)$/i);
+        if (m && !postalCode) {
+            postalCode = m[1];
+            city = m[2];
+        } else {
+            rest.push(line);
+        }
+    }
+    return { line1: rest.join(', '), postalCode, city };
+}
+
+/** QR'ın ortasına bindirilen İsviçre haçı — siyah kare içinde beyaz artı. */
+function drawSwissCross(doc: jsPDF, cx: number, cy: number) {
+    const box = 7;            // 7×7 mm — SIX şartnamesindeki logo ölçüsü
+    const pad = 0.35;         // haçı QR modüllerinden ayıran beyaz çerçeve
+    const armLen = 4.6;
+    const armW = 1.4;
+    doc.setFillColor(255, 255, 255);
+    doc.rect(cx - box / 2 - pad, cy - box / 2 - pad, box + pad * 2, box + pad * 2, 'F');
+    doc.setFillColor(0, 0, 0);
+    doc.rect(cx - box / 2, cy - box / 2, box, box, 'F');
+    doc.setFillColor(255, 255, 255);
+    doc.rect(cx - armW / 2, cy - armLen / 2, armW, armLen, 'F');
+    doc.rect(cx - armLen / 2, cy - armW / 2, armLen, armW, 'F');
+}
+
 async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings) {
     doc.addPage();
 
     const yTop = PAGE_H - 105;
 
-    doc.setDrawColor(180, 180, 180);
+    doc.setDrawColor(120, 120, 120);
     doc.setLineDashPattern([1, 1], 0);
     doc.line(0, yTop, PAGE_W, yTop);
     doc.line(62, yTop, 62, PAGE_H);
@@ -1559,6 +1649,28 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     // İsviçre QR faturası yalnızca CHF/EUR için geçerlidir; diğer para
     // birimlerinde QR kısmı CHF'ye düşer ki kod taranabilir kalsın.
     const qrCurrency: 'CHF' | 'EUR' = s.currency === 'EUR' ? 'EUR' : 'CHF';
+
+    // Borçlu (Zahlbar durch): fatura yolundan yapılandırılmış gelir; teklif
+    // yolunda müşteri adresi satırlarından ayrıştırılır. PLZ + şehir olmadan
+    // yapılandırılmış borçlu GEÇERSİZ olur ve kod taranmaz — o durumda borçlu
+    // bloğu boş bırakılır (ödeyen elle doldurur), kod geçerli kalır.
+    const parsed = splitPostalAddress(data.customerAddress);
+    const debtor = (data.qrDebtor?.postalCode && data.qrDebtor.city)
+        ? data.qrDebtor
+        : (data.customerName && parsed.postalCode && parsed.city)
+            ? {
+                name: data.customerName,
+                addressLine1: parsed.line1,
+                addressLine2: '',
+                postalCode: parsed.postalCode,
+                city: parsed.city,
+                country: 'CH',
+            }
+            : null;
+
+    const additionalInfo = (data.qrAdditionalInfo || '').trim()
+        || `${data.docTitle || L.offerTitle} ${data.tenderNumber}`;
+
     const payload = buildQrBillPayload({
         iban: s.iban,
         creditorName: s.companyName,
@@ -1569,65 +1681,110 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         creditorCountry: s.country,
         amount,
         currency: qrCurrency,
-        debtorName: data.customerName,
-        debtorAddressLine1: data.customerAddress || '',
-        debtorAddressLine2: '',
-        debtorPostalCode: '',
-        debtorCity: '',
-        debtorCountry: 'CH',
+        debtorName: debtor?.name,
+        debtorAddressLine1: debtor?.addressLine1 || '',
+        debtorAddressLine2: debtor?.addressLine2 || '',
+        debtorPostalCode: debtor?.postalCode || '',
+        debtorCity: debtor?.city || '',
+        debtorCountry: debtor?.country || 'CH',
         referenceType: data.referenceNumber ? 'SCOR' : 'NON',
         reference: data.referenceNumber || '',
-        unstructuredMessage: `${L.offerTitle} ${data.tenderNumber}`,
+        unstructuredMessage: additionalInfo,
     });
 
+    const QR_X = 67;
+    const QR_Y = yTop + 11;
+    const QR_SIZE = 46;
     try {
         const qrDataUrl = await QRCode.toDataURL(payload, {
             errorCorrectionLevel: 'M',
             margin: 0,
-            width: 200,
+            width: 500,
         });
-        doc.addImage(qrDataUrl, 'PNG', 67, yTop + 11, 46, 46);
+        doc.addImage(qrDataUrl, 'PNG', QR_X, QR_Y, QR_SIZE, QR_SIZE);
     } catch {
         doc.setDrawColor(0);
-        doc.rect(67, yTop + 11, 46, 46);
+        doc.rect(QR_X, QR_Y, QR_SIZE, QR_SIZE);
     }
+    // İsviçre haçı QR'ın tam ortasına bindirilir (hata düzeltme payı bunu taşır).
+    drawSwissCross(doc, QR_X + QR_SIZE / 2, QR_Y + QR_SIZE / 2);
 
     doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0);
     doc.text(L.qrReceipt, 5, yTop + 7);
-    doc.text(L.qrPaymentPart, 67, yTop + 7);
+    doc.text(L.qrPaymentPart, QR_X, yTop + 7);
 
-    const writeBlock = (x: number, yy: number) => {
+    // Etiket + değer satırları — makbuz 6/8 pt, ödeme bölümü 8/10 pt yerine
+    // şartnamenin kompakt ölçüleri (başlık 6/8, değer 8/10 yaklaşık).
+    const writeLabel = (text: string, x: number, y: number, size = 6) => {
         doc.setFont(FONT, 'bold');
-        doc.setFontSize(6);
-        doc.text(L.qrAccountPayableTo, x, yy);
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(8);
-        doc.text(formatIban(s.iban), x, yy + 3);
-        doc.text(s.companyName, x, yy + 7);
-        doc.text(`${s.addressLine1} ${s.addressLine2}`.replace(/\s+/g, ' ').trim(), x, yy + 10.5);
-        doc.text(`${s.postalCode} ${s.city}`, x, yy + 14);
+        doc.setFontSize(size);
+        doc.text(text, x, y);
     };
-    writeBlock(5, yTop + 12);
-    writeBlock(118, yTop + 12);
+    const writeLines = (lines: string[], x: number, y: number, size = 8, lineH = 3.5): number => {
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(size);
+        let yy = y;
+        for (const line of lines.filter(Boolean)) {
+            doc.text(line, x, yy);
+            yy += lineH;
+        }
+        return yy;
+    };
 
+    const creditorLines = [
+        formatIban(s.iban),
+        s.companyName,
+        `${s.addressLine1} ${s.addressLine2}`.replace(/\s+/g, ' ').trim(),
+        `${s.postalCode} ${s.city}`,
+    ];
+    const debtorLines = debtor
+        ? [
+            debtor.name,
+            `${debtor.addressLine1 || ''} ${debtor.addressLine2 || ''}`.replace(/\s+/g, ' ').trim(),
+            `${debtor.postalCode || ''} ${debtor.city || ''}`.trim(),
+        ]
+        : [];
+
+    // ── Empfangsschein (sol) ────────────────────────────────────────────────
+    writeLabel(L.qrAccountPayableTo, 5, yTop + 12);
+    let ry = writeLines(creditorLines, 5, yTop + 15.5);
+    if (debtorLines.length > 0) {
+        ry += 3;
+        writeLabel(L.qrPayableBy, 5, ry);
+        writeLines(debtorLines, 5, ry + 3.5);
+    }
+    writeLabel(L.qrCurrency, 5, yTop + 68);
+    writeLabel(L.qrAmount, 25, yTop + 68);
+    writeLines([qrCurrency], 5, yTop + 72);
+    writeLines([amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })], 25, yTop + 72);
     doc.setFont(FONT, 'bold');
     doc.setFontSize(6);
-    doc.text(L.qrCurrency, 67, yTop + 70);
-    doc.text(L.qrAmount, 87, yTop + 70);
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(8);
-    doc.text(qrCurrency, 67, yTop + 74);
-    doc.text(amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 87, yTop + 74);
+    doc.text(L.qrAcceptancePoint, 57, yTop + 82, { align: 'right' });
 
+    // ── Zahlteil (QR altı: para birimi + tutar) ─────────────────────────────
+    writeLabel(L.qrCurrency, QR_X, yTop + 70);
+    writeLabel(L.qrAmount, QR_X + 20, yTop + 70);
+    writeLines([qrCurrency], QR_X, yTop + 74);
+    writeLines([amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })], QR_X + 20, yTop + 74);
+
+    // ── Zahlteil sağ bilgi sütunu ───────────────────────────────────────────
+    const infoX = 118;
+    writeLabel(L.qrAccountPayableTo, infoX, yTop + 12);
+    let iy = writeLines(creditorLines, infoX, yTop + 15.5);
     if (data.referenceNumber) {
-        doc.setFont(FONT, 'bold');
-        doc.setFontSize(6);
-        doc.text(L.qrReference, 118, yTop + 40);
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(8);
-        doc.text(formatReference(data.referenceNumber), 118, yTop + 43);
+        iy += 3;
+        writeLabel(L.qrReference, infoX, iy);
+        iy = writeLines([formatReference(data.referenceNumber)], infoX, iy + 3.5);
+    }
+    iy += 3;
+    writeLabel(L.qrAdditionalInfo, infoX, iy);
+    iy = writeLines([additionalInfo], infoX, iy + 3.5);
+    if (debtorLines.length > 0) {
+        iy += 3;
+        writeLabel(L.qrPayableBy, infoX, iy);
+        writeLines(debtorLines, infoX, iy + 3.5);
     }
 }
 

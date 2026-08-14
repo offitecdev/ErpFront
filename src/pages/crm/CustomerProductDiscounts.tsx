@@ -10,6 +10,7 @@ import type { ArticleQuickPick } from '../../types/inventory';
 import { Button } from '../../components/ui-shared/Button';
 import { BottomSheet } from '../inventory/components/BottomSheet';
 import { CELL_INPUT_CLASS, Pager, SearchBox, SectionCard, TableStateRow } from '../../components/ui-shared/TableKit';
+import { CUSTOMER_ADD_ROW_BUTTON_CLASS } from './detail/customerDetail.constants';
 
 /**
  * ── PREISLISTE (Produktrabatte) ─────────────────────────────────────────────
@@ -131,7 +132,7 @@ const ProductPickerSheet = ({
         >
             <div className="space-y-2 p-4">
                 <SearchBox value={search} onChange={setSearch} placeholder={i18nT('crm.productDiscountSearch')} autoFocus />
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <thead>
                         <tr>
                             <th className="w-36 text-left">{i18nT('crm.productDiscountColArticle')}</th>
@@ -312,7 +313,7 @@ export const CustomerProductDiscounts = ({ customerId }: { customerId: string })
                     </div>
                 }
             >
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <thead>
                         <tr>
                             <th className="w-36 text-left">{i18nT('crm.productDiscountColArticle')}</th>
@@ -388,19 +389,24 @@ export const CustomerProductDiscounts = ({ customerId }: { customerId: string })
 
                         {/* Leerzeile: das "+" öffnet den Artikelwähler. */}
                         <tr className="bg-slate-50/60 dark:bg-white/[0.02]">
-                            <td colSpan={5} className="text-[12.5px] text-slate-400 dark:text-white/40">
-                                {i18nT('crm.productDiscountAddHint')}
-                            </td>
-                            <td className="text-right">
-                                <button
-                                    type="button"
-                                    onClick={() => setPickerOpen(true)}
-                                    title={i18nT('crm.productDiscountAdd')}
-                                    aria-label={i18nT('crm.productDiscountAdd')}
-                                    className="inline-flex size-6 items-center justify-center rounded-[2px] border border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                                >
-                                    <Plus size={13} />
-                                </button>
+                            {/* Knopf UND Beschriftung in DERSELBEN Zelle, rechts —
+                                dieselbe Anlege-Zeile wie in den Tabellen der
+                                Kundenübersicht. */}
+                            <td colSpan={6}>
+                                <div className="flex items-center gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPickerOpen(true)}
+                                        title={i18nT('crm.productDiscountAdd')}
+                                        aria-label={i18nT('crm.productDiscountAdd')}
+                                        className={CUSTOMER_ADD_ROW_BUTTON_CLASS}
+                                    >
+                                        <Plus size={18} />
+                                    </button>
+                                    <span className="text-[12.5px] text-slate-400 dark:text-white/40">
+                                        {i18nT('crm.productDiscountAddHint')}
+                                    </span>
+                                </div>
                             </td>
                         </tr>
                     </tbody>

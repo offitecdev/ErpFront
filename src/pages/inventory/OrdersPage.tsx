@@ -4,7 +4,8 @@ import { InventoryListHeader } from '@/components/inventory/InventoryListHeader'
 import { t } from '@/i18n/translate';
 import { useAuthStore } from '@/store/authStore';
 import type { PurchaseOrderStatus } from '@/types/inventory';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { OrderSheet } from './components/OrderSheet';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { ORDERS_PAGE_SIZE, useOrdersList } from './hooks/useOrdersList';
@@ -17,12 +18,32 @@ const TOOLBAR_CONTROL_CLASS = 'h-9 rounded-md border border-slate-200 bg-white p
  * Satın alma siparişleri listesi. Satıra tıklanınca detay/önizleme popup'ı
  * (OrderSheet) açılır; ok tuşlarıyla sayfadaki siparişler arasında gezilir.
  */
+// Sürüklenebilir sütun genişlikleri. Proje sütunu burada YOKTUR: genişliği
+// olmayan tek sütun odur ve artan yeri o emer.
+const ORDER_LIST_COLUMN_WIDTHS = {
+    reference: 144,
+    quote: 144,
+    supplier: 192,
+    itemCount: 96,
+    total: 128,
+    date: 160,
+    status: 192,
+};
+type OrderListColumn = keyof typeof ORDER_LIST_COLUMN_WIDTHS;
+
 export const OrdersPage = () => {
     useLanguageTick();
     const navigate = useNavigate();
     const permissions = useAuthStore((state) => state.permissions);
     const canManage = permissions.includes('inventory.transfer');
     const list = useOrdersList();
+    // Sürüklenebilir sütunlar: proje sütununun solundakiler SAĞ kenarlarından,
+    // sağındakiler sol kenarlarından tutulur — her tutamaç kendi taşıdığı çizgi.
+    const grid = useColumnWidths<OrderListColumn>({
+        storageKey: 'offitec:inv-orders:col-widths:v1',
+        defaults: ORDER_LIST_COLUMN_WIDTHS,
+        minPx: 72,
+    });
 
     // Açık popup, sayfadaki listenin indeksiyle takip edilir (sol/sağ gezinme).
     const [sheetIndex, setSheetIndex] = useState<number | null>(null);
@@ -80,17 +101,49 @@ export const OrdersPage = () => {
 
             <SectionCard title={t('inv.orders.sectionTitle', { count: list.total })}>
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-unstyled-table className="w-full min-w-[880px]">
+                    {/* min-w, DURUM SÜTUNU GENİŞLEDİĞİ için 880 → 960: rozet tek
+                        satırda kalmalı ("Bestellung bestätigt" gibi uzun etiketler
+                        de dahil — kullanıcı isteği 2026-08-03). */}
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[960px]">
+                        <colgroup>
+                            <ResizableCols keys={['reference', 'quote'] as const} grid={grid} />
+                            {/* Proje sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['supplier', 'itemCount', 'total', 'date', 'status'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-36 text-left">{t('inv.orders.columns.reference')}</th>
-                                <th className="w-36 text-left">{t('inv.orders.columns.quoteNumber')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.orders.columns.reference')}
+                                    <ColResizeHandle {...grid.resizeProps('reference', 'right')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('inv.orders.columns.quoteNumber')}
+                                    <ColResizeHandle {...grid.resizeProps('quote', 'right')} />
+                                </th>
                                 <th className="text-left">{t('inv.orders.columns.project')}</th>
-                                <th className="w-48 text-left">{t('inv.columns.supplier')}</th>
-                                <th className="w-24 text-right">{t('inv.orders.columns.itemCount')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.total')}</th>
-                                <th className="w-40 text-left">{t('common.date')}</th>
-                                <th className="w-36 text-left">{t('inv.columns.status')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.supplier')}
+                                    <ColResizeHandle {...grid.resizeProps('supplier')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.orders.columns.itemCount')}
+                                    <ColResizeHandle {...grid.resizeProps('itemCount')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.total')}
+                                    <ColResizeHandle {...grid.resizeProps('total')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('common.date')}
+                                    <ColResizeHandle {...grid.resizeProps('date')} />
+                                </th>
+                                {/* Durum rozeti ASLA sarılmaz; sütun en uzun etiketi
+                                    tek satırda taşıyacak kadar geniştir. */}
+                                <th className="relative text-left">
+                                    {t('inv.columns.status')}
+                                    <ColResizeHandle {...grid.resizeProps('status')} />
+                                </th>
                             </tr>
                             {/* Kolon filtreleri: sipariş no / ad / tedarikçi. */}
                             <tr data-filter-row>
@@ -126,7 +179,12 @@ export const OrdersPage = () => {
                                         className={FILTER_INPUT_CLASS}
                                     />
                                 </th>
-                                <th colSpan={4} />
+                                {/* Filtresi olmayan sütunlar da kendi (boş)
+                                    hücrelerini alır ki çizgiler kesilmesin. */}
+                                <th />
+                                <th />
+                                <th />
+                                <th />
                             </tr>
                         </thead>
                         <tbody>
@@ -155,7 +213,7 @@ export const OrdersPage = () => {
                                         </td>
                                         <td className="font-mono text-[12.5px] text-slate-500 dark:text-white/60">{fmtDateTime(order.createdAt)}</td>
                                         <td>
-                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}>
+                                            <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.className}`}>
                                                 {t(meta.labelKey)}
                                             </span>
                                         </td>

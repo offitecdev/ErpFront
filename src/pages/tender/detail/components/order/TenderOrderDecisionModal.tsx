@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui-shared/Button';
 import { Field, Input } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
+
 import { t } from '@/i18n/translate';
 import type { SalesOrderMode } from '@/lib/api/project';
 import type { ProjectDto } from '@/types/project';
@@ -14,14 +15,21 @@ type TenderOrderDecisionModalProps = {
     onModeChange: (mode: SalesOrderMode) => void;
     attachExisting: boolean;
     onAttachExistingChange: (value: boolean) => void;
-    projectName: string;
-    onProjectNameChange: (value: string) => void;
+    // Teslimat siparişinde zorunlu teslim tarihi (YYYY-MM-DD).
+    deliveryDate: string;
+    onDeliveryDateChange: (value: string) => void;
     projectSearch: string;
     onProjectSearchChange: (value: string) => void;
     projectSearchLoading: boolean;
     projectSearchResults: ProjectDto[];
     selectedProject: ProjectDto | null;
     onSelectProject: (project: ProjectDto | null) => void;
+    /**
+     * Kundenadresse der Offerte — nur als JA/NEIN gebraucht: fehlt sie, geht
+     * keine Auftragsbestätigung hinaus und der Dialog sagt das. Die Adressen
+     * selbst werden NICHT angezeigt (Benutzerwunsch).
+     */
+    notifyRecipient: string | null;
 };
 
 export const TenderOrderDecisionModal = ({
@@ -33,22 +41,23 @@ export const TenderOrderDecisionModal = ({
     onModeChange,
     attachExisting,
     onAttachExistingChange,
-    projectName,
-    onProjectNameChange,
+    deliveryDate,
+    onDeliveryDateChange,
     projectSearch,
     onProjectSearchChange,
     projectSearchLoading,
     projectSearchResults,
     selectedProject,
     onSelectProject,
+    notifyRecipient,
 }: TenderOrderDecisionModalProps) => (
     <Modal
         open={open}
         onClose={() => {
             if (!loading) onClose();
         }}
-        title={t('tenders.order_turunu_select')}
-        description={t('tenders.tender_onaylandiktan_sonra_order_record_create')}
+        title={t('tenders.order_project_or_direct_question')}
+        description={t('tenders.order_choice_required')}
         width="lg"
         closeOnBackdrop={false}
         footer={
@@ -77,10 +86,25 @@ export const TenderOrderDecisionModal = ({
                     }}
                     className={`rounded-[2px] border px-3 py-3 text-left transition-colors ${mode === 'INVOICE' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
                 >
-                    <div className="text-[13px] font-semibold">{t('tenders.invoice_icin_order_create')}</div>
+                    <div className="text-[13px] font-semibold">{t('tenders.delivery_order_create')}</div>
                     <div className="mt-1 text-[11.5px] text-slate-500">{t('tenders.project_olusturulmaz_crm_order_listesine_duser')}</div>
                 </button>
             </div>
+
+            {/* Teslimat siparişinin tek zaman taahhüdü teslim tarihidir, bu yüzden
+                ZORUNLUDUR. Projeli siparişte takvimi randevular taşır. Alan
+                teklifin "Lieferdatum" değerini gösterir ve kaydederken onu günceller. */}
+            {mode === 'INVOICE' && (
+                <div className="space-y-3 rounded-[2px] border border-slate-200 bg-slate-50/60 p-3">
+                    <Field label={t('tenders.lieferdatum_intern')} required>
+                        <Input
+                            type="date"
+                            value={deliveryDate}
+                            onChange={(event) => onDeliveryDateChange(event.target.value)}
+                        />
+                    </Field>
+                </div>
+            )}
 
             {mode === 'PROJECT_NEW' && (
                 <div className="space-y-3 rounded-[2px] border border-slate-200 bg-slate-50/60 p-3">
@@ -95,9 +119,10 @@ export const TenderOrderDecisionModal = ({
                         />{t('tenders.add_to_existing_project')}</label>
 
                     {!attachExisting ? (
-                        <Field label={t('tenders.project_ismi')}>
-                            <Input value={projectName} onChange={(event) => onProjectNameChange(event.target.value)} />
-                        </Field>
+                        // Proje adı burada GİRİLMEZ — sistem projeyi kendi
+                        // koduyla (PR-2026-10001) adlandırır ve sayaç kaldığı
+                        // yerden devam eder.
+                        <p className="text-[12px] text-slate-500">{t('tenders.project_code_auto_hint')}</p>
                     ) : (
                         <div className="space-y-2 transition-all duration-200 ease-out">
                             <Field label={t('tenders.project_search')}>
@@ -132,6 +157,17 @@ export const TenderOrderDecisionModal = ({
                     )}
                 </div>
             )}
+
+            {/* Die Auftragsbestätigung geht mit dem Erstellen automatisch an den
+                Kunden, in Kopie an die CC-Liste der Offerte, die Offerte als PDF
+                im Anhang. Kein Schalter — und BEWUSST ohne Adressliste
+                (Benutzerwunsch): nur der fehlende Empfänger ist eine Meldung
+                wert, denn dann geht gar nichts hinaus. */}
+            <div className="rounded-[2px] border border-slate-200 bg-slate-50/60 px-3 py-2 text-[12px] text-slate-600">
+                {notifyRecipient
+                    ? t('tenders.order_mail_auto_notice')
+                    : t('tenders.notify_customer_no_email')}
+            </div>
         </div>
     </Modal>
 );

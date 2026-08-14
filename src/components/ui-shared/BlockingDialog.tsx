@@ -10,7 +10,7 @@ interface BlockingDialogProps {
 
 export const BlockingDialog: React.FC<BlockingDialogProps> = ({ open, title, description }) => {
     return (
-        <Modal open={open} centered footer={null} closable={false} mask={{ closable: false }} keyboard={false} width={448}>
+        <Modal open={open} centered footer={null} closable={false} mask={{ closable: false }} keyboard={false} width={448} rootClassName="ofi-compact-modal">
             <div className="flex items-start gap-4">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-primary_alt">
                     <Spin size="small" />

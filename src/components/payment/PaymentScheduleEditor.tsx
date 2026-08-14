@@ -2,21 +2,29 @@ import { ArrowDown, ArrowUp, Check, Plus, X } from 'lucide-react';
 
 import { t } from '@/i18n/translate';
 import {
+    formatStageDate,
     MAX_PAYMENT_STAGES,
+    paymentStagesMissingDate,
     paymentStagesSum,
     paymentStagesValid,
     stageStatus,
+    type PaymentStage,
 } from '@/lib/paymentSchedule';
+// The quote's own calendar rather than `<input type="date">`: the native control
+// cannot be themed and renders in the OS language (see QuoteDatePicker).
+import { QuoteDatePicker } from '@/pages/tender/detail/components/common/QuoteDatePicker';
 
 type PaymentScheduleEditorProps = {
-    stages: number[];
-    onChange: (stages: number[]) => void;
+    stages: PaymentStage[];
+    onChange: (stages: PaymentStage[]) => void;
     readOnly?: boolean;
     /** Gross total the per-stage amount preview is computed against. */
     baseTotal?: number | null;
     formatMoney?: (value: number) => string;
     /** Order side: marks stages already covered by invoices with a check. */
     billedPercent?: number | null;
+    /** Suppresses the empty-state hint paragraph (order page: no extra text). */
+    hideEmptyHint?: boolean;
 };
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -27,10 +35,11 @@ const parsePercentInput = (raw: string): number => {
     return Number.isFinite(value) ? value : 0;
 };
 
-// Row list editing a percentage payment schedule (30/20/10/40, 50/50, …).
-// Purely presentational + local math: the parent owns the stage array and
-// decides when/where it is persisted. Amounts are a live preview against the
-// current gross total, never stored.
+// Row list editing a payment schedule (30/20/10/40, 50/50, …). Every instalment
+// carries its percentage AND the day it falls due; both are required before the
+// plan counts as valid. Purely presentational + local math: the parent owns the
+// stage array and decides when/where it is persisted. Amounts are a live preview
+// against the current gross total, never stored.
 export const PaymentScheduleEditor = ({
     stages,
     onChange,
@@ -38,15 +47,20 @@ export const PaymentScheduleEditor = ({
     baseTotal,
     formatMoney,
     billedPercent,
+    hideEmptyHint = false,
 }: PaymentScheduleEditorProps) => {
     const sum = paymentStagesSum(stages);
     const valid = paymentStagesValid(stages);
+    const missingDate = paymentStagesMissingDate(stages);
     const statuses = billedPercent != null && stages.length > 0 ? stageStatus(stages, billedPercent) : null;
 
-    const setStage = (index: number, value: number) => {
-        const next = [...stages];
-        next[index] = Math.min(100, Math.max(0, round2(value)));
+    const patchStage = (index: number, patch: Partial<PaymentStage>) => {
+        const next = stages.map((stage, i) => (i === index ? { ...stage, ...patch } : stage));
         onChange(next);
+    };
+
+    const setPercent = (index: number, value: number) => {
+        patchStage(index, { percent: Math.min(100, Math.max(0, round2(value))) });
     };
 
     const removeStage = (index: number) => {
@@ -65,18 +79,20 @@ export const PaymentScheduleEditor = ({
         if (stages.length >= MAX_PAYMENT_STAGES) return;
         // The new row takes whatever is missing to 100%, so 30/20 → add → 30/20/50.
         const remainder = round2(100 - sum);
-        onChange([...stages, remainder > 0 && remainder <= 100 ? remainder : 0]);
+        onChange([...stages, { percent: remainder > 0 && remainder <= 100 ? remainder : 0, date: null }]);
     };
 
     return (
         <div className="space-y-2">
             {stages.length === 0 ? (
-                <p className="text-[12.5px] text-slate-500 dark:text-white/60">{t('tenders.payment_empty_hint')}</p>
+                hideEmptyHint ? null : (
+                    <p className="text-[12.5px] text-slate-500 dark:text-white/60">{t('tenders.payment_empty_hint')}</p>
+                )
             ) : (
                 <div className="space-y-1">
                     {stages.map((stage, index) => {
                         const status = statuses?.[index] ?? null;
-                        const amount = baseTotal != null && baseTotal > 0 ? (baseTotal * stage) / 100 : null;
+                        const amount = baseTotal != null && baseTotal > 0 ? (baseTotal * stage.percent) / 100 : null;
                         return (
                             // Stages have no identity of their own; the position is the key.
                             <div
@@ -89,24 +105,24 @@ export const PaymentScheduleEditor = ({
                                             : 'border-slate-200 bg-white dark:border-white/15 dark:bg-white/5'
                                 }`}
                             >
-                                <span className="w-20 shrink-0 text-[12px] font-medium text-slate-600 dark:text-white/70">
+                                <span className="w-16 shrink-0 text-[12px] font-medium text-slate-600 dark:text-white/70">
                                     {t('tenders.payment_stage', { n: index + 1 })}
                                 </span>
                                 {readOnly ? (
-                                    <span className="w-16 text-right text-[12.5px] font-semibold tabular-nums text-slate-800 dark:text-white">
-                                        {round2(stage)}%
+                                    <span className="w-14 shrink-0 text-right text-[12.5px] font-semibold tabular-nums text-slate-800 dark:text-white">
+                                        {round2(stage.percent)}%
                                     </span>
                                 ) : (
-                                    <span className="inline-flex items-center gap-1">
+                                    <span className="inline-flex shrink-0 items-center gap-1">
                                         <input
-                                            key={`stage-${index}-${stage}`}
+                                            key={`stage-${index}-${stage.percent}`}
                                             aria-label={t('tenders.payment_stage', { n: index + 1 })}
                                             type="text"
                                             inputMode="decimal"
-                                            defaultValue={stage ? String(round2(stage)) : ''}
+                                            defaultValue={stage.percent ? String(round2(stage.percent)) : ''}
                                             onBlur={(event) => {
                                                 if (event.target.value !== event.target.defaultValue) {
-                                                    setStage(index, parsePercentInput(event.target.value));
+                                                    setPercent(index, parsePercentInput(event.target.value));
                                                 }
                                             }}
                                             onKeyDown={(event) => {
@@ -115,9 +131,32 @@ export const PaymentScheduleEditor = ({
                                                     (event.target as HTMLInputElement).blur();
                                                 }
                                             }}
-                                            className="w-16 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-right text-[12.5px] tabular-nums text-slate-800 outline-none transition-colors hover:border-slate-400 focus:border-[#1f2654] dark:border-white/25 dark:bg-white/10 dark:text-white"
+                                            className="w-14 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-right text-[12.5px] tabular-nums text-slate-800 outline-none transition-colors hover:border-slate-400 focus:border-[#1f2654] dark:border-white/25 dark:bg-white/10 dark:text-white"
                                         />
                                         <span className="text-[12px] text-slate-500 dark:text-white/60">%</span>
+                                    </span>
+                                )}
+                                {/* Fälligkeit der Rate — Pflichtfeld: ohne Datum
+                                    bleibt der Plan ungültig und wird nicht gespeichert. */}
+                                {readOnly ? (
+                                    <span className="w-[104px] shrink-0 text-[12px] tabular-nums text-slate-600 dark:text-white/70">
+                                        {formatStageDate(stage.date) || '—'}
+                                    </span>
+                                ) : (
+                                    <span className="w-[128px] shrink-0">
+                                        <QuoteDatePicker
+                                            value={stage.date ?? ''}
+                                            onChange={(next) => patchStage(index, { date: next || null })}
+                                            ariaLabel={t('tenders.payment_stage_date', { n: index + 1 })}
+                                            // A ring rather than a border colour for the
+                                            // "still missing" hint: the base chrome already
+                                            // sets border-slate-300, and two border-colour
+                                            // utilities at the same specificity would settle
+                                            // by stylesheet order rather than by intent.
+                                            className={`dark:border-white/25 dark:bg-white/10 dark:text-white ${
+                                                stage.date ? '' : 'ring-1 ring-amber-300'
+                                            }`}
+                                        />
                                     </span>
                                 )}
                                 <span className="min-w-0 flex-1 truncate text-right text-[12px] tabular-nums text-slate-500 dark:text-white/60">
@@ -187,7 +226,13 @@ export const PaymentScheduleEditor = ({
                                 : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
                         }`}
                     >
-                        {valid ? t('tenders.payment_sum_ok') : t('tenders.payment_sum_invalid', { sum })}
+                        {valid
+                            ? t('tenders.payment_sum_ok')
+                            : Math.abs(sum - 100) > 0.01
+                                ? t('tenders.payment_sum_invalid', { sum })
+                                : missingDate
+                                    ? t('tenders.payment_dates_missing')
+                                    : t('tenders.payment_sum_invalid', { sum })}
                     </span>
                 )}
             </div>

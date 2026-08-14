@@ -134,7 +134,7 @@ const SummaryRows = ({ responses }: { responses: DeliveryResponseItem[] }) => (
                 <div className="border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11.5px] font-semibold text-slate-700">
                     {group.category === '—' ? t('projects.delivery.uncategorized') : group.category}
                 </div>
-                <table className="w-full text-[12px]">
+                <table data-grid-lines className="w-full text-[12px]">
                     <tbody className="divide-y divide-slate-100">
                         {group.items.map((r) => (
                             <tr key={r.id}>

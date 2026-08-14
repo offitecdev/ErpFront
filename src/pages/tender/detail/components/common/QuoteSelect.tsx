@@ -142,11 +142,21 @@ export const QuoteSelect = ({
                                         event.preventDefault();
                                         commit(option);
                                     }}
+                                    // The highlighted row must NOT also carry
+                                    // `text-slate-800`: index.css re-declares that
+                                    // utility with !important, and against a static
+                                    // `text-white` (same layer, same specificity, but
+                                    // declared later) it wins — which painted dark
+                                    // text on the navy fill. The hover variant beats
+                                    // it on specificity, so only the state-painted
+                                    // row needs the swap.
                                     className={`ofi-option-row flex cursor-pointer items-center justify-between gap-2 px-2.5 py-1.5 text-[13px] transition-colors ${
                                         option.disabled
                                             ? 'cursor-not-allowed text-slate-300'
-                                            : 'text-slate-800 hover:bg-[#1f2654] hover:!text-white'
-                                    } ${index === activeIndex && !option.disabled ? 'bg-[#1f2654] !text-white' : ''}`}
+                                            : index === activeIndex
+                                                ? 'bg-[#1f2654] text-white'
+                                                : 'text-slate-800 hover:bg-[#1f2654] hover:!text-white'
+                                    }`}
                                 >
                                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
                                     {isSelected && <Check size={13} className="shrink-0" />}

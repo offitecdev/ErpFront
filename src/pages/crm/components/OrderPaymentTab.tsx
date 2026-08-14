@@ -3,7 +3,12 @@ import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
 import { PaymentScheduleEditor } from '@/components/payment/PaymentScheduleEditor';
-import { parsePaymentStages, paymentStagesValid, serializePaymentStages } from '@/lib/paymentSchedule';
+import {
+    parsePaymentStages,
+    paymentStagesValid,
+    serializePaymentStages,
+    type PaymentStage,
+} from '@/lib/paymentSchedule';
 import { myOrdersApi } from '@/lib/api/billing';
 import type { MyOrderDetailDto } from '@/types/billing';
 
@@ -24,7 +29,7 @@ type OrderPaymentTabProps = {
 // harmless because billing progress is derived from billedPercent, not from a
 // stage↔invoice link.
 export const OrderPaymentTab = ({ order, onChanged }: OrderPaymentTabProps) => {
-    const [stages, setStages] = useState<number[]>(() => parsePaymentStages(order.paymentStages) ?? []);
+    const [stages, setStages] = useState<PaymentStage[]>(() => parsePaymentStages(order.paymentStages) ?? []);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -49,18 +54,20 @@ export const OrderPaymentTab = ({ order, onChanged }: OrderPaymentTabProps) => {
         }
     };
 
+    // Başlık ve açıklama metni YOK (kullanıcı isteği): sekmede yalnızca taksit
+    // satırları, "Rate hinzufügen" düğmesi ve Kaydet durur.
     return (
-        <Card title={t('billing.paymentScheduleTab')}>
+        <Card>
             <div className="max-w-xl space-y-3">
-                <p className="text-[12.5px] text-slate-500 dark:text-white/60">
-                    {t('billing.paymentScheduleOrderHint')}
-                </p>
                 <PaymentScheduleEditor
                     stages={stages}
                     onChange={setStages}
                     baseTotal={order.totalAmount}
                     formatMoney={fmtMoney}
-                    billedPercent={order.billingSummary?.billedPercent ?? 0}
+                    /* Onay işareti ÖDENEN payı izler (plan popup'ıyla aynı kural):
+                       kesilmiş ama ödenmemiş fatura taksiti kapatmaz. */
+                    billedPercent={order.billingSummary?.paidPercent ?? 0}
+                    hideEmptyHint
                 />
                 <div className="flex justify-end">
                     <Button variant="primary" size="md" loading={saving} disabled={!canSave} onClick={save}>

@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui-shared/Button';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { SlidingTopTabs } from '../../components/ui-shared/SlidingTopTabs';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import type { MaintenanceReportDto, MaintenanceTaskDto, PersonLite } from '../../types/maintenance';
@@ -336,13 +337,18 @@ const MaintenanceWorkspace = () => {
                     :t('auto.bakim_gorevleri_icin_sorumlu_teknisyenleri_atayi')}
             />
 
-            <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-white/15 dark:bg-white/5">
+            <div className="ofi-quote-tabs-strip mb-4 min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 dark:border-white/15">
+                <SlidingTopTabs activeKey={view} className="flex min-w-max items-stretch gap-1">
                 {tabs.map((tab) => (
                     <button
                         key={tab.key}
+                        data-tab-key={tab.key}
                         type="button"
                         onClick={() => changeView(tab.key)}
-                        className={`relative rounded-md px-4 py-2 text-[12.5px] font-semibold transition-colors ${view === tab.key ?"bg-white text-slate-950 shadow-xs" :"text-slate-600 hover:text-slate-950 dark:text-white dark:hover:text-white"}`}
+                        className={`ofi-quote-tab relative -mb-px inline-flex items-center rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${view === tab.key
+                            ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
+                            : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                        }`}
                     >
                         {tab.label}
                         {tab.showDot && (
@@ -356,6 +362,7 @@ const MaintenanceWorkspace = () => {
                         )}
                     </button>
                 ))}
+                </SlidingTopTabs>
             </div>
 
             {view === 'reports'

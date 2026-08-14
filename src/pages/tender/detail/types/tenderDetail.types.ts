@@ -61,6 +61,7 @@ export type ChatterTimelineItem = {
     title: string;
     body: string;
     document?: TenderDocumentDto;
+    kind?: 'note' | 'change' | 'attachment' | 'event';
 };
 
 export type DetailInfoRow = {
@@ -94,4 +95,4 @@ export type CustomerOption = {
 export type TenderLineColumnKey = 'pos' | 'description' | 'quantity' | 'unit' | 'unitPrice' | 'discount' | 'taxRate' | 'total' | 'profit';
 
 export type TenderSettingsTabKey = 'mail' | 'schedule' | 'overtime' | 'materials';
-export type TenderWorkspaceTabKey = 'lines' | TenderSettingsTabKey | 'pdf' | 'payment';
+export type TenderWorkspaceTabKey = 'lines' | TenderSettingsTabKey | 'pdf' | 'payment' | 'logs';

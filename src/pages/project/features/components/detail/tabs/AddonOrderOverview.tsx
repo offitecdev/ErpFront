@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 
 import { BillingStatusChip } from '@/components/billing/BillingStatusChip';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 
 import { CostList } from '../../common/CostList';
@@ -16,7 +15,7 @@ export const AddonOrderOverview = memo(({ project, order, isPrimary, totals }: {
     const materialRows = useMemo(
         () => scopedRecords(project.extraMaterials, order, isPrimary, project.salesOrders).map((item: any) => ({
             id: item.id,
-            title: item.material?.name ||t('auto.malzeme'),
+            title: item.material?.name || item.article?.name || t('auto.malzeme'),
             meta: `${numberFmt(item.quantity)} adet x ${money(item.unitPrice)}`,
             amount: (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
             note: item.description,
@@ -51,7 +50,7 @@ export const AddonOrderOverview = memo(({ project, order, isPrimary, totals }: {
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className="text-[11px] font-semibold uppercase text-slate-500">{t('auto.ek_siparis')}</div>
-                    <div className="mt-1 text-[20px] font-bold text-slate-950">{localizeTenderNumbersInText(order.orderNumber)}</div>
+                    <div className="mt-1 text-[20px] font-bold text-slate-950">{order.orderNumber}</div>
                 </div>
                 {!order.id.startsWith('project-main-') && (
                     <div className="flex flex-col items-end gap-1">

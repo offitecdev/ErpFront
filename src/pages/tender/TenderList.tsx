@@ -5,8 +5,6 @@ import { toast } from 'sonner';
 import {
     Building02 as Building2,
     CheckCircle,
-    ChevronRight,
-    Eye,
     File05 as FileSpreadsheet,
     Plus,
     UploadCloud02 as Upload,
@@ -19,13 +17,13 @@ import { Field } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { BlockingDialog } from '../../components/ui-shared/BlockingDialog';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../hooks/useColumnWidths';
 
 import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
 import type { TenderListItem } from '../../types/tender';
 import { formatMoney, toCurrencyCode } from '../../utils/currency';
-import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 import { t as i18nT } from '@/i18n/translate';
 // İş akışı iki durumludur: sipariş (projeye bağlı ya da kaynağı satış siparişi)
@@ -37,6 +35,20 @@ import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 
 const tenderCreatorName = (tender: TenderListItem) =>
     tender.createdByName || tender.createdByEmail || tender.createdByEmployeeId || '—';
+
+// Sürüklenebilir sütun genişlikleri (quote-lines tablosundaki ile aynı mekanik).
+// Teklif no sütunu listede YOKTUR: genişliği olmayan tek sütun odur, artan yeri
+// o emer — böylece bir sütun genişletilince sağda boşluk kalmaz.
+const TENDER_LIST_COLUMN_WIDTHS = {
+    customer: 224,
+    status: 128,
+    creator: 176,
+    amount: 144,
+    createdAt: 160,
+    mail: 80,
+};
+type TenderListColumn = keyof typeof TENDER_LIST_COLUMN_WIDTHS;
+const TENDER_LIST_COLUMNS = Object.keys(TENDER_LIST_COLUMN_WIDTHS) as TenderListColumn[];
 
 const initialsFromName = (value?: string | null) => {
     const cleaned = value?.trim();
@@ -63,6 +75,14 @@ export const TenderList = () => {
         list, listTotal, listPage, listTotalPages, loadingList, fetchList,
         importSalesOrderCsv,
     } = useTenderStore();
+
+    // Sütun genişlikleri: başlıkların sol kenarından sürüklenir, çift tıklama
+    // varsayılana döndürür, seçim tarayıcıda saklanır.
+    const { widths, setColRef, startResize, resetColumn } = useColumnWidths<TenderListColumn>({
+        storageKey: 'offitec:tender-list:col-widths:v1',
+        defaults: TENDER_LIST_COLUMN_WIDTHS,
+        minPx: 72,
+    });
 
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -262,17 +282,35 @@ export const TenderList = () => {
             </div>
 
             <SectionCard title={`${i18nT('crm.tenders.tableTitle')} (${listTotal})`}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    {/* Teklif no sütununun genişliği yoktur: kalan yeri o emer. */}
+                    <colgroup>
+                        <col />
+                        {TENDER_LIST_COLUMNS.map((key) => (
+                            <col key={key} ref={setColRef(key)} style={{ width: widths[key] }} />
+                        ))}
+                    </colgroup>
                     <thead>
                         <tr>
                             <SortableTh label={i18nT('tenders.tender_no')} sortKey="tenderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
-                            <SortableTh label={i18nT('nav.quickActionsGroup.customers')} sortKey="customerName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-56 text-left" />
-                            <SortableTh label={i18nT('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-32 text-left" />
-                            <th className="w-44 text-left">{i18nT('tenders.olusturan')}</th>
-                            <th className="w-36 text-right">{i18nT('common.amount')}</th>
-                            <SortableTh label={i18nT('tenders.olusturma')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-40 text-left" />
-                            <th className="w-20 text-center">{i18nT('tenders.mail')}</th>
-                            <th className="w-28 text-right" />
+                            <SortableTh label={i18nT('nav.quickActionsGroup.customers')} sortKey="customerName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('customer', event)} onResizeReset={() => resetColumn('customer')} />
+                            <SortableTh label={i18nT('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('status', event)} onResizeReset={() => resetColumn('status')} />
+                            <th className="relative text-left">
+                                {i18nT('tenders.olusturan')}
+                                <ColResizeHandle onResizeStart={(event) => startResize('creator', event)} onResizeReset={() => resetColumn('creator')} />
+                            </th>
+                            <th className="relative text-right">
+                                {i18nT('common.amount')}
+                                <ColResizeHandle onResizeStart={(event) => startResize('amount', event)} onResizeReset={() => resetColumn('amount')} />
+                            </th>
+                            <SortableTh label={i18nT('tenders.olusturma')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('createdAt', event)} onResizeReset={() => resetColumn('createdAt')} />
+                            {/* Detay sütunu YOK: satırın kendisi tıklanınca teklif
+                                detayına gidiyor, ayrı bir düğme sütunu yalnızca
+                                yer kaplıyordu. */}
+                            <th className="relative text-center">
+                                {i18nT('tenders.mail')}
+                                <ColResizeHandle onResizeStart={(event) => startResize('mail', event)} onResizeReset={() => resetColumn('mail')} />
+                            </th>
                         </tr>
                         {/* Kolon bazlı filtre satırı — teklif no / müşteri / oluşturan metinle daraltır. */}
                         <tr data-filter-row>
@@ -301,13 +339,19 @@ export const TenderList = () => {
                                     className={FILTER_INPUT_CLASS}
                                 />
                             </th>
-                            <th colSpan={4} />
+                            {/* Filtresi olmayan sütunlar da KENDİ hücrelerini alır
+                                (tek bir `colSpan` değil): boş kalabilirler ama
+                                sütun çizgileri filtre satırında da kesilmeden
+                                devam etsin — ızgara aşağı doğru sürsün. */}
+                            <th />
+                            <th />
+                            <th />
                         </tr>
                     </thead>
                     <tbody>
                         {(loadingList || list.length === 0) && (
                             <TableStateRow
-                                colSpan={8}
+                                colSpan={7}
                                 loading={loadingList}
                                 emptyText={hasFilters ?i18nT('crmOverview.picker.empty') :i18nT('tenders.no_tenders_yet')}
                             />
@@ -324,7 +368,7 @@ export const TenderList = () => {
                                             <FileSpreadsheet size={14} />
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="truncate font-semibold text-slate-900 dark:text-white">{localizeTenderNumber(t.tenderNumber)}</div>
+                                            <div className="truncate font-semibold text-slate-900 dark:text-white">{t.tenderNumber}</div>
                                             <div className="mt-0.5 font-mono text-[11.5px] text-slate-400">v{t.version}</div>
                                         </div>
                                     </div>
@@ -372,14 +416,6 @@ export const TenderList = () => {
                                             <XClose size={15} />
                                         </span>
                                     )}
-                                </td>
-                                <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                        onClick={() => navigate(`/crm/tenders/${t.id}`)}
-                                        className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100 dark:text-sky-300 dark:hover:bg-sky-500/15"
-                                    >
-                                        <Eye size={12} />{i18nT('common.detail')}<ChevronRight size={11} />
-                                    </button>
                                 </td>
                             </tr>
                         ))}

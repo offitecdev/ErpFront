@@ -6,10 +6,12 @@ import { InventoryListHeader } from '@/components/inventory/InventoryListHeader'
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
-import type { BulkArticleItemInput, ItemType } from '@/types/inventory';
+import type { BulkArticleItemInput } from '@/types/inventory';
 import { ExcelImportSheet } from './ExcelImportSheet';
+import { RowImageCell } from './RowImageCell';
 import { SupplierComboCell } from './SupplierComboCell';
-import { CELL_INPUT_CLASS, SectionCard } from './primitives';
+import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from './primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from '../hooks/useLanguageTick';
 import type { DraftProductRow, ImportedRecord, SupplierChoice } from '../types';
 import { normalizeHeader } from '../utils/columnMatch';
@@ -25,6 +27,8 @@ const emptyRow = (): DraftProductRow => ({
     purchasePrice: '',
     supplierId: null,
     supplierName: '',
+    description: '',
+    imageUrl: null,
     error: null,
 });
 
@@ -34,24 +38,30 @@ const isBlankRow = (row: DraftProductRow) => !row.articleCode.trim()
     && !row.salePrice.trim()
     && !row.quantity.trim()
     && !row.purchasePrice.trim()
-    && !row.supplierName.trim();
+    && !row.supplierName.trim()
+    && !row.description.trim()
+    && !row.imageUrl;
+
+/**
+ * Sunucunun gövde sınırı 15 MB — base64 görseller bunu tek istekte aşabilir.
+ * Kaydetmeden önce kaba boyut kontrolü yapılır ki kullanıcı anlaşılır bir
+ * mesaj alsın (sunucudan kopuk bir 413 yerine).
+ */
+const MAX_PAYLOAD_BYTES = 14 * 1024 * 1024;
 
 /**
  * Ürün / malzeme toplu ekleme sayfasının ortak gövdesi — stok ekranıyla aynı
  * desende tam sayfa tablo (pop-up değil). Satırlar tabloda düzenlenir, alttaki
  * "+" ile yeni satır eklenir; Excel içe aktarımı satırları buraya doldurur.
  * Tedarikçi hücresine tıklanınca hücreden açılan hızlı seçici gelir.
- * Kodlar benzersiz olmalıdır (ürün ve malzeme aynı kod havuzunu paylaşır):
- * tablo içi mükerrerler anında işaretlenir, mevcut kayıtlarla çakışanlar
- * kaydetme sırasında satır hatası olarak döner.
+ * Kodlar benzersiz olmalıdır: tablo içi mükerrerler anında işaretlenir,
+ * mevcut kayıtlarla çakışanlar kaydetme sırasında satır hatası olarak döner.
  */
 export const ArticleCreateView = ({
-    itemType,
     copyPrefix,
     backPath,
 }: {
-    itemType: ItemType;
-    /** 'inv.bulkProducts' | 'inv.bulkMaterials' — aynı yaprak adlarını taşırlar. */
+    /** 'inv.bulkProducts' — metin yaprağı. */
     copyPrefix: string;
     backPath: string;
 }) => {
@@ -60,14 +70,22 @@ export const ArticleCreateView = ({
     const permissions = useAuthStore((state) => state.permissions);
     const canCreate = permissions.includes('inventory.articles.create');
 
+    // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
+    // v2: açıklama + görsel sütunları eklendi (varsayılanlar değişti).
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-article-create:col-widths:v2',
+        defaults: { code: 144, salePrice: 112, quantity: 96, supplier: 200, purchasePrice: 112, description: 200, image: 72, remove: 48 },
+        minPx: 48,
+    });
     const [rows, setRows] = useState<DraftProductRow[]>(() => [emptyRow(), emptyRow(), emptyRow()]);
     const [saving, setSaving] = useState(false);
     const [excelOpen, setExcelOpen] = useState(false);
 
-    const codeLabel = t(itemType === 'MATERIAL' ? 'inv.columns.materialCode' : 'inv.columns.serialCode');
-    const nameLabel = t(itemType === 'MATERIAL' ? 'inv.columns.materialName' : 'inv.columns.productName');
+    const codeLabel = t('inv.columns.serialCode');
+    const nameLabel = t('inv.columns.productName');
 
-    /** Excel sihirbazının hedef kolonları. Etiketler çağrı anında çözülür (dil). */
+    /** Excel sihirbazının hedef kolonları. Etiketler çağrı anında çözülür (dil).
+        Görsel Excel'den gelemez; satırdaki hücreden elle eklenir. */
     const importFields = () => ([
         { key: 'articleCode', label: codeLabel, keyField: true },
         { key: 'name', label: nameLabel, keyField: true },
@@ -75,6 +93,7 @@ export const ArticleCreateView = ({
         { key: 'quantity', label: t('inv.columns.quantity'), numeric: true },
         { key: 'supplierName', label: t('inv.columns.supplier') },
         { key: 'purchasePrice', label: t('inv.columns.purchasePrice'), numeric: true },
+        { key: 'description', label: t('inv.columns.description') },
     ]);
 
     const patchRow = (key: string, patch: Partial<DraftProductRow>) => {
@@ -118,6 +137,7 @@ export const ArticleCreateView = ({
                 quantity: record.quantity === null || record.quantity === undefined ? '' : String(record.quantity),
                 purchasePrice: record.purchasePrice === null || record.purchasePrice === undefined ? '' : String(record.purchasePrice),
                 supplierName: record.supplierName === null || record.supplierName === undefined ? '' : String(record.supplierName),
+                description: record.description === null || record.description === undefined ? '' : String(record.description),
             }));
             // Önce tablodaki boş satırlar sırayla doldurulur (satır anahtarı
             // korunur), yetmezse kalanlar sona yeni satır olarak eklenir.
@@ -147,11 +167,19 @@ export const ArticleCreateView = ({
             purchasePrice: parseNum(row.purchasePrice) ?? 0,
             supplierId: row.supplierId,
             supplierName: row.supplierId ? null : (row.supplierName.trim() || null),
+            description: row.description.trim() ? row.description.trim() : null,
+            ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
         }));
+
+        // Görseller base64 gittiği için istek gövdesi sunucu sınırını aşabilir.
+        if (JSON.stringify(payload).length > MAX_PAYLOAD_BYTES) {
+            toast.error(t(`${copyPrefix}.payloadTooLarge`));
+            return;
+        }
 
         setSaving(true);
         try {
-            const result = await inventoryApi.bulkCreateArticles(payload, itemType);
+            const result = await inventoryApi.bulkCreateArticles(payload);
             if (result.errors.length) {
                 // Hatalı satırlar tabloda kalır ve hatasını gösterir; oluşanlar düşer.
                 const errorByIndex = new Map(result.errors.map((error) => [error.index, error.error]));
@@ -207,16 +235,47 @@ export const ArticleCreateView = ({
             </div>
 
             <SectionCard title={t(`${copyPrefix}.title`)}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <colgroup>
+                        <ResizableCols keys={['code'] as const} grid={grid} />
+                        {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
+                        <col />
+                        <ResizableCols keys={['salePrice', 'quantity', 'supplier', 'purchasePrice', 'description', 'image', 'remove'] as const} grid={grid} />
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th className="w-36 text-left">{codeLabel}</th>
+                            <th className="relative text-left">
+                                {codeLabel}
+                                <ColResizeHandle {...grid.resizeProps('code', 'right')} />
+                            </th>
                             <th className="text-left">{nameLabel}</th>
-                            <th className="w-28 text-right">{t('inv.columns.salePrice')}</th>
-                            <th className="w-24 text-right">{t('inv.columns.quantity')}</th>
-                            <th className="w-56 text-left">{t('inv.columns.supplier')}</th>
-                            <th className="w-28 text-right">{t('inv.columns.purchasePrice')}</th>
-                            <th className="w-12" />
+                            <th className="relative text-right">
+                                {t('inv.columns.salePrice')}
+                                <ColResizeHandle {...grid.resizeProps('salePrice')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('inv.columns.quantity')}
+                                <ColResizeHandle {...grid.resizeProps('quantity')} />
+                            </th>
+                            <th className="relative text-left">
+                                {t('inv.columns.supplier')}
+                                <ColResizeHandle {...grid.resizeProps('supplier')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('inv.columns.purchasePrice')}
+                                <ColResizeHandle {...grid.resizeProps('purchasePrice')} />
+                            </th>
+                            <th className="relative text-left">
+                                {t('inv.columns.description')}
+                                <ColResizeHandle {...grid.resizeProps('description')} />
+                            </th>
+                            <th className="relative text-center">
+                                {t('inv.detail.imageTitle')}
+                                <ColResizeHandle {...grid.resizeProps('image')} />
+                            </th>
+                            <th className="relative">
+                                <ColResizeHandle {...grid.resizeProps('remove')} />
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -281,6 +340,21 @@ export const ArticleCreateView = ({
                                             className={`${CELL_INPUT_CLASS} text-right font-mono`}
                                         />
                                     </td>
+                                    <td>
+                                        <input
+                                            value={row.description}
+                                            onChange={(event) => patchRow(row.key, { description: event.target.value })}
+                                            placeholder={t('inv.columns.description')}
+                                            className={CELL_INPUT_CLASS}
+                                        />
+                                    </td>
+                                    <td>
+                                        {/* Satırın ürün görseli — kaydedince ürün kartına yazılır. */}
+                                        <RowImageCell
+                                            value={row.imageUrl}
+                                            onChange={(next) => patchRow(row.key, { imageUrl: next })}
+                                        />
+                                    </td>
                                     <td className="text-center">
                                         <button
                                             type="button"
@@ -320,7 +394,7 @@ export const ArticleCreateView = ({
             <ExcelImportSheet
                 open={excelOpen}
                 onClose={() => setExcelOpen(false)}
-                title={t(itemType === 'MATERIAL' ? 'inv.excel.materialsTitle' : 'inv.excel.productsTitle')}
+                title={t('inv.excel.productsTitle')}
                 fields={importFields()}
                 onCommit={applyImport}
             />

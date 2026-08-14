@@ -10,7 +10,8 @@ import { AddressFields, AddressLines } from '@/components/ui-shared/AddressField
 import { EMPTY_ADDRESS, toAddressForm, toAddressPayload } from '@/components/ui-shared/addressForm';
 import type { AddressFormValue } from '@/components/ui-shared/addressForm';
 import { BottomSheet } from './components/BottomSheet';
-import { CELL_INPUT_CLASS, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { CELL_INPUT_CLASS, ColResizeHandle, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { SUPPLIERS_PAGE_SIZE, useSuppliersList } from './hooks/useSuppliersList';
 
@@ -39,9 +40,25 @@ const emptyForm: SupplierFormState = {
  * (modüldeki diğer popup'larla aynı kabuk); tablo tedarikçi adı, iletişim,
  * işlem sayısı ve aksiyonları gösterir.
  */
+// Sürüklenebilir sütun genişlikleri. Ad sütunu burada YOKTUR: genişliği olmayan
+// tek sütun odur ve artan yeri o emer.
+const SUPPLIER_COLUMN_WIDTHS = {
+    contact: 288,
+    address: 256,
+    txCount: 128,
+    actions: 112,
+};
+type SupplierColumn = keyof typeof SUPPLIER_COLUMN_WIDTHS;
+
 export const SuppliersPage = () => {
     useLanguageTick();
     const list = useSuppliersList();
+    // Sütunlar başlıklarının sol kenarından sürüklenerek genişletilir.
+    const grid = useColumnWidths<SupplierColumn>({
+        storageKey: 'offitec:inv-suppliers:col-widths:v1',
+        defaults: SUPPLIER_COLUMN_WIDTHS,
+        minPx: 72,
+    });
     const permissions = useAuthStore((state) => state.permissions);
     const canCreate = permissions.includes('inventory.articles.create');
     const canUpdate = permissions.includes('inventory.articles.update');
@@ -138,14 +155,31 @@ export const SuppliersPage = () => {
             />
 
             <SectionCard title={t('inv.suppliers.sectionTitle', { count: list.totalCount })}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <colgroup>
+                        {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
+                        <col />
+                        <ResizableCols keys={['contact', 'address', 'txCount', 'actions'] as const} grid={grid} />
+                    </colgroup>
                     <thead>
                         <tr>
                             <th className="text-left">{t('inv.suppliers.name')}</th>
-                            <th className="w-72 text-left">{t('inv.suppliers.contact')}</th>
-                            <th className="w-64 text-left">{t('address.sectionTitle')}</th>
-                            <th className="w-32 text-right">{t('inv.suppliers.txCount')}</th>
-                            <th className="w-28 text-right">{t('common.actions')}</th>
+                            <th className="relative text-left">
+                                {t('inv.suppliers.contact')}
+                                <ColResizeHandle {...grid.resizeProps('contact')} />
+                            </th>
+                            <th className="relative text-left">
+                                {t('address.sectionTitle')}
+                                <ColResizeHandle {...grid.resizeProps('address')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('inv.suppliers.txCount')}
+                                <ColResizeHandle {...grid.resizeProps('txCount')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('common.actions')}
+                                <ColResizeHandle {...grid.resizeProps('actions')} />
+                            </th>
                         </tr>
                     </thead>
                     <tbody>

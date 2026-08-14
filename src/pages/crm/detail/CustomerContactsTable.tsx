@@ -6,7 +6,9 @@ import { t as i18nT } from '@/i18n/translate';
 import { customerApi } from '../../../lib/api/customer';
 import type { CustomerContactDto } from '../../../lib/api/customer';
 import { Button } from '../../../components/ui-shared/Button';
-import { CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { ColResizeHandle, ResizableCols, CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../../hooks/useColumnWidths';
+import { CUSTOMER_ADD_ROW_BUTTON_CLASS } from './customerDetail.constants';
 
 /**
  * Ansprechpartner als Tabelle mit GESAMMELTEM Speichern.
@@ -27,6 +29,12 @@ interface ContactDraft {
     key: string;
     firstName: string;
     lastName: string;
+    /**
+     * Die Funktionsbezeichnung des Kontakts. Sie hat seit 2026-08-03 KEINE
+     * eigene Spalte mehr (Nutzerwunsch) — der Wert wird aber weiter geladen und
+     * beim Speichern unverändert zurückgeschickt, damit bestehende Einträge
+     * nicht durch das Ausblenden der Spalte verloren gehen.
+     */
     title: string;
     email: string;
     phone: string;
@@ -68,6 +76,11 @@ export const CustomerContactsTable = ({
     items: CustomerContactDto[];
     onChanged: () => void | Promise<void>;
 }) => {
+    const grid = useColumnWidths({
+        storageKey: 'offitec:customer-contacts:col-widths:v1',
+        defaults: { primary: 56, email: 224, phone: 176, actions: 64 },
+        minPx: 48,
+    });
     const saved = useMemo(() => items.map(toDraft), [items]);
     const [rows, setRows] = useState<ContactDraft[]>(saved);
     const [syncedItems, setSyncedItems] = useState(items);
@@ -178,21 +191,38 @@ export const CustomerContactsTable = ({
 
     return (
         <SectionCard title={`${i18nT('crm.tab_contacts')} (${rows.length})`}>
-            <table data-inv-table data-unstyled-table className="w-full">
+            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                <colgroup>
+                    <ResizableCols keys={['primary'] as const} grid={grid} />
+                    {/* Ad ve soyad sütunları: genişlikleri yok, kalan yeri paylaşırlar. */}
+                    <col />
+                    <col />
+                    <ResizableCols keys={['email', 'phone', 'actions'] as const} grid={grid} />
+                </colgroup>
                 <thead>
                     <tr>
-                        <th className="w-14 text-center">{i18nT('crm.primaryShort')}</th>
+                        <th className="relative text-center">
+                            {i18nT('crm.primaryShort')}
+                            <ColResizeHandle {...grid.resizeProps('primary', 'right')} />
+                        </th>
                         <th className="text-left">{i18nT('crm.customers.responsibleFirstName')}</th>
                         <th className="text-left">{i18nT('crm.customers.responsibleLastName')}</th>
-                        <th className="w-44 text-left">{i18nT('crm.customers.title')}</th>
-                        <th className="w-56 text-left">{i18nT('common.email')}</th>
-                        <th className="w-44 text-left">{i18nT('common.phone')}</th>
-                        <th className="w-16 text-right" />
+                        <th className="relative text-left">
+                            {i18nT('common.email')}
+                            <ColResizeHandle {...grid.resizeProps('email')} />
+                        </th>
+                        <th className="relative text-left">
+                            {i18nT('common.phone')}
+                            <ColResizeHandle {...grid.resizeProps('phone')} />
+                        </th>
+                        <th className="relative text-right">
+                            <ColResizeHandle {...grid.resizeProps('actions')} />
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.length === 0 && (
-                        <TableStateRow colSpan={7} loading={false} emptyText={i18nT('crm.noContacts')} />
+                        <TableStateRow colSpan={6} loading={false} emptyText={i18nT('crm.noContacts')} />
                     )}
                     {rows.map((row) => (
                         <tr key={row.key} className="group transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
@@ -213,7 +243,6 @@ export const CustomerContactsTable = ({
                             </td>
                             <td>{cell(row, 'firstName', i18nT('crm.customers.responsibleFirstName'))}</td>
                             <td>{cell(row, 'lastName', i18nT('crm.customers.responsibleLastName'))}</td>
-                            <td>{cell(row, 'title', i18nT('crm.customers.title'))}</td>
                             <td>{cell(row, 'email', i18nT('common.email'))}</td>
                             <td>{cell(row, 'phone', i18nT('common.phone'))}</td>
                             <td className="text-right">
@@ -231,19 +260,22 @@ export const CustomerContactsTable = ({
 
                     {/* Leerzeile: das "+" hängt eine weitere Zeile an. */}
                     <tr className="bg-slate-50/60 dark:bg-white/[0.02]">
-                        <td colSpan={6} className="text-[12.5px] text-slate-400 dark:text-white/40">
-                            {i18nT('crm.addContactHint')}
-                        </td>
-                        <td className="text-right">
-                            <button
-                                type="button"
-                                onClick={addRow}
-                                title={i18nT('crm.addContact')}
-                                aria-label={i18nT('crm.addContact')}
-                                className="inline-flex size-6 items-center justify-center rounded-[2px] border border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                            >
-                                <Plus size={13} />
-                            </button>
+                        {/* Knopf UND Beschriftung in DERSELBEN Zelle, rechts. */}
+                        <td colSpan={6}>
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={addRow}
+                                    title={i18nT('crm.addContact')}
+                                    aria-label={i18nT('crm.addContact')}
+                                    className={CUSTOMER_ADD_ROW_BUTTON_CLASS}
+                                >
+                                    <Plus size={18} />
+                                </button>
+                                <span className="text-[12.5px] text-slate-400 dark:text-white/40">
+                                    {i18nT('crm.addContactHint')}
+                                </span>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

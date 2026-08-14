@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { tenderApi, articleApi, type TenderListFilter } from '../lib/api/tender';
+import { takePrefetchedTender } from '../lib/bootPrefetch';
 import { inventoryApi } from '../lib/api/inventory';
 import type {
     TenderListItem,
@@ -51,7 +52,8 @@ interface TenderState {
     logs: TenderChangeLog[];
     fetchLogs: (tenderId: string) => Promise<void>;
 
-    createTender: (input: { customerId?: string | null; tenderNumber: string; format: TenderFormat; validUntil?: string | null }) => Promise<TenderListItem>;
+    // Teklif kodu (AN-2026-10001) sunucuda üretilir; gövdede gönderilmez.
+    createTender: (input: { customerId?: string | null; format: TenderFormat; validUntil?: string | null }) => Promise<TenderListItem>;
     importTender: (input: { customerId: string; xmlContent: string; format: TenderFormat }) => Promise<TenderListItem>;
     importSalesOrderCsv: (input: { csvContent: string; fileName?: string | null }) => Promise<TenderListItem | null>;
     deleteTender: (id: string) => Promise<void>;
@@ -88,6 +90,14 @@ let stockArticlesRequest: Promise<void> | null = null;
 let stockArticlesRequestHasImages = false;
 let detailRequestId: string | null = null;
 let detailRequest: Promise<void> | null = null;
+let detailFetchedId: string | null = null;
+let detailFetchedAt = 0;
+
+/** True while the detail in the store for `id` is younger than `maxAgeMs`.
+ *  Lets mount-time "re-sync just in case" fetches skip data that another
+ *  caller (e.g. the deep-link prefetch in App.tsx) loaded moments ago. */
+export const isDetailFresh = (id: string, maxAgeMs = 10_000) =>
+    detailFetchedId === id && Date.now() - detailFetchedAt < maxAgeMs;
 let pdfContentRequestId: string | null = null;
 let pdfContentRequest: Promise<TenderPdfContentDto> | null = null;
 
@@ -144,11 +154,16 @@ export const useTenderStore = create<TenderState>((set, get) => ({
             // tender detail (they were several MB of base64 and only ever needed
             // for the PDF) — they are fetched on demand at PDF-generation time.
             detailRequestId = id;
-            detailRequest = tenderApi.getById(id, {
-                includeImages: false,
-                includeActivities: false,
-                deferOrderPdfContent: true,
-            }).then((detail) => {
+            // A tender deep link may already have this exact request in
+            // flight since HTML-parse time (inline prefetch in index.html);
+            // otherwise fall back to the normal axios call.
+            detailRequest = takePrefetchedTender<TenderDetailDto>(id).then((prefetched) =>
+                prefetched ?? tenderApi.getById(id, {
+                    includeImages: false,
+                    includeActivities: false,
+                    deferOrderPdfContent: true,
+                }),
+            ).then((detail) => {
                 set((state) => {
                     const current = state.detail;
                     // A silent background refresh must not throw away PDF content
@@ -173,6 +188,8 @@ export const useTenderStore = create<TenderState>((set, get) => ({
                     }
                     return { detail };
                 });
+                detailFetchedId = id;
+                detailFetchedAt = Date.now();
             });
             await detailRequest;
         } finally {

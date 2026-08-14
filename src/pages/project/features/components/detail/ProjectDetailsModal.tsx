@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import type { ProjectDto } from '@/types/project';
 
 import type { calculateProjectTotals } from '../../utils/projectTotals';
@@ -69,7 +68,7 @@ export const ProjectDetailsModal = ({
                 <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-7 py-5">
                     <div className="min-w-0">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{t('common.detail')}</p>
-                        <h2 className="mt-0.5 truncate text-[18px] font-semibold tracking-tight text-slate-900">{localizeTenderNumbersInText(project.projectName)}</h2>
+                        <h2 className="mt-0.5 truncate text-[18px] font-semibold tracking-tight text-slate-900">{project.projectName}</h2>
                     </div>
                     <button
                         type="button"

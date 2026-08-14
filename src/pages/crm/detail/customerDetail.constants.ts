@@ -28,6 +28,23 @@ export const CUSTOMER_CONTROL_CLASS =
 export const CUSTOMER_NAVY = '#1f2654';
 
 /**
+ * Das "+" am Fuss der Tabellen (Kontakte, Adressen, Aktivitäten, Notizen).
+ *
+ * Es ist die einzige Schaltfläche, mit der eine Zeile ENTSTEHT, und war vorher
+ * als grau gestrichelter Umriss kaum zu finden. Jetzt ist es eine RICHTIGE
+ * Schaltfläche in der Hausfarbe: gefüllt, 32 px statt 24, Glyphe 18 statt 13.
+ *
+ * Die Farbe kommt nicht von hier, sondern aus der Markenklasse `bg-[#272f67]` —
+ * derselbe Weg wie bei jedem Primärknopf der Anwendung. Damit gibt es die zwei
+ * Fassungen geschenkt und immer im Gleichschritt mit dem Rest: Marineblau im
+ * hellen Modus, Gold im dunklen (`dark.css` färbt die Klasse um und setzt dort
+ * auch die fast schwarze Glyphe). `ofi-btn-brand` liefert die Rückmeldung beim
+ * Zeigen und Drücken (siehe index.css / dark.css).
+ */
+export const CUSTOMER_ADD_ROW_BUTTON_CLASS =
+    'ofi-btn-brand ofi-add-row-button inline-flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#272f67] text-white shadow-sm';
+
+/**
  * Adressarten einer Kundenadresse (`CustomerLocation.kind`). Die Hauptadresse
  * ist KEIN Standort-Datensatz — sie liegt als flache Spalten auf `Customer` und
  * wird in der Tabelle als erste, graue Zeile geführt.

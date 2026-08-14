@@ -3,6 +3,8 @@ import { t } from '@/i18n/translate';
 import { formatAddressLines, fitsInChars } from '@/utils/address';
 import { addressParts } from './addressForm';
 import type { AddressFormValue } from './addressForm';
+import { CountrySelect } from './CountrySelect';
+import type { CountryEntry } from './countries';
 
 /**
  * Adresin giriş ve gösterim bileşenleri. Alanların anlamı, tekrarsızlık kuralı
@@ -43,6 +45,7 @@ export const AddressFields = ({
     disabled = false,
     fields,
     labels,
+    onCountryPicked,
 }: {
     value: AddressFormValue;
     onChange: (next: AddressFormValue) => void;
@@ -50,6 +53,11 @@ export const AddressFields = ({
     disabled?: boolean;
     fields?: Array<keyof AddressFormValue>;
     labels?: Partial<Record<keyof AddressFormValue, string>>;
+    /**
+     * Meldet die AUSWAHL eines Landes aus der Liste (nicht das blosse Tippen).
+     * Das CRM hängt daran die Telefonvorwahl; wer das nicht braucht, lässt es weg.
+     */
+    onCountryPicked?: (country: CountryEntry) => void;
 }) => {
     const shows = (key: keyof AddressFormValue) => !fields || fields.includes(key);
     const label = (key: keyof AddressFormValue, fallback: string) => labels?.[key] ?? fallback;
@@ -69,7 +77,20 @@ export const AddressFields = ({
             {shows('postalCode') && <AddressField label={label('postalCode', t('address.postalCode'))}>{input('postalCode')}</AddressField>}
             {shows('city') && <AddressField label={label('city', t('address.city'))}>{input('city')}</AddressField>}
             {shows('state') && <AddressField label={label('state', t('address.state'))}>{input('state')}</AddressField>}
-            {shows('country') && <AddressField label={label('country', t('address.country'))}>{input('country')}</AddressField>}
+            {/* Das Land ist das einzige Feld mit Auswahlliste: getippt wird
+                weiterhin frei, die Liste schlägt nur vor (häufige Länder oben)
+                und gibt bei echter Auswahl die Telefonvorwahl nach oben. */}
+            {shows('country') && (
+                <AddressField label={label('country', t('address.country'))}>
+                    <CountrySelect
+                        value={value.country}
+                        onChange={(next) => onChange({ ...value, country: next })}
+                        onPick={onCountryPicked}
+                        disabled={disabled}
+                        inputClassName={inputClassName}
+                    />
+                </AddressField>
+            )}
         </div>
     );
 };

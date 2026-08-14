@@ -16,6 +16,7 @@ import { Field, Input, Select } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { projectApi } from '@/lib/api/project';
 import { tenderApi } from '@/lib/api/tender';
+import { isRequestTimeout } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
 import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
 import { useTenderStore } from '@/store/tenderStore';
@@ -25,7 +26,6 @@ import { t } from '@/i18n/translate';
 import { toCurrencyCode } from '@/utils/currency';
 import { parseClosingImages } from '../../utils/tenderProduct.utils';
 import { attachPdfPositionImages } from '../../utils/tenderPdfImages.utils';
-import { localizeTenderNumber } from '@/utils/tenderNumber';
 import {
     flattenTenderTreeForPdf,
     fmtNumber,
@@ -34,6 +34,7 @@ import {
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { RichTextMarkdownEditor, looksLikeRichHtml } from '../../TenderRichText';
 import { MailDraftsDrawer } from '../mail/MailDraftsDrawer';
+import { TenderCcField } from '../mail/TenderCcField';
 // Eski (klasik, sablon.pdf antetli) şablon — geri dönmek için bu satırı aç:
 // import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
 import type { TenderPdfTotals } from '@/utils/pdf/tenderPdfModern';
@@ -90,6 +91,25 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
     // until explicitly closed.
     const [draftsOpen, setDraftsOpen] = useState(false);
 
+    // ── CC ───────────────────────────────────────────────────────────────────
+    // Die CC-Liste gehört der OFFERTE, nicht diesem Fenster: sie gilt für die
+    // Offertmail UND für die automatische Auftragsbestätigung. Darum wird jede
+    // Änderung sofort auf der Offerte gespeichert (nicht erst beim Senden) und
+    // im Store gespiegelt, damit Karte und Auftragsdialog sie sehen.
+    const ccEmails: string[] = Array.isArray(detail?.tender.ccEmails) ? detail!.tender.ccEmails! : [];
+    const handleCcChange = (emails: string[]) => {
+        const current = useTenderStore.getState();
+        if (current.detail?.tender.id === tenderId) {
+            useTenderStore.setState({
+                detail: { ...current.detail, tender: { ...current.detail.tender, ccEmails: emails } },
+                list: current.list.map((item) => (item.id === tenderId ? { ...item, ccEmails: emails } : item)),
+            });
+        }
+        void tenderApi.updateMeta(tenderId, { ccEmails: emails }).catch((error: any) => {
+            toast.error(error?.response?.data?.error || t('tenders.cc_save_failed'));
+        });
+    };
+
     const loadSlots = async () => {
         if (!open) return;
         try {
@@ -123,7 +143,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
         setForm((prev) => ({
             ...prev,
             to: detail.tender.customerEmail || '',
-            subject: t('tenders.tender_email_subject', { number: localizeTenderNumber(detail.tender.tenderNumber) }),
+            subject: t('tenders.tender_email_subject', { number: detail.tender.tenderNumber }),
         }));
     }, [open, detail?.tender.id, overtimeHourlyRate, initialTab]);
 
@@ -169,7 +189,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
             await tenderApi.removeMaterialMapping(tenderId, usage.id);
             setTenderMaterials((prev) => prev.filter((item) => item.id !== usage.id));
             setAvailableMaterials((prev) => prev.map((material) =>
-                material.id === usage.materialId
+                material.id === ((usage as any).articleId || usage.materialId)
                     ? { ...material, stockQuantity: Number(material.stockQuantity || 0) + Number(usage.quantity || 0) }
                     : material
             ));
@@ -218,11 +238,12 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 : '';
             // Eski (klasik) şablon — geri dönmek için bu satırı aç:
             // const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdf');
-            const { buildTenderPdfBytes } = await import('@/utils/pdf/tenderPdfModern');
-            const [positions, pdfContent] = await Promise.all([
+            const [positions, pdfContent, pdfModule] = await Promise.all([
                 attachPdfPositionImages(tenderId, flattenTenderTreeForPdf(tree)),
                 ensurePdfContent(tenderId),
+                import('@/utils/pdf/tenderPdfModern'),
             ]);
+            const { buildTenderPdfBytes } = pdfModule;
             const pdfBytes = await buildTenderPdfBytes({
                 tenderNumber: detail.tender.tenderNumber,
                 version: detail.tender.version,
@@ -243,23 +264,29 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 totals: pdfTotals ?? null,
                 // The mailed PDF must be the same document as the exported one.
                 coverLetter: pdfContent.coverLetter,
-                closingNote: pdfContent.closingNote,
                 closingImages: parseClosingImages(pdfContent.closingImages),
             }, { ...settings, currency: toCurrencyCode((detail.tender as { currency?: string | null }).currency) });
-            const res = await tenderApi.sendOfferMail(tenderId, {
+            await tenderApi.sendOfferMail(tenderId, {
                 ...form,
                 message: `${form.message}${overtimeNote}`,
                 attachments: [{
-                    filename: `${localizeTenderNumber(detail.tender.tenderNumber, 'de')}.pdf`,
+                    filename: `${detail.tender.tenderNumber}.pdf`,
                     contentType: 'application/pdf',
                     contentBase64: bytesToBase64(pdfBytes),
                 }],
             });
-            toast.success(res.message ||t('tenders.tender_maili_gonderildi'));
+            // Bildirim metni SUNUCUDAN GELMEZ: `res.message` tek dilde (Türkçe)
+            // yazılıdır ve seçili dilin ortasında yabancı bir cümle olarak
+            // görünürdü. Onay her zaman kullanıcının dilinden okunur.
+            toast.success(t('tenders.tender_maili_gonderildi'));
             await onChanged();
             onClose();
         } catch (e: any) {
-            toast.error(e.response?.data?.error || e.message ||t('tenders.tender_maili_gonderilemedi'));
+            toast.error(
+                isRequestTimeout(e)
+                    ? t('common.mailTimeout')
+                    : e.response?.data?.error || t('tenders.tender_maili_gonderilemedi'),
+            );
         } finally {
             setLoading(false);
         }
@@ -269,13 +296,16 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
         { key: 'mail' as const, label:t('tenders.mail') },
         { key: 'overtime' as const, label:t('tenders.additional_fee') },
         { key: 'schedule' as const, label:t('tenders.appointment') },
-        { key: 'materials' as const, label:t('nav.materials') },
+        // Malzeme/ürün birleşmesi (2026-08-14): sekme artık ürün kataloğunu listeler.
+        { key: 'materials' as const, label:t('nav.articles') },
     ];
 
+    // Satırlar birleşme sonrası `article` taşır; eski kayıtların `material`
+    // biçimi yedek olarak okunmaya devam eder.
     const usedMaterials = tenderMaterials.map((item) => ({
         id: item.id,
-        serialLabel: item.material?.serialId || '-',
-        name: item.material?.name ||t('tenders.material'),
+        serialLabel: item.material?.serialId || (item as any).article?.articleCode || '-',
+        name: item.material?.name || (item as any).article?.name || t('tenders.material'),
         quantity: item.quantity || 0,
         unit: 'adet',
         unitPrice: item.unitCost || 0,
@@ -323,6 +353,12 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                             <Field label={t('settings.mail.senderEmail')}><Input value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></Field>
                         </div>
                         <Field label={t('tenders.alici')}><Input value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></Field>
+                        {/* CC der Offerte: Tippen schlägt Kunde, Kontaktpersonen
+                            und Mitarbeitende vor. Gilt auch für die
+                            Auftragsbestätigung. */}
+                        <Field label={t('calendar.detail.cc')} hint={t('tenders.cc_hint')}>
+                            <TenderCcField tenderId={tenderId} value={ccEmails} onChange={handleCcChange} />
+                        </Field>
                         <Field label={t('tenders.konu')}><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></Field>
                         <div className="flex flex-col gap-1.5">
                             <span className="text-sm font-medium text-secondary">{t('tenders.additional_mesaj')}</span>

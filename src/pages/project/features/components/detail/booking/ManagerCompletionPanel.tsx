@@ -106,8 +106,8 @@ export const ManagerCompletionPanel = ({
                 </div>
             </div>
 
-            <div className="mb-3 overflow-x-auto border-b border-slate-200">
-                <div className="flex min-w-max items-center gap-6 px-1">
+            <div className="mb-3 overflow-x-hidden border-b border-slate-200">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-1">
                     {[
                         { key: 'reports' as const, label: t('projects.fieldReport') },
                         { key: 'costs' as const, label: t('auto.harici_giderler') },

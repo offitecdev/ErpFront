@@ -114,14 +114,15 @@ export const AppointmentMailPanel = ({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+            <div className="ofi-viewport-sheet-scroll min-h-0 w-full flex-1 overflow-y-auto">
+                <div className="mx-auto w-full max-w-6xl space-y-3 p-5 md:p-8">
                 {openAppointments.length > 0 && (
                     <div>
                         <div className="mb-1.5 text-[12px] font-semibold text-slate-700">
                             {t('projects.schedule.selectAppointmentsOptional')}
                         </div>
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/15 dark:bg-transparent">
-                            <table data-inv-table data-unstyled-table className="w-full">
+                            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                                 <thead>
                                     <tr>
                                         <th className="w-9 text-left" />
@@ -177,6 +178,7 @@ export const AppointmentMailPanel = ({
                         onChange={(e) => setMessageOverride(e.target.value)}
                     />
                 </Field>
+                </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 dark:border-white/10">
                 <Button

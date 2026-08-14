@@ -12,17 +12,24 @@ export interface ProjectCustomer {
     language?: string | null;
 }
 
+/**
+ * Saha ekranlarının "malzeme" katalog satırı. Malzeme/ürün birleşmesinden
+ * (2026-08-14) beri sunucu ÜRÜN listesini bu eski biçimde döndürür:
+ * id = ürün (Article) id'si, serialId = articleCode, unitCost = salePrice,
+ * stockQuantity = bakiye toplamı.
+ */
 export interface ProjectMaterial {
     id: string;
-    tenantId: string;
+    tenantId?: string;
     serialId: string;
     name: string;
+    unit?: string;
     stockQuantity: number;
     unitCost: number;
     minStockLevel?: number;
     criticalStockLevel?: number;
     imageUrl?: string | null;
-    isActive: boolean;
+    isActive?: boolean;
     createdAt?: string;
 }
 
@@ -96,7 +103,9 @@ export interface MontageReportResourcesDto {
         quantity: number;
         unitPrice: number;
         description: string | null;
-        material: { name: string } | null;
+        /** Birleşme sonrası satırlar `article` taşır; eski yanıtlar `material`. */
+        article?: { name: string } | null;
+        material?: { name: string } | null;
     }>;
     expenses: Array<{
         id: string;
@@ -160,6 +169,8 @@ export interface ProjectDto {
     customerId: string;
     tenderId?: string | null;
     managerId?: string | null;
+    /** Proje kodu — PR-2026-10001. Sunucuda üretilir, her dilde aynıdır. */
+    projectNumber?: string;
     projectName: string;
     status: ProjectStatus;
     plannedBudget: number;
@@ -178,25 +189,32 @@ export interface ProjectDto {
         tenderNumber: string;
         status: string;
         projectId?: string | null;
+        /** Kommissionsnummer — listed per order on the project screen. */
+        commissionNumber?: string | null;
+        /** Verkäufer — the tender's salesperson, else its creator (billing tab prefill). */
+        salespersonName?: string | null;
+        createdBy?: { firstName: string; lastName: string } | null;
+        /** Projektadresse (Montageadresse) — first line of the project overview. */
+        installationAddress?: string | null;
+        /**
+         * Teklife dahil "malzeme" satırları. Malzeme/ürün birleşmesinden
+         * (2026-08-14) beri satırlar Article'a bağlıdır (`articleId`/`article`);
+         * eski alan adları yalnızca eski yanıtlar için opsiyonel kaldı.
+         */
         usedMaterials?: Array<{
             id: string;
-            materialId: string;
+            articleId?: string;
+            materialId?: string;
             quantity: number;
             unitCost: number;
             description?: string | null;
+            article?: { id: string; articleCode: string; name: string; salePrice: number } | null;
             material?: { id: string; serialId: string; name: string; stockQuantity: number; unitCost: number } | null;
         }>;
         positions?: Array<{
             id: string;
             positionNumber: string;
             shortDescription: string;
-            materialMappings?: Array<{
-                id: string;
-                quantityMultiplier: number;
-                discount?: number | null;
-                materialId?: string;
-                material?: { id: string; serialId: string; name: string; stockQuantity: number; unitCost: number } | null;
-            }>;
         }>;
     } | null;
     appointments?: AppointmentDto[];
@@ -237,9 +255,30 @@ export interface MailSettingDto {
     smtpPort: number;
     smtpSecure: boolean;
     smtpUser?: string | null;
+    /** GÖNDERİLENLER KOPYASI — SMTP mailin gönderenin kutusunda iz bırakmaz;
+        kopyanın Outlook'ta görünmesi için gönderim sonrası IMAP APPEND yapılır.
+        imapHost boşsa özellik kapalıdır. */
+    imapHost?: string | null;
+    imapPort?: number;
+    imapSecure?: boolean;
+    /** Boş = SMTP kullanıcı/şifresi kullanılır. */
+    imapUser?: string | null;
+    /** Boş = klasör sunucudan bulunur (RFC 6154 `\Sent`). */
+    sentFolder?: string | null;
+    /** Kopyayı sunucu tarafında dosyalayan Exchange kurulumlarında kapatılır. */
+    saveToSent?: boolean;
     /** Tenant e-posta imzası — sınırlı HTML; gönderilen maillerin sonuna eklenir. */
     signatureHtml?: string | null;
     /** İmza görseli (PNG/JPG data URI, ≤ 2 MB); mailde CID'li inline ek olarak gider. */
     signatureImage?: string | null;
     hasPassword?: boolean;
+    hasImapPassword?: boolean;
+}
+
+/** /mail/send yanıtındaki gönderilenler-kopyası sonucu. */
+export interface SentCopyResultDto {
+    status: 'saved' | 'skipped' | 'failed';
+    folder?: string;
+    reason?: string;
+    error?: string;
 }

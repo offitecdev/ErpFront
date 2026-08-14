@@ -95,11 +95,13 @@ export const buildGeneralSnapshot = (appointment: any, deliveryReports: Delivery
         };
     });
     const deliverySections = deliveries.flatMap((d) => {
+        // Kategori = liste adı (yeni düz listelerde boş kalır → liste adına düşer).
+        const catOf = (x: any) => x.category?.trim() || d.checklistName || t('projects.delivery.uncategorized');
         const cats: string[] = [];
-        for (const x of d.responses || []) { const k = x.category?.trim() || t('projects.delivery.uncategorized'); if (!cats.includes(k)) cats.push(k); }
+        for (const x of d.responses || []) { const k = catOf(x); if (!cats.includes(k)) cats.push(k); }
         return cats.map((c) => ({
-            heading: `${d.checklistName || t('projects.delivery.pdf.title')} · ${c}`,
-            rows: (d.responses || []).filter((x) => (x.category?.trim() || t('projects.delivery.uncategorized')) === c).map((x) => ({ label: x.label, status: x.status, value: x.measurement || undefined })),
+            heading: c === d.checklistName ? c : `${d.checklistName || t('projects.delivery.pdf.title')} · ${c}`,
+            rows: (d.responses || []).filter((x) => catOf(x) === c).map((x) => ({ label: x.label, status: x.status, value: x.measurement || undefined })),
         }));
     });
     return {

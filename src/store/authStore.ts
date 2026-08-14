@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { apiClient } from '../lib/axios';
+import { apiClient, getShared } from '../lib/axios';
+import { takePrefetched } from '../lib/bootPrefetch';
 
 interface User {
     id: string;
@@ -30,6 +31,11 @@ export interface TenantOption {
     /** Company category ("Numara" profile); null/undefined = all modules enabled. */
     moduleProfileId?: string | null;
     moduleProfile?: TenantModuleProfile | null;
+    /**
+     * Şirket numarası — belge kodundaki blok (numara × 10000, yani 4 →
+     * AN-2026-40001). 0 = bloksuz. Modül kategorisinden bağımsızdır.
+     */
+    companyNumber?: number;
 }
 
 // Tokens live exclusively in HttpOnly cookies set by the server — JavaScript
@@ -84,19 +90,25 @@ export const useAuthStore = create<AuthState>((set) => ({
     fetchProfile: async () => {
         try {
             set({ isLoading: true });
-            const [userRes, permRes, tenantRes] = await Promise.all([
-                apiClient.get('/auth/me'),
-                apiClient.get('/auth/me/permissions'),
-                apiClient.get('/tenants')
+            // The inline script in index.html may have started these three
+            // requests at HTML-parse time; use those responses when present
+            // and fall back to the normal (refresh-capable) axios path.
+            const [userData, permData, tenantData] = await Promise.all([
+                takePrefetched<User>('me')
+                    .then((data) => data ?? getShared<User>('/auth/me').then((r) => r.data)),
+                takePrefetched<{ permissions: string[] }>('permissions')
+                    .then((data) => data ?? getShared<{ permissions: string[] }>('/auth/me/permissions').then((r) => r.data)),
+                takePrefetched<{ tenants: TenantOption[] }>('tenants')
+                    .then((data) => data ?? getShared<{ tenants: TenantOption[] }>('/tenants').then((r) => r.data)),
             ]);
 
-            const tenants: TenantOption[] = tenantRes.data.tenants || [];
+            const tenants: TenantOption[] = tenantData.tenants || [];
             const savedTenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
             const selectedTenantId =
                 tenants.some((tenant) => tenant.id === savedTenantId)
                     ? savedTenantId
-                    : tenants.some((tenant) => tenant.id === userRes.data.tenantId)
-                        ? userRes.data.tenantId
+                    : tenants.some((tenant) => tenant.id === userData.tenantId)
+                        ? userData.tenantId
                         : tenants[0]?.id ?? null;
 
             if (selectedTenantId) {
@@ -106,10 +118,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
             localStorage.setItem(HAS_SESSION_KEY, '1');
             set({
-                user: userRes.data,
+                user: userData,
                 tenants,
                 selectedTenantId,
-                permissions: permRes.data.permissions,
+                permissions: permData.permissions,
                 isAuthenticated: true
             });
         } catch (error) {

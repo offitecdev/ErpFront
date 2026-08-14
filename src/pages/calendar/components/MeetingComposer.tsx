@@ -147,8 +147,8 @@ export const MeetingComposer = ({ open, onClose, initialDate, onSaved }: {
             onClose={onClose}
             title={t('calendar.meeting.title')}
             subtitle={view === 'mail' ? t('calendar.mail.title') : undefined}
-            width={860}
-            height="min(700px, 92vh)"
+            width={1280}
+            height="min(800px, 94vh)"
             footer={view === 'form' ? (
                 <div className="flex items-center justify-end gap-2">
                     {error && <span className="max-w-[380px] truncate text-[12px] font-semibold text-red-600 dark:text-red-400">{error}</span>}
@@ -205,7 +205,7 @@ export const MeetingComposer = ({ open, onClose, initialDate, onSaved }: {
             )}
 
             {view === 'form' && (
-                <div className="ofi-rise-in grid gap-5 p-5 lg:grid-cols-2">
+                <div className="ofi-rise-in grid gap-7 p-5 md:p-7 lg:grid-cols-2">
                     <div className="space-y-4">
                         <label className="block">
                             <span className="mb-1 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">{t('calendar.meeting.subject')}</span>

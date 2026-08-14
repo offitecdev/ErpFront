@@ -1,5 +1,3 @@
-import { formatMissingTranslationKey } from './autoFallback';
-import { AUTO_KEYS } from './autoTranslations';
 import type { TranslationTree } from './manualTranslations';
 
 export const SUPPORTED_LANGUAGES = ['tr', 'en', 'de'] as const;
@@ -27,8 +25,7 @@ const mergeTranslations = (base: TranslationResource, overlay: TranslationTree):
 
 // Per-language dynamic imports. Keeping each language behind its own import()
 // lets the bundler split the (large) translation data into one chunk per
-// language, so only the active language (plus the `tr` fallback) is downloaded
-// and evaluated on startup instead of all three.
+// language, so only the active language is downloaded and evaluated on startup.
 const localeLoaders: Record<SupportedLanguage, () => Promise<{ default: TranslationResource }>> = {
     tr: () => import('./locales/tr.json'),
     en: () => import('./locales/en.json'),
@@ -41,20 +38,11 @@ const manualLoaders: Record<SupportedLanguage, () => Promise<{ default: Translat
     de: () => import('./manual.de.json'),
 };
 
-const buildAuto = (language: SupportedLanguage): Record<string, string> =>
-    Object.fromEntries(AUTO_KEYS.map((key) => [key, formatMissingTranslationKey(`auto.${key}`, language)]));
-
 // Builds the full `translation` namespace bundle for one language by merging the
-// manual overlay over the base locale and layering generated `auto` fallbacks
-// underneath. Mirrors the previous eager `withTranslations` behaviour exactly.
+// manual overlay over the base locale. Missing `auto.*` entries are formatted
+// on demand by i18next's parseMissingKeyHandler, so a large eager key table does
+// not need to be downloaded, parsed and expanded on every application start.
 export const loadResource = async (language: SupportedLanguage): Promise<TranslationResource> => {
     const [locale, manual] = await Promise.all([localeLoaders[language](), manualLoaders[language]()]);
-    const merged = mergeTranslations(locale.default, manual.default);
-    return {
-        ...merged,
-        auto: {
-            ...buildAuto(language),
-            ...((merged.auto as Record<string, string> | undefined) ?? {}),
-        },
-    };
+    return mergeTranslations(locale.default, manual.default);
 };

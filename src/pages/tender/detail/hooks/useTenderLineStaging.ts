@@ -16,7 +16,8 @@ import type {
 } from '../types/tenderDetail.types';
 import { sortPositions, buildSimpleTenderLines } from '../utils/tenderLine.utils';
 import { isInlinePatchConfirmed, normalizeInlinePatchValue } from '../utils/tenderInlinePatch.utils';
-import { deriveLineDiscountPercent } from '../utils/tenderDiscounts.utils';
+import { deriveLineDiscountPercent, seedTotalDiscounts } from '../utils/tenderDiscounts.utils';
+import { computeTenderPricingSummary } from '../utils/tenderPricing.utils';
 import {
     buildProductDefaults,
     createTempPositionId,
@@ -61,11 +62,16 @@ export const useTenderLineStaging = ({
     const isDraft = tender?.status === 'Draft';
 
     const [pendingMeta, setPendingMeta] = useState<TenderMetaPatch>({});
+    const committedTenderRef = useRef(tender);
     const [dirtyLineIds, setDirtyLineIds] = useState<Set<string>>(() => new Set());
     const [savingAll, setSavingAll] = useState(false);
     // React state is not synchronous. This ref closes the small window in which
     // a double click can enter handleSaveAll twice before savingAll re-renders.
     const savingAllRef = useRef(false);
+
+    useEffect(() => {
+        if (tender && Object.keys(pendingMeta).length === 0) committedTenderRef.current = tender;
+    }, [pendingMeta, tender]);
 
     const [pendingAddrId, setPendingAddrId] = useState<{ INSTALLATION: string | null; DELIVERY: string | null; BILLING: string | null }>({
         INSTALLATION: null,
@@ -189,7 +195,14 @@ export const useTenderLineStaging = ({
         handleInlinePositionChange(positionId, { [field]: field === 'unit' ? (value || null) : value });
     }, [handleInlinePositionChange]);
     const commitNumberField = useCallback((positionId: string, field: NumberField, value: number) => {
-        handleInlinePositionChange(positionId, { [field]: value });
+        // A typed discount REPLACES whatever the line carried, including a
+        // stacked list left over from the removed per-line discount editor —
+        // otherwise the stack would keep driving the total while the cell shows
+        // the number the user just typed (same rule as the bulk discount).
+        handleInlinePositionChange(
+            positionId,
+            field === 'discount' ? { discount: value, discounts: null } : { [field]: value },
+        );
     }, [handleInlinePositionChange]);
     const commitLongDescription = useCallback((positionId: string, value: string) => {
         handleInlinePositionChange(positionId, { longDescription: value || null });
@@ -288,11 +301,31 @@ export const useTenderLineStaging = ({
                 || pendingDeletePositionIds.length > 0
             ) {
                 try {
+                    const committedTender = committedTenderRef.current ?? tender!;
+                    const nextTender = { ...committedTender, ...sentMeta };
+                    const previousDiscounts = seedTotalDiscounts(committedTender);
+                    const nextDiscounts = seedTotalDiscounts(nextTender);
+                    const previousSummary = computeTenderPricingSummary(
+                        buildSimpleTenderLines(detail?.positions ?? [], fallbackTaxRate),
+                        fallbackTaxRate,
+                        previousDiscounts,
+                    );
+                    const nextSummary = computeTenderPricingSummary(
+                        buildSimpleTenderLines(localPositions, fallbackTaxRate),
+                        fallbackTaxRate,
+                        nextDiscounts,
+                    );
                     const result = await tenderApi.savePositions(id, {
                         positions: createEntries,
                         updates: updateEntries,
                         deleteIds: pendingDeletePositionIds,
                         meta: sentMeta,
+                        summary: {
+                            previousGrandTotal: previousSummary.grossTotal,
+                            nextGrandTotal: nextSummary.grossTotal,
+                            previousTotalDiscounts: JSON.stringify(previousDiscounts),
+                            nextTotalDiscounts: JSON.stringify(nextDiscounts),
+                        },
                     });
                     const createdByClientId = new Map(
                         result.positions.map((created) => [created.clientId, created]),
@@ -380,7 +413,6 @@ export const useTenderLineStaging = ({
                                                 ...updated,
                                                 calculation: updated.calculation ?? position.calculation,
                                                 articleMappings: updated.articleMappings ?? position.articleMappings,
-                                                materialMappings: updated.materialMappings ?? position.materialMappings,
                                             };
                                         }),
                                     ...createdPositions.filter((position) => !cachedIds.has(position.id)),
@@ -411,6 +443,7 @@ export const useTenderLineStaging = ({
                                     !== normalizeInlinePatchValue(sentMeta[field as keyof TenderMetaPatch]),
                                 ),
                             ) as TenderMetaPatch);
+                            committedTenderRef.current = { ...committedTender, ...result.updatedTender };
                         }
                     }
 
@@ -426,7 +459,6 @@ export const useTenderLineStaging = ({
                                 id: serverId,
                                 calculation: created?.calculation ?? position.calculation,
                                 articleMappings: created?.articleMappings ?? position.articleMappings,
-                                materialMappings: created?.materialMappings ?? position.materialMappings,
                             };
                         }
                         const updated = updatedById.get(position.id);
@@ -437,7 +469,6 @@ export const useTenderLineStaging = ({
                             ...(remainingUpdatePatches.get(position.id) ?? {}),
                             calculation: updated.calculation ?? position.calculation,
                             articleMappings: updated.articleMappings ?? position.articleMappings,
-                            materialMappings: updated.materialMappings ?? position.materialMappings,
                         };
                     }));
                     setSelectedId((current) => current ? (tempToServerId.get(current) ?? current) : current);
@@ -583,7 +614,6 @@ export const useTenderLineStaging = ({
             imageUrl: displayImageUrl,
             calculation: null,
             articleMappings: [],
-            materialMappings: [],
         };
 
         // Stage the new row: mark it as a pending create and keep its temp id

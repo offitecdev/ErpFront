@@ -3,7 +3,8 @@ import { ArrowLeft } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
 import type { MovementKind } from '@/types/inventory';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { MOVEMENTS_PAGE_SIZE, useMovementsList } from './hooks/useMovementsList';
 import { fmtDateTime, fmtMoney, fmtQty } from './utils/format';
@@ -24,10 +25,30 @@ const FILTERABLE_KINDS: MovementKind[] = ['IN', 'OUT', 'DEFINITION', 'RETURN', '
  * Tanım (DEFINITION) hareketi, ürün 0 adetle tanımlanırken atılan giriş kaydıdır;
  * tedarikçi bilgisini taşır ama stok değiştirmez.
  */
+// Sürüklenebilir sütun genişlikleri. Ürün adı sütunu burada YOKTUR: genişliği
+// olmayan tek sütun odur ve artan yeri o emer.
+const MOVEMENT_COLUMN_WIDTHS = {
+    date: 160,
+    code: 128,
+    kind: 144,
+    quantity: 96,
+    unitCost: 128,
+    total: 128,
+    description: 224,
+};
+type MovementColumn = keyof typeof MOVEMENT_COLUMN_WIDTHS;
+
 export const StockMovementsPage = () => {
     useLanguageTick();
     const navigate = useNavigate();
     const list = useMovementsList();
+    // Sütunlar sürüklenerek genişletilir; ürün adının solundakiler sağ
+    // kenarlarından, sağındakiler sol kenarlarından tutulur.
+    const grid = useColumnWidths<MovementColumn>({
+        storageKey: 'offitec:inv-movements:col-widths:v1',
+        defaults: MOVEMENT_COLUMN_WIDTHS,
+        minPx: 72,
+    });
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -84,17 +105,44 @@ export const StockMovementsPage = () => {
 
             <SectionCard title={t('inv.movements.sectionTitle', { count: list.total })}>
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-unstyled-table className="w-full min-w-[880px]">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[880px]">
+                        <colgroup>
+                            <ResizableCols keys={['date', 'code'] as const} grid={grid} />
+                            {/* Ürün adı: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['kind', 'quantity', 'unitCost', 'total', 'description'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-40 text-left">{t('common.date')}</th>
-                                <th className="w-32 text-left">{t('inv.columns.serialCode')}</th>
+                                <th className="relative text-left">
+                                    {t('common.date')}
+                                    <ColResizeHandle {...grid.resizeProps('date', 'right')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.serialCode')}
+                                    <ColResizeHandle {...grid.resizeProps('code', 'right')} />
+                                </th>
                                 <th className="text-left">{t('inv.columns.productName')}</th>
-                                <th className="w-36 text-left">{t('inv.columns.movementType')}</th>
-                                <th className="w-24 text-right">{t('inv.columns.quantity')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.unitCost')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.total')}</th>
-                                <th className="w-56 text-left">{t('inv.columns.description')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.movementType')}
+                                    <ColResizeHandle {...grid.resizeProps('kind')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.quantity')}
+                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.unitCost')}
+                                    <ColResizeHandle {...grid.resizeProps('unitCost')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.total')}
+                                    <ColResizeHandle {...grid.resizeProps('total')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.description')}
+                                    <ColResizeHandle {...grid.resizeProps('description')} />
+                                </th>
                             </tr>
                             {/* Kolon filtreleri: seri kod / ürün adı / açıklama. */}
                             <tr data-filter-row>
@@ -115,7 +163,12 @@ export const StockMovementsPage = () => {
                                         className={FILTER_INPUT_CLASS}
                                     />
                                 </th>
-                                <th colSpan={4} />
+                                {/* Filtresi olmayan sütunlar da kendi (boş)
+                                    hücrelerini alır ki çizgiler kesilmesin. */}
+                                <th />
+                                <th />
+                                <th />
+                                <th />
                                 <th className="pb-1.5">
                                     <input
                                         value={list.filters.description}

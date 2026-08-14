@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { Bell01 as Bell, Mail01 as Mail, Send01 as Send } from '@/components/icons/antIconCompat';
+import { Send01 as Send } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
-import { Checkbox } from '@/components/ui-shared/Checkbox';
-import { Field, Input } from '@/components/ui-shared/Field';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import {
@@ -17,6 +15,8 @@ import {
 import { t } from '@/i18n/translate';
 import type { ProjectDto } from '@/types/project';
 
+import { SignatureDispatchPanel, type SignatureDispatchChannels } from './SignatureDispatchPanel';
+import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 import type { SignatureDispatchTarget } from '../../../projects/types/signatureTypes';
 import {
     computeSignatureStatus,
@@ -61,9 +61,6 @@ export const AppointmentSignaturesView = ({
     const [requests, setRequests] = useState<SignatureRequestDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
-    const [notifyTech, setNotifyTech] = useState(true);
-    const [emailCustomer, setEmailCustomer] = useState(false);
-    const [email, setEmail] = useState('');
     const [busy, setBusy] = useState(false);
 
     const load = async () => {
@@ -143,21 +140,26 @@ export const AppointmentSignaturesView = ({
 
     const selected = rows.find((row) => row.key === selectedKey) || null;
 
+    // Everyone the request asks a signature from: the crew of this appointment
+    // plus the customer contact.
+    const signatories = useMemo(() => {
+        const people = new Set<string>();
+        appointmentTechnicianNames(appointment)
+            .split(', ')
+            .map((name) => name.trim())
+            .filter((name) => name && name !== t('auto.atanmadi'))
+            .forEach((name) => people.add(name));
+        people.add(project.customer?.companyName || t('projects.musteri'));
+        return Array.from(people);
+    }, [appointment, project.customer]);
+
     const selectRow = (row: TargetRow) => {
         if (!row.makeTarget) return;
         setSelectedKey(row.key === selectedKey ? null : row.key);
-        setNotifyTech(true);
-        setEmailCustomer(Boolean(project.customer?.mainEmail));
-        setEmail(project.customer?.mainEmail || '');
     };
 
-    const dispatch = async () => {
+    const dispatch = async (channels: SignatureDispatchChannels) => {
         if (!selected?.makeTarget) return;
-        const willEmail = emailCustomer && Boolean(email.trim());
-        if (!notifyTech && !willEmail) {
-            toast.error(t('signatures.chooseChannel'));
-            return;
-        }
         setBusy(true);
         try {
             const target = selected.makeTarget();
@@ -167,9 +169,9 @@ export const AppointmentSignaturesView = ({
                 projectId: project.id,
                 title: target.title,
                 snapshot: target.snapshot,
-                customerEmail: email.trim() || null,
-                sendEmail: willEmail,
-                notifyTechnician: notifyTech,
+                customerEmail: channels.email || null,
+                sendEmail: channels.sendEmail,
+                notifyTechnician: channels.notifyTechnician,
             });
             const parts: string[] = [];
             if (res.notified) parts.push(t('signatures.notifiedTech'));
@@ -189,7 +191,7 @@ export const AppointmentSignaturesView = ({
     return (
         <div className="space-y-3">
             <SectionCard title={`${t('projects.reportsHub.signaturesSection')} (${rows.length})`}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <thead>
                         <tr>
                             <th className="text-left">{t('projects.reportsHub.document')}</th>
@@ -215,7 +217,9 @@ export const AppointmentSignaturesView = ({
                                     </td>
                                     <td>
                                         <div className="flex items-center justify-end">
-                                            {status === 'ready' || status === 'pending' ? (
+                                            {/* Same rule as the project-wide signature desk:
+                                                a signed document is never offered again. */}
+                                            {status !== 'signed' && status !== 'notReady' ? (
                                                 <Button variant="secondary" size="sm" icon={<Send size={12} />} onClick={() => selectRow(row)}>
                                                     {t('signatures.sendForSignature')}
                                                 </Button>
@@ -233,32 +237,15 @@ export const AppointmentSignaturesView = ({
 
             {/* Channel selection for the selected row — the dual send option. */}
             {selected && (
-                <div className="space-y-2 rounded-[3px] border border-slate-200 bg-white p-3">
-                    <div className="text-[12px] font-semibold text-slate-700">{selected.label} · {t('signatures.dualOption')}</div>
-                    <Checkbox
-                        label={<span className="inline-flex items-center gap-1.5"><Bell size={13} /> {t('signatures.notifyTechnician')}</span>}
-                        hint={t('signatures.notifyTechnicianHint')}
-                        size="sm"
-                        isSelected={notifyTech}
-                        onChange={setNotifyTech}
-                    />
-                    <Checkbox
-                        label={<span className="inline-flex items-center gap-1.5"><Mail size={13} /> {t('signatures.emailCustomerOpt')}</span>}
-                        hint={t('signatures.emailCustomerHint')}
-                        size="sm"
-                        isSelected={emailCustomer}
-                        onChange={setEmailCustomer}
-                    />
-                    {emailCustomer && (
-                        <Field label={t('signatures.customerEmail')}>
-                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="kunde@example.ch" />
-                        </Field>
-                    )}
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                        <Button variant="secondary" size="sm" onClick={() => setSelectedKey(null)}>{t('common.close')}</Button>
-                        <Button variant="primary" size="sm" icon={<Send size={13} />} loading={busy} onClick={() => void dispatch()}>{t('signatures.send')}</Button>
-                    </div>
-                </div>
+                <SignatureDispatchPanel
+                    key={selected.key}
+                    title={selected.label}
+                    signatories={signatories}
+                    defaultEmail={project.customer?.mainEmail || ''}
+                    busy={busy}
+                    onCancel={() => setSelectedKey(null)}
+                    onSend={(channels) => void dispatch(channels)}
+                />
             )}
         </div>
     );

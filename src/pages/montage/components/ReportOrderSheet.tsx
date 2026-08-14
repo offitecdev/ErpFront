@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { CheckCircle, ChevronRight, Clipboard, File05, X } from '@/components/icons/antIconCompat';
+import { CheckCircle, Clipboard, File05 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
 import type { MontageReportOrderDetailDto, MontageReportOrderListItem } from '@/types/project';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
+import { ReportsSheet } from '@/pages/project/features/components/detail/reports/ReportsSheet';
 
 import { BigButton } from './BigButton';
-import { dateFmt, timeRange } from '../utils/montageFormat';
+
+const reportReference = (prefix: 'GR' | 'DR', id?: string | null) =>
+    id ? `${prefix}-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}` : '—';
 
 export const ReportOrderSheet = ({
     order,
@@ -68,117 +69,97 @@ export const ReportOrderSheet = ({
         navigate(`/montage/reports/general/${detail.createAppointmentId}`);
     };
 
-    return createPortal(
-        <div className="fixed inset-0 z-[85] flex items-end justify-center px-2 sm:px-4">
-            <button type="button" aria-label={t('common.close')} onClick={onClose} className="absolute inset-0 bg-slate-950/45" />
-            <section
-                role="dialog"
-                aria-modal="true"
-                className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[14px] border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#17191c]"
-            >
-                <header className="flex items-start justify-between gap-3 bg-[#1f2654] px-4 py-3.5 text-white dark:bg-amber-500">
-                    <div className="min-w-0">
-                        <div className="truncate text-[16px] font-bold">{localizeTenderNumbersInText(order.orderNumber)}</div>
-                        <div className="mt-0.5 truncate text-[12px] text-white/75">
-                            {order.customerName} · {order.projectName}
-                        </div>
+    return (
+        <ReportsSheet
+            open={Boolean(order)}
+            title={order.orderNumber}
+            subtitle={`${order.customerName} · ${order.projectName}`}
+            onClose={onClose}
+            zIndex={85}
+        >
+            <div className="flex min-h-full flex-col px-6 py-7 sm:px-8 sm:py-9 lg:px-10">
+                {loading ? (
+                    <div className="flex min-h-64 flex-1 items-center justify-center gap-2 text-[13px] text-slate-500">
+                        <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-t-amber-500" />
+                        {t('common.loading')}
                     </div>
-                    <button type="button" onClick={onClose} aria-label={t('common.close')} className="grid size-10 shrink-0 place-items-center rounded-[3px] bg-white/12 hover:bg-white/20">
-                        <X size={19} />
-                    </button>
-                </header>
+                ) : detail ? (
+                    <div className="space-y-7">
+                        <dl className="grid overflow-hidden rounded-lg border border-slate-200 bg-white sm:grid-cols-3 dark:border-white/10 dark:bg-white/[0.03]">
+                            {[
+                                [t('montage.table.order'), detail.order.orderNumber],
+                                [t('montage.table.customer'), detail.order.customerName],
+                                [t('montage.table.project'), detail.order.projectName],
+                            ].map(([label, value]) => (
+                                <div key={label} className="min-w-0 border-b border-slate-200 px-5 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 dark:border-white/10">
+                                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
+                                    <dd className="mt-1 truncate text-[13.5px] font-semibold text-slate-800 dark:text-slate-100">{value || '—'}</dd>
+                                </div>
+                            ))}
+                        </dl>
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-                    {loading ? (
-                        <div className="flex h-48 items-center justify-center gap-2 text-[13px] text-slate-500">
-                            <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-t-amber-500" />
-                            {t('common.loading')}
-                        </div>
-                    ) : detail ? (
-                        <div className="space-y-4">
-                            <section className="rounded-[3px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
-                                <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-[#1f2654] dark:border-white/10 dark:text-amber-300">
-                                    Rapor oluştur
-                                </div>
-                                <div className="grid gap-2 p-3 sm:grid-cols-2">
-                                    <BigButton
-                                        tone="brand"
-                                        icon={detail.deliveryReport ? <CheckCircle size={16} /> : <Clipboard size={16} />}
-                                        onClick={openDelivery}
-                                        disabled={!detail.deliveryReport && (!detail.order.projectId || !detail.createAppointmentId)}
-                                    >
-                                        {detail.deliveryReport ? 'Teslim raporu' : 'Teslim raporu oluştur'}
-                                    </BigButton>
-                                    <BigButton
-                                        tone="brand"
-                                        icon={detail.generalReport ? <CheckCircle size={16} /> : <File05 size={16} />}
-                                        onClick={openGeneral}
-                                        disabled={!detail.generalReport && !detail.createAppointmentId}
-                                    >
-                                        {detail.generalReport ? 'Genel rapor' : 'Genel rapor oluştur'}
-                                    </BigButton>
-                                </div>
-                            </section>
-
-                            <section className="overflow-hidden rounded-[3px] border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]" data-unstyled-table>
-                                <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-[#1f2654] dark:border-white/10 dark:text-amber-300">
-                                    Tüm saha raporları
-                                </div>
-                                <table data-montage-table data-unstyled-table className="min-w-[680px] text-left">
+                        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]" data-unstyled-table>
+                            <div className="border-b border-slate-200 px-5 py-3 text-[12px] font-bold uppercase tracking-wide text-[#1f2654] dark:border-white/10 dark:text-amber-300">
+                                {t('montage.reportPicker.title')}
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table data-montage-table data-unstyled-table className="min-w-[760px] text-left">
                                     <thead className="dark:[&_th]:border-white/10 dark:[&_th]:bg-white/5 dark:[&_th]:text-slate-300">
                                         <tr>
-                                            <th>Randevu</th>
-                                            <th>{t('projects.teknisyen')}</th>
+                                            <th>{t('montage.reportPicker.type')}</th>
+                                            <th>{t('montage.reportPicker.number')}</th>
                                             <th>{t('montage.table.status')}</th>
-                                            <th className="w-14" />
+                                            <th className="w-[260px]">{t('montage.reportPicker.action')}</th>
                                         </tr>
                                     </thead>
                                     <tbody className="dark:[&_td]:border-white/10">
-                                        {detail.fieldReports.map((report) => (
-                                            <tr
-                                                key={report.id}
-                                                onClick={() => {
-                                                    onClose();
-                                                    navigate(`/montage/reports/view/field/${report.id}`);
-                                                }}
-                                                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5"
-                                            >
-                                                <td>
-                                                    <span className="font-semibold text-slate-900 dark:text-slate-50">
-                                                        {dateFmt(report.appointment?.startTime || report.workDate || report.reportDate)}
-                                                    </span>
-                                                    {report.appointment && (
-                                                        <span className="ml-2 text-slate-500">
-                                                            {timeRange(report.appointment.startTime, report.appointment.endTime)}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="text-slate-600 dark:text-slate-300">
-                                                    {[report.employee?.firstName, report.employee?.lastName].filter(Boolean).join(' ') || '-'}
-                                                </td>
-                                                <td>
-                                                    <span className={report.isSigned
-                                                        ? 'text-[11px] font-semibold text-emerald-700 dark:text-emerald-300'
-                                                        : 'text-[11px] font-semibold text-[#d30f15] dark:text-amber-300'}
-                                                    >
-                                                        {report.isSigned ? t('projects.delivery.statusSigned') : t('projects.delivery.statusUnsigned')}
-                                                    </span>
-                                                </td>
-                                                <td className="text-right">
-                                                    <span className="inline-grid size-8 place-items-center rounded-[3px] bg-[#1f2654] text-white dark:bg-amber-500">
-                                                        <ChevronRight size={16} />
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        <tr>
+                                            <td className="font-semibold text-slate-900 dark:text-slate-50">{t('projects.reportsHub.generalSection')}</td>
+                                            <td className="font-mono text-[12.5px] text-slate-600 dark:text-slate-300">{reportReference('GR', detail.generalReport?.id)}</td>
+                                            <td>
+                                                <span className={detail.generalReport ? 'font-semibold text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}>
+                                                    {detail.generalReport ? t('projects.reportAvailable') : t('projects.reportUnavailable')}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <BigButton
+                                                    tone="brand"
+                                                    className="w-full"
+                                                    icon={detail.generalReport ? <CheckCircle size={16} /> : <File05 size={16} />}
+                                                    onClick={openGeneral}
+                                                    disabled={!detail.generalReport && !detail.createAppointmentId}
+                                                >
+                                                    {detail.generalReport ? t('projects.reportsHub.reviewGeneral') : t('projects.reportsHub.createGeneral')}
+                                                </BigButton>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td className="font-semibold text-slate-900 dark:text-slate-50">{t('projects.reportsHub.deliverySection')}</td>
+                                            <td className="font-mono text-[12.5px] text-slate-600 dark:text-slate-300">{reportReference('DR', detail.deliveryReport?.id)}</td>
+                                            <td>
+                                                <span className={detail.deliveryReport ? 'font-semibold text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}>
+                                                    {detail.deliveryReport ? t('projects.reportAvailable') : t('projects.reportUnavailable')}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <BigButton
+                                                    tone="brand"
+                                                    className="w-full"
+                                                    icon={detail.deliveryReport ? <CheckCircle size={16} /> : <Clipboard size={16} />}
+                                                    onClick={openDelivery}
+                                                    disabled={!detail.deliveryReport && (!detail.order.projectId || !detail.createAppointmentId)}
+                                                >
+                                                    {detail.deliveryReport ? t('projects.reportsHub.reviewDelivery') : t('projects.reportsHub.createDelivery')}
+                                                </BigButton>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
-                            </section>
-                        </div>
-                    ) : null}
-                </div>
-            </section>
-        </div>,
-        document.body,
+                            </div>
+                        </section>
+                    </div>
+                ) : null}
+            </div>
+        </ReportsSheet>
     );
 };

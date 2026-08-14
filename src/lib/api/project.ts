@@ -1,4 +1,4 @@
-import { apiClient } from '../axios';
+import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import type { AppointmentDto, MailSettingDto, MontageOrdersPageDto, MontageReportOrderDetailDto, MontageReportOrdersPageDto, MontageReportResourcesDto, ProjectAddonRequestDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
 import type { PersonLite } from '../../types/maintenance';
 
@@ -34,7 +34,9 @@ export interface SalesOrderDto {
     updatedAt: string;
     customer?: { id: string; companyName: string; mainEmail?: string | null; mainPhone?: string | null } | null;
     tender?: { id: string; tenderNumber: string; status: string; projectId?: string | null } | null;
-    project?: { id: string; projectName: string; status: ProjectStatus } | null;
+    // Projesi OLMAYAN sipariş = teslimat siparişi (teklifin proje açmayan yolu);
+    // listede "Teslimat siparişi" olarak işaretlenir.
+    project?: { id: string; projectNumber?: string; projectName: string; status?: ProjectStatus } | null;
     createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
 }
 
@@ -76,11 +78,17 @@ export type CompleteInstallationInput = {
     startedAt?: string;
     endedAt?: string;
     signatureBase64?: string;
-    expenses?: { expenseType: string; amount: number; description?: string }[];
-    materials?: { materialId: string; quantity: number; description?: string }[];
-    usedMaterials?: { materialId: string; quantity: number; description?: string }[];
+    expenses?: { id?: string; expenseType: string; amount: number; description?: string }[];
+    materials?: { id?: string; materialId: string; quantity: number; description?: string }[];
+    usedMaterials?: { id?: string; materialId: string; quantity: number; description?: string }[];
     // Optional field-report photos as base64 data URLs.
     images?: string[];
+    /**
+     * 'replace': die geschickten Listen sind der VOLLSTÄNDIGE Stand des Termins —
+     * der Abschluss ersetzt statt anzuhängen (der letzte Speicherstand gilt).
+     * Ohne Flagge bleibt das alte Anhängeverhalten (Alt-Clients).
+     */
+    resourceMode?: 'replace';
 };
 
 export interface ProjectPickerDto {
@@ -98,6 +106,16 @@ export interface ProjectPickerDto {
         totalAmount?: number | null;
     }>;
 }
+
+const startupProjectPrefetches = new Map<string, Promise<ProjectDto>>();
+const projectDetailKey = (id: string, view?: ProjectDetailScope) => `${id}:${view || 'full'}`;
+
+const requestProjectDetail = async (id: string, view?: ProjectDetailScope): Promise<ProjectDto> => {
+    const res = await getShared<ProjectDto>(`/projects/${id}`, {
+        params: view ? { view } : undefined,
+    });
+    return res.data;
+};
 
 export const projectApi = {
     list: async (filter: { status?: ProjectStatus | ''; search?: string } = {}): Promise<ProjectDto[]> => {
@@ -120,10 +138,31 @@ export const projectApi = {
     },
 
     getById: async (id: string, view?: ProjectDetailScope): Promise<ProjectDto> => {
-        const res = await apiClient.get(`/projects/${id}`, {
-            params: view ? { view } : undefined,
+        const key = projectDetailKey(id, view);
+        const prefetched = startupProjectPrefetches.get(key);
+        if (prefetched) {
+            startupProjectPrefetches.delete(key);
+            return prefetched;
+        }
+        return requestProjectDetail(id, view);
+    },
+
+    // Direct project URLs can fetch their compact overview while auth/profile
+    // validation is in flight. getById consumes this promise once the protected
+    // route mounts, removing the profile -> route -> project API waterfall.
+    prefetchById: (id: string, view?: ProjectDetailScope): Promise<ProjectDto> => {
+        const key = projectDetailKey(id, view);
+        const existing = startupProjectPrefetches.get(key);
+        if (existing) return existing;
+
+        const pending = requestProjectDetail(id, view);
+        startupProjectPrefetches.set(key, pending);
+        void pending.catch(() => {
+            if (startupProjectPrefetches.get(key) === pending) {
+                startupProjectPrefetches.delete(key);
+            }
         });
-        return res.data;
+        return pending;
     },
 
     createFromTender: async (tenderId: string, managerId?: string | null, overtimeHourlyRate?: number): Promise<{ project: ProjectDto; bookingLink: string; message: string }> => {
@@ -134,8 +173,11 @@ export const projectApi = {
     createSalesOrderFromTender: async (input: {
         tenderId: string;
         mode: SalesOrderMode;
-        projectName?: string;
+        // Proje adi sunucuda uretilir (kod = ad); gonderilmez.
         projectId?: string;
+        // Teslimat siparisinde (INVOICE) ZORUNLU teslim tarihi, YYYY-MM-DD.
+        // Teklifin `internalDeliveryDate` alanina yazilir.
+        deliveryDate?: string;
         overtimeHourlyRate?: number;
     }): Promise<{ message: string; salesOrder: SalesOrderDto; project?: ProjectDto | null }> => {
         const res = await apiClient.post('/sales-orders/from-tender', input);
@@ -153,6 +195,12 @@ export const projectApi = {
     // main orders with addons or any invoiced order are rejected.
     deleteSalesOrder: async (projectId: string, salesOrderId: string): Promise<void> => {
         await apiClient.delete(`/projects/${projectId}/sales-orders/${salesOrderId}`);
+    },
+
+    // Projeyi tüm operasyonel kayıtlarıyla siler; faturalanmış proje sunucuda
+    // reddedilir. İstemci onay için "DELETE" yazdırır.
+    deleteProject: async (projectId: string): Promise<void> => {
+        await apiClient.delete(`/projects/${projectId}`);
     },
 
     createAddonOrder: async (id: string, input: { parentSalesOrderId: string }) => {
@@ -201,6 +249,34 @@ export const projectApi = {
         return res.data;
     },
 
+    /**
+     * Kompletter Rapport-Speicherstand eines Termins in EINEM Aufruf: Körper
+     * (upsert) + Spesen/Zusatzmaterial/verwendetes Material als vollständiger
+     * Ersatz — der letzte Speicherstand gilt. Zeilen mit id bleiben erhalten
+     * (Menge/Betrag wird angepasst), Zeilen ohne id werden neu angelegt,
+     * fehlende gelöscht (Zusatzmaterial wird dabei restockt).
+     */
+    saveFieldReport: async (appointmentId: string, input: {
+        salesOrderId?: string | null;
+        startedAt?: string;
+        endedAt?: string;
+        operationsDoneItems: string[];
+        technicalNotes?: string;
+        images?: string[];
+        expenses?: Array<{ id?: string; expenseType: string; amount: number }>;
+        extraMaterials?: Array<{ id?: string; materialId: string; quantity: number; description?: string }>;
+        usedMaterials?: Array<{ id?: string; materialId: string; quantity: number }>;
+    }) => {
+        const res = await apiClient.put(`/projects/appointments/${appointmentId}/field-report`, input);
+        return res.data;
+    },
+
+    // Speicherprotokoll des Rapports (wer/wann/was, neueste zuerst).
+    getReportLogs: async (reportId: string): Promise<{ logs: Array<{ id: string; action: string; createdAt: string; employee?: { id: string; firstName: string; lastName: string } | null }> }> => {
+        const res = await apiClient.get(`/projects/reports/${reportId}/logs`);
+        return res.data;
+    },
+
     signReport: async (reportId: string, signatureBase64: string) => {
         const res = await apiClient.patch(`/projects/reports/${reportId}/sign`, { signatureBase64 });
         return res.data;
@@ -212,7 +288,7 @@ export const projectApi = {
     },
 
     requestReportSignature: async (reportId: string, input: { channel: 'technician' | 'mail' | 'both'; to?: string; subject?: string; message?: string; fromEmail?: string; fromName?: string }) => {
-        const res = await apiClient.post(`/projects/reports/${reportId}/signature-request`, input);
+        const res = await apiClient.post(`/projects/reports/${reportId}/signature-request`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 
@@ -367,36 +443,21 @@ export const projectApi = {
         await apiClient.delete(`/projects/expenses/${expenseId}`);
     },
 
+    /**
+     * Saha ekranlarının "malzeme" kataloğu. Malzeme/ürün birleşmesinden
+     * (2026-08-14) beri sunucu ÜRÜN listesini eski ProjectMaterial biçiminde
+     * döndürür (serialId=articleCode, unitCost=salePrice, stockQuantity=bakiye);
+     * satır id'leri ürün (Article) id'leridir.
+     */
     materials: async (options: { compact?: boolean } = {}): Promise<ProjectMaterial[]> => {
-        try {
-            const res = await apiClient.get('/projects/materials', {
-                params: options.compact ? { view: 'picker' } : undefined,
-            });
-            return res.data;
-        } catch {
-            const res = await apiClient.get('/inventory/materials', {
-                params: options.compact ? { view: 'picker' } : undefined,
-            });
-            return res.data;
-        }
-    },
-
-    createMaterial: async (input: { name: string; serialId: string; unitCost: number; stockQuantity: number; minStockLevel?: number; criticalStockLevel?: number; imageUrl?: string | null }): Promise<ProjectMaterial> => {
-        const res = await apiClient.post('/inventory/materials', input);
+        const res = await apiClient.get('/projects/materials', {
+            params: options.compact ? { view: 'picker' } : undefined,
+        });
         return res.data;
-    },
-
-    updateMaterial: async (id: string, input: Partial<Pick<ProjectMaterial, 'name' | 'serialId' | 'unitCost' | 'stockQuantity' | 'minStockLevel' | 'criticalStockLevel' | 'imageUrl' | 'isActive'>>): Promise<ProjectMaterial> => {
-        const res = await apiClient.patch(`/inventory/materials/${id}`, input);
-        return res.data;
-    },
-
-    deleteMaterial: async (id: string): Promise<void> => {
-        await apiClient.delete(`/inventory/materials/${id}`);
     },
 
     sendBookingMail: async (id: string, input: { salesOrderId?: string | null; fromEmail?: string; fromName?: string; to: string; subject: string; message: string }) => {
-        const res = await apiClient.post(`/projects/${id}/send-booking-mail`, input);
+        const res = await apiClient.post(`/projects/${id}/send-booking-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 };
@@ -432,14 +493,18 @@ export const mailApi = {
         return res.data;
     },
 
-    // smtpPassword: undefined/atlanmış = kayıtlı şifreye dokunma, null = sil.
-    saveSettings: async (input: Partial<MailSettingDto> & { smtpPassword?: string | null }): Promise<MailSettingDto> => {
+    // smtpPassword/imapPassword: undefined/atlanmış = kayıtlı şifreye dokunma, null = sil.
+    saveSettings: async (
+        input: Partial<MailSettingDto> & { smtpPassword?: string | null; imapPassword?: string | null },
+    ): Promise<MailSettingDto> => {
         const res = await apiClient.put('/mail/settings', input);
         return res.data;
     },
 
+    // Zaman aşımı: yanıtsız kalan bir gönderim ekranı sonsuz "gönderiliyor"da
+    // bırakmasın (axios'un varsayılan zaman aşımı yoktur).
     send: async (input: { fromEmail?: string; fromName?: string; to: string; cc?: string[]; subject: string; text?: string; html?: string; attachments?: Array<{ filename: string; contentType: string; contentBase64: string }> }) => {
-        const res = await apiClient.post('/mail/send', input);
+        const res = await apiClient.post('/mail/send', input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 };
@@ -517,6 +582,8 @@ export interface DeliveryReportDto {
     // Wer sie braucht (PDF-Erzeugung), holt den Bericht einzeln nach.
     responses?: DeliveryResponseItem[];
     notes?: string | null;
+    /** Report-own photo attachments (base64 data URLs) — detail fetch only. */
+    images?: Array<{ imageData: string; caption?: string }> | null;
     customerSignature?: string | null;
     isSigned: boolean;
     signedAt: string | null;
@@ -537,12 +604,13 @@ export type DeliveryReportInput = {
     checklistName?: string | null;
     responses: Array<Partial<DeliveryResponseItem> & { label: string }>;
     notes?: string | null;
+    images?: Array<{ imageData: string; caption?: string }>;
     signatureBase64?: string | null;
 };
 
 export const deliveryReportApi = {
     list: async (params?: { appointmentId?: string; projectId?: string; salesOrderId?: string }): Promise<DeliveryReportDto[]> => {
-        const res = await apiClient.get('/delivery-reports', { params });
+        const res = await getShared<DeliveryReportDto[]>('/delivery-reports', { params });
         return res.data;
     },
     getOne: async (id: string): Promise<DeliveryReportDto> => {
@@ -561,7 +629,7 @@ export const deliveryReportApi = {
         const res = await apiClient.patch(`/delivery-reports/${id}/sign`, { signatureBase64 });
         return res.data;
     },
-    update: async (id: string, input: { responses?: DeliveryReportInput['responses']; notes?: string | null; checklistName?: string | null }): Promise<DeliveryReportDto> => {
+    update: async (id: string, input: { responses?: DeliveryReportInput['responses']; notes?: string | null; checklistName?: string | null; images?: Array<{ imageData: string; caption?: string }> }): Promise<DeliveryReportDto> => {
         const res = await apiClient.patch(`/delivery-reports/${id}`, input);
         return res.data;
     },
@@ -637,7 +705,7 @@ export const signatureApi = {
         return res.data;
     },
     create: async (input: SignatureRequestInput): Promise<SignatureRequestDto & { emailed: boolean; notified: boolean }> => {
-        const res = await apiClient.post('/signature-requests', input);
+        const res = await apiClient.post('/signature-requests', input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
     getOne: async (id: string): Promise<SignatureRequestDetailDto> => {

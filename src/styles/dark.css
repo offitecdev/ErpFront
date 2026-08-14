@@ -142,25 +142,62 @@ html.dark body,
 .dark .bg-\[\#1a2361\],
 .dark .bg-brand-solid,
 .dark .ant-btn-primary {
-  background: var(--ofi-d-wheat-solid) !important;
-  border-color: var(--ofi-d-wheat-solid) !important;
-  color: var(--ofi-d-on-accent) !important;
-  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
-  box-shadow: 0 0 0 1px rgba(212, 143, 22, 0.28) !important;
+  background: var(--ofi-button-navy) !important;
+  border-color: var(--ofi-button-navy) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: none !important;
 }
 .dark .bg-\[\#272f67\] *,
 .dark .bg-\[\#1f2654\] *,
 .dark .bg-\[\#1a2361\] *,
 .dark .bg-brand-solid *,
 .dark .ant-btn-primary * {
-  color: var(--ofi-d-on-accent) !important;
-  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
-.dark .ant-btn-primary:hover {
-  background: var(--ofi-d-wheat-strong) !important;
-  border-color: var(--ofi-d-wheat-strong) !important;
-  color: var(--ofi-d-on-accent) !important;
+/* ── Marken-Primärbuttons im Dunkelmodus ──
+   Die Grundfarbe bleibt das Gold von oben; die Rückmeldung geht nach OBEN,
+   also heller — auf dunklem Grund liest sich das als „aktiv“, während ein
+   Abdunkeln dort eher wie „ausgegraut“ wirkt. Im Hellmodus läuft dieselbe
+   Leiter genau andersherum (siehe index.css). Ohne die Regel hier kam gar
+   keine Rückmeldung durch: die Füllung oben ist !important gesetzt und hat
+   die Tailwind-Hover-Klasse überstimmt. Reine Farbe, kein Schein.
+   Die Leiter: #d48f16 (Ruhe) → #f2bb5c (Hover) → #ffd188 (gedrückt). */
+.dark button[class~="bg-[#272f67]"],
+.dark a[class~="bg-[#272f67]"],
+.dark button[class~="bg-[#1f2654]"],
+.dark button[class~="bg-[#1a2361]"],
+.dark button[class~="bg-brand-solid"],
+.dark .ofi-btn-brand,
+.dark .ant-btn-primary {
+  transition: background-color 140ms ease;
 }
+.dark button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):hover,
+.dark a[class~="bg-[#272f67]"]:hover,
+.dark button[class~="bg-[#1f2654]"]:not(:disabled):not([disabled]):hover,
+.dark button[class~="bg-[#1a2361]"]:not(:disabled):not([disabled]):hover,
+.dark button[class~="bg-brand-solid"]:not(:disabled):not([disabled]):hover,
+.dark .ofi-btn-brand:not(:disabled):not([disabled]):hover,
+.dark .ant-btn-primary:not(:disabled):not([disabled]):hover {
+  background: var(--ofi-button-navy) !important;
+  /* Der Hover-Rahmen aus dem Hellmodus ist weiß — auf der goldenen Fläche hier
+     wäre er unsichtbar. Also dieselbe Kante, nur andersherum: dunkel. */
+  border-color: var(--ofi-button-hover-fill) !important;
+  color: #ffffff !important;
+}
+.dark button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):active,
+.dark a[class~="bg-[#272f67]"]:active,
+.dark button[class~="bg-[#1f2654]"]:not(:disabled):not([disabled]):active,
+.dark button[class~="bg-[#1a2361]"]:not(:disabled):not([disabled]):active,
+.dark button[class~="bg-brand-solid"]:not(:disabled):not([disabled]):active,
+.dark .ofi-btn-brand:not(:disabled):not([disabled]):active,
+.dark .ant-btn-primary:not(:disabled):not([disabled]):active {
+  background: var(--ofi-button-navy) !important;
+  border-color: var(--ofi-button-hover-fill) !important;
+  color: #ffffff !important;
+}
+
 .dark .ant-btn-primary:disabled,
 .dark .ant-btn-primary[disabled] {
   background: #2a2e34 !important;
@@ -399,9 +436,11 @@ html.dark body,
 }
 
 /* ── AntD: secondary / text buttons ── */
+/* Wie im Hellmodus: in Ruhe kein Rahmen, er kommt erst beim Hover. Die
+   Ruhefläche trägt die Abgrenzung allein. */
 .dark .ant-btn-default {
   background: var(--ofi-d-surface) !important;
-  border-color: var(--ofi-d-border) !important;
+  border-color: transparent !important;
   color: var(--ofi-d-text-2) !important;
 }
 .dark .ant-btn-default:hover {
@@ -427,12 +466,17 @@ html.dark body,
   color: var(--ofi-d-wheat-strong);
 }
 .dark .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn,
-.dark .ant-tabs .ant-tabs-tab:hover,
+.dark .ant-tabs .ant-tabs-tab:hover {
+  color: #272f67 !important;
+}
 .dark .ant-menu-light .ant-menu-item-selected,
 .dark .ant-menu-light .ant-menu-submenu-selected > .ant-menu-submenu-title {
   color: var(--ofi-d-text) !important;
 }
-.dark .ant-tabs .ant-tabs-ink-bar,
+.dark .ant-tabs .ant-tabs-ink-bar {
+  background: #272f67 !important;
+  border-color: #272f67 !important;
+}
 .dark .ant-slider .ant-slider-track,
 .dark .ant-slider .ant-slider-handle::after,
 .dark .ant-progress .ant-progress-bg {
@@ -556,15 +600,16 @@ html.dark body,
   color: var(--ofi-d-text-3) !important;
 }
 .dark .ofi-rep-tab:hover {
-  color: var(--ofi-d-text) !important;
+  color: #0f172a !important;
 }
-/* Active pill: wheat label (the app's accent) on the raised hover tone. */
+/* Active report tabs keep their light-mode palette in both themes. */
 .dark .ofi-rep-tab.is-active {
-  background: var(--ofi-d-hover) !important;
-  color: var(--ofi-d-wheat) !important;
+  background: #ffffff !important;
+  color: #272f67 !important;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 2px 6px rgba(0, 0, 0, 0.6) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(16, 24, 40, 0.12),
+    0 0 0 1px rgba(15, 23, 42, 0.05) !important;
 }
 
 /* Order table rows (My Orders detail): hovering darkens the row to
@@ -723,31 +768,55 @@ html.dark body,
 .dark .offitec-toaster [data-description],
 .dark .offitec-toast-description { color: var(--ofi-d-text-3) !important; }
 
-/* ── Quote detail: header bands and money columns ──
-   index.css paints these with light navy tints (#f1f5fd / #f4f7fd / #e4ecfb).
-   On dark they would read as bright bands, so they resolve to the shared dark
-   surfaces here — the two money columns keep a one-step lift over the rows
-   around them, which is what made them legible in light mode too. */
+/* ── Quote detail: header band and rows ──
+   index.css paints the header with a light navy tint and the rows plain white.
+   On dark those would read as bright bands, so both resolve to the shared dark
+   surfaces here. The light theme gives every column ONE tone (no per-column
+   tint), and dark follows: the rows are a single surface, the header one step
+   off it, and the column rules do the separating. */
 .dark table[data-tender-detail-table] th {
   background: var(--ofi-d-surface-2) !important;
   border-bottom-color: var(--ofi-d-border) !important;
   color: var(--ofi-d-text-3) !important;
 }
 
-.dark table[data-tender-detail-table] th:nth-child(5),
-.dark table[data-tender-detail-table] th:nth-child(8) {
-  background: var(--ofi-d-surface-3) !important;
-  color: var(--ofi-d-text-2) !important;
+/* The rows' hard white from index.css must not survive into dark mode. */
+.dark table[data-tender-detail-table] tbody td {
+  background: var(--ofi-d-surface) !important;
 }
 
-.dark table[data-tender-detail-table] td:nth-child(5),
-.dark table[data-tender-detail-table] td:nth-child(8) {
-  background: var(--ofi-d-surface-3) !important;
+/* The grid lines are one variable in index.css (`--quote-grid-line`); dark mode
+   only re-points it, so both themes define their rules the same way. On a
+   near-black surface the theme's default border tone all but vanishes, and these
+   tables lean on their rules — they mark the resizable column edges. Applies to
+   every table that opts in (`data-grid-lines`: customer list, quote list) as
+   well as the quote-lines table. */
+.dark table[data-tender-detail-table],
+.dark table[data-grid-lines] {
+  --quote-grid-line: var(--ofi-d-border-strong);
 }
 
-.dark table[data-tender-detail-table] tbody tr:hover td:nth-child(5),
-.dark table[data-tender-detail-table] tbody tr:hover td:nth-child(8) {
-  background: var(--ofi-d-hover) !important;
+/* The list tables' own td/th rules carry explicit light colours, so the ruled
+   variant needs the override to reach them. */
+.dark table[data-grid-lines] th + th,
+.dark table[data-grid-lines] td + td {
+  border-left-color: var(--quote-grid-line) !important;
+}
+
+.dark table[data-grid-lines] td {
+  border-bottom-color: var(--quote-grid-line) !important;
+}
+
+/* The header's own bottom rule is set with an explicit colour in index.css, so
+   it needs the one override. */
+.dark table[data-tender-detail-table] th {
+  border-bottom-color: var(--ofi-d-border-strong) !important;
+}
+
+/* The selected row's accent bar is navy in light mode; on dark it takes the
+   app's gold, like every other accent. */
+.dark table[data-tender-detail-table] tbody tr[data-row-selected='true'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ofi-d-wheat) !important;
 }
 
 /* Card headers and section (TITLE) rows carry the same light navy tint. */
@@ -768,7 +837,7 @@ html.dark body,
 }
 .dark .focus\:border-\[\#1f2654\]:focus { border-color: var(--ofi-d-wheat) !important; }
 
-/* Hover on the quote's own tinted money columns follows the same warm step. */
+/* Row hover: one warm step above the row surface, the whole row at once. */
 .dark table[data-tender-detail-table] tbody tr:hover td {
   background-color: var(--ofi-d-hover) !important;
 }
@@ -830,27 +899,27 @@ html.dark body,
    white, which is unreadable on gold. */
 .dark button.ofi-quote-tab-active,
 .dark button.ofi-quote-tab-active:hover {
-  background-color: var(--ofi-d-wheat-solid) !important;
-  border-bottom-color: var(--ofi-d-wheat-strong) !important;
-  color: var(--ofi-d-on-accent) !important;
-  -webkit-text-fill-color: var(--ofi-d-on-accent) !important;
+  background-color: rgba(245, 158, 11, 0.14) !important;
+  border-color: rgba(245, 158, 11, 0.38) !important;
+  color: #fbbf24 !important;
+  -webkit-text-fill-color: #fbbf24 !important;
 }
 
 /* The count badge sits INSIDE that gold fill, and its own `bg-[#1f2654]` would
    also resolve to gold — gold on gold, i.e. invisible. Invert it instead. */
 .dark button.ofi-quote-tab-active .ofi-quote-tab-badge {
-  background-color: var(--ofi-d-on-accent) !important;
+  background-color: #f59e0b !important;
   border-color: transparent !important;
-  color: var(--ofi-d-wheat) !important;
-  -webkit-text-fill-color: var(--ofi-d-wheat) !important;
+  color: #1c1917 !important;
+  -webkit-text-fill-color: #1c1917 !important;
 }
 
 /* Idle tabs: quiet until hovered, then a soft wash of the same gold rather than
    a neutral grey, so the whole strip stays in one colour family. */
 .dark button.ofi-quote-tab:not(.ofi-quote-tab-active):not(:disabled):hover {
-  background-color: var(--ofi-d-wheat-softer) !important;
-  border-bottom-color: var(--ofi-d-wheat-border) !important;
-  color: var(--ofi-d-wheat) !important;
+  background-color: rgba(245, 158, 11, 0.09) !important;
+  border-color: rgba(245, 158, 11, 0.24) !important;
+  color: #fbbf24 !important;
 }
 
 /* Primary-button hover. The resting state is repainted gold by the brand-surface
@@ -910,11 +979,21 @@ html.dark body,
   background: rgba(0, 0, 0, 0.6) !important;
 }
 
-/* ── Reports sheet: the orange accent family. The sheet gets an orange top
-   hairline; the "+" actions, nav arrows and PDF glyphs all glow orange
-   instead of the light theme's navy. ── */
+/* ── Reports sheet: the orange accent family. The "+" actions, nav arrows and
+   PDF glyphs glow orange instead of the light theme's navy. The sheet itself
+   carries NO accent line — an orange hairline across the top read as a status
+   banner on the popup rather than as chrome. ── */
+/* Der Rapport-Bereich läuft SCHWARZ (Benutzerwunsch): nicht auf der gehobenen
+   Sheet-Fläche (#22242a) wie der Terminplan, sondern auf dem tiefsten Ton der
+   Palette. Die Karten darin tragen `dark:bg-transparent` und übernehmen ihn,
+   Kopf- und Fussleiste eine Spur darüber, damit die Ränder ablesbar bleiben. */
 .dark .ofi-reports-sheet {
-  border-top: 2px solid rgba(251, 146, 60, 0.55) !important;
+  background: var(--ofi-d-bg) !important;
+  border-top: 1px solid var(--ofi-d-border) !important;
+}
+.dark .ofi-reports-sheet > header,
+.dark .ofi-reports-sheet > footer {
+  background: var(--ofi-d-surface) !important;
 }
 .dark .ofi-rs-nav { color: rgba(255, 255, 255, 0.7) !important; }
 .dark .ofi-rs-nav:hover:not(:disabled) {
@@ -978,9 +1057,146 @@ html.dark body,
 }
 
 /* ── Unified calendar chips ── */
-.dark .ofi-ucal-chip--planned { background: #23307f; border-left-color: #f0a83c; color: #fff; }
+.dark .ofi-ucal-chip--planned { background: transparent; border-color: #8fa2ff; color: #b9c5ff; }
+.dark .ofi-ucal-chip--planned:hover { background: rgba(143, 162, 255, 0.12); }
+.dark .ofi-ucal-chip--ongoing { background: #23307f; color: #fff; }
 .dark .ofi-ucal-chip--done { background: #0c8a60; color: #eafff6; }
-.dark .ofi-ucal-chip--cancelled { background: rgba(255, 255, 255, 0.07); border-left-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.4); }
+.dark .ofi-ucal-chip--cancelled { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.4); }
 .dark .ofi-ucal-chip--meeting { background: #5d4bc4; color: #f1eeff; }
 .dark .ofi-ucal-chip--maintenance { background: #9a4a08; color: #ffedd7; }
+.dark .ofi-ucal-dot--planned { background: transparent; box-shadow: inset 0 0 0 1.5px #8fa2ff; }
+.dark .ofi-ucal-dot--ongoing { background: #8fa2ff; }
 .dark .ofi-ucal-slot:hover { background: rgba(230, 207, 158, 0.1); }
+
+/* Quote address read-back: a raised translucent well so the block still reads as
+   a block against the card it sits in, with its text at full secondary contrast
+   instead of inheriting whatever the flattened surface left behind. */
+.dark .ofi-addr-box {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--ofi-d-border) !important;
+  color: var(--ofi-d-text-2) !important;
+}
+.dark .ofi-sheet.ofi-viewport-sheet {
+  box-shadow: none !important;
+}
+.dark .ofi-viewport-sheet-shadow {
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -20px 56px rgba(0, 0, 0, 0.65);
+}
+/* Brand-button colours are identical in light and dark mode. */
+.dark {
+  --ofi-button-navy: #272f67;
+  --ofi-button-hover-fill: #c2410c;
+}
+
+.dark :where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]),
+.dark :where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover,
+.dark :where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):active {
+  border-color: var(--ofi-button-navy) !important;
+  background: var(--ofi-button-navy) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.dark :where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover {
+  border-color: var(--ofi-button-hover-fill) !important;
+}
+
+.dark :where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+) *,
+.dark :where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+) {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.dark #root button[class~="bg-white"],
+.dark #root .ant-btn-default,
+.dark body > div:not(#root) .ant-btn-default {
+  background: #1c1d1f !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.dark #root button[class~="bg-white"] :where(span, svg),
+.dark #root .ant-btn-default :where(span, svg),
+.dark body > div:not(#root) .ant-btn-default :where(span, svg) {
+  color: inherit !important;
+}

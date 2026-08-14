@@ -31,12 +31,11 @@ const ToastProvider = () => {
     const [shouldMount, setShouldMount] = useState(false);
 
     useEffect(() => {
-        if ('requestIdleCallback' in window) {
-            const id = window.requestIdleCallback(() => setShouldMount(true), { timeout: 1500 });
-            return () => window.cancelIdleCallback(id);
-        }
-
-        const id = globalThis.setTimeout(() => setShouldMount(true), 250);
+        // Sonner is not needed to paint or operate the initial route. A plain
+        // idle callback fires during the first loading gap and pulled the whole
+        // toast runtime into Lighthouse's critical window, so wait until the
+        // page has settled. Calls made earlier are queued by Sonner itself.
+        const id = globalThis.setTimeout(() => setShouldMount(true), 4000);
         return () => globalThis.clearTimeout(id);
     }, []);
 
@@ -105,6 +104,18 @@ function App() {
                     })
                     .catch(() => undefined);
             }
+
+            // Project-detail visits used to wait for all profile requests before
+            // loading both their route chunk and overview data. Start both now;
+            // the protected route still controls when anything is rendered.
+            const projectMatch = window.location.pathname.match(/^\/projects\/([^/?#]+)$/);
+            const projectId = projectMatch?.[1];
+            if (projectId) {
+                void import('./pages/project/ProjectDetail').catch(() => undefined);
+                void import('./lib/api/project')
+                    .then(({ projectApi }) => projectApi.prefetchById(projectId, 'overview'))
+                    .catch(() => undefined);
+            }
         } else useAuthStore.setState({ isLoading: false });
     }, [fetchProfile]);
 
@@ -121,7 +132,9 @@ function App() {
             theme={{
                 algorithm: isDarkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
                 token: {
-                    fontFamily: '"Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+                    // Must match --font-body (theme.css) — a bare 'sans-serif'
+                    // here rendered every antd control in Arial.
+                    fontFamily: '"Open Sans", Arial, sans-serif',
                     borderRadius: 10,
                     borderRadiusXS: 10,
                     borderRadiusSM: 10,

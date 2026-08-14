@@ -1,9 +1,8 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
     ArrowLeft,
     Briefcase01 as BriefcaseBusiness,
-    ClockRewind as History,
     File05 as FileText,
     FileCheck02 as FileCheck2,
     FileDownload02 as FileDown,
@@ -12,7 +11,6 @@ import {
     User01 as User,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumber } from '@/utils/tenderNumber';
 
 import { StatusChip } from '../../../../components/ui-shared/StatusBadge';
 import type { TenderListItem } from '../../../../types/tender';
@@ -31,15 +29,21 @@ type TenderDetailHeaderProps = {
     canApprove: boolean;
     isSalesOrderStatus: boolean;
     projectId?: string | null;
+    /** Bu tekliften doğmuş sipariş — varsa ana düğme "Zum Auftrag" olur. */
+    salesOrderId?: string | null;
     projectCreateLoading: boolean;
     onBack: () => void;
     onCreateVersion: () => void;
     onExport: () => void;
     onCreateProject: () => void;
-    onOpenOrderDecision: () => void;
+    /**
+     * Var olan hedefi DOĞRUDAN açar: proje düzeyinde seçim yapılmışsa projeyi,
+     * teslimat siparişiyse siparişi (kullanıcı isteği — soru yok).
+     */
+    onOpenOrder: () => void;
+    /** İki seçenekli karar popup'ını açar (proje siparişi / teslimat siparişi). */
+    onCreateOrder: () => void;
     onApprove: () => void;
-    /** Opens the log / notes / attachments drawer. */
-    onOpenLogs: () => void;
     /** Opens the "delete offer" confirmation, from the settings gear menu. */
     onDeleteOffer: () => void;
     canSave: boolean;
@@ -88,14 +92,15 @@ export const TenderDetailHeader = ({
     canApprove,
     isSalesOrderStatus,
     projectId,
+    salesOrderId,
     projectCreateLoading,
     onBack,
     onCreateVersion,
     onExport,
     onCreateProject,
-    onOpenOrderDecision,
+    onOpenOrder,
+    onCreateOrder,
     onApprove,
-    onOpenLogs,
     onDeleteOffer,
     canSave,
     saving,
@@ -104,14 +109,27 @@ export const TenderDetailHeader = ({
     creatorName,
 }: TenderDetailHeaderProps) => {
     const barRef = useRef<HTMLDivElement>(null);
-    const [barHeight, setBarHeight] = useState(44);
+    // One-line bar: 40px controls + 16px vertical padding + 1px border. Using
+    // the real common-case height on the first paint avoids a spacer correction
+    // (and therefore CLS) before ResizeObserver reports wrapped narrow layouts.
+    // Below ~640px the toolbar always wraps to two rows (92px measured), so a
+    // narrow viewport starts from the wrapped height for the same reason.
+    const [barHeight, setBarHeight] = useState(() =>
+        typeof window !== 'undefined' && window.innerWidth < 640 ? 92 : 57);
 
-    useLayoutEffect(() => {
+    useEffect(() => {
         const bar = barRef.current;
         if (!bar) return;
-        const sync = () => setBarHeight(bar.offsetHeight);
-        sync();
-        const observer = new ResizeObserver(sync);
+        // `offsetHeight` here ran synchronously after React's DOM writes and
+        // forced layout for the entire quote. ResizeObserver already carries
+        // the calculated border-box size, so no geometry read is needed.
+        const observer = new ResizeObserver(([entry]) => {
+            const measured = entry.borderBoxSize[0]?.blockSize;
+            // Legacy ResizeObserver only exposes the content box. The bar has
+            // 8px vertical padding and a 1px bottom border.
+            const height = measured || entry.contentRect.height + 17;
+            setBarHeight((current) => current === height ? current : height);
+        });
         observer.observe(bar);
         return () => observer.disconnect();
     }, []);
@@ -128,7 +146,7 @@ export const TenderDetailHeader = ({
                 onClick={onBack}
                 title={t('tenders.list_back')}
                 aria-label={t('tenders.list_back')}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-[#272f67]/15 hover:text-[#1f2654]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] border border-transparent text-slate-500 transition-colors hover:border-slate-300 hover:bg-[#272f67]/15 hover:text-[#1f2654]"
             >
                 <ArrowLeft size={16} />
             </button>
@@ -137,7 +155,7 @@ export const TenderDetailHeader = ({
             <span className="flex min-w-0 items-center gap-2.5">
                 <FileText size={16} className="shrink-0 text-slate-400" />
                 <span className="truncate text-[17px] font-semibold tracking-tight text-slate-900">
-                    {localizeTenderNumber(tender.tenderNumber)}
+                    {tender.tenderNumber}
                 </span>
                 <span className="shrink-0 text-[12px] tabular-nums text-slate-400">v{tender.version}</span>
                 <StatusChip variant={tenderStatusVariant}>{tenderStatusLabel}</StatusChip>
@@ -145,15 +163,6 @@ export const TenderDetailHeader = ({
 
             {/* Log storage / save / settings, on the same line as the quote. */}
             <span className="flex shrink-0 items-center gap-1 border-l border-slate-200 pl-3">
-                <button
-                    type="button"
-                    onClick={onOpenLogs}
-                    title={t('tenders.loglar')}
-                    aria-label={t('tenders.loglar')}
-                    className="flex h-7 w-7 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-[#272f67]/15 hover:text-[#1f2654]"
-                >
-                    <History size={16} />
-                </button>
                 {canSave && (
                     <button
                         type="button"
@@ -161,7 +170,7 @@ export const TenderDetailHeader = ({
                         disabled={!isDirty || saving}
                         title={t('common.save')}
                         aria-label={t('common.save')}
-                        className={`flex h-7 items-center gap-1.5 rounded-[3px] px-2.5 text-[12.5px] font-semibold transition-colors ${
+                        className={`flex h-10 items-center gap-2 rounded-[3px] px-4 text-[14px] font-semibold transition-colors ${
                             saving
                                 ? 'cursor-wait bg-[#1f2654] text-white'
                                 : isDirty
@@ -177,34 +186,43 @@ export const TenderDetailHeader = ({
                         {t('common.save')}
                     </button>
                 )}
+                {/* Sipariş türü sorusu artık ANA düğmenin popup'ında sorulur —
+                    ayarlar menüsünde saklanmaz (kullanıcı isteği). */}
                 <TenderSettingsMenu onDeleteOffer={onDeleteOffer} />
             </span>
 
             {/* Primary actions, right-aligned on the same line. */}
             <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
                 {!isDraft && canManage && (!isSalesOrderStatus || projectId) && (
-                    <Button size="sm" variant="secondary" icon={<GitBranch size={13} />} onClick={onCreateVersion}>
+                    <Button size="sm" className="h-10 px-4 text-[14px]" variant="secondary" icon={<GitBranch size={15} />} onClick={onCreateVersion}>
                         {t('tenders.new_versiyon')}
                     </Button>
                 )}
                 {canExport && (
-                    <Button size="sm" variant="secondary" icon={<FileDown size={13} />} onClick={onExport}>
+                    <Button size="sm" className="h-10 px-4 text-[14px]" variant="secondary" icon={<FileDown size={15} />} onClick={onExport}>
                         {t('tenders.pdf_export')}
                     </Button>
                 )}
                 {!isDraft && canManage && (
+                    /* Sipariş/proje zaten varsa düğme hedefi DOĞRUDAN açar:
+                       proje düzeyinde seçim → "Zum Projekt", teslimat siparişi
+                       → "Zum Auftrag" (kullanıcı isteği). Henüz yoksa iki
+                       seçenekli karar popup'ı açılır. */
                     <Button
                         size="sm"
+                        className="h-10 px-4 text-[14px]"
                         variant="primary"
-                        icon={<BriefcaseBusiness size={13} />}
+                        icon={<BriefcaseBusiness size={15} />}
                         loading={projectCreateLoading}
-                        onClick={projectId ? onCreateProject : onOpenOrderDecision}
+                        onClick={salesOrderId ? onOpenOrder : projectId ? onCreateProject : onCreateOrder}
                     >
-                        {projectId ? t('tenders.siparise_git') : t('tenders.order_create')}
+                        {salesOrderId || projectId
+                            ? (projectId ? t('tenders.project_go_to') : t('tenders.siparise_git'))
+                            : t('tenders.order_create')}
                     </Button>
                 )}
                 {isDraft && canApprove && (
-                    <Button size="sm" variant="primary" icon={<FileCheck2 size={13} />} onClick={onApprove}>
+                    <Button size="sm" className="h-10 px-4 text-[14px]" variant="primary" icon={<FileCheck2 size={15} />} onClick={onApprove}>
                         {t('common.confirm')}
                     </Button>
                 )}

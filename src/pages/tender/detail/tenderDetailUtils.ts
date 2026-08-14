@@ -1,5 +1,5 @@
 import { useTenderStore } from '../../../store/tenderStore';
-import type { CalculationItemDto, PositionArticleMappingDto, PositionMaterialMappingDto, PositionDto } from '../../../types/tender';
+import type { CalculationItemDto, PositionArticleMappingDto, PositionDto } from '../../../types/tender';
 
 import { t } from '@/i18n/translate';
 
@@ -76,7 +76,6 @@ export const buildTree = (positions: PositionDto[], fallbackTaxRate = 8.1): Tree
                     parentPositionId: p.id,
                     hierarchyLevel: p.hierarchyLevel + 1,
                     articleMappings: [],
-                    materialMappings: [],
                     children: [],
                     totalWithChildren: 0,
                     calculation: null,
@@ -175,67 +174,9 @@ export const mergeArticleMappingUpdate = (
     }));
 };
 
-export type MaterialMappingUpdateResult = {
-    mapping?: PositionMaterialMappingDto;
-    updatedCalculation?: CalculationItemDto | null;
-};
-
-export const mergeMaterialMappingUpdate = (
-    positionId: string,
-    mappingId: string,
-    result: MaterialMappingUpdateResult,
-    fallbackPatch: Partial<PositionMaterialMappingDto> = {}
-) => {
-    useTenderStore.setState((state) => ({
-        detail: state.detail
-            ? {
-                ...state.detail,
-                positions: state.detail.positions.map((p) => {
-                    if (p.id !== positionId) return p;
-                    return {
-                        ...p,
-                        calculation: result.updatedCalculation !== undefined ? result.updatedCalculation : p.calculation,
-                        materialMappings: p.materialMappings?.map((m) => {
-                            if (m.id !== mappingId) return m;
-                            const incoming = result.mapping;
-                            return {
-                                ...m,
-                                ...fallbackPatch,
-                                ...(incoming ?? {}),
-                                material: incoming?.material
-                                    ? { ...(m.material ?? {}), ...incoming.material }
-                                    : m.material,
-                            };
-                        }),
-                    };
-                }),
-            }
-            : state.detail,
-    }));
-};
-
-export const mergeMaterialMappingRemoval = (
-    positionId: string,
-    mappingId: string,
-    updatedCalculation?: CalculationItemDto | null
-) => {
-    useTenderStore.setState((state) => ({
-        detail: state.detail
-            ? {
-                ...state.detail,
-                positions: state.detail.positions.map((p) =>
-                    p.id === positionId
-                        ? {
-                            ...p,
-                            calculation: updatedCalculation !== undefined ? updatedCalculation : p.calculation,
-                            materialMappings: p.materialMappings?.filter((m) => m.id !== mappingId),
-                        }
-                        : p
-                ),
-            }
-            : state.detail,
-    }));
-};
+// mergeMaterialMappingUpdate / mergeMaterialMappingRemoval kaldırıldı:
+// PositionMaterialMapping tablosu malzeme/ürün birleşmesiyle (2026-08-14)
+// silindi; iki yardımcının da çağıranı yoktu.
 
 export const mergePositionUpdate = (positionId: string, updated: Partial<PositionDto>) => {
     useTenderStore.setState((state) => ({

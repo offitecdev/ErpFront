@@ -2,7 +2,6 @@ import { Button } from '@/components/ui-shared/Button';
 import { Modal } from '@/components/ui-shared/Modal';
 import { t } from '@/i18n/translate';
 import type { ProjectSalesOrder } from '@/types/project';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 export const ProjectDeleteOrderModal = ({
     order,
@@ -41,7 +40,7 @@ export const ProjectDeleteOrderModal = ({
                     : hasAddons
                         ? 'projects.detail.deleteMainCascadeConfirm'
                         : 'projects.deleteMainConfirm',
-                { orderNumber: localizeTenderNumbersInText(order.orderNumber) },
+                { orderNumber: order.orderNumber },
             )}
         </p>
     </Modal>

@@ -3,11 +3,13 @@ import type { NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
-import { localizeTenderNumber } from '@/utils/tenderNumber';
+import { tenderApi } from '@/lib/api/tender';
+import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
 
 import { projectApi, type SalesOrderMode } from '../../../../lib/api/project';
 import type { ProjectDto } from '../../../../types/project';
 import type { TenderListItem } from '../../../../types/tender';
+import { bytesToBase64 } from '../tenderDetailUtils';
 
 type UseTenderOrderDecisionParams = {
     tender: TenderListItem | undefined;
@@ -20,17 +22,20 @@ type UseTenderOrderDecisionParams = {
     saveAll: () => Promise<boolean>;
 };
 
-// An order requires the quote's single project/delivery address (EITHER the
-// Projektadresse or the Lieferadresse — one of the two, never both) and the
-// billing address. Shows a toast naming whichever is missing and returns false
-// so the caller can bail out. When "same as installation" is on, billing
-// mirrors that active address.
+// An order needs somewhere to work and somewhere to invoice. Both slots normally
+// carry the customer's Hauptadresse, so this only bites when the customer has no
+// address at all: the check stays deliberately lenient — either the Projekt- or
+// the Lieferadresse satisfies the first half — so quotes written under the older
+// single-slot model can still be turned into orders. Shows a toast naming
+// whichever is missing and returns false so the caller can bail out.
 const hasRequiredAddresses = (tender: TenderListItem): boolean => {
     const installation = String((tender as any).installationAddress ?? '').trim();
     const delivery = String((tender as any).deliveryAddress ?? '').trim();
     const active = installation || delivery;
+    // Legacy quotes could mirror billing off the project address instead of
+    // storing it; honour that flag when the billing slot itself is empty.
     const sameAsInstallation = !!(tender as any).billingSameAsInstallation;
-    const billing = sameAsInstallation ? active : String((tender as any).billingAddress ?? '').trim();
+    const billing = String((tender as any).billingAddress ?? '').trim() || (sameAsInstallation ? active : '');
     if (!active) {
         toast.error(t('tenders.installation_address_required'));
         return false;
@@ -42,8 +47,35 @@ const hasRequiredAddresses = (tender: TenderListItem): boolean => {
     return true;
 };
 
+/**
+ * Auftragsbestätigung an den Kunden — läuft unmittelbar nach dem Erstellen des
+ * Auftrags. Die Offerte wird dafür noch einmal als PDF gerendert (derselbe
+ * Generator wie Vorschau und Export) und als Anhang mitgeschickt; Empfänger und
+ * CC bestimmt der Server aus der Offerte.
+ *
+ * Ein Fehler hier darf den erstellten Auftrag NICHT zurücknehmen: er wird als
+ * Warnung gemeldet, der Ablauf geht weiter — die Mail lässt sich danach von
+ * Hand aus dem Offert-Mailfenster nachreichen.
+ */
+const sendOrderConfirmation = async (tenderId: string): Promise<void> => {
+    const { buildQuotePdf } = await import('@/utils/pdf/quotePdf');
+    const doc = await buildQuotePdf(tenderId, usePdfSettingsStore.getState().settings);
+    const result = await tenderApi.sendOrderMail(tenderId, {
+        attachments: [{
+            filename: doc.fileName,
+            contentType: 'application/pdf',
+            contentBase64: bytesToBase64(doc.bytes),
+        }],
+    });
+    // preview = für den Mandanten ist kein SMTP hinterlegt: es ging NICHTS
+    // hinaus, und genau das muss dastehen (sonst glaubt der Bediener, der Kunde
+    // sei informiert).
+    if (result.preview) toast.warning(t('tenders.order_mail_preview'));
+    else toast.success(t('tenders.order_mail_sent', { to: result.to }));
+};
+
 // Owns the "turn this tender into an order/project" flow: the decision modal's
-// state (mode, attach-to-existing toggle, new project name), the debounced
+// state (mode, attach-to-existing toggle), the debounced
 // existing-project search, and the submit/approve/create-project handlers. The
 // resulting project id (freshly created or already linked) is surfaced as
 // `projectId` so the caller can drive its sales-order UI.
@@ -59,7 +91,9 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
     // order type pre-selected.
     const [orderMode, setOrderMode] = useState<SalesOrderMode | null>(null);
     const [attachExistingProject, setAttachExistingProject] = useState(false);
-    const [orderProjectName, setOrderProjectName] = useState('');
+    // Teslimat siparişinde zorunlu teslim tarihi (YYYY-MM-DD); teklifin
+    // "Lieferdatum" (internalDeliveryDate) değerinden doldurulur.
+    const [orderDeliveryDate, setOrderDeliveryDate] = useState('');
     const [projectSearch, setProjectSearch] = useState('');
     const [projectSearchLoading, setProjectSearchLoading] = useState(false);
     const [projectSearchResults, setProjectSearchResults] = useState<ProjectDto[]>([]);
@@ -95,7 +129,7 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         setSelectedExistingProject(null);
         setProjectSearch('');
         setProjectSearchResults([]);
-        setOrderProjectName(localizeTenderNumber(tender.tenderNumber));
+        setOrderDeliveryDate(tender.internalDeliveryDate ? tender.internalDeliveryDate.slice(0, 10) : '');
         setOrderDecisionOpen(true);
     };
 
@@ -110,12 +144,14 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
             return;
         }
         const finalMode: SalesOrderMode = orderMode === 'PROJECT_NEW' && attachExistingProject ? 'PROJECT_EXISTING' : orderMode;
-        if (finalMode === 'PROJECT_NEW' && !orderProjectName.trim()) {
-            toast.error(t('tenders.project_ismi_zorunludur'));
-            return;
-        }
+        // Yeni proje için ad SORULMAZ; sunucu projeyi kendi koduyla adlandırır.
         if (finalMode === 'PROJECT_EXISTING' && !selectedExistingProject) {
             toast.error(t('tenders.add_istediginiz_projeyi_select'));
+            return;
+        }
+        // Teslimat siparişinde teslim tarihi zorunlu (sunucu da doğrular).
+        if (finalMode === 'INVOICE' && !orderDeliveryDate) {
+            toast.error(t('tenders.delivery_date_required'));
             return;
         }
 
@@ -125,15 +161,33 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
             const res = await projectApi.createSalesOrderFromTender({
                 tenderId: tender.id,
                 mode: finalMode,
-                projectName: finalMode === 'PROJECT_NEW' ? orderProjectName.trim() : undefined,
                 projectId: finalMode === 'PROJECT_EXISTING' ? selectedExistingProject?.id : undefined,
+                deliveryDate: finalMode === 'INVOICE' ? orderDeliveryDate : undefined,
                 overtimeHourlyRate,
             });
             if (res.project?.id) setCreatedProjectId(res.project.id);
             toast.success(res.message ||t('tenders.order_created'));
-            await fetchDetail(tender.id, true);
+
+            // Der Kunde erfährt SOFORT vom Auftrag — ohne Rückfrage und noch
+            // bevor die Seite zum Projekt/Auftrag wechselt, damit ein Mailfehler
+            // hier sichtbar wird und nicht in einem Seitenwechsel untergeht.
+            if (tender.customerEmail) {
+                try {
+                    await sendOrderConfirmation(tender.id);
+                } catch (mailError: any) {
+                    toast.error(mailError?.response?.data?.error || t('tenders.order_mail_failed'));
+                }
+            }
             setOrderDecisionOpen(false);
-            if (res.project?.id) setProjectCreatedModalId(res.project.id);
+            // Seçim doğrudan götürür (kullanıcı isteği, ara popup yok): proje
+            // düzeyinde bir seçim PROJEYE, teslimat siparişi SİPARİŞE gider.
+            if (res.project?.id) {
+                navigate(`/projects/${res.project.id}`);
+            } else if (res.salesOrder?.id) {
+                navigate(`/crm/my-orders/${res.salesOrder.id}`);
+            } else {
+                await fetchDetail(tender.id, true);
+            }
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.order_olusturulamadi'));
         } finally {
@@ -142,13 +196,14 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         }
     };
 
+    // Confirm / "Auftrag erstellen" artık SORAR (kullanıcı isteği): iki
+    // seçenekli popup açılır — proje siparişi ya da teslimat siparişi. Bu karar
+    // ayarlar menüsünde SAKLANAMAZ; ana akışın kendisidir. Adres kontrolü ve
+    // asıl oluşturma popup'ın onayında yapılır (handleSubmitOrderDecision).
     const handleApprove = async () => {
         if (!tender) return;
-        // Approve doubles as Save: staged line/meta edits are flushed first.
-        if (!(await flushPendingEdits())) return;
-        // Block the whole approve → deliver flow up front unless the
-        // installation, delivery and billing addresses are set.
-        if (!hasRequiredAddresses(tender)) return;
+        // Approve doubles as Save: staged line/meta edits are flushed first
+        // (openOrderDecision does the flush).
         await openOrderDecision();
     };
 
@@ -189,8 +244,11 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         setOrderMode,
         attachExistingProject,
         setAttachExistingProject,
-        orderProjectName,
-        setOrderProjectName,
+        orderDeliveryDate,
+        setOrderDeliveryDate,
+        // Nur die Frage "geht überhaupt etwas hinaus?" für den Auftragsdialog —
+        // die Adresse selbst wird dort nicht angezeigt.
+        notifyRecipient: tender?.customerEmail || null,
         projectSearch,
         setProjectSearch,
         projectSearchLoading,

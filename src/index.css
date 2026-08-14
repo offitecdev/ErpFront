@@ -2,6 +2,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  --bs-border-radius: 0.375rem;
+  --bs-border-radius-sm: 0.25rem;
+  --bs-border-radius-lg: 0.5rem;
+  --bs-border-radius-xl: 1rem;
+  --bs-border-radius-xxl: 2rem;
+  --bs-border-radius-2xl: var(--bs-border-radius-xxl);
+  --bs-border-radius-pill: 50rem;
+  --ofi-button-radius: 10px;
+  --ofi-bottom-sheet-radius: 18px;
+  --ofi-button-navy: #272f67;
+  --ofi-button-hover-fill: #f59e0b;
+  --ofi-control-height: 40px;
+  --ofi-control-font-size: 14px;
+  --ofi-control-border: #aeb8c8;
+}
+
 /* ── Global ── */
 *,
 *::before,
@@ -411,9 +428,9 @@ table[data-tender-detail-table] {
 
 /* `:where()` keeps these at zero specificity, so any utility class on an
    individual cell still wins — the block is a baseline, not an override. */
-/* The header band sits in the same navy family as the card headers and the
-   money columns, with text dark enough to read as a label rather than a
-   watermark. */
+/* The header band sits in the same navy family as the card headers, with text
+   dark enough to read as a label rather than a watermark. It is ONE shade for
+   every column — no column gets a tint of its own. */
 :where(table[data-tender-detail-table]) th {
   height: 34px;
   padding: 0.5rem 0.375rem;
@@ -429,14 +446,24 @@ table[data-tender-detail-table] {
 
 :where(table[data-tender-detail-table]) td {
   padding: 0.25rem 0.375rem;
-  border-bottom: 1px solid var(--color-border-secondary);
+  border-bottom: 1px solid var(--quote-grid-line);
   color: var(--color-text-secondary);
   line-height: 1.3;
   vertical-align: top;
 }
 
-/* No vertical rules between columns: the row hairlines plus the right-aligned
-   figures carry the grid on their own, and the extra lines only added noise. */
+/* Vertical rules between the columns: with resizable columns the grid has to
+   SHOW where one column ends and the next begins — the line is also the edge
+   the user grabs to drag. It sits on each cell's LEFT border, which is exactly
+   where the resize handle lives, so the handle and the line are the same edge.
+
+   Both rules use --quote-grid-line rather than the app's default hairline: this
+   table needs one step more contrast than a plain list, and light + dark are
+   then defined the same way, one variable each (dark.css re-points it). */
+:where(table[data-tender-detail-table]) th + th,
+:where(table[data-tender-detail-table]) td + td {
+  border-left: 1px solid var(--quote-grid-line);
+}
 
 /* A little air at the table's outer edges only — the inner columns stay tight
    so the numeric cells keep their alignment. */
@@ -450,26 +477,27 @@ table[data-tender-detail-table] {
   padding-right: 0.625rem;
 }
 
-/* The two money columns — unit price (5th) and amount (8th) — sit on a soft
-   tint drawn from the brand navy, so the eye lands on the prices without any
-   extra rules or heavier type. The hover shade keeps row feedback alive, which
-   an opaque cell background would otherwise swallow. */
-:where(table[data-tender-detail-table]) td:nth-child(5),
-:where(table[data-tender-detail-table]) td:nth-child(8) {
-  background: #f4f7fd;
+/* ONE tone for the whole table. The rows are white — all of them, whatever the
+   line is (title, description, product) — and the only tinted band is the
+   header, in a single shade shared by EVERY column. Money columns used to carry
+   their own tint and their headers a deeper one; three shades in one grid read
+   as three different kinds of column, which is exactly what this table must not
+   do. Emphasis on the prices now comes from type weight alone. */
+:where(table[data-tender-detail-table]) tbody td {
+  background: #ffffff;
 }
 
-/* Their headers take a deeper step of the same tint, so the two money columns
-   stay identifiable in the header band too. */
-:where(table[data-tender-detail-table]) th:nth-child(5),
-:where(table[data-tender-detail-table]) th:nth-child(8) {
-  background: #dbe6f9;
-  color: #1f2654;
+/* Hover is feedback, not a colour scheme: the faintest neutral step, gone as
+   soon as the pointer leaves. */
+:where(table[data-tender-detail-table]) tbody tr:hover td {
+  background: #f8fafc;
 }
 
-:where(table[data-tender-detail-table]) tbody tr:hover td:nth-child(5),
-:where(table[data-tender-detail-table]) tbody tr:hover td:nth-child(8) {
-  background: #e9effb;
+/* The selected row keeps its white background too — it is marked by an accent
+   bar on its leading edge instead of a fill, so no row is ever a different
+   colour from its neighbours. */
+:where(table[data-tender-detail-table]) tbody tr[data-row-selected='true'] td:first-child {
+  box-shadow: inset 3px 0 0 #1f2654;
 }
 
 :where(table[data-tender-detail-table]) tbody tr:last-child td {
@@ -566,6 +594,58 @@ table[data-inv-table] {
   border-bottom-color: transparent;
 }
 
+/* ── Column grid (opt-in) ──────────────────────────────────────────────────
+   `data-grid-lines` gives a table ruled columns: a visible line between every
+   pair of cells, one step stronger than the app's default hairline. Tables that
+   let the user DRAG their column widths need it — the line is the edge being
+   dragged, and without it the handle is invisible. The quote-lines table has it
+   built in; the list tables (customer, quote, project, order, inventory) and the
+   project detail tabs/popups opt in with the attribute.
+
+   One variable holds the colour so light and dark are defined the same way,
+   in one place each (dark.css re-points it).
+
+   POSITION MATTERS: this block sits AFTER the data-inv-table / data-montage-table
+   base rules. All three are zero-specificity `:where()` selectors, so source
+   order decides — declared earlier, the row rule's colour was taken back by the
+   base rule (the vertical rules were unaffected) and the two directions of the
+   grid ended up in different tones. */
+table[data-tender-detail-table],
+table[data-grid-lines] {
+  --quote-grid-line: #d8dfea;
+}
+
+:where(table[data-grid-lines]) th + th,
+:where(table[data-grid-lines]) td + td {
+  border-left: 1px solid var(--quote-grid-line);
+}
+
+:where(table[data-grid-lines]) td {
+  border-bottom-color: var(--quote-grid-line);
+}
+
+/* The filter row sits under the headings INSIDE the same band, so it must not
+   draw a rule of its own between the two. */
+:where(table[data-grid-lines]) thead tr[data-filter-row] th {
+  border-top: 0;
+}
+
+/* Sideways scrolling AT EVERY WIDTH for a ruled table's wrapper.
+   These are the tables whose columns the user can drag wider: with
+   `table-layout: fixed` the table's used width is the LARGER of 100% and the
+   sum of its column widths, so a few wide columns push it past the card — and
+   the card clips (`overflow-hidden`), which would simply cut the last columns
+   off. The app's responsive block only opens this below 1024px; a dragged
+   column needs it on the desktop too. `data-unstyled-table` keeps the generic
+   "Untitled UI" wrappers (which pin `overflow: visible !important`) out of it. */
+[data-table-scroll]:has(> table[data-grid-lines]),
+div:has(> table[data-grid-lines][data-unstyled-table]) {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+
 /* MAL KABUL tablosu daha ferah satırlar taşır (kullanıcı isteği 2026-08-02):
    satır satır kabul yapılırken hedef büyüsün, hücreler nefes alsın. Kural
    `:where()` sarmalayıcısı KULLANMAZ ki sıfır özgüllüklü temel kuralı geçsin. */
@@ -577,6 +657,47 @@ table[data-inv-table].ofi-receive-table th {
 table[data-inv-table].ofi-receive-table td {
   height: 68px;
   padding: 0.75rem 1rem;
+}
+
+/* KOMPAKT VARYANT (kullanıcı isteği 2026-08-03: randevu sihirbazındaki montajcı
+   tablosu küçülsün): dar bir sheet/popup içinde açılan seçim tabloları için
+   alçak satırlar ve dar hücre dolgusu. `:where()` sarmalayıcısı KULLANMAZ ki
+   sıfır özgüllüklü taban kuralı geçsin. */
+table[data-inv-table].ofi-compact-table {
+  font-size: 12.5px;
+}
+
+table[data-inv-table].ofi-compact-table th {
+  height: 30px;
+  padding: 0.25rem 0.5rem;
+  font-size: 11px;
+}
+
+table[data-inv-table].ofi-compact-table td {
+  height: 34px;
+  padding: 0.25rem 0.5rem;
+}
+
+table[data-inv-table].ofi-compact-table th:first-child,
+table[data-inv-table].ofi-compact-table td:first-child {
+  padding-left: 0.625rem;
+}
+
+table[data-inv-table].ofi-compact-table th:last-child,
+table[data-inv-table].ofi-compact-table td:last-child {
+  padding-right: 0.625rem;
+}
+
+/* SON SÜTUN KENARDAN DAHA İÇERİDE (kullanıcı isteği 2026-08-03: sipariş
+   popup'ındaki "Total (Net) CHF 40'433.28" satırı sağa fazla taşıyordu).
+   Başlık, kalem satırları ve toplam satırları AYNI kuralla kaydığı için sütun
+   hizası korunur. `:where()` sarmalayıcısı KULLANILMAZ — taban `td:last-child`
+   dolgusunu (1.125rem) geçmesi gerekir; Tailwind yardımcı sınıfı burada işe
+   YARAMAZ, çünkü bu dosyanın kuralları katman dışıdır ve v4'te katmanlı
+   yardımcı sınıfları yener. */
+table[data-inv-table].ofi-last-col-inset th:last-child,
+table[data-inv-table].ofi-last-col-inset td:last-child {
+  padding-right: 2rem;
 }
 
 /* Filtre satırı başlık şeridinden ayrışır: beyaz zemin. */
@@ -795,12 +916,40 @@ textarea,
   color: #ffffff !important;
 }
 
-/* Butonlar */
-.ant-btn {
+/* Butonlar — Vorlage: Adsız.png („WEITERLESEN“). Übernommen sind nur die
+   rechtwinkligen Ecken auf allen vier Seiten und der Hover, bei dem der Rahmen
+   erscheint und die Fläche eine Stufe dunkler wird. Die Maße bleiben bewusst
+   die von AntD: eine feste Höhe hätte auch die Buttons in Tabellenzeilen und
+   Dialog-Fußzeilen getroffen. `.ofi-cta` ist der Aufhänger für rohe
+   <button>-Elemente, unter denen kein AntD steckt. */
+.ant-btn,
+.ofi-cta {
   font-weight: 500 !important;
   box-shadow: none !important;
-  border-radius: 2px !important;
+  border-radius: 0 !important;
+  /* Der Rahmen liegt schon in Ruhe da, nur transparent. Käme er erst beim
+     Hover dazu, würde die Box in dem Moment auf jeder Seite um 1px wachsen
+     und das Layout zucken. */
+  border: 1px solid transparent !important;
+  transition: background-color 140ms ease, border-color 140ms ease;
 }
+
+/* Link-Buttons sind Text, keine Fläche — sie tragen auch keine Kante. */
+.ant-btn-link {
+  border-color: transparent !important;
+}
+
+/* ══ Kopfleiste ═══════════════════════════════════════════════════════════
+   Eine einzige Schriftgröße für die ganze Leiste. Vorher standen dort 10,
+   11, 12, 13 und 14px nebeneinander — das las sich unruhig und die kleinen
+   Beschriftungen waren auf dem hellen Grund kaum zu greifen.
+   Zwei Dinge sind ausgenommen und tragen dafür `.ofi-nosize`: die Initialen
+   im Avatar-Kreis und der Zähler auf der Glocke. Beide sitzen in einem festen
+   runden Feld, das bei 14px überlaufen würde — sie sind Marken, kein Text. */
+.ofi-topbar :is(a, button, select, input, label, p, span, h1, h2):not(.ofi-nosize) {
+  font-size: 14px;
+}
+
 .ant-btn-primary {
   background: #272f67 !important;
   border-color: #272f67 !important;
@@ -815,9 +964,11 @@ textarea,
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
+/* Hover: Fläche dunkler + Rahmen erscheint. Auf gefüllten Buttons muss die
+   Kante hell sein, sonst verschwindet sie in der ohnehin dunkleren Fläche. */
 .ant-btn-primary:hover {
   background: #1f2654 !important;
-  border-color: #1f2654 !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
 }
 .ant-btn-primary:disabled {
   background: #cbd5e1 !important;
@@ -831,7 +982,7 @@ textarea,
 }
 .ofi-btn-danger:not(:disabled):not([disabled]):hover {
   background: #b80d12 !important;
-  border-color: #b80d12 !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
   color: #ffffff !important;
 }
 .ofi-btn-danger:not(:disabled):not([disabled]) * {
@@ -843,14 +994,85 @@ textarea,
   border-color: #cbd5e1 !important;
   color: #ffffff !important;
 }
+
+/* Marken-Primärbuttons („Neues Produkt“, „Neuer Kunde“ …) — Rückmeldung rein
+   über die Farbe, keine Schatten und keine Bewegung. Im Hellmodus geht die
+   Leiter deutlich nach unten: #272f67 (Ruhe) → #141a3d (Hover) → #0b0f2a
+   (gedrückt). Das überstimmt bewusst das app-weite `hover:bg-[#1f2654]` der
+   einzelnen Buttons, weil dessen Unterschied zur Grundfarbe zu klein war, um
+   ihn zu bemerken. Im Dunkelmodus läuft dieselbe Leiter andersherum, also
+   heller — siehe dark.css. `.ofi-btn-brand` ist der Aufhänger für Buttons,
+   die den Navy-Ton nicht als Tailwind-Klasse tragen. */
+button[class~="bg-[#272f67]"],
+a[class~="bg-[#272f67]"],
+.ofi-btn-brand {
+  /* Diese Buttons sind rohe Elemente mit Tailwind-Klassen, kein AntD. Radius
+     und Rahmen müssen hier eigens gesetzt werden — und mit !important, weil
+     ein `rounded-*` aus dem Markup sonst gleich stark oder stärker wäre. */
+  border-radius: 0 !important;
+  border: 1px solid transparent !important;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+/* Header utility icons stay circular when their open/active state adds the
+   brand background class handled by the primary-button rule above. */
+button.ofi-header-icon-button {
+  border-radius: 9999px !important;
+}
+
+/* Active workspace tabs are anchors, so the generic brand-anchor rule used to
+   flatten only the selected tab. Keep both selected and unselected tabs as the
+   same soft capsule. */
+#root a.workspace-tab {
+  border-radius: 9999px !important;
+}
+
+/* Close controls remain light at rest; hovering makes the cross visibly bold.
+   Labels are localized, so cover the languages shipped by the application. */
+:where(
+  button[aria-label*="close" i],
+  button[aria-label*="kapat" i],
+  button[aria-label*="schließ" i],
+  button[title*="close" i],
+  button[title*="kapat" i],
+  button[title*="schließ" i],
+  .workspace-tab [role="button"]
+):hover svg {
+  stroke-width: 3 !important;
+  transform: scale(1.08);
+}
+
+button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):hover,
+a[class~="bg-[#272f67]"]:hover,
+.ofi-btn-brand:not(:disabled):not([disabled]):hover {
+  background-color: var(--ofi-button-navy);
+  border-color: var(--ofi-button-hover-fill) !important;
+}
+button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):active,
+a[class~="bg-[#272f67]"]:active,
+.ofi-btn-brand:not(:disabled):not([disabled]):active {
+  background-color: var(--ofi-button-navy);
+}
+.ant-btn-primary:not(:disabled):not([disabled]):hover {
+  background: var(--ofi-button-navy) !important;
+  border-color: var(--ofi-button-hover-fill) !important;
+}
+.ant-btn-primary:not(:disabled):not([disabled]):active {
+  background: var(--ofi-button-navy) !important;
+  border-color: var(--ofi-button-hover-fill) !important;
+}
+/* Sekundär trägt in Ruhe keinen Rahmen mehr (das ist der Punkt der Vorlage).
+   Weiß auf weißer Karte hätte damit gar keine Kante mehr und würde als Fläche
+   verschwinden — deshalb liegt die Ruhefarbe jetzt auf dem neutralen Grau,
+   und der Hover geht eine Stufe tiefer statt heller. */
 .ant-btn-default {
-  background: #ffffff !important;
-  border-color: #e2e8f0 !important;
+  background: #f1f1ef !important;
+  border-color: transparent !important;
   color: #334155 !important;
 }
 .ant-btn-default:hover {
-  background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
+  background: #e5e4e1 !important;
+  border-color: #0f172a !important;
   color: #0f172a !important;
 }
 .ant-btn-text:hover {
@@ -1403,93 +1625,30 @@ select option:checked {
   .text-slate-300 {
     color: var(--app-text-muted-4) !important;
   }
+
+  /* Icons der Kopfleiste tragen die Markenfarbe statt Schiefergrau — auf
+     #f6f8fb war slate-700 nur ein grauer Fleck.
+     Die Regel muss in DIESER Schicht stehen: die `.text-slate-*` oben sind
+     `!important`, und bei wichtigen Deklarationen ist eine schichtlose Regel
+     die schwächste von allen — von außen wäre dagegen nicht anzukommen,
+     auch nicht mit `!important`. Innerhalb der Schicht entscheidet wieder
+     ganz normal die Spezifität, und (0,1,1) schlägt (0,1,0). */
+  .ofi-topbar svg {
+    color: #272f67 !important;
+  }
+  .dark .ofi-topbar svg {
+    color: var(--ofi-d-wheat) !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LOGIN SCREEN v2 — minimal, Linear-style, dark-first
+   LOGIN SCREEN — siehe src/styles/login.css
+   Der frühere „v2, Linear-style"-Block stand hier doppelt und hat
+   login.css per !important überschrieben (Schaltflächenfarbe, Höhe
+   der Felder, Position der Schneeflocke, Reduced-Motion). Ersatzlos
+   entfernt: die Anmeldeseite wird ausschliesslich in
+   src/styles/login.css gestaltet.
 ═══════════════════════════════════════════════════════════════ */
-.ofi-login2 {
-  --l2-bg: #ffffff;
-  --l2-text: #0f172a;
-  --l2-sub: #64748b;
-  --l2-flake: rgba(39, 47, 103, 0.26);
-  --l2-glow: rgba(39, 47, 103, 0.12);
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(120% 75% at 50% -8%, var(--l2-glow), transparent 55%),
-    var(--l2-bg);
-  color: var(--l2-text);
-}
-.dark .ofi-login2 {
-  --l2-bg: #08090a;
-  --l2-text: #f2f3f5;
-  --l2-sub: #8b8f99;
-  --l2-flake: rgba(230, 207, 158, 0.78);
-  --l2-glow: rgba(230, 207, 158, 0.16);
-}
-
-/* Detailed, static snowflake — tucked into the bottom-right corner,
-   partly cut off and almost invisible. */
-.ofi-login2__flake {
-  position: absolute;
-  right: -96px;
-  bottom: -104px;
-  width: clamp(260px, 34vw, 460px);
-  height: auto;
-  color: var(--l2-flake);
-  opacity: 0.18;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Login primary action — white button, black label (matches dark_dashboard) */
-.ofi-login2__btn.ant-btn-primary {
-  background: #1a2361 !important;
-  border-color: #1a2361 !important;
-  color: #ffffff !important;
-}
-.ofi-login2__btn.ant-btn-primary:hover {
-  background: #272f67 !important;
-  border-color: #272f67 !important;
-  color: #ffffff !important;
-}
-.dark .ofi-login2__btn.ant-btn-primary {
-  background: #ffffff !important;
-  border-color: #ffffff !important;
-  color: #0a0b0d !important;
-}
-.dark .ofi-login2__btn.ant-btn-primary:hover {
-  background: #e6e7ea !important;
-  border-color: #e6e7ea !important;
-  color: #0a0b0d !important;
-}
-.dark .ofi-login2__btn.ant-btn-primary:disabled,
-.dark .ofi-login2__btn.ant-btn-primary[disabled] {
-  background: #1c1f26 !important;
-  border-color: transparent !important;
-  color: #6b7079 !important;
-}
-
-.ofi-login2__input .ant-input,
-.ofi-login2__input.ant-input,
-.ofi-login2__input .ant-input-affix-wrapper {
-  height: 54px;
-  font-size: 15px;
-}
-.ofi-login2__input.ant-input-affix-wrapper { padding-block: 0; }
-
-@keyframes ofi-login2-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.ofi-login2__enter { animation: ofi-login2-up 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-
-
-@media (prefers-reduced-motion: reduce) {
-  .ofi-login2__flake,
-  .ofi-login2__enter { animation: none !important; }
-}
 
 /* Custom Toast Reverse Loading Animation */
 .custom-toast {
@@ -1918,6 +2077,8 @@ main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:
   background: #fff;
   border: 1px solid #e2e8f0;
   border-bottom: 0;
+  border-top-left-radius: var(--ofi-bottom-sheet-radius) !important;
+  border-top-right-radius: var(--ofi-bottom-sheet-radius) !important;
   box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.22);
 }
 @keyframes ofi-sheet-up {
@@ -1979,6 +2140,22 @@ main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:
   to { transform: none; opacity: 1; }
 }
 .ofi-rise-in { animation: ofi-rise 0.24s ease-out; }
+
+/* Calendar dialogs stay spatially stable. Their multi-step forms update often;
+   suppressing nested translate/scale animations prevents the inputs, scrollbar
+   and footer from appearing to jump on open or between steps. */
+.ofi-calendar-dialog,
+.ofi-calendar-dialog.ofi-sheet-up,
+.ofi-calendar-dialog .ofi-rise-in,
+.ofi-calendar-dialog .ofi-slide-in-right,
+.ofi-calendar-dialog .ofi-slide-in-left {
+  animation: none !important;
+  transform: none !important;
+}
+
+.ofi-calendar-dialog .ofi-pop-body {
+  overscroll-behavior: contain;
+}
 
 /* ── Reports sheet: bottom-bar "+" actions, back/next arrows and the PDF
    glyphs. Own classes (not bg-* utilities) so dark mode can repaint the whole
@@ -2117,30 +2294,37 @@ main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:
    done      = past / completed      → green
    cancelled = struck through, muted
    meeting   = violet, maintenance = amber. */
+/* FLAT chips like the project-view calendar (.ofi-cal-chip-*, user request
+   2026-08-07): square corners, plain fills, no accent edge, smaller type.
+   Color contract: ongoing = solid navy (default), planned = navy OUTLINE,
+   done = green, meeting = violet, maintenance = amber. */
 .ofi-ucal-chip {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 7px;
-    padding: 3px 7px 3px 9px;
+    border-radius: 0;
+    padding: 2px 5px;
     text-align: left;
-    font-size: 11.5px;
-    line-height: 1.25;
+    font-size: 10.5px;
+    line-height: 1.3;
     font-weight: 600;
-    border-left: 3px solid transparent;
+    border: 1px solid transparent;
     transition: filter 120ms ease, background-color 120ms ease;
     cursor: pointer;
 }
 .ofi-ucal-chip:hover { filter: brightness(1.08); }
-.ofi-ucal-chip--planned { background: #101e6e; border-left-color: #f59e0b; color: #fff; }
-.ofi-ucal-chip--done { background: #0e9f6e; border-left-color: #057a55; color: #fff; }
-.ofi-ucal-chip--cancelled { background: #eceef3; border-left-color: #cbd5e1; color: #94a3b8; text-decoration: line-through; }
-.ofi-ucal-chip--meeting { background: #6d5bd0; border-left-color: #4c3fb0; color: #fff; }
-.ofi-ucal-chip--maintenance { background: #b45309; border-left-color: #f59e0b; color: #fff; }
+.ofi-ucal-chip--planned { background: #fff; border-color: #101e6e; color: #101e6e; }
+.ofi-ucal-chip--planned:hover { background: rgba(16, 30, 110, 0.07); filter: none; }
+.ofi-ucal-chip--ongoing { background: #101e6e; color: #fff; }
+.ofi-ucal-chip--done { background: #059669; color: #fff; }
+.ofi-ucal-chip--cancelled { background: #e2e8f0; color: #94a3b8; text-decoration: line-through; }
+.ofi-ucal-chip--meeting { background: #6d5bd0; color: #fff; }
+.ofi-ucal-chip--maintenance { background: #b45309; color: #fff; }
 
 .ofi-ucal-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; flex: none; }
-.ofi-ucal-dot--planned { background: #101e6e; box-shadow: inset 0 0 0 2px #101e6e, -3px 0 0 -1px #f59e0b; }
-.ofi-ucal-dot--done { background: #0e9f6e; }
+.ofi-ucal-dot--planned { background: #fff; box-shadow: inset 0 0 0 1.5px #101e6e; }
+.ofi-ucal-dot--ongoing { background: #101e6e; }
+.ofi-ucal-dot--done { background: #059669; }
 .ofi-ucal-dot--cancelled { background: #cbd5e1; }
 .ofi-ucal-dot--meeting { background: #6d5bd0; }
 .ofi-ucal-dot--maintenance { background: #b45309; }
@@ -2154,4 +2338,505 @@ main table:not([role="grid"]):not([data-unstyled-table]) tr[data-filter-row] th:
 }
 .ofi-ucal-slot:hover {
     background: rgba(7, 20, 92, 0.05);
+}
+
+/* Quote address read-back — the quiet block under a picker that shows which
+   address a slot holds, and the Hauptadresse row of the quote header.
+
+   The background/border/colour live on THIS class rather than on bg-slate-50 /
+   border-slate-200 / text-slate-600 utilities, because dark.css maps all of
+   those to the card's own surface with !important: the block would flatten into
+   the card behind it and read as one dark slab (see .ofi-rep-* above for the
+   same pattern). Light-mode values are the ones the utilities produced, so the
+   light theme is unchanged. */
+.ofi-addr-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+/* ── Unified radius system ────────────────────────────────────────────────
+   Tables remain restrained, while cards and floating surfaces receive only
+   a modest radius. Pills and intentionally circular controls keep their form. */
+#root :where([class~="rounded-xl"], [class~="rounded-2xl"]):not([class~="rounded-full"]),
+body > div:not(#root) :where([class~="rounded-xl"], [class~="rounded-2xl"]):not([class~="rounded-full"]),
+.ant-card,
+.ant-card-bordered,
+.ant-modal-content,
+.ant-drawer-content,
+.ant-popover-inner,
+.ant-dropdown-menu,
+.ant-select-dropdown,
+.ant-picker-panel-container,
+.offitec-toast {
+  border-radius: var(--bs-border-radius-lg) !important;
+}
+
+.ant-table-wrapper .ant-table-container,
+#root table:not([role="grid"]),
+body > div:not(#root) table:not([role="grid"]) {
+  border-radius: var(--bs-border-radius) !important;
+}
+
+button:not([class~="rounded-full"]):not(.ant-switch),
+a.ofi-btn-brand:not([class~="rounded-full"]),
+.ant-btn:not(.ant-btn-circle):not(.ant-btn-round) {
+  border-radius: var(--ofi-button-radius) !important;
+}
+
+/* Brand buttons: Offitec navy at rest; an OSYM-inspired orange circle grows
+   upward from the bottom edge on hover until it covers the full button. */
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--ofi-button-navy) !important;
+  background: var(--ofi-button-navy) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  transition: border-color 220ms ease, color 220ms ease, box-shadow 0s linear 0s !important;
+}
+
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled])::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 110%;
+  left: 50%;
+  width: 240%;
+  height: 320%;
+  border-radius: 50%;
+  background: var(--ofi-button-hover-fill);
+  transform: translateX(-50%);
+  transition: top 800ms ease;
+  pointer-events: none;
+}
+
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover {
+  border-color: var(--ofi-button-hover-fill) !important;
+  background: var(--ofi-button-navy) !important;
+  color: #fff !important;
+  /* The expanding circle supplies the animation. Once it has arrived, this
+     delayed inset fill replaces the navy base completely so sub-pixel edge
+     antialiasing cannot leave dark hairlines in the rounded corners. */
+  box-shadow: inset 0 0 0 999px var(--ofi-button-hover-fill) !important;
+  transition: border-color 220ms ease, color 220ms ease, box-shadow 0s linear 800ms !important;
+}
+
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover::before,
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):active::before,
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):focus-visible::before {
+  top: -110%;
+}
+
+:where(
+  .ant-btn-primary,
+  .ofi-btn-brand,
+  button[class~="bg-[#272f67]"],
+  a[class~="bg-[#272f67]"],
+  button[class~="bg-[#1f2654]"],
+  a[class~="bg-[#1f2654]"],
+  button[class~="bg-[#07145c]"],
+  a[class~="bg-[#07145c]"],
+  button[class~="bg-[#0b1a6e]"],
+  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-brand-solid"],
+  a[class~="bg-brand-solid"]
+) > * {
+  position: relative;
+  z-index: 1;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    a[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    a[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    a[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    a[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    a[class~="bg-brand-solid"]
+  )::before {
+    transition-duration: 0.01ms;
+  }
+}
+
+/* Neutral buttons keep readable contrast without taking the brand colour. */
+#root button[class~="bg-white"],
+#root .ant-btn-default,
+body > div:not(#root) .ant-btn-default {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+}
+
+#root button[class~="bg-white"] :where(span, svg),
+#root .ant-btn-default :where(span, svg),
+body > div:not(#root) .ant-btn-default :where(span, svg) {
+  color: inherit !important;
+}
+
+/* Bottom sheets sit against the viewport edge, so only their upper corners
+   receive the larger popup radius. This final rule wins over rounded-* helpers. */
+#root .ofi-sheet,
+body > div:not(#root) .ofi-sheet {
+  border-top-left-radius: var(--ofi-bottom-sheet-radius) !important;
+  border-top-right-radius: var(--ofi-bottom-sheet-radius) !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+/* Project appointment/report sheets cover the viewport from edge to edge.
+   Removing the permanently reserved scrollbar gutter prevents a blank strip on
+   the right while these fixed sheets are open. */
+html:has(.ofi-viewport-sheet) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+html:has(.ofi-viewport-sheet) body {
+  overflow: hidden;
+}
+#root .ofi-sheet.ofi-viewport-sheet,
+body > div:not(#root) .ofi-sheet.ofi-viewport-sheet {
+  border-top-left-radius: 28px !important;
+  border-top-right-radius: 28px !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  box-shadow: none !important;
+}
+.ofi-viewport-sheet-shadow {
+  background: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 -18px 48px rgba(15, 23, 42, 0.28);
+}
+.ofi-viewport-sheet-scroll {
+  scrollbar-width: auto;
+  /* Keep the content on the exact viewport centreline when the native vertical
+     scrollbar appears. Both gutters remain transparent; this only reserves
+     equal geometry on the left and right, so there is no horizontal nudge. */
+  scrollbar-gutter: stable both-edges;
+}
+button.ofi-sheet-backdrop:not(.ant-switch) {
+  appearance: none;
+  border-radius: 0 !important;
+  outline: 0;
+}
+
+/* Full-screen clickable modal masks are buttons in a few modules. They must
+   behave like a flat viewport layer, not inherit the global action-button
+   radius. The popup card rendered above them keeps its own radius. */
+button[class~="absolute"][class~="inset-0"]:not(.ant-switch) {
+  appearance: none;
+  border-radius: 0 !important;
+  outline: 0;
+}
+
+/* System popup layout: the popup surface spans the viewport, while its actual
+   form/table content stays readable and centred. Compact alert dialogs are
+   intentionally excluded. */
+.ant-modal-root:not(.ofi-compact-modal) .ant-modal {
+  width: min(calc(100vw - 40px), 1280px) !important;
+  max-width: 1280px !important;
+  margin-inline: auto !important;
+}
+.ant-modal-root:not(.ofi-compact-modal) .ant-modal-title,
+.ant-modal-root:not(.ofi-compact-modal) .ant-modal-body,
+.ant-modal-root:not(.ofi-compact-modal) .ant-modal-footer {
+  width: 100%;
+  margin-inline: auto !important;
+}
+
+body > div:not(#root) section[role="dialog"][aria-modal="true"]:not(.ofi-viewport-sheet) {
+  width: min(calc(100% - 40px), 1280px) !important;
+  max-width: 1280px !important;
+}
+body > div:not(#root) section[role="dialog"][aria-modal="true"]:not(.ofi-viewport-sheet) > :is(header, footer, form, div) {
+  width: 100%;
+  margin-inline: auto;
+}
+
+/* Detail-page top tabs are navigation labels, not rounded action buttons.
+   Restore their original compact, top-only radius after the global button rule. */
+#root button.ofi-quote-tab {
+  border-radius: 3px 3px 0 0 !important;
+}
+
+/* Form and action-control standard: 40px height, 14px copy and a clearly
+   visible one-pixel edge. Compact row actions and navigation tabs keep their
+   purpose-built dimensions. */
+#root :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(.ant-btn-link):not(.ant-btn-text),
+body > div:not(#root) :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(.ant-btn-link):not(.ant-btn-text) {
+  height: var(--ofi-control-height) !important;
+  min-height: var(--ofi-control-height) !important;
+  padding-inline: 16px !important;
+  border-width: 1px !important;
+  font-size: var(--ofi-control-font-size) !important;
+  line-height: 1.2 !important;
+}
+
+#root .ant-btn-icon-only,
+body > div:not(#root) .ant-btn-icon-only {
+  width: var(--ofi-control-height) !important;
+  min-width: var(--ofi-control-height) !important;
+  padding-inline: 0 !important;
+}
+
+/* CRM table add-row action: keep the + unmistakable and prevent the generic
+   brand-button sizing/overlay rules from turning this compact action into an
+   empty navy tile. */
+#root button.ofi-add-row-button {
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  border-radius: 10px !important;
+}
+
+#root button.ofi-add-row-button svg {
+  position: relative;
+  z-index: 2;
+  display: block;
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  opacity: 1 !important;
+  width: 22px !important;
+  height: 22px !important;
+}
+
+#root button.ofi-workspace-launcher {
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+}
+
+#root .ant-btn-default,
+body > div:not(#root) .ant-btn-default {
+  border-color: var(--ofi-control-border) !important;
+}
+
+/* Solid destructive actions must never inherit dark label colours. */
+#root .ofi-btn-danger,
+#root .ofi-btn-danger *,
+body > div:not(#root) .ofi-btn-danger,
+body > div:not(#root) .ofi-btn-danger * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Navy icon tiles use white artwork for sufficient contrast. */
+#root [class~="bg-[#272f67]"] > svg,
+#root [class~="bg-[#1f2654]"] > svg {
+  color: #ffffff !important;
+  stroke: currentColor;
+}
+
+/* Header utility actions share the same 40px square/circle geometry. */
+#root button.ofi-header-icon-button {
+  width: var(--ofi-control-height) !important;
+  height: var(--ofi-control-height) !important;
+  min-width: var(--ofi-control-height) !important;
+  min-height: var(--ofi-control-height) !important;
+  border: 1px solid #d9dee8 !important;
+  font-size: var(--ofi-control-font-size) !important;
+}
+
+/* Calendar view selector follows the same dimensions without inheriting the
+   generic action-button hover animation. */
+#root .ofi-calendar-view-button {
+  height: var(--ofi-control-height);
+  min-width: 72px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font-size: var(--ofi-control-font-size);
+  font-weight: 600;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+#root .ofi-calendar-view-button:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #172554;
+}
+
+#root .ofi-calendar-view-button.is-active,
+#root .ofi-calendar-view-button.is-active:hover {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+/* Ant Design controls and ordinary native fields use the same height and a
+   stronger neutral border. Transparent search inputs inside composite fields
+   stay borderless because their wrapper already owns the edge. */
+#root :where(
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-picker,
+  .ant-select-single .ant-select-selector
+),
+body > div:not(#root) :where(
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-picker,
+  .ant-select-single .ant-select-selector
+) {
+  min-height: var(--ofi-control-height) !important;
+  border-color: var(--ofi-control-border) !important;
+  font-size: var(--ofi-control-font-size) !important;
+}
+
+#root :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.ant-input):not([class~="bg-transparent"]),
+  select:not(.ant-select),
+  textarea:not(.ant-input)
+) {
+  border: 1px solid var(--ofi-control-border);
+  border-radius: 4px;
+  background: #ffffff;
+  font-size: var(--ofi-control-font-size);
+}
+
+#root :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.ant-input):not([class~="bg-transparent"]),
+  select:not(.ant-select)
+) {
+  min-height: var(--ofi-control-height);
+}
+
+#root :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea
+):focus {
+  border-color: #272f67 !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(39, 47, 103, 0.12);
+}
+
+.dark #root .ofi-calendar-view-button {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dark #root .ofi-calendar-view-button:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.dark #root .ofi-calendar-view-button.is-active,
+.dark #root .ofi-calendar-view-button.is-active:hover {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+/* Quote metadata is intentionally denser than general forms. The global 40px
+   form standard must not inflate Kommission / Referenz and sibling controls. */
+#root input.ofi-quote-control,
+#root select.ofi-quote-control,
+#root textarea.ofi-quote-control {
+  height: 32px !important;
+  min-height: 32px !important;
+  font-size: 13px !important;
+}
+
+/* The full-width collapse control is part of the card surface, not a rounded
+   action button. The outer card owns the 8px clipping on every corner. */
+#root .ofi-tender-customer-card {
+  border-radius: 8px !important;
+}
+
+#root button.ofi-tender-card-toggle {
+  min-height: 40px;
+  border-radius: 0 !important;
 }

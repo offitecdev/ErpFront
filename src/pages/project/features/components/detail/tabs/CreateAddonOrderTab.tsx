@@ -8,7 +8,6 @@ import { Card } from '@/components/ui-shared/Card';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 
 import { InfoCard } from '../../common/InfoCard';
@@ -123,9 +122,9 @@ export const CreateAddonOrderTab = memo(({
             <Card title={t('auto.ek_siparis_olustur')} icon={<ReceiptText size={13} />} className="xl:col-span-2">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <InfoCard title={t('auto.bagli_siparis')} rows={[
-                        [t('auto.ana_siparis'), localizeTenderNumbersInText(parentOrder.orderNumber)],
-                        [t('auto.yeni_ek_siparis'), localizeTenderNumbersInText(nextOrderNumber)],
-                        [t('auto.onceki_ek_siparis'), latestAddon?.orderNumber ? localizeTenderNumbersInText(latestAddon.orderNumber) : '-'],
+                        [t('auto.ana_siparis'), parentOrder.orderNumber],
+                        [t('auto.yeni_ek_siparis'), nextOrderNumber],
+                        [t('auto.onceki_ek_siparis'), latestAddon?.orderNumber ? latestAddon.orderNumber : '-'],
                     ]} />
                     <InfoCard title={t('auto.alinacak_maliyetler')} rows={[
                         [t('auto.harici_gider'), `${recordCount(pendingExpenses.length)} / ${money(expenseTotal)}`],
@@ -156,7 +155,7 @@ export const CreateAddonOrderTab = memo(({
                         }
                     }}
                 >
-                    {localizeTenderNumbersInText(nextOrderNumber)}{t('common.create')}</Button>
+                    {nextOrderNumber}{t('common.create')}</Button>
             </Card>
             <div className="rounded-md border border-slate-200/70 bg-white p-4">
                 <div className="text-[12px] font-semibold text-slate-700">{t('auto.ek_siparis_toplami')}</div>

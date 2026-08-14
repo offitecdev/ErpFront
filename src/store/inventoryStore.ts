@@ -67,8 +67,6 @@ interface InventoryState {
         quantity: number;
         unitCost?: number | null;
         supplierId?: string | null;
-        itemKind?: 'PRODUCT' | 'MATERIAL';
-        materialId?: string | null;
         sourceLocationId?: string | null;
         destLocationId?: string | null;
         referenceId?: string | null;

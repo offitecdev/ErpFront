@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import { ArrowLeft } from '@/components/icons/antIconCompat';
-import i18n from '@/i18n';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui-shared/Button';
@@ -12,16 +11,9 @@ import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../lib/axios';
 
-const suggestTenderNumber = () => {
-    const year = dayjs().year();
-    const rand = Math.floor(Math.random() * 9000) + 1000;
-    // Language-specific document initial: A(ngebot) for German, O(ffer) for
-    // English — e.g. "A-2026-4474". Anything else falls back to the German
-    // offer prefix so a tender number never carries a non-offer code.
-    const lang = (i18n.language || '').split('-')[0];
-    const prefix = lang === 'en' ? 'O' : 'A';
-    return `${prefix}-${year}-${rand}`;
-};
+// Teklif kodu (AN-2026-10001) SUNUCUDA üretilir ve yanıtla birlikte gelir. Burada
+// eskiden `Math.random()` ile dile bağlı bir numara (A-2026-4474 / O-2026-…)
+// uydurulup gönderiliyordu; artık kod her dilde aynı ve sıralıdır.
 
 const defaultTenderValidUntil = () => dayjs().add(1, 'month').format('YYYY-MM-DD');
 
@@ -53,11 +45,10 @@ export const TenderCreate = () => {
         startedRef.current = true;
 
         const validUntil = defaultTenderValidUntil();
-        const tenderNumber = suggestTenderNumber();
 
-        createTender({ tenderNumber, format: 'SIA451', validUntil, customerId })
+        createTender({ format: 'SIA451', validUntil, customerId })
             .then((created) => {
-                toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
+                toast.success(t('tenders.tender_taslagi_created', { number: created.tenderNumber }));
                 // `autoSaveOnExit` marks the very first visit after creation:
                 // leaving the detail page then saves automatically instead of
                 // prompting (cleared again by the first successful save).
@@ -74,11 +65,10 @@ export const TenderCreate = () => {
                         if (!fallbackCustomer) throw new Error(t('tenders.customer_not_found'));
                         const created = await createTender({
                             customerId: fallbackCustomer.id,
-                            tenderNumber,
                             format: 'SIA451',
                             validUntil,
                         });
-                        toast.success(t('tenders.tender_taslagi_created', { number: tenderNumber }));
+                        toast.success(t('tenders.tender_taslagi_created', { number: created.tenderNumber }));
                         navigate(`/crm/tenders/${created.id}`, { replace: true, state: { autoSaveOnExit: true } });
                         return;
                     } catch (fallbackError: any) {

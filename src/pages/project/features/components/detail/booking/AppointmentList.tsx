@@ -139,7 +139,7 @@ export const AppointmentList = ({
             toast.success(result.message || t('auto.montaj_yonetici_tarafindan_bitirildi'));
             if (result.addonOrder) toast.success(`${t('projects.addonOrder')}: ${result.addonOrder.orderNumber}`);
             if (result.overtimeWarning) toast.warning(result.overtimeWarning);
-            await refreshAll();
+            void refreshAll();
         } catch (e: any) {
             toast.error(e.response?.data?.error || t('auto.montaj_bitirilemedi'));
             throw e;

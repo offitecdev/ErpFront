@@ -42,7 +42,7 @@ export const ListBrowseModal = ({ open, onClose, title, columns, rows, onPick }:
     const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     return (
-        <CenterModal open={open} onClose={onClose} title={title} width={720} z={150}>
+        <CenterModal open={open} onClose={onClose} title={title} width={920} z={150}>
             <div className="border-b border-slate-100 px-3 py-2.5 dark:border-white/10">
                 <SearchBox value={query} onChange={setQuery} placeholder={t('common.search')} autoFocus />
             </div>

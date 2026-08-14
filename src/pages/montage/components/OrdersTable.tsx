@@ -2,7 +2,6 @@ import clsx from 'clsx';
 
 import { CheckCircle } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 import type { MontageOrderRow } from '../types/montage';
 import { dateFmt, timeRange } from '../utils/montageFormat';
@@ -68,7 +67,7 @@ export const OrdersTable = ({
                         <td className="truncate font-medium text-slate-700 dark:text-slate-200">{row.customerName}</td>
                         <td className="truncate text-slate-600 dark:text-slate-300">{row.projectName}</td>
                         <td className="truncate text-slate-500 dark:text-slate-400">
-                            {localizeTenderNumbersInText(row.orderNumber)}
+                            {row.orderNumber}
                         </td>
                         {showSignature && (
                             <td className="whitespace-nowrap">

@@ -5,7 +5,8 @@ import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import type { SupplierSearchItem } from '@/types/inventory';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { SearchBox, TableStateRow } from './primitives';
+import { ColResizeHandle, ResizableCols, SearchBox, TableStateRow } from './primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 
 /**
  * Tek tedarikçi seçim penceresi (ArticlePickerModal kabuğu) — sipariş
@@ -24,6 +25,12 @@ export const SupplierPickerModal = ({
     const [items, setItems] = useState<SupplierSearchItem[]>([]);
     const [loading, setLoading] = useState(false);
     const debouncedQuery = useDebouncedValue(query);
+    // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-supplier-picker:col-widths:v1',
+        defaults: { contact: 224, txCount: 96 },
+        minPx: 64,
+    });
 
     useEffect(() => {
         if (!open) return;
@@ -72,12 +79,23 @@ export const SupplierPickerModal = ({
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        <colgroup>
+                            {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['contact', 'txCount'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th className="text-left">{t('inv.suppliers.name')}</th>
-                                <th className="w-56 text-left">{t('inv.suppliers.contact')}</th>
-                                <th className="w-24 text-right">{t('inv.suppliers.txCount')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.suppliers.contact')}
+                                    <ColResizeHandle {...grid.resizeProps('contact')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.suppliers.txCount')}
+                                    <ColResizeHandle {...grid.resizeProps('txCount')} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>

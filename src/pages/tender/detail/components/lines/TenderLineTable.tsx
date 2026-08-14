@@ -1,21 +1,20 @@
 
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
+    ArrowDown,
+    ArrowUp,
     ChevronDown,
     ChevronUp,
     File05 as FileText,
     Package,
     Tag01,
     Trash01,
-    TrendDown01,
-    TrendUp01,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 import { AutoFitAmount } from '../common/AutoFitAmount';
 import { PlainCheckbox as Checkbox } from '../common/PlainUi';
-import { TenderLineDiscountButton } from '../discounts/TenderLineDiscountButton';
 
 import { richTextToHtml } from '../../utils/markdown.utils';
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
@@ -38,8 +37,6 @@ import {
     TENDER_LINE_TABLE_MIN_WIDTH,
 } from '../../utils/tenderDetail.constants';
 import { cleanImportedProductDescription } from '../../utils/tenderLine.utils';
-import { formatDiscountPercent } from '../../utils/tenderPricing.utils';
-import { lineDiscountBase, parseDiscountList, MAX_LINE_DISCOUNTS } from '../../utils/tenderDiscounts.utils';
 import { BufferedTextInput } from '../TenderLineInputs';
 import { TenderLineHeaderCell } from './TenderLineTableHeader';
 import { TenderLinePriceInput } from './TenderLinePriceInput';
@@ -47,6 +44,16 @@ import { TenderLinePriceInput } from './TenderLinePriceInput';
 const LazyInlineDescriptionEditor = lazy(() =>
     import('../InlineDescriptionEditor').then((mod) => ({ default: mod.InlineDescriptionEditor })),
 );
+
+// Each editable line contains several inputs, buttons and SVGs. Mounting all
+// lines before first paint made an ordinary quote create roughly 2,000 nodes.
+// Totals and save logic still use every row; only off-screen row DOM is staged.
+// First commit stays lean — every extra initial row is table DOM rendered
+// inside the boot's biggest main-thread task. The IntersectionObserver batch
+// reveal below fills the window long before the user reaches row 10.
+const INITIAL_RENDERED_ROWS = 10;
+const RENDER_ROW_BATCH = 16;
+const COLLAPSED_ROW_HEIGHT_PX = 37;
 
 // Small square pop-up behind the profit/loss icon: sales, cost, result and the
 // margin ratio for one line. Portal + fixed position so it overlays the rows
@@ -110,7 +117,7 @@ const TenderLineProfitPopover = ({
             <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3.5 py-2">
                 <span className="text-[11.5px] font-semibold text-slate-600">{t('tenders.profit_loss')}</span>
                 <span className={`inline-flex items-center gap-1 text-[12px] font-bold tabular-nums ${isProfit ? 'text-emerald-700' : 'text-rose-600'}`}>
-                    {isProfit ? <TrendUp01 size={13} /> : <TrendDown01 size={13} />}
+                    {isProfit ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
                     {profit.resultRate.toFixed(1)}%
                 </span>
             </div>
@@ -178,8 +185,6 @@ type TenderLineTableProps = {
     onProductComboInput: (rowId: string, text: string, anchorEl: HTMLInputElement) => void;
     /** Per-row profit/loss figures for the icon next to the row total. */
     profitByRowId: Map<string, TenderLineProfit>;
-    /** Opens the stacked-discount editor for one product line. */
-    onOpenLineDiscounts: (rowId: string) => void;
 };
 
 // Every column EXCEPT the description is fixed-width, so the figures can never
@@ -188,13 +193,30 @@ type TenderLineTableProps = {
 // overflow-x-auto provides left/right scrolling.
 //
 // Labels are read through functions so they re-resolve on a language change.
-const COLUMN_LABELS: Record<ResizableLineColumn, () => string> = {
+// Profit/loss carries no caption: the column is one icon wide, and any wording
+// for it was longer than the column itself. The paired up/down arrows say what
+// it is; the words live in the header's tooltip (COLUMN_TITLES).
+const COLUMN_LABELS: Record<ResizableLineColumn, () => ReactNode> = {
     quantity: () => t('common.quantity'),
     unit: () => t('tenders.unit'),
     unitPrice: () => t('tenders.unit_price'),
     discount: () => `${t('common.discount')} %`,
     taxRate: () => `${t('tenders.kdv')} %`,
     total: () => t('common.amount'),
+    // Plain up + down arrows, not trend-chart zigzags: the column is about a
+    // figure going one way or the other, and two straight arrows say that at
+    // 13px where a jagged line just reads as noise.
+    profit: () => (
+        <span className="flex items-center justify-end text-slate-500">
+            <ArrowUp size={12} />
+            <ArrowDown size={12} className="-ml-0.5" />
+        </span>
+    ),
+};
+
+// Tooltip / accessible name per column — the only place the profit column's
+// wording still appears.
+const COLUMN_TITLES: Partial<Record<ResizableLineColumn, () => string>> = {
     profit: () => t('tenders.profit_loss'),
 };
 
@@ -225,7 +247,6 @@ export const TenderLineTable = ({
     autoFocusRowId,
     onProductComboInput,
     profitByRowId,
-    onOpenLineDiscounts,
 }: TenderLineTableProps) => {
     // Row totals follow the offer's selected currency (symbol-only display).
     const fmtMoney = useMoneyFormat();
@@ -236,6 +257,58 @@ export const TenderLineTable = ({
     const [expandedId, setExpandedId] = useState<string | null>(null);
     // Profit/loss pop-up opened from the icon next to a row total.
     const [profitPopover, setProfitPopover] = useState<{ rowId: string; anchorEl: HTMLElement } | null>(null);
+    const [renderedRowCount, setRenderedRowCount] = useState(() => Math.min(INITIAL_RENDERED_ROWS, rows.length));
+    const moreRowsRef = useRef<HTMLTableRowElement | null>(null);
+    const pendingKeyboardNavRef = useRef<{ col: string; rowIndex: number; dir: 1 | -1 } | null>(null);
+    const autoFocusIndex = autoFocusRowId
+        ? rows.findIndex((row) => row.id === autoFocusRowId)
+        : -1;
+    // Derived rather than synchronized through an effect: deletions clamp the
+    // window with no cascading render, and a requested focus is present in the
+    // same render that receives its row id.
+    const effectiveRenderedRowCount = Math.min(
+        rows.length,
+        Math.max(renderedRowCount, autoFocusIndex + 1),
+    );
+
+    // Reveal another batch shortly before the virtual spacer reaches view.
+    // Its fixed estimated height keeps the totals below the table stable and
+    // avoids a layout jump while real rows replace the placeholder space.
+    useEffect(() => {
+        const marker = moreRowsRef.current;
+        if (!marker || effectiveRenderedRowCount >= rows.length) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) {
+                setRenderedRowCount((current) => Math.min(rows.length, current + RENDER_ROW_BATCH));
+            }
+        }, { rootMargin: '0px 0px 160px 0px' });
+        observer.observe(marker);
+        return () => observer.disconnect();
+    }, [effectiveRenderedRowCount, rows.length]);
+
+    // Arrow navigation remains seamless at a batch boundary: render the next
+    // batch, then focus the requested cell after React commits it.
+    useEffect(() => {
+        const pending = pendingKeyboardNavRef.current;
+        if (!pending) return;
+        pendingKeyboardNavRef.current = null;
+        const frame = window.requestAnimationFrame(() =>
+            onArrowNav(pending.col, pending.rowIndex, pending.dir),
+        );
+        return () => window.cancelAnimationFrame(frame);
+    }, [renderedRowCount, onArrowNav]);
+
+    const handleArrowNav = useCallback((col: string, rowIndex: number, dir: 1 | -1) => {
+        const nextIndex = rowIndex + dir;
+        if (dir === 1 && nextIndex >= effectiveRenderedRowCount && nextIndex < rows.length) {
+            pendingKeyboardNavRef.current = { col, rowIndex, dir };
+            setRenderedRowCount((current) =>
+                Math.min(rows.length, Math.max(current + RENDER_ROW_BATCH, nextIndex + 1)),
+            );
+            return true;
+        }
+        return onArrowNav(col, rowIndex, dir);
+    }, [effectiveRenderedRowCount, onArrowNav, rows.length]);
 
     useEffect(() => {
         if (!expandedId) return;
@@ -251,9 +324,6 @@ export const TenderLineTable = ({
     }, [expandedId]);
 
     const canReorder = isDraft && canManage;
-    // The grey "+" only appears where discounts can actually be changed; a
-    // line that already has some still shows its green badge read-only.
-    const canManageDiscounts = isDraft && canManage;
     const popoverProfit = profitPopover ? profitByRowId.get(profitPopover.rowId) : undefined;
 
     return (
@@ -308,6 +378,7 @@ export const TenderLineTable = ({
                         <TenderLineHeaderCell
                             key={key}
                             label={COLUMN_LABELS[key]()}
+                            title={COLUMN_TITLES[key]?.()}
                             noTruncate={key === 'quantity'}
                             onResizeStart={(event) => startResize(key, event)}
                             onResizeReset={() => resetColumn(key)}
@@ -321,7 +392,7 @@ export const TenderLineTable = ({
                         <td colSpan={9} className="px-3 py-10 text-center text-[12px] text-slate-400">{t('tenders.tender_line_not_found')}</td>
                     </tr>
                 )}
-                {rows.map((row, rowIndex) => {
+                {rows.slice(0, effectiveRenderedRowCount).map((row, rowIndex) => {
                     const position = row.position;
                     const isSelected = selectedId === row.id;
                     // Once anything is ticked the checkboxes stay visible, so the
@@ -334,7 +405,6 @@ export const TenderLineTable = ({
                         ? cleanImportedProductDescription(position.longDescription)
                         : position.longDescription || '';
                     const profit = isProduct ? profitByRowId.get(row.id) : undefined;
-                    const lineDiscounts = isProduct ? parseDiscountList(position.discounts, MAX_LINE_DISCOUNTS) : [];
                     const canExpand = (isProduct || isDescription) && (Boolean(visibleLongDescription) || isDraft);
                     // An empty DESCRIPTION row in draft is always open — there is
                     // nothing to preview and the user needs the editor to type into.
@@ -392,7 +462,12 @@ export const TenderLineTable = ({
                         <tr
                             key={stableRowKeys.get(row.id) ?? row.id}
                             onClick={() => onSelectRow(row.id)}
-                            className={`group ${isSelected ? 'bg-[#e8eefb]' : row.kind === 'TITLE' ? 'bg-[#f1f5fd]' : 'hover:bg-slate-50'}`}
+                            // Every row is white — a title line is told apart by its
+                            // type, not by a background of its own. Selection is an
+                            // accent bar on the leading edge (index.css), so the row
+                            // colour never changes underneath the figures.
+                            data-row-selected={isSelected ? 'true' : undefined}
+                            className="group"
                         >
                             {/* Position column: the row number is the resting state;
                                 the checkbox takes its place on hover (and stays put
@@ -481,7 +556,7 @@ export const TenderLineTable = ({
                                                     rowIndex={rowIndex}
                                                     navCol="shortDescription"
                                                     registerCell={registerCell}
-                                                    onArrowNav={onArrowNav}
+                                                    onArrowNav={handleArrowNav}
                                                     className={row.kind === 'TITLE' ? INLINE_TITLE_INPUT_CLASS : INLINE_NAME_INPUT_CLASS}
                                                     onDraftChange={isProduct ? (text, anchor) => onProductComboInput(row.id, text, anchor) : undefined}
                                                     autoFocus={autoFocusRowId === row.id}
@@ -498,7 +573,7 @@ export const TenderLineTable = ({
                                 {expandedDescription}
                             </td>
                             <td className="text-right align-top">
-                                <TenderLinePriceInput row={row} field="quantity" value={position.quantity} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} />
+                                <TenderLinePriceInput row={row} field="quantity" value={position.quantity} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={handleArrowNav} />
                             </td>
                             <td className="text-right align-top">
                                 {isProduct && isDraft ? (
@@ -511,7 +586,7 @@ export const TenderLineTable = ({
                                         rowIndex={rowIndex}
                                         navCol="unit"
                                         registerCell={registerCell}
-                                        onArrowNav={onArrowNav}
+                                        onArrowNav={handleArrowNav}
                                         className="h-7 w-full min-w-0 rounded-[3px] border border-solid border-transparent bg-transparent px-2 text-right text-[12.5px] text-slate-700 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-200 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
                                     />
                                 ) : (
@@ -519,46 +594,32 @@ export const TenderLineTable = ({
                                 )}
                             </td>
                             <td className="text-right align-top">
-                                <TenderLinePriceInput row={row} field="unitPrice" value={position.unitPrice} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} />
+                                <TenderLinePriceInput row={row} field="unitPrice" value={position.unitPrice} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={handleArrowNav} />
                             </td>
-                            {/* Discount: a single percentage stays editable in
-                                place. Once the line carries a STACK of discounts
-                                the cell shows their combined effect read-only —
-                                the individual entries live behind the square,
-                                which turns green and lists them on click. */}
+                            {/* Discount: ONE editable percentage, nothing else. The
+                                per-line stack of named discounts (and the little
+                                "+" square that opened its editor) is gone — a
+                                product line carries a single rate, and what the
+                                cell shows is what the line applies. */}
                             <td className="text-right align-top">
                                 {isProduct ? (
-                                    <div className="flex items-center justify-end gap-1">
-                                        <div className="min-w-0 flex-1">
-                                            {lineDiscounts.length > 0 ? (
-                                                <span
-                                                    title={t('tenders.total_discount')}
-                                                    className="block truncate py-1 pr-1 text-right text-[12.5px] font-semibold tabular-nums text-emerald-700"
-                                                >
-                                                    {formatDiscountPercent(Number(position.discount || 0))}
-                                                </span>
-                                            ) : (
-                                                <TenderLinePriceInput row={row} field="discount" value={position.discount} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} max={100} />
-                                            )}
-                                        </div>
-                                        {(canManageDiscounts || lineDiscounts.length > 0) && (
-                                            <TenderLineDiscountButton
-                                                entries={lineDiscounts}
-                                                base={lineDiscountBase(position)}
-                                                onEdit={() => onOpenLineDiscounts(row.id)}
-                                            />
-                                        )}
-                                    </div>
+                                    <TenderLinePriceInput row={row} field="discount" value={position.discount} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={handleArrowNav} max={100} />
                                 ) : null}
                             </td>
                             <td className="text-right align-top">
-                                <TenderLinePriceInput row={row} field="taxRate" value={taxRate} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={onArrowNav} max={100} />
+                                <TenderLinePriceInput row={row} field="taxRate" value={taxRate} rowIndex={rowIndex} isDraft={isDraft} commit={commitNumberField} registerCell={registerCell} onArrowNav={handleArrowNav} max={100} />
                             </td>
                             <td className="text-right align-top">
                                 {isProduct && row.total > 0 ? (
+                                    // `shrink={false}`: the amount keeps its full size
+                                    // however long it gets. A figure that outgrows the
+                                    // column scrolls inside its cell — and the column
+                                    // itself can be dragged wider — instead of the
+                                    // digits getting smaller and harder to read.
                                     <AutoFitAmount
                                         value={fmtMoney(row.total)}
-                                        basePx={12.5}
+                                        basePx={13}
+                                        shrink={false}
                                         scrollbar="thin"
                                         className="py-0.5 text-right font-bold tabular-nums text-[#1f2654]"
                                     />
@@ -592,7 +653,10 @@ export const TenderLineTable = ({
                                                     : 'text-rose-600 hover:bg-rose-50'
                                             }`}
                                         >
-                                            {profit.result >= 0 ? <TrendUp01 size={14} /> : <TrendDown01 size={14} />}
+                                            {/* Same arrows as the column header — one
+                                                direction each, so the cell and its
+                                                heading speak the same language. */}
+                                            {profit.result >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                                         </button>
                                     )}
                                     {canReorder && isSelected && (
@@ -611,6 +675,16 @@ export const TenderLineTable = ({
                         </tr>
                     );
                 })}
+                {effectiveRenderedRowCount < rows.length && (
+                    <tr
+                        ref={moreRowsRef}
+                        aria-hidden
+                        data-tender-lines-virtual-spacer
+                        style={{ height: (rows.length - effectiveRenderedRowCount) * COLLAPSED_ROW_HEIGHT_PX }}
+                    >
+                        <td colSpan={9} className="!p-0" />
+                    </tr>
+                )}
                 {/* Permanent blank line: the next product / title / description
                     lands HERE — selecting in the dropdown or the large pop-up
                     fills this slot and a fresh blank line appears below it. */}
@@ -620,7 +694,10 @@ export const TenderLineTable = ({
                         <td colSpan={8}>
                             <button
                                 type="button"
-                                onClick={() => onAddProductRow(lastRowId)}
+                                onClick={() => {
+                                    setRenderedRowCount(rows.length + 1);
+                                    onAddProductRow(lastRowId);
+                                }}
                                 className="block w-full max-w-[380px] rounded-[2px] border border-dashed border-slate-300 px-2.5 py-1.5 text-left text-[12px] text-slate-400 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-slate-600"
                             >
                                 {t('tenders.search_product')}
@@ -636,8 +713,11 @@ export const TenderLineTable = ({
                             <div className="flex flex-wrap items-center gap-2 py-0.5">
                                 <button
                                     type="button"
-                                    onClick={() => onAddProductRow(lastRowId)}
-                                    className="inline-flex items-center gap-1.5 rounded-[2px] px-2 py-1 text-[12.5px] font-semibold text-[#1f2654] transition-colors hover:bg-[#1f2654]/[0.06]"
+                                    onClick={() => {
+                                        setRenderedRowCount(rows.length + 1);
+                                        onAddProductRow(lastRowId);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-[2px] bg-emerald-600 px-2.5 py-1 text-[12.5px] font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
                                 >
                                     <Package size={13} />
                                     {t('tenders.product_add')}
@@ -646,7 +726,10 @@ export const TenderLineTable = ({
                                 <div className="inline-flex items-center overflow-hidden rounded-[2px] border border-slate-200">
                                     <button
                                         type="button"
-                                        onClick={() => onAddRow('TITLE', undefined, undefined, lastRowId)}
+                                        onClick={() => {
+                                            setRenderedRowCount(rows.length + 1);
+                                            onAddRow('TITLE', undefined, undefined, lastRowId);
+                                        }}
                                         className="px-2.5 py-1 text-[11.5px] font-medium text-slate-700 transition-colors hover:bg-[#1f2654] hover:text-white"
                                     >
                                         {t('tenders.baslik')}
@@ -654,7 +737,10 @@ export const TenderLineTable = ({
                                     <span className="h-5 w-px bg-slate-200" aria-hidden />
                                     <button
                                         type="button"
-                                        onClick={() => onAddRow('DESCRIPTION', undefined, undefined, lastRowId)}
+                                        onClick={() => {
+                                            setRenderedRowCount(rows.length + 1);
+                                            onAddRow('DESCRIPTION', undefined, undefined, lastRowId);
+                                        }}
                                         className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 transition-colors hover:bg-[#1f2654] hover:text-white"
                                     >
                                         <FileText size={11} />

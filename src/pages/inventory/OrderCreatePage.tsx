@@ -22,7 +22,8 @@ import { BottomSheet } from './components/BottomSheet';
 import { ExcelImportSheet } from './components/ExcelImportSheet';
 import { SupplierComboCell } from './components/SupplierComboCell';
 import { SupplierPickerModal } from './components/SupplierPickerModal';
-import { CELL_INPUT_CLASS, SectionCard } from './components/primitives';
+import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from './components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import type { DraftOrderFee, DraftOrderRow, ImportedRecord } from './types';
 import { normalizeHeader } from './utils/columnMatch';
@@ -83,9 +84,10 @@ type CalcMode = 'AUTO' | 'DIRECT' | 'SUPPLIER';
  * SİPARİŞ GİRİŞ YOLU (kullanıcı isteği 2026-08-01, ikinci tur):
  *   ORDER         → doğrudan resmî sipariş (PENDING) — eski davranış.
  *   PRICE_REQUEST → fiyat talebi: satırlar FİYATSIZDIR (seri kod + ad + miktar),
- *                   fiyat sütunları gizlenir. KAYDET henüz onaylanmamış talebi
- *                   TASLAK (DRAFT) olarak yazar; mail gönderilince onay bekler,
- *                   onaylanınca resmî siparişe döner.
+ *                   fiyat sütunları gizlenir. KAYDET henüz gönderilmemiş talebi
+ *                   TALEP TASLAĞI (DRAFT) olarak yazar; mail gönderilince
+ *                   FİYAT TALEBİ (PRICE_REQUEST) olur, siparişe dönüştürülünce
+ *                   fiyatlı sipariş taslağına geçer.
  * Seçim EN BAŞTA yapılır: sayfa iki büyük düğmeyle açılır (listede iki ayrı
  * "ekle" düğmesi YOKTUR) ve editörün ortasında kip anahtarı bulunmaz — yol
  * sonradan değiştirilemez. Ayrı bir "taslak" seçeneği de yoktur; taslak,
@@ -94,9 +96,10 @@ type CalcMode = 'AUTO' | 'DIRECT' | 'SUPPLIER';
 type OrderMode = 'ORDER' | 'PRICE_REQUEST';
 
 /** Yeni satır — hesap kipi satır başınadır, varsayılanı çağıran verir. */
-const emptyRow = (itemType: ItemType, calcMode: CalcMode = 'DIRECT'): DraftOrderRow => ({
+const emptyRow = (calcMode: CalcMode = 'DIRECT'): DraftOrderRow => ({
     key: `order-${rowSeed += 1}`,
-    itemType,
+    // Malzeme/ürün birleşmesi (2026-08-14): her sipariş satırı üründür.
+    itemType: 'PRODUCT' as ItemType,
     articleId: null,
     code: '',
     serialNumber: '',
@@ -194,7 +197,7 @@ const percentCell = (value: string | number | null | undefined): string => {
  * seçilmemişse — son alım tedarikçisi otomatik dolar ("sipariş kendiliğinden
  * oluşur"), her alan düzenlenebilir kalır.
  * `?id=` ile açılırsa mevcut sipariş yüklenir ve PATCH ile güncellenir
- * (mail gönderilmiş siparişte içerik değişikliği backend'de UPDATED yapar).
+ * (mail gönderilmiş siparişte içerik değişikliği backend'de revizyonu artırır).
  */
 export const OrderCreatePage = () => {
     useLanguageTick();
@@ -207,11 +210,6 @@ export const OrderCreatePage = () => {
     const canTransfer = permissions.includes('inventory.transfer');
     const canCreateArticles = permissions.includes('inventory.articles.create');
 
-    // ÜRÜN / MALZEME EN BAŞTA seçilir (kullanıcı isteği 2026-08-02): giriş
-    // ekranındaki açılır listeden — varsayılan MALZEME. Editörde tür anahtarı
-    // YOKTUR, yalnızca ne seçildiği yazar.
-    const [itemKind, setItemKind] = useState<ItemType>('MATERIAL');
-    const isMaterial = itemKind === 'MATERIAL';
     /**
      * Hesap kipi (DIRECT / AUTO / SUPPLIER — açıklama yukarıda) artık SATIR
      * BAŞINADIR (kullanıcı isteği 2026-08-02, satır satır çalışma): her satır
@@ -282,7 +280,7 @@ export const OrderCreatePage = () => {
     const [orderMode, setOrderMode] = useState<OrderMode | null>(editId ? 'ORDER' : null);
     // Fiyatsız kip: fiyat/indirim/KDV sütunları ve toplamlar gizlenir.
     const priceless = orderMode === 'PRICE_REQUEST';
-    // "Auftrag" (sipariş kodu): sunucu AU-{yıl}-{sıra} önerir, kullanıcı
+    // "Bestellung" (sipariş kodu): sunucu BE-{yıl}-{sıra} önerir, kullanıcı
     // değiştirebilir. Boş bırakılırsa (yeni siparişte) sunucu üretir.
     const [reference, setReference] = useState('');
     const [quoteNumber, setQuoteNumber] = useState('');
@@ -333,7 +331,7 @@ export const OrderCreatePage = () => {
      *   'confirm' → sipariş resmîleşir, KİLİTLENİR ve listeye dönülür.
      * İkisi de geri alması pahalı olduğu için kazara tıklamaya kapalıdır.
      */
-    const [stageConfirm, setStageConfirm] = useState<'convert' | 'confirm' | null>(null);
+    const [stageConfirm, setStageConfirm] = useState<'convert' | 'confirm' | 'revoke' | null>(null);
     // Tedarikçi sipariş düzeyinde tutulur — tek sipariş = tek tedarikçi.
     const [supplier, setSupplier] = useState<{ id: string | null; name: string; email: string | null }>({
         id: null,
@@ -421,10 +419,6 @@ export const OrderCreatePage = () => {
                 // düğmesidir, kaydın durumunu göstermez.
                 // Fiyat talebi aşamasındaki sipariş fiyatsız tabloyla düzenlenir.
                 setOrderMode(isPriceRequestStage(order.status) ? 'PRICE_REQUEST' : 'ORDER');
-                // ÜRÜN / MALZEME siparişin başındaki seçimden devralınır
-                // (kullanıcı isteği 2026-08-02) — kullanıcı yine değiştirebilir.
-                const materialCount = order.items.filter((item) => item.itemType === 'MATERIAL').length;
-                setItemKind(materialCount > order.items.length / 2 ? 'MATERIAL' : 'PRODUCT');
                 setRows(order.items.map((item) => {
                     const storedMode: CalcMode = item.calcMode === 'SUPPLIER' || item.calcMode === 'AUTO' || item.calcMode === 'DIRECT'
                         ? item.calcMode
@@ -452,7 +446,7 @@ export const OrderCreatePage = () => {
                             },
                         };
                     return {
-                        ...emptyRow(item.itemType, itemMode),
+                        ...emptyRow(itemMode),
                         itemType: item.itemType,
                         articleId: item.articleId ?? null,
                         code: item.code ?? '',
@@ -588,7 +582,7 @@ export const OrderCreatePage = () => {
     };
 
     const addRow = () => {
-        const row = emptyRow(itemKind, calcMode);
+        const row = emptyRow(calcMode);
         setRows((current) => [...current, row]);
         setFocusRowKey(row.key);
     };
@@ -627,7 +621,7 @@ export const OrderCreatePage = () => {
         setRows((current) => current.map((row) => (row.key === rowKey
             ? {
                 ...row,
-                itemType: itemKind,
+                itemType: 'PRODUCT',
                 articleId: article.id,
                 code: article.articleCode,
                 name: article.name,
@@ -640,7 +634,7 @@ export const OrderCreatePage = () => {
                 error: null,
             }
             : row)));
-        void supplyApi.itemSuppliers(itemKind, article.id)
+        void supplyApi.itemSuppliers(article.id)
             .then((result) => {
                 const best = result.suppliers[0];
                 if (!best) return;
@@ -682,7 +676,7 @@ export const OrderCreatePage = () => {
                 page: 1,
                 pageSize: 5,
                 code,
-                itemType: itemKind,
+                itemType: 'PRODUCT',
                 status: 'ACTIVE',
             });
             const match = result.items.find(
@@ -758,7 +752,7 @@ export const OrderCreatePage = () => {
                 // boş kalır (tedarikçiden istenecek).
                 if (priceless) {
                     additions.push({
-                        ...emptyRow(itemKind, 'AUTO'),
+                        ...emptyRow('AUTO'),
                         ...base,
                         quantity: cellText(record.quantity) || '1',
                     });
@@ -771,7 +765,7 @@ export const OrderCreatePage = () => {
                     const supplierNet = cellText(record.netPrice)
                         || (article?.baseCost ? String(article.baseCost) : '');
                     additions.push({
-                        ...emptyRow(itemKind, 'SUPPLIER'),
+                        ...emptyRow('SUPPLIER'),
                         ...base,
                         quantity: cellText(record.quantity) || '1',
                         grossPrice: cellText(record.grossPrice)
@@ -793,7 +787,7 @@ export const OrderCreatePage = () => {
                     // DOĞRUDAN GİRİŞE dönerse Excel'deki değerler geri gelir
                     // (kullanıcı isteği 2026-08-02).
                     additions.push({
-                        ...emptyRow(itemKind, 'DIRECT'),
+                        ...emptyRow('DIRECT'),
                         ...base,
                         code,
                         name,
@@ -815,7 +809,7 @@ export const OrderCreatePage = () => {
                     return;
                 }
                 additions.push({
-                    ...emptyRow(itemKind, 'AUTO'),
+                    ...emptyRow('AUTO'),
                     ...base,
                     // Seri no içe aktarılmaz (şablonda sütunu yok); satırın seri
                     // kodu ürünün kimliğidir.
@@ -910,9 +904,16 @@ export const OrderCreatePage = () => {
     }, [rows, rowFigures, feesTotal, orderVatRate, priceless]);
 
     const rowToItem = (row: DraftOrderRow, articleId?: string): PurchaseOrderItemInput => {
+        const figures = rowFigures(row);
+        // ⚠ ZATEN FİYATLI SATIR, fiyat talebi kipinde de FİYATLARIYLA kaydedilir
+        // (kullanıcı isteği 2026-08-03): "onayı geri al" bir siparişi talebe
+        // döndürebiliyor ve geri alma FİYAT SİLMEMELİDİR. Gerçek bir fiyat
+        // talebinde bu alanlar zaten boştur (fiyat sütunları görünmez, Excel
+        // eşleme listesi de fiyat taşımaz), dolayısıyla davranış değişmez.
+        const rowIsPriced = (parseNum(row.grossPrice) ?? 0) > 0 || figures.lineTotal > 0;
         // FİYAT TALEBİ: satır fiyatsız kaydedilir (seri kod + ad + miktar) —
         // fiyatlar tedarikçiden istenecektir.
-        if (priceless) {
+        if (priceless && !rowIsPriced) {
             return {
                 itemType: row.itemType,
                 articleId: articleId ?? row.articleId,
@@ -932,7 +933,6 @@ export const OrderCreatePage = () => {
                 receivedAt: row.receivedAt,
             };
         }
-        const figures = rowFigures(row);
         return {
             itemType: row.itemType,
             articleId: articleId ?? row.articleId,
@@ -984,6 +984,26 @@ export const OrderCreatePage = () => {
      * bağlanır; ardından üstteki tedarikçiyle TEK sipariş oluşturulur ya da
      * düzenleme modunda mevcut sipariş PATCH edilir.
      */
+    /**
+     * ONAYI GERİ AL (editör) — "siparişe dönüştür"ün TERSİ (kullanıcı isteği
+     * 2026-08-03): kayıt FİYAT TALEBİNE döner, fiyat/KDV sütunları kapanır.
+     * Satırlardaki fiyatlar SİLİNMEZ (`rowToItem` fiyatlı satırı olduğu gibi
+     * kaydeder), kayıt yeniden siparişe dönüştürülünce olduğu gibi görünürler.
+     * Kilitlenmiş (onaylanmış) sipariş bu sayfada zaten AÇILMAZ; oradaki geri
+     * alma sipariş popup'ındadır.
+     */
+    const revokeToPriceRequest = async () => {
+        if (!editId) return;
+        try {
+            await purchaseOrdersApi.setStatus(editId, 'PRICE_REQUEST');
+            setEditStatus('PRICE_REQUEST');
+            setOrderMode('PRICE_REQUEST');
+            toast.success(t('inv.orders.revokedToast'));
+        } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+            toast.error(error?.response?.data?.error || t('inv.orders.saveFailed'));
+        }
+    };
+
     const save = async (options?: { confirm?: boolean; convert?: boolean }) => {
         if (!filledRows.length) return;
 
@@ -1019,38 +1039,39 @@ export const OrderCreatePage = () => {
             // 1) Yeni ürünler ürün listesine 0 adetle açılır (DEFINITION kaydı);
             //    KODU ZATEN KAYITLI satırlar hata yerine mevcut ürünü GÜNCELLER
             //    (`overwrite` — dosya kazanır, kullanıcı isteği 2026-08-02).
-            //    Tür başına ayrı toplu çağrı; dönen id satıra bağlanır.
+            //    Tek toplu çağrı (malzeme/ürün birleşmesi); dönen id satıra bağlanır.
             const createdIds = new Map<string, string>();
-            for (const kind of ['PRODUCT', 'MATERIAL'] as ItemType[]) {
-                const newRows = filledRows.filter((row) => !row.articleId && row.itemType === kind);
-                if (!newRows.length) continue;
-                const result = await inventoryApi.bulkCreateArticles(newRows.map((row) => ({
-                    articleCode: row.code.trim(),
-                    name: row.name.trim(),
-                    quantity: 0,
-                    // Ürünün alış fiyatı İNDİRİMLİ birim fiyattır (gerçekten ödenen).
-                    purchasePrice: rowFigures(row).netUnitPrice,
-                    supplierId: supplier.id,
-                    supplierName: supplier.id ? null : (supplier.name.trim() || null),
-                    unit: row.unit || null,
-                })), kind, { overwrite: true });
-                if (result.errors.length) {
-                    const failed = new Map<string, string>();
-                    result.errors.forEach((error) => {
-                        const row = newRows[error.index];
-                        if (row) failed.set(row.key, error.error);
+            {
+                const newRows = filledRows.filter((row) => !row.articleId);
+                if (newRows.length) {
+                    const result = await inventoryApi.bulkCreateArticles(newRows.map((row) => ({
+                        articleCode: row.code.trim(),
+                        name: row.name.trim(),
+                        quantity: 0,
+                        // Ürünün alış fiyatı İNDİRİMLİ birim fiyattır (gerçekten ödenen).
+                        purchasePrice: rowFigures(row).netUnitPrice,
+                        supplierId: supplier.id,
+                        supplierName: supplier.id ? null : (supplier.name.trim() || null),
+                        unit: row.unit || null,
+                    })), undefined, { overwrite: true });
+                    if (result.errors.length) {
+                        const failed = new Map<string, string>();
+                        result.errors.forEach((error) => {
+                            const row = newRows[error.index];
+                            if (row) failed.set(row.key, error.error);
+                        });
+                        setRows((current) => current.map((row) => (failed.has(row.key)
+                            ? { ...row, error: failed.get(row.key) ?? null }
+                            : row)));
+                        toast.error(t('inv.orders.newArticlesFailed', { count: result.errors.length }));
+                        return;
+                    }
+                    result.created.forEach((created) => {
+                        const row = newRows.find((candidate) => !createdIds.has(candidate.key)
+                            && candidate.code.trim().toLowerCase() === created.articleCode.toLowerCase());
+                        if (row) createdIds.set(row.key, created.id);
                     });
-                    setRows((current) => current.map((row) => (failed.has(row.key)
-                        ? { ...row, error: failed.get(row.key) ?? null }
-                        : row)));
-                    toast.error(t('inv.orders.newArticlesFailed', { count: result.errors.length }));
-                    return;
                 }
-                result.created.forEach((created) => {
-                    const row = newRows.find((candidate) => !createdIds.has(candidate.key)
-                        && candidate.code.trim().toLowerCase() === created.articleCode.toLowerCase());
-                    if (row) createdIds.set(row.key, created.id);
-                });
             }
 
             const items = filledRows.map((row) => rowToItem(row, createdIds.get(row.key)));
@@ -1086,7 +1107,7 @@ export const OrderCreatePage = () => {
                 });
                 if (!options?.confirm) toast.success(t('inv.orders.updatedToast'));
             } else {
-                // 2) Tek sipariş = tek tedarikçi (üstten seçilen). Auftrag boşsa sunucu
+                // 2) Tek sipariş = tek tedarikçi (üstten seçilen). Bestellung boşsa sunucu
                 //    üretir. Fiyat talebi HENÜZ ONAYLANMADIĞI için TASLAK (DRAFT)
                 //    olarak kaydedilir (kullanıcı isteği); doğrudan sipariş PENDING.
                 // KAYDET SİPARİŞİ RESMİLEŞTİRMEZ (kullanıcı isteği 2026-08-02):
@@ -1121,8 +1142,10 @@ export const OrderCreatePage = () => {
                 return;
             }
             // ONAYLA: kaydetmenin ARDINDAN gelen AYRI adım (kullanıcı isteği
-            // 2026-08-02). Sipariş resmîleşir (PENDING), artık düzenlenemez ve
-            // mal kabul düğmesi açılır → LİSTEYE DÖNÜLÜR.
+            // 2026-08-02). Sipariş resmîleşir ve artık düzenlenemez; durumu
+            // "SİPARİŞ ONAYLANDI" (PENDING) olur — tedarikçiye mail gidince
+            // kendiliğinden "sipariş verildi"ye (ORDERED) döner (2026-08-03).
+            // Mal kabul düğmesi de açılır → LİSTEYE DÖNÜLÜR.
             if (options?.confirm && savedId) {
                 await purchaseOrdersApi.setStatus(savedId, 'PENDING');
                 toast.success(t('inv.orders.confirmedToast'));
@@ -1150,16 +1173,25 @@ export const OrderCreatePage = () => {
     // FİYAT TALEBİNDE fiyat ve kip sütunları da yoktur: ürün + kod + miktar + eylem.
     const columnCount = priceless ? 4 : 10;
     const tableMinWidth = priceless ? 560 : 1016;
+    // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
+    // Fiyat sütunları FİYAT TALEBİ kipinde hiç çizilmez — `<col>` listesi de
+    // aynı koşulu izler, yoksa sütunlar kayardı.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-order-create:col-widths:v1',
+        defaults: {
+            code: 144, quantity: 96, grossPrice: 112, netPrice: 112,
+            discount: 96, discount2: 96, lineTotal: 128, mode: 40, remove: 48,
+        },
+        minPx: 40,
+    });
 
+    // Malzeme/ürün birleşmesi (2026-08-14): tek tür kaldı, başlıklar sabit.
     const kindLabels = {
-        // Başlık TEK TÜR yazar (kullanıcı isteği 2026-08-02): sipariş baştan
-        // "malzeme" ya da "ürün" seçilerek açıldığı için "Ürün / Malzeme" ikilisi
-        // ekranda seçilmemiş türü de gösteriyordu.
-        name: t(isMaterial ? 'inv.columns.materialName' : 'inv.columns.productName'),
-        pick: t(isMaterial ? 'inv.stock.pickMaterial' : 'inv.stock.pickProduct'),
-        code: t(isMaterial ? 'inv.columns.materialCode' : 'inv.columns.serialCode'),
-        viewAll: `${t(isMaterial ? 'inv.materialPicker.viewAll' : 'inv.productPicker.viewAll')} …`,
-        allTitle: t(isMaterial ? 'inv.materialPicker.allTitle' : 'inv.productPicker.allTitle'),
+        name: t('inv.columns.productName'),
+        pick: t('inv.stock.pickProduct'),
+        code: t('inv.columns.serialCode'),
+        viewAll: `${t('inv.productPicker.viewAll')} …`,
+        allTitle: t('inv.productPicker.allTitle'),
     };
 
     // ── GİRİŞ YOLU SEÇİMİ (yalnızca yeni sipariş) ────────────────────────────
@@ -1205,20 +1237,8 @@ export const OrderCreatePage = () => {
                         {chooseButton('ORDER', <ShoppingCart01 size={22} />, t('inv.orders.mode.order'), t('inv.orders.choose.orderHint'))}
                         {chooseButton('PRICE_REQUEST', <File05 size={22} />, t('inv.orders.mode.priceRequest'), t('inv.orders.choose.priceRequestHint'))}
                     </div>
-                    {/* TÜR BURADA SEÇİLİR (kullanıcı isteği 2026-08-02): varsayılan
-                        MALZEME, açılır listeden ürüne çevrilebilir. Editörde ayrıca
-                        ürün/malzeme seçimi YOKTUR. */}
-                    <label className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold text-slate-500 dark:text-white/60">
-                        {t('inv.orders.choose.kindLabel')}
-                        <select
-                            value={itemKind}
-                            onChange={(event) => setItemKind(event.target.value as ItemType)}
-                            className={`${INPUT_BASE_CLASS} w-44`}
-                        >
-                            <option value="MATERIAL">{t('inv.stock.kindMaterial')}</option>
-                            <option value="PRODUCT">{t('inv.stock.kindProduct')}</option>
-                        </select>
-                    </label>
+                    {/* Ürün/malzeme seçimi kalktı (birleşme 2026-08-14): her
+                        sipariş satırı üründür. */}
                 </div>
             </div>
         );
@@ -1295,16 +1315,35 @@ export const OrderCreatePage = () => {
                         </button>
                     ) : undefined)
                     : ((!editStatus || canConfirmToOrder(editStatus)) ? (
-                        <button
-                            type="button"
-                            disabled={saving || !canTransfer || !filledRows.length}
-                            onClick={() => setStageConfirm('confirm')}
-                            title={t('inv.orders.actions.confirmOrder')}
-                            className="flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            <CheckCircle size={15} />
-                            {t('inv.orders.actions.confirmOrder')}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {/* ONAYI GERİ AL — yalnızca KAYITLI sipariş taslağında:
+                                talebin siparişe dönüştürülmesini geri alır, kayıt
+                                fiyat talebine döner (kullanıcı isteği 2026-08-03).
+                                Yeni, henüz kaydedilmemiş siparişte geri alınacak
+                                bir onay yoktur. */}
+                            {editId && editStatus === 'ORDER_DRAFT' && (
+                                <button
+                                    type="button"
+                                    disabled={saving || !canTransfer}
+                                    onClick={() => setStageConfirm('revoke')}
+                                    title={t('inv.orders.actions.revokeApproval')}
+                                    className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                                >
+                                    <RefreshCcw01 size={15} />
+                                    {t('inv.orders.actions.revokeApproval')}
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                disabled={saving || !canTransfer || !filledRows.length}
+                                onClick={() => setStageConfirm('confirm')}
+                                title={t('inv.orders.actions.confirmOrder')}
+                                className="flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <CheckCircle size={15} />
+                                {t('inv.orders.actions.confirmOrder')}
+                            </button>
+                        </div>
                     ) : undefined)}
             />
 
@@ -1333,8 +1372,8 @@ export const OrderCreatePage = () => {
                     </label>
 
                     {/* Sipariş detayları: kırmızı kalem — alttan açılan pencerede
-                        Auftrag / Besteller / proje / teklif no girilir. Hiçbiri zorunlu
-                        değildir; Auftrag boş bırakılırsa sunucu AU-{yıl}-{sıra} üretir.
+                        Bestellung / Besteller / proje / teklif no girilir. Hiçbiri zorunlu
+                        değildir; Bestellung boş bırakılırsa sunucu BE-{yıl}-{sıra} üretir.
                         Düğmenin ALTINDA özet YAZILMAZ (kullanıcı isteği) — girilen
                         değerler yalnızca pencerede görünür. */}
                     <div className="flex flex-col gap-1">
@@ -1382,10 +1421,6 @@ export const OrderCreatePage = () => {
                         {t('inv.orders.mode.priceRequest')}
                     </span>
                 )}
-                {/* Tür başta seçildi; burada yalnızca hangisi olduğu yazar. */}
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11.5px] font-semibold text-slate-600 dark:bg-white/10 dark:text-white/70">
-                    {t(isMaterial ? 'inv.stock.kindMaterial' : 'inv.stock.kindProduct')}
-                </span>
                 {/* HESAP KİPİ — Excel düğmesinin YANINDA durur, çünkü kararın
                     verildiği yer aktarımdan hemen öncedir (eşlenebilir sütunlar da
                     buna göre değişir). Doğrudan giriş VARSAYILANDIR ve ilk sırada
@@ -1457,34 +1492,68 @@ export const OrderCreatePage = () => {
                 )}
             >
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-unstyled-table className="w-full" style={{ minWidth: tableMinWidth }}>
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full" style={{ minWidth: tableMinWidth }}>
+                        <colgroup>
+                            {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['code', 'quantity'] as const} grid={grid} />
+                            {!priceless && (
+                                <ResizableCols keys={['grossPrice', 'netPrice', 'discount', 'discount2', 'lineTotal', 'mode'] as const} grid={grid} />
+                            )}
+                            <ResizableCols keys={['remove'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th className="text-left">{kindLabels.name}</th>
-                                <th className="w-36 text-left">{kindLabels.code}</th>
-                                <th className="w-24 text-right">{t('inv.columns.quantity')}</th>
+                                <th className="relative text-left">
+                                    {kindLabels.code}
+                                    <ColResizeHandle {...grid.resizeProps('code')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.quantity')}
+                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
+                                </th>
                                 {/* FİYAT TALEBİ fiyatsızdır: fiyat/indirim/KDV/tutar
                                     sütunları hiç çizilmez. */}
                                 {!priceless && (
                                     <>
-                                        <th className="w-28 text-right">{t('inv.orders.columns.grossPrice')}</th>
-                                        <th className="w-28 text-right">{t('inv.orders.columns.netPrice')}</th>
+                                        <th className="relative text-right">
+                                            {t('inv.orders.columns.grossPrice')}
+                                            <ColResizeHandle {...grid.resizeProps('grossPrice')} />
+                                        </th>
+                                        <th className="relative text-right">
+                                            {t('inv.orders.columns.netPrice')}
+                                            <ColResizeHandle {...grid.resizeProps('netPrice')} />
+                                        </th>
                                         {/* İndirim: başlık altı çizili — tıklanınca İndirim 2 / 3
                                             sütunlarını açan pencere gelir. Yüzdeler sırayla uygulanır;
                                             tedarikçi kipindeki SATIRLARDA hücreler kilitlidir. */}
                                         {/* İKİ indirim sütunu HER ZAMAN görünür: gizli
                                             sütun = sessizce silinen indirim demekti. */}
-                                        <th className="w-24 text-right">{t('inv.orders.columns.discount')}</th>
-                                        <th className="w-24 text-right">{t('inv.orders.columns.discount2')}</th>
+                                        <th className="relative text-right">
+                                            {t('inv.orders.columns.discount')}
+                                            <ColResizeHandle {...grid.resizeProps('discount')} />
+                                        </th>
+                                        <th className="relative text-right">
+                                            {t('inv.orders.columns.discount2')}
+                                            <ColResizeHandle {...grid.resizeProps('discount2')} />
+                                        </th>
                                         {/* KDV SÜTUNU YOK: tek oran sipariş detaylarından
                                             seçilir ve genel toplama uygulanır. */}
-                                        <th className="w-32 text-right">{t('inv.columns.lineTotal')}</th>
+                                        <th className="relative text-right">
+                                            {t('inv.columns.lineTotal')}
+                                            <ColResizeHandle {...grid.resizeProps('lineTotal')} />
+                                        </th>
                                         {/* Kip göstergesi (satırın sağında): tıklamak o satırın
                                             hesap kipini değiştirir — toplu ayardan bağımsız. */}
-                                        <th className="w-10" aria-label={t('inv.orders.calcMode.rowToggleHint')} />
+                                        <th className="relative" aria-label={t('inv.orders.calcMode.rowToggleHint')}>
+                                            <ColResizeHandle {...grid.resizeProps('mode')} />
+                                        </th>
                                     </>
                                 )}
-                                <th className="w-12" />
+                                <th className="relative">
+                                    <ColResizeHandle {...grid.resizeProps('remove')} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1517,11 +1586,10 @@ export const OrderCreatePage = () => {
                                                 onCreate={(name) => markAsNewArticle(row.key, name)}
                                                 onOpenAll={() => setAllPickerRowKey(row.key)}
                                                 linked={Boolean(row.articleId)}
-                                                itemType={itemKind}
                                                 canCreate={canCreateArticles}
                                                 autoFocus={row.key === focusRowKey}
                                                 placeholder={kindLabels.pick}
-                                                addLabel={t(isMaterial ? 'inv.materialPicker.addNew' : 'inv.productPicker.addNew', { name: row.name.trim() })}
+                                                addLabel={t('inv.productPicker.addNew', { name: row.name.trim() })}
                                                 viewAllLabel={kindLabels.viewAll}
                                             />
                                             {row.error && (
@@ -1735,7 +1803,6 @@ export const OrderCreatePage = () => {
                 open={allPickerRowKey !== null}
                 onClose={() => setAllPickerRowKey(null)}
                 onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
-                itemType={itemKind}
                 title={kindLabels.allTitle}
             />
             {/* Sipariş detayları penceresi — alttan yükselen sheet. Tüm alanlar
@@ -2136,13 +2203,20 @@ export const OrderCreatePage = () => {
                 open={stageConfirm !== null}
                 title={t(stageConfirm === 'confirm'
                     ? 'inv.orders.actions.confirmOrder'
-                    : 'inv.orders.actions.convertToOrder')}
+                    : stageConfirm === 'revoke'
+                        ? 'inv.orders.actions.revokeApproval'
+                        : 'inv.orders.actions.convertToOrder')}
                 message={t(stageConfirm === 'confirm'
                     ? 'inv.orders.confirmOrderConfirm'
-                    : 'inv.orders.convertConfirm')}
+                    : stageConfirm === 'revoke'
+                        ? 'inv.orders.revokeRequestConfirm'
+                        : 'inv.orders.convertConfirm')}
                 onConfirm={() => {
                     const kind = stageConfirm;
                     setStageConfirm(null);
+                    // GERİ ALMA kaydetmez: yalnızca durumu geri alır (kaydedilmemiş
+                    // düzenlemeler tabloda durur, kullanıcı isterse kaydeder).
+                    if (kind === 'revoke') { void revokeToPriceRequest(); return; }
                     void save(kind === 'confirm' ? { confirm: true } : { convert: true });
                 }}
                 onCancel={() => setStageConfirm(null)}

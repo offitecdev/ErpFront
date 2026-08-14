@@ -11,23 +11,33 @@ export const dayKey = (value: dayjs.Dayjs | string) => dayjs(value).format('YYYY
 export const SCHEDULE_START_HOUR = 6;
 export const SCHEDULE_END_HOUR = 20;
 
-// Last tolerance percent the user typed into the wizard, so the next appointment
-// defaults to it (falls back to the project's stored tolerance, then 15).
-export const LAST_TOLERANCE_STORAGE_KEY = 'ofi:lastAppointmentTolerance';
+// The overtime threshold is a fixed company rule, not a per-appointment choice:
+// work beyond 15% of the planned duration is billed. Only the hourly rate that
+// applies past that threshold is entered in the wizard.
+export const FIXED_TOLERANCE_PERCENT = 15;
 
-export const readLastTolerance = (project: ProjectDto): number => {
+// Last hourly rate the user typed into the wizard, so the next appointment
+// defaults to it (falls back to the project's stored rate, then 0). The minute
+// price is never entered — the backend derives it as rate / 60.
+export const LAST_HOURLY_RATE_STORAGE_KEY = 'ofi:lastAppointmentHourlyRate';
+
+export const readLastHourlyRate = (project: ProjectDto): number => {
     try {
-        const raw = localStorage.getItem(LAST_TOLERANCE_STORAGE_KEY);
-        if (raw !== null && Number.isFinite(Number(raw))) return Number(raw);
+        const raw = localStorage.getItem(LAST_HOURLY_RATE_STORAGE_KEY);
+        if (raw !== null && raw !== '' && Number.isFinite(Number(raw))) return Number(raw);
     } catch { /* storage unavailable — fall through to the project value */ }
-    return Number(project.overtimeTolerancePercent ?? 15);
+    return Number(project.overtimeHourlyRate) || 0;
 };
 
-export const saveLastTolerance = (value: number) => {
+export const saveLastHourlyRate = (value: number) => {
     try {
-        localStorage.setItem(LAST_TOLERANCE_STORAGE_KEY, String(value));
+        localStorage.setItem(LAST_HOURLY_RATE_STORAGE_KEY, String(value));
     } catch { /* storage unavailable — the default chain covers the next open */ }
 };
+
+// Minute price shown next to the hourly rate — the same division the backend
+// applies when it bills overtime.
+export const perMinuteRate = (hourlyRate: number) => (Number(hourlyRate) || 0) / 60;
 
 export const rangesOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
     aStart < bEnd && bStart < aEnd;

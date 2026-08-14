@@ -4,7 +4,6 @@ import { Clipboard, SearchLg } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { t } from '@/i18n/translate';
 import type { MontageReportOrderListItem } from '@/types/project';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 import { MontageHeader } from './components/MontageHeader';
 import { MontagePager } from './components/MontagePager';
@@ -23,8 +22,8 @@ export const MontageReports = () => {
             <section className="overflow-hidden rounded-[3px] border border-slate-200 bg-white dark:border-white/10 dark:bg-[#17191c]">
                 <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#1f2654] px-3 py-2.5 text-white dark:border-white/10 dark:bg-amber-500">
                     <div>
-                        <div className="text-[13px] font-bold">Rapor oluştur</div>
-                        <div className="text-[11px] text-white/70">Saha raporu bulunan siparişi seçin.</div>
+                        <div className="text-[13px] font-bold">{t('montage.reportPicker.pageTitle')}</div>
+                        <div className="text-[11px] text-white/70">{t('montage.reportPicker.pageHint')}</div>
                     </div>
                     <div className="relative w-full sm:w-72">
                         <SearchLg size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -73,7 +72,7 @@ export const MontageReports = () => {
                                         className="cursor-pointer hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-white/5"
                                     >
                                         <td className="font-semibold text-slate-900 dark:text-slate-50">
-                                            {localizeTenderNumbersInText(row.orderNumber)}
+                                            {row.orderNumber}
                                         </td>
                                         <td>
                                             <span className="font-medium text-slate-700 dark:text-slate-200">{row.customerName}</span>

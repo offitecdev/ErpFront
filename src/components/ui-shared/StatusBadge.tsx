@@ -1,5 +1,4 @@
 import React from 'react';
-import Tag from 'antd/es/tag';
 
 // Exportiert, damit Aufrufer ihre Status-→-Variante-Tabellen typisieren können,
 // statt die Zuordnung auf `never` zu casten.
@@ -10,17 +9,6 @@ interface StatusBadgeProps {
     children: React.ReactNode;
     dot?: boolean;
 }
-
-const tagColorMap: Record<Variant, string> = {
-    active: 'success',
-    approved: 'processing',
-    passive: 'default',
-    info: 'blue',
-    warning: 'warning',
-    danger: 'error',
-    neutral: 'default',
-    order: 'success',
-};
 
 const chipClassMap: Record<Variant, string> = {
     active: 'bg-[#059669] text-white border-transparent',
@@ -37,12 +25,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     variant = 'neutral',
     children,
 }) => (
-    <Tag
-        color={tagColorMap[variant]}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 13 }}
-    >
+    <span className={`inline-flex size-max items-center gap-1.5 whitespace-nowrap rounded-[13px] border px-2.5 py-0.5 text-[11px] font-semibold ${chipClassMap[variant]}`}>
         {children}
-    </Tag>
+    </span>
 );
 
 export const StatusChip: React.FC<StatusBadgeProps> = ({

@@ -107,7 +107,7 @@ export const SignatureSheet = ({
             <div
                 role="dialog"
                 aria-modal="true"
-                className="ofi-signature-pop w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200"
+                className="ofi-signature-pop w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
@@ -115,14 +115,14 @@ export const SignatureSheet = ({
                     <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={16} /></button>
                 </div>
 
-                <div className="max-h-[70vh] overflow-y-auto px-4 py-4">
-                    <div className="rounded-lg border border-slate-200 p-3">
+                <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">
+                    <div className="rounded-lg border border-slate-200 p-4">
                         <div className="mb-1.5 text-[11.5px] font-semibold text-slate-600">{t('signatures.signHereLabel')}</div>
                         <canvas
                             ref={canvasRef}
                             width={900}
                             height={260}
-                            className="h-[220px] w-full cursor-crosshair touch-none rounded-lg border border-slate-300 bg-white"
+                            className="h-[260px] w-full cursor-crosshair touch-none rounded-lg border border-slate-300 bg-white"
                             onPointerDown={(event) => {
                                 drawing.current = true;
                                 event.currentTarget.setPointerCapture(event.pointerId);

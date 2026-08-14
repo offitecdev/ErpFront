@@ -27,9 +27,6 @@ const LazyCreateAddonOrderTab = lazy(() =>
 const LazyCostsTab = lazy(() =>
     import('./tabs/CostsTab').then((module) => ({ default: module.CostsTab })),
 );
-const LazyMaterialsTab = lazy(() =>
-    import('./tabs/MaterialsTab').then((module) => ({ default: module.MaterialsTab })),
-);
 const LazyReportsTab = lazy(() =>
     import('./tabs/ReportsTab').then((module) => ({ default: module.ReportsTab })),
 );
@@ -64,6 +61,7 @@ export type RenderSectionArgs = {
     addonAttention: boolean;
     canCreateAddon: boolean;
     onNavigate: (view: ProjectDetailView) => void;
+    /** Sipariş seçimini bölüm içinden değiştirir; aktif sekme KORUNUR. */
     onSelectOrder: (orderId: string) => void;
     onReload: () => Promise<void>;
     onOrderCreated: (orderId: string) => Promise<void>;
@@ -87,7 +85,7 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
             );
         }
         if (view.section === 'billing') {
-            return deferredSection(<LazyBillingTab project={project} orders={orders} onReload={onReload} />);
+            return deferredSection(<LazyBillingTab project={project} order={order} orders={orders} onSelectOrder={onSelectOrder} />);
         }
         return (
             <EmptyState
@@ -108,8 +106,9 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
                     isPrimary={isPrimary}
                     awaitingAppointments={awaitingAppointments}
                     addonAttention={addonAttention}
+                    canCreateAddon={canCreateAddon}
                     onNavigate={onNavigate}
-                    onSelectOrder={onSelectOrder}
+                    onOrderCreated={onOrderCreated}
                 />
             );
         case 'positions':
@@ -124,7 +123,7 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
                     settings={mailSettings}
                     userEmail={userEmail}
                     onSaved={onReload}
-                    leaf={view.subSection === 'appointmentMail' ? 'mail' : 'schedule'}
+                    leaf="schedule"
                 />,
             );
         case 'field':
@@ -141,42 +140,16 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
                 />,
             );
         case 'costs':
-            if (view.subSection === 'materials') {
-                return deferredSection(
-                    <LazyMaterialsTab
-                        project={project}
-                        order={order}
-                        isPrimary={isPrimary}
-                        materials={materials}
-                        onSaved={onReload}
-                        onGoFieldReports={goFieldReports}
-                    />,
-                );
-            }
-            if (view.subSection === 'overtime') {
-                return deferredSection(
-                    <LazyBookingSection
-                        project={project}
-                        order={order}
-                        isPrimary={isPrimary}
-                        materials={materials}
-                        settings={mailSettings}
-                        userEmail={userEmail}
-                        onSaved={onReload}
-                        leaf="overtime"
-                    />,
-                );
-            }
             return deferredSection(
                 <LazyCostsTab
                     project={project}
                     order={order}
-                    isPrimary={isPrimary}
+                    onSaved={onReload}
                     onGoFieldReports={goFieldReports}
                 />,
             );
         case 'billing':
-            return deferredSection(<LazyBillingTab project={project} orders={orders} onReload={onReload} />);
+            return deferredSection(<LazyBillingTab project={project} order={order} orders={orders} onSelectOrder={onSelectOrder} />);
         case 'addons':
             return deferredSection(
                 <LazyCreateAddonOrderTab

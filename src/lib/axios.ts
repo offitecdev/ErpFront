@@ -60,6 +60,29 @@ export const apiClient = axios.create({
     withCredentials: true,
 });
 
+/**
+ * ── MAIL GÖNDERİMİ İÇİN ZAMAN AŞIMI ─────────────────────────────────────────
+ * Axios'un VARSAYILAN zaman aşımı YOKTUR: bir istek yanıtlanmazsa söz (promise)
+ * asla çözülmez ve gönder düğmesi sonsuza kadar döner. Sunucu tarafında bir
+ * gönderim en fazla ~60 sn sürebilir (SMTP toplam süre bütçesi + büyük ekler
+ * için verilen pay); buradaki sınır onun biraz üstündedir, böylece ekran her
+ * hâlükârda bir sonuca ulaşır: ya "gönderildi" ya da anlaşılır bir hata.
+ *
+ * Normal bir gönderim 1-3 saniyede biter — bu sınır yalnızca ağ/sunucu
+ * takıldığında devreye girer.
+ */
+export const MAIL_REQUEST_TIMEOUT_MS = 90_000;
+
+/**
+ * Zaman aşımına uğramış bir istek mi? Axios bu durumda İNGİLİZCE ve teknik bir
+ * metin üretir ("timeout of 90000ms exceeded"); ekrana onu basmak yerine
+ * kullanıcının dilinde bir cümle gösterebilmek için ayırt edilir.
+ */
+export const isRequestTimeout = (error: unknown): boolean => {
+    const code = (error as { code?: string } | null)?.code;
+    return code === 'ECONNABORTED' || code === 'ETIMEDOUT';
+};
+
 apiClient.interceptors.request.use((config) => {
     // CSRF double-submit: echo the JS-readable csrf cookie back as a header.
     // The server compares them on cookie-authenticated mutations; a cross-site

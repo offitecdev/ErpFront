@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 
-import { ArrowLeft, ArrowRight, File05 as FilePdf, Plus } from '@/components/icons/antIconCompat';
+import { ArrowLeft, ArrowRight, File05 as FilePdf, FileDownload02 as FileDown } from '@/components/icons/antIconCompat';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
-import { deliveryReportApi, projectApi, type DeliveryReportDto } from '@/lib/api/project';
+import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 
 import { AppointmentSignaturesView } from './AppointmentSignaturesView';
 import { DeliveryChecklistView } from './DeliveryChecklistView';
-import { FieldReportEditorView } from './FieldReportEditorView';
+import { FieldReportEditorView, type FieldReportSaveHandle } from './FieldReportEditorView';
 import { PdfView } from './PdfView';
 import { ReportsSheet } from './ReportsSheet';
 import { appointmentStatusKind, statusLabel } from '../booking/schedule/scheduleShared';
@@ -19,9 +20,14 @@ import { orderPayloadId } from '../../../utils/projectOrderScope';
 type SheetView = 'overview' | 'field' | 'delivery' | 'signatures' | 'pdf';
 type SlideDir = 'right' | 'left' | 'rise';
 
-// The back/next walking order. The PDF stage sits outside the sequence and
-// always returns to wherever it was opened from.
-const SEQUENCE: SheetView[] = ['overview', 'field', 'delivery', 'signatures'];
+/*
+ * Navigation is a real history stack, not a fixed running order. The views
+ * BRANCH — the overview opens any of them, the field report opens the PDF — so
+ * "back" has to return to the exact place the click came from, which a running
+ * order cannot express: from the PDF it would walk to whatever happened to
+ * precede it in the list rather than to the row that opened it. Past and future
+ * behave like a browser's, so forward re-enters whatever back just left.
+ */
 
 const animClass: Record<SlideDir, string> = {
     right: 'ofi-slide-in-right',
@@ -31,23 +37,13 @@ const animClass: Record<SlideDir, string> = {
 
 type PdfDoc = { title: string; build: () => Promise<Blob | null> };
 
-// A label/value hairline row for the project & order reference block — fine
-// gray lines instead of the appointment color.
-const MetaRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <tr>
-        <td className="w-44 font-semibold text-slate-500 dark:text-white/60">{label}</td>
-        <td className="text-slate-800 dark:text-white">{value}</td>
-    </tr>
-);
-
 /**
  * The appointment popup of the Reports section: a large square sheet that
  * slides up from the bottom (identical animation to the planning popup) and
  * NEVER resizes — field report, delivery checklist, signatures and the PDF
  * stage slide in sideways inside it, driven by the back/next bar at the
- * bottom. The "+" buttons live in that bottom bar; every document row carries
- * a PDF glyph that opens the live document in place (dimmed while the
- * document does not exist yet).
+ * bottom. Every document row carries a PDF glyph that opens the live document
+ * in place (dimmed while the document does not exist yet).
  */
 export const AppointmentReportSheet = ({
     open,
@@ -66,27 +62,65 @@ export const AppointmentReportSheet = ({
     appointment: any;
     report: any | null;
     materials: ProjectMaterial[];
-    /** 'pdf' opens straight onto the field report document (hub row PDF icon). */
-    initialView?: 'overview' | 'pdf';
+    /**
+     * 'pdf' opens straight onto the field report document (hub row PDF icon);
+     * 'delivery' straight onto the delivery checklist (hub toolbar button).
+     */
+    initialView?: 'overview' | 'pdf' | 'delivery';
     onSaved: () => Promise<void>;
     onClose: () => void;
 }) => {
     const [view, setView] = useState<SheetView>('overview');
     const [anim, setAnim] = useState<SlideDir>('rise');
     const [pdfDoc, setPdfDoc] = useState<PdfDoc | null>(null);
-    const [pdfFrom, setPdfFrom] = useState<SheetView>('overview');
-    const [delivery, setDelivery] = useState<DeliveryReportDto | null>(null);
+    /**
+     * Başlıktaki sabit aksiyon alanı: editörler Kaydet/PDF düğmelerini buraya
+     * PORTALLAR — başlık sabit olduğundan düğmeler kaydırmada görünür kalır.
+     */
+    const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
+    /** Where we came from, newest last — and what `back` stepped out of. */
+    const [past, setPast] = useState<SheetView[]>([]);
+    const [future, setFuture] = useState<SheetView[]>([]);
+    const [downloading, setDownloading] = useState<string | null>(null);
+    /**
+     * Editörün kayıt tutamacı: popup DEĞİŞİKLİKLE kapatılırsa kayıt otomatik
+     * tetiklenir ve kullanıcıya kaydedildiği bildirilir (kullanıcı isteği —
+     * "son kayıt geçerlidir", hiçbir değişiklik sessizce kaybolmaz).
+     */
+    const editorHandle = useRef<FieldReportSaveHandle | null>(null);
+    // Editör kendi POST yanıtıyla anında güncellenir. Büyük fieldReports proje
+    // modelini her Kaydet tıklamasında çekmek yerine, kullanıcı editörden
+    // ayrılırken üst görünümü bir kez senkronize ederiz.
+    const fieldChangedSinceSync = useRef(false);
+    /**
+     * Editörden ayrılırken (başka görünüme geçiş YA DA popup kapanışı) bekleyen
+     * değişiklik varsa kayıt otomatik tetiklenir ve kullanıcıya bildirilir —
+     * görünümler ayrılınca unmount olduğundan aksi halde değişiklik kaybolurdu.
+     */
+    const flushEditor = (leavingView: SheetView) => {
+        const handle = editorHandle.current;
+        if (leavingView === 'field' && handle?.dirty && !handle.saving) {
+            toast.info(t('projects.reportsHub.savingOnClose'), { position: 'top-center' });
+            void handle.save().then((saved) => {
+                if (!saved) return;
+                fieldChangedSinceSync.current = false;
+                void onSaved();
+            });
+        } else if (leavingView === 'field' && fieldChangedSinceSync.current) {
+            fieldChangedSinceSync.current = false;
+            void onSaved();
+        }
+        if (leavingView === 'field') editorHandle.current = null;
+    };
+    const handleClose = () => {
+        flushEditor(view);
+        onClose();
+    };
 
     const salesOrderId = orderPayloadId(order);
-    const fieldReports = useMemo(
-        () => ((project as any).reports || []).filter(
-            (r: any) => !salesOrderId || (r.salesOrderId || null) === salesOrderId,
-        ),
-        [project, salesOrderId],
-    );
-    const hasFieldReports = fieldReports.length > 0;
 
     const kind = appointmentStatusKind(appointment);
+    const isCompleted = kind === 'completed';
     const start = dayjs(appointment.startTime);
     const end = dayjs(appointment.endTime);
 
@@ -94,19 +128,13 @@ export const AppointmentReportSheet = ({
         // Re-clicking the current view's button must not remount it (that would
         // drop unsaved editor state) — the slide only runs on a real change.
         if (next === view) return;
+        flushEditor(view);
+        // A fresh jump forks the history: whatever `back` had parked is dropped.
+        setPast((stack) => [...stack, view]);
+        setFuture([]);
         setAnim(dir);
         setView(next);
     };
-
-    // Delivery report of this appointment — needed up-front for its PDF glyph.
-    useEffect(() => {
-        if (!open) return;
-        let cancelled = false;
-        deliveryReportApi.getByAppointment(appointment.id)
-            .then((row) => { if (!cancelled) setDelivery(row); })
-            .catch(() => { if (!cancelled) setDelivery(null); });
-        return () => { cancelled = true; };
-    }, [open, appointment.id]);
 
     // ── PDF builders — always from a freshly fetched full project graph, so new
     // rows and received signatures are already inside the document. ──
@@ -122,43 +150,28 @@ export const AppointmentReportSheet = ({
         return (await exportFieldReportPdf(full, fullReport, { appointment, output: 'blob' })) || null;
     };
 
-    const buildGeneralPdf = async () => {
-        const [{ exportProjectGeneralReportPdf }, full] = await Promise.all([
-            import('@/utils/pdf/projectReportPdf'),
-            fullProject(),
-        ]);
-        return (await exportProjectGeneralReportPdf(full, { output: 'blob' })) || null;
-    };
-
-    const buildDeliveryPdf = async () => {
-        if (!delivery) return null;
-        const [{ exportDeliveryReportPdf }, full] = await Promise.all([
-            import('@/utils/pdf/deliveryReportPdf'),
-            fullProject(),
-        ]);
-        const fieldImages = ((full as any).reports || [])
-            .filter((r: any) => !delivery.salesOrderId || (r.salesOrderId || null) === delivery.salesOrderId)
-            .flatMap((r: any) => (Array.isArray(r.images) ? r.images : []))
-            .filter((img: any) => img?.imageData)
-            .map((img: any) => ({ imageData: img.imageData }));
-        return (await exportDeliveryReportPdf({ report: delivery, project: full, fieldImages, output: 'blob' })) || null;
-    };
-
-    const openPdf = (doc: PdfDoc, from: SheetView) => {
+    // `from` is no longer tracked separately: the history stack already holds the
+    // exact view the glyph was clicked in, so `back` lands on that row.
+    const openPdf = (doc: PdfDoc) => {
         setPdfDoc(doc);
-        // Switching documents while already on the PDF stage keeps the original
-        // origin, so "back" still leaves the stage instead of looping on it.
-        setPdfFrom(from === 'pdf' ? pdfFrom : from);
+        // Swapping documents while already on the stage must not stack the stage
+        // onto itself, or `back` would loop between two PDFs.
         if (view !== 'pdf') go('pdf', 'right');
     };
 
     // Deep-link from the hub's row PDF glyph straight onto the document.
     useEffect(() => {
         if (!open) return;
+        // A newly opened sheet starts with an empty history, so `back` is inert
+        // until something has actually been navigated away from.
+        setPast([]);
+        setFuture([]);
         if (initialView === 'pdf' && report) {
             setPdfDoc({ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf });
-            setPdfFrom('overview');
             setView('pdf');
+            setAnim('rise');
+        } else if (initialView === 'delivery') {
+            setView('delivery');
             setAnim('rise');
         } else {
             setView('overview');
@@ -167,18 +180,27 @@ export const AppointmentReportSheet = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
-    // ── back / next along the fixed sequence; PDF returns to its origin. ──
-    const sequenceIndex = SEQUENCE.indexOf(view === 'pdf' ? pdfFrom : view);
+    // ── back / forward over the visited views, browser style. ──
     const goBack = () => {
-        if (view === 'pdf') return go(pdfFrom, 'left');
-        if (sequenceIndex > 0) return go(SEQUENCE[sequenceIndex - 1], 'left');
+        if (past.length === 0) return;
+        const target = past[past.length - 1];
+        flushEditor(view);
+        setPast((stack) => stack.slice(0, -1));
+        setFuture((stack) => [view, ...stack]);
+        setAnim('left');
+        setView(target);
     };
     const goNext = () => {
-        if (view === 'pdf') return go(pdfFrom, 'left');
-        if (sequenceIndex < SEQUENCE.length - 1) return go(SEQUENCE[sequenceIndex + 1], 'right');
+        if (future.length === 0) return;
+        const target = future[0];
+        flushEditor(view);
+        setFuture((stack) => stack.slice(1));
+        setPast((stack) => [...stack, view]);
+        setAnim('right');
+        setView(target);
     };
-    const canBack = view === 'pdf' || sequenceIndex > 0;
-    const canNext = view !== 'pdf' && sequenceIndex < SEQUENCE.length - 1;
+    const canBack = past.length > 0;
+    const canNext = future.length > 0;
 
     const viewTitles: Record<SheetView, string> = {
         overview: t('projects.reportsHub.appointmentTitle'),
@@ -188,27 +210,30 @@ export const AppointmentReportSheet = ({
         pdf: pdfDoc?.title || 'PDF',
     };
 
-    // PDF glyph next to each document row — lit when the document can be
-    // rendered, dimmed (and inert) while it does not exist yet.
-    const PdfGlyph = ({ available, doc }: { available: boolean; doc: PdfDoc }) => (
-        <button
-            type="button"
-            title={available ? t('projects.reportsHub.preview') : t('projects.reportUnavailable')}
-            aria-label={t('projects.reportsHub.preview')}
-            disabled={!available}
-            onClick={(event) => {
-                event.stopPropagation();
-                openPdf(doc, view);
-            }}
-            className={`inline-flex size-7 items-center justify-center rounded-[2px] border transition-colors ${
-                available ? 'ofi-rs-pdf' : 'ofi-rs-pdf-dim cursor-default'
-            }`}
-        >
-            <FilePdf size={14} />
-        </button>
-    );
+    // Belgeyi doğrudan dosya olarak indirir (önizlemeden bağımsız).
+    const downloadDoc = async (doc: PdfDoc) => {
+        setDownloading(doc.title);
+        try {
+            const blob = await doc.build();
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${doc.title.replace(/[\\/:*?"<>|]/g, '-')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } finally {
+            setDownloading(null);
+        }
+    };
 
-    const DocumentRow = ({ title, status, available, doc, target }: {
+    /**
+     * Alt rapor kutusu: İNCE kenarlıklı kutu (kullanıcı isteği) — başlık +
+     * durum solda, önizleme ve indirme sağda. Kutuya tıklamak ilgili editörü açar.
+     */
+    const DocumentBox = ({ title, status, available, doc, target }: {
         title: string;
         status: React.ReactNode;
         available: boolean;
@@ -225,14 +250,37 @@ export const AppointmentReportSheet = ({
                     go(target, 'right');
                 }
             } : undefined}
-            className={`flex items-center justify-between gap-3 border-t border-dashed border-slate-300 py-2.5 dark:border-white/15 ${target ? 'cursor-pointer hover:bg-slate-50/70 dark:hover:bg-white/5' : ''}`}
+            className={`flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3.5 sm:px-5 dark:border-white/15 ${target ? 'cursor-pointer hover:bg-slate-50/70 dark:hover:bg-white/5' : ''}`}
         >
             <div className="flex min-w-0 items-center gap-2.5">
                 <span className="text-[12.5px] font-semibold text-slate-800">{title}</span>
                 {status}
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-                <PdfGlyph available={available} doc={doc} />
+                <button
+                    type="button"
+                    title={available ? t('projects.reportsHub.preview') : t('projects.reportUnavailable')}
+                    aria-label={t('projects.reportsHub.preview')}
+                    disabled={!available}
+                    onClick={(event) => { event.stopPropagation(); openPdf(doc); }}
+                    className={`inline-flex size-7 items-center justify-center rounded-[2px] border transition-colors ${
+                        available ? 'ofi-rs-pdf' : 'ofi-rs-pdf-dim cursor-default'
+                    }`}
+                >
+                    <FilePdf size={14} />
+                </button>
+                <button
+                    type="button"
+                    title={t('projects.delivery.download')}
+                    aria-label={t('projects.delivery.download')}
+                    disabled={!available || downloading === doc.title}
+                    onClick={(event) => { event.stopPropagation(); void downloadDoc(doc); }}
+                    className={`inline-flex size-7 items-center justify-center rounded-[2px] border transition-colors ${
+                        available ? 'ofi-rs-pdf' : 'ofi-rs-pdf-dim cursor-default'
+                    } ${downloading === doc.title ? 'opacity-50' : ''}`}
+                >
+                    <FileDown size={14} />
+                </button>
             </div>
         </div>
     );
@@ -243,9 +291,13 @@ export const AppointmentReportSheet = ({
             title={`${start.format('DD.MM.YYYY')} · ${start.format('HH:mm')}–${end.format('HH:mm')}`}
             subtitle={viewTitles[view]}
             onBack={canBack ? goBack : undefined}
-            onClose={onClose}
+            onClose={handleClose}
+            headerActions={<div ref={setActionsHost} className="flex items-center gap-1.5" />}
             footer={(
                 <>
+                    {/* Yalnızca gezinme kaldı: Gesamtrapport/Abnahme düğmeleri
+                        popup'tan çıkıp Rapporte sekmesinin araç çubuğuna taşındı,
+                        "Auftragsrapporte" tamamen kalktı (kullanıcı isteği). */}
                     <button
                         type="button"
                         disabled={!canBack}
@@ -255,35 +307,6 @@ export const AppointmentReportSheet = ({
                         <ArrowLeft size={13} />
                         {t('common.back')}
                     </button>
-
-                    {/* The "+" actions live here, at the bottom of the square. */}
-                    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
-                        <button
-                            type="button"
-                            onClick={() => go('field', 'right')}
-                            className="ofi-rs-plus inline-flex shrink-0 items-center gap-1.5 rounded-[3px] px-2.5 py-1.5 text-[12px] font-semibold transition-colors"
-                        >
-                            <Plus size={13} />
-                            {report ? t('projects.reportsHub.reviewField') : t('projects.reportsHub.createField')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => go('delivery', 'right')}
-                            className="ofi-rs-plus inline-flex shrink-0 items-center gap-1.5 rounded-[3px] px-2.5 py-1.5 text-[12px] font-semibold transition-colors"
-                        >
-                            <Plus size={13} />
-                            {delivery ? t('projects.reportsHub.reviewDelivery') : t('projects.reportsHub.createDelivery')}
-                        </button>
-                        <button
-                            type="button"
-                            disabled={!hasFieldReports}
-                            onClick={() => openPdf({ title: t('projects.reportsHub.generalSection'), build: buildGeneralPdf }, view)}
-                            className="ofi-rs-plus inline-flex shrink-0 items-center gap-1.5 rounded-[3px] px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-30"
-                        >
-                            <Plus size={13} />
-                            {hasFieldReports ? t('projects.reportsHub.reviewGeneral') : t('projects.reportsHub.createGeneral')}
-                        </button>
-                    </div>
 
                     <button
                         type="button"
@@ -299,25 +322,44 @@ export const AppointmentReportSheet = ({
         >
             <div key={`${view}-${anim}-${view === 'pdf' ? pdfDoc?.title || '' : ''}`} className={`flex min-h-0 flex-1 flex-col ${animClass[anim]}`}>
                 {view === 'overview' && (
-                    <div className="space-y-4 p-4">
-                        {/* Project & order reference — fine lines, no colors. */}
-                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-white/15 dark:bg-transparent dark:shadow-none">
-                            <table data-inv-table data-unstyled-table className="w-full">
-                                <tbody>
-                                    <MetaRow label={t('auto.proje')} value={project.projectName || '—'} />
-                                    <MetaRow label={t('projects.reportsHub.order')} value={order?.orderNumber || '—'} />
-                                    <MetaRow label={t('projects.musteri')} value={project.customer?.companyName || '—'} />
-                                    <MetaRow label={t('common.date')} value={start.format('DD.MM.YYYY')} />
-                                    <MetaRow label={t('projects.schedule.time')} value={`${start.format('HH:mm')} – ${end.format('HH:mm')}`} />
-                                    <MetaRow label={t('projects.teknisyen')} value={appointmentTechnicianNames(appointment)} />
-                                    <MetaRow label={t('common.status')} value={statusLabel(kind)} />
-                                </tbody>
-                            </table>
-                        </div>
+                    <div className="space-y-7 px-6 py-7 sm:px-8 sm:py-9 lg:px-10">
+                        {/* Auftrag-Details als EINE Tabelle (Benutzerwunsch) — nur bei
+                            laufenden Terminen; bei abgeschlossenen genügt der Titel
+                            samt Status-Chip darunter. */}
+                        {!isCompleted ? (
+                            <div className="overflow-hidden rounded-[3px] border border-slate-200 dark:border-white/15">
+                                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                                    <thead>
+                                        <tr>
+                                            <th className="text-left">{t('projects.reportsHub.order')}</th>
+                                            <th className="text-left">{t('projects.musteri')}</th>
+                                            <th className="text-left">{t('common.date')}</th>
+                                            <th className="text-left">{t('projects.schedule.time')}</th>
+                                            <th className="text-left">{t('projects.teknisyen')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td className="font-semibold text-slate-800 dark:text-white">{order?.orderNumber || '—'}</td>
+                                            <td className="text-slate-700 dark:text-white/80">{project.customer?.companyName || '—'}</td>
+                                            <td className="tabular-nums text-slate-700 dark:text-white/80">{start.format('DD.MM.YYYY')}</td>
+                                            <td className="tabular-nums text-slate-700 dark:text-white/80">{`${start.format('HH:mm')} – ${end.format('HH:mm')}`}</td>
+                                            <td className="text-slate-700 dark:text-white/80">{appointmentTechnicianNames(appointment) || '—'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-[13px] font-semibold text-slate-800 dark:text-white">{order?.orderNumber || project.projectName}</span>
+                                <StatusChip variant="active">{statusLabel(kind)}</StatusChip>
+                            </div>
+                        )}
 
-                        {/* Documents — dashed dividers, PDF glyph per row. */}
-                        <div>
-                            <DocumentRow
+                        {/* Montage-Rapport: nur Vorschau + PDF (Benutzerwunsch); die
+                            Zeile öffnet den Editor. */}
+                        <div className="space-y-2.5">
+                            <DocumentBox
                                 title={t('projects.reportsHub.fieldSection')}
                                 status={report
                                     ? <StatusChip variant={report.isSigned ? 'active' : 'info'}>{report.isSigned ? t('projects.reportsHub.signed') : t('projects.reportAvailable')}</StatusChip>
@@ -326,52 +368,55 @@ export const AppointmentReportSheet = ({
                                 doc={{ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf }}
                                 target="field"
                             />
-                            <DocumentRow
-                                title={t('projects.reportsHub.generalSection')}
-                                status={hasFieldReports
-                                    ? <StatusChip variant="info">{t('projects.reportsHub.reportCount', { count: fieldReports.length })}</StatusChip>
-                                    : <span className="text-[11.5px] text-slate-400">{t('projects.reportsHub.generalNeedsField')}</span>}
-                                available={hasFieldReports}
-                                doc={{ title: t('projects.reportsHub.generalSection'), build: buildGeneralPdf }}
-                            />
-                            <DocumentRow
-                                title={t('projects.reportsHub.deliverySection')}
-                                status={delivery
-                                    ? <StatusChip variant={delivery.isSigned ? 'active' : 'info'}>{delivery.isSigned ? t('projects.reportsHub.signed') : t('projects.reportsHub.unsigned')}</StatusChip>
-                                    : <StatusChip variant="neutral">{t('projects.reportUnavailable')}</StatusChip>}
-                                available={Boolean(delivery)}
-                                doc={{ title: t('projects.reportsHub.deliverySection'), build: buildDeliveryPdf }}
-                                target="delivery"
-                            />
-                            <DocumentRow
-                                title={t('projects.reportsHub.signaturesSection')}
-                                status={null}
-                                available={false}
-                                doc={{ title: '', build: async () => null }}
-                                target="signatures"
-                            />
+
+                            {/* Unterschriften-Zeile — Gesamtrapport & Abnahme-Rapport
+                                sind aus dem Popup in die Werkzeugleiste des
+                                Rapporte-Tabs gewandert (Benutzerwunsch), links
+                                neben "Unterschriften". */}
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => go('signatures', 'right')}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        go('signatures', 'right');
+                                    }
+                                }}
+                                className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3.5 hover:bg-slate-50/70 sm:px-5 dark:border-white/15 dark:hover:bg-white/5"
+                            >
+                                <span className="text-[12.5px] font-semibold text-slate-800">{t('projects.reportsHub.signaturesSection')}</span>
+                            </div>
                         </div>
                     </div>
                 )}
 
                 {view === 'field' && (
-                    <div className="p-4">
+                    <div className="p-6 sm:p-8">
                         <FieldReportEditorView
                             project={project}
                             order={order}
                             appointment={appointment}
                             report={report}
                             materials={materials}
-                            onSaved={onSaved}
+                            showLogs
+                            saveHandleRef={editorHandle}
+                            onSaved={() => { fieldChangedSinceSync.current = true; }}
                             onBack={() => go('overview', 'left')}
-                            onPreviewPdf={report ? () => openPdf({ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf }, 'field') : undefined}
+                            onPreviewPdf={report ? () => openPdf({ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf }) : undefined}
+                            actionsHost={actionsHost}
                         />
                     </div>
                 )}
 
                 {view === 'delivery' && (
-                    <div className="p-4">
-                        <DeliveryChecklistView project={project} order={order} appointment={appointment} onChanged={setDelivery} />
+                    <div className="p-6 sm:p-8">
+                        <DeliveryChecklistView
+                            project={project}
+                            order={order}
+                            appointment={appointment}
+                            actionsHost={actionsHost}
+                        />
                     </div>
                 )}
 

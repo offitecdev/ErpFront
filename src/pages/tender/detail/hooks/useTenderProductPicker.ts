@@ -32,7 +32,12 @@ export const useTenderProductPicker = () => {
 
     // Fetch the current page whenever the pop-up is open and page/search change.
     useEffect(() => {
-        if (!productPickerOpen) return;
+        if (!productPickerOpen || !debouncedSearch) {
+            setPickerItems([]);
+            setPickerTotal(0);
+            setPickerLoading(false);
+            return;
+        }
         let cancelled = false;
         setPickerLoading(true);
         inventoryApi
@@ -42,7 +47,7 @@ export const useTenderProductPicker = () => {
             .articlesQuickPick({
                 page: productPickerPage,
                 pageSize: PRODUCT_PICKER_PAGE_SIZE,
-                search: debouncedSearch || undefined,
+                search: debouncedSearch,
             })
             .then((res) => {
                 if (cancelled) return;

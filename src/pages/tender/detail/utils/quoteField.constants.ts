@@ -18,7 +18,7 @@ export const QUOTE_LABEL_CLASS =
  * prices only lines up on its decimal point when it is flushed right.)
  */
 export const QUOTE_CONTROL_CLASS =
-    'h-8 w-full min-w-0 rounded-[3px] border border-slate-300 bg-white px-2.5 text-left text-[13px] font-medium text-slate-900 outline-none transition-[border-color,box-shadow] duration-150 placeholder:font-normal placeholder:text-slate-400 hover:border-slate-400 focus:border-[#1f2654] focus:ring-2 focus:ring-[#1f2654]/15 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400';
+    'ofi-quote-control h-8 w-full min-w-0 rounded-[3px] border border-slate-300 bg-white px-2.5 text-left text-[13px] font-medium text-slate-900 outline-none transition-[border-color,box-shadow] duration-150 placeholder:font-normal placeholder:text-slate-400 hover:border-slate-400 focus:border-[#1f2654] focus:ring-2 focus:ring-[#1f2654]/15 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400';
 
 /** Read-only counterpart of a control, so read-only rows keep the same rhythm. */
 export const QUOTE_READONLY_CLASS =

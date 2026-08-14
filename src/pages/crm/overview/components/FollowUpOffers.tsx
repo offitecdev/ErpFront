@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { ArrowRight, Briefcase01, Clock } from '@/components/icons/antIconCompat';
 import { formatMoney, toCurrencyCode } from '../../../../utils/currency';
-import { localizeTenderNumber } from '../../../../utils/tenderNumber';
 import type { TenderListItem } from '../../../../types/tender';
 import {
     daysUntilExpiry,
@@ -31,7 +30,7 @@ const STAGE_BADGE: Record<OfferStage, string> = {
 /** Offers needing follow-up: starred (important), recent drafts, drafts with the
     nearest deadline. Offers already turned into an order are left out. */
 export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, orderedIds }) => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [tab, setTab] = useState<FollowTab>('deadline');
     const [importantIds, setImportantIds] = useState<string[]>(loadImportantOfferIds);
@@ -146,7 +145,7 @@ export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, ordered
                             </button>
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-[13.5px] font-semibold text-[#1A1A1A] dark:text-white">
-                                    {localizeTenderNumber(tender.tenderNumber, i18n.language)}
+                                    {tender.tenderNumber}
                                     {tender.customerName && <span className="font-normal text-[#6B7280] dark:text-[#aab0bb]"> · {tender.customerName}</span>}
                                 </p>
                                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-[#6B7280] dark:text-[#aab0bb]">

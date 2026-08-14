@@ -78,7 +78,7 @@ export const CustomerBrowseModal = ({ open, onClose, onPick }: {
     const totalPages = Math.max(1, Math.ceil(total / BROWSE_PAGE_SIZE));
 
     return (
-        <CenterModal open={open} onClose={onClose} title={t('calendar.picker.allCustomers')} width={760} z={150}>
+        <CenterModal open={open} onClose={onClose} title={t('calendar.picker.allCustomers')} width={940} z={150}>
             <div className="border-b border-slate-100 px-3 py-2.5 dark:border-white/10">
                 <SearchBox value={query} onChange={setQuery} placeholder={t('calendar.picker.searchCustomer')} autoFocus />
             </div>

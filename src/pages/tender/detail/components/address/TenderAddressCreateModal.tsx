@@ -3,6 +3,8 @@ import { Button } from '@/components/ui-shared/Button';
 import { Field, Input, Select } from '@/components/ui-shared/Field';
 import { Modal } from '@/components/ui-shared/Modal';
 import { AddressFields } from '@/components/ui-shared/AddressFields';
+import { addressParts } from '@/components/ui-shared/addressForm';
+import { isAddressEmpty } from '@/utils/address';
 import { t } from '@/i18n/translate';
 
 // Form tipi ve bos degeri `detail/utils/tenderAddress.utils.ts` icinde yasar —
@@ -40,7 +42,10 @@ export const TenderAddressCreateModal = ({
         footer={
             <>
                 <Button variant="secondary" onClick={onClose} disabled={saving}>{t('common.cancel')}</Button>
-                <Button variant="primary" loading={saving} icon={<Plus size={13} />} onClick={() => void onSubmit()} disabled={!form.address.trim() && !form.name.trim()}>{t('common.add')}</Button>
+                {/* Kaydin adres OLARAK ise yaramasi icin en az bir posta bileseni
+                    sart. Eskiden ad TEK BASINA yeterliydi: bilesensiz kayitlar
+                    boyle olusuyor, sonra etiketleri adres diye gorunuyordu. */}
+                <Button variant="primary" loading={saving} icon={<Plus size={13} />} onClick={() => void onSubmit()} disabled={isAddressEmpty(addressParts(form))}>{t('common.add')}</Button>
             </>
         }
     >

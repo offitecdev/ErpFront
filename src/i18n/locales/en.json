@@ -7,6 +7,16 @@
         "updateReadyHint": "Reload to switch to the latest version.",
         "updateReload": "Reload"
     },
+    "montage": {
+        "reportPicker": {
+            "title": "Installation reports",
+            "type": "Report type",
+            "number": "Report number",
+            "action": "Action",
+            "pageTitle": "View or create reports",
+            "pageHint": "Select an order for its general and delivery reports."
+        }
+    },
     "supply": {
         "title": "Supply Requests",
         "description": "Open direct requests to suppliers for products and materials that have dropped to minimum/critical stock.",
@@ -283,6 +293,7 @@
         "welcome": "Welcome back to your workspace.",
         "email": "Email",
         "emailPlaceholder": "name@offitec.ch",
+        "forgotPassword": "Forgot my password",
         "password": "Password",
         "passwordPlaceholder": "Enter your password",
         "demoNotice": "This is a demo version of the Offitec ERP web application. Unauthorized reproduction or use is prohibited.",
@@ -390,6 +401,18 @@
             "tomorrow": "Tomorrow",
             "inDays": "In {{days}} days",
             "empty": "No upcoming appointments."
+        }
+    },
+    "dash": {
+        "upcoming": {
+            "title": "Upcoming",
+            "installations": "Installations",
+            "meetings": "Meetings",
+            "deliveries": "Deliveries",
+            "week": "This week",
+            "thisWeek": "this week",
+            "empty": "No appointments this week.",
+            "close": "Close"
         }
     },
     "attendance": {
@@ -702,7 +725,18 @@
         "productDiscountLoadError": "Discounts could not be loaded.",
         "productDiscountSaved": "Discount saved.",
         "productDiscountDeleted": "Discount deleted.",
-        "productDiscountDeleteConfirm": "Are you sure you want to delete this product discount?"
+        "productDiscountDeleteConfirm": "Are you sure you want to delete this product discount?",
+        "deliveryOrder": "Delivery order",
+        "projectOrder": "Project order",
+        "overviewTab": "Overview",
+        "completionStatus": "Completion status",
+        "orderAddresses": "Addresses",
+        "destinationAddress": "Destination address",
+        "deliveryAddressLabel": "Delivery address",
+        "addressNotStored": "No address stored",
+        "noDeliveryDateInProject": "A project order has no delivery date — the appointments drive the execution.",
+        "commissions": "Commissions",
+        "commissionMissing": "No commission"
     },
     "inventory": {
         "breadcrumb": "Inventory",
@@ -928,7 +962,12 @@
             "errorName": "A category name is required.",
             "deleteConfirm": "Delete this category? Mapped companies become uncategorized (all modules enabled).",
             "deleted": "Category deleted.",
-            "assigned": "Company category updated."
+            "assigned": "Company category updated.",
+            "colCompanyNumber": "Company no.",
+            "colCodeBlock": "Document code",
+            "companyNumberHint": "The company number sets the block used in that company's document codes (4 → AN-2026-40001) and is independent of the module category. Changing it affects only codes issued from now on; codes already issued stay as they are.",
+            "errorCompanyNumber": "The company number must be a whole number between 0 and 99.",
+            "numberSaved": "Company number updated."
         },
         "pdf": {
             "breadcrumb": "Settings › PDF & Offer Template",
@@ -1252,8 +1291,11 @@
         "optional_category_barcode": "Optional Category Barcode",
         "optional_category_barcode_manual_or_camera": "Optional Category Barcode Manual Or Camera",
         "order_create": "Create Order",
+        "order_create_with_options": "Create order with options…",
         "order_created": "Order created",
         "order_olusturulamadi": "Order could not be created",
+        "order_project_or_direct_question": "Will it be added to the project or billed directly?",
+        "order_choice_required": "You have to make a choice here.",
         "order_turunu_select": "Select order type",
         "orn_10_bakim_seti_10_lecksuchspray_10_reinigungs": "Orn 10 Bakim Seti 10 Lecksuchspray 10 Reinigungs",
         "otomatik_kaydedilecek": "Otomatik Kaydedilecek",
@@ -1300,7 +1342,7 @@
         "profit_margin": "Profit Margin",
         "profit_margin_amount": "Profit Margin Amount",
         "project_adi_customer_veya_tender_no": "Project name, customer or offer no.",
-        "project_icin_order_create": "Create order for project",
+        "project_icin_order_create": "Create project for order",
         "project_ismi": "Project Name",
         "project_ismi_zorunludur": "Project name is required",
         "project_not_found": "Project not found",
@@ -1450,7 +1492,10 @@
         "yeni_versiyon_olusturuldu": "New version created.",
         "import_from_excel": "Import from Excel",
         "mail_sent": "Sent",
-        "mail_not_sent": "Not sent"
+        "mail_not_sent": "Not sent",
+        "delivery_order_create": "Create invoice for order",
+        "project_code_auto_hint": "The project code is assigned automatically (e.g. PR-2026-10001) and is also the project name.",
+        "delivery_date_required": "A delivery order requires a delivery date."
     },
     "auto": {
         "0_ise_hareket_yok": "No movement if 0",

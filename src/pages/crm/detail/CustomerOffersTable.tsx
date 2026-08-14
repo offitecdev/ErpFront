@@ -14,9 +14,9 @@ import {
 import { getShared } from '../../../lib/axios';
 import { Button } from '../../../components/ui-shared/Button';
 import { StatusChip } from '../../../components/ui-shared/StatusBadge';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../../hooks/useColumnWidths';
 import { formatMoney, toCurrencyCode } from '../../../utils/currency';
-import { localizeTenderNumber } from '../../../utils/tenderNumber';
 import { tenderStatusLabel, tenderStatusVariant } from '../../tender/detail/utils/tenderStatus.utils';
 
 import { t as i18nT } from '@/i18n/translate';
@@ -99,6 +99,11 @@ export const CustomerOffersTable = ({
     const [creatorFilter, setCreatorFilter] = useState('');
     const [debouncedColumns, setDebouncedColumns] = useState({ tenderNumber: '', creatorName: '' });
     const [orderState, setOrderState] = useState<'' | 'draft' | 'order'>('');
+    const grid = useColumnWidths({
+        storageKey: 'offitec:customer-offers:col-widths:v1',
+        defaults: { status: 128, creator: 176, amount: 144, createdAt: 160, mail: 80, actions: 112 },
+        minPx: 64,
+    });
     const [sortBy, setSortBy] = useState<OfferSortKey>('createdAt');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -232,16 +237,32 @@ export const CustomerOffersTable = ({
                     </Button>
                 }
             >
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <colgroup>
+                        {/* Teklif no: genişliği yok, kalan yeri emer. */}
+                        <col />
+                        <ResizableCols keys={['status', 'creator', 'amount', 'createdAt', 'mail', 'actions'] as const} grid={grid} />
+                    </colgroup>
                     <thead>
                         <tr>
                             <SortableTh label={i18nT('tenders.tender_no')} sortKey="tenderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
-                            <SortableTh label={i18nT('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-32 text-left" />
-                            <th className="w-44 text-left">{i18nT('tenders.olusturan')}</th>
-                            <th className="w-36 text-right">{i18nT('common.amount')}</th>
-                            <SortableTh label={i18nT('tenders.olusturma')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-40 text-left" />
-                            <th className="w-20 text-center">{i18nT('tenders.mail')}</th>
-                            <th className="w-28 text-right" />
+                            <SortableTh label={i18nT('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('status')} />
+                            <th className="relative text-left">
+                                {i18nT('tenders.olusturan')}
+                                <ColResizeHandle {...grid.resizeProps('creator')} />
+                            </th>
+                            <th className="relative text-right">
+                                {i18nT('common.amount')}
+                                <ColResizeHandle {...grid.resizeProps('amount')} />
+                            </th>
+                            <SortableTh label={i18nT('tenders.olusturma')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('createdAt')} />
+                            <th className="relative text-center">
+                                {i18nT('tenders.mail')}
+                                <ColResizeHandle {...grid.resizeProps('mail')} />
+                            </th>
+                            <th className="relative text-right">
+                                <ColResizeHandle {...grid.resizeProps('actions')} />
+                            </th>
                         </tr>
                         {/* Spaltenfilter — Angebotsnummer und Ersteller. */}
                         <tr data-filter-row>
@@ -262,7 +283,12 @@ export const CustomerOffersTable = ({
                                     className={FILTER_INPUT_CLASS}
                                 />
                             </th>
-                            <th colSpan={4} />
+                            {/* Filtresi olmayan sütunlar da kendi (boş) hücrelerini
+                                alır ki sütun çizgileri burada da kesilmesin. */}
+                            <th />
+                            <th />
+                            <th />
+                            <th />
                         </tr>
                     </thead>
                     <tbody>
@@ -286,7 +312,7 @@ export const CustomerOffersTable = ({
                                         </div>
                                         <div className="min-w-0">
                                             <div className="truncate font-semibold text-slate-900 dark:text-white">
-                                                {localizeTenderNumber(row.tenderNumber)}
+                                                {row.tenderNumber}
                                             </div>
                                             <div className="mt-0.5 font-mono text-[11.5px] text-slate-400">v{row.version}</div>
                                         </div>

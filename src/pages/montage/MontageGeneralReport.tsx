@@ -10,7 +10,6 @@ import { useInstallationDetail } from '@/pages/project/features/installations/ho
 import { useInstallationGeneralSignature } from '@/pages/project/features/installations/hooks/useInstallationGeneralSignature';
 import { buildGeneralSnapshot } from '@/pages/project/features/installations/utils/installationSnapshots';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 import { BigButton } from './components/BigButton';
 import { MontageHeader } from './components/MontageHeader';
@@ -67,7 +66,7 @@ export const MontageGeneralReport = () => {
         <div className="space-y-4">
             <MontageHeader
                 title={t('projects.general.button')}
-                subtitle={`${localizeTenderNumbersInText(selected.salesOrder?.orderNumber || '')} · ${selected.project?.customer?.companyName || ''}`}
+                subtitle={`${selected.salesOrder?.orderNumber || ''} · ${selected.project?.customer?.companyName || ''}`}
                 backTo="/montage/reports"
             />
 

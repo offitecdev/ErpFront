@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
+    AlertTriangle,
     ArrowLeft,
     ArrowRight,
     CheckCircle,
@@ -11,6 +13,7 @@ import {
     FileDownload02,
     List,
     Mail01,
+    RefreshCcw01,
     Send01,
     ShoppingCart01,
     Trash01,
@@ -19,6 +22,7 @@ import {
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
 import { purchaseOrdersApi } from '@/lib/api/inventory';
+import { isRequestTimeout } from '@/lib/axios';
 import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
 import type { PurchaseOrderRow } from '@/types/inventory';
 // CC penceresi takvim modülünde yaşar ve TEK KOPYADIR: aynı pencere hem randevu
@@ -30,7 +34,17 @@ import type { OrderPdfLang } from '@/utils/pdf/orderPdf';
 import { BottomSheet } from './BottomSheet';
 import { fmtDateTime, fmtMoneyIn, fmtQty } from '../utils/format';
 import { EXTRA_DISCOUNT_KEYS, fmtPercent, itemDisplayNetPrice, orderGrandTotal } from '../utils/orderPricing';
-import { ORDER_STATUS_META, canConfirmToOrder, canConvertToOrder, canReceiveGoods, isEditableStage, isPriceRequestStage } from '../utils/orderStatus';
+import {
+    ORDER_STATUS_META,
+    canConfirmToOrder,
+    canConvertToOrder,
+    canReceiveGoods,
+    canRevokeApproval,
+    isEditableStage,
+    isMailPending,
+    isPriceRequestStage,
+    revokeApprovalTarget,
+} from '../utils/orderStatus';
 
 type SheetView = 'overview' | 'pdf' | 'mail';
 type SlideDir = 'right' | 'left' | 'rise';
@@ -51,7 +65,7 @@ const INPUT_CLASS = 'h-9 w-full rounded-md border border-slate-200 bg-white px-2
  * Fonksiyon olarak tutulur: `t()` modül yüklenirken değil, pencere çizilirken
  * çağrılsın (dil değişince metin de değişir).
  */
-type ConfirmKind = 'convert' | 'confirm' | 'receive' | 'delete';
+type ConfirmKind = 'convert' | 'confirm' | 'receive' | 'receiveNoMail' | 'revokeOrder' | 'revokeRequest' | 'delete';
 const CONFIRM_TEXTS: Record<ConfirmKind, { title: () => string; message: () => string }> = {
     convert: {
         title: () => t('inv.orders.actions.convertToOrder'),
@@ -64,6 +78,22 @@ const CONFIRM_TEXTS: Record<ConfirmKind, { title: () => string; message: () => s
     receive: {
         title: () => t('inv.orders.views.receive'),
         message: () => t('inv.orders.receive.stageConfirm'),
+    },
+    // Mail HENÜZ GİTMEDİ: mal kabul engellenmez, ayrı bir metinle sorulur
+    // (kullanıcı isteği 2026-08-03).
+    receiveNoMail: {
+        title: () => t('inv.orders.views.receive'),
+        message: () => t('inv.orders.receive.stageConfirmNoMail'),
+    },
+    // ONAYI GERİ AL — hangi onayın geri alındığına göre AYRI metin: onaylanmış
+    // sipariş sipariş taslağına, dönüştürülmüş talep fiyat talebine döner.
+    revokeOrder: {
+        title: () => t('inv.orders.actions.revokeApproval'),
+        message: () => t('inv.orders.revokeOrderConfirm'),
+    },
+    revokeRequest: {
+        title: () => t('inv.orders.actions.revokeApproval'),
+        message: () => t('inv.orders.revokeRequestConfirm'),
     },
     delete: {
         title: () => t('common.delete'),
@@ -88,7 +118,7 @@ const errorText = (err: unknown): string =>
 
 /**
  * Sipariş detay/önizleme popup'ı. Başlık SİPARİŞİN DURUMUDUR ("Preisanfrage",
- * "Warten auf Auftragsbestätigung"…) — kullanıcı isteği 2026-08-01: popup
+ * "Bestellung bestätigt"…) — kullanıcı isteği 2026-08-01: popup
  * başlığı akıştaki yeri söyler, uzun düğme metinleri yerine ok/ikon gezinmesi
  * kullanılır. Görünümler: genel bakış · PDF · mail · mal kabul; ileri/geri
  * oklarla ya da ikonlarla geçilir. Alt bar İKON düğmelerden oluşur (başlıklar
@@ -303,10 +333,32 @@ export const OrderSheet = ({
                 }],
             });
             onOrderChanged(result.order);
-            setNotice({ kind: result.preview ? 'err' : 'ok', text: result.message });
-            if (!result.preview) go('overview');
+            // ── GÖNDERİM BİLDİRİMİ ───────────────────────────────────────────
+            // Metin SUNUCUDAN GELMEZ: sunucunun `result.message` alanı tek dilde
+            // (Türkçe) yazılıdır ve ekrana basıldığında kullanıcının seçtiği
+            // dilin ortasında yabancı bir cümle olarak belirirdi. Bildirim
+            // kullanıcının dilindeki sözlükten kurulur (de/en/tr).
+            //
+            // `preview` = SMTP yapılandırılmamış → mail GERÇEKTEN gitmedi;
+            // "gönderildi" demek yanlış olurdu, uyarı olarak gösterilir.
+            if (result.preview) {
+                const text = t('inv.orders.mail.previewToast');
+                toast.warning(text);
+                setNotice({ kind: 'err', text });
+            } else {
+                const text = t(priceRequest ? 'inv.orders.mail.sentToastPriceRequest' : 'inv.orders.mail.sentToast');
+                toast.success(text);
+                setNotice({ kind: 'ok', text });
+                go('overview');
+            }
         } catch (err) {
-            setNotice({ kind: 'err', text: errorText(err) });
+            // Zaman aşımında axios teknik bir İngilizce metin verir; onun yerine
+            // kullanıcının dilindeki açıklama gösterilir.
+            const text = isRequestTimeout(err)
+                ? t('common.mailTimeout')
+                : errorText(err) || t('inv.orders.mail.failedToast');
+            toast.error(text);
+            setNotice({ kind: 'err', text });
         } finally {
             setBusy(null);
         }
@@ -349,6 +401,28 @@ export const OrderSheet = ({
         }
     };
 
+    /**
+     * ONAYI GERİ AL — son onay adımını BİR ADIM geri alır (kullanıcı isteği
+     * 2026-08-03: "onaylandıktan sonra güncellenebilsin"). Onaylanmış sipariş
+     * yeniden SİPARİŞ TASLAĞI olur (düzenleme açılır), dönüştürülmüş talep ise
+     * FİYAT TALEBİNE döner. Hedefi `revokeApprovalTarget` belirler; kalem, fiyat
+     * ve mail geçmişine DOKUNULMAZ — yalnızca durum geri alınır.
+     */
+    const revokeApproval = async () => {
+        const target = revokeApprovalTarget(order.status);
+        if (!target) return;
+        setBusy('revoke');
+        try {
+            const updated = await purchaseOrdersApi.setStatus(order.id, target);
+            onOrderChanged(updated);
+            setNotice({ kind: 'ok', text: t('inv.orders.revokedToast') });
+        } catch (err) {
+            setNotice({ kind: 'err', text: errorText(err) });
+        } finally {
+            setBusy(null);
+        }
+    };
+
     const deleteOrder = async () => {
         setBusy('delete');
         try {
@@ -376,7 +450,8 @@ export const OrderSheet = ({
         setConfirmKind(null);
         if (kind === 'convert') await convertToOrder();
         else if (kind === 'confirm') await confirmOrder();
-        else if (kind === 'receive') await openReceivePage();
+        else if (kind === 'receive' || kind === 'receiveNoMail') await openReceivePage();
+        else if (kind === 'revokeOrder' || kind === 'revokeRequest') await revokeApproval();
         else if (kind === 'delete') await deleteOrder();
     };
 
@@ -384,12 +459,19 @@ export const OrderSheet = ({
     // kendi sayfasında açılır — buradaki düğme yalnızca oraya götürür.
     const receiveAllowed = canManage && canReceiveGoods(order.status);
     /**
+     * MAİL HENÜZ GİTMEDİ Mİ? Sipariş onaylandı ama tedarikçiye sipariş maili
+     * gönderilmediyse (durum "Sipariş onaylandı"), mal kabul düğmesi AYRI bir
+     * uyarı penceresi açar; genel bakışta da uyarı şeridi görünür (kullanıcı
+     * isteği 2026-08-03).
+     */
+    const mailPending = isMailPending(order);
+    /**
      * Mal kabul düğmesi: durum "Wareneingang"a YALNIZCA BURADA geçer (kullanıcı
      * isteği 2026-08-02) — sipariş verilmiş olması yetmez, mal kabulün fiilen
      * başlatılması gerekir. Sonra kendi sayfası açılır.
      */
     const openReceivePage = async () => {
-        if (order.status === 'PENDING' || order.status === 'UPDATED') {
+        if (order.status === 'PENDING' || order.status === 'ORDERED') {
             setBusy('goreceive');
             try {
                 const updated = await purchaseOrdersApi.setStatus(order.id, 'TO_BE_STOCKED');
@@ -473,8 +555,8 @@ export const OrderSheet = ({
             title={(
                 <span className="flex items-center gap-2">
                     {/* Başlık = SİPARİŞİN DURUMU (kullanıcı isteği): "Preisanfrage",
-                        "Warten auf Auftragsbestätigung"… Sipariş kodu yanında kalır. */}
-                    <span>{t(statusMeta.labelKey)}</span>
+                        "Bestellung bestätigt"… Sipariş kodu yanında kalır. */}
+                    <span className="whitespace-nowrap">{t(statusMeta.labelKey)}</span>
                     <span className={`rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold ${statusMeta.className}`}>
                         {order.referenceNumber}
                     </span>
@@ -558,13 +640,25 @@ export const OrderSheet = ({
                             () => setConfirmKind('confirm'),
                             { primary: true },
                         )}
+                        {/* ONAYI GERİ AL: onaylanmış sipariş → sipariş taslağı,
+                            dönüştürülmüş talep → fiyat talebi. Kilitli kaydın tek
+                            düzenlenebilir hâle gelme yoludur; mal kabul başladıysa
+                            (TO_BE_STOCKED) artık görünmez. */}
+                        {canManage && canRevokeApproval(order.status) && iconAction(
+                            'revoke',
+                            t('inv.orders.actions.revokeApproval'),
+                            <RefreshCcw01 size={14} />,
+                            () => setConfirmKind(order.status === 'ORDER_DRAFT' ? 'revokeRequest' : 'revokeOrder'),
+                        )}
                         {/* Mal kabul: popup DEĞİL, kendi sayfası — yalnızca sipariş
                             verilmişse (fiyat talebi/taslak aşamasında görünmez). */}
                         {receiveAllowed && iconAction(
                             'goreceive',
                             t('inv.orders.views.receive'),
                             <Truck01 size={14} />,
-                            () => setConfirmKind('receive'),
+                            // Mail gitmediyse ONAY METNİ FARKLIDIR: "mail henüz
+                            // gönderilmedi, yine de mal kabule geçilsin mi?"
+                            () => setConfirmKind(mailPending ? 'receiveNoMail' : 'receive'),
                             { primary: true },
                         )}
                         {/* DÜZENLE ve SİL ayrı bir kümede, daha büyük ve belirgin
@@ -616,6 +710,16 @@ export const OrderSheet = ({
             <div key={`${order.id}-${view}-${anim}`} className={`flex min-h-0 flex-1 flex-col ${ANIM_CLASS[anim]}`}>
                 {view === 'overview' && (
                     <div className="flex flex-col gap-4 p-4">
+                        {/* SİPARİŞ ONAYLANDI ama MAİL GİTMEDİ: mal kabulden ÖNCE
+                            mail gönderilmelidir (kullanıcı isteği 2026-08-03).
+                            Uyarı engellemez — mail gidince durum kendiliğinden
+                            "Sipariş verildi" olur ve şerit kaybolur. */}
+                        {mailPending && (
+                            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                <AlertTriangle size={15} className="shrink-0" />
+                                <span>{t('inv.orders.mailPendingWarning')}</span>
+                            </div>
+                        )}
                         <div className="grid gap-2.5 rounded-lg border border-slate-200 p-3.5 dark:border-white/10 sm:grid-cols-2">
                             {infoRow(t('inv.orders.columns.reference'), <span className="font-mono">{order.referenceNumber}</span>)}
                             {infoRow(t('common.date'), fmtDateTime(order.createdAt))}
@@ -635,7 +739,7 @@ export const OrderSheet = ({
                                 </span>
                             ))}
                             {infoRow(t('inv.columns.status'), (
-                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}>
+                                <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}>
                                     {t(statusMeta.labelKey)}
                                 </span>
                             ))}
@@ -679,9 +783,21 @@ export const OrderSheet = ({
 
                         {/* Kalem tablosu SİPARİŞ TABLOSU, PDF ve Excel ile AYNI sütun
                             sırasını taşır. Fiyat talebi aşamasında fiyat sütunları
-                            GİZLENİR (seri no + ad + miktar sorulur, fiyat henüz yok). */}
+                            GİZLENİR (seri no + ad + miktar sorulur, fiyat henüz yok).
+                            TUTAR SÜTUNU KENARDAN DAHA İÇERİDE durur (kullanıcı isteği
+                            2026-08-03: "Toplam (Net) CHF 40'433.28 çok sağa taşıyor")
+                            — `.ofi-last-col-inset` index.css'te tanımlıdır; Tailwind
+                            sınıfı burada işe yaramaz (katman dışı taban kuralı yener). */}
                         <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-white/10">
-                            <table data-inv-table data-unstyled-table className={`w-full ${priceRequest ? 'min-w-[480px]' : 'min-w-[760px]'}`}>
+                            {/* Sütun takımı siparişe göre değişir (ek indirim
+                                sütunları, satır KDV'si): sabit bir genişlik
+                                takımı tutulamaz, bu yüzden yalnızca çizgiler. */}
+                            <table
+                                data-inv-table
+                                data-grid-lines
+                                data-unstyled-table
+                                className={`ofi-last-col-inset w-full ${priceRequest ? 'min-w-[480px]' : 'min-w-[760px]'}`}
+                            >
                                 <thead>
                                     <tr>
                                         <th className="text-left">{t('inv.columns.item')}</th>

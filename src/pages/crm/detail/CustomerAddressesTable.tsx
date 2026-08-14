@@ -3,20 +3,24 @@ import { toast } from 'sonner';
 import { Plus, Save01 as Save, Trash01 as TrashIcon, X as XIcon } from '@/components/icons/antIconCompat';
 
 import { t as i18nT } from '@/i18n/translate';
+import { apiClient } from '../../../lib/axios';
 import { customerApi } from '../../../lib/api/customer';
 import type { CustomerLocationDto } from '../../../lib/api/customer';
 import { Button } from '../../../components/ui-shared/Button';
-import { CELL_INPUT_CLASS, SectionCard } from '../../../components/ui-shared/TableKit';
-import { ADDRESS_KIND_OPTIONS, DEFAULT_ADDRESS_KIND, normalizeAddressKind } from './customerDetail.constants';
+import { ColResizeHandle, ResizableCols, CELL_INPUT_CLASS, SectionCard } from '../../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../../hooks/useColumnWidths';
+import { ADDRESS_KIND_OPTIONS, CUSTOMER_ADD_ROW_BUTTON_CLASS, DEFAULT_ADDRESS_KIND, normalizeAddressKind } from './customerDetail.constants';
 import type { AddressKind } from './customerDetail.constants';
 
 /**
  * ALLE Adressen des Kunden in EINER Tabelle, mit GESAMMELTEM Speichern.
  *
- * Erste Zeile ist die Hauptadresse: grau und schreibgeschützt, weil sie kein
- * Standort-Datensatz ist, sondern als flache Spalten am Kunden hängt (gepflegt
- * wird sie in den Stammdaten der Übersicht). Danach folgen Projekt-, Rechnungs-
- * und Lieferadressen als gewöhnliche Zeilen.
+ * Erste Zeile ist die Hauptadresse. Sie ist abgesetzt eingefärbt, weil sie KEIN
+ * Standort-Datensatz ist, sondern als flache Spalten am Kunden hängt — seit
+ * 2026-08-03 aber genauso bearbeitbar wie die Zeilen darunter (Nutzerwunsch).
+ * Gespeichert wird sie über denselben Weg wie im Kundenprofil (PATCH auf den
+ * Kunden), darum steht eine Änderung hier anschliessend auch dort. Danach
+ * folgen Projekt-, Rechnungs- und Lieferadressen als gewöhnliche Zeilen.
  *
  * Geändert wird direkt in den Zellen; alles bleibt lokal, bis unten einmal
  * gespeichert wird — kein Speichern je Zeile.
@@ -58,6 +62,23 @@ const apiErrorMessage = (error: unknown, fallback: string): string => {
     return typeof message === 'string' && message ? message : fallback;
 };
 
+/** Die vier Felder der Hauptadresse, die in dieser Tabelle bearbeitet werden. */
+interface MainDraft {
+    addressName: string;
+    address: string;
+    postalCode: string;
+    city: string;
+}
+
+const toMainDraft = (value: MainAddressValue): MainDraft => ({
+    addressName: value.addressName ?? '',
+    address: value.address ?? '',
+    postalCode: value.postalCode ?? '',
+    city: value.city ?? '',
+});
+
+const MAIN_FIELDS = ['addressName', 'address', 'postalCode', 'city'] as const;
+
 /** Die Hauptadresse des Kunden (flache Spalten, kein Standort-Datensatz). */
 export interface MainAddressValue {
     addressName?: string | null;
@@ -84,6 +105,11 @@ export const CustomerAddressesTable = ({
     items: CustomerLocationDto[];
     onChanged: () => void | Promise<void>;
 }) => {
+    const grid = useColumnWidths({
+        storageKey: 'offitec:customer-addresses:col-widths:v1',
+        defaults: { kind: 176, name: 208, postalCode: 112, city: 176, actions: 64 },
+        minPx: 56,
+    });
     const saved = useMemo(
         () => [...items].map(toDraft).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name)),
         [items],
@@ -94,7 +120,16 @@ export const CustomerAddressesTable = ({
     const [saving, setSaving] = useState(false);
     const [newRowSeq, setNewRowSeq] = useState(0);
 
-    const dirty = useMemo(() => {
+    const savedMain = useMemo(() => toMainDraft(mainAddress), [mainAddress]);
+    const [main, setMain] = useState<MainDraft>(savedMain);
+    const [syncedMain, setSyncedMain] = useState(mainAddress);
+
+    const mainDirty = useMemo(
+        () => MAIN_FIELDS.some((field) => savedMain[field] !== main[field]),
+        [savedMain, main],
+    );
+
+    const rowsDirty = useMemo(() => {
         if (removedIds.length > 0) return true;
         if (rows.length !== saved.length) return true;
         const savedByKey = new Map(saved.map((row) => [row.key, row]));
@@ -104,10 +139,16 @@ export const CustomerAddressesTable = ({
         });
     }, [rows, saved, removedIds]);
 
+    const dirty = rowsDirty || mainDirty;
+
     // Frische Serverdaten dürfen offene Eingaben nicht überschreiben.
     if (items !== syncedItems) {
         setSyncedItems(items);
-        if (!dirty) setRows(saved);
+        if (!rowsDirty) setRows(saved);
+    }
+    if (mainAddress !== syncedMain) {
+        setSyncedMain(mainAddress);
+        if (!mainDirty) setMain(toMainDraft(mainAddress));
     }
 
     const patch = (key: string, next: Partial<AddressDraft>) =>
@@ -129,6 +170,7 @@ export const CustomerAddressesTable = ({
 
     const discard = () => {
         setRows(saved);
+        setMain(savedMain);
         setRemovedIds([]);
     };
 
@@ -142,6 +184,15 @@ export const CustomerAddressesTable = ({
             setSaving(true);
             // Ein Klick, ein Vorgang: Löschungen, Änderungen und neue Zeilen gemeinsam.
             await Promise.all([
+                // Die Hauptadresse liegt als flache Spalten am Kunden — derselbe
+                // PATCH, den auch das Kundenprofil schickt. Deshalb steht eine
+                // Änderung von hier gleich darauf ebenso im Profil.
+                ...(mainDirty ? [apiClient.patch(`/customers/${customerId}`, {
+                    addressName: main.addressName,
+                    address: main.address,
+                    postalCode: main.postalCode,
+                    city: main.city,
+                })] : []),
                 ...removedIds.map((id) => customerApi.deleteLocation(customerId, id)),
                 ...rows.map((row) => {
                     const body = {
@@ -167,6 +218,16 @@ export const CustomerAddressesTable = ({
         }
     };
 
+    /** Zelle der Hauptadresse — schreibt in den eigenen Entwurf, nicht in `rows`. */
+    const mainCell = (field: keyof MainDraft, placeholder: string) => (
+        <input
+            value={main[field]}
+            onChange={(event) => setMain((current) => ({ ...current, [field]: event.target.value }))}
+            placeholder={placeholder}
+            className={CELL_INPUT_CLASS}
+        />
+    );
+
     const cell = (row: AddressDraft, field: keyof AddressDraft, placeholder: string) => (
         <input
             value={row[field] as string}
@@ -178,28 +239,50 @@ export const CustomerAddressesTable = ({
 
     return (
         <SectionCard title={`${i18nT('crm.tab_locations')} (${rows.length + 1})`}>
-            <table data-inv-table data-unstyled-table className="w-full">
+            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                <colgroup>
+                    <ResizableCols keys={['kind', 'name'] as const} grid={grid} />
+                    {/* Sokak sütunu: genişliği yok, kalan yeri emer. */}
+                    <col />
+                    <ResizableCols keys={['postalCode', 'city', 'actions'] as const} grid={grid} />
+                </colgroup>
                 <thead>
                     <tr>
-                        <th className="w-44 text-left">{i18nT('crm.addressKind')}</th>
-                        <th className="w-52 text-left">{i18nT('crm.locationName')}</th>
+                        <th className="relative text-left">
+                            {i18nT('crm.addressKind')}
+                            <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                        </th>
+                        <th className="relative text-left">
+                            {i18nT('crm.locationName')}
+                            <ColResizeHandle {...grid.resizeProps('name', 'right')} />
+                        </th>
                         <th className="text-left">{i18nT('address.street')}</th>
-                        <th className="w-28 text-left">{i18nT('address.postalCode')}</th>
-                        <th className="w-44 text-left">{i18nT('address.city')}</th>
-                        <th className="w-16 text-right" />
+                        <th className="relative text-left">
+                            {i18nT('address.postalCode')}
+                            <ColResizeHandle {...grid.resizeProps('postalCode')} />
+                        </th>
+                        <th className="relative text-left">
+                            {i18nT('address.city')}
+                            <ColResizeHandle {...grid.resizeProps('city')} />
+                        </th>
+                        <th className="relative text-right">
+                            <ColResizeHandle {...grid.resizeProps('actions')} />
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
-                    {/* Hauptadresse: grau und schreibgeschützt — sie wird in den Stammdaten gepflegt. */}
-                    <tr className="bg-slate-100/70 text-slate-500 dark:bg-white/[0.04] dark:text-white/55">
-                        <td className="font-semibold">{i18nT('crm.locationPrimary')}</td>
-                        <td>{mainAddress.addressName || '—'}</td>
+                    {/* Hauptadresse: abgesetzt eingefärbt, weil sie am Kunden hängt und
+                        nicht gelöscht werden kann — bearbeitet wird sie wie jede andere
+                        Zeile. Die Art ist fest, darum steht dort Text statt Auswahl. */}
+                    <tr className="bg-slate-100/70 dark:bg-white/[0.04]">
+                        <td className="font-semibold text-slate-500 dark:text-white/55">{i18nT('crm.locationPrimary')}</td>
+                        <td>{mainCell('addressName', i18nT('crm.locationName'))}</td>
                         {/* Adresse / PLZ / Stadt in den eigenen Spalten — wie die Zeilen
                             darunter und wie im Kundenprofil: genau diese drei Einträge. */}
-                        <td>{mainAddress.address || '—'}</td>
-                        <td>{mainAddress.postalCode || '—'}</td>
-                        <td>{mainAddress.city || '—'}</td>
-                        <td className="text-right text-[11.5px] uppercase tracking-wide">{i18nT('common.readOnly')}</td>
+                        <td>{mainCell('address', i18nT('address.street'))}</td>
+                        <td>{mainCell('postalCode', i18nT('address.postalCode'))}</td>
+                        <td>{mainCell('city', i18nT('address.city'))}</td>
+                        <td />
                     </tr>
 
                     {rows.map((row) => (
@@ -234,19 +317,24 @@ export const CustomerAddressesTable = ({
 
                     {/* Leerzeile: das "+" hängt eine weitere Adresse an. */}
                     <tr className="bg-slate-50/60 dark:bg-white/[0.02]">
-                        <td colSpan={5} className="text-[12.5px] text-slate-400 dark:text-white/40">
-                            {i18nT('crm.addAddressHint')}
-                        </td>
-                        <td className="text-right">
-                            <button
-                                type="button"
-                                onClick={addRow}
-                                title={i18nT('crm.addAddress')}
-                                aria-label={i18nT('crm.addAddress')}
-                                className="inline-flex size-6 items-center justify-center rounded-[2px] border border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                            >
-                                <Plus size={13} />
-                            </button>
+                        {/* Knopf UND Beschriftung in DERSELBEN Zelle, rechts am
+                            Zeilenende: in getrennten Zellen risse die Spaltenbreite
+                            die beiden auseinander. */}
+                        <td colSpan={6}>
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={addRow}
+                                    title={i18nT('crm.addAddress')}
+                                    aria-label={i18nT('crm.addAddress')}
+                                    className={CUSTOMER_ADD_ROW_BUTTON_CLASS}
+                                >
+                                    <Plus size={18} />
+                                </button>
+                                <span className="text-[12.5px] text-slate-400 dark:text-white/40">
+                                    {i18nT('crm.addAddressHint')}
+                                </span>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

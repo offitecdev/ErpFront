@@ -38,6 +38,8 @@ export interface PdfCompanySettings {
 // faturası yapılandırılmış adres ("S") tipinde bu ayrımı bekler.
 /** Der bis v2 vorbelegte Dankestext — nur noch für die Migration relevant. */
 const LEGACY_FOOTER_NOTE = 'Wir bedanken uns für Ihre Anfrage und freuen uns auf eine Zusammenarbeit.';
+/** Der bis v3 vorbelegte Platzhalter-IBAN — ungültig, QR-Rechnungen scheiterten daran. */
+const LEGACY_PLACEHOLDER_IBAN = 'CH00 0000 0000 0000 0000 0';
 
 const DEFAULT_SETTINGS: PdfCompanySettings = {
     companyName: 'OffiTec Heating & Cooling',
@@ -46,8 +48,10 @@ const DEFAULT_SETTINGS: PdfCompanySettings = {
     postalCode: '4133',
     city: 'Pratteln',
     country: 'CH',
-    iban: 'CH00 0000 0000 0000 0000 0',
-    bic: '',
+    // Gerçek firma IBAN'ı: eski 'CH00 …' yer tutucusu GEÇERSİZDİ ve QR fatura
+    // bankacılık uygulamalarında taranmıyordu (PDF alt bilgisiyle aynı hesap).
+    iban: 'CH50 8080 8005 5315 3585 1',
+    bic: 'RAIFCH22XXX',
     bankName: '',
     phone: '+41 55 000 00 00',
     email: 'info@offitec.ch',
@@ -86,9 +90,11 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
             // değişikliği bir sürüm artışı + KORUMALI bir taşıma gerektirir.
             //   v2: ESKİ varsayılan adresi (Schübelbach) yeni adrese taşır.
             //   v3: ESKİ varsayılan teşekkür notunu siler.
-            // Her iki adım da yalnızca değer HÂLÂ eski varsayılana eşitse çalışır;
+            //   v4: geçersiz 'CH00 …' yer tutucu IBAN'ı gerçek hesapla değiştirir
+            //       (QR fatura ancak geçerli bir IBAN ile taranabilir).
+            // Adımlar yalnızca değer HÂLÂ eski varsayılana eşitse çalışır;
             // kendi metnini/adresini girmiş olan tenant'a dokunulmaz.
-            version: 3,
+            version: 4,
             migrate: (persisted: any, version: number) => {
                 if (!persisted?.settings) return persisted;
                 let s = persisted.settings as PdfCompanySettings;
@@ -111,6 +117,10 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
 
                 if (version < 3 && s.footerNote === LEGACY_FOOTER_NOTE) {
                     s = { ...s, footerNote: '' };
+                }
+
+                if (version < 4 && (s.iban || '').replace(/\s+/g, '') === LEGACY_PLACEHOLDER_IBAN.replace(/\s+/g, '')) {
+                    s = { ...s, iban: DEFAULT_SETTINGS.iban, bic: s.bic || DEFAULT_SETTINGS.bic };
                 }
 
                 return s === persisted.settings ? persisted : { ...persisted, settings: s };

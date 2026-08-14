@@ -1,6 +1,6 @@
 import { Fragment, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AnchoredPicker } from './AnchoredPicker';
+import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { CELL_INPUT_CLASS } from './primitives';
 
 /** Listede gösterilen tek seçenek. */

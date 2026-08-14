@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-    ChevronRight,
-    Eye,
     Hash01 as Hash,
     Mail01 as Mail,
     MarkerPin01 as MapPin,
@@ -15,7 +13,8 @@ import {
 import { getShared } from '../../lib/axios';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../hooks/useColumnWidths';
 import { CUSTOMER_STATUS_OPTIONS, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
 import { CustomerCreateModal } from './CustomerCreateModal';
 
@@ -41,6 +40,17 @@ type CustomerListResponse = CustomerRow[] | { items?: CustomerRow[]; total?: num
 type CustomerSortKey = 'companyName' | 'vatNumber' | 'status';
 type SortDirection = 'asc' | 'desc';
 
+// Sürüklenebilir sütun genişlikleri (teklif satırları tablosundaki mekanik).
+// Firma sütunu listede YOKTUR: genişliği olmayan tek sütun odur, artan yeri o
+// emer — böylece bir sütun genişletilince sağda boşluk kalmaz.
+const CUSTOMER_LIST_COLUMN_WIDTHS = {
+    vat: 176,
+    contact: 256,
+    status: 144,
+};
+type CustomerListColumn = keyof typeof CUSTOMER_LIST_COLUMN_WIDTHS;
+const CUSTOMER_LIST_COLUMNS = Object.keys(CUSTOMER_LIST_COLUMN_WIDTHS) as CustomerListColumn[];
+
 export const CustomerList = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -49,6 +59,14 @@ export const CustomerList = () => {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
+
+    // Sütun genişlikleri: başlıkların sol kenarından sürüklenir, çift tıklama
+    // varsayılana döndürür, seçim tarayıcıda saklanır.
+    const { widths, setColRef, startResize, resetColumn } = useColumnWidths<CustomerListColumn>({
+        storageKey: 'offitec:customer-list:col-widths:v1',
+        defaults: CUSTOMER_LIST_COLUMN_WIDTHS,
+        minPx: 72,
+    });
 
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -176,7 +194,7 @@ export const CustomerList = () => {
                         onClick={() => setShowForm(!showForm)}
                         className={showForm
                             ? 'flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10'
-                            : 'flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]'}
+                            : 'ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]'}
                     >
                         {showForm ? <XIcon size={14} /> : <Plus size={14} />}
                         {showForm ?t('common.close') :t('crm.customers.newCustomer')}
@@ -254,7 +272,14 @@ export const CustomerList = () => {
             </div>
 
             <SectionCard title={`${t('nav.customerList')} (${total})`}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    {/* Firma sütununun genişliği yoktur: kalan yeri o emer. */}
+                    <colgroup>
+                        <col />
+                        {CUSTOMER_LIST_COLUMNS.map((key) => (
+                            <col key={key} ref={setColRef(key)} style={{ width: widths[key] }} />
+                        ))}
+                    </colgroup>
                     <thead>
                         <tr>
                             {/* Kolon başlıkları KISA `col*` anahtarlarından gelir. Başlık
@@ -264,10 +289,14 @@ export const CustomerList = () => {
                                 "Kontakt" başlığının üstüne binerdi. Kolon da bir tık geniş —
                                 başlıklar arasında gözle görülür boşluk kalsın. */}
                             <SortableTh label={t('common.company')} sortKey="companyName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
-                            <SortableTh label={t('crm.customers.colTax')} sortKey="vatNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-44 text-left" />
-                            <th className="w-64 text-left">{t('crm.customers.colContact')}</th>
-                            <SortableTh label={t('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-36 text-left" />
-                            <th className="w-28 text-right" />
+                            <SortableTh label={t('crm.customers.colTax')} sortKey="vatNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('vat', event)} onResizeReset={() => resetColumn('vat')} />
+                            <th className="relative text-left">
+                                {t('crm.customers.colContact')}
+                                <ColResizeHandle onResizeStart={(event) => startResize('contact', event)} onResizeReset={() => resetColumn('contact')} />
+                            </th>
+                            {/* Detay sütunu YOK: satıra tıklamak zaten müşteri
+                                detayını açıyor. */}
+                            <SortableTh label={t('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('status', event)} onResizeReset={() => resetColumn('status')} />
                         </tr>
                         {/* Kolon bazlı filtre satırı — şirket / VAT / e-posta metinle daraltır. */}
                         <tr data-filter-row>
@@ -295,13 +324,16 @@ export const CustomerList = () => {
                                     className={FILTER_INPUT_CLASS}
                                 />
                             </th>
-                            <th colSpan={2} />
+                            {/* Filtresi olmayan sütun da KENDİ hücresini alır (tek
+                                bir `colSpan` değil): boş kalabilir ama sütun
+                                çizgisi filtre satırında da kesilmeden sürsün. */}
+                            <th />
                         </tr>
                     </thead>
                     <tbody>
                         {(loading || customers.length === 0) && (
                             <TableStateRow
-                                colSpan={5}
+                                colSpan={4}
                                 loading={loading}
                                 emptyText={hasFilters ?t('crm.customers.noCustomersSearch') :t('crm.customers.noCustomersEmpty')}
                             />
@@ -351,14 +383,6 @@ export const CustomerList = () => {
                                     <StatusChip variant={getCustomerStatusOption(c.status).variant}>
                                         {getCustomerStatusLabel(c.status)}
                                     </StatusChip>
-                                </td>
-                                <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                        onClick={() => navigate(`/crm/customers/${c.id}`)}
-                                        className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100 dark:text-sky-300 dark:hover:bg-sky-500/15"
-                                    >
-                                        <Eye size={12} />{t('common.detail')}<ChevronRight size={11} />
-                                    </button>
                                 </td>
                             </tr>
                         ))}

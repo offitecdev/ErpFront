@@ -1,4 +1,5 @@
 import { apiClient, getShared } from '../axios';
+import type { PaymentStage } from '../paymentSchedule';
 import type {
     BillingSummaryDto,
     CreateInvoiceInput,
@@ -13,7 +14,7 @@ export const billingApi = {
         const params = new URLSearchParams();
         if (target.salesOrderId) params.set('salesOrderId', target.salesOrderId);
         if (target.projectId) params.set('projectId', target.projectId);
-        const res = await apiClient.get(`/billing/summary?${params.toString()}`);
+        const res = await getShared<BillingSummaryDto>(`/billing/summary?${params.toString()}`);
         return res.data;
     },
 
@@ -36,6 +37,12 @@ export const billingApi = {
         const res = await apiClient.patch(`/billing/invoices/${id}/status`, { status });
         return res.data;
     },
+
+    /** Kalıcı silme — sunucu yalnızca iptal edilmiş faturalar için izin verir. */
+    deleteInvoice: async (id: string): Promise<{ message: string }> => {
+        const res = await apiClient.delete(`/billing/invoices/${id}`);
+        return res.data;
+    },
 };
 
 export const myOrdersApi = {
@@ -55,7 +62,7 @@ export const myOrdersApi = {
         return res.data;
     },
 
-    updatePaymentStages: async (id: string, stages: number[] | null): Promise<{ message: string; paymentStages: string | null }> => {
+    updatePaymentStages: async (id: string, stages: PaymentStage[] | null): Promise<{ message: string; paymentStages: string | null }> => {
         const res = await apiClient.patch(`/sales-orders/${id}/payment-stages`, { paymentStages: stages });
         return res.data;
     },

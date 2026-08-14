@@ -16,6 +16,12 @@ const tinyMetaSpinner = (
     />
 );
 
+// Surface, border and text colour come from `.ofi-addr-box` (index.css +
+// dark.css), NOT from bg-slate-50 / text-slate-600 utilities: dark.css maps
+// those to the card's own surface with !important, which turned this block into
+// an unreadable dark slab in dark mode.
+const readBackClass = 'ofi-addr-box rounded-[2px] px-2.5 py-1.5 text-[12px] leading-[1.45]';
+
 type TenderAddressPickerProps = {
     storedValue: string;
     locations: CustomerLocationDto[];
@@ -75,7 +81,11 @@ export const TenderAddressPicker = ({
                             // Select the item instantly, before the save round-trips.
                             onSelectPending(id || null);
                             const loc = locations.find((item) => item.id === id);
-                            onPick(loc ? formatLocationAddress(loc) : null);
+                            // A legacy record saved with only a label and no postal
+                            // components formats to '' — clear the slot instead of
+                            // storing a blank, so it reads as "no address" and the
+                            // order check still trips.
+                            onPick((loc && formatLocationAddress(loc)) || null);
                         }}
                     />
                 </div>
@@ -94,7 +104,7 @@ export const TenderAddressPicker = ({
             {/* Quiet read-back of the picked address, so the selection stays
                 visible without competing with the control above it. */}
             {displayValue ? (
-                <div className="rounded-[2px] border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[12px] leading-[1.45] text-slate-600">
+                <div className={readBackClass}>
                     {renderLines(displayValue)}
                 </div>
             ) : null}
@@ -102,28 +112,90 @@ export const TenderAddressPicker = ({
     );
 };
 
-type TenderBillingAddressRowProps = {
-    sameAsInstallation: boolean;
-    onSameAsInstallationChange: (checked: boolean) => void;
-    billingPicker: ReactNode;
-    // Tracks the active address type so the checkbox reads "Wie Projektadresse"
-    // or "Wie Lieferadresse" — matching the toggle above, not a fixed label.
-    label: string;
+type TenderMainAddressRowProps = {
+    value: string;
+    hasCustomer: boolean;
+    onAdd: () => void;
+    renderLines: (value: string) => ReactNode;
 };
 
-// "Billing same as installation": when on, billing mirrors the project/delivery
-// address and its own picker is hidden (no duplicate entry).
-export const TenderBillingAddressRow = ({ sameAsInstallation, onSameAsInstallationChange, billingPicker, label }: TenderBillingAddressRowProps) => (
-    <div className="space-y-1.5">
-        <label className="flex h-8 cursor-pointer items-center gap-2 text-[12px] font-medium text-slate-600">
-            <PlainCheckbox
-                size="sm"
-                isSelected={sameAsInstallation}
-                onChange={onSameAsInstallationChange}
-                aria-label={label}
-            />
-            {label}
-        </label>
-        {!sameAsInstallation && billingPicker}
+// The Hauptadresse: the customer's own address, and the source every other
+// address slot defaults to. It is not picked here — it belongs to the customer
+// record — so the row only reads it back. The "+" appears only while the
+// customer has no address at all, since without one no slot can be filled.
+export const TenderMainAddressRow = ({ value, hasCustomer, onAdd, renderLines }: TenderMainAddressRowProps) => (
+    <div className="flex items-start gap-1.5">
+        <div className={`min-w-0 flex-1 ${readBackClass}`}>
+            {value
+                ? renderLines(value)
+                : <span className="text-slate-400">{t('tenders.address_info_not_found')}</span>}
+        </div>
+        {!value && (
+            <button
+                type="button"
+                onClick={onAdd}
+                disabled={!hasCustomer}
+                title={t('crm.addAddressTitle')}
+                aria-label={t('crm.addAddressTitle')}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654] disabled:opacity-40"
+            >
+                <Plus size={13} />
+            </button>
+        )}
     </div>
 );
+
+export type TenderAddressSlotOption<TSlot extends string> = {
+    slot: TSlot;
+    /** Short caption of the slot, e.g. "Projekt" / "Lieferung" / "Rechnung". */
+    label: string;
+    active: boolean;
+};
+
+type TenderCustomAddressRowProps<TSlot extends string> = {
+    options: Array<TenderAddressSlotOption<TSlot>>;
+    onToggle: (slot: TSlot, checked: boolean) => void;
+    renderPicker: (slot: TSlot) => ReactNode;
+};
+
+// All three deviating addresses in ONE row: the normal quote uses the customer's
+// Hauptadresse everywhere, so what the screen has to show is not three address
+// fields but a single question — which of them is different? Three tick boxes on
+// one line answer it, and only the ticked ones unfold a picker underneath.
+export const TenderCustomAddressRow = <TSlot extends string>({
+    options,
+    onToggle,
+    renderPicker,
+}: TenderCustomAddressRowProps<TSlot>) => {
+    const active = options.filter((option) => option.active);
+    return (
+        <div className={active.length ? 'space-y-2' : undefined}>
+            <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 py-1">
+                {options.map((option) => (
+                    <label
+                        key={option.slot}
+                        className="flex cursor-pointer items-center gap-1.5 text-[12px] text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                        <PlainCheckbox
+                            size="sm"
+                            isSelected={option.active}
+                            onChange={(checked) => onToggle(option.slot, checked)}
+                            aria-label={option.label}
+                        />
+                        {option.label}
+                    </label>
+                ))}
+            </div>
+            {/* Only the deviating slots get a picker, each under its own caption
+                so the addresses below can never be mixed up. */}
+            {active.map((option) => (
+                <div key={option.slot} className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-400">
+                        {option.label}
+                    </span>
+                    {renderPicker(option.slot)}
+                </div>
+            ))}
+        </div>
+    );
+};

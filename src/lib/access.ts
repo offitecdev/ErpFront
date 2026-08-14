@@ -60,7 +60,6 @@ export const PROFILE_ALLOWED_KEYS: Record<Exclude<RoleProfile, 'full'>, string[]
         '/crm/customers',
         '/crm/tenders',
         '/inventory/articles',
-        '/inventory/materials',
         '/inventory/suppliers',
         '/inventory/stock',
         '/inventory/stock/movements',

@@ -14,6 +14,11 @@ export interface TenderListItem {
     customerPhone?: string | null;
     customerTaxNumber?: string | null;
     projectId?: string | null;
+    /**
+     * Teklifin siparişi (1:1) — yalnızca detay ucunda doldurulur. Varsa teklif
+     * ekranındaki ana düğme "Zum Auftrag" olur ve siparişi doğrudan açar.
+     */
+    salesOrder?: { id: string; orderNumber: string; projectId?: string | null } | null;
     tenderNumber: string;
     version: number;
     format: TenderFormat;
@@ -60,6 +65,12 @@ export interface TenderListItem {
     /** Heavy PDF-only fields were omitted from the initial read-only order load. */
     pdfContentDeferred?: boolean;
     sourceStatus?: string | null;
+    /**
+     * CC-Empfänger der Offerte (wie im Kalender). Jede Kundenmail dieser
+     * Offerte — Offertmail und automatische Auftragsbestätigung — geht an den
+     * Kunden und in Kopie an diese Adressen.
+     */
+    ccEmails?: string[] | null;
     offerMailSentAt?: string | null;
     offerAcceptedAt?: string | null;
     offerMailRecipient?: string | null;
@@ -142,6 +153,11 @@ export interface TenderChatterSummary {
     logCount: number;
 }
 
+export interface TenderChatterDto {
+    logs: TenderChangeLog[];
+    documents: TenderDocumentDto[];
+}
+
 // Tenant-wide reusable offer-mail draft (subject + message template),
 // shared by the mail composer of every tender.
 export interface TenderMailDraftDto {
@@ -198,30 +214,26 @@ export interface PositionArticleMappingDto {
     } | null;
 }
 
-export interface PositionMaterialMappingDto {
-    id: string;
-    positionId: string;
-    materialId: string;
-    quantityMultiplier: number;
-    discount?: number | null;
-    material?: {
-        id: string;
-        serialId: string;
-        name: string;
-        stockQuantity: number;
-        unitCost: number;
-        isActive: boolean;
-    } | null;
-}
-
+/**
+ * Teklife dahil "malzeme" satırı. Malzeme/ürün birleşmesinden (2026-08-14)
+ * beri satırlar Article'a bağlıdır (`articleId`/`article`); eski `materialId`/
+ * `material` alanları yalnızca eski yanıtlar için opsiyonel kaldı.
+ */
 export interface TenderMaterialUsageDto {
     id: string;
     tenderId: string;
-    materialId: string;
+    articleId?: string;
+    materialId?: string;
     quantity: number;
     unitCost: number;
     description?: string | null;
     createdAt?: string;
+    article?: {
+        id: string;
+        articleCode: string;
+        name: string;
+        salePrice?: number;
+    } | null;
     material?: {
         id: string;
         serialId: string;
@@ -263,7 +275,6 @@ export interface PositionDto {
     imageUrl?: string | null;
     calculation?: CalculationItemDto | null;
     articleMappings?: PositionArticleMappingDto[];
-    materialMappings?: PositionMaterialMappingDto[];
 }
 
 export interface TenderDetailDto {

@@ -15,9 +15,3 @@ export type MontageOrderRow = {
     status: MontageStatusKey;
     highlight: MontageHighlight;
 };
-
-/** Sections of the order work screen (the three big buttons). */
-export type MontageSection = 'work' | 'expenses' | 'materials';
-
-/** Materials sub-toggle: quoted/used vs additionally requested. */
-export type MontageMaterialMode = 'used' | 'extra';

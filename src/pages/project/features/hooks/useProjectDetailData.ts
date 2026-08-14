@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 
 import { mailApi, projectApi, type ProjectDetailScope } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
+import { lazyToast as toast } from '@/lib/lazyToast';
 import type { MailSettingDto, ProjectDto, ProjectMaterial } from '@/types/project';
 
 import type { ProjectDetailView } from '../types/projectDetailNavigation';
@@ -10,15 +10,15 @@ import type { ProjectDetailView } from '../types/projectDetailNavigation';
 const scopeForView = (view: ProjectDetailView): ProjectDetailScope => {
     switch (view.section) {
         case 'planning':
-            return view.subSection === 'appointmentMail' ? 'overview' : 'planning';
+            return 'planning';
         case 'field':
             // The consolidated Reports hub always runs on the lean fieldReports
             // read model; PDF preview/download fetch the full 'generalReport'
             // graph on demand instead of paying for images/signatures up front.
             return 'fieldReports';
+        // One costs tab, one read model: the merged table needs the expenses, the
+        // extra materials and the reports (extra work) in the same payload.
         case 'costs':
-            if (view.subSection === 'materials') return 'materials';
-            if (view.subSection === 'overtime') return 'overtime';
             return 'expenses';
         case 'addons':
             return 'addons';
@@ -33,13 +33,15 @@ const scopeForView = (view: ProjectDetailView): ProjectDetailScope => {
 };
 
 const needsMaterialPicker = (view: ProjectDetailView) =>
-    (view.section === 'planning' && view.subSection !== 'appointmentMail')
+    view.section === 'planning'
     // The whole Reports hub can open the field-report editor (and its product
     // picker popup), regardless of which legacy sub-section the URL carries.
     || view.section === 'field';
 
-const needsMailSettings = (view: ProjectDetailView) =>
-    view.section === 'planning' && view.subSection === 'appointmentMail';
+// The appointment calendar hosts the mail composer itself (header button and the
+// day pop-up), so the whole planning section needs the sender settings — not just
+// the mail leaf that used to hang under it.
+const needsMailSettings = (view: ProjectDetailView) => view.section === 'planning';
 
 // Loads the compact overview first, then swaps to a section-specific read model
 // only when that section is opened. Project responses are cached per section for
@@ -124,12 +126,15 @@ export const useProjectDetailData = (id: string | undefined, view: ProjectDetail
         await Promise.resolve();
         if (currentKeyRef.current !== key || requestSequenceRef.current !== requestSequence) return;
 
+        // A silent reload must NOT raise the section skeleton. `ProjectDetail`
+        // swaps the whole section out for the skeleton while `sectionLoading` is
+        // set, which unmounts whatever is open inside it — deleting a row from a
+        // popup refreshed the project and tore the popup down with it. Silent is
+        // exactly the "refresh underneath what the user is looking at" case.
         if (!silent) {
             if (isInitialLoad) setLoading(true);
             else setSectionLoading(true);
             setLoadError(null);
-        } else {
-            setSectionLoading(true);
         }
 
         try {

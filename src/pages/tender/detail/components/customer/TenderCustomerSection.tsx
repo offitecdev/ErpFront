@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, XClose } from '@/components/icons/antIconCompat';
+import { Plus, User01, XClose } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 import { QUOTE_CONTROL_CLASS } from '../../utils/quoteField.constants';
@@ -17,6 +17,8 @@ type TenderCustomerSectionProps = {
     onSelectCustomer: (customer: CustomerOption) => void;
     onClearCustomer: () => void;
     onAddCustomer: () => void;
+    /** Öffnet die Kunden-/CC-Karte; fehlt, solange keine Kundschaft gewählt ist. */
+    onOpenInfo?: () => void;
 };
 
 /**
@@ -39,6 +41,7 @@ export const TenderCustomerSection = ({
     onSelectCustomer,
     onClearCustomer,
     onAddCustomer,
+    onOpenInfo,
 }: TenderCustomerSectionProps) => {
     const [fieldEl, setFieldEl] = useState<HTMLDivElement | null>(null);
 
@@ -117,6 +120,19 @@ export const TenderCustomerSection = ({
                         ))}
                     </ul>
                 </AnchoredPopup>
+            )}
+            {/* Kontaktdaten und CC-Empfänger der Offerte — dieselbe Karte wie im
+                Kalender, geöffnet über den Kunden selbst. */}
+            {onOpenInfo && (
+                <button
+                    type="button"
+                    onClick={onOpenInfo}
+                    title={t('tenders.customer_details')}
+                    aria-label={t('tenders.customer_details')}
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+                >
+                    <User01 size={13} />
+                </button>
             )}
             <button
                 type="button"

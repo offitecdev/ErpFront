@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
-import { Eye, FileDownload02 as DownloadIcon } from '@/components/icons/antIconCompat';
+import { Eye } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import { customerApi } from '../../lib/api/customer';
 import type { CustomerOrderDto } from '../../lib/api/customer';
 import { projectApi, deliveryReportApi, type ServiceReportDto, type DeliveryReportDto } from '../../lib/api/project';
@@ -12,7 +11,7 @@ import type { ProjectDto } from '../../types/project';
 import { Button } from '../../components/ui-shared/Button';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { FILTER_INPUT_CLASS, SectionCard, TableStateRow } from '../../components/ui-shared/TableKit';
-import { ReportPdfSheet } from './detail/ReportPdfSheet';
+import { PdfPreviewSheet } from '../../components/pdf/PdfPreviewSheet';
 
 /**
  * ── KUNDENBERICHTE ──────────────────────────────────────────────────────────
@@ -169,7 +168,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
     }, [view, deliveryLoaded, ordersLoaded, orders]);
 
     const orderNumberOf = (report: ServiceReportDto) =>
-        report.salesOrder?.orderNumber ? localizeTenderNumbersInText(report.salesOrder.orderNumber) : '';
+        report.salesOrder?.orderNumber ? report.salesOrder.orderNumber : '';
 
     /** Spaltenfilter: Arbeitstag und Auftrag, beide als Teiltreffer. */
     const visibleReports = useMemo(() => {
@@ -252,7 +251,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
             return;
         }
         if (preview) {
-            openSheet(t('services.tabGeneral'), `${localizeTenderNumbersInText(order.orderNumber)} · ${dayjs(range.start).format('DD.MM.YYYY')} – ${dayjs(range.end).format('DD.MM.YYYY')}`);
+            openSheet(t('services.tabGeneral'), `${order.orderNumber} · ${dayjs(range.start).format('DD.MM.YYYY')} – ${dayjs(range.end).format('DD.MM.YYYY')}`);
         }
         setBusyId(order.id);
         try {
@@ -282,7 +281,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
 
     const deliveryReportFor = async (row: DeliveryReportDto, preview: boolean) => {
         if (preview) {
-            openSheet(t('projects.delivery.adminTitle'), `${row.orderNumber ? localizeTenderNumbersInText(row.orderNumber) : row.checklistName || '—'}`);
+            openSheet(t('projects.delivery.adminTitle'), `${row.orderNumber ? row.orderNumber : row.checklistName || '—'}`);
         }
         setBusyId(row.id);
         try {
@@ -330,8 +329,11 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
         </button>
     );
 
-    /** Filterzeile — dieselben zwei Felder für alle drei Ansichten. */
-    const filterRow = (dateLabel: string, orderColSpan: number, trailingColSpan: number) => (
+    /** Filterzeile — dieselben zwei Felder für alle drei Ansichten.
+     *  `trailing` = filtresiz kalan sütun SAYISI. Bunlar tek bir `colSpan`
+     *  yerine BİRER BOŞ HÜCRE olarak çizilir: hücre boş olsa bile sütun
+     *  çizgisi filtre şeridinde de kesilmeden devam etsin. */
+    const filterRow = (dateLabel: string, trailing: number) => (
         <tr data-filter-row>
             <th className="pb-1.5">
                 <input
@@ -341,7 +343,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                     className={FILTER_INPUT_CLASS}
                 />
             </th>
-            <th colSpan={orderColSpan} className="pb-1.5">
+            <th className="pb-1.5">
                 <input
                     value={orderFilter}
                     onChange={(event) => setOrderFilter(event.target.value)}
@@ -349,7 +351,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                     className={FILTER_INPUT_CLASS}
                 />
             </th>
-            <th colSpan={trailingColSpan} />
+            {Array.from({ length: trailing }, (_unused, index) => <th key={index} />)}
         </tr>
     );
 
@@ -363,20 +365,29 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
 
             {view === 'field' && (
                 <SectionCard title={`${t('services.tabField')} (${visibleReports.length})`}>
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        {/* Sadece sipariş no ile PDF sütunu sabit ve DAR; geri
+                            kalanların genişliği yoktur, `table-layout: fixed`
+                            altında kalan yeri EŞİT paylaşırlar. */}
+                        <colgroup>
+                            <col />
+                            <col style={{ width: 150 }} />
+                            <col /><col /><col /><col /><col /><col />
+                            <col style={{ width: 56 }} />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-40 text-left">{t('services.colWorkDate')}</th>
+                                <th className="text-left">{t('services.colWorkDate')}</th>
                                 <th className="text-left">{t('crm.orderNumber')}</th>
-                                <th className="w-28 text-right">{t('services.colAppointmentTime')}</th>
-                                <th className="w-28 text-right">{t('services.colWorkedHours')}</th>
-                                <th className="w-28 text-right">{t('services.colOvertime')}</th>
-                                <th className="w-28 text-right">{t('services.colHourlyRate')}</th>
-                                <th className="w-28 text-right">{t('services.colExtraFee')}</th>
-                                <th className="w-32 text-left">{t('common.status')}</th>
-                                <th className="w-24 text-right">PDF</th>
+                                <th className="text-right">{t('services.colAppointmentTime')}</th>
+                                <th className="text-right">{t('services.colWorkedHours')}</th>
+                                <th className="text-right">{t('services.colOvertime')}</th>
+                                <th className="text-right">{t('services.colHourlyRate')}</th>
+                                <th className="text-right">{t('services.colExtraFee')}</th>
+                                <th className="text-left">{t('common.status')}</th>
+                                <th className="text-center">PDF</th>
                             </tr>
-                            {filterRow(t('services.colWorkDate'), 1, 7)}
+                            {filterRow(t('services.colWorkDate'), 7)}
                         </thead>
                         <tbody>
                             {(reportsLoading || visibleReports.length === 0) && (
@@ -403,10 +414,18 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                                     <td className="text-right font-mono tabular-nums text-slate-600 dark:text-white/70">{money(r.overtimeHourlyRate)}</td>
                                     <td className="text-right font-mono tabular-nums font-medium text-slate-800 dark:text-white">{money(r.overtimeCost)}</td>
                                     <td><SignatureChip signed={Boolean(r.isSigned)} /></td>
-                                    <td className="text-right">
-                                        <Button variant="ghost" size="sm" icon={<Eye size={13} />} disabled={busyId === r.id} onClick={() => void previewFieldReport(r)}>
-                                            {busyId === r.id ? '…' : t('projects.general.preview')}
-                                        </Button>
+                                    {/* Yalnızca göz ikonu: önizleme penceresi zaten
+                                        indirme düğmesini taşıyor. */}
+                                    <td className="text-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            icon={<Eye size={14} />}
+                                            aria-label={t('projects.general.preview')}
+                                            title={t('projects.general.preview')}
+                                            disabled={busyId === r.id}
+                                            onClick={() => void previewFieldReport(r)}
+                                        />
                                     </td>
                                 </tr>
                             ))}
@@ -417,16 +436,21 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
 
             {view === 'general' && (
                 <SectionCard title={`${t('services.tabGeneral')} (${visibleOrders.length})`}>
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        <colgroup>
+                            <col style={{ width: 150 }} />
+                            <col /><col /><col />
+                            <col style={{ width: 56 }} />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-44 text-left">{t('crm.orderNumber')}</th>
+                                <th className="text-left">{t('crm.orderNumber')}</th>
                                 <th className="text-left">{t('nav.projects')}</th>
-                                <th className="w-[150px] text-left">{t('services.colStart')}</th>
-                                <th className="w-[150px] text-left">{t('services.colEnd')}</th>
-                                <th className="w-52 text-right">PDF</th>
+                                <th className="text-left">{t('services.colStart')}</th>
+                                <th className="text-left">{t('services.colEnd')}</th>
+                                <th className="text-center">PDF</th>
                             </tr>
-                            {filterRow(t('common.date'), 1, 3)}
+                            {filterRow(t('common.date'), 3)}
                         </thead>
                         <tbody>
                             {(!ordersLoaded || visibleOrders.length === 0) && (
@@ -435,7 +459,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                             {visibleOrders.map((order) => (
                                 <tr key={order.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
                                     <td className="font-mono text-[13px] font-semibold text-slate-800 dark:text-white">
-                                        {localizeTenderNumbersInText(order.orderNumber)}
+                                        {order.orderNumber}
                                     </td>
                                     <td className="text-slate-600 dark:text-white/70">{order.project?.projectName || '—'}</td>
                                     <td>
@@ -454,15 +478,18 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                                             className={FILTER_INPUT_CLASS}
                                         />
                                     </td>
-                                    <td className="text-right">
-                                        <div className="flex items-center justify-end gap-1.5">
-                                            <Button variant="ghost" size="sm" icon={<Eye size={13} />} disabled={busyId === order.id} onClick={() => void generalReportFor(order, true)}>
-                                                {t('projects.general.preview')}
-                                            </Button>
-                                            <Button variant="secondary" size="sm" icon={<DownloadIcon size={13} />} disabled={busyId === order.id} onClick={() => void generalReportFor(order, false)}>
-                                                {busyId === order.id ? '…' : 'PDF'}
-                                            </Button>
-                                        </div>
+                                    {/* Yalnızca göz ikonu: indirme, açılan önizleme
+                                        penceresinin kendi düğmesinden yapılır. */}
+                                    <td className="text-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            icon={<Eye size={14} />}
+                                            aria-label={t('projects.general.preview')}
+                                            title={t('projects.general.preview')}
+                                            disabled={busyId === order.id}
+                                            onClick={() => void generalReportFor(order, true)}
+                                        />
                                     </td>
                                 </tr>
                             ))}
@@ -473,16 +500,22 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
 
             {view === 'delivery' && (
                 <SectionCard title={`${t('projects.delivery.adminTitle')} (${visibleDeliveries.length})`}>
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        <colgroup>
+                            <col />
+                            <col style={{ width: 150 }} />
+                            <col /><col />
+                            <col style={{ width: 56 }} />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-40 text-left">{t('projects.delivery.colSentAt')}</th>
+                                <th className="text-left">{t('projects.delivery.colSentAt')}</th>
                                 <th className="text-left">{t('crm.orderNumber')}</th>
-                                <th className="w-56 text-left">{t('projects.delivery.colChecklist')}</th>
-                                <th className="w-32 text-left">{t('common.status')}</th>
-                                <th className="w-52 text-right">PDF</th>
+                                <th className="text-left">{t('projects.delivery.colChecklist')}</th>
+                                <th className="text-left">{t('common.status')}</th>
+                                <th className="text-center">PDF</th>
                             </tr>
-                            {filterRow(t('projects.delivery.colSentAt'), 1, 3)}
+                            {filterRow(t('projects.delivery.colSentAt'), 3)}
                         </thead>
                         <tbody>
                             {(!deliveryLoaded || visibleDeliveries.length === 0) && (
@@ -493,21 +526,23 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                                     <td className="text-slate-600 dark:text-white/70">{dayjs(r.sentAt || r.createdAt).format('DD.MM.YYYY HH:mm')}</td>
                                     <td>
                                         <div className="font-medium text-slate-800 dark:text-white">
-                                            {r.orderNumber ? localizeTenderNumbersInText(r.orderNumber) : '—'}
+                                            {r.orderNumber ? r.orderNumber : '—'}
                                         </div>
                                         <div className="text-[11px] text-slate-500 dark:text-white/50">{r.projectName || '—'}</div>
                                     </td>
                                     <td className="truncate text-slate-600 dark:text-white/70">{r.checklistName || '—'}</td>
                                     <td><SignatureChip signed={Boolean(r.isSigned)} /></td>
-                                    <td className="text-right">
-                                        <div className="flex items-center justify-end gap-1.5">
-                                            <Button variant="ghost" size="sm" icon={<Eye size={13} />} disabled={busyId === r.id} onClick={() => void deliveryReportFor(r, true)}>
-                                                {t('projects.general.preview')}
-                                            </Button>
-                                            <Button variant="secondary" size="sm" icon={<DownloadIcon size={13} />} disabled={busyId === r.id} onClick={() => void deliveryReportFor(r, false)}>
-                                                {busyId === r.id ? '…' : 'PDF'}
-                                            </Button>
-                                        </div>
+                                    {/* Yalnızca göz ikonu (indirme önizlemede). */}
+                                    <td className="text-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            icon={<Eye size={14} />}
+                                            aria-label={t('projects.general.preview')}
+                                            title={t('projects.general.preview')}
+                                            disabled={busyId === r.id}
+                                            onClick={() => void deliveryReportFor(r, true)}
+                                        />
                                     </td>
                                 </tr>
                             ))}
@@ -516,7 +551,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                 </SectionCard>
             )}
 
-            <ReportPdfSheet
+            <PdfPreviewSheet
                 open={sheetOpen}
                 title={sheetTitle}
                 subtitle={sheetSubtitle}
