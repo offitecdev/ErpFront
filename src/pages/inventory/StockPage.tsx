@@ -6,29 +6,21 @@ import { InventoryListHeader } from '@/components/inventory/InventoryListHeader'
 import { t } from '@/i18n/translate';
 import { inventoryApi, purchaseOrdersApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
-import type { ArticleListItem, BulkMovementItemInput, ItemType } from '@/types/inventory';
+import type { ArticleListItem, BulkMovementItemInput } from '@/types/inventory';
 import type { OrderStockPrefill } from './types';
 import { ArticleComboCell } from './components/ArticleComboCell';
 import { ArticlePickerModal } from './components/ArticlePickerModal';
 import { ExcelImportSheet } from './components/ExcelImportSheet';
 import { StockFlashArrow } from './components/StockFlashArrow';
 import { SupplierComboCell } from './components/SupplierComboCell';
-import { CELL_INPUT_CLASS, SectionCard, ToggleGroup } from './components/primitives';
+import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard, ToggleGroup } from './components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import type { DraftStockRow, ImportedRecord, StockDirection } from './types';
 import { normalizeHeader } from './utils/columnMatch';
 import { fmtMoney, fmtQty, parseNum } from './utils/format';
 
 let rowSeed = 0;
-
-/** Ürün/Malzeme anahtarı sayfadan çıkınca da korunur. */
-const ITEM_KIND_KEY = 'offitec:stock-item-kind';
-
-const readStoredKind = (): ItemType => {
-    if (typeof window === 'undefined') return 'PRODUCT';
-    return window.localStorage.getItem(ITEM_KIND_KEY) === 'MATERIAL' ? 'MATERIAL' : 'PRODUCT';
-};
-
 
 /** Ürünü henüz seçilmemiş taslak satır — hücreden açılan seçici doldurur. */
 const emptyRow = (): DraftStockRow => ({
@@ -85,24 +77,21 @@ export const StockPage = () => {
     });
 
     const [direction, setDirection] = useState<StockDirection>('IN');
-    // Ürün mü malzeme mi ekleniyor: seçici, sütun başlıkları ve yeni kayıtların
-    // türü buna bağlı. Seçim tarayıcıda saklanır, sayfaya dönünce aynı kalır.
-    const [itemKind, setItemKind] = useState<ItemType>(() => {
-        // Sipariş aktarımı: satır türü siparişten gelir (çoğunluk türü seçilir).
-        if (orderPrefill) {
-            const materials = orderPrefill.rows.filter((row) => row.itemType === 'MATERIAL').length;
-            return materials > orderPrefill.rows.length / 2 ? 'MATERIAL' : 'PRODUCT';
-        }
-        return readStoredKind();
-    });
-    const isMaterial = itemKind === 'MATERIAL';
+    // Malzeme/ürün birleşmesi (2026-08-14): Ürün/Malzeme anahtarı kalktı,
+    // her satır üründür.
     const kindLabels = {
-        name: t(isMaterial ? 'inv.columns.materialName' : 'inv.columns.productName'),
-        code: t(isMaterial ? 'inv.columns.materialCode' : 'inv.columns.serialCode'),
-        pick: t(isMaterial ? 'inv.stock.pickMaterial' : 'inv.stock.pickProduct'),
-        viewAll: `${t(isMaterial ? 'inv.materialPicker.viewAll' : 'inv.productPicker.viewAll')} …`,
-        allTitle: t(isMaterial ? 'inv.materialPicker.allTitle' : 'inv.productPicker.allTitle'),
+        name: t('inv.columns.productName'),
+        code: t('inv.columns.serialCode'),
+        pick: t('inv.stock.pickProduct'),
+        viewAll: `${t('inv.productPicker.viewAll')} …`,
+        allTitle: t('inv.productPicker.allTitle'),
     };
+    // Sürüklenebilir sütunlar; kalem sütununun genişliği yoktur, kalanı o emer.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-stock-entry:col-widths:v1',
+        defaults: { code: 160, currentStock: 128, quantity: 112, unitCost: 128, supplier: 224, lineTotal: 128, remove: 48 },
+        minPx: 48,
+    });
     const [rows, setRows] = useState<DraftStockRow[]>(() => (orderPrefill
         ? orderPrefill.rows.map((row) => ({
             ...emptyRow(),
@@ -129,19 +118,6 @@ export const StockPage = () => {
 
     const patchRow = (key: string, patch: Partial<DraftStockRow>) => {
         setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch, error: null } : row)));
-    };
-
-    /**
-     * Tür değişince tablo sıfırlanır: satırlar tek bir türe aittir, kaydedilen
-     * kayıtlar da o listeye yazılır. Dolu satır varsa önce onay istenir.
-     */
-    const changeItemKind = (next: ItemType) => {
-        if (next === itemKind) return;
-        const hasContent = rows.some((row) => row.articleId || row.name.trim() || row.articleCode.trim());
-        if (hasContent && !window.confirm(t('inv.stock.switchKindConfirm'))) return;
-        setItemKind(next);
-        window.localStorage.setItem(ITEM_KIND_KEY, next);
-        setRows([]);
     };
 
     /** Boş satır ekler — kullanıcı doğrudan yeni satırın ürün hücresine yazar. */
@@ -328,7 +304,7 @@ export const StockPage = () => {
                     purchasePrice: parseNum(row.unitCost) ?? 0,
                     supplierId: row.supplierId,
                     supplierName: row.supplierId ? null : (row.supplierName.trim() || null),
-                })), itemKind);
+                })));
                 createdCount = result.createdCount;
                 result.errors.forEach((error) => {
                     const row = newRows[error.index];
@@ -420,15 +396,6 @@ export const StockPage = () => {
                     onChange={setDirection}
                 />
                 <div className="flex items-center gap-2">
-                    {/* Ürün / Malzeme: seçime göre liste, başlıklar ve yeni kayıt türü değişir. */}
-                    <ToggleGroup
-                        options={[
-                            { key: 'PRODUCT' as ItemType, label: t('inv.stock.kindProduct') },
-                            { key: 'MATERIAL' as ItemType, label: t('inv.stock.kindMaterial') },
-                        ]}
-                        value={itemKind}
-                        onChange={changeItemKind}
-                    />
                     <button
                         type="button"
                         onClick={() => setExcelOpen(true)}
@@ -457,17 +424,42 @@ export const StockPage = () => {
                         </span>
                     ) : undefined}
                 >
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        <colgroup>
+                            {/* Kalem sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['code', 'currentStock', 'quantity', 'unitCost', 'supplier', 'lineTotal', 'remove'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th className="text-left">{t('inv.columns.item')}</th>
-                                <th className="w-40 text-left">{t('inv.columns.serialCode')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.currentStock')}</th>
-                                <th className="w-28 text-right">{t('inv.columns.quantity')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.unitCost')}</th>
-                                <th className="w-56 text-left">{t('inv.columns.supplier')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.lineTotal')}</th>
-                                <th className="w-12" />
+                                <th className="relative text-left">
+                                    {t('inv.columns.serialCode')}
+                                    <ColResizeHandle {...grid.resizeProps('code')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.currentStock')}
+                                    <ColResizeHandle {...grid.resizeProps('currentStock')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.quantity')}
+                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.unitCost')}
+                                    <ColResizeHandle {...grid.resizeProps('unitCost')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.supplier')}
+                                    <ColResizeHandle {...grid.resizeProps('supplier')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.lineTotal')}
+                                    <ColResizeHandle {...grid.resizeProps('lineTotal')} />
+                                </th>
+                                <th className="relative">
+                                    <ColResizeHandle {...grid.resizeProps('remove')} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -496,11 +488,10 @@ export const StockPage = () => {
                                                 onCreate={(name) => markAsNewArticle(row.key, name)}
                                                 onOpenAll={() => setAllPickerRowKey(row.key)}
                                                 linked={Boolean(row.articleId)}
-                                                itemType={itemKind}
                                                 canCreate={canCreateArticles}
                                                 autoFocus={row.key === focusRowKey}
                                                 placeholder={kindLabels.pick}
-                                                addLabel={t(isMaterial ? 'inv.materialPicker.addNew' : 'inv.productPicker.addNew', { name: row.name.trim() })}
+                                                addLabel={t('inv.productPicker.addNew', { name: row.name.trim() })}
                                                 viewAllLabel={kindLabels.viewAll}
                                             />
                                             {/* Aynı ürün ikinci kez girildiyse: bildirim yok, satırda uyarı. */}
@@ -619,7 +610,6 @@ export const StockPage = () => {
                 open={allPickerRowKey !== null}
                 onClose={() => setAllPickerRowKey(null)}
                 onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
-                itemType={itemKind}
                 title={kindLabels.allTitle}
             />
             <ExcelImportSheet

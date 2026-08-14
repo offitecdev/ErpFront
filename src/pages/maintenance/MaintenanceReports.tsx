@@ -6,7 +6,7 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Field, Input, Textarea } from '../../components/ui-shared/Field';
 import { Button } from '../../components/ui-shared/Button';
-import { Modal } from '../../components/ui-shared/Modal';
+import { ReportsSheet } from '../project/features/components/detail/reports/ReportsSheet';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import type { MaintenanceReportDto } from '../../types/maintenance';
 import { arrayFromUnknown, fmtDate, money, personName, StatCard } from './MaintenanceShared';
@@ -219,12 +219,11 @@ export const MaintenanceReportsPanel = ({
                 )}
             </Card>
 
-            <Modal
+            <ReportsSheet
                 open={Boolean(editing)}
                 title={t('auto.rapor_duzenle')}
-                description={editing?.task?.contract?.customer?.companyName || editing?.taskId}
+                subtitle={editing?.task?.contract?.customer?.companyName || editing?.taskId}
                 onClose={() => setEditing(null)}
-                width="lg"
                 footer={
                     <>
                         <Button variant="secondary" onClick={() => setEditing(null)}>{t('common.cancel')}</Button>
@@ -232,7 +231,7 @@ export const MaintenanceReportsPanel = ({
                     </>
                 }
             >
-                <div className="space-y-3">
+                <div className="mx-auto w-full max-w-4xl space-y-3 px-5 py-6 md:px-8">
                     <Field label={t('auto.yapilan_islemler')}>
                         <Textarea rows={4} value={editForm.operationsDone} onChange={(e) => setEditForm((form) => ({ ...form, operationsDone: e.target.value }))} />
                     </Field>
@@ -246,7 +245,7 @@ export const MaintenanceReportsPanel = ({
                         <Textarea rows={2} value={editForm.riskNotes} onChange={(e) => setEditForm((form) => ({ ...form, riskNotes: e.target.value }))} />
                     </Field>
                 </div>
-            </Modal>
+            </ReportsSheet>
         </div>
     );
 };

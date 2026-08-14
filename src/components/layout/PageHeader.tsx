@@ -4,7 +4,7 @@ import React from 'react';
 // altı çizili değil, tıklanamaz. Aynı biçim ve konumlandırma her sayfada kullanılır.
 export const StockModuleHeader: React.FC<{ label: React.ReactNode; actions?: React.ReactNode }> = ({ label, actions }) => (
     <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200/60 pb-2.5">
-        <span className="text-[12px] font-semibold tracking-tight" style={{ color: '#272f67' }}>
+        <span className="text-[14px] font-semibold tracking-tight" style={{ color: '#272f67' }}>
             {label}
         </span>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -31,7 +31,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         <div className="mb-5 flex flex-col sm:flex-row sm:flex-wrap sm:items-end sm:justify-between gap-3 pb-4 border-b border-slate-200/60">
             <div className="min-w-0 flex-1 basis-[220px]">
                 {breadcrumb && (
-                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+                    <p className="text-[14px] font-medium text-slate-500 uppercase tracking-wider mb-1">
                         {breadcrumb}
                     </p>
                 )}
@@ -39,7 +39,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                     {title}
                 </h1>
                 {description && (
-                    <div className="text-[13px] text-slate-500 mt-1">{description}</div>
+                    <div className="text-[14px] text-slate-500 mt-1">{description}</div>
                 )}
             </div>
             {actions && (

@@ -156,18 +156,18 @@ export const ScheduleCalendar = ({
     return (
         // Fluid: fills whatever the card gives it, so collapsing the app
         // sidebar lets the calendar grow into the freed space.
-        <div className="w-full">
+        <div className="w-full min-w-0 overflow-x-hidden">
             {/* Header: filters on the left, the period selector dead-centre with
                 the create button right beside it. */}
-            <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                <div className="flex items-center gap-2">
-                    <div className="inline-flex overflow-hidden rounded-md border border-slate-200 bg-white dark:border-white/15">
+            <div className="mb-4 grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-center">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/15 dark:bg-white/5">
                         {(['week', 'month'] as CalendarView[]).map((key) => (
                             <button
                                 key={key}
                                 type="button"
                                 onClick={() => onViewChange(key)}
-                                className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+                                className={`h-9 min-w-[78px] rounded-lg px-4 text-[13px] font-semibold transition-colors ${
                                     view === key
                                         ? 'bg-[#272f67] text-white'
                                         : 'text-slate-600 hover:bg-slate-50 dark:text-white/80'
@@ -180,14 +180,14 @@ export const ScheduleCalendar = ({
                     <button
                         type="button"
                         onClick={() => onCursorChange(dayKey(today))}
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-white/15 dark:text-white/80"
+                        className="h-10 rounded-[10px] border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 dark:border-white/15 dark:text-white/80"
                     >
                         {t('projects.schedule.today')}
                     </button>
                     <select
                         value={technicianFilter}
                         onChange={(event) => onTechnicianFilter(event.target.value)}
-                        className="h-[30px] rounded-md border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-600 outline-none dark:border-white/15"
+                        className="h-10 max-w-full rounded-[10px] border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-600 outline-none dark:border-white/15"
                         aria-label={t('projects.schedule.allInstallers')}
                     >
                         <option value="">{t('projects.schedule.allInstallers')}</option>
@@ -196,23 +196,23 @@ export const ScheduleCalendar = ({
                         ))}
                     </select>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="inline-flex overflow-hidden rounded-md border border-slate-200 bg-white dark:border-white/15">
+                <div className="flex items-center gap-2 xl:justify-self-center">
+                    <div className="inline-flex overflow-hidden rounded-[10px] border border-slate-200 bg-white dark:border-white/15">
                         <button
                             type="button"
                             aria-label="previous"
-                            className="flex h-[30px] w-8 items-center justify-center text-slate-500 hover:bg-slate-50"
+                            className="flex h-10 w-10 items-center justify-center text-slate-500 hover:bg-slate-50"
                             onClick={() => shift(-1)}
                         >
                             <ChevronLeft size={15} />
                         </button>
-                        <span className="flex h-[30px] min-w-[170px] items-center justify-center border-x border-slate-200 px-3 text-[12.5px] font-bold capitalize text-slate-800 dark:border-white/15">
+                        <span className="flex h-10 min-w-[190px] items-center justify-center border-x border-slate-200 px-3 text-[13px] font-bold capitalize text-slate-800 dark:border-white/15">
                             {periodLabel}
                         </span>
                         <button
                             type="button"
                             aria-label="next"
-                            className="flex h-[30px] w-8 items-center justify-center text-slate-500 hover:bg-slate-50"
+                            className="flex h-10 w-10 items-center justify-center text-slate-500 hover:bg-slate-50"
                             onClick={() => shift(1)}
                         >
                             <ChevronRight size={15} />
@@ -220,8 +220,8 @@ export const ScheduleCalendar = ({
                     </div>
                 </div>
                 {/* Actions on the right edge of the header. */}
-                <div className="flex items-center justify-end gap-2">
-                    <Button size="md" variant="primary" icon={<Plus size={14} />} onClick={onCreate}>
+                <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                    <Button size="md" variant="primary" icon={<Plus size={19} />} onClick={onCreate}>
                         {t('projects.schedule.createAppointment')}
                     </Button>
                     <Button size="md" variant="secondary" icon={<Mail size={14} />} onClick={onSendMail}>

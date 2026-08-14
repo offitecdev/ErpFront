@@ -3,7 +3,14 @@ import type { AddressFormValue } from '../../../../components/ui-shared/addressF
 import { formatAddressLines } from '../../../../utils/address';
 import type { CustomerLocationDto } from '../../../../lib/api/customer';
 
-export type TenderAddressTarget = 'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER';
+/**
+ * The three address slots a quote carries. Each one defaults to the customer's
+ * Hauptadresse and is only picked separately when the user ticks that slot's
+ * "andere Adresse verwenden" box.
+ */
+export type TenderAddressSlot = 'INSTALLATION' | 'DELIVERY' | 'BILLING';
+
+export type TenderAddressTarget = TenderAddressSlot | 'CUSTOMER';
 
 /**
  * "+ adres ekle" formu. Adres AYRI BILESENLERLE girilir (`AddressFormValue`) —
@@ -44,14 +51,18 @@ export const EMPTY_TENDER_CUSTOMER_FORM: TenderCustomerCreateForm = {
  * anlamı taşıyan ikinci bir satır asla yazılmaz; teklif PDF'i bu metni satır
  * satır basar.
  *
- * `name` (kaydın liste etiketi) posta adresinin parçası DEĞİLDİR — yalnızca
- * hiçbir bileşen girilmediğinde yedek olarak kullanılır: adres yuvası boş
- * kalırsa sipariş oluşturma engellenir.
+ * `name` (kaydın liste etiketi) posta adresinin parçası DEĞİLDİR ve BURADA HİÇ
+ * KULLANILMAZ — yedek olarak bile. Etiket yalnızca açılır listede görünür
+ * (`locationOptionLabel`), çünkü buradan dönen metin teklifin adres yuvasına
+ * yazılır ve teklif PDF'ine olduğu gibi basılır: "Rewukfh" gibi bir etiket
+ * müşteriye adres diye gitmemelidir.
+ *
+ * Hiçbir bileşen girilmemişse sonuç BOŞ metindir. Yuva boş kalır, böylece
+ * `useTenderOrderDecision` / `hasRequiredAddresses` sipariş oluşturmayı
+ * zaten engeller ve eksik adres sessizce doldurulmuş gibi görünmez.
  */
-export const formatLocationAddress = (loc: CustomerLocationDto): string => {
-    const formatted = formatAddressLines(addressParts(loc)).join('\n');
-    return formatted || String(loc.name || '').trim();
-};
+export const formatLocationAddress = (loc: CustomerLocationDto): string =>
+    formatAddressLines(addressParts(loc)).join('\n');
 
 export const locationOptionLabel = (loc: CustomerLocationDto): string => {
     const place = [loc.postalCode, loc.city].map((part) => String(part || '').trim()).filter(Boolean).join(' ');

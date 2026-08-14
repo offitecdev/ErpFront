@@ -8,8 +8,10 @@ import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Select } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
 import { AddressFields } from '../../components/ui-shared/AddressFields';
-import { EMPTY_ADDRESS } from '../../components/ui-shared/addressForm';
+import { EMPTY_ADDRESS, toAddressForm } from '../../components/ui-shared/addressForm';
 import type { AddressFormValue } from '../../components/ui-shared/addressForm';
+import { setDialCode } from '../../components/ui-shared/countries';
+import type { CountryEntry } from '../../components/ui-shared/countries';
 import {
     CUSTOMER_LANGUAGE_OPTIONS,
     CUSTOMER_STATUS_OPTIONS,
@@ -63,6 +65,14 @@ const BLANK: CustomerCreateForm = {
 };
 
 /**
+ * Die Hauptadresse wird bewusst KNAPP gehalten (Nutzerwunsch 2026-08-03):
+ * Adressname, Strasse, PLZ, Ort — dazu das Land, weil daran die Telefonvorwahl
+ * hängt. Adresszusatz und Kanton kommen im Anlegen-Fenster nicht mehr vor;
+ * bestehende Werte bleiben unberührt, sie werden hier nur nicht angezeigt.
+ */
+const CREATE_ADDRESS_FIELDS: Array<keyof AddressFormValue> = ['address', 'postalCode', 'city', 'country'];
+
+/**
  * Trennt die Abschnitte, ohne eine zweite Kartenebene aufzumachen. Läuft über
  * beide Spalten des Rasters, damit die Trennlinie das ganze Fenster überspannt.
  */
@@ -92,6 +102,17 @@ export const CustomerCreateModal = ({
     }, [open]);
 
     const set = (patch: Partial<CustomerCreateForm>) => setForm((current) => ({ ...current, ...patch }));
+
+    /**
+     * Landauswahl → Telefonvorwahl, bei BEIDEN Nummern und ohne Bedingung: die
+     * Vorwahl gehört zum Land, nicht zur Nummer. Der nationale Teil bleibt
+     * stehen, davor steht immer die Vorwahl des aktuell gewählten Landes.
+     */
+    const onCountryPicked = (country: CountryEntry) => setForm((current) => ({
+        ...current,
+        mainPhone: setDialCode(current.mainPhone, country.dial),
+        mobilePhone: setDialCode(current.mobilePhone, country.dial),
+    }));
 
     const submit = async (event?: React.FormEvent) => {
         event?.preventDefault();
@@ -177,10 +198,37 @@ export const CustomerCreateModal = ({
                     <Input value={form.priceList} onChange={(e) => set({ priceList: e.target.value })} />
                 </Field>
 
+                {/* Die Adresse steht VOR den Kontaktdaten (Nutzerwunsch 2026-08-03):
+                    aus dem Land dort ergibt sich die Vorwahl der Telefonnummern
+                    weiter unten, also wird es auch zuerst gefragt. */}
+                <SectionLabel>{t('crm.locationPrimary')}</SectionLabel>
+                <Field label={t('crm.locationName')} className="col-span-full">
+                    <Input value={form.addressName} onChange={(e) => set({ addressName: e.target.value })} />
+                </Field>
+                {/* Adresse in getrennten Bestandteilen — dieselbe Quelle wie überall
+                    sonst. Bringt ihr eigenes zweispaltiges Raster mit, darum hier
+                    über die ganze Breite eingesetzt. */}
+                <div className="col-span-full">
+                    {/* `toAddressForm` schneidet die Rückgabe auf die ADRESSFELDER
+                        zurecht. `value={form}` reicht das ganze Formular hinein, also
+                        käme sonst ein Abbild aller Felder vom letzten Render zurück —
+                        und das überschriebe die Telefonnummern, die `onCountryPicked`
+                        im selben Durchgang gerade mit der Vorwahl gefüllt hat. */}
+                    <AddressFields
+                        value={form}
+                        onChange={(next) => set(toAddressForm(next))}
+                        fields={CREATE_ADDRESS_FIELDS}
+                        onCountryPicked={onCountryPicked}
+                    />
+                </div>
+
                 <SectionLabel>{t('crm.customers.contactData')}</SectionLabel>
                 <Field label={t('common.email')} className="col-span-full">
                     <Input type="email" value={form.mainEmail} onChange={(e) => set({ mainEmail: e.target.value })} />
                 </Field>
+                {/* Die Vorwahl steht MIT IM Feld (ein Text, "+90 532 …"): so wird sie
+                    beim Kopieren mitgenommen und lässt sich bei Bedarf von Hand
+                    ändern. Beim Wechsel des Landes wird sie neu gesetzt. */}
                 <Field label={t('common.phone')}>
                     <Input value={form.mainPhone} onChange={(e) => set({ mainPhone: e.target.value })} />
                 </Field>
@@ -214,17 +262,6 @@ export const CustomerCreateModal = ({
                         />
                     </div>
                 </Field>
-
-                <SectionLabel>{t('crm.locationPrimary')}</SectionLabel>
-                <Field label={t('crm.locationName')} className="col-span-full">
-                    <Input value={form.addressName} onChange={(e) => set({ addressName: e.target.value })} />
-                </Field>
-                {/* Adresse in getrennten Bestandteilen — dieselbe Quelle wie überall
-                    sonst. Bringt ihr eigenes zweispaltiges Raster mit, darum hier
-                    über die ganze Breite eingesetzt. */}
-                <div className="col-span-full">
-                    <AddressFields value={form} onChange={(next) => set(next)} />
-                </div>
 
                 {/* Absenden per Enter; der sichtbare Knopf sitzt in der Fussleiste. */}
                 <button type="submit" className="hidden" aria-hidden tabIndex={-1} />

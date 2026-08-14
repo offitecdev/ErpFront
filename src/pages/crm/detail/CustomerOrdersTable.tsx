@@ -9,8 +9,15 @@ import { customerApi } from '../../../lib/api/customer';
 import type { CustomerOrderDto } from '../../../lib/api/customer';
 import { billingApi } from '../../../lib/api/billing';
 import type { InvoiceDto } from '../../../types/billing';
-import { FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
-import { cumulativeStages, parsePaymentStages, stageStatus } from '../../../lib/paymentSchedule';
+import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../../hooks/useColumnWidths';
+import {
+    cumulativeStages,
+    formatStageDate,
+    parsePaymentStages,
+    stageStatus,
+    type PaymentStage,
+} from '../../../lib/paymentSchedule';
 
 /**
  * Aufträge des Kunden als HIERARCHISCHE Tabelle mit Verrechnung in der Zeile.
@@ -49,7 +56,7 @@ interface OrderFigures {
     billedPercent: number;
     remainingPercent: number;
     remainingAmount: number;
-    stages: number[] | null;
+    stages: PaymentStage[] | null;
     /** Rest der nächsten offenen Rate in Prozent; null ohne Ratenplan. */
     nextStagePercent: number | null;
 }
@@ -118,6 +125,11 @@ export const CustomerOrdersTable = ({
     const [numberFilter, setNumberFilter] = useState('');
     const [projectFilter, setProjectFilter] = useState('');
     const [debouncedColumns, setDebouncedColumns] = useState({ orderNumber: '', project: '' });
+    const grid = useColumnWidths({
+        storageKey: 'offitec:customer-orders:col-widths:v1',
+        defaults: { orderNumber: 224, count: 96, date: 112, total: 144, remaining: 144, billing: 220 },
+        minPx: 64,
+    });
     const [sortBy, setSortBy] = useState<OrderSortKey>('createdAt');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
     const [page, setPage] = useState(1);
@@ -377,7 +389,7 @@ export const CustomerOrdersTable = ({
                     {i18nT('billing.paymentScheduleTab')}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                    {figures.stages.map((percent, index) => (
+                    {figures.stages.map((stage, index) => (
                         <span
                             key={index}
                             className={`inline-flex items-center gap-1 rounded-[2px] border px-2 py-1 font-mono text-[12px] tabular-nums ${
@@ -389,9 +401,10 @@ export const CustomerOrdersTable = ({
                             }`}
                         >
                             {statuses[index] === 'done' && <Check size={11} />}
-                            {index + 1}. {percent}%
+                            {index + 1}. {stage.percent}%
                             <span className="text-[11px] opacity-70">
-                                {fmtMoney((order.totalAmount * percent) / 100)} · {cumulative[index]}%
+                                {fmtMoney((order.totalAmount * stage.percent) / 100)} · {cumulative[index]}%
+                                {stage.date ? ` · ${formatStageDate(stage.date)}` : ''}
                             </span>
                         </span>
                     ))}
@@ -415,16 +428,28 @@ export const CustomerOrdersTable = ({
             </div>
 
             <SectionCard title={`${i18nT('crm.tab_orders')} (${sortedGroups.length})`}>
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <colgroup>
+                        <ResizableCols keys={['orderNumber'] as const} grid={grid} />
+                        {/* Proje sütunu: genişliği yok, kalan yeri emer. */}
+                        <col />
+                        <ResizableCols keys={['count', 'date', 'total', 'remaining', 'billing'] as const} grid={grid} />
+                    </colgroup>
                     <thead>
                         <tr>
-                            <SortableTh label={i18nT('crm.orderNumber')} sortKey="orderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-56 text-left" />
+                            <SortableTh label={i18nT('crm.orderNumber')} sortKey="orderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('orderNumber', 'right')} />
                             <SortableTh label={i18nT('nav.projects')} sortKey="project" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
-                            <th className="w-24 text-right">{i18nT('crm.orderCount')}</th>
-                            <SortableTh label={i18nT('common.date')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-28 text-left" />
-                            <SortableTh label={i18nT('crm.orderTotal')} sortKey="total" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-36 text-right" />
-                            <SortableTh label={i18nT('crm.outstandingTotal')} sortKey="remaining" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="w-36 text-right" />
-                            <th className="w-[220px] text-right">{i18nT('billing.buttonLabel')}</th>
+                            <th className="relative text-right">
+                                {i18nT('crm.orderCount')}
+                                <ColResizeHandle {...grid.resizeProps('count')} />
+                            </th>
+                            <SortableTh label={i18nT('common.date')} sortKey="createdAt" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('date')} />
+                            <SortableTh label={i18nT('crm.orderTotal')} sortKey="total" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-right" {...grid.resizeProps('total')} />
+                            <SortableTh label={i18nT('crm.outstandingTotal')} sortKey="remaining" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-right" {...grid.resizeProps('remaining')} />
+                            <th className="relative text-right">
+                                {i18nT('billing.buttonLabel')}
+                                <ColResizeHandle {...grid.resizeProps('billing')} />
+                            </th>
                         </tr>
                         {/* Spaltenfilter — Auftragsnummer und Projekt/Angebot. */}
                         <tr data-filter-row>
@@ -444,7 +469,13 @@ export const CustomerOrdersTable = ({
                                     className={FILTER_INPUT_CLASS}
                                 />
                             </th>
-                            <th colSpan={5} />
+                            {/* Filtresi olmayan sütunlar da kendi (boş) hücrelerini
+                                alır ki sütun çizgileri burada da kesilmesin. */}
+                            <th />
+                            <th />
+                            <th />
+                            <th />
+                            <th />
                         </tr>
                     </thead>
                     <tbody>

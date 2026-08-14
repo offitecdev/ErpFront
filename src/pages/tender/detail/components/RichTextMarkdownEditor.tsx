@@ -13,7 +13,9 @@ import { t } from '@/i18n/translate';
 
 import { richTextToHtml } from '../utils/markdown.utils';
 
-export const INLINE_INPUT_FONT_FAMILY = "'Google Sans', 'Product Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+// Keep in step with --font-body (theme.css); 'sans-serif' alone rendered the
+// editor and its toolbar in Arial while the rest of the page is Open Sans.
+export const INLINE_INPUT_FONT_FAMILY = '"Open Sans", Arial, sans-serif';
 
 // WYSIWYG rich-text editor (contentEditable). Stores HTML; legacy markdown-ish
 // values are converted on load via richTextToHtml. Formatting is available in
@@ -106,7 +108,7 @@ const FormatToolbar: React.FC<ToolbarProps> = ({ exec, active, compact = false }
             translate="no"
             data-google-translate="false"
             data-notranslate="true"
-            style={{ fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif" }}
+            style={{ fontFamily: INLINE_INPUT_FONT_FAMILY }}
             onMouseDown={(event) => event.preventDefault()}
         >
             <button type="button" aria-pressed={active.bold} title={t('tenders.rt_bold')} className={stateBtn(active.bold)} onPointerDown={(event) => { event.preventDefault(); run({ cmd: 'bold' }); }}><BoldIcon size={17} strokeWidth={1.75} /></button>

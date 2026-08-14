@@ -7,6 +7,16 @@
         "updateReadyHint": "Neu laden, um zur neuesten Version zu wechseln.",
         "updateReload": "Neu laden"
     },
+    "montage": {
+        "reportPicker": {
+            "title": "Montage-Rapporte",
+            "type": "Rapporttyp",
+            "number": "Rapportnummer",
+            "action": "Aktion",
+            "pageTitle": "Rapporte anzeigen oder erstellen",
+            "pageHint": "Wählen Sie einen Auftrag für Gesamt- und Abnahme-Rapport."
+        }
+    },
     "supply": {
         "title": "Beschaffungsanfragen",
         "description": "Öffnen Sie direkte Anfragen an Lieferanten für Produkte und Materialien, die auf Mindest-/kritischen Bestand gefallen sind.",
@@ -283,6 +293,7 @@
         "welcome": "Willkommen zurück in Ihrem Arbeitsbereich.",
         "email": "E-Mail",
         "emailPlaceholder": "name@offitec.ch",
+        "forgotPassword": "Passwort vergessen",
         "password": "Passwort",
         "passwordPlaceholder": "Passwort eingeben",
         "demoNotice": "Dies ist eine Demo-Version der Offitec ERP-Webanwendung. Unbefugte Vervielfältigung oder Nutzung ist untersagt.",
@@ -390,6 +401,18 @@
             "tomorrow": "Morgen",
             "inDays": "In {{days}} Tagen",
             "empty": "Keine bevorstehenden Termine."
+        }
+    },
+    "dash": {
+        "upcoming": {
+            "title": "Anstehend",
+            "installations": "Montagen",
+            "meetings": "Besprechungen",
+            "deliveries": "Lieferungen",
+            "week": "Diese Woche",
+            "thisWeek": "diese Woche",
+            "empty": "Keine Termine diese Woche.",
+            "close": "Schliessen"
         }
     },
     "attendance": {
@@ -702,7 +725,18 @@
         "productDiscountLoadError": "Rabatte konnten nicht geladen werden.",
         "productDiscountSaved": "Rabatt gespeichert.",
         "productDiscountDeleted": "Rabatt gelöscht.",
-        "productDiscountDeleteConfirm": "Möchten Sie diesen Produktrabatt wirklich löschen?"
+        "productDiscountDeleteConfirm": "Möchten Sie diesen Produktrabatt wirklich löschen?",
+        "deliveryOrder": "Lieferauftrag",
+        "projectOrder": "Projektauftrag",
+        "overviewTab": "Übersicht",
+        "completionStatus": "Fertigstellungsstatus",
+        "orderAddresses": "Adressen",
+        "destinationAddress": "Zieladresse",
+        "deliveryAddressLabel": "Lieferadresse",
+        "addressNotStored": "Keine Adresse hinterlegt",
+        "noDeliveryDateInProject": "Beim Projektauftrag gibt es kein Lieferdatum — die Ausführung steuern die Termine.",
+        "commissions": "Kommissionen",
+        "commissionMissing": "Keine Kommission"
     },
     "inventory": {
         "breadcrumb": "Lager",
@@ -928,7 +962,12 @@
             "errorName": "Ein Kategoriename ist erforderlich.",
             "deleteConfirm": "Diese Kategorie löschen? Zugeordnete Firmen bleiben ohne Kategorie (alle Module aktiv).",
             "deleted": "Kategorie gelöscht.",
-            "assigned": "Firmenkategorie aktualisiert."
+            "assigned": "Firmenkategorie aktualisiert.",
+            "colCompanyNumber": "Firmen-Nr.",
+            "colCodeBlock": "Belegnummer",
+            "companyNumberHint": "Die Firmen-Nr. bestimmt den Block in den Belegnummern dieser Firma (4 → AN-2026-40001) und ist unabhängig von der Modulkategorie. Eine Änderung wirkt nur auf Künftig erzeugte Nummern; bereits vergebene bleiben unverändert.",
+            "errorCompanyNumber": "Die Firmen-Nr. muss eine ganze Zahl zwischen 0 und 99 sein.",
+            "numberSaved": "Firmen-Nr. aktualisiert."
         },
         "pdf": {
             "breadcrumb": "Einstellungen › PDF & Angebotsvorlage",
@@ -1252,8 +1291,11 @@
         "optional_category_barcode": "Kategorie (optional)",
         "optional_category_barcode_manual_or_camera": "Kategorie optional; manuell oder per Kamera erfassbar",
         "order_create": "Auftrag erstellen",
+        "order_create_with_options": "Auftrag mit Optionen erstellen…",
         "order_created": "Auftrag erstellt",
         "order_olusturulamadi": "Auftrag konnte nicht erstellt werden",
+        "order_project_or_direct_question": "Wird es dem Projekt hinzugefügt oder direkt verrechnet?",
+        "order_choice_required": "Hier müssen Sie eine Auswahl treffen.",
         "order_turunu_select": "Bestelltyp auswählen",
         "orn_10_bakim_seti_10_lecksuchspray_10_reinigungs": "Orn 10 Bakim Seti 10 Lecksuchspray 10 Reinigungs",
         "otomatik_kaydedilecek": "Otomatik Kaydedilecek",
@@ -1300,11 +1342,11 @@
         "profit_margin": "Gewinn Marge",
         "profit_margin_amount": "Betrag der Gewinnmarge",
         "project_adi_customer_veya_tender_no": "Projektname, Kunde oder Angebotsnr.",
-        "project_icin_order_create": "Auftrag für Projekt erstellen",
+        "project_icin_order_create": "Projekt für Auftrag erstellen",
         "project_ismi": "Projektname",
         "project_ismi_zorunludur": "Projektname ist erforderlich",
         "project_not_found": "Projekt nicht gefunden",
-        "project_olusturulmaz_crm_order_listesine_duser": "Es wird kein Projekt erstellt; die Auftrag erscheint in der CRM-Bestellliste",
+        "project_olusturulmaz_crm_order_listesine_duser": "Es wird kein Projekt erstellt; der Auftrag erscheint in der CRM-Bestellliste",
         "project_search": "Projekt suchen",
         "projects_araniyor": "Projekte Araniyor",
         "qr_bill_reference_skipped_when_empty": "Bei leerem Feld wird der QR-Bill-Referenzbereich übersprungen",
@@ -1327,7 +1369,7 @@
         "sales_order_satirlari_okunuyor_customer_product_v": "Auftragszeilen werden gelesen; Kunden- und Produktdaten werden vorbereitet.",
         "sata_r_ga_ncellenemedi": "Zeile konnte nicht aktualisiert werden.",
         "sata_r_id_info_ala_namada": "Zeilen-ID konnte nicht gelesen werden.",
-        "satirlari_hesaplayin_report_otomatik_dolacak": "Zeilen berechnen; der Bericht wird automatisch ausgefüllt.",
+        "satirlari_hesaplayin_report_otomatik_dolacak": "Zeilen berechnen; der Rapport wird automatisch ausgefüllt.",
         "satirlari_hesaplayinca_dagilim_burada_gorunecek": "Die Verteilung erscheint hier, nachdem die Zeilen berechnet wurden.",
         "sayfanin_altina_isvicre_qr_bill_empfangsschein_z": "Sayfanin Altina Isvicre QR Bill Empfangsschein Z",
         "scan_general_code_with_camera": "Scannen Allgemein Code Mit Camera",
@@ -1431,7 +1473,7 @@
         "chatter_belge": "Dokument",
         "chatter_log": "Protokoll",
         "bulk_discounti_apply": "Massenrabatt anwenden",
-        "crm_teklif_rapor": "CRM · Angebotsbericht {{number}}",
+        "crm_teklif_rapor": "CRM · Angebots-Rapport {{number}}",
         "crm_teklif_yonetimi": "CRM · Angebotsverwaltung",
         "desteklenmiyor_pdf_png_veya_jpg_yukleyin": "Nicht unterstützt. Bitte PDF, PNG oder JPG hochladen.",
         "import_csv_failed": "CSV-Import fehlgeschlagen.",
@@ -1450,7 +1492,10 @@
         "yeni_versiyon_olusturuldu": "Neue Version erstellt.",
         "import_from_excel": "Aus Excel importieren",
         "mail_sent": "Gesendet",
-        "mail_not_sent": "Nicht gesendet"
+        "mail_not_sent": "Nicht gesendet",
+        "delivery_order_create": "Rechnung für Auftrag erstellen",
+        "project_code_auto_hint": "Der Projektcode wird automatisch vergeben (z. B. PR-2026-10001) und ist zugleich der Projektname.",
+        "delivery_date_required": "Für einen Lieferauftrag ist das Lieferdatum erforderlich."
     },
     "auto": {
         "0_ise_hareket_yok": "Keine Bewegung bei 0",

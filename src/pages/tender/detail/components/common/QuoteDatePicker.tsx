@@ -16,6 +16,9 @@ type QuoteDatePickerProps = {
     min?: string;
     ariaLabel: string;
     placeholder?: string;
+    /** Appended to the trigger — how callers outside the quote form (dense rows,
+     *  dark surfaces) adjust height and colours without restyling the calendar. */
+    className?: string;
 };
 
 const ISO = 'YYYY-MM-DD';
@@ -29,7 +32,7 @@ const ISO = 'YYYY-MM-DD';
  * draws the month grid itself, so the control matches every other field on the
  * quote and honours the app's language for month and weekday names.
  */
-export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder }: QuoteDatePickerProps) => {
+export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder, className = '' }: QuoteDatePickerProps) => {
     const { i18n } = useTranslation();
     const [open, setOpen] = useState(false);
     const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
@@ -85,7 +88,7 @@ export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder }
                 aria-label={ariaLabel}
                 aria-expanded={open}
                 onClick={() => (open ? setOpen(false) : openPicker())}
-                className={`${QUOTE_CONTROL_CLASS} flex items-center justify-between gap-2 ${open ? 'border-[#1f2654] ring-2 ring-[#1f2654]/15' : ''}`}
+                className={`${QUOTE_CONTROL_CLASS} flex items-center justify-between gap-2 ${open ? 'border-[#1f2654] ring-2 ring-[#1f2654]/15' : ''} ${className}`}
             >
                 <Calendar size={13} className="order-2 shrink-0 text-slate-400" />
                 <span className={`min-w-0 flex-1 truncate text-left tabular-nums ${selected ? '' : 'font-normal text-slate-400'}`}>

@@ -14,7 +14,6 @@ import {
 } from '@/components/icons/antIconCompat';
 import { Button } from '../../../../components/ui-shared/Button';
 import { formatMoney, toCurrencyCode } from '../../../../utils/currency';
-import { localizeTenderNumber } from '../../../../utils/tenderNumber';
 import type { NotificationDto } from '../../../../lib/api/notifications';
 import type { MaintenanceTaskDto } from '../../../../types/maintenance';
 import type { AppointmentDto } from '../../../../types/project';
@@ -111,7 +110,7 @@ export const PriorityAgenda: React.FC<PriorityAgendaProps> = ({
                 id: `offer-${tender.id}`,
                 kind: 'offer',
                 critical: true,
-                title: `${localizeTenderNumber(tender.tenderNumber, i18n.language)}${tender.customerName ? ` · ${tender.customerName}` : ''}`,
+                title: `${tender.tenderNumber}${tender.customerName ? ` · ${tender.customerName}` : ''}`,
                 subtitle: tender.grandTotal
                     ? formatMoney(tender.grandTotal, toCurrencyCode(tender.currency))
                     : undefined,

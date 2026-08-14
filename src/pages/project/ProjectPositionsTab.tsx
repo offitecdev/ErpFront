@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { List } from '@/components/icons/antIconCompat';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, ResizableCols, TableStateRow } from '../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../hooks/useColumnWidths';
 
 import { tenderApi } from '../../lib/api/tender';
 import type { ProjectDto } from '../../types/project';
@@ -18,7 +19,6 @@ import { discountDisplayName, seedTotalDiscounts } from '../tender/detail/utils/
 import { formatMoney, toCurrencyCode } from '../../utils/currency';
 
 import { t } from '@/i18n/translate';
-import { localizeTenderNumber } from '@/utils/tenderNumber';
 
 const COLUMN_COUNT = 7;
 
@@ -34,6 +34,12 @@ const fmtQuantity = (value: number) =>
 // shown by product name plus its plain figures (no images, no long-description
 // rows, no position number) plus the offer totals, in the app-wide table design.
 export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
+    // Kalem sütunu esnektir; diğerleri sürüklenerek genişletilir.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:project-positions:col-widths:v1',
+        defaults: { quantity: 112, unit: 96, unitPrice: 128, discount: 96, tax: 96, amount: 144 },
+        minPx: 64,
+    });
     // undefined = still loading, null = failed to load, otherwise the offer detail.
     const [detail, setDetail] = useState<TenderDetailDto | null | undefined>(() => {
         const id = project.tenderId || project.tender?.id;
@@ -95,20 +101,43 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
             icon={<List size={14} />}
             noPadding
             actions={detail?.tender.tenderNumber ? (
-                <span className="font-mono text-[11.5px] text-slate-500">{localizeTenderNumber(detail.tender.tenderNumber)}</span>
+                <span className="font-mono text-[11.5px] text-slate-500">{detail.tender.tenderNumber}</span>
             ) : undefined}
         >
             <div className="overflow-x-auto">
-                <table data-inv-table data-unstyled-table className="w-full">
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <colgroup>
+                        {/* Kalem sütunu: genişliği yok, kalan yeri emer. */}
+                        <col />
+                        <ResizableCols keys={['quantity', 'unit', 'unitPrice', 'discount', 'tax', 'amount'] as const} grid={grid} />
+                    </colgroup>
                     <thead>
                         <tr>
                             <th className="text-left">{t('nav.articles')}</th>
-                            <th className="w-28 text-right">{t('common.quantity')}</th>
-                            <th className="w-24 text-left">{t('tenders.unit')}</th>
-                            <th className="w-32 text-right">{t('tenders.unit_price')}</th>
-                            <th className="w-24 text-right">{t('common.discount')}</th>
-                            <th className="w-24 text-right">{t('common.tax')}</th>
-                            <th className="w-36 text-right">{t('common.amount')}</th>
+                            <th className="relative text-right">
+                                {t('common.quantity')}
+                                <ColResizeHandle {...grid.resizeProps('quantity')} />
+                            </th>
+                            <th className="relative text-left">
+                                {t('tenders.unit')}
+                                <ColResizeHandle {...grid.resizeProps('unit')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('tenders.unit_price')}
+                                <ColResizeHandle {...grid.resizeProps('unitPrice')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('common.discount')}
+                                <ColResizeHandle {...grid.resizeProps('discount')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('common.tax')}
+                                <ColResizeHandle {...grid.resizeProps('tax')} />
+                            </th>
+                            <th className="relative text-right">
+                                {t('common.amount')}
+                                <ColResizeHandle {...grid.resizeProps('amount')} />
+                            </th>
                         </tr>
                     </thead>
                     <tbody>

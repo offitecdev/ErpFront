@@ -13,7 +13,7 @@ export { TenderBulkDiscountModal } from './bulk/TenderBulkDiscountModal';
 export { TenderCustomerSection } from './customer/TenderCustomerSection';
 export { TenderCustomerCreateModal } from './customer/TenderCustomerCreateModal';
 
-export { TenderAddressPicker, TenderBillingAddressRow } from './address/TenderAddressSection';
+export { TenderAddressPicker, TenderCustomAddressRow, TenderMainAddressRow } from './address/TenderAddressSection';
 export { TenderAddressCreateModal } from './address/TenderAddressCreateModal';
 
 export { TenderProfitabilityPanel } from './profitability/TenderProfitabilityPanel';

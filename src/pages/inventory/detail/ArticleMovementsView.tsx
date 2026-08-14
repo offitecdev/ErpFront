@@ -1,7 +1,7 @@
-import { ArrowLeft } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import type { MovementKind } from '@/types/inventory';
-import { Pager, SectionCard, TableStateRow } from '../components/primitives';
+import { ColResizeHandle, Pager, ResizableCols, SectionCard, TableStateRow } from '../components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { MOVEMENTS_PAGE_SIZE, useMovementsList } from '../hooks/useMovementsList';
 import { fmtDateTime, fmtMoney, fmtQty } from '../utils/format';
 
@@ -18,42 +18,32 @@ const KIND_META: Record<string, { labelKey: string; className: string }> = {
 const FILTERABLE_KINDS: MovementKind[] = ['IN', 'OUT', 'DEFINITION', 'RETURN', 'ADJUSTMENT', 'TRANSFER'];
 
 /**
- * Tek ürünün stok hareketleri — ürün detayının İÇİNDE, aynı ekranda açılır ve
- * kendi geri düğmesiyle detaya döner. Bileşen yalnızca kullanıcı düğmeye
- * bastığında monte edildiği için istek de o an atılır; ürün sayfası açılırken
- * hareket geçmişi çekilmez. Sorgu sunucuda `articleId` ile daraltılır.
+ * Tek ürünün stok hareketleri — detay ekranının "Lagerbewegungen" SEKMESİ
+ * (ayrı görünüm + geri düğmesi kalktı, kullanıcı isteği). Bileşen yalnızca
+ * sekmeye geçildiğinde monte edildiği için istek de o an atılır; ürün sayfası
+ * açılırken hareket geçmişi çekilmez. Sorgu sunucuda `articleId` ile daraltılır.
  */
 export const ArticleMovementsView = ({
     articleId,
-    articleName,
     unit,
-    onBack,
 }: {
     articleId: string;
-    articleName: string;
     unit: string;
-    onBack: () => void;
 }) => {
     const list = useMovementsList({ articleId });
+    // Sürüklenebilir sütunlar; açıklama sütununun genişliği yoktur, kalanı o
+    // emer — bu yüzden ondan öncekiler SAĞ kenarlarından tutulur.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-article-movements:col-widths:v1',
+        defaults: { date: 160, kind: 144, quantity: 112, unitCost: 128, total: 128 },
+        minPx: 72,
+    });
 
     return (
         <div className="flex w-full flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    aria-label={t('common.back')}
-                    title={t('common.back')}
-                    onClick={onBack}
-                    className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                >
-                    <ArrowLeft size={16} />
-                </button>
-                <h2 className="text-[14px] font-bold text-slate-900 dark:text-white">
-                    {t('inv.detail.movementsTitle')}
-                </h2>
-                <span className="text-[12.5px] text-slate-500 dark:text-white/60">{articleName}</span>
-
-                <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* Sekme başlığı üstte zaten durur — burada yalnızca filtreler kalır. */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <select
                         value={list.type}
                         onChange={(event) => list.setType(event.target.value as MovementKind | '')}
@@ -85,14 +75,34 @@ export const ArticleMovementsView = ({
 
             <SectionCard title={t('inv.detail.movementsSectionTitle', { count: list.total })}>
                 <div className="overflow-x-auto">
-                    <table data-inv-table data-unstyled-table className="w-full min-w-[720px]">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[720px]">
+                        <colgroup>
+                            <ResizableCols keys={['date', 'kind', 'quantity', 'unitCost', 'total'] as const} grid={grid} />
+                            {/* Açıklama sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-40 text-left">{t('common.date')}</th>
-                                <th className="w-36 text-left">{t('inv.columns.movementType')}</th>
-                                <th className="w-28 text-right">{t('inv.columns.quantity')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.unitCost')}</th>
-                                <th className="w-32 text-right">{t('inv.columns.total')}</th>
+                                <th className="relative text-left">
+                                    {t('common.date')}
+                                    <ColResizeHandle {...grid.resizeProps('date', 'right')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.movementType')}
+                                    <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.quantity')}
+                                    <ColResizeHandle {...grid.resizeProps('quantity', 'right')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.unitCost')}
+                                    <ColResizeHandle {...grid.resizeProps('unitCost', 'right')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.total')}
+                                    <ColResizeHandle {...grid.resizeProps('total', 'right')} />
+                                </th>
                                 <th className="text-left">{t('inv.columns.description')}</th>
                             </tr>
                         </thead>

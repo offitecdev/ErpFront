@@ -86,13 +86,13 @@ export const TenderCustomerCard = ({ groups, summary }: TenderCustomerCardProps)
     return (
         <section
             data-ui-card
-            className="relative z-10 mb-2 overflow-hidden rounded-[2px] border border-slate-300 bg-white"
+            className="ofi-tender-customer-card relative z-10 mb-2 overflow-hidden rounded-lg border border-slate-300 bg-white"
         >
             <button
                 type="button"
                 onClick={toggle}
                 aria-expanded={!collapsed}
-                className="flex w-full items-center gap-2.5 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5 text-left transition-colors hover:bg-[#e9effb]"
+                className="ofi-tender-card-toggle flex w-full items-center gap-2.5 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5 text-left transition-colors hover:bg-[#e9effb]"
             >
                 <span className="flex size-5 shrink-0 items-center justify-center rounded-[2px] bg-[#1f2654] text-white">
                     <User size={12} />

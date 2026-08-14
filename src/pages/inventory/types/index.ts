@@ -153,6 +153,10 @@ export interface DraftProductRow {
     supplierId: string | null;
     /** Elle girilen tedarikçi adı (listeden seçilmediyse). */
     supplierName: string;
+    /** Ürün kartına yazılacak açıklama (serbest metin). */
+    description: string;
+    /** Ürün görseli (data URL) — satırdaki küçük seçiciyle eklenir. */
+    imageUrl: string | null;
     /** Sunucudan dönen satır hatası (kaydetme denemesi sonrası). */
     error?: string | null;
 }

@@ -8,6 +8,8 @@ import { autoMap, suggestForField } from '../utils/columnMatch';
 import { isSpreadsheetFile, readSpreadsheetFile } from '../utils/excel';
 import { parseNum } from '../utils/format';
 import { BottomSheet } from './BottomSheet';
+import { ColResizeHandle, ResizableCols } from './primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 
 type WizardStep = 0 | 1 | 2;
 
@@ -35,6 +37,12 @@ export const ExcelImportSheet = ({
     zIndex?: number;
 }) => {
     const [step, setStep] = useState<WizardStep>(0);
+    // Eşleme tablosunun sürüklenebilir sütunları; öneriler sütunu kalanı emer.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-excel-mapping:col-widths:v1',
+        defaults: { target: 176, source: 224 },
+        minPx: 96,
+    });
     const [slideClass, setSlideClass] = useState('ofi-rise-in');
     const [sheet, setSheet] = useState<ParsedSheet | null>(null);
     const [mapping, setMapping] = useState<ColumnMapping>({});
@@ -294,11 +302,22 @@ export const ExcelImportSheet = ({
             {step === 1 && sheet && (
                 <div key="step-mapping" className={`${slideClass} flex flex-col gap-3 p-4`}>
                     <p className="text-[12.5px] text-slate-500 dark:text-white/60">{t('inv.excel.mappingHint')}</p>
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        <colgroup>
+                            <ResizableCols keys={['target', 'source'] as const} grid={grid} />
+                            {/* Öneriler sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-44 text-left">{t('inv.excel.targetColumn')}</th>
-                                <th className="w-56 text-left">{t('inv.excel.excelColumn')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.excel.targetColumn')}
+                                    <ColResizeHandle {...grid.resizeProps('target', 'right')} />
+                                </th>
+                                <th className="relative text-left">
+                                    {t('inv.excel.excelColumn')}
+                                    <ColResizeHandle {...grid.resizeProps('source', 'right')} />
+                                </th>
                                 <th className="text-left">{t('inv.excel.suggestionsAndSamples')}</th>
                             </tr>
                         </thead>
@@ -407,7 +426,10 @@ export const ExcelImportSheet = ({
                     </div>
 
                     <div className="overflow-x-auto">
-                        <table data-inv-table data-unstyled-table className="w-full">
+                        {/* Önizleme sütunları veriden (`fields`) gelir ve her
+                            içe aktarımda değişir: saklanabilir bir genişlik
+                            takımı yok, bu yüzden yalnızca çizgiler. */}
+                        <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                             <thead>
                                 <tr>
                                     {fields.map((field) => (

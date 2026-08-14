@@ -7,6 +7,16 @@
         "updateReadyHint": "En son sürüme geçmek için sayfayı yenileyin.",
         "updateReload": "Yenile"
     },
+    "montage": {
+        "reportPicker": {
+            "title": "Montaj raporları",
+            "type": "Rapor tipi",
+            "number": "Rapor numarası",
+            "action": "İşlem",
+            "pageTitle": "Raporları görüntüle veya oluştur",
+            "pageHint": "Genel rapor ve teslim raporu için bir sipariş seçin."
+        }
+    },
     "supply": {
         "title": "Tedarik Talepleri",
         "description": "Minimum/kritik stoğa düşen ürün ve malzemeler için tedarikçilerden direkt talep açın.",
@@ -283,6 +293,7 @@
         "welcome": "Çalışma alanınıza tekrar hoş geldiniz.",
         "email": "E-posta",
         "emailPlaceholder": "name@offitec.ch",
+        "forgotPassword": "Şifremi unuttum",
         "password": "Şifre",
         "passwordPlaceholder": "Şifrenizi girin",
         "demoNotice": "Bu Offitec ERP web uygulamasının demo sürümüdür. İzinsiz çoğaltılması veya kullanılması yasaktır.",
@@ -390,6 +401,18 @@
             "tomorrow": "Yarın",
             "inDays": "{{days}} gün içinde",
             "empty": "Yaklaşan randevu bulunmuyor."
+        }
+    },
+    "dash": {
+        "upcoming": {
+            "title": "Yaklaşan",
+            "installations": "Montajlar",
+            "meetings": "Toplantılar",
+            "deliveries": "Sevkiyatlar",
+            "week": "Bu hafta",
+            "thisWeek": "bu hafta",
+            "empty": "Bu hafta randevu yok.",
+            "close": "Kapat"
         }
     },
     "attendance": {
@@ -702,7 +725,18 @@
         "productDiscountLoadError": "İndirimler yüklenemedi.",
         "productDiscountSaved": "İndirim kaydedildi.",
         "productDiscountDeleted": "İndirim silindi.",
-        "productDiscountDeleteConfirm": "Bu ürün indirimini silmek istediğinizden emin misiniz?"
+        "productDiscountDeleteConfirm": "Bu ürün indirimini silmek istediğinizden emin misiniz?",
+        "deliveryOrder": "Teslimat siparişi",
+        "projectOrder": "Proje siparişi",
+        "overviewTab": "Genel bakış",
+        "completionStatus": "Tamamlanma durumu",
+        "orderAddresses": "Adresler",
+        "destinationAddress": "Hedef adres",
+        "deliveryAddressLabel": "Teslimat adresi",
+        "addressNotStored": "Adres girilmemiş",
+        "noDeliveryDateInProject": "Proje siparişinde teslimat tarihi yoktur — işi randevular yürütür.",
+        "commissions": "Komisyonlar",
+        "commissionMissing": "Komisyon yok"
     },
     "inventory": {
         "breadcrumb": "Stok",
@@ -928,7 +962,12 @@
             "errorName": "Kategori adı gereklidir.",
             "deleteConfirm": "Bu kategori silinsin mi? Eşlenmiş şirketler kategorisiz kalır (tüm modüller açılır).",
             "deleted": "Kategori silindi.",
-            "assigned": "Şirket kategorisi güncellendi."
+            "assigned": "Şirket kategorisi güncellendi.",
+            "colCompanyNumber": "Şirket No",
+            "colCodeBlock": "Belge kodu",
+            "companyNumberHint": "Şirket No, o şirketin belge kodlarındaki bloğu belirler (4 → AN-2026-40001) ve modül kategorisinden bağımsızdır. Değiştirmek yalnızca bundan sonra üretilecek kodları etkiler; dağıtılmış kodlar olduğu gibi kalır.",
+            "errorCompanyNumber": "Şirket numarası 0 ile 99 arasında bir tam sayı olmalıdır.",
+            "numberSaved": "Şirket numarası güncellendi."
         },
         "pdf": {
             "breadcrumb": "Ayarlar › PDF & Teklif Şablonu",
@@ -1252,8 +1291,11 @@
         "optional_category_barcode": "Kategori barkodu isteğe bağlıdır",
         "optional_category_barcode_manual_or_camera": "Kategori barkodu isteğe bağlıdır; manuel veya kamera ile girilebilir",
         "order_create": "Sipariş oluştur",
+        "order_create_with_options": "Seçeneklerle sipariş oluştur…",
         "order_created": "Sipariş oluşturuldu",
         "order_olusturulamadi": "Sipariş oluşturulamadı",
+        "order_project_or_direct_question": "Projeye mi eklenecek, yoksa doğrudan mı faturalanacak?",
+        "order_choice_required": "Burada bir seçim yapmanız gerekiyor.",
         "order_turunu_select": "Sipariş türünü seç",
         "orn_10_bakim_seti_10_lecksuchspray_10_reinigungs": "Örn. 10 bakım seti, 10 kaçak arama spreyi, 10 temizleme ürünü",
         "otomatik_kaydedilecek": "Otomatik kaydedilecek",
@@ -1300,7 +1342,7 @@
         "profit_margin": "Kâr marjı",
         "profit_margin_amount": "Kâr marjı tutarı",
         "project_adi_customer_veya_tender_no": "Proje adı, müşteri veya teklif no",
-        "project_icin_order_create": "Proje için sipariş oluştur",
+        "project_icin_order_create": "Sipariş için proje oluştur",
         "project_ismi": "Proje ismi",
         "project_ismi_zorunludur": "Proje ismi zorunludur",
         "project_not_found": "Proje bulunamadı",
@@ -1450,7 +1492,10 @@
         "yeni_versiyon_olusturuldu": "Yeni versiyon oluşturuldu.",
         "import_from_excel": "Excel'den içe aktar",
         "mail_sent": "Gönderildi",
-        "mail_not_sent": "Gönderilmedi"
+        "mail_not_sent": "Gönderilmedi",
+        "delivery_order_create": "Sipariş için fatura oluştur",
+        "project_code_auto_hint": "Proje kodu otomatik verilir (örn. PR-2026-10001) ve aynı zamanda proje adıdır.",
+        "delivery_date_required": "Teslimat siparişi için teslim tarihi zorunludur."
     },
     "auto": {
         "0_ise_hareket_yok": "0 ise hareket yok",

@@ -1,7 +1,13 @@
+import type { ReactNode } from 'react';
+
 import { t } from '@/i18n/translate';
 
 type TenderLineHeaderCellProps = {
-    label: string;
+    /** Caption — or, for a column too narrow for words, an icon. */
+    label: ReactNode;
+    /** What the column is, in words. Required when `label` is an icon: it is
+        the tooltip and the name screen readers announce. */
+    title?: string;
     align?: 'left' | 'right' | 'center';
     className?: string;
     noTruncate?: boolean;
@@ -11,8 +17,10 @@ type TenderLineHeaderCellProps = {
     onResizeReset?: () => void;
 };
 
-export const TenderLineHeaderCell = ({ label, align = 'right', className, noTruncate, onResizeStart, onResizeReset }: TenderLineHeaderCellProps) => (
+export const TenderLineHeaderCell = ({ label, title, align = 'right', className, noTruncate, onResizeStart, onResizeReset }: TenderLineHeaderCellProps) => (
     <th
+        title={title}
+        aria-label={title}
         className={`relative ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className || ''}`}
     >
         <span className={`block ${noTruncate ? 'whitespace-nowrap' : 'truncate'}`}>{label}</span>

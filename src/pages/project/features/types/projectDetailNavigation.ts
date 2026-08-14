@@ -9,28 +9,21 @@ export type ProjectSectionKey =
 
 export type ProjectSubSectionKey =
   | 'appointments'
-  | 'appointmentMail'
   | 'fieldReports'
   | 'generalReport'
   | 'delivery'
-  | 'signatures'
-  | 'expenses'
-  | 'materials'
-  | 'overtime'
-  | 'addonOrders';
+  | 'signatures';
 
 export type ProjectDetailView = {
   section: ProjectSectionKey;
   subSection?: ProjectSubSectionKey;
 };
 
-// The default sub-section opened when a user clicks a top-level group.
-// `overview`, `positions` and `billing` have no sub-sections.
+// The default sub-section opened when a user clicks a top-level group. Every
+// group is a single tab now; these only pick the view a section starts on.
 export const DEFAULT_SUB_SECTION: Partial<Record<ProjectSectionKey, ProjectSubSectionKey>> = {
   planning: 'appointments',
   field: 'fieldReports',
-  costs: 'expenses',
-  addons: 'addonOrders',
 };
 
 export const viewForSection = (section: ProjectSectionKey): ProjectDetailView => ({

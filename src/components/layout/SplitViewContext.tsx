@@ -36,7 +36,6 @@ export const SPLITABLE_ROUTES: SplitableRoute[] = [
     { path: '/crm/my-orders', label: 'nav.myOrders' },
     { path: '/projects', label: 'nav.projectManagement' },
     { path: '/inventory/articles', label: 'nav.articles' },
-    { path: '/inventory/materials', label: 'nav.materials' },
     { path: '/inventory/stock', label: 'nav.stock' },
     { path: '/inventory/stock/movements', label: 'nav.movements' },
     { path: '/inventory/orders', label: 'nav.inventoryOrders' },

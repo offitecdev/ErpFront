@@ -3,7 +3,6 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LuMoon, LuSun } from '@/components/icons/lucideLocal';
 import { useAuthStore } from '../../store/authStore';
-import { useAttendanceStore } from '../../store/attendanceStore';
 import { useThemeStore } from '../../store/themeStore';
 import {
     Bell01 as BellOutlined,
@@ -11,7 +10,6 @@ import {
     Building02 as BankOutlined,
     Building03 as ContactsOutlined,
     Calendar as CalendarOutlined,
-    FileCheck02 as ServiceReportsOutlined,
     Clock as ClockCircleOutlined,
     SwitchHorizontal01 as SwapOutlined,
     LogOut01 as LogoutOutlined,
@@ -132,7 +130,6 @@ const MENU_SECTIONS: MenuSection[] = [
         icon: InboxOutlined,
         items: [
             { key: '/inventory/articles', label: 'nav.articles', permission: 'inventory.view' },
-            { key: '/inventory/materials', label: 'nav.materials', permission: 'inventory.view' },
             { key: '/inventory/stock', label: 'nav.stock', permission: 'inventory.view' },
             { key: '/inventory/orders', label: 'nav.inventoryOrders', permission: 'inventory.view' },
             { key: '/inventory/suppliers', label: 'nav.suppliers', permission: 'inventory.view' },
@@ -165,16 +162,6 @@ const MENU_SECTIONS: MenuSection[] = [
 
     {
         type: 'group',
-        key: 'services',
-        label: 'nav.services',
-        feature: 'projects',
-        icon: ServiceReportsOutlined,
-        items: [
-            { key: '/services/reports', label: 'nav.serviceReports', permission: 'projects.view' },
-        ],
-    },
-    {
-        type: 'group',
         key: 'settings',
         label: 'nav.settings',
         icon: SettingOutlined,
@@ -183,7 +170,6 @@ const MENU_SECTIONS: MenuSection[] = [
             // Mail and checklists are project features (their routes sit behind
             // the project-module guard), so the leaves follow the projects module.
             { key: '/settings/mail', label: 'nav.mailSettings', permission: 'mail.manage', module: 'projects' },
-            { key: '/settings/checklists', label: 'nav.checklistSettings', module: 'projects' },
             // Company categories map companies onto module bundles: an admin
             // surface that no category may hide (module 'administration').
             { key: '/settings/company-categories', label: 'nav.companyCategories', permission: 'roles.manage', module: 'administration' },
@@ -331,7 +317,7 @@ const HeaderQuickCreate: React.FC<{
                 title={t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}
                 aria-label={t('nav.quickCreate', { defaultValue: 'Hızlı oluştur' })}
                 onClick={() => setOpen((v) => !v)}
-                className={`inline-flex size-9 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${open
+                className={`ofi-header-icon-button inline-flex size-9 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${open
                     ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg'
                     : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
                     }`}
@@ -379,7 +365,6 @@ const MainLayoutInner: React.FC = () => {
     const { t, i18n } = useTranslation();
 
     const { user, logout, permissions, tenants, selectedTenantId, setSelectedTenant } = useAuthStore();
-    const { fetchTodayAttendance } = useAttendanceStore();
     const { splitMode, isSplit, secondaryPath, secondaryCurrentPath, exitSplit, openSecondary } = useSplitView();
     const { isDarkMode, toggleTheme } = useThemeStore();
 
@@ -568,11 +553,6 @@ const MainLayoutInner: React.FC = () => {
     }, [isSearchOverlayOpen]);
 
     useEffect(() => {
-        // Fetch attendance in the background — do NOT block layout paint
-        fetchTodayAttendance();
-    }, [fetchTodayAttendance]);
-
-    useEffect(() => {
         if (!isNotificationPanelOpen) return;
         setNotificationsLoading(true);
         notificationApi.list({ limit: 40 })
@@ -589,12 +569,16 @@ const MainLayoutInner: React.FC = () => {
         // rows linger until (or if) the refetch lands.
         setNotifications([]);
         setUnreadCount(0);
-        notificationApi.list({ unreadOnly: true, limit: 20 })
-            .then(setNotifications)
-            .catch(() => undefined);
-        notificationApi.unreadCount()
-            .then(setUnreadCount)
-            .catch(() => undefined);
+        // The badge is useful but not render-critical. The panel fetches its own
+        // list when opened, so eagerly downloading unread rows duplicated work
+        // and put a slow notification endpoint in the quote's critical chain.
+        // Only fetch the count, after the route has had ample time to settle.
+        const timer = window.setTimeout(() => {
+            notificationApi.unreadCount()
+                .then(setUnreadCount)
+                .catch(() => undefined);
+        }, 8000);
+        return () => window.clearTimeout(timer);
     }, [user?.id, selectedTenantId]);
 
     useEffect(() => {
@@ -737,8 +721,14 @@ const MainLayoutInner: React.FC = () => {
         guardedNavigate(item.path);
     };
 
+    // Takvim ve ana sayfada yan bar GENİŞLEMEZ (kullanıcı isteği 2026-08-07):
+    // dar rail kalır — hover paneli açılmaz, pin bu sayfalarda YOK SAYILIR
+    // (localStorage'daki pin durumu silinmez; başka sayfaya geçince geri gelir).
+    const sidebarLockedCollapsed = location.pathname === '/' || location.pathname.startsWith('/calendar');
+    const sidebarExpanded = sidebarPinnedOpen && !sidebarLockedCollapsed;
+
     // Rail is always visible; pinning adds the flush submenu panel beside it.
-    const visibleWidth = sidebarPinnedOpen
+    const visibleWidth = sidebarExpanded
         ? SIDEBAR_RAIL_WIDTH + SIDEBAR_PANEL_WIDTH
         : SIDEBAR_RAIL_WIDTH;
 
@@ -791,7 +781,7 @@ const MainLayoutInner: React.FC = () => {
             // header + sidebar + page read as one continuous surface and only the
             // page's own white cards lift off it. (dark.css maps #f6f8fb to the
             // dark page background, so the same holds there.)
-            className={`min-h-screen font-sans text-[#1D1D1F] lg:flex lg:h-screen [--app-shell-inset:0px] [--app-header-height:4rem] ${hideSidebar ? 'bg-white dark:bg-[#0f1114] lg:[--app-shell-inset:0px]' : sidebarPinnedOpen ? 'bg-[#f6f8fb] lg:[--app-shell-inset:316px]' : 'bg-[#f6f8fb] lg:[--app-shell-inset:84px]'}`}
+            className={`min-h-screen font-sans text-[#1D1D1F] lg:flex lg:h-screen [--app-shell-inset:0px] [--app-header-height:4rem] ${hideSidebar ? 'bg-white dark:bg-[#0f1114] lg:[--app-shell-inset:0px]' : sidebarExpanded ? 'bg-[#f6f8fb] lg:[--app-shell-inset:316px]' : 'bg-[#f6f8fb] lg:[--app-shell-inset:84px]'}`}
         >
             {/* ── Sidebar (Evernote-style rail: hover-peek, flyout side-tabs, no footer) ── */}
             {!hideSidebar && <AppSidebar
@@ -801,7 +791,8 @@ const MainLayoutInner: React.FC = () => {
                 permissions={permissions}
                 projectModuleEnabled={projectModuleEnabled}
                 onNavigate={handleSidebarNavigate}
-                pinnedOpen={sidebarPinnedOpen}
+                pinnedOpen={sidebarExpanded}
+                lockCollapsed={sidebarLockedCollapsed}
                 onTogglePin={() => setSidebarPinnedOpen((open) => !open)}
                 onOpenSearch={() => setIsSearchOverlayOpen(true)}
                 quickCreateItems={quickCreateItems}
@@ -872,7 +863,7 @@ const MainLayoutInner: React.FC = () => {
                 {/* Header — the top slice of the shell. Same canvas colour as the
                     rail and the content column, so the three meet without a seam.
                     Montage keeps its own white shell. */}
-                <header className={`fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between pl-2 pr-3 sm:pr-5 ${hideSidebar ? 'bg-white dark:bg-[#0f1114]' : 'bg-[#f6f8fb] lg:left-[84px]'}`}>
+                <header className={`ofi-topbar fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between pl-2 pr-3 sm:pr-5 ${hideSidebar ? 'bg-white dark:bg-[#0f1114]' : 'bg-[#f6f8fb] lg:left-[84px]'}`}>
                     <WorkspaceTabsProvider userId={user?.id}>
                         <div className="flex min-w-0 flex-1 items-center">
                             {/* Mobile drawer opener — desktop has the always-visible rail. */}
@@ -984,12 +975,12 @@ const MainLayoutInner: React.FC = () => {
                                 setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
                                 setUnreadCount(0);
                             }}
-                            className="relative flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd]"
+                            className="relative flex size-9 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd] dark:hover:bg-white/10"
                             aria-label={t('nav.notifications')}
                         >
                             <BellOutlined size={16} />
                             {unreadNotificationCount > 0 && (
-                                <span className="absolute right-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-white dark:ring-[#08090a]">
+                                <span className="ofi-nosize absolute right-0 top-0 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-white dark:ring-[#08090a]">
                                     {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
                                 </span>
                             )}
@@ -1000,7 +991,7 @@ const MainLayoutInner: React.FC = () => {
                                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                                 className="flex items-center gap-2 rounded-full p-1 transition-colors hover:bg-[#d3e3fd] text-left"
                             >
-                                <div className="flex size-8 items-center justify-center rounded-full bg-[#272f67] text-[11px] font-semibold text-white ring-2 ring-[#d3e3fd]">
+                                <div className="ofi-nosize flex size-8 items-center justify-center rounded-full bg-[#272f67] text-[12px] font-semibold text-white ring-2 ring-[#d3e3fd]">
                                     {initials || <UserOutlined style={{ fontSize: 14 }} />}
                                 </div>
                             </button>

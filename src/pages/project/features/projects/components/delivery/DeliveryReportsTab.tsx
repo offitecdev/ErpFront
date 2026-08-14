@@ -7,7 +7,7 @@ import { Button } from '@/components/ui-shared/Button';
 import { Checkbox } from '@/components/ui-shared/Checkbox';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { Field, Textarea } from '@/components/ui-shared/Field';
-import { Modal } from '@/components/ui-shared/Modal';
+import { ReportsSheet } from '@/pages/project/features/components/detail/reports/ReportsSheet';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import {
     deliveryReportApi,
@@ -252,12 +252,11 @@ export const DeliveryReportsTab = ({ project }: { project: ProjectDto; order?: {
             {/* Send popup: the orders to be delivered to the customer. Signature
                 images are intentionally not rendered anywhere — the signed /
                 unsigned chip on each report row is the whole story. */}
-            <Modal
+            <ReportsSheet
                 open={sendOpen}
                 title={t('projects.delivery.sendTitle')}
-                description={t('projects.delivery.sendHint')}
+                subtitle={t('projects.delivery.sendHint')}
                 onClose={() => setSendOpen(false)}
-                width="md"
                 footer={
                     <>
                         <Button variant="secondary" onClick={() => setSendOpen(false)}>{t('common.close')}</Button>
@@ -268,7 +267,7 @@ export const DeliveryReportsTab = ({ project }: { project: ProjectDto; order?: {
                 {pending.length === 0 ? (
                     <div className="px-1 py-6 text-center text-[12.5px] text-slate-500">{t('projects.delivery.nothingToSend')}</div>
                 ) : (
-                    <div className="space-y-2">
+                    <div className="mx-auto w-full max-w-4xl space-y-2 px-5 py-6 md:px-8">
                         <div className="text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.delivery.ordersToDeliver')}</div>
                         {pending.map((report) => (
                             <div key={report.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2">
@@ -283,7 +282,7 @@ export const DeliveryReportsTab = ({ project }: { project: ProjectDto; order?: {
                         ))}
                     </div>
                 )}
-            </Modal>
+            </ReportsSheet>
         </div>
     );
 };

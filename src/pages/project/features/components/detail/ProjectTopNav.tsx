@@ -12,6 +12,7 @@ import {
 } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
+import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
 import type {
     ProjectDetailView,
     ProjectSectionKey,
@@ -44,13 +45,13 @@ const getGroups = (): Group[] => [
         subs: [],
     },
     {
+        // One plain button, no dropdown: it goes straight to the appointment
+        // calendar. The mail entry it used to carry is redundant — the calendar
+        // header already has its own "send e-mail" button.
         section: 'planning',
-        label: () => t('auto.planlama'),
+        label: () => t('projects.appointment'),
         icon: <CalendarClock size={15} />,
-        subs: [
-            { key: 'appointments', label: () => t('auto.randevu_saat_planlari') },
-            { key: 'appointmentMail', label: () => t('auto.randevu_maili') },
-        ],
+        subs: [],
     },
     {
         // Formerly "Saha Operasyonu" — consolidated into a single "Reports"
@@ -61,28 +62,27 @@ const getGroups = (): Group[] => [
         subs: [],
     },
     {
+        // Single tab: external expenses, extra materials and extra work all live
+        // in one table there, and the overtime tolerance is no longer configured
+        // here — it is settled on the tablet during the appointment.
         section: 'costs',
         label: () => t('auto.maliyet_ve_malzemeler'),
         icon: <ReceiptText size={15} />,
-        subs: [
-            { key: 'expenses', label: () => t('auto.harici_giderler') },
-            { key: 'materials', label: () => t('nav.materials') },
-            { key: 'overtime', label: () => t('auto.15_uzeri_fazla_calisma') },
-        ],
+        subs: [],
+    },
+    {
+        // Addon orders come BEFORE billing: their lines have to be reviewed and
+        // ordered before anything is invoiced.
+        section: 'addons',
+        label: () => t('projects.addonOrder'),
+        icon: <PackagePlus size={15} />,
+        subs: [],
     },
     {
         section: 'billing',
         label: () => t('projects.flow.billing'),
         icon: <Wallet size={15} />,
         subs: [],
-    },
-    {
-        section: 'addons',
-        label: () => t('projects.addonOrder'),
-        icon: <PackagePlus size={15} />,
-        subs: [
-            { key: 'addonOrders', label: () => t('auto.ek_siparis_olustur') },
-        ],
     },
 ];
 
@@ -134,9 +134,9 @@ export const ProjectTopNav = ({
             // Same tab strip as the tender detail workspace (TenderWorkspaceTabs):
             // underline on the page edge, active tab = filled panel + brand
             // underline + weight. `ofi-quote-tab*` are the dark.css accent hooks.
-            className="mb-2 min-w-0 overflow-x-auto border-b border-slate-200 md:overflow-visible dark:border-white/15"
+            className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 md:overflow-visible dark:border-white/15"
         >
-            <div className="flex min-w-max items-center gap-1">
+            <SlidingTopTabs activeKey={activeView.section} className="flex min-w-max items-stretch gap-1">
             {groups.map((group) => {
                 const active = activeView.section === group.section;
                 const badge = sectionAttention(group.section);
@@ -145,7 +145,8 @@ export const ProjectTopNav = ({
                 return (
                     <div
                         key={group.section}
-                        className="relative shrink-0"
+                        data-tab-key={group.section}
+                        className="relative -mb-px shrink-0"
                         onMouseEnter={() => hasSubs && openMenu(group.section)}
                         onMouseLeave={scheduleClose}
                     >
@@ -159,10 +160,10 @@ export const ProjectTopNav = ({
                                 setOpenSection(null);
                             }}
                             onFocus={() => hasSubs && openMenu(group.section)}
-                            className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-[3px] border-b-2 px-3.5 py-2 text-[12.5px] transition-colors ${
+                            className={`ofi-quote-tab inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                 active
-                                    ? 'ofi-quote-tab-active border-[#1f2654] bg-[#eef2fb] font-bold text-[#1f2654]'
-                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70 dark:hover:text-white'
+                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
+                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
                             }`}
                         >
                             <span>{group.label()}</span>
@@ -170,7 +171,7 @@ export const ProjectTopNav = ({
                             {hasSubs && (
                                 <ChevronDown
                                     size={13}
-                                    className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${active ? 'text-[#1f2654]/70 dark:text-current' : 'text-slate-400'}`}
+                                    className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${active ? 'text-[#1f2654]/70 dark:text-[#fbbf24]' : 'text-slate-400'}`}
                                 />
                             )}
                         </button>
@@ -183,7 +184,7 @@ export const ProjectTopNav = ({
                             >
                                 {group.subs.map((sub) => {
                                     const subActive = active && activeView.subSection === sub.key;
-                                    const subBadge = sub.key === 'addonOrders' && addonAttention ? t('projects.addonRequestBadge') : null;
+                                    const subBadge = sectionAttention(group.section);
                                     return (
                                         <button
                                             key={sub.key}
@@ -194,8 +195,8 @@ export const ProjectTopNav = ({
                                             }}
                                             className={`flex w-full items-center justify-between gap-2 whitespace-nowrap px-3.5 py-2 text-left text-[12.5px] font-medium transition-colors ${
                                                 subActive
-                                                    ? 'bg-[#eef4ff] text-[#272f67] dark:bg-white/10 dark:text-white'
-                                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-white/70 dark:hover:bg-white/10'
+                                                    ? 'bg-[#eef4ff] text-[#272f67] dark:bg-[#f59e0b]/15 dark:text-[#fbbf24]'
+                                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-white/70 dark:hover:bg-[#f59e0b]/10 dark:hover:text-[#fbbf24]'
                                             }`}
                                         >
                                             <span>{sub.label()}</span>
@@ -208,7 +209,7 @@ export const ProjectTopNav = ({
                     </div>
                 );
             })}
-            </div>
+            </SlidingTopTabs>
         </nav>
     );
 };

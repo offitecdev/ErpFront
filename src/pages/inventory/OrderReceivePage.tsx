@@ -11,7 +11,8 @@ import type { ArticleListItem, ItemType, OrderCalcMode, PurchaseOrderItemInput, 
 import { ArticleComboCell } from './components/ArticleComboCell';
 import { ArticlePickerModal } from './components/ArticlePickerModal';
 import { ExcelImportSheet } from './components/ExcelImportSheet';
-import { CELL_INPUT_CLASS, SectionCard } from './components/primitives';
+import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from './components/primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import type { DraftOrderRow, ImportedRecord } from './types';
 import { normalizeHeader } from './utils/columnMatch';
@@ -35,9 +36,10 @@ const errorText = (err: unknown): string =>
     || (err as Error)?.message
     || 'error';
 
-const emptyRow = (itemType: ItemType, calcMode: OrderCalcMode = 'DIRECT'): DraftOrderRow => ({
+const emptyRow = (calcMode: OrderCalcMode = 'DIRECT'): DraftOrderRow => ({
     key: `receive-${receiveRowSeed += 1}`,
-    itemType,
+    // Malzeme/ürün birleşmesi (2026-08-14): her satır üründür.
+    itemType: 'PRODUCT' as ItemType,
     articleId: null,
     code: '',
     serialNumber: '',
@@ -66,7 +68,7 @@ const rowFromItem = (item: PurchaseOrderRow['items'][number]): DraftOrderRow => 
     // yuvarlanması tutarı kaydırmasın (editörle aynı kural).
     const itemMode: OrderCalcMode = (item.discount3 ?? 0) > 0 ? 'DIRECT' : storedMode;
     return {
-        ...emptyRow(item.itemType, itemMode),
+        ...emptyRow(itemMode),
         articleId: item.articleId ?? null,
         code: item.code ?? '',
         serialNumber: item.serialNumber ?? '',
@@ -152,11 +154,6 @@ export const OrderReceivePage = () => {
     const [busy, setBusy] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    // ÜRÜN / MALZEME: mal kabulde yeniden SEÇİLMEZ — siparişin başında ne
-    // seçildiyse o geçerlidir (kullanıcı isteği 2026-08-02). Sipariş satırları
-    // yüklenirken baskın türden devralınır.
-    const [itemKind, setItemKind] = useState<ItemType>('PRODUCT');
-    const isMaterial = itemKind === 'MATERIAL';
     const [calcMode, setCalcMode] = useState<OrderCalcMode>('DIRECT');
     const [excelOpen, setExcelOpen] = useState(false);
     const [importing, setImporting] = useState(false);
@@ -166,9 +163,6 @@ export const OrderReceivePage = () => {
     const adoptOrder = (row: PurchaseOrderRow) => {
         setOrder(row);
         setRows(row.items.map(rowFromItem));
-        // Tür siparişten devralınır: satırların çoğunluğu malzemeyse malzeme.
-        const materialCount = row.items.filter((item) => item.itemType === 'MATERIAL').length;
-        setItemKind(materialCount > row.items.length / 2 ? 'MATERIAL' : 'PRODUCT');
         setDirty(false);
         setSelected(new Set());
     };
@@ -200,7 +194,7 @@ export const OrderReceivePage = () => {
     };
 
     const addRow = () => {
-        const row = emptyRow(itemKind, calcMode);
+        const row = emptyRow(calcMode);
         setRows((current) => [...current, row]);
         setFocusRowKey(row.key);
         setSelected(new Set());
@@ -258,7 +252,7 @@ export const OrderReceivePage = () => {
         setRows((current) => current.map((row) => (row.key === rowKey
             ? {
                 ...row,
-                itemType: itemKind,
+                itemType: 'PRODUCT',
                 articleId: article.id,
                 code: article.articleCode,
                 name: article.name,
@@ -269,7 +263,7 @@ export const OrderReceivePage = () => {
             }
             : row)));
         setDirty(true);
-        void supplyApi.itemSuppliers(itemKind, article.id)
+        void supplyApi.itemSuppliers(article.id)
             .then((result) => {
                 const best = result.suppliers[0];
                 if (!best?.lastPurchasePrice) return;
@@ -295,7 +289,6 @@ export const OrderReceivePage = () => {
                 page: 1,
                 pageSize: 5,
                 code,
-                itemType: itemKind,
                 status: 'ACTIVE',
             });
             const match = result.items.find(
@@ -350,7 +343,7 @@ export const OrderReceivePage = () => {
                 if (calcMode === 'SUPPLIER') {
                     const supplierNet = cellText(record.netPrice) || (article?.baseCost ? String(article.baseCost) : '');
                     additions.push({
-                        ...emptyRow(itemKind, 'SUPPLIER'),
+                        ...emptyRow('SUPPLIER'),
                         ...base,
                         quantity: cellText(record.quantity) || '1',
                         grossPrice: cellText(record.grossPrice) || (article?.baseCost ? String(article.baseCost) : ''),
@@ -361,7 +354,7 @@ export const OrderReceivePage = () => {
                 }
                 if (calcMode === 'DIRECT') {
                     additions.push({
-                        ...emptyRow(itemKind, 'DIRECT'),
+                        ...emptyRow('DIRECT'),
                         ...base,
                         code,
                         name,
@@ -382,7 +375,7 @@ export const OrderReceivePage = () => {
                     return;
                 }
                 additions.push({
-                    ...emptyRow(itemKind, 'AUTO'),
+                    ...emptyRow('AUTO'),
                     ...base,
                     quantity: cellText(record.quantity) || '1',
                     grossPrice: cellText(record.grossPrice)
@@ -450,25 +443,26 @@ export const OrderReceivePage = () => {
             return null;
         }
         // Yeni/çakışan kodlu satırlar önce ürün listesine yazılır (dosya kazanır).
+        // Tek toplu çağrı (malzeme/ürün birleşmesi 2026-08-14).
         const createdIds = new Map<string, string>();
-        for (const kind of ['PRODUCT', 'MATERIAL'] as ItemType[]) {
-            const newRows = filledRows.filter((row) => !row.articleId && row.itemType === kind && row.code.trim());
-            if (!newRows.length) continue;
-            if (!canCreateArticles) continue; // izin yoksa satır snapshot olarak kalır
-            const result = await inventoryApi.bulkCreateArticles(newRows.map((row) => ({
-                articleCode: row.code.trim(),
-                name: row.name.trim(),
-                quantity: 0,
-                purchasePrice: draftRowFigures(row).netUnitPrice,
-                supplierId: order.supplierId ?? null,
-                supplierName: order.supplierId ? null : order.supplierName,
-                unit: row.unit || null,
-            })), kind, { overwrite: true });
-            result.created.forEach((created) => {
-                const row = newRows.find((candidate) => !createdIds.has(candidate.key)
-                    && candidate.code.trim().toLowerCase() === created.articleCode.toLowerCase());
-                if (row) createdIds.set(row.key, created.id);
-            });
+        {
+            const newRows = filledRows.filter((row) => !row.articleId && row.code.trim());
+            if (newRows.length && canCreateArticles) {
+                const result = await inventoryApi.bulkCreateArticles(newRows.map((row) => ({
+                    articleCode: row.code.trim(),
+                    name: row.name.trim(),
+                    quantity: 0,
+                    purchasePrice: draftRowFigures(row).netUnitPrice,
+                    supplierId: order.supplierId ?? null,
+                    supplierName: order.supplierId ? null : order.supplierName,
+                    unit: row.unit || null,
+                })), undefined, { overwrite: true });
+                result.created.forEach((created) => {
+                    const row = newRows.find((candidate) => !createdIds.has(candidate.key)
+                        && candidate.code.trim().toLowerCase() === created.articleCode.toLowerCase());
+                    if (row) createdIds.set(row.key, created.id);
+                });
+            }
         }
         const updated = await purchaseOrdersApi.update(orderId, {
             items: filledRows.map((row) => rowToItem(row, createdIds.get(row.key))),
@@ -551,16 +545,26 @@ export const OrderReceivePage = () => {
 
     const openKeys = rows.filter((row) => remainingOf(row) > 0 && (row.articleId || row.name.trim())).map((row) => row.key);
 
+    // Malzeme/ürün birleşmesi (2026-08-14): tek tür kaldı, başlıklar sabit.
     const kindLabels = {
-        // Başlık TEK TÜR yazar (editörle aynı kural): tür siparişten devralınır.
-        name: t(isMaterial ? 'inv.columns.materialName' : 'inv.columns.productName'),
-        pick: t(isMaterial ? 'inv.stock.pickMaterial' : 'inv.stock.pickProduct'),
-        code: t(isMaterial ? 'inv.columns.materialCode' : 'inv.columns.serialCode'),
-        viewAll: `${t(isMaterial ? 'inv.materialPicker.viewAll' : 'inv.productPicker.viewAll')} …`,
-        allTitle: t(isMaterial ? 'inv.materialPicker.allTitle' : 'inv.productPicker.allTitle'),
+        name: t('inv.columns.productName'),
+        pick: t('inv.stock.pickProduct'),
+        code: t('inv.columns.serialCode'),
+        viewAll: `${t('inv.productPicker.viewAll')} …`,
+        allTitle: t('inv.productPicker.allTitle'),
     };
 
     const columnCount = 12;
+    // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
+    // (Kanca erken `return`'den ÖNCE çağrılmalı.)
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-order-receive:col-widths:v1',
+        defaults: {
+            code: 128, quantity: 88, grossPrice: 104, netPrice: 104,
+            discount: 88, discount2: 88, lineTotal: 120, mode: 40, send: 80,
+        },
+        minPx: 40,
+    });
 
     if (loading || !order) {
         return (
@@ -589,7 +593,7 @@ export const OrderReceivePage = () => {
                         {t('inv.orders.receive.title')}
                         <span className="font-mono text-[13px] text-slate-500 dark:text-white/60">{order.referenceNumber}</span>
                         {statusMeta && (
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}>
+                            <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}>
                                 {t(statusMeta.labelKey)}
                             </span>
                         )}
@@ -670,9 +674,6 @@ export const OrderReceivePage = () => {
                 ÜRÜN/MALZEME SEÇİCİSİ YOKTUR: tür siparişten devralınır. */}
             {allowed && (
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                    <span className="mr-auto text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t(isMaterial ? 'inv.stock.kindMaterial' : 'inv.stock.kindProduct')}
-                    </span>
                     <span className="flex items-center gap-2">
                     {/* HESAP KİPİ — TEK AÇILIR LİSTE (kullanıcı isteği 2026-08-02, üç
                         düğme yerine). Varsayılan DOĞRUDAN GİRİŞtir. Liste TÜM satırlara
@@ -713,7 +714,15 @@ export const OrderReceivePage = () => {
                     {/* Satırlar mal kabulde daha FERAH (kullanıcı isteği): yükseklik
                         `.ofi-receive-table` ile büyütülür. Ürün/malzeme sütunu ise
                         daraltıldı — tür zaten siparişten sabit. */}
-                    <table data-inv-table data-unstyled-table className="ofi-receive-table w-full" style={{ minWidth: 1136 }}>
+                    <table data-inv-table data-grid-lines data-unstyled-table className="ofi-receive-table w-full" style={{ minWidth: 1136 }}>
+                        <colgroup>
+                            {/* Seçim kutusu sütunu yalnızca yetkiliye çizilir —
+                                `<col>` listesi de aynı koşulu izler. */}
+                            {allowed && <col style={{ width: 36 }} />}
+                            {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['code', 'quantity', 'grossPrice', 'netPrice', 'discount', 'discount2', 'lineTotal', 'mode', 'send'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
                                 {allowed && (
@@ -726,18 +735,43 @@ export const OrderReceivePage = () => {
                                         />
                                     </th>
                                 )}
-                                <th className="w-64 text-left">{kindLabels.name}</th>
-                                <th className="w-32 text-left">{kindLabels.code}</th>
-                                <th className="w-20 text-right">{t('inv.columns.quantity')}</th>
-                                <th className="w-24 text-right">{t('inv.orders.columns.grossPrice')}</th>
-                                <th className="w-24 text-right">{t('inv.orders.columns.netPrice')}</th>
-                                <th className="w-20 text-right">{t('inv.orders.columns.discount')}</th>
-                                <th className="w-20 text-right">{t('inv.orders.columns.discount2')}</th>
-                                <th className="w-28 text-right">{t('inv.columns.lineTotal')}</th>
-                                <th className="w-10" aria-label={t('inv.orders.calcMode.rowToggleHint')} />
+                                <th className="text-left">{kindLabels.name}</th>
+                                <th className="relative text-left">
+                                    {kindLabels.code}
+                                    <ColResizeHandle {...grid.resizeProps('code')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.quantity')}
+                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.orders.columns.grossPrice')}
+                                    <ColResizeHandle {...grid.resizeProps('grossPrice')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.orders.columns.netPrice')}
+                                    <ColResizeHandle {...grid.resizeProps('netPrice')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.orders.columns.discount')}
+                                    <ColResizeHandle {...grid.resizeProps('discount')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.orders.columns.discount2')}
+                                    <ColResizeHandle {...grid.resizeProps('discount2')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.lineTotal')}
+                                    <ColResizeHandle {...grid.resizeProps('lineTotal')} />
+                                </th>
+                                <th className="relative" aria-label={t('inv.orders.calcMode.rowToggleHint')}>
+                                    <ColResizeHandle {...grid.resizeProps('mode')} />
+                                </th>
                                 {/* "Aktarılan" SÜTUNU YOKTUR (kullanıcı isteği):
                                     aktarılan satır zaten onay işaretiyle görünür. */}
-                                <th className="w-20" aria-label={t('inv.orders.receive.sendRow')} />
+                                <th className="relative" aria-label={t('inv.orders.receive.sendRow')}>
+                                    <ColResizeHandle {...grid.resizeProps('send')} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -777,11 +811,10 @@ export const OrderReceivePage = () => {
                                                     onCreate={(name) => patchRow(row.key, { name, articleId: null, unit: '' })}
                                                     onOpenAll={() => setAllPickerRowKey(row.key)}
                                                     linked={Boolean(row.articleId)}
-                                                    itemType={itemKind}
                                                     canCreate={canCreateArticles}
                                                     autoFocus={row.key === focusRowKey}
                                                     placeholder={kindLabels.pick}
-                                                    addLabel={t(isMaterial ? 'inv.materialPicker.addNew' : 'inv.productPicker.addNew', { name: row.name.trim() })}
+                                                    addLabel={t('inv.productPicker.addNew', { name: row.name.trim() })}
                                                     viewAllLabel={kindLabels.viewAll}
                                                 />
                                             ) : (
@@ -988,7 +1021,6 @@ export const OrderReceivePage = () => {
                 open={allPickerRowKey !== null}
                 onClose={() => setAllPickerRowKey(null)}
                 onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
-                itemType={itemKind}
                 title={kindLabels.allTitle}
             />
             <ExcelImportSheet

@@ -1,5 +1,6 @@
 import React from 'react';
 import { t } from '@/i18n/translate';
+import { attemptChunkReload } from '@/lib/chunkReload';
 
 interface PaneErrorBoundaryProps {
     /** When this changes (new page picked, route change), a shown error resets. */
@@ -26,6 +27,12 @@ export class PaneErrorBoundary extends React.Component<PaneErrorBoundaryProps, P
     componentDidCatch(error: Error) {
         // eslint-disable-next-line no-console
         console.error('[PaneErrorBoundary]', error);
+        // A deploy renames every hashed chunk; lazy component imports from a
+        // tab that loaded the previous build then reject and land here. One
+        // automatic reload picks up the new chunk graph instead of showing
+        // the error screen (routeHelpers has the same recovery for routes —
+        // this covers the dozens of in-page lazy() modals and panels).
+        attemptChunkReload(error);
     }
 
     componentDidUpdate(prevProps: PaneErrorBoundaryProps) {

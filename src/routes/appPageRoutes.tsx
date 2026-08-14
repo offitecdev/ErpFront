@@ -34,10 +34,8 @@ const TenderReport = lazyNamed(() => import('../pages/tender/TenderReport'), 'Te
 // Yeni tablo tabanlı envanter modülü — eski sayfalar pages/inventory_old altında arşivlendi.
 const ProductsPage = lazyNamed(() => import('../pages/inventory/ProductsPage'), 'ProductsPage');
 const ProductCreatePage = lazyNamed(() => import('../pages/inventory/ProductCreatePage'), 'ProductCreatePage');
+const ProductBulkCreatePage = lazyNamed(() => import('../pages/inventory/ProductBulkCreatePage'), 'ProductBulkCreatePage');
 const ProductDetailPage = lazyNamed(() => import('../pages/inventory/ProductDetailPage'), 'ProductDetailPage');
-const MaterialsPage = lazyNamed(() => import('../pages/inventory/MaterialsPage'), 'MaterialsPage');
-const MaterialCreatePage = lazyNamed(() => import('../pages/inventory/MaterialCreatePage'), 'MaterialCreatePage');
-const MaterialDetailPage = lazyNamed(() => import('../pages/inventory/MaterialDetailPage'), 'MaterialDetailPage');
 const StockPage = lazyNamed(() => import('../pages/inventory/StockPage'), 'StockPage');
 const StockMovementsPage = lazyNamed(() => import('../pages/inventory/StockMovementsPage'), 'StockMovementsPage');
 const SuppliersPage = lazyNamed(() => import('../pages/inventory/SuppliersPage'), 'SuppliersPage');
@@ -114,15 +112,17 @@ export const renderAppPageRoutes = () => (
         <Route path="/crm/tenders/:id/report" element={page(TenderReport)} />
         <Route path="/inventory" element={<Navigate to="/inventory/articles" replace />} />
         <Route path="/inventory/articles" element={page(ProductsPage)} />
-        {/* Ürün ekleme artık pop-up değil, kendi sayfası (stok ekranıyla aynı desen). */}
+        {/* Ürün ekleme artık TEKLİ form (detay ekranı düzeninde); toplu tablo
+            kendi sayfasında yaşar. Sabit yollar ':id'den ÖNCE tanımlıdır. */}
         <Route path="/inventory/articles/new" element={page(ProductCreatePage)} />
+        <Route path="/inventory/articles/bulk-new" element={page(ProductBulkCreatePage)} />
         {/* Detay: listeden satıra tıklayınca açılır; '/new' ile çakışmaması için
             sabit yol ÖNCE tanımlıdır. */}
         <Route path="/inventory/articles/:id" element={page(ProductDetailPage)} />
-        {/* Malzemeler: ürünlerle aynı tablo, aynı akış — yalnızca itemType farklı. */}
-        <Route path="/inventory/materials" element={page(MaterialsPage)} />
-        <Route path="/inventory/materials/new" element={page(MaterialCreatePage)} />
-        <Route path="/inventory/materials/:id" element={page(MaterialDetailPage)} />
+        {/* Malzeme/ürün birleşmesi (2026-08-14): ayrı malzeme listesi kalktı,
+            eski yollar ürün listesine yönlenir. */}
+        <Route path="/inventory/materials" element={<Navigate to="/inventory/articles" replace />} />
+        <Route path="/inventory/materials/:id" element={<Navigate to="/inventory/articles" replace />} />
         <Route path="/inventory/stock" element={page(StockPage)} />
         <Route path="/inventory/stock/movements" element={page(StockMovementsPage)} />
         {/* Eski yol: hareket girişi artık ortak stok ekranında. */}

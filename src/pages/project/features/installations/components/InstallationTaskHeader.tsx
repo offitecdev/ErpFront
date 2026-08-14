@@ -1,5 +1,4 @@
 import { Clock } from '@/components/icons/antIconCompat';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 const TONE_STYLES: Record<string, string> = {
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',
@@ -36,7 +35,7 @@ export const InstallationTaskHeader = ({
     <div className="ofi-rep-panel rounded-xl p-3.5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
-                <div className="font-mono text-[11px] font-semibold text-slate-500">{orderNumber ? localizeTenderNumbersInText(orderNumber) : '-'}</div>
+                <div className="font-mono text-[11px] font-semibold text-slate-500">{orderNumber ? orderNumber : '-'}</div>
                 <div className="truncate text-[15px] font-semibold text-slate-950">{title || '-'}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-600">
                     <span className="flex items-center gap-1.5"><Clock size={12} />{dateTimeText}</span>

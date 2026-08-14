@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { inventoryApi } from '@/lib/api/inventory';
-import type { ArticleListItem, ItemType } from '@/types/inventory';
+import type { ArticleListItem } from '@/types/inventory';
 import { useDebouncedValue } from './useDebouncedValue';
 
 export const PRODUCTS_PAGE_SIZE = 15;
@@ -16,11 +16,11 @@ export interface ProductSort {
 }
 
 /**
- * Ürün/malzeme listesi: sunucu sayfalı; genel arama + durum + kolon filtreleri
- * eski listeyle aynı kriterlerle DB'de uygulanır. İki ekran da aynı Article
- * tablosunu kullanır, yalnızca `itemType` değişir.
+ * Ürün listesi: sunucu sayfalı; genel arama + kolon filtreleri eski listeyle
+ * aynı kriterlerle DB'de uygulanır. Malzeme/ürün birleşmesinden (2026-08-14)
+ * beri liste tektir — itemType (ürün/hizmet) filtre değildir, satır rozetidir.
  */
-export const useArticlesList = (itemType: ItemType) => {
+export const useArticlesList = () => {
     const [items, setItems] = useState<ArticleListItem[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -37,21 +37,37 @@ export const useArticlesList = (itemType: ItemType) => {
     const debouncedFilters = useDebouncedValue(filters);
 
     // Filtre/arama değişince ilk sayfaya dön.
-    useEffect(() => { setPage(1); }, [itemType, debouncedSearch, debouncedFilters]);
+    useEffect(() => { setPage(1); }, [debouncedSearch, debouncedFilters]);
 
     const [reloadTick, setReloadTick] = useState(0);
-    const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
+    // `silent: true` — tablo "yükleniyor" durumuna DÜŞMEDEN arkada tazelenir
+    // (satır silme sonrası sayfa dolgusu için; ekran o sırada eldeki satırları
+    // göstermeye devam eder).
+    const silentRef = useRef(false);
+    const reload = useCallback((options?: { silent?: boolean }) => {
+        silentRef.current = Boolean(options?.silent);
+        setReloadTick((tick) => tick + 1);
+    }, []);
+
+    /** Satırı BEKLEMEDEN listeden düşürür (silme sonrası anlık kaldırma). */
+    const removeItem = useCallback((id: string) => {
+        setItems((current) => current.filter((item) => item.id !== id));
+        setTotal((current) => Math.max(0, current - 1));
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
+        // Bayrak tek kullanımlıktır: sayfa/filtre kaynaklı normal yüklemeler
+        // spinner'ını göstermeye devam eder.
+        const silent = silentRef.current;
+        silentRef.current = false;
+        if (!silent) setLoading(true);
         setError(null);
         inventoryApi
             .articlesSummaryPaged({
                 page,
                 pageSize: PRODUCTS_PAGE_SIZE,
                 search: debouncedSearch || undefined,
-                itemType,
                 code: debouncedFilters.code || undefined,
                 name: debouncedFilters.name || undefined,
                 sortBy: sort.by,
@@ -67,7 +83,7 @@ export const useArticlesList = (itemType: ItemType) => {
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [itemType, page, debouncedSearch, debouncedFilters, sort, reloadTick]);
+    }, [page, debouncedSearch, debouncedFilters, sort, reloadTick]);
 
     const totalPages = useMemo(() => Math.max(1, Math.ceil(total / PRODUCTS_PAGE_SIZE)), [total]);
 
@@ -80,6 +96,6 @@ export const useArticlesList = (itemType: ItemType) => {
     return {
         items, total, totalPages, page, setPage, loading, error,
         search, setSearch, filters, setFilters,
-        sort, toggleSort, reload,
+        sort, toggleSort, reload, removeItem,
     };
 };

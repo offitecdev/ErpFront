@@ -1,10 +1,9 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import {
     Check,
     Edit01,
     File05 as FileText,
-    Image01 as ImageIcon,
     Plus,
     Trash01,
 } from '@/components/icons/antIconCompat';
@@ -20,15 +19,13 @@ const LazyRichTextEditor = lazy(() =>
 );
 
 /** 6 MB of binary — a data URI is ~4/3 the size, which is what actually travels. */
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg'];
 
 export type TenderPdfContent = {
     /** Intro text — printed on page 1, directly below the offer title. */
     coverLetter: string | null;
-    /** Final text — printed after the totals. */
-    closingNote: string | null;
-    /** Related images, printed after the final text. */
+    /** Related images, printed after the totals. */
     closingImages: string[];
 };
 
@@ -94,30 +91,23 @@ const BlockShell = ({
 
 /**
  * The optional blocks appended to an offer's PDF: an intro text (page 1,
- * directly below the offer title), a final text (printed after the totals) and
- * any number of related images printed after that text.
+ * directly below the offer title) and any number of images printed after the
+ * totals. There is no "final text" any more — the block, its add-button and its
+ * PDF rendering were removed; images now stand alone at the end of the document.
  *
- * The intro text is backed by tenant-wide templates (Textbausteine) stored in
- * the database: the picker popup lists them, applying one replaces the editor
- * content, and "+" saves the current text as a new template. The template
- * marked as default is pre-filled when the block is first added.
+ * The intro text is not gated behind an add-button: the editor is always on
+ * screen, plain, with the image slot directly underneath. It is backed by
+ * tenant-wide templates (Textbausteine) stored in the database: the picker popup
+ * lists them, applying one replaces the editor content, and "+" saves the
+ * current text as a new template. The template marked as default is loaded into
+ * an empty editor when the panel opens — the add-button used to do that.
  *
- * Rendered inline in the quote's lines tab, right under the row-entry menu,
- * but still lazy-loaded — it pulls in the rich-text editor, which must not sit
- * in the tender detail bundle for blocks most offers never fill in.
- *
- * The add-buttons render BELOW the blocks: once an intro text exists, the row
- * that adds the remaining blocks belongs under it rather than pushing the text
- * the user is writing down the page.
+ * Rendered in the quote's PDF tab, lazy-loaded — it pulls in the rich-text
+ * editor, which must not sit in the tender detail bundle for a tab most offers
+ * never visit.
  */
 export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: TenderPdfContentPanelProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    // A block can be open while still empty — the user has just added it and is
-    // about to type. Emptying a saved block does not close it; only Remove does.
-    const [openBlocks, setOpenBlocks] = useState({
-        coverLetter: hasText(value.coverLetter),
-        closingNote: hasText(value.closingNote),
-    });
 
     // ── Intro-text templates (Textbausteine) ─────────────────────────────────
     const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -131,8 +121,6 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
     const [formTitle, setFormTitle] = useState('');
     const [formContent, setFormContent] = useState('');
 
-    const showCoverLetter = openBlocks.coverLetter || hasText(value.coverLetter);
-    const showClosingNote = openBlocks.closingNote || hasText(value.closingNote);
     const images = value.closingImages ?? [];
 
     const loadTemplates = async (): Promise<TenderTextTemplateDto[]> => {
@@ -197,7 +185,6 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
 
     const applyTemplate = (template: TenderTextTemplateDto) => {
         onChange({ coverLetter: template.content ?? '' });
-        setOpenBlocks((current) => ({ ...current, coverLetter: true }));
         setTemplatesOpen(false);
     };
 
@@ -225,39 +212,40 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
         }
     };
 
-    /** "Add intro text": opens the block, pre-filled from the default template. */
-    const addCoverLetter = async () => {
-        setOpenBlocks((current) => ({ ...current, coverLetter: true }));
-        if (hasText(value.coverLetter)) return;
-        try {
-            const list = await loadTemplates();
-            const fallback = list.find((item) => item.isDefault) ?? null;
-            if (fallback?.content) onChange({ coverLetter: fallback.content });
-        } catch {
-            /* Vorbefüllung ist best-effort — der Block bleibt einfach leer. */
-        }
-    };
-
-    const removeBlock = (key: 'coverLetter' | 'closingNote') => {
-        setOpenBlocks((current) => ({ ...current, [key]: false }));
-        onChange({ [key]: null });
-    };
+    /**
+     * Vorbelegung: Der Einleitungstext hat keinen Hinzufügen-Button mehr, also
+     * übernimmt das Öffnen des Panels dessen Aufgabe — ein leerer Editor wird
+     * einmalig mit dem Standard-Textbaustein gefüllt. Der Aufrufer rendert das
+     * Panel erst, wenn der gespeicherte Text geladen ist; sonst würde die
+     * Vorbelegung einen vorhandenen Text überschreiben. Best effort: schlägt der
+     * Abruf fehl, bleibt der Editor einfach leer.
+     */
+    const prefillDone = useRef(false);
+    useEffect(() => {
+        if (prefillDone.current || !canEdit || hasText(value.coverLetter)) return;
+        prefillDone.current = true;
+        void loadTemplates()
+            .then((list) => {
+                const fallback = list.find((item) => item.isDefault) ?? null;
+                if (fallback?.content) onChange({ coverLetter: fallback.content });
+            })
+            .catch(() => { /* stiller Fehlschlag — der Editor bleibt leer */ });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canEdit]);
 
     const addImages = async (files: FileList | null) => {
         if (!files?.length) return;
-        const accepted: string[] = [];
-        for (const file of Array.from(files)) {
-            if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-                onError(t('tenders.image_invalid_type'));
-                continue;
-            }
-            if (file.size > MAX_IMAGE_BYTES) {
-                onError(t('tenders.image_too_large'));
-                continue;
-            }
-            accepted.push(await fileToDataUrl(file));
+        const file = files[0];
+        if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+            onError(t('tenders.image_invalid_type'));
+            return;
         }
-        if (accepted.length) onChange({ closingImages: [...images, ...accepted] });
+        if (file.size > MAX_IMAGE_BYTES) {
+            onError(t('tenders.image_too_large').replace('6 MB', '5 MB'));
+            return;
+        }
+        const image = await fileToDataUrl(file);
+        onChange({ closingImages: [...images, image] });
     };
 
     const removeImage = (index: number) => {
@@ -268,49 +256,33 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
         <div className="space-y-2.5">
             <p className="text-[12px] text-slate-500">{t('tenders.pdf_content_hint')}</p>
 
-            {showCoverLetter && (
-                <BlockShell
-                    title={t('tenders.cover_letter')}
-                    hint={t('tenders.cover_letter_hint')}
-                    canEdit={canEdit}
-                    onRemove={() => removeBlock('coverLetter')}
-                    headerAction={(
-                        <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={openTemplatePicker}>
-                            {t('tenders.text_templates')}
-                        </Button>
-                    )}
-                >
-                    <Suspense fallback={<div className="h-32 animate-pulse rounded-[3px] bg-slate-100" />}>
-                        <LazyRichTextEditor
-                            value={value.coverLetter ?? ''}
-                            onChange={(next) => onChange({ coverLetter: next })}
-                            minHeight={160}
-                        />
-                    </Suspense>
-                </BlockShell>
-            )}
-
-            {showClosingNote && (
-                <BlockShell
-                    title={t('tenders.closing_note')}
-                    hint={t('tenders.closing_note_hint')}
-                    canEdit={canEdit}
-                    onRemove={() => removeBlock('closingNote')}
-                >
-                    <Suspense fallback={<div className="h-32 animate-pulse rounded-[3px] bg-slate-100" />}>
-                        <LazyRichTextEditor
-                            value={value.closingNote ?? ''}
-                            onChange={(next) => onChange({ closingNote: next })}
-                            minHeight={140}
-                        />
-                    </Suspense>
-                </BlockShell>
-            )}
+            {/* Der Einleitungstext ist immer offen — kein Hinzufügen-Button
+                mehr davor; der Papierkorb leert nur noch das Feld. Direkt
+                darunter folgt der Bildblock, genau wie im PDF. */}
+            <BlockShell
+                title={t('tenders.cover_letter')}
+                hint={t('tenders.cover_letter_hint')}
+                canEdit={canEdit}
+                onRemove={() => onChange({ coverLetter: null })}
+                headerAction={(
+                    <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={openTemplatePicker}>
+                        {t('tenders.text_templates')}
+                    </Button>
+                )}
+            >
+                <Suspense fallback={<div className="h-32 animate-pulse rounded-[3px] bg-slate-100" />}>
+                    <LazyRichTextEditor
+                        value={value.coverLetter ?? ''}
+                        onChange={(next) => onChange({ coverLetter: next })}
+                        minHeight={160}
+                    />
+                </Suspense>
+            </BlockShell>
 
             {(images.length > 0 || canEdit) && (
                 <BlockShell
                     title={t('tenders.closing_image')}
-                    hint={t('tenders.closing_image_hint')}
+                    hint={t('tenders.closing_image_hint').replace('6 MB', '5 MB')}
                     canEdit={canEdit && images.length > 0}
                     onRemove={() => onChange({ closingImages: [] })}
                 >
@@ -356,7 +328,6 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
                 ref={fileInputRef}
                 type="file"
                 accept={ACCEPTED_IMAGE_TYPES.join(',')}
-                multiple
                 className="hidden"
                 onChange={(event) => {
                     void addImages(event.target.files);
@@ -364,34 +335,6 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
                     event.target.value = '';
                 }}
             />
-
-            {/* Quick-add row, BELOW the blocks so it never displaces text being
-                written. It doubles as the readout of what this PDF carries: a
-                button is only offered for a block the offer does not have yet. */}
-            {canEdit && (!showCoverLetter || !showClosingNote) && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2.5">
-                    {!showCoverLetter && (
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={<FileText size={13} />}
-                            onClick={() => void addCoverLetter()}
-                        >
-                            {t('tenders.add_cover_letter')}
-                        </Button>
-                    )}
-                    {!showClosingNote && (
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={<ImageIcon size={13} />}
-                            onClick={() => setOpenBlocks((current) => ({ ...current, closingNote: true }))}
-                        >
-                            {t('tenders.add_closing_note')}
-                        </Button>
-                    )}
-                </div>
-            )}
 
             {/* ── Textbausteine: Popup von UNTEN, Inhalt gleitet links/rechts ──── */}
             <BottomSheet

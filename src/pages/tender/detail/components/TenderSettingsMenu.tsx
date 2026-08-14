@@ -40,7 +40,7 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
                 aria-label={t('tenders.tender_settings')}
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className={`inline-flex h-7 w-7 items-center justify-center rounded-[3px] transition-colors ${
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-[3px] border border-transparent transition-colors ${
                     open
                         ? 'bg-[#272f67]/15 text-[#1f2654]'
                         : 'text-slate-500 hover:bg-[#272f67]/15 hover:text-[#1f2654]'
@@ -52,13 +52,16 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
             {open && (
                 <div
                     role="menu"
-                    className="absolute left-0 top-8 z-50 w-56 rounded-[2px] bg-primary p-1.5 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2"
+                    className="absolute left-0 top-11 z-50 w-56 rounded-[2px] bg-primary p-1.5 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2"
                 >
                     <div className="border-b border-secondary px-3 py-2">
                         <p className="text-xs font-semibold uppercase tracking-wide text-tertiary">
                             {t('tenders.tender_settings')}
                         </p>
                     </div>
+                    {/* Sipariş türü sorusu ARTIK BURADA DEĞİL: Onayla / Auftrag
+                        erstellen düğmesi iki seçenekli popup'ı kendisi açar
+                        (kullanıcı isteği). */}
                     <button
                         type="button"
                         role="menuitem"

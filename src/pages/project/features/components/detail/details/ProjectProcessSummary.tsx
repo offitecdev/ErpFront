@@ -2,7 +2,6 @@ import { memo } from 'react';
 
 import { Check, Plus, Receipt as ReceiptText } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import type { ProjectFlow } from '@/lib/projectFlow';
 
 import type { FlowBillItem } from '../../../hooks/useProjectFlowSummary';
@@ -78,7 +77,7 @@ export const ProjectProcessSummary = memo(({
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <div className="truncate font-mono text-[12px] font-semibold text-slate-800">
-                                        {localizeTenderNumbersInText(item.label)}
+                                        {item.label}
                                     </div>
                                     <div className="font-mono text-[10.5px] text-slate-400">{money(item.amount)}</div>
                                 </div>

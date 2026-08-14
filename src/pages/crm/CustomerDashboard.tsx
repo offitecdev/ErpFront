@@ -20,7 +20,7 @@ import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Modal } from '../../components/ui-shared/Modal';
 import { LoadingPanel, SkeletonBar } from '../../components/ui-shared/Loader';
-import { localizeTenderNumber } from '../../utils/tenderNumber';
+import { SlidingTopTabs } from '../../components/ui-shared/SlidingTopTabs';
 import type { TenderListItem } from '../../types/tender';
 import { getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
 
@@ -416,19 +416,20 @@ export const CustomerDashboard = () => {
             />
 
             {/* Reiterleiste in der Optik der Angebotsdetailseite. */}
-            <div className="mb-2 min-w-0 overflow-x-auto border-b border-slate-200 dark:border-white/15">
-                <nav className="flex gap-0.5" aria-label={i18nT('crm.customer_sections')}>
+            <div className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 dark:border-white/15">
+                <SlidingTopTabs activeKey={activeCustomerTab} className="flex min-w-max items-stretch gap-1" role="navigation" aria-label={i18nT('crm.customer_sections')}>
                     {customerTabs.map((tab) => {
                         const active = activeCustomerTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
+                                data-tab-key={tab.id}
                                 type="button"
                                 onClick={() => selectCustomerTab(tab.id)}
-                                className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-[2px] border-b-2 px-3.5 py-2 text-[12.5px] transition-colors ${
+                                className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                     active
-                                        ? 'ofi-quote-tab-active border-[#1f2654] bg-[#eef2fb] font-bold text-[#1f2654]'
-                                        : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70 dark:hover:text-white'
+                                        ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
+                                        : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
                                 }`}
                             >
                                 {tab.label}
@@ -442,7 +443,7 @@ export const CustomerDashboard = () => {
                             </button>
                         );
                     })}
-                </nav>
+                </SlidingTopTabs>
             </div>
 
             {/* ---- PROFILE ---- */}
@@ -524,7 +525,7 @@ export const CustomerDashboard = () => {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="text-[13px] font-semibold text-slate-900">{localizeTenderNumber(t.tenderNumber)}</span>
+                                            <span className="text-[13px] font-semibold text-slate-900">{t.tenderNumber}</span>
                                             <StatusChip variant="active">{i18nT('nav.projects')}</StatusChip>
                                             <span className="font-mono text-[10.5px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
                                                 {t.format}

@@ -1,4 +1,4 @@
-import { apiClient } from '../axios';
+import { apiClient, getShared } from '../axios';
 
 export interface NotificationDto {
     id: string;
@@ -16,7 +16,7 @@ export interface NotificationDto {
 
 export const notificationApi = {
     list: async (params?: { unreadOnly?: boolean; limit?: number }): Promise<NotificationDto[]> => {
-        const res = await apiClient.get('/notifications', { params });
+        const res = await getShared<NotificationDto[]>('/notifications', { params });
         return res.data;
     },
 
@@ -28,7 +28,7 @@ export const notificationApi = {
 
     /** Server-side unread count for the active company (badge figure). */
     unreadCount: async (): Promise<number> => {
-        const res = await apiClient.get('/notifications/unread-count');
+        const res = await getShared<{ count?: number }>('/notifications/unread-count');
         return Number(res.data?.count) || 0;
     },
 

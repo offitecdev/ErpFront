@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
-import { Plus, Save01 as Save, Trash01 as TrashIcon, X as XIcon } from '@/components/icons/antIconCompat';
+import { AlertTriangle, Plus, Save01 as Save, Trash01 as TrashIcon, X as XIcon } from '@/components/icons/antIconCompat';
 
 import { t as i18nT } from '@/i18n/translate';
 import { apiClient } from '../../../lib/axios';
 import { customerApi } from '../../../lib/api/customer';
 import { Button } from '../../../components/ui-shared/Button';
-import { CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { ColResizeHandle, ResizableCols, CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../../hooks/useColumnWidths';
+import { CUSTOMER_ADD_ROW_BUTTON_CLASS } from './customerDetail.constants';
 
 /**
  * Interne Notizen als Tabelle mit gesammeltem Speichern: das "+" hängt eine
@@ -24,16 +26,18 @@ export interface CustomerNoteDto {
     createdBy?: { firstName?: string; lastName?: string };
 }
 
-// Notizarten — Beschriftung kommt aus der Übersetzung, gespeichert wird der Code.
-const NOTE_TYPE_OPTIONS = [
-    { value: 'internal', labelKey: 'crm.noteTypeInternal' },
-    { value: 'customer', labelKey: 'crm.noteTypeCustomer' },
-    { value: 'warning', labelKey: 'crm.noteTypeWarning' },
-] as const;
+/**
+ * Notizarten (intern / Kunde / Warnung) gibt es in der Oberfläche NICHT mehr
+ * (Nutzerwunsch 2026-08-03): statt einer Einordnung wird eine Notiz nur noch
+ * als „Wichtig“ markiert. Die Spalte `noteType` bleibt am Datensatz, damit
+ * bestehende Notizen unverändert bleiben — neue bekommen `internal`.
+ */
+const DEFAULT_NOTE_TYPE = 'internal';
 
 interface NoteDraft {
     id: string | null;
     key: string;
+    /** Wird nicht mehr bearbeitet, aber unverändert mitgespeichert. */
     noteType: string;
     noteText: string;
     isHighlight: boolean;
@@ -47,7 +51,7 @@ const authorOf = (note: CustomerNoteDto) =>
 const toDraft = (note: CustomerNoteDto): NoteDraft => ({
     id: note.id,
     key: note.id,
-    noteType: note.noteType || 'internal',
+    noteType: note.noteType || DEFAULT_NOTE_TYPE,
     noteText: note.noteText ?? '',
     isHighlight: Boolean(note.isHighlight),
     createdAt: note.createdAt,
@@ -71,12 +75,29 @@ export const CustomerNotesTable = ({
     items: CustomerNoteDto[];
     onChanged: () => void | Promise<void>;
 }) => {
+    const grid = useColumnWidths({
+        storageKey: 'offitec:customer-notes:col-widths:v1',
+        defaults: { highlight: 112, date: 128, author: 160, actions: 64 },
+        minPx: 56,
+    });
     const saved = useMemo(() => items.map(toDraft), [items]);
     const [rows, setRows] = useState<NoteDraft[]>(saved);
     const [syncedItems, setSyncedItems] = useState(items);
     const [removedIds, setRemovedIds] = useState<string[]>([]);
     const [saving, setSaving] = useState(false);
     const [newRowSeq, setNewRowSeq] = useState(0);
+
+    /**
+     * Anzeigereihenfolge: WICHTIGE Notizen zuerst, alles andere in seiner
+     * bisherigen Reihenfolge. `sort` in JS ist stabil, also bleibt innerhalb der
+     * beiden Gruppen die Eingabe-/Ladereihenfolge erhalten — auch die leere
+     * neue Zeile bleibt damit unten, bis sie als wichtig markiert wird.
+     * Nur die ANSICHT wird sortiert; `rows` (und damit das Speichern) nicht.
+     */
+    const visibleRows = useMemo(
+        () => [...rows].sort((a, b) => Number(b.isHighlight) - Number(a.isHighlight)),
+        [rows],
+    );
 
     const dirty = useMemo(() => {
         if (removedIds.length > 0) return true;
@@ -101,7 +122,7 @@ export const CustomerNotesTable = ({
         setNewRowSeq((current) => current + 1);
         setRows((current) => [
             ...current,
-            { id: null, key, noteType: 'internal', noteText: '', isHighlight: false, createdAt: null, author: '' },
+            { id: null, key, noteType: DEFAULT_NOTE_TYPE, noteText: '', isHighlight: false, createdAt: null, author: '' },
         ]);
     };
 
@@ -145,50 +166,76 @@ export const CustomerNotesTable = ({
 
     return (
         <SectionCard title={`${i18nT('crm.internal_notes')} (${rows.length})`}>
-            <table data-inv-table data-unstyled-table className="w-full">
+            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                <colgroup>
+                    {/* Not metni: genişliği yok, kalan yeri emer. */}
+                    <col />
+                    <ResizableCols keys={['highlight', 'date', 'author', 'actions'] as const} grid={grid} />
+                </colgroup>
                 <thead>
                     <tr>
-                        <th className="w-40 text-left">{i18nT('crm.noteType')}</th>
                         <th className="text-left">{i18nT('crm.noteText')}</th>
-                        <th className="w-28 text-center">{i18nT('crm.noteHighlight')}</th>
-                        <th className="w-32 text-left">{i18nT('common.date')}</th>
-                        <th className="w-40 text-left">{i18nT('crm.noteAuthor')}</th>
-                        <th className="w-16 text-right" />
+                        <th className="relative text-center">
+                            {i18nT('crm.noteHighlight')}
+                            <ColResizeHandle {...grid.resizeProps('highlight')} />
+                        </th>
+                        <th className="relative text-left">
+                            {i18nT('common.date')}
+                            <ColResizeHandle {...grid.resizeProps('date')} />
+                        </th>
+                        <th className="relative text-left">
+                            {i18nT('crm.noteAuthor')}
+                            <ColResizeHandle {...grid.resizeProps('author')} />
+                        </th>
+                        <th className="relative text-right">
+                            <ColResizeHandle {...grid.resizeProps('actions')} />
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.length === 0 && (
-                        <TableStateRow colSpan={6} loading={false} emptyText={i18nT('crm.noNotes')} />
+                        <TableStateRow colSpan={5} loading={false} emptyText={i18nT('crm.noNotes')} />
                     )}
-                    {rows.map((row) => (
-                        <tr key={row.key} className="group transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
-                            <td>
-                                <select
-                                    value={row.noteType}
-                                    onChange={(event) => patch(row.key, { noteType: event.target.value })}
-                                    className={CELL_INPUT_CLASS}
-                                >
-                                    {NOTE_TYPE_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>{i18nT(option.labelKey)}</option>
-                                    ))}
-                                </select>
-                            </td>
+                    {visibleRows.map((row) => (
+                        // WICHTIG = rot: die Zeile bekommt einen roten Grundton und
+                        // der Notiztext wird rot geschrieben, damit sie im Stapel
+                        // sofort auffällt. Umschalten geht jederzeit über den Knopf
+                        // in der Spalte „Wichtig“.
+                        <tr
+                            key={row.key}
+                            className={`group transition-colors ${
+                                row.isHighlight
+                                    ? 'bg-rose-50 hover:bg-rose-100/70 dark:bg-rose-500/10 dark:hover:bg-rose-500/15'
+                                    : 'hover:bg-slate-50 dark:hover:bg-white/5'
+                            }`}
+                        >
                             <td>
                                 <input
                                     value={row.noteText}
                                     onChange={(event) => patch(row.key, { noteText: event.target.value })}
                                     placeholder={i18nT('crm.noteText')}
-                                    className={CELL_INPUT_CLASS}
+                                    className={`${CELL_INPUT_CLASS} ${
+                                        row.isHighlight ? '!font-semibold !text-rose-700 dark:!text-rose-300' : ''
+                                    }`}
                                 />
                             </td>
                             <td className="text-center">
-                                <input
-                                    type="checkbox"
-                                    checked={row.isHighlight}
-                                    onChange={(event) => patch(row.key, { isHighlight: event.target.checked })}
+                                {/* Umschalter statt Häkchen: rot gefüllt = wichtig,
+                                    blass = normal. Ein Klick kehrt es um. */}
+                                <button
+                                    type="button"
+                                    onClick={() => patch(row.key, { isHighlight: !row.isHighlight })}
+                                    aria-pressed={row.isHighlight}
                                     aria-label={i18nT('crm.noteHighlight')}
-                                    className="size-4 accent-[#1f2654]"
-                                />
+                                    title={i18nT('crm.noteHighlight')}
+                                    className={`inline-flex size-6 items-center justify-center rounded-[2px] border transition-colors ${
+                                        row.isHighlight
+                                            ? 'border-rose-300 bg-rose-100 text-rose-600 hover:bg-rose-200 dark:border-rose-400/40 dark:bg-rose-500/20 dark:text-rose-300'
+                                            : 'border-slate-200 text-slate-300 hover:border-rose-300 hover:text-rose-500 dark:border-white/15 dark:text-white/30'
+                                    }`}
+                                >
+                                    <AlertTriangle size={13} />
+                                </button>
                             </td>
                             <td className="text-slate-500 dark:text-white/55">
                                 {row.createdAt ? dayjs(row.createdAt).format('DD.MM.YYYY') : '—'}
@@ -208,19 +255,22 @@ export const CustomerNotesTable = ({
                     ))}
 
                     <tr className="bg-slate-50/60 dark:bg-white/[0.02]">
-                        <td colSpan={5} className="text-[12.5px] text-slate-400 dark:text-white/40">
-                            {i18nT('crm.addNoteHint')}
-                        </td>
-                        <td className="text-right">
-                            <button
-                                type="button"
-                                onClick={addRow}
-                                title={i18nT('crm.addNote')}
-                                aria-label={i18nT('crm.addNote')}
-                                className="inline-flex size-6 items-center justify-center rounded-[2px] border border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                            >
-                                <Plus size={13} />
-                            </button>
+                        {/* Knopf UND Beschriftung in DERSELBEN Zelle, rechts. */}
+                        <td colSpan={5}>
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={addRow}
+                                    title={i18nT('crm.addNote')}
+                                    aria-label={i18nT('crm.addNote')}
+                                    className={CUSTOMER_ADD_ROW_BUTTON_CLASS}
+                                >
+                                    <Plus size={18} />
+                                </button>
+                                <span className="text-[12.5px] text-slate-400 dark:text-white/40">
+                                    {i18nT('crm.addNoteHint')}
+                                </span>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

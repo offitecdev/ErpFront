@@ -7,7 +7,9 @@ import { t as i18nT } from '@/i18n/translate';
 import { apiClient } from '../../../lib/axios';
 import { customerApi } from '../../../lib/api/customer';
 import { Button } from '../../../components/ui-shared/Button';
-import { CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { ColResizeHandle, ResizableCols, CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { useColumnWidths } from '../../../hooks/useColumnWidths';
+import { CUSTOMER_ADD_ROW_BUTTON_CLASS } from './customerDetail.constants';
 
 /**
  * Aktivitäten (Zeitachse) als Tabelle mit gesammeltem Speichern — gleiche
@@ -90,6 +92,11 @@ export const CustomerActivitiesTable = ({
     items: CustomerActivityDto[];
     onChanged: () => void | Promise<void>;
 }) => {
+    const grid = useColumnWidths({
+        storageKey: 'offitec:customer-activities:col-widths:v1',
+        defaults: { date: 128, kind: 176, author: 160, actions: 64 },
+        minPx: 56,
+    });
     const saved = useMemo(() => items.map(toDraft), [items]);
     const [rows, setRows] = useState<ActivityDraft[]>(saved);
     const [syncedItems, setSyncedItems] = useState(items);
@@ -171,14 +178,31 @@ export const CustomerActivitiesTable = ({
 
     return (
         <SectionCard title={`${i18nT('crm.activities_label')} (${rows.length})`}>
-            <table data-inv-table data-unstyled-table className="w-full">
+            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                <colgroup>
+                    <ResizableCols keys={['date', 'kind'] as const} grid={grid} />
+                    {/* Açıklama sütunu: genişliği yok, kalan yeri emer. */}
+                    <col />
+                    <ResizableCols keys={['author', 'actions'] as const} grid={grid} />
+                </colgroup>
                 <thead>
                     <tr>
-                        <th className="w-32 text-left">{i18nT('common.date')}</th>
-                        <th className="w-44 text-left">{i18nT('crm.activityType')}</th>
+                        <th className="relative text-left">
+                            {i18nT('common.date')}
+                            <ColResizeHandle {...grid.resizeProps('date', 'right')} />
+                        </th>
+                        <th className="relative text-left">
+                            {i18nT('crm.activityType')}
+                            <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                        </th>
                         <th className="text-left">{i18nT('crm.activityDescription')}</th>
-                        <th className="w-40 text-left">{i18nT('crm.noteAuthor')}</th>
-                        <th className="w-16 text-right" />
+                        <th className="relative text-left">
+                            {i18nT('crm.noteAuthor')}
+                            <ColResizeHandle {...grid.resizeProps('author')} />
+                        </th>
+                        <th className="relative text-right">
+                            <ColResizeHandle {...grid.resizeProps('actions')} />
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -239,19 +263,22 @@ export const CustomerActivitiesTable = ({
                     })}
 
                     <tr className="bg-slate-50/60 dark:bg-white/[0.02]">
-                        <td colSpan={4} className="text-[12.5px] text-slate-400 dark:text-white/40">
-                            {i18nT('crm.addActivityHint')}
-                        </td>
-                        <td className="text-right">
-                            <button
-                                type="button"
-                                onClick={addRow}
-                                title={i18nT('crm.addActivity')}
-                                aria-label={i18nT('crm.addActivity')}
-                                className="inline-flex size-6 items-center justify-center rounded-[2px] border border-dashed border-slate-300 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                            >
-                                <Plus size={13} />
-                            </button>
+                        {/* Knopf UND Beschriftung in DERSELBEN Zelle, rechts. */}
+                        <td colSpan={5}>
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={addRow}
+                                    title={i18nT('crm.addActivity')}
+                                    aria-label={i18nT('crm.addActivity')}
+                                    className={CUSTOMER_ADD_ROW_BUTTON_CLASS}
+                                >
+                                    <Plus size={18} />
+                                </button>
+                                <span className="text-[12.5px] text-slate-400 dark:text-white/40">
+                                    {i18nT('crm.addActivityHint')}
+                                </span>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

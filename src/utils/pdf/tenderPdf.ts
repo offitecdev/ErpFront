@@ -3,7 +3,6 @@ import { companySenderLine, drawAddressBlockLines } from './addressBlock';
 import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
-import { localizeTenderNumber } from '../tenderNumber';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
 import { drawRichText, parseRichTextParagraphs } from './richTextPdf';
@@ -64,12 +63,11 @@ export interface TenderPdfData {
     /** PDF dili (indirmeden önce seçilir). Varsayılan: Almanca. */
     lang?: PdfLang;
     /**
-     * Optional content blocks, all independent. `coverLetter` and `closingNote`
-     * are rich HTML (bold / italic / colour); `closingImage` is a data URI.
-     * Omitted or empty means the document renders exactly as it did before.
+     * Optional content blocks, all independent. `coverLetter` is rich HTML
+     * (bold / italic / colour); `closingImages` are data URIs. Omitted or empty
+     * means the document renders exactly as it did before.
      */
     coverLetter?: string | null;
-    closingNote?: string | null;
     closingImages?: string[] | null;
 }
 
@@ -101,7 +99,6 @@ export type PdfLang = 'tr' | 'de' | 'en';
 // Eski kayıtlarda kalan "T-2026-5494" / "TKF-2026-5720" gibi numaralar PDF'e
 // yazılırken seçilen dilin teklif ön ekine çevrilir (ör. Almanca PDF'te
 // "A-2026-5720"). Ekran gösterimleriyle aynı eşleme kullanılır.
-export { localizeTenderNumber };
 
 interface PdfStrings {
     offerNumber: string;
@@ -383,16 +380,16 @@ const drawRichTextFlow = (doc: jsPDF, html: string, startY: number): number =>
     });
 
 /**
- * Closing note followed by the closing image, in that order — the image is the
- * sign-off (a signature, a stamp, a photo) and belongs under the text.
+ * The closing images — the sign-off (a signature, a stamp, a photo) printed
+ * after the totals. They used to sit under a closing note; that text block was
+ * removed, so the images now stand on their own.
  *
- * The note continues on the totals page when there is room for a few lines,
- * rather than always claiming a fresh page for two sentences.
+ * They continue on the totals page when there is room, rather than always
+ * claiming a fresh page for one picture.
  */
 const appendClosingBlocks = async (doc: jsPDF, data: TenderPdfData, contentY: number) => {
-    const hasNote = hasRichContent(data.closingNote);
     const images = data.closingImages ?? [];
-    if (!hasNote && images.length === 0) return;
+    if (images.length === 0) return;
 
     const bottom = PAGE_H - FOOTER_RESERVED_BOTTOM;
     // Continue below the totals block when this page still has usable room;
@@ -405,13 +402,8 @@ const appendClosingBlocks = async (doc: jsPDF, data: TenderPdfData, contentY: nu
         y += 10;
     }
 
-    if (hasNote) {
-        y = drawRichTextFlow(doc, data.closingNote as string, y);
-        y += 3;
-    }
-
-    // Images follow the text, each scaled into the text column and flowed onto
-    // further pages as needed.
+    // Each image is scaled into the text column and flowed onto further pages
+    // as needed.
     for (const image of images) {
         try {
             const properties = doc.getImageProperties(image);
@@ -444,7 +436,7 @@ export async function buildTenderPdfBytes(
     const L = I18N[data.lang ?? 'de'];
     // Teklif numarası kapakta, başlıkta, QR mesajında ve dosya adında hep
     // seçilen dilin ön ekiyle görünsün.
-    data = { ...data, tenderNumber: localizeTenderNumber(data.tenderNumber, data.lang ?? 'de') };
+    data = { ...data, tenderNumber: data.tenderNumber };
 
     // ── SAYFA 1: Kapak & Giriş ───────────────────────────────────────────────
     drawCoverPage(doc, data, settings, L);
@@ -531,7 +523,7 @@ export async function exportTenderPdf(
 ): Promise<void> {
     const finalBytes = await buildTenderPdfBytes(data, settings, onProgress);
     onProgress?.({ stage: 'download' });
-    downloadPdf(finalBytes, `${localizeTenderNumber(data.tenderNumber, data.lang ?? 'de')}.pdf`);
+    downloadPdf(finalBytes, `${data.tenderNumber}.pdf`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

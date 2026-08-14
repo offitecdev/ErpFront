@@ -347,8 +347,8 @@ export const AppointmentWizard = ({ open, onClose, prefill, onSaved }: {
             onClose={onClose}
             title={t('calendar.wizard.title')}
             subtitle={view === 'form' ? `${step}/4 · ${stepTitles[step]}` : undefined}
-            width={960}
-            height="min(720px, 92vh)"
+            width={1400}
+            height="min(820px, 94vh)"
             footer={view === 'form' ? (
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-1.5">
@@ -441,9 +441,9 @@ export const AppointmentWizard = ({ open, onClose, prefill, onSaved }: {
             )}
 
             {view === 'form' && (
-                <div key={step} className={`${animClass[anim]} flex min-h-0 flex-1 flex-col p-5`}>
+                <div key={step} className={`${animClass[anim]} flex min-h-0 flex-1 flex-col p-5 md:p-7`}>
                     {step === 1 && (
-                        <div className="mx-auto w-full max-w-[560px] space-y-4">
+                        <div className="mx-auto w-full max-w-[980px] space-y-5">
                             <div>
                                 <span className="mb-1 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">{t('calendar.picker.customer')}</span>
                                 {/* No autoFocus: focusing would pop the list open while the
@@ -509,7 +509,7 @@ export const AppointmentWizard = ({ open, onClose, prefill, onSaved }: {
                     )}
 
                     {step === 2 && (
-                        <div className="mx-auto w-full max-w-[520px] space-y-4">
+                        <div className="mx-auto w-full max-w-[980px] space-y-5">
                             <label className="block">
                                 <span className="mb-1 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">{t('calendar.wizard.date')}</span>
                                 <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className={FIELD_CLASS} />

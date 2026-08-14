@@ -9,7 +9,7 @@
  *    üç satıra bölünmüştü, geri alındı): "OffiTec Heating & Cooling, Cores Tower
  *    - Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa sarılmaz, puntosu küçülür.
  *  - Kapak KARTI teklif belgesindeki DAR TABLONUN aynısıdır (78 mm, 5.6 mm
- *    satır): Auftrag / Besteller / Datum / Angebots-Nr / Projekt / EMPFÄNGER /
+ *    satır): Bestellung / Besteller / Datum / Angebots-Nr / Projekt / EMPFÄNGER /
  *    Lieferant. Alıcı adı sağdaki adres bloğunda DEĞİL bu kartta durur; DURUM
  *    SATIRI YOKTUR (kısa süre denendi, kullanıcı isteğiyle kaldırıldı).
  *    `tenderPdfModern` + `priceRequestPdf` ile birlikte güncellenir.
@@ -77,8 +77,8 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
     tr: {
         docTitle: 'Sipariş',
         // Sipariş numarasının etiketi ARTIK DİLE GÖRE ÇEVRİLİR (kullanıcı isteği
-        // 2026-08-02 — önceden tüm dillerde Almanca "Auftrag" kalıyordu).
-        // Numara AU-{yıl}-{sıra} biçimindedir (eski kayıtlar BE-{yıl}-{sıra}).
+        // 2026-08-02 — önceden tüm dillerde Almanca belge adı kalıyordu).
+        // Numara BE-{yıl}-{sıra} biçimindedir (BE-2026-001).
         orderNumber: 'Sipariş No',
         orderDate: 'Sipariş Tarihi',
         orderedBy: 'Sipariş veren',
@@ -108,18 +108,19 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         recipient: 'Alıcı',
     },
     de: {
-        // BELGE ALMANCADA "AUFTRAG"DIR (kullanıcı isteği 2026-08-02): başlık
-        // satırı "Auftrag AU-2026-001" olarak basılır. Diğer dillerde belge adı
-        // kendi dilindedir (Sipariş / Purchase Order).
-        docTitle: 'Auftrag',
-        orderNumber: 'Auftrag',
-        orderDate: 'Auftragsdatum',
+        // BELGE ALMANCADA "BESTELLUNG"DUR (kullanıcı isteği 2026-08-03; arada
+        // denenen "Auftrag" geri alındı): başlık satırı "Bestellung BE-2026-001"
+        // olarak basılır. Diğer dillerde belge adı kendi dilindedir
+        // (Sipariş / Purchase Order).
+        docTitle: 'Bestellung',
+        orderNumber: 'Bestellung',
+        orderDate: 'Bestelldatum',
         orderedBy: 'Besteller',
         quoteNumber: 'Angebots-Nr.',
         project: 'Projekt',
         supplier: 'Lieferant',
         greeting: 'Sehr geehrte Damen und Herren',
-        intro: 'Hiermit erhalten Sie die Details unseres Auftrags. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten. Für Terminbestätigung und Rückfragen können Sie auf diese Nachricht antworten.',
+        intro: 'Hiermit erhalten Sie die Details unserer Bestellung. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten. Für Terminbestätigung und Rückfragen können Sie auf diese Nachricht antworten.',
         colPos: 'Pos',
         colDesc: 'Produkt / Material',
         colCode: 'Seriencode',

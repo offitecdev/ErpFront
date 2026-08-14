@@ -1,4 +1,5 @@
 import type { AppointmentWithProject, ScopedRecord, UsedMaterial } from '../types/signatureTypes';
+import { rowMaterial } from '../../utils/materialCompat';
 
 /** The sales-order id an appointment belongs to, if any. */
 export const getAppointmentOrderId = (appointment: AppointmentWithProject): string | null =>
@@ -28,21 +29,18 @@ export const scopedAppointmentRecords = <T extends ScopedRecord>(
     });
 };
 
-/** Materials used on an appointment, derived from the tender usage + position mappings. */
+/**
+ * Materials used on an appointment, derived from the tender usage rows.
+ * (Position material mappings were dropped with the material/product merge
+ * 2026-08-14; the rows link to Article and are adapted to the legacy shape.)
+ */
 export const getAppointmentUsedMaterials = (appointment: AppointmentWithProject): UsedMaterial[] => {
     const tender = appointment.salesOrder?.tender || appointment.project?.tender;
-    return [
-        ...((tender?.usedMaterials || []).map((usage: any) => ({
+    return (tender?.usedMaterials || [])
+        .map((usage: any) => ({
             id: `usage-${usage.id}`,
-            material: usage.material,
+            material: rowMaterial(usage),
             quantity: Number(usage.quantity || 0),
-        }))),
-        ...((tender?.positions || []).flatMap((position: any) =>
-            (position.materialMappings || []).map((mapping: any) => ({
-                id: `mapping-${mapping.id}`,
-                material: mapping.material,
-                quantity: Number(mapping.quantityMultiplier || 0),
-            }))
-        )),
-    ].filter((item) => item.quantity > 0);
+        }))
+        .filter((item: any) => item.quantity > 0);
 };

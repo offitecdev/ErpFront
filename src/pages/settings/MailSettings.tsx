@@ -13,6 +13,8 @@ import { Card } from '../../components/ui-shared/Card';
 import { Field, Input, Textarea } from '../../components/ui-shared/Field';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
 import { mailApi } from '../../lib/api/project';
+import { isRequestTimeout } from '../../lib/axios';
+import type { SentCopyResultDto } from '../../types/project';
 import { useAuthStore } from '../../store/authStore';
 import { SignatureEditor } from './SignatureEditor';
 import { SIGNATURE_IMAGE_TYPES, SIGNATURE_IMAGE_MAX_BYTES, signatureFileToDataUrl } from './signatureImage';
@@ -30,6 +32,14 @@ export const MailSettings = () => {
         smtpSecure: false,
         smtpUser: '',
         smtpPassword: '',
+        // Gönderilenler kopyası (IMAP) — boş sunucu adı = kapalı.
+        imapHost: '',
+        imapPort: 993,
+        imapSecure: true,
+        imapUser: '',
+        imapPassword: '',
+        sentFolder: '',
+        saveToSent: true,
         signatureHtml: '',
         signatureImage: '',
     });
@@ -47,11 +57,15 @@ export const MailSettings = () => {
     // olmadığını görür ve isterse siler (null gönderilir).
     const [hasPassword, setHasPassword] = useState(false);
     const [clearPassword, setClearPassword] = useState(false);
+    const [hasImapPassword, setHasImapPassword] = useState(false);
+    const [clearImapPassword, setClearImapPassword] = useState(false);
 
     useEffect(() => {
         mailApi.getSettings().then((settings) => {
             setHasPassword(Boolean(settings.hasPassword));
             setClearPassword(false);
+            setHasImapPassword(Boolean(settings.hasImapPassword));
+            setClearImapPassword(false);
             setForm({
                 fromName: settings.fromName ||t('auto.offitec_erp'),
                 fromEmail: settings.fromEmail || user?.email || '',
@@ -61,6 +75,13 @@ export const MailSettings = () => {
                 smtpSecure: Boolean(settings.smtpSecure),
                 smtpUser: settings.smtpUser || '',
                 smtpPassword: '',
+                imapHost: settings.imapHost || '',
+                imapPort: settings.imapPort || 993,
+                imapSecure: settings.imapSecure ?? true,
+                imapUser: settings.imapUser || '',
+                imapPassword: '',
+                sentFolder: settings.sentFolder || '',
+                saveToSent: settings.saveToSent ?? true,
                 // Eski ayrı "imza görseli" alanı editöre satır içi görsel olarak
                 // taşınır; bir sonraki kayıtta her şey tek HTML'de birleşir.
                 signatureHtml: `${settings.signatureHtml || ''}${
@@ -77,13 +98,17 @@ export const MailSettings = () => {
         mevcut şifreyi korur); "sil" seçildiyse açıkça null gider. */
     const persist = async () => {
         const typedPassword = form.smtpPassword.trim();
+        const typedImapPassword = form.imapPassword.trim();
         const settings = await mailApi.saveSettings({
             ...form,
             smtpPassword: typedPassword ? form.smtpPassword : clearPassword ? null : undefined,
+            imapPassword: typedImapPassword ? form.imapPassword : clearImapPassword ? null : undefined,
         });
         setHasPassword(Boolean(settings?.hasPassword));
         setClearPassword(false);
-        setForm((prev) => ({ ...prev, smtpPassword: '' }));
+        setHasImapPassword(Boolean(settings?.hasImapPassword));
+        setClearImapPassword(false);
+        setForm((prev) => ({ ...prev, smtpPassword: '', imapPassword: '' }));
         return settings;
     };
 
@@ -148,9 +173,23 @@ export const MailSettings = () => {
             await persist();
             const res = await mailApi.send({ ...test, fromEmail: form.fromEmail, fromName: form.fromName });
             setTestSent(true);
-            toast.success(res.message ||t('settings.mail.testSuccess'));
+            // Onay metni sözlükten okunur; sunucunun `res.message` alanı tek
+            // dilde yazılıdır ve seçili dilin ortasında yabancı görünürdü.
+            toast.success(t('settings.mail.testSuccess'));
+            // Gönderilenler kopyası gönderimden BAĞIMSIZDIR: mail gitmiş ama
+            // kopya yazılamamış olabilir — sessizce yutulmaz, ayrı bildirilir.
+            const sentCopy = res.sentCopy as SentCopyResultDto | undefined;
+            if (sentCopy?.status === 'saved') {
+                toast.success(t('settings.mail.sentCopySaved', { folder: sentCopy.folder || '' }));
+            } else if (sentCopy?.status === 'failed') {
+                toast.warning(t('settings.mail.sentCopyFailed', { error: sentCopy.error || '' }));
+            }
         } catch (e: any) {
-            toast.error(e.response?.data?.error ||t('settings.mail.errorTest'));
+            toast.error(
+                isRequestTimeout(e)
+                    ? t('common.mailTimeout')
+                    : e.response?.data?.error || t('settings.mail.errorTest'),
+            );
         } finally {
             setTestLoading(false);
         }
@@ -211,6 +250,89 @@ export const MailSettings = () => {
                             onChange={(checked) => setForm({ ...form, smtpSecure: checked })}
                             className="rounded-lg bg-secondary px-3 py-2 ring-1 ring-secondary ring-inset"
                         />
+                    </div>
+                </Card>
+
+                {/* GÖNDERİLENLER KOPYASI — SMTP yalnızca teslim eder; mailin
+                    Outlook'un "Gönderilmiş Öğeler" klasöründe görünmesi için
+                    gönderimden sonra IMAP ile kutuya kopyalanması gerekir.
+                    Sunucu adı boşsa özellik kapalıdır. */}
+                <Card title={t('settings.mail.sentCopyTitle')} className="xl:col-span-3">
+                    <div className="space-y-3">
+                        <p className="text-[12px] text-slate-500">{t('settings.mail.sentCopyHint')}</p>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <Field label={t('settings.mail.imapHost')} hint={t('settings.mail.imapHostHint')}>
+                                <Input
+                                    value={form.imapHost}
+                                    onChange={(e) => setForm({ ...form, imapHost: e.target.value })}
+                                    placeholder="imap.example.com"
+                                />
+                            </Field>
+                            <Field label={t('settings.mail.imapPort')}>
+                                <Input
+                                    type="number"
+                                    value={form.imapPort}
+                                    onChange={(e) => setForm({ ...form, imapPort: Number(e.target.value) || 993 })}
+                                />
+                            </Field>
+                            <Field label={t('settings.mail.imapUser')} hint={t('settings.mail.imapCredentialsHint')}>
+                                <Input
+                                    value={form.imapUser}
+                                    onChange={(e) => setForm({ ...form, imapUser: e.target.value })}
+                                    autoComplete="off"
+                                    placeholder={form.smtpUser || ''}
+                                />
+                            </Field>
+                            <Field
+                                label={t('auth.password')}
+                                hint={clearImapPassword
+                                    ? t('settings.mail.passwordClearPending')
+                                    : hasImapPassword
+                                        ? t('settings.mail.passwordKeepHint')
+                                        : t('settings.mail.imapPasswordMissing')}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="password"
+                                        className="flex-1"
+                                        value={form.imapPassword}
+                                        autoComplete="new-password"
+                                        placeholder={hasImapPassword && !clearImapPassword ? '••••••••' : ''}
+                                        onChange={(e) => { setForm({ ...form, imapPassword: e.target.value }); setClearImapPassword(false); }}
+                                    />
+                                    {hasImapPassword && !clearImapPassword && !form.imapPassword && (
+                                        <Button variant="ghost" size="sm" onClick={() => setClearImapPassword(true)}>
+                                            {t('settings.mail.passwordClear')}
+                                        </Button>
+                                    )}
+                                </div>
+                            </Field>
+                            <Field label={t('settings.mail.sentFolder')} hint={t('settings.mail.sentFolderHint')}>
+                                <Input
+                                    value={form.sentFolder}
+                                    onChange={(e) => setForm({ ...form, sentFolder: e.target.value })}
+                                    placeholder={t('settings.mail.sentFolderAuto')}
+                                />
+                            </Field>
+                            <div className="space-y-2">
+                                <Checkbox
+                                    label={t('settings.mail.imapSecure')}
+                                    hint={t('settings.mail.imapSecureHint')}
+                                    size="sm"
+                                    isSelected={form.imapSecure}
+                                    onChange={(checked) => setForm({ ...form, imapSecure: checked })}
+                                    className="rounded-lg bg-secondary px-3 py-2 ring-1 ring-secondary ring-inset"
+                                />
+                                <Checkbox
+                                    label={t('settings.mail.saveToSent')}
+                                    hint={t('settings.mail.saveToSentHint')}
+                                    size="sm"
+                                    isSelected={form.saveToSent}
+                                    onChange={(checked) => setForm({ ...form, saveToSent: checked })}
+                                    className="rounded-lg bg-secondary px-3 py-2 ring-1 ring-secondary ring-inset"
+                                />
+                            </div>
+                        </div>
                     </div>
                 </Card>
 

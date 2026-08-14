@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { ArrowLeft, Building02, CheckCircle, SwitchHorizontal01 } from '@/components/icons/antIconCompat';
+import { ArrowLeft, Building02, CheckCircle, List, SwitchHorizontal01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { Spinner } from '@/components/ui-shared/Loader';
+import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
 // Uygulamanın TEK biçimli metin editörü — teklif açıklamalarıyla aynı bileşen.
 // Kalın/italik ve "- " + boşluk → madde kısayolu (madde satır başında Backspace
 // ile geri sökülür) burada zaten çözülmüş durumda; ürün açıklaması da HTML
@@ -14,14 +15,13 @@ import { richTextToHtml } from '@/pages/tender/detail/utils/markdown.utils';
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
-import type { ItemType } from '@/types/inventory';
 import { CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../components/primitives';
 import { useLanguageTick } from '../hooks/useLanguageTick';
 import { fmtMoney, fmtQty, fmtUnitCost } from '../utils/format';
 import { ArticleImagePanel } from './ArticleImagePanel';
 import { buildDetailPatch, draftFromDetail, type DetailDraft } from './detailPatch';
 import { ArticleMovementsView } from './ArticleMovementsView';
-import { ArticleSuppliersSheet } from './ArticleSuppliersSheet';
+import { ArticleSuppliersView } from './ArticleSuppliersView';
 import { useArticleDetail } from './useArticleDetail';
 
 /** Etiket/değer satırı — detay tablosunun tek satırı. */
@@ -42,7 +42,7 @@ const errorMessage = (error: unknown, fallback: string) =>
  *
  * Veri disiplini: sayfa açılırken YALNIZCA başlık tablosu çekilir
  * (`/articles/:id/detail`). Tedarikçi listesi ve hareket geçmişi bu yanıtta
- * yoktur; ikisi de kendi düğmesine basıldığında monte olan bileşenle, kendi
+ * yoktur; ikisi de kendi SEKMESİNE geçildiğinde monte olan bileşenle, kendi
  * ucundan yüklenir. Görsel de ayrı uçtan gelir (base64 blob başlık isteğine
  * binmesin).
  *
@@ -50,9 +50,8 @@ const errorMessage = (error: unknown, fallback: string) =>
  * (`PATCH /articles/:id/detail`) gider. Böylece alanları yazıp görseli düşüren
  * yarım kayıt oluşamaz; yalnızca DEĞİŞEN alanlar gönderilir.
  */
-export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
-    itemType: ItemType;
-    /** 'inv.products' | 'inv.materials'. */
+export const ArticleDetailView = ({ copyPrefix, listPath }: {
+    /** 'inv.products'. */
     copyPrefix: string;
     listPath: string;
 }) => {
@@ -64,10 +63,11 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
     const permissions = useAuthStore((state) => state.permissions);
     const canUpdate = permissions.includes('inventory.articles.update');
 
-    // 'detail' → 'movements': aynı ekranda değişir, hareketler kendi geri
-    // düğmesiyle buraya döner (ayrı sayfaya gidilmez).
-    const [view, setView] = useState<'detail' | 'movements'>('detail');
-    const [suppliersOpen, setSuppliersOpen] = useState(false);
+    // Detay / hareketler / tedarikçiler artık SEKMELERDİR (kullanıcı isteği —
+    // popup ve ayrı görünüm yerine alt menü). Sekme panelleri yalnızca aktifken
+    // monte edilir, veri disiplini aynı kalır: hareketler ve tedarikçiler kendi
+    // ucundan, ancak sekmeye geçilince yüklenir.
+    const [tab, setTab] = useState<'detail' | 'movements' | 'suppliers'>('detail');
     const [saving, setSaving] = useState(false);
 
     // Taslak sunucudaki kayıttan TÜRETİLİR; kullanıcı bir alana dokunduğunda
@@ -89,8 +89,8 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
         setEdited({ articleId: detail.id, draft: { ...draft, ...patchDraft } });
     };
 
-    const codeLabel = t(itemType === 'MATERIAL' ? 'inv.columns.materialCode' : 'inv.columns.serialCode');
-    const nameLabel = t(itemType === 'MATERIAL' ? 'inv.columns.materialName' : 'inv.columns.productName');
+    const codeLabel = t('inv.columns.serialCode');
+    const nameLabel = t('inv.columns.productName');
 
     /** Yalnızca DEĞİŞEN alanlar — hiçbiri değişmediyse `null` (düğme pasif). */
     const patch = useMemo(
@@ -148,7 +148,7 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
                         {detail?.name || t(`${copyPrefix}.detailTitle`)}
                     </span>
                 )}
-                action={canUpdate && view === 'detail' && detail && (
+                action={canUpdate && tab === 'detail' && detail && (
                     // ORTAK kaydet: alanlar + açıklama + görsel tek istekte gider.
                     <div className="flex items-center gap-2">
                         {dirty && (
@@ -174,20 +174,55 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
                 )}
             />
 
-            {view === 'movements' && detail ? (
-                <ArticleMovementsView
-                    articleId={detail.id}
-                    articleName={detail.name}
-                    unit={detail.unit}
-                    onBack={() => setView('detail')}
-                />
+            {/* Alt menü: detay / hareketler / tedarikçiler — teklif çalışma
+                alanındaki sekme şeridiyle aynı dil (ofi-quote-tab*). */}
+            {detail && (
+                <nav
+                    aria-label={t(`${copyPrefix}.detailTitle`)}
+                    className="ofi-quote-tabs-strip min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 md:overflow-visible dark:border-white/15"
+                >
+                    <SlidingTopTabs activeKey={tab} className="flex min-w-max items-stretch gap-1">
+                        {([
+                            { key: 'detail' as const, label: t(`${copyPrefix}.detailTitle`), icon: <List size={15} /> },
+                            { key: 'movements' as const, label: t('inv.detail.movementsTitle'), icon: <SwitchHorizontal01 size={15} /> },
+                            { key: 'suppliers' as const, label: t('inv.detail.suppliersButton', { count: detail.supplierCount ?? '…' }), icon: <Building02 size={15} /> },
+                        ]).map((item) => {
+                            const active = tab === item.key;
+                            return (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    data-tab-key={item.key}
+                                    aria-current={active ? 'page' : undefined}
+                                    onClick={() => setTab(item.key)}
+                                    className={`ofi-quote-tab -mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
+                                        active
+                                            ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
+                                            : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                                    }`}
+                                >
+                                    {item.icon}
+                                    <span>{item.label}</span>
+                                </button>
+                            );
+                        })}
+                    </SlidingTopTabs>
+                </nav>
+            )}
+
+            {tab === 'movements' && detail ? (
+                <ArticleMovementsView articleId={detail.id} unit={detail.unit} />
+            ) : tab === 'suppliers' && detail ? (
+                <ArticleSuppliersView articleId={detail.id} unit={detail.unit} />
             ) : (
-                // İki sütun: solda detay tablosu ve düğmeler, sağda görsel.
+                // İki sütun: solda detay tablosu, sağda görsel.
                 // Dar ekranda görsel tablonun altına iner.
                 <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
                     <div className="flex min-w-0 flex-col gap-4">
                         <SectionCard title={t(`${copyPrefix}.detailTitle`)}>
-                            <table data-inv-table data-unstyled-table className="w-full">
+                            {/* Etiket/değer tablosu: başlık satırı olmadığı için
+                                sürükleme tutamacı taşıyamaz — yalnızca çizgiler. */}
+                            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                                 <tbody>
                                     {(loading || !detail || !draft) && (
                                         <TableStateRow colSpan={2} loading={loading} emptyText={error || t('inv.detail.notFound')} />
@@ -204,14 +239,41 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
                                                     ? <input aria-label={nameLabel} {...field('name', 'max-w-md')} />
                                                     : detail.name}
                                             </Row>
+                                            {/* Ürün/hizmet anahtarı (kullanıcı isteği 2026-08-14):
+                                                yeni kayıt ÜRÜN olarak doğar, buradan hizmete çevrilir.
+                                                Ortak Kaydet ile diğer alanlarla birlikte yazılır. */}
+                                            <Row label={t('inv.detail.kind')}>
+                                                {canUpdate ? (
+                                                    <div className="flex items-center gap-1 py-0.5">
+                                                        {(['PRODUCT', 'SERVICE'] as const).map((kind) => (
+                                                            <button
+                                                                key={kind}
+                                                                type="button"
+                                                                onClick={() => editDraft({ itemType: kind })}
+                                                                aria-pressed={draft.itemType === kind}
+                                                                className={`rounded-[3px] border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                                                                    draft.itemType === kind
+                                                                        ? 'border-[#272f67] bg-[#272f67] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
+                                                                        : 'border-slate-200 bg-white text-slate-500 hover:text-slate-800 dark:border-white/15 dark:bg-transparent dark:text-white/60'
+                                                                }`}
+                                                            >
+                                                                {t(kind === 'PRODUCT' ? 'inv.detail.kindProduct' : 'inv.detail.kindService')}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    t(detail.itemType === 'SERVICE' ? 'inv.detail.kindService' : 'inv.detail.kindProduct')
+                                                )}
+                                            </Row>
                                             <Row label={t('inv.columns.unit')}>
                                                 {canUpdate
                                                     ? <input aria-label={t('inv.columns.unit')} {...field('unit', 'max-w-[8rem]')} />
                                                     : detail.unit}
                                             </Row>
                                             {/* Stok, ortalama maliyet ve sipariş adedi TÜRETİLMİŞ
-                                                değerlerdir — hareketlerden gelir, elle düzenlenmez. */}
-                                            <Row label={t('inv.columns.currentStock')} mono>
+                                                değerlerdir — hareketlerden gelir, elle düzenlenmez.
+                                                Etiket "Lagerbestand" (kullanıcı isteği). */}
+                                            <Row label={t('inv.detail.warehouseStock')} mono>
                                                 {fmtQty(detail.totalQuantity)} {detail.unit}
                                             </Row>
                                             <Row label={t('inv.detail.averageUnitCost')} mono>
@@ -253,27 +315,6 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
                                 </tbody>
                             </table>
                         </SectionCard>
-
-                        {detail && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setSuppliersOpen(true)}
-                                    className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
-                                >
-                                    <Building02 size={14} />
-                                    {t('inv.detail.suppliersButton', { count: detail.supplierCount ?? '…' })}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setView('movements')}
-                                    className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
-                                >
-                                    <SwitchHorizontal01 size={14} />
-                                    {t('inv.detail.movementsButton')}
-                                </button>
-                            </div>
-                        )}
                     </div>
 
                     {/* Görsel ayrı ve önbelleklenebilir binary uçtan gelir.
@@ -288,16 +329,6 @@ export const ArticleDetailView = ({ itemType, copyPrefix, listPath }: {
                         />
                     )}
                 </div>
-            )}
-
-            {/* Popup yalnızca açıkken monte edilir → veri de yalnızca o an çekilir. */}
-            {suppliersOpen && detail && (
-                <ArticleSuppliersSheet
-                    articleId={detail.id}
-                    articleName={detail.name}
-                    unit={detail.unit}
-                    onClose={() => setSuppliersOpen(false)}
-                />
             )}
         </div>
     );

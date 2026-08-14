@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, SearchLg, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { SkeletonTableRows } from './Loader';
@@ -16,15 +16,47 @@ export const CELL_INPUT_CLASS =
    kaydırma alanına dönüşür — tablo kolonlarını okunmaz şeritlere sıkıştırmak
    yerine en az genişliğini koruyup yana kayar. Kart başlığı ile alttaki
    sayfalama şeridi yerinde durur (bkz. index.css "RESPONSIVE TABLES"). */
-export const SectionCard = ({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) => (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-white/15 dark:bg-transparent dark:shadow-none">
-        <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
-            <span className="text-[13px] font-semibold text-slate-800 dark:text-white">{title}</span>
-            {action}
-        </header>
-        <div data-table-scroll>{children}</div>
-    </section>
-);
+/**
+ * `collapsible`: başlık şeridi açılıp kapanan bir düğmeye dönüşür — uzun
+ * tablolar (faturalama, saha raporu kaynakları) katlanıp yer açabilsin diye.
+ * Katlanan kartta yalnızca başlık kalır; `action` düğmeleri erişilebilir
+ * kalsın diye başlıkta durmayı sürdürür.
+ */
+export const SectionCard = ({ title, action, children, collapsible = false, defaultOpen = true }: {
+    title: ReactNode;
+    action?: ReactNode;
+    children: ReactNode;
+    collapsible?: boolean;
+    defaultOpen?: boolean;
+}) => {
+    const [open, setOpen] = useState(defaultOpen);
+    const expanded = !collapsible || open;
+    return (
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-white/15 dark:bg-transparent dark:shadow-none">
+            <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                {collapsible ? (
+                    <button
+                        type="button"
+                        onClick={() => setOpen((value) => !value)}
+                        aria-expanded={open}
+                        title={open ? t('common.collapse') : t('common.expand')}
+                        className="flex min-w-0 items-center gap-1.5 text-left"
+                    >
+                        <ChevronDown
+                            size={14}
+                            className={`shrink-0 text-slate-400 transition-transform dark:text-white/50 ${open ? '' : '-rotate-90'}`}
+                        />
+                        <span className="truncate text-[13px] font-semibold text-slate-800 dark:text-white">{title}</span>
+                    </button>
+                ) : (
+                    <span className="text-[13px] font-semibold text-slate-800 dark:text-white">{title}</span>
+                )}
+                {action}
+            </header>
+            {expanded && <div data-table-scroll>{children}</div>}
+        </section>
+    );
+};
 
 /** Genel arama kutusu — etiket sarmalı, odaklanınca çerçeve koyulaşır. */
 export const SearchBox = ({
@@ -100,7 +132,7 @@ export const Pager = ({
                 >
                     <ChevronLeft size={15} />
                 </button>
-                <span className="min-w-14 text-center font-mono text-[12.5px] text-slate-600 dark:text-white/70">{page} / {totalPages}</span>
+                <span className="ofi-page-number min-w-14 text-center font-mono text-slate-600 dark:text-white/70">{page} / {totalPages}</span>
                 <button
                     type="button"
                     aria-label={t('common.next')}
@@ -207,6 +239,57 @@ export const ActionTh = ({
     </th>
 );
 
+/**
+ * Genişletilebilir sütunların `<col>` etiketleri. Esnek (genişliği olmayan)
+ * sütunlar için tabloda ayrıca düz bir `<col />` yazılır ve bu bileşen ONDAN
+ * SONRA gelir: tutamaçlar sütunların SOL kenarında olduğu için genişletilebilir
+ * sütunların hepsi esnek sütunun SAĞINDA olmalıdır.
+ */
+export const ResizableCols = <K extends string>({
+    keys,
+    grid,
+}: {
+    keys: readonly K[];
+    grid: { widths: Record<K, number>; setColRef: (key: string) => (el: HTMLTableColElement | null) => void };
+}) => (
+    <>
+        {keys.map((key) => (
+            <col key={key} ref={grid.setColRef(key)} style={{ width: grid.widths[key] }} />
+        ))}
+    </>
+);
+
+/**
+ * Sütun genişletme tutamacı: başlığın SOL kenarında oturur — sürüklenince
+ * hareket eden kenar orada olduğu için imleçle birlikte gider. Çift tıklama
+ * sütunu varsayılan genişliğine döndürür. Bulunduğu `<th>` `relative` olmalıdır
+ * ve tablo `table-layout: fixed` + `<colgroup>` kullanmalıdır (bkz.
+ * `useColumnWidths`). Sütunlar arasındaki görünür çizgi ile aynı kenardır:
+ * kullanıcı gördüğü çizgiyi tutar.
+ */
+export const ColResizeHandle = ({
+    onResizeStart,
+    onResizeReset,
+    side = 'left',
+}: {
+    onResizeStart: (event: React.PointerEvent) => void;
+    onResizeReset?: () => void;
+    /** Esnek sütunun SOLUNDA kalan sabit sütunlar sağ kenarlarından tutulur. */
+    side?: 'left' | 'right';
+}) => (
+    <span
+        role="separator"
+        aria-orientation="vertical"
+        title={t('tenders.column_resize')}
+        onPointerDown={onResizeStart}
+        onDoubleClick={onResizeReset}
+        onClick={(event) => event.stopPropagation()}
+        className={`absolute inset-y-0 z-10 w-[7px] cursor-col-resize touch-none select-none before:absolute before:inset-y-0 before:left-1/2 before:w-[3px] before:-translate-x-1/2 before:rounded-full before:bg-transparent before:transition-colors hover:before:bg-[#1f2654]/30 active:before:bg-[#1f2654]/50 dark:hover:before:bg-white/30 dark:active:before:bg-white/45 ${
+            side === 'left' ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'
+        }`}
+    />
+);
+
 /** Sıralanabilir başlık: tıklandıkça asc/desc döner, aktif yön küçük okla görünür. */
 export const SortableTh = <K extends string>({
     label,
@@ -215,6 +298,9 @@ export const SortableTh = <K extends string>({
     direction,
     onSort,
     className = '',
+    onResizeStart,
+    onResizeReset,
+    side,
 }: {
     label: ReactNode;
     sortKey: K;
@@ -222,8 +308,12 @@ export const SortableTh = <K extends string>({
     direction: 'asc' | 'desc';
     onSort: (key: K) => void;
     className?: string;
+    /** Verilirse başlığın kenarı sütunu genişletme tutamacı olur. */
+    onResizeStart?: (event: React.PointerEvent) => void;
+    onResizeReset?: () => void;
+    side?: 'left' | 'right';
 }) => (
-    <th className={className}>
+    <th className={`relative ${className}`}>
         <button
             type="button"
             onClick={() => onSort(sortKey)}
@@ -232,5 +322,6 @@ export const SortableTh = <K extends string>({
             {label}
             {activeKey === sortKey && (direction === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
         </button>
+        {onResizeStart && <ColResizeHandle onResizeStart={onResizeStart} onResizeReset={onResizeReset} side={side} />}
     </th>
 );

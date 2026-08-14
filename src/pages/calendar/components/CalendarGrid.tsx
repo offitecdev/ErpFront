@@ -30,9 +30,9 @@ const TimeBlock = ({ position, onOpen }: { position: Positioned; onOpen: (event:
             className={`absolute z-10 ${chipClass(event.status)}`}
             title={`${event.start.format('HH:mm')} – ${event.end.format('HH:mm')} · ${event.title}`}
         >
-            <span className="truncate text-[11.5px] font-bold">{event.title}</span>
+            <span className="truncate text-[10.5px] font-bold">{event.title}</span>
             {!compact && (
-                <span className="truncate text-[10.5px] font-semibold opacity-85">
+                <span className="truncate text-[9.5px] font-semibold opacity-85">
                     {event.start.format('HH:mm')}–{event.end.format('HH:mm')}{event.subtitle ? ` · ${event.subtitle}` : ''}
                 </span>
             )}

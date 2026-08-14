@@ -6,7 +6,12 @@ export type ProposalStatus = 'PENDING' | 'APPROVED' | 'CONVERTED' | 'REJECTED';
 
 export type ArticleStatus = 'ACTIVE' | 'INACTIVE' | 'IN_SUPPLY' | 'IN_PRODUCTION';
 
-export type ItemType = 'PRODUCT' | 'MATERIAL';
+/**
+ * Ürün/hizmet sınıflandırması. Eski PRODUCT|MATERIAL ayrımı 2026-08-14'te
+ * kaldırıldı: malzemeler ürün listesine taşındı, itemType artık ürün detayındaki
+ * "Produkt / Dienstleistung" anahtarıdır (varsayılan PRODUCT).
+ */
+export type ItemType = 'PRODUCT' | 'SERVICE';
 
 export interface InventoryLocation {
     id: string;
@@ -163,6 +168,8 @@ export interface ArticleDetailPatch {
     name?: string;
     unit?: string;
     salePrice?: number;
+    /** Ürün/hizmet anahtarı — detay ekranındaki "Typ" satırı. */
+    itemType?: ItemType;
     description?: string | null;
     imageUrl?: string | null;
 }
@@ -178,9 +185,7 @@ export interface ArticleSupplierCostRow {
     quantity: number;
     totalCost: number;
     averageUnitCost: number;
-    purchaseCount: number;
     lastPurchaseDate?: string | null;
-    currency: string;
 }
 
 export interface ArticleSuppliersSummary {
@@ -240,9 +245,9 @@ export interface StockMovementRow {
     supplier?: { companyName: string } | null;
 }
 
-// Stok hareketi seçiminde kullanılan birleşik ürün + malzeme arama sonucu.
+// Stok hareketi seçiminde kullanılan ürün arama sonucu.
 export interface SearchItem {
-    kind: 'PRODUCT' | 'MATERIAL';
+    kind: 'PRODUCT';
     id: string;
     code: string;
     name: string;
@@ -338,9 +343,8 @@ export interface MovementListItem {
     unitCost?: number | null;
     totalCost: number;
     description?: string | null;
-    referenceId?: string | null;
-    article?: { id: string; articleCode: string; name: string; unit: string } | null;
-    supplier?: { id: string; companyName: string } | null;
+    article?: { articleCode: string; name: string } | null;
+    supplier?: { companyName: string } | null;
     employee?: { firstName: string; lastName: string } | null;
 }
 
@@ -384,7 +388,10 @@ export interface BulkArticleItemInput {
     supplierId?: string | null;
     supplierName?: string | null;
     unit?: string | null;
+    /** Ürün kartının açıklaması (biçimli metin) — hareket notu DEĞİLDİR. */
     description?: string | null;
+    /** Ürün görseli (data URL, en fazla 2 MB) — kartın tek görseli olur. */
+    imageUrl?: string | null;
 }
 
 export interface BulkRowError {
@@ -419,9 +426,9 @@ export interface BulkMovementsResult {
 
 // --- TEDARİK TALEPLERİ (Supply Requests) ---
 
-// Minimum/kritik seviyeye düşmüş tek bir ürün/malzeme (yalın liste satırı).
+// Minimum/kritik seviyeye düşmüş tek bir ürün (yalın liste satırı).
 export interface LowStockItem {
-    kind: ItemType;
+    kind: 'PRODUCT';
     id: string;
     code: string;
     name: string;
@@ -452,7 +459,7 @@ export interface ItemSupplier {
 }
 
 export interface ItemSuppliersResponse {
-    item: { kind: ItemType; id: string; code: string; name: string; unit: string };
+    item: { kind: 'PRODUCT'; id: string; code: string; name: string; unit: string };
     suppliers: ItemSupplier[];
 }
 
@@ -463,7 +470,6 @@ export interface SupplyRequestRow {
     tenantId: string;
     itemType: ItemType;
     articleId?: string | null;
-    materialId?: string | null;
     itemName: string;
     itemCode?: string | null;
     unit?: string | null;
@@ -482,9 +488,8 @@ export interface SupplyRequestRow {
 }
 
 export interface CreateSupplyRequestInput {
-    itemType: ItemType;
+    itemType?: ItemType;
     articleId?: string | null;
-    materialId?: string | null;
     itemName: string;
     itemCode?: string | null;
     unit?: string | null;
@@ -501,21 +506,29 @@ export interface CreateSupplyRequestInput {
 // Tek sipariş = tek tedarikçi; satırlar backend'de JSON snapshot olarak durur.
 
 /**
- * Sipariş yaşam döngüsü (2026-08-01 genişletildi):
- * DRAFT (tedarikçi taslağı) → PRICE_REQUEST (fiyat talebi) → AWAITING_CONFIRMATION
- * (talep maili gönderildi) → PENDING (resmî sipariş) → TO_BE_STOCKED (mal kabul)
- * → COMPLETED (stoğa aktarıldı). UPDATED: mail sonrası içerik değişikliği.
+ * Sipariş yaşam döngüsü (2026-08-01 genişletildi, 2026-08-03 ORDERED eklendi):
+ * DRAFT (talep taslağı) → PRICE_REQUEST (gönderilmiş fiyat talebi) →
+ * PENDING (sipariş onaylandı, mail HENÜZ gitmedi) → ORDERED (sipariş maili
+ * gönderildi = sipariş verildi) → TO_BE_STOCKED (mal kabul) → COMPLETED
+ * (stoğa aktarıldı).
+ * UPDATED durumu KALDIRILDI: mail sonrası içerik değişikliği yalnızca `revision`ı
+ * artırır (arayüzde "Güncellendi · Rev. n" etiketi).
+ * AWAITING_CONFIRMATION ("onay bekleniyor") da KALDIRILDI (kullanıcı isteği
+ * 2026-08-03): gönderilmiş talep artık PRICE_REQUEST'te durur.
  */
 export type PurchaseOrderStatus =
+    /** TALEP TASLAĞI: fiyatsız, kaydedilmiş ama henüz gönderilmemiş talep. */
     | 'DRAFT'
     /** SİPARİŞ TASLAĞI: fiyatlı, kaydedilmiş ama onaylanmamış — "Kaydet" bunu yazar. */
     | 'ORDER_DRAFT'
+    /** GÖNDERİLMİŞ fiyat talebi (talep maili taslağı buraya ilerletir). */
     | 'PRICE_REQUEST'
-    | 'AWAITING_CONFIRMATION'
+    /** SİPARİŞ ONAYLANDI: resmîleşti ve kilitlendi, tedarikçiye mail henüz gitmedi. */
     | 'PENDING'
+    /** SİPARİŞ VERİLDİ: sipariş maili tedarikçiye gerçekten gönderildi. */
+    | 'ORDERED'
     | 'TO_BE_STOCKED'
-    | 'COMPLETED'
-    | 'UPDATED';
+    | 'COMPLETED';
 
 /** Satır hesap kipi: AUTO hesaplar, DIRECT gönderileni saklar (eski directCopy),
  *  SUPPLIER tedarikçi hesabındaki SABİT net birim fiyatla çarpar (indirim kilitli). */
@@ -577,7 +590,7 @@ export interface PurchaseOrderFee {
 export interface PurchaseOrderRow {
     id: string;
     tenantId: string;
-    /** "Auftrag" — sipariş kodu (AU-2026-001), kullanıcı düzenleyebilir. */
+    /** "Bestellung" — sipariş kodu (BE-2026-001), kullanıcı düzenleyebilir. */
     referenceNumber: string;
     /** Opsiyonel teklif numarası (PDF'te görünür). */
     quoteNumber?: string | null;
@@ -680,7 +693,7 @@ export interface PurchaseOrderItemInput {
 }
 
 export interface CreatePurchaseOrderInput {
-    /** Boş bırakılırsa sunucu AU-{yıl}-{sıra} üretir. */
+    /** Boş bırakılırsa sunucu BE-{yıl}-{sıra} üretir. */
     referenceNumber?: string | null;
     quoteNumber?: string | null;
     orderedByName?: string | null;

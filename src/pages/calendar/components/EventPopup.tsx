@@ -7,6 +7,7 @@ import { dotClass, type CalEvent, type CalEventDetail, type CalStatus } from '..
 
 const STATUS_LABEL_KEY: Record<CalStatus, string> = {
     planned: 'calendar.status.planned',
+    ongoing: 'calendar.status.ongoing',
     done: 'calendar.status.done',
     cancelled: 'calendar.status.cancelled',
     meeting: 'calendar.status.meeting',
@@ -15,6 +16,7 @@ const STATUS_LABEL_KEY: Record<CalStatus, string> = {
 
 const STATUS_BADGE: Record<CalStatus, string> = {
     planned: 'border-[#101e6e]/25 bg-[#101e6e]/[0.07] text-[#101e6e] dark:border-[#8fa2ff]/30 dark:bg-[#8fa2ff]/10 dark:text-[#b9c5ff]',
+    ongoing: 'border-[#101e6e]/40 bg-[#101e6e]/15 text-[#101e6e] dark:border-[#8fa2ff]/40 dark:bg-[#8fa2ff]/20 dark:text-[#b9c5ff]',
     done: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300',
     cancelled: 'border-slate-200 bg-slate-50 text-slate-400 line-through dark:border-white/15 dark:bg-white/5 dark:text-white/40',
     meeting: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/10 dark:text-violet-300',
@@ -73,8 +75,8 @@ export const EventPopup = ({ event, onClose, onNavigate, onCreateFrom, canCreate
                 </span>
             )}
             subtitle={when}
-            width={640}
-            height="min(560px, 85vh)"
+            width={1080}
+            height="min(720px, 92vh)"
             headerActions={(
                 <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[event.status]}`}>
                     {t(STATUS_LABEL_KEY[event.status])}
@@ -104,7 +106,7 @@ export const EventPopup = ({ event, onClose, onNavigate, onCreateFrom, canCreate
                 </div>
             )}
         >
-            <div className="px-5 py-4">
+            <div className="px-6 py-5 md:px-8 md:py-6">
                 {event.subtitle && <div className="pb-2 text-[13px] font-semibold text-slate-600 dark:text-white/70">{event.subtitle}</div>}
 
                 {loading && (

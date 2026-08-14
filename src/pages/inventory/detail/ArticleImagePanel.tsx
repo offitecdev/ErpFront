@@ -1,20 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 
 import { Image01, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
 import { Spinner } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
-import { ARTICLE_IMAGE_MAX_BYTES, ARTICLE_IMAGE_TYPES } from '@/types/inventory';
+import { ARTICLE_IMAGE_TYPES } from '@/types/inventory';
 import { SectionCard } from '../components/primitives';
-
-const fileToDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-    });
+import { readArticleImageFile } from '../utils/image';
 
 /**
  * Ürün detayının SAĞ SÜTUNU — ürünün TEK görseli.
@@ -26,6 +18,9 @@ const fileToDataUrl = (file: File) =>
  * Yükleme ANINDA KAYDETMEZ: seçilen dosya yalnızca önizlemeye alınır ve
  * `onPick` ile üst bileşene bildirilir. Yazma işlemi ekranın ortak "Kaydet"
  * düğmesiyle, alanlar ve açıklamayla aynı istekte olur.
+ *
+ * OLUŞTURMA kipinde (`articleId === null`, henüz kayıt yok) kayıtlı görsel
+ * çekilmez; panel yalnızca bekleyen seçimi gösterir.
  */
 export const ArticleImagePanel = ({
     canUpdate,
@@ -35,7 +30,8 @@ export const ArticleImagePanel = ({
     onPick,
 }: {
     canUpdate: boolean;
-    articleId: string;
+    /** null = oluşturma kipi: kayıtlı görsel yok, uçtan da istenmez. */
+    articleId: string | null;
     imageVersion: string;
     /** Bekleyen seçim: string = yeni görsel, null = kaldırıldı, undefined = değişmedi. */
     pending: string | null | undefined;
@@ -51,6 +47,10 @@ export const ArticleImagePanel = ({
         let cancelled = false;
         let objectUrl: string | null = null;
         setSaved(null);
+        if (!articleId) {
+            setLoadingSaved(false);
+            return;
+        }
         setLoadingSaved(true);
 
         inventoryApi
@@ -76,17 +76,10 @@ export const ArticleImagePanel = ({
     const pick = async (files: FileList | null) => {
         const file = files?.[0];
         if (!file) return;
-        if (!ARTICLE_IMAGE_TYPES.includes(file.type)) {
-            toast.error(t('inv.detail.imageInvalid'));
-            return;
-        }
-        if (file.size > ARTICLE_IMAGE_MAX_BYTES) {
-            toast.error(t('inv.detail.imageTooLarge'));
-            return;
-        }
         setReading(true);
         try {
-            onPick(await fileToDataUrl(file));
+            const dataUrl = await readArticleImageFile(file);
+            if (dataUrl) onPick(dataUrl);
         } finally {
             setReading(false);
         }

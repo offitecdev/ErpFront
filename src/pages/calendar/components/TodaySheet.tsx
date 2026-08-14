@@ -8,6 +8,7 @@ import { dayKey, dotClass, type CalEvent, type CalStatus } from '../calendarShar
 
 const STATUS_LABEL_KEY: Record<CalStatus, string> = {
     planned: 'calendar.status.planned',
+    ongoing: 'calendar.status.ongoing',
     done: 'calendar.status.done',
     cancelled: 'calendar.status.cancelled',
     meeting: 'calendar.status.meeting',
@@ -41,6 +42,8 @@ export const TodaySheet = ({ open, onClose, events, onOpenEvent, onCreate, canCr
             onClose={onClose}
             title={isToday ? t('calendar.todaySheet.title') : day.format('DD MMMM YYYY, dddd')}
             subtitle={isToday ? day.format('DD MMMM YYYY, dddd') : undefined}
+            width={1200}
+            height="min(760px, 92vh)"
             headerActions={(
                 <>
                     {canCreate && (

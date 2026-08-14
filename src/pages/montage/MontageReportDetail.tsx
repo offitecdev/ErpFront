@@ -66,7 +66,7 @@ const withFieldResources = (
             value: `${item.quantity} ${item.article?.unit || ''}`.trim(),
         })),
         ...resources.extraMaterials.map((item) => ({
-            label: item.material?.name || item.description || '-',
+            label: item.material?.name || item.article?.name || item.description || '-',
             value: String(item.quantity),
         })),
     ];
@@ -265,7 +265,7 @@ export const MontageReportDetail = () => {
                 )}
             />
 
-            <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
                 <section className="rounded-[3px] border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#17191c]">
                     {kind === 'field' ? (
                         <div className="space-y-3">
@@ -321,7 +321,7 @@ export const MontageReportDetail = () => {
                                         quantity: item.quantity,
                                     })), ...(resources?.extraMaterials || []).map((item) => ({
                                         id: `extra-${item.id}`,
-                                        name: item.material?.name || item.description || '-',
+                                        name: item.material?.name || item.article?.name || item.description || '-',
                                         detail: 'Ek malzeme',
                                         quantity: item.quantity,
                                     }))].length ? (
@@ -333,7 +333,7 @@ export const MontageReportDetail = () => {
                                                 quantity: item.quantity,
                                             })), ...(resources?.extraMaterials || []).map((item) => ({
                                                 id: `extra-${item.id}`,
-                                                name: item.material?.name || item.description || '-',
+                                                name: item.material?.name || item.article?.name || item.description || '-',
                                                 detail: 'Ek malzeme',
                                                 quantity: item.quantity,
                                             }))].map((item) => (

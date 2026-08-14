@@ -1,16 +1,13 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'sonner';
 import { Briefcase01 as BriefcaseBusiness } from '@/components/icons/antIconCompat';
 
-import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectSalesOrder } from '../../types/project';
 import { ProjectTopNav } from './features/components/detail/ProjectTopNav';
 import { ProjectDetailHeader } from './features/components/detail/ProjectDetailHeader';
 import { renderProjectSection } from './features/components/detail/ProjectSectionRenderer';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import { useProjectDetailData } from './features/hooks/useProjectDetailData';
 import { getProjectDisplayOrders } from './features/utils/projectOrderScope';
 import {
@@ -22,15 +19,13 @@ import { getAwaitingTechnicianAppointments } from './features/utils/projectAppoi
 import { type ProjectDetailView, viewForSection } from './features/types/projectDetailNavigation';
 
 import { t } from '@/i18n/translate';
+import { lazyToast as toast } from '@/lib/lazyToast';
 
 const LazyProjectProcessModal = lazy(() =>
     import('./ProjectProcessModal').then((module) => ({ default: module.ProjectProcessModal })),
 );
 const LazyProjectDetailsModal = lazy(() =>
     import('./features/components/detail/ProjectDetailsModal').then((module) => ({ default: module.ProjectDetailsModal })),
-);
-const LazyCustomerContactModal = lazy(() =>
-    import('./features/components/detail/CustomerContactModal').then((module) => ({ default: module.CustomerContactModal })),
 );
 const LazyProjectDeleteOrderModal = lazy(() =>
     import('./features/components/detail/ProjectDeleteOrderModal').then((module) => ({ default: module.ProjectDeleteOrderModal })),
@@ -45,9 +40,9 @@ export const ProjectDetail = () => {
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [showComplete, setShowComplete] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
-    const [showContact, setShowContact] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<ProjectSalesOrder | null>(null);
     const [deletingOrder, setDeletingOrder] = useState(false);
+    const [deletingProject, setDeletingProject] = useState(false);
 
     const salesOrders = useMemo(() => getProjectDisplayOrders(project), [project]);
     // Memoized so downstream memo() tabs and callbacks see a stable `order` reference
@@ -89,7 +84,7 @@ export const ProjectDetail = () => {
         setDeletingOrder(true);
         try {
             await projectApi.deleteSalesOrder(project.id, orderToDelete.id);
-            toast.success(t('projects.orderDeleted', { orderNumber: localizeTenderNumbersInText(orderToDelete.orderNumber) }));
+            toast.success(t('projects.orderDeleted', { orderNumber: orderToDelete.orderNumber }));
             if (selectedOrderId === orderToDelete.id) setSelectedOrderId(null);
             setOrderToDelete(null);
             await load(true);
@@ -103,10 +98,19 @@ export const ProjectDetail = () => {
 
     // Stable handlers passed down to the header and the section renderer so memo()'d
     // children don't re-render on unrelated ProjectDetail state changes.
+    // Sipariş değiştirmek sekmeyi DEĞİŞTİRMEZ: kullanıcı hangi bölümdeyse orada
+    // kalır (kullanıcı isteği). Tek istisna ek siparişler — onlarda yalnızca
+    // Übersicht ve Abrechnung anlamlı olduğundan diğer bölümlerden Übersicht'e
+    // düşülür, yoksa kullanıcı "bu bölüm uygun değil" boş ekranında kalırdı.
     const handleSelectOrder = useCallback((orderId: string) => {
         setSelectedOrderId(orderId);
-        setActiveView({ section: 'overview' });
-    }, []);
+        const target = salesOrders.find((candidate) => candidate.id === orderId);
+        if (target?.parentSalesOrderId) {
+            setActiveView((view) => (
+                view.section === 'overview' || view.section === 'billing' ? view : { section: 'overview' }
+            ));
+        }
+    }, [salesOrders]);
 
     const handleCreateAddon = useCallback((parentOrderId: string) => {
         setSelectedOrderId(parentOrderId);
@@ -123,9 +127,25 @@ export const ProjectDetail = () => {
     // Stable header action handlers so the memo()'d header doesn't re-render (and
     // re-run its per-order totals) when unrelated modal state toggles.
     const handleOpenDetails = useCallback(() => setShowDetails(true), []);
-    const handleOpenContact = useCallback(() => setShowContact(true), []);
     const handleComplete = useCallback(() => setShowComplete(true), []);
     const handleBack = useCallback(() => navigate('/projects'), [navigate]);
+
+    // Dişli menüsünden, "DELETE" yazılarak onaylanmış proje silme. Faturalanmış
+    // projeyi sunucu reddeder; başarıda listeye dönülür.
+    const handleDeleteProject = useCallback(async () => {
+        if (!project) return;
+        setDeletingProject(true);
+        try {
+            await projectApi.deleteProject(project.id);
+            toast.success(t('projects.projectDeleted'));
+            navigate('/projects');
+        } catch (error: unknown) {
+            const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+            toast.error(message || t('projects.projectDeleteFailed'));
+        } finally {
+            setDeletingProject(false);
+        }
+    }, [project, navigate]);
 
     if (loading) {
         return (
@@ -138,22 +158,31 @@ export const ProjectDetail = () => {
     }
 
     if (!project) {
-        return <EmptyState icon={<BriefcaseBusiness size={32} />} title={t('auto.proje_bulunamadi')} description={loadError || t('auto.proje_silinmis_ya_da_erisiminiz_olmayabilir')} />;
+        return (
+            <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 text-center" role="alert">
+                <BriefcaseBusiness size={32} className="text-slate-400" />
+                <h2 className="mt-3 text-base font-semibold text-slate-900">{t('auto.proje_bulunamadi')}</h2>
+                <p className="mt-1 max-w-lg text-sm text-slate-500">
+                    {loadError || t('auto.proje_silinmis_ya_da_erisiminiz_olmayabilir')}
+                </p>
+            </div>
+        );
     }
 
     return (
-        <div>
+        <div className="min-w-0 overflow-x-hidden">
             <ProjectDetailHeader
                 project={project}
                 orders={salesOrders}
                 selectedOrder={selectedOrder}
                 addonAttention={addonAttention}
                 canManageOrders={canManageOrders}
+                deletingProject={deletingProject}
                 onDeleteOrder={requestDeleteOrder}
+                onDeleteProject={handleDeleteProject}
                 onSelectOrder={handleSelectOrder}
                 onCreateAddon={handleCreateAddon}
                 onOpenDetails={handleOpenDetails}
-                onOpenContact={handleOpenContact}
                 onComplete={handleComplete}
                 onBack={handleBack}
             />
@@ -164,7 +193,7 @@ export const ProjectDetail = () => {
                 onChange={setActiveView}
                 addonAttention={addonAttention}
             />
-            <div className="min-w-0 rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs md:p-6">
+            <div className="min-w-0 overflow-x-hidden rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs md:p-6">
                 {sectionLoading ? (
                     <div className="space-y-3" aria-busy="true">
                         <div className="h-10 animate-pulse rounded-md bg-slate-100" />
@@ -208,12 +237,6 @@ export const ProjectDetail = () => {
             {showDetails && (
                 <Suspense fallback={null}>
                     <LazyProjectDetailsModal project={project} totals={projectTotals} onClose={() => setShowDetails(false)} />
-                </Suspense>
-            )}
-
-            {showContact && (
-                <Suspense fallback={null}>
-                    <LazyCustomerContactModal project={project} open onClose={() => setShowContact(false)} />
                 </Suspense>
             )}
 

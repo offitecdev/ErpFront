@@ -1,7 +1,14 @@
+import type { PaymentStage } from '../lib/paymentSchedule';
 import type { ProjectStatus } from './project';
 
 export type InvoiceStatus = 'ISSUED' | 'PAID' | 'CANCELLED';
 export type InvoiceBillingType = 'FULL' | 'PARTIAL';
+/**
+ * Rechnung = tam fatura (tüm pozisyonlar, %100) | Akonto = avans faturası |
+ * Zwischen = ara fatura | Schluss = kalan yüzdeyi kapatan son fatura.
+ * billingType bundan türetilir (RECHNUNG/SCHLUSS → FULL, diğerleri → PARTIAL).
+ */
+export type InvoiceKind = 'RECHNUNG' | 'AKONTO' | 'ZWISCHEN' | 'SCHLUSS';
 export type InvoiceLineSourceType = 'ORDER' | 'OVERTIME' | 'EXPENSE' | 'EXTRA_MATERIAL' | 'MANUAL';
 
 export interface InvoiceLineItemDto {
@@ -23,6 +30,11 @@ export interface InvoiceDto {
     salesOrderId?: string | null;
     invoiceNumber: string;
     billingType: InvoiceBillingType;
+    kind: InvoiceKind;
+    invoiceDate?: string | null;
+    dueDate?: string | null;
+    salespersonName?: string | null;
+    commissionNumber?: string | null;
     billedPercent: number;
     baseAmount: number;
     amount: number;
@@ -42,6 +54,7 @@ export interface BillingSummaryInvoice {
     id: string;
     invoiceNumber: string;
     billingType: InvoiceBillingType;
+    kind?: InvoiceKind;
     billedPercent: number;
     amount: number;
     status: InvoiceStatus;
@@ -60,12 +73,15 @@ export interface OrderBillingFiguresDto {
 
 export interface BillingSummaryDto extends OrderBillingFiguresDto {
     billedPercent: number;
+    /** Fiilen ödenmiş (PAID) pay — ödeme planı ilerlemesi bunu izler. */
+    paidPercent?: number;
+    paidAmount?: number;
     remainingPercent: number;
     remainingAmount: number;
-    /** Order-level payment schedule (percent array); null when free-form. */
-    paymentStages?: number[] | null;
+    /** Order-level payment schedule (percent + due date per stage); null when free-form. */
+    paymentStages?: PaymentStage[] | null;
     /** Derived next stage to bill; null when done or no schedule. */
-    nextStage?: { index: number; percent: number; suggestedPercent: number } | null;
+    nextStage?: { index: number; percent: number; date: string | null; suggestedPercent: number } | null;
     invoices: BillingSummaryInvoice[];
 }
 
@@ -74,6 +90,9 @@ export interface MyOrderListAddonDto {
     id: string;
     orderNumber: string;
     totalAmount: number;
+    createdAt?: string;
+    /** Ek işin ait olduğu randevu/iş günü — liste satırındaki tarih budur. */
+    orderDate?: string | null;
     billingSummary?: OrderBillingFiguresDto | null;
 }
 
@@ -81,7 +100,7 @@ export interface MyOrderListAddonDto {
  * One row of `GET /sales-orders/my-orders`.
  *
  * A list shape on purpose — the endpoint selects the table's own columns and
- * the sub-orders under them, nothing more. Anything richer (order type/status,
+ * the sub-orders under them, nothing more. Anything richer (order status,
  * payment schedule, tender/project/creator relations, the invoice breakdown)
  * lives on `MyOrderDetailDto` and is only fetched when a single order is opened.
  */
@@ -90,8 +109,19 @@ export interface MyOrderDto {
     orderNumber: string;
     totalAmount: number;
     createdAt: string;
+    /**
+     * Teklif onaylanırken seçilen yol. PROJECT_* = proje siparişi, INVOICE =
+     * teslimat siparişi; liste bu seçimi rozetle gösterir.
+     */
+    orderType?: string | null;
     /** Kept so the project screens can group this feed by project. */
     projectId?: string | null;
+    /**
+     * Bağlı proje — sipariş listesinde gösterilir. NULL ise sipariş bir projeye
+     * bağlı değildir (teklifin proje açmayan yolu) ve listede "Teslimat
+     * siparişi" olarak işaretlenir.
+     */
+    project?: { id: string; projectNumber?: string | null; projectName: string } | null;
     customer?: { id: string; companyName: string } | null;
     addonSalesOrders?: MyOrderListAddonDto[];
     billingSummary?: OrderBillingFiguresDto | null;
@@ -112,12 +142,15 @@ export interface MyOrderAddonDto extends MyOrderListAddonDto {
 export interface MyOrderReportDto {
     id: string;
     workDate: string;
+    /** Entry timestamp — the addon-order slices are cut on this, not on workDate. */
+    reportDate?: string | null;
     reportType: string;
     operationsDone: string;
     technicalNotes?: string | null;
     workedMinutes: number;
     overtimeMinutes: number;
     overtimeCost: number;
+    overtimeHourlyRate?: number;
     isSigned: boolean;
     signedAt?: string | null;
     employee?: { id: string; firstName: string; lastName: string } | null;
@@ -141,6 +174,24 @@ export interface MyOrderDetailDto extends MyOrderDto {
     customerId?: string | null;
     customer?: { id: string; companyName: string; mainEmail?: string | null; mainPhone?: string | null; address?: string | null } | null;
     createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
+    /**
+     * Siparişin doğduğu teklif. Adresler ve teslim tarihi SİPARİŞTE DEĞİL burada
+     * durur; sipariş görünümünün genel bakışı hangisini göstereceğini `orderType`
+     * ile seçer: proje siparişinde montaj adresi, teslimat siparişinde teslimat
+     * adresi + teslim tarihi.
+     */
+    tender?: {
+        id: string;
+        tenderNumber: string;
+        commissionNumber?: string | null;
+        /** Verkäufer — teklifin satıcısı; boşsa teklifi oluşturan kişi kullanılır. */
+        salespersonName?: string | null;
+        createdBy?: { firstName: string; lastName: string } | null;
+        billingAddress?: string | null;
+        installationAddress?: string | null;
+        deliveryAddress?: string | null;
+        internalDeliveryDate?: string | null;
+    } | null;
     addonSalesOrders?: MyOrderAddonDto[];
     billingSummary?: BillingSummaryDto | null;
     parentSalesOrder?: { id: string; orderNumber: string } | null;
@@ -156,7 +207,9 @@ export interface MyOrderDetailDto extends MyOrderDto {
     } | null;
     reports?: MyOrderReportDto[];
     expenses?: Array<{ id: string; expenseType: string; amount: number; description?: string | null; expenseDate: string }>;
-    extraMaterials?: Array<{ id: string; quantity: number; unitPrice: number; description?: string | null; addedAt: string; material?: { id: string; name: string; serialId: string } | null }>;
+    // Malzeme/ürün birleşmesi (2026-08-14): satırlar `article` taşır; eski
+    // yanıtların `material` biçimi opsiyonel yedek olarak kaldı.
+    extraMaterials?: Array<{ id: string; quantity: number; unitPrice: number; description?: string | null; addedAt: string; article?: { id: string; name: string; articleCode: string } | null; material?: { id: string; name: string; serialId: string } | null }>;
     costSummary?: MyOrderCostSummary;
 }
 
@@ -164,7 +217,15 @@ export interface CreateInvoiceInput {
     salesOrderId?: string | null;
     projectId?: string | null;
     billingType: InvoiceBillingType;
+    kind?: InvoiceKind | null;
     percent?: number | null;
-    invoiceNumber?: string | null;
+    /** Rechnungsdatum (ISO gün). Verilmezse sunucu "şimdi" kullanır. */
+    invoiceDate?: string | null;
+    /** Fälligkeit / vade (ISO gün). */
+    dueDate?: string | null;
+    salespersonName?: string | null;
+    commissionNumber?: string | null;
+    // invoiceNumber kasıtlı olarak YOK: Rechnungsnummer sunucuda üretilir
+    // (RE- serisi yalnızca ileri gider), gövdeden gelen numara kabul edilmez.
     notes?: string | null;
 }

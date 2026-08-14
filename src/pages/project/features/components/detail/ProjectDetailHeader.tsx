@@ -1,30 +1,29 @@
-import { memo, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
     AlertTriangle,
     ArrowLeft,
-    Briefcase01 as BriefcaseBusiness,
-    CalendarCheck01 as CalendarClock,
     Check,
     CheckCircle as CheckCircle2,
     ChevronDown,
     InfoCircle,
-    Phone,
     Plus,
     Receipt as ReceiptText,
+    Settings01 as Settings,
     Trash01,
     User01 as UserRound,
 } from '@/components/icons/antIconCompat';
 
-import { Button } from '@/components/ui-shared/Button';
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 import { money } from '../../utils/projectFormatters';
 import { ProjectStatusBadge } from '../common/ProjectStatusBadge';
-import { ProjectFlowStatusBadges } from './ProjectFlowStatusBadges';
 import { calculateTotals } from '../../utils/projectTotals';
+
+const LazyProjectSettingsMenu = lazy(() =>
+    import('./ProjectSettingsMenu').then((module) => ({ default: module.ProjectSettingsMenu })),
+);
 
 const OrderRow = ({
     order,
@@ -60,7 +59,7 @@ const OrderRow = ({
                 </span>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        <span className={`truncate text-[13px] font-semibold ${selected ? 'text-[#272f67]' : 'text-slate-800'}`}>{localizeTenderNumbersInText(order.orderNumber)}</span>
+                        <span className={`truncate text-[13px] font-semibold ${selected ? 'text-[#272f67]' : 'text-slate-800'}`}>{order.orderNumber}</span>
                         <span className={`shrink-0 rounded px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide ${isMain ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>
                             {isMain ? t('projects.mainOrder') : t('projects.addonOrder')}
                         </span>
@@ -151,7 +150,7 @@ const OrderDropdown = ({
                     </span>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                            <span className="truncate text-[13px] font-bold text-slate-900">{selectedOrder?.orderNumber ? localizeTenderNumbersInText(selectedOrder.orderNumber) : '-'}</span>
+                            <span className="truncate text-[13px] font-bold text-slate-900">{selectedOrder?.orderNumber ? selectedOrder.orderNumber : '-'}</span>
                             <span className={`shrink-0 rounded px-1.5 py-px text-[8.5px] font-semibold uppercase tracking-wide ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                                 {selectedIsAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
                             </span>
@@ -223,19 +222,20 @@ const OrderDropdown = ({
     );
 };
 
-// ERP-style detail header: project identity on the left, the order selector in the
-// middle and the primary actions on the right.
+// ERP-style detail header: project identity on the left, the order selector in
+// the middle and the primary actions on the right.
 export const ProjectDetailHeader = memo(({
     project,
     orders,
     selectedOrder,
     addonAttention,
     canManageOrders,
+    deletingProject,
     onSelectOrder,
     onCreateAddon,
     onDeleteOrder,
+    onDeleteProject,
     onOpenDetails,
-    onOpenContact,
     onComplete,
     onBack,
 }: {
@@ -244,36 +244,69 @@ export const ProjectDetailHeader = memo(({
     selectedOrder: ProjectSalesOrder | null;
     addonAttention: boolean;
     canManageOrders?: boolean;
+    deletingProject: boolean;
     onSelectOrder: (orderId: string) => void;
     onCreateAddon: (parentOrderId: string) => void;
     onDeleteOrder?: (order: ProjectSalesOrder) => void;
+    /** Dişli menüsündeki "Projeyi sil" — onay ("DELETE") popup'tan sonra çağrılır. */
+    onDeleteProject: () => Promise<void> | void;
     onOpenDetails: () => void;
-    onOpenContact: () => void;
     onComplete: () => void;
     onBack: () => void;
 }) => {
     const detailsLabel = t('common.detail');
-    const contactLabel = t('projects.detail.contactTitle');
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
     return (
-        <div className="mb-5 flex flex-col gap-4 border-b border-slate-200/60 pb-4 lg:flex-row lg:items-stretch lg:justify-between">
-            {/* Identity: name + status, then customer / manager / created date. */}
-            <div className="flex min-w-0 flex-col justify-between gap-2">
-                <h1 className="flex flex-wrap items-center gap-3 text-[20px] font-semibold tracking-tight text-slate-900">
-                    <span className="truncate">{localizeTenderNumbersInText(project.projectName)}</span>
+        // Başlığın altındaki ayraç çizgisi de kaldırıldı (kullanıcı isteği).
+        // Üç sütunlu grid: yan sütunlar eşit (1fr) olduğundan sipariş seçici
+        // ÜSTTE ve ekranın TAM ortasında durur (kullanıcı isteği; seçicinin
+        // kendisi — kutu + fiyat — olduğu gibi kaldı).
+        <div className="mb-4 flex flex-col gap-4 pb-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(auto,28rem)_minmax(0,1fr)] lg:items-center">
+            {/* Identity — BÜYÜK proje adı/numarası ve hemen yanında bilgi +
+                dişli (kullanıcı isteği); sorumlu kişi satırdan kaldırıldı.
+                Altında küçük satırda müşteri + durum. Geri ok yerine sağdaki
+                "Projektliste" bağlantısı kullanılır. */}
+            <div className="flex min-w-0 flex-col justify-center gap-0.5">
+                <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate font-mono text-[19px] font-bold leading-tight text-slate-900">{project.projectNumber || project.projectName}</span>
+                    {/* Bilgi düğmesi dişlinin SOLUNDA (kullanıcı isteği). */}
+                    <button
+                        type="button"
+                        aria-label={detailsLabel}
+                        title={detailsLabel}
+                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#272f67]"
+                        onClick={onOpenDetails}
+                    >
+                        <InfoCircle size={16} strokeWidth={1.9} />
+                    </button>
+                    {canManageOrders && (settingsLoaded ? (
+                        <Suspense fallback={<span className="size-7 shrink-0" />}>
+                            <LazyProjectSettingsMenu
+                                deleting={deletingProject}
+                                onDeleteProject={onDeleteProject}
+                                initiallyOpen
+                            />
+                        </Suspense>
+                    ) : (
+                        <button
+                            type="button"
+                            aria-label={t('nav.settings')}
+                            title={t('nav.settings')}
+                            onClick={() => setSettingsLoaded(true)}
+                            className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#272f67]"
+                        >
+                            <Settings size={16} />
+                        </button>
+                    ))}
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-slate-600">
+                    <span className="inline-flex items-center gap-1"><UserRound size={12} /> {project.customer?.companyName || project.customerId}</span>
                     <ProjectStatusBadge status={project.status} />
-                    <ProjectFlowStatusBadges project={project} />
-                </h1>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px] text-slate-500">
-                    <span className="inline-flex items-center gap-1"><UserRound size={11} /> {project.customer?.companyName || project.customerId}</span>
-                    {project.manager && (
-                        <span className="inline-flex items-center gap-1"><BriefcaseBusiness size={11} /> {project.manager.firstName} {project.manager.lastName}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1"><CalendarClock size={11} /> {dayjs(project.createdAt).format('DD.MM.YYYY')}</span>
                 </div>
             </div>
 
-            {/* Order selector, vertically centered between the info block and actions. */}
-            <div className="flex items-center justify-center lg:flex-1">
+            {/* Order selector — the middle grid column, exactly centered. */}
+            <div className="flex items-center justify-center">
                 <OrderDropdown
                     orders={orders}
                     project={project}
@@ -286,26 +319,9 @@ export const ProjectDetailHeader = memo(({
                 />
             </div>
 
-            {/* Actions. */}
-            <div className="flex items-center gap-2 self-start lg:self-center">
-                <button
-                    type="button"
-                    aria-label={contactLabel}
-                    title={contactLabel}
-                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#272f67] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#272f67]"
-                    onClick={onOpenContact}
-                >
-                    <Phone size={16} strokeWidth={1.9} />
-                </button>
-                <button
-                    type="button"
-                    aria-label={detailsLabel}
-                    title={detailsLabel}
-                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#272f67] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#272f67]"
-                    onClick={onOpenDetails}
-                >
-                    <InfoCircle size={17} strokeWidth={1.9} />
-                </button>
+            {/* Actions — tamamlama/durum + sağda ürün listesindeki geri
+                düğmesiyle aynı biçimde "Projektliste" bağlantısı. */}
+            <div className="flex items-center gap-2 lg:justify-end">
                 {project.status === 'COMPLETED' ? (
                     <span className="inline-flex items-center gap-1.5 px-2 text-[13px] font-semibold text-[#059669]">
                         <Check size={26} strokeWidth={3} />
@@ -317,13 +333,23 @@ export const ProjectDetailHeader = memo(({
                         {t('projects.specialClosure.closedIndicator')}
                     </span>
                 ) : (
-                    <Button
-                        variant="primary"
-                        icon={<CheckCircle2 size={13} />}
+                    <button
+                        type="button"
                         onClick={onComplete}
-                    >{t('projects.complete.completeProject')}</Button>
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
+                    >
+                        <CheckCircle2 size={14} />
+                        {t('projects.complete.completeProject')}
+                    </button>
                 )}
-                <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={onBack}>{t('projects.backToList')}</Button>
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                >
+                    <ArrowLeft size={14} />
+                    {t('projects.projectList')}
+                </button>
             </div>
         </div>
     );

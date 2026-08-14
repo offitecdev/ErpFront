@@ -6,16 +6,16 @@ import type { MailSettingDto, ProjectDto, ProjectMaterial, ProjectSalesOrder } f
 import { SubTabs } from '../../common/SubTabs';
 import { AppointmentList } from './AppointmentList';
 import { MailTab } from './MailTab';
-import { OvertimeTab } from './OvertimeTab';
 import { SignatureRequestTab } from './SignatureRequestTab';
 
-export type BookingMode = 'schedule' | 'mail' | 'signature' | 'overtime';
+// Overtime is no longer a mode here: it is recorded on the tablet during the
+// appointment and reported in the single costs table.
+export type BookingMode = 'schedule' | 'mail' | 'signature';
 
 const getBookingSubTabs = (): Array<{ key: BookingMode; label: string }> => [
     { key: 'schedule', label: t('auto.randevu_saat_planlari') },
     { key: 'mail', label: t('auto.randevu_maili') },
     { key: 'signature', label: t('auto.imzaya_gonder') },
-    { key: 'overtime', label: t('auto.15_uzeri_fazla_calisma') },
 ];
 
 export const BookingSection = ({
@@ -47,7 +47,6 @@ export const BookingSection = ({
             {activeMode === 'schedule' && <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
             {activeMode === 'mail' && <MailTab project={project} order={order} settings={settings} userEmail={userEmail} />}
             {activeMode === 'signature' && <SignatureRequestTab project={project} order={order} isPrimary={isPrimary} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
-            {activeMode === 'overtime' && <OvertimeTab project={project} order={order} isPrimary={isPrimary} onSaved={onSaved} />}
         </div>
     );
 };

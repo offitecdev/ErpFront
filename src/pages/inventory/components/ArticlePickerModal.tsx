@@ -4,7 +4,8 @@ import { t } from '@/i18n/translate';
 import type { ArticleListItem, ItemType } from '@/types/inventory';
 import { useArticleSearch } from '../hooks/useArticleSearch';
 import { fmtQty } from '../utils/format';
-import { Pager, SearchBox, TableStateRow } from './primitives';
+import { ColResizeHandle, Pager, ResizableCols, SearchBox, TableStateRow } from './primitives';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 
 const PAGE_SIZE = 12;
 
@@ -28,6 +29,13 @@ export const ArticlePickerModal = ({
     title?: string;
 }) => {
     const { items, total, totalPages, page, setPage, loading, query, setQuery } = useArticleSearch(PAGE_SIZE, open, itemType);
+    // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
+    // (Kanca erken `return`'den ÖNCE çağrılmalı.)
+    const grid = useColumnWidths({
+        storageKey: 'offitec:inv-article-picker:col-widths:v1',
+        defaults: { code: 160, unit: 88, stock: 112 },
+        minPx: 64,
+    });
 
     if (!open) return null;
 
@@ -69,13 +77,28 @@ export const ArticlePickerModal = ({
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                    <table data-inv-table data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                        <colgroup>
+                            <ResizableCols keys={['code'] as const} grid={grid} />
+                            {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['unit', 'stock'] as const} grid={grid} />
+                        </colgroup>
                         <thead>
                             <tr>
-                                <th className="w-40 text-left">{t(itemType === 'MATERIAL' ? 'inv.columns.materialCode' : 'inv.columns.serialCode')}</th>
-                                <th className="text-left">{t(itemType === 'MATERIAL' ? 'inv.columns.materialName' : 'inv.columns.productName')}</th>
-                                <th className="w-20 text-left">{t('inv.columns.unit')}</th>
-                                <th className="w-28 text-right">{t('inv.columns.currentStock')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.serialCode')}
+                                    <ColResizeHandle {...grid.resizeProps('code', 'right')} />
+                                </th>
+                                <th className="text-left">{t('inv.columns.productName')}</th>
+                                <th className="relative text-left">
+                                    {t('inv.columns.unit')}
+                                    <ColResizeHandle {...grid.resizeProps('unit')} />
+                                </th>
+                                <th className="relative text-right">
+                                    {t('inv.columns.currentStock')}
+                                    <ColResizeHandle {...grid.resizeProps('stock')} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>

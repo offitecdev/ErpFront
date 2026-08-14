@@ -21,7 +21,6 @@ import type { InvoiceDto, MyOrderDto } from '../../types/billing';
 import type { ProjectDto } from '../../types/project';
 
 import { t } from '@/i18n/translate';
-import { localizeTenderNumbersInText } from '@/utils/tenderNumber';
 
 type Phase = 'overview' | 'technical' | 'billing' | 'done';
 
@@ -124,9 +123,9 @@ export const ProjectProcessModal = ({
     const billItems = useMemo<BillItem[]>(() => {
         const items: BillItem[] = [];
         for (const order of orders) {
-            items.push({ id: order.id, label: localizeTenderNumbersInText(order.orderNumber), amount: Number(order.totalAmount) || 0, isAddon: false });
+            items.push({ id: order.id, label: order.orderNumber, amount: Number(order.totalAmount) || 0, isAddon: false });
             for (const addon of order.addonSalesOrders || []) {
-                items.push({ id: addon.id, label: localizeTenderNumbersInText(addon.orderNumber), amount: Number(addon.totalAmount) || 0, isAddon: true });
+                items.push({ id: addon.id, label: addon.orderNumber, amount: Number(addon.totalAmount) || 0, isAddon: true });
             }
         }
         return items;
@@ -274,7 +273,7 @@ export const ProjectProcessModal = ({
                                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#272f67] text-white"><ReceiptText size={14} /></span>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="truncate font-mono text-[12.5px] font-semibold text-slate-800">{localizeTenderNumbersInText(order.orderNumber)}</span>
+                                                <span className="truncate font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</span>
                                                 {addonCount > 0 && (
                                                     <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
                                                         <Plus size={9} />{t('projects.complete.addonCount', { count: addonCount })}
@@ -308,7 +307,7 @@ export const ProjectProcessModal = ({
                             return (
                                 <div key={order.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-mono text-[12.5px] font-semibold text-slate-800">{localizeTenderNumbersInText(order.orderNumber)}</div>
+                                        <div className="font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</div>
                                         <div className="mt-0.5">
                                             <StatusChip variant={isSkipped ? 'passive' : 'warning'}>
                                                 {isSkipped ? t('projects.complete.skipped') : t('projects.complete.technicalIncompleteBadge')}

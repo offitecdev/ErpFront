@@ -33,4 +33,13 @@ export const moduleProfileApi = {
     assignTenant: async (tenantId: string, profileId: string | null): Promise<void> => {
         await apiClient.patch('/module-profiles/assign/tenant', { tenantId, profileId });
     },
+
+    /**
+     * Şirket numarası — belge kodundaki blok (numara × 10000, yani 4 →
+     * AN-2026-40001). Modül kategorisinden bağımsızdır ve yalnızca bundan sonra
+     * üretilecek kodları etkiler.
+     */
+    setTenantNumber: async (tenantId: string, companyNumber: number): Promise<void> => {
+        await apiClient.patch('/module-profiles/assign/tenant-number', { tenantId, companyNumber });
+    },
 };

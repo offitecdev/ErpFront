@@ -8,7 +8,7 @@ import { loadResource, SUPPORTED_LANGUAGES, type SupportedLanguage } from './loa
 
 // Custom i18next backend that resolves each language from its own lazily
 // imported chunk (see loadResources). i18next only asks for the active language
-// and the `tr` fallback on startup, and fetches any other language the first
+// on startup and fetches any other language the first
 // time the user switches to it — so we no longer parse/execute all three
 // translation tables up front.
 const lazyBackend: BackendModule = {
@@ -47,7 +47,10 @@ export const initI18n = (): Promise<unknown> => {
             .use(LanguageDetector)
             .use(initReactI18next)
             .init({
-                fallbackLng: 'tr',
+                // Every language resource already contains generated fallbacks.
+                // Disabling a second language fallback prevents German/English
+                // sessions from downloading the complete Turkish tables too.
+                fallbackLng: false,
                 supportedLngs: [...SUPPORTED_LANGUAGES],
                 // Map region-specific browser locales onto the base language so
                 // de-DE/de-CH -> de, en-US/en-GB -> en, tr-TR -> tr.

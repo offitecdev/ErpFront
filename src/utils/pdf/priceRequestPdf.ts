@@ -1,7 +1,7 @@
 /**
  * ── FİYAT TALEBİ (PREISANFRAGE) PDF ŞABLONU ─────────────────────────────────
  * `orderPdf.ts`'in fiyatsız uyarlaması — fiyat talebi aşamasındaki siparişler
- * (DRAFT / PRICE_REQUEST / AWAITING_CONFIRMATION) için AYRI belge (kullanıcı
+ * (TALEP TASLAĞI = DRAFT, gönderilmiş talep = PRICE_REQUEST) için AYRI belge (kullanıcı
  * isteği 2026-08-01). Antet (logo + dalga + iletişim) ve alt bilgi bandı sipariş
  * şablonuyla birebirdir; içerik farkları:
  *  - Belge başlığı "Preisanfrage"dir; tabloda FİYAT SÜTUNU YOKTUR — yalnızca
@@ -59,7 +59,7 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
     tr: {
         docTitle: 'Fiyat Talebi',
         // Numaranın etiketi DİLE GÖRE ÇEVRİLİR (sipariş şablonuyla aynı karar,
-        // 2026-08-02) — numara AU-{yıl}-{sıra} biçimindedir.
+        // 2026-08-02) — numara BE-{yıl}-{sıra} biçimindedir.
         requestNumber: 'Sipariş No',
         requestDate: 'Talep Tarihi',
         orderedBy: 'Talep eden',
@@ -81,7 +81,9 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
     },
     de: {
         docTitle: 'Preisanfrage',
-        requestNumber: 'Auftrag',
+        // Numara etiketi belgeyle aynı kelimeyi taşır: kayıt bir BESTELLUNG'dur
+        // (kullanıcı isteği 2026-08-03 — önceki "Auftrag" geri alındı).
+        requestNumber: 'Bestellung',
         requestDate: 'Anfragedatum',
         orderedBy: 'Besteller',
         project: 'Projekt',

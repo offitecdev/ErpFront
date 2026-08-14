@@ -13,7 +13,7 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { Input } from '../../components/ui-shared/Field';
-import { Modal } from '../../components/ui-shared/Modal';
+import { ReportsSheet } from '../project/features/components/detail/reports/ReportsSheet';
 import { projectApi, deliveryReportApi, type ServiceReportDto, type DeliveryReportDto } from '../../lib/api/project';
 import type { ProjectDto } from '../../types/project';
 
@@ -427,12 +427,11 @@ export const ServiceReports = () => {
                 </Card>
             )}
 
-            <Modal
+            <ReportsSheet
                 open={previewOpen}
                 title={t('projects.general.previewTitle')}
-                description={previewProject ? `${previewProject.projectName} · ${dayjs(previewRange.start).format('DD.MM.YYYY')} – ${dayjs(previewRange.end).format('DD.MM.YYYY')}` : ''}
+                subtitle={previewProject ? `${previewProject.projectName} · ${dayjs(previewRange.start).format('DD.MM.YYYY')} – ${dayjs(previewRange.end).format('DD.MM.YYYY')}` : ''}
                 onClose={() => setPreviewOpen(false)}
-                width="xl"
                 footer={
                     <>
                         <Button variant="secondary" onClick={() => setPreviewOpen(false)}>{t('common.close')}</Button>
@@ -444,7 +443,7 @@ export const ServiceReports = () => {
                     </>
                 }
             >
-                <div className="max-h-[62vh] space-y-3 overflow-y-auto pr-1">
+                <div className="space-y-3 px-5 py-6 md:px-8">
                     <div className="flex flex-wrap gap-2 text-[12px]">
                         <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">{t('projects.general.reportsCount', { count: previewReports.length })}</span>
                         <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1">{previewProject?.customer?.companyName || '—'}</span>
@@ -480,7 +479,7 @@ export const ServiceReports = () => {
                         ))
                     )}
                 </div>
-            </Modal>
+            </ReportsSheet>
         </div>
     );
 };

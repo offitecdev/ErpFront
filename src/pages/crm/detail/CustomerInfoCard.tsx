@@ -11,6 +11,9 @@ import {
 import { t as i18nT } from '@/i18n/translate';
 import { apiClient } from '../../../lib/axios';
 import { Button } from '../../../components/ui-shared/Button';
+import { CountrySelect } from '../../../components/ui-shared/CountrySelect';
+import { setDialCode } from '../../../components/ui-shared/countries';
+import type { CountryEntry } from '../../../components/ui-shared/countries';
 import {
     CUSTOMER_CONTROL_CLASS,
     CUSTOMER_EDITABLE_CLASS,
@@ -93,7 +96,15 @@ export const CustomerInfoCard = ({
         [saved, draft],
     );
 
-    const openField = (key: FieldKey) => setOpenFields((current) => new Set(current).add(key));
+    // Welche Zeile per KLICK geöffnet wurde. Nur sie bekommt den Fokus: beim
+    // Wechsel des Landes gehen die beiden Telefonzeilen von selbst auf, und dann
+    // dürfte der Fokus nicht aus dem Länderfeld wegspringen.
+    const [focusField, setFocusField] = useState<FieldKey | null>(null);
+
+    const openField = (key: FieldKey) => {
+        setOpenFields((current) => new Set(current).add(key));
+        setFocusField(key);
+    };
     const isOpen = (key: FieldKey) => openFields.has(key);
     const set = (patch: Partial<CustomerInfoValue>) => setDraft((current) => ({ ...current, ...patch }));
 
@@ -146,7 +157,10 @@ export const CustomerInfoCard = ({
         <InfoFieldRow key={key} label={label}>
             {isOpen(key) ? (
                 <input
-                    autoFocus
+                    // Nur die angeklickte Zeile zieht den Fokus: ein Länderwechsel
+                    // öffnet beide Telefonzeilen, und die dürfen ihn dem Länderfeld
+                    // nicht wegnehmen.
+                    autoFocus={focusField === key}
                     type={type}
                     value={draft[key]}
                     onChange={(event) => set({ [key]: event.target.value } as Partial<CustomerInfoValue>)}
@@ -157,6 +171,22 @@ export const CustomerInfoCard = ({
             )}
         </InfoFieldRow>
     );
+
+    /**
+     * Landauswahl → Telefonvorwahl, genau wie im Anlegen-Fenster: beide Nummern
+     * bekommen bedingungslos die Vorwahl des gewählten Landes vorangestellt, der
+     * nationale Teil bleibt. Die Telefonzeilen öffnen sich dabei mit, sonst
+     * änderte sich ein Wert, den man gar nicht sieht.
+     */
+    const onCountryPicked = (country: CountryEntry) => {
+        setDraft((current) => ({
+            ...current,
+            mainPhone: setDialCode(current.mainPhone, country.dial),
+            mobilePhone: setDialCode(current.mobilePhone, country.dial),
+        }));
+        setOpenFields((current) => new Set(current).add('mainPhone').add('mobilePhone'));
+    };
+
 
     /**
      * Eine Adresszeile. Alle drei teilen sich den Schlüssel `address`, damit ein
@@ -243,31 +273,53 @@ export const CustomerInfoCard = ({
                             {textField('vatNumber', i18nT('crm.customers.vatNumber'))}
                         </div>
 
+                        {/* Adresse VOR den Kontaktdaten (Nutzerwunsch 2026-08-03) — dieselbe
+                            Reihenfolge wie im Anlegen-Fenster. Die Rahmenklassen der beiden
+                            Spalten bleiben, wo sie sind: sie hängen an der POSITION, nicht am
+                            Inhalt (bei `md` rutscht die dritte Spalte in eine zweite Zeile und
+                            braucht dort ihre obere Linie). */}
                         <div className="min-w-0 border-t border-slate-200 px-3 py-2 md:border-l md:border-t-0 dark:border-white/10">
-                            <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
-                                {i18nT('crm.customers.contactData')}
-                            </span>
-                            {textField('mainEmail', i18nT('common.email'), 'email')}
-                            {textField('mainPhone', i18nT('common.phone'))}
-                            {textField('mobilePhone', i18nT('crm.customers.mobilePhone'))}
-                            {textField('website', i18nT('crm.customers.website'))}
-                            {selectField('language', i18nT('crm.customers.language'), CUSTOMER_LANGUAGE_OPTIONS, getCustomerLanguageLabel(draft.language) ?? '', true)}
-                        </div>
-
-                        <div className="min-w-0 border-t border-slate-200 px-3 py-2 md:border-l lg:border-t-0 dark:border-white/10">
                             <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
                                 {i18nT('crm.locationPrimary')}
                             </span>
                             {textField('addressName', i18nT('crm.locationName'))}
-                            {/* Die Adresse besteht hier aus GENAU DREI Einträgen —
-                                Adresse / PLZ / Stadt — je eine Zeile, in Anzeige UND
-                                Bearbeitung identisch aufgebaut. Adresszusatz, Kanton und
-                                Land werden im Kundenprofil bewusst nicht geführt.
-                                Ein Klick auf eine der Zeilen öffnet alle drei; gespeichert
-                                wird weiterhin als EIN Block. */}
+                            {/* Die Adresse besteht hier aus VIER Einträgen — Adresse /
+                                PLZ / Stadt / Land — je eine Zeile, in Anzeige UND
+                                Bearbeitung identisch aufgebaut. Adresszusatz und Kanton
+                                werden im Kundenprofil bewusst nicht geführt. Ein Klick auf
+                                eine der Zeilen öffnet alle vier; gespeichert wird weiterhin
+                                als EIN Block. Das Land kam 2026-08-03 dazu, weil daran die
+                                Telefonvorwahl hängt. */}
                             {addressField('address', i18nT('address.sectionTitle'))}
                             {addressField('postalCode', i18nT('address.postalCode'))}
                             {addressField('city', i18nT('address.city'))}
+                            <InfoFieldRow label={i18nT('address.country')}>
+                                {isOpen('address') ? (
+                                    <CountrySelect
+                                        value={draft.country}
+                                        onChange={(next) => set({ country: next })}
+                                        onPick={onCountryPicked}
+                                        inputClassName={CUSTOMER_CONTROL_CLASS}
+                                    />
+                                ) : (
+                                    readValue('address', draft.country)
+                                )}
+                            </InfoFieldRow>
+                        </div>
+
+                        <div className="min-w-0 border-t border-slate-200 px-3 py-2 md:border-l lg:border-t-0 dark:border-white/10">
+                            <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                                {i18nT('crm.customers.contactData')}
+                            </span>
+                            {textField('mainEmail', i18nT('common.email'), 'email')}
+                            {/* Die Vorwahl steht MIT IM Feld — mitkopierbar und von Hand
+                                änderbar; bei einem Länderwechsel wird sie neu gesetzt. */}
+                            {textField('mainPhone', i18nT('common.phone'))}
+                            {textField('mobilePhone', i18nT('crm.customers.mobilePhone'))}
+                            {textField('website', i18nT('crm.customers.website'))}
+                            {selectField('language', i18nT('crm.customers.language'), CUSTOMER_LANGUAGE_OPTIONS, getCustomerLanguageLabel(draft.language) ?? '', true)}
+                            {/* Die zuständige Person gehört zu den Kontaktdaten, nicht zur
+                                Postanschrift (Nutzerwunsch 2026-08-03). */}
                             <InfoFieldRow label={i18nT('crm.customers.responsibleEmployee')}>
                                 {isOpen('responsible') ? (
                                     <div className="flex gap-2">

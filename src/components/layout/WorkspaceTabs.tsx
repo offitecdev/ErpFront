@@ -40,7 +40,6 @@ const TAB_CATALOG: TabDefinition[] = [
     { id: 'projects', labelKey: 'nav.projectManagement', path: '/projects', icon: ProjectsIcon },
     { id: 'orders', labelKey: 'nav.myOrders', path: '/crm/my-orders', icon: OrdersIcon },
     { id: 'articles', labelKey: 'nav.articles', path: '/inventory/articles', icon: ProductsIcon },
-    { id: 'materials', labelKey: 'nav.materials', path: '/inventory/materials', icon: ProductsIcon },
     { id: 'stock', labelKey: 'nav.stock', path: '/inventory/stock', icon: StockPanelIcon },
     // 'orders' kimliği CRM'in "Siparişlerim" sekmesine ait — bu yüzden inventoryOrders.
     { id: 'inventoryOrders', labelKey: 'nav.inventoryOrders', path: '/inventory/orders', icon: OrdersIcon },
@@ -200,12 +199,12 @@ export const WorkspaceTabLauncher: React.FC<{ className?: string }> = ({ classNa
                 aria-expanded={isMenuOpen}
                 title={t('nav.workspaceTabs.add')}
                 onClick={() => setIsMenuOpen((open) => !open)}
-                className={`inline-flex size-9 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isMenuOpen
+                className={`ofi-header-icon-button ofi-workspace-launcher inline-flex size-12 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isMenuOpen
                     ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg'
                     : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
                     }`}
             >
-                <PlusIcon style={{ fontSize: 20 }} />
+                <PlusIcon style={{ fontSize: 24 }} />
             </button>
 
             {isMenuOpen && (
@@ -288,7 +287,7 @@ export const WorkspaceTabStrip: React.FC = () => {
                         data-active={isActive || undefined}
                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); navigate(tab.path); }}
                         title={t(tab.labelKey)}
-                        className={`group inline-flex h-9 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors ${isActive
+                        className={`workspace-tab group inline-flex h-10 max-w-[190px] shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13px] font-semibold transition-colors ${isActive
                             ? 'border-[#272f67] bg-[#272f67] text-white'
                             : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/80 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
                             }`}

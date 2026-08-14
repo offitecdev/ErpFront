@@ -220,7 +220,8 @@ export const useInstallationDetail = (
                 const hasDraft = current.some((row) => Boolean(row.materialId) || row.description.trim());
                 if (hasDraft || !extraMaterials.length) return current;
                 return extraMaterials.map((row: any) => ({
-                    materialId: row.materialId || '',
+                    // Birleşme sonrası satırlar `articleId` taşır (eski yanıtlar materialId).
+                    materialId: row.articleId || row.materialId || '',
                     quantity: Number(row.quantity || 0),
                     description: row.description || '',
                 }));
@@ -311,8 +312,7 @@ export const useInstallationDetail = (
             setCapturedSignature(null);
             // Stay on the appointment so the now-sent report shows and the
             // signature actions unlock (signatures are disabled until Finish).
-            await load();
-            setReloadKey((key) => key + 1);
+            void load().then(() => setReloadKey((key) => key + 1));
         } catch (error: any) {
             toast.error(error.response?.data?.error || t('projects.montaj_tamamlanamadi'));
         } finally {

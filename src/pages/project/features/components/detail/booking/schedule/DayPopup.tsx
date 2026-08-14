@@ -10,7 +10,8 @@ import {
     Trash01 as Trash2,
 } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
-import { TableStateRow } from '@/components/ui-shared/TableKit';
+import { ColResizeHandle, ResizableCols, TableStateRow } from '@/components/ui-shared/TableKit';
+import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 import type { PersonLite } from '@/types/maintenance';
@@ -108,6 +109,12 @@ export const DayPopup = ({
         setView(next);
     };
 
+    // Müşteri sütunu esnektir; diğerleri sürüklenerek genişletilir.
+    const grid = useColumnWidths({
+        storageKey: 'offitec:day-popup:col-widths:v1',
+        defaults: { time: 176, installer: 176, status: 112 },
+        minPx: 72,
+    });
     const rows = useMemo(() => {
         const mineIds = new Set(mine.map((appointment) => appointment.id));
         return [
@@ -178,7 +185,7 @@ export const DayPopup = ({
             title={header.title}
             subtitle={header.subtitle}
             headerActions={view.kind === 'list' ? (
-                <Button size="sm" variant="primary" icon={<Plus size={13} />} onClick={() => go({ kind: 'create' }, 'right')}>
+                <Button size="md" variant="primary" icon={<Plus size={19} />} onClick={() => go({ kind: 'create' }, 'right')}>
                     {t('projects.schedule.newForDay')}
                 </Button>
             ) : undefined}
@@ -186,13 +193,28 @@ export const DayPopup = ({
             {view.kind === 'list' && (
                 <div key="list" className={`flex-1 p-4 ${animClass[anim]}`}>
                     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/15 dark:bg-transparent">
-                        <table data-inv-table data-unstyled-table className="w-full">
+                        <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                            <colgroup>
+                                <ResizableCols keys={['time'] as const} grid={grid} />
+                                {/* Müşteri sütunu: genişliği yok, kalan yeri emer. */}
+                                <col />
+                                <ResizableCols keys={['installer', 'status'] as const} grid={grid} />
+                            </colgroup>
                             <thead>
                                 <tr>
-                                    <th className="w-44 text-left">{t('projects.schedule.time')}</th>
+                                    <th className="relative text-left">
+                                        {t('projects.schedule.time')}
+                                        <ColResizeHandle {...grid.resizeProps('time', 'right')} />
+                                    </th>
                                     <th className="text-left">{t('projects.schedule.customer')}</th>
-                                    <th className="text-left">{t('projects.schedule.installer')}</th>
-                                    <th className="w-28 text-left">{t('common.status')}</th>
+                                    <th className="relative text-left">
+                                        {t('projects.schedule.installer')}
+                                        <ColResizeHandle {...grid.resizeProps('installer')} />
+                                    </th>
+                                    <th className="relative text-left">
+                                        {t('common.status')}
+                                        <ColResizeHandle {...grid.resizeProps('status')} />
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -249,7 +271,7 @@ export const DayPopup = ({
                         client, window (planned vs actual for completed jobs),
                         crew, status — then the 15%+ overtime rows. */}
                     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/15 dark:bg-transparent">
-                        <table data-inv-table data-unstyled-table className="w-full">
+                        <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                             <thead>
                                 <tr>
                                     <th className="w-44 text-left">{t('common.detail')}</th>

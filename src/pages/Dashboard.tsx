@@ -47,10 +47,15 @@ export const Dashboard = () => {
         breakPeriods,
         stationQrPayload,
         recentLogs,
+        fetchTodayAttendance,
         processCheckIn,
         startBreak,
         endBreak,
     } = useAttendanceStore();
+
+    useEffect(() => {
+        void fetchTodayAttendance();
+    }, [fetchTodayAttendance]);
 
     useEffect(() => {
         const id = setInterval(() => setNow(Date.now()), 1000);

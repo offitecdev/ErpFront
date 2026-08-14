@@ -1,7 +1,6 @@
 import dayjs from 'dayjs';
 
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
-import { localizeTenderNumber } from '@/utils/tenderNumber';
 
 // Sales orders sorted oldest-first (the main order followed by its addons in time order).
 export const getProjectSalesOrders = (project?: ProjectDto | null): ProjectSalesOrder[] =>
@@ -18,7 +17,7 @@ export const getProjectDisplayOrders = (project?: ProjectDto | null): ProjectSal
         customerId: project.customerId,
         tenderId: project.tenderId || project.tender.id,
         projectId: project.id,
-        orderNumber: project.tender.tenderNumber ? localizeTenderNumber(project.tender.tenderNumber) : project.projectName,
+        orderNumber: project.tender.tenderNumber ? project.tender.tenderNumber : project.projectName,
         orderType: 'PROJECT_NEW',
         status: 'ORDERED',
         totalAmount: project.plannedBudget,
@@ -37,9 +36,12 @@ export const getOrderRecordDate = (record: any) =>
     record.expenseDate || record.addedAt || record.reportDate || record.createdAt || record.workDate || record.startTime || null;
 
 // Narrows a record list (reports / expenses / materials / appointments) to those
-// belonging to the selected order. For addon orders the window is the time slice
-// between the previous addon and this one; for base orders it is the order id
-// (plus any legacy unscoped records when this is the primary order).
+// belonging to the selected order. Addon orders own their records DIRECTLY since
+// 2026-08-07 (creation stamps the swept records with the addon's id — the list
+// is "based on the additional order", not inferred from the initial one); the
+// time-window inference below survives only for addons created before that
+// change, whose records still carry the parent's id. For base orders it is the
+// order id (plus any legacy unscoped records when this is the primary order).
 export const scopedRecords = <T extends { salesOrderId?: string | null }>(
     records: T[] | undefined,
     order: ProjectSalesOrder | null,
@@ -47,6 +49,11 @@ export const scopedRecords = <T extends { salesOrderId?: string | null }>(
     orders: ProjectSalesOrder[] = [],
 ) => {
     if (order?.parentSalesOrderId) {
+        // New-model records: stamped with the addon's own id.
+        const direct = (records || []).filter((record) => record.salesOrderId === order.id);
+
+        // Legacy slice: parent-stamped records inside this addon's time window.
+        // Disjoint from `direct` by construction (different salesOrderId).
         const previousAddon = orders
             .filter((candidate) =>
                 candidate.parentSalesOrderId === order.parentSalesOrderId &&
@@ -55,13 +62,14 @@ export const scopedRecords = <T extends { salesOrderId?: string | null }>(
             .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())[0];
         const start = previousAddon ? dayjs(previousAddon.createdAt).valueOf() : null;
         const end = dayjs(order.createdAt).valueOf();
-        return (records || []).filter((record) => {
+        const legacy = (records || []).filter((record) => {
             if (record.salesOrderId !== order.parentSalesOrderId) return false;
             const rawDate = getOrderRecordDate(record);
             if (!rawDate) return false;
             const time = dayjs(rawDate).valueOf();
             return time <= end && (start === null || time > start);
         });
+        return [...direct, ...legacy];
     }
     const payloadId = orderPayloadId(order);
     if (!payloadId) return records || [];

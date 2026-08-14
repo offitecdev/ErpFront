@@ -21,7 +21,7 @@ const buildExtraMaterialAttachments = (appointment: AppointmentWithProject): Sig
         return {
             id: `extra-${item.id}`,
             group: t('signatures.attach.extra'),
-            label: item.material?.name || t('signatures.attach.extra'),
+            label: item.material?.name || item.article?.name || t('signatures.attach.extra'),
             detail: `${numberFmt(item.quantity)} x ${money(item.unitPrice)}`,
             amount: money(total),
         };

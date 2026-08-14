@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Radio from 'antd/es/radio';
 import { toast } from 'sonner';
-import { Modal } from '../ui-shared/Modal';
 import { Button } from '../ui-shared/Button';
 import { Field, Input } from '../ui-shared/Field';
+import { ReportsSheet } from '../../pages/project/features/components/detail/reports/ReportsSheet';
 import { billingApi } from '../../lib/api/billing';
-import { stageStatus } from '../../lib/paymentSchedule';
+import { formatStageDate, stageStatus } from '../../lib/paymentSchedule';
 import type { BillingSummaryDto, InvoiceBillingType } from '../../types/billing';
 
 export type BillingTarget = {
@@ -36,13 +36,11 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
     const [submitting, setSubmitting] = useState(false);
     const [mode, setMode] = useState<InvoiceBillingType>('FULL');
     const [percent, setPercent] = useState<number>(60);
-    const [invoiceNumber, setInvoiceNumber] = useState('');
 
     useEffect(() => {
         if (!open || !target) return;
         setMode('FULL');
         setPercent(60);
-        setInvoiceNumber('');
         setSummary(null);
         setLoading(true);
         billingApi
@@ -76,7 +74,7 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                 ...(target.type === 'order' ? { salesOrderId: target.id } : { projectId: target.id }),
                 billingType: mode,
                 percent: mode === 'PARTIAL' ? percent : undefined,
-                invoiceNumber: invoiceNumber.trim() || undefined,
+                // Rechnungsnummer sunucuda üretilir (RE- serisi) — buradan numara gitmez.
             });
             toast.success(t('billing.createSuccess'));
             onSuccess?.();
@@ -89,12 +87,11 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
     };
 
     return (
-        <Modal
+        <ReportsSheet
             open={open}
             title={t('billing.title')}
-            description={target?.label}
+            subtitle={target?.label}
             onClose={onClose}
-            width="md"
             footer={
                 <>
                     <Button variant="secondary" onClick={onClose} isDisabled={submitting}>{t('common.cancel')}</Button>
@@ -109,10 +106,11 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                 </>
             }
         >
+            <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8">
             {loading ? (
-                <div className="py-8 text-center text-sm text-tertiary">{t('common.loading')}</div>
-            ) : (
-                <div className="flex flex-col gap-4">
+                    <div className="py-8 text-center text-sm text-tertiary">{t('common.loading')}</div>
+                ) : (
+                    <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-xs">
                         <div>
                             <div className="text-tertiary">{t('billing.totalAmount')}</div>
@@ -136,7 +134,7 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                         the schedule guides, it does not lock. */}
                     {target?.type === 'order' && summary?.paymentStages?.length ? (
                         <div className="flex flex-wrap items-center gap-1.5">
-                            {summary.paymentStages.map((stagePercent, index) => {
+                            {summary.paymentStages.map((stage, index) => {
                                 const status = stageStatus(summary.paymentStages!, summary.billedPercent)[index];
                                 const isNext = status === 'next' && !!summary.nextStage;
                                 return (
@@ -160,7 +158,10 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                                                     : 'border-slate-200 bg-slate-50 text-slate-400'
                                         }`}
                                     >
-                                        {status === 'done' ? '✓ ' : ''}{t('billing.stageOf', { n: index + 1, total: summary.paymentStages!.length })} · {stagePercent}%
+                                        {status === 'done' ? '✓ ' : ''}{t('billing.stageOf', { n: index + 1, total: summary.paymentStages!.length })} · {stage.percent}%
+                                        {stage.date && (
+                                            <span className="font-normal opacity-70">{formatStageDate(stage.date)}</span>
+                                        )}
                                     </button>
                                 );
                             })}
@@ -185,32 +186,13 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                             </Radio.Group>
 
                             {mode === 'PARTIAL' && (
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <Field label={t('billing.percentLabel')} hint={t('billing.maxPercent', { percent: remainingPercent })}>
-                                        <Input
-                                            type="number"
-                                            min={1}
-                                            max={remainingPercent}
-                                            value={String(percent)}
-                                            onChange={(e) => setPercent(Number(e.target.value))}
-                                        />
-                                    </Field>
-                                    <Field label={t('billing.invoiceNumber')} hint={t('billing.autoGeneratedHint')}>
-                                        <Input
-                                            value={invoiceNumber}
-                                            onChange={(e) => setInvoiceNumber(e.target.value)}
-                                            placeholder={t('billing.automaticPlaceholder')}
-                                        />
-                                    </Field>
-                                </div>
-                            )}
-
-                            {mode === 'FULL' && (
-                                <Field label={t('billing.invoiceNumber')} hint={t('billing.autoGeneratedHint')}>
+                                <Field label={t('billing.percentLabel')} hint={t('billing.maxPercent', { percent: remainingPercent })}>
                                     <Input
-                                        value={invoiceNumber}
-                                        onChange={(e) => setInvoiceNumber(e.target.value)}
-                                        placeholder={t('billing.automaticPlaceholder')}
+                                        type="number"
+                                        min={1}
+                                        max={remainingPercent}
+                                        value={String(percent)}
+                                        onChange={(e) => setPercent(Number(e.target.value))}
                                     />
                                 </Field>
                             )}
@@ -227,8 +209,9 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                             </div>
                         </>
                     )}
-                </div>
-            )}
-        </Modal>
+                    </div>
+                )}
+            </div>
+        </ReportsSheet>
     );
 };

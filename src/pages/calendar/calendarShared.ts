@@ -9,13 +9,15 @@ dayjs.extend(isoWeek);
 export type CalendarView = 'day' | 'week' | 'month';
 export type CalCategory = 'appointments' | 'maintenance' | 'meetings';
 
-/* Chip color contract (see .ofi-ucal-chip-* in index.css):
-   planned   → dark blue block with an orange edge (upcoming appointment)
+/* Chip color contract (see .ofi-ucal-chip-* in index.css) — flat blocks like
+   the project-view calendar (user request 2026-08-07):
+   ongoing   → solid navy (the DEFAULT look; window started, not finished)
+   planned   → navy OUTLINE on white (upcoming appointment)
    done      → green (appointment whose window is over / completed)
    cancelled → muted, struck through
    meeting   → violet
    maintenance → amber */
-export type CalStatus = 'planned' | 'done' | 'cancelled' | 'meeting' | 'maintenance';
+export type CalStatus = 'planned' | 'ongoing' | 'done' | 'cancelled' | 'meeting' | 'maintenance';
 
 export type CalParticipant = {
     id?: string;
@@ -78,10 +80,12 @@ export const viewRange = (view: CalendarView, anchor: dayjs.Dayjs) => {
 };
 
 /* Appointment status → chip color. "Past" = the planned window is over OR the
-   job is completed → green; everything still ahead → dark blue + orange. */
-export const appointmentCalStatus = (raw: { status?: string | null }, end: dayjs.Dayjs): CalStatus => {
+   job is completed → green; a window that has STARTED but not ended → solid
+   navy (ongoing); everything still ahead → outlined navy (planned). */
+export const appointmentCalStatus = (raw: { status?: string | null }, start: dayjs.Dayjs, end: dayjs.Dayjs): CalStatus => {
     if (raw.status === 'CANCELLED') return 'cancelled';
     if (raw.status === 'COMPLETED' || end.valueOf() < Date.now()) return 'done';
+    if (start.valueOf() <= Date.now()) return 'ongoing';
     return 'planned';
 };
 

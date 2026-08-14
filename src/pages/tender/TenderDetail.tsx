@@ -1,17 +1,17 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { toast } from 'sonner';
 import { LuTable2 as MdTableChart } from '@/components/icons/lucideLocal';
 import {
     File05 as FileText,
     FileDownload02 as FileDown,
     Coins01 as CoinsIcon,
+    User01 as User01Icon,
 } from '@/components/icons/antIconCompat';
 
 import { PlainButton as Button, PlainCard as Card } from './detail/components/common/PlainUi';
 
-import { useTenderStore } from '../../store/tenderStore';
+import { useTenderStore, isDetailFresh } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
 import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
 import { apiClient } from '../../lib/axios';
@@ -20,7 +20,6 @@ import { tenderApi } from '../../lib/api/tender';
 import { customerApi, type CustomerLocationDto } from '../../lib/api/customer';
 import type { PositionDto, TenderChangeLog, TenderDocumentDto } from '../../types/tender';
 
-import TenderCreate from './TenderCreate';
 import {
     STATUS_VARIANT,
     buildTree,
@@ -28,7 +27,6 @@ import {
 } from './detail/tenderDetailUtils';
 import { useMoneyFormat } from './detail/utils/useMoneyFormat';
 import { toCurrencyCode } from '../../utils/currency';
-import { localizeTenderNumber } from '../../utils/tenderNumber';
 
 import { t } from '@/i18n/translate';
 import type { ArticleQuickPick } from '@/types/inventory';
@@ -41,25 +39,21 @@ import type {
     TenderSettingsTabKey,
     TenderWorkspaceTabKey,
 } from './detail/types/tenderDetail.types';
-import {
-    DEFAULT_VAT,
-    EMPTY_CHATTER_SUMMARY,
-} from './detail/utils/tenderDetail.constants';
-import { getLineKind } from './detail/utils/tenderCalculation.utils';
+import { DEFAULT_VAT } from './detail/utils/tenderDetail.constants';
 import { buildSimpleTenderLines } from './detail/utils/tenderLine.utils';
 import {
-    fileToDataUrl,
-    isPreviewableDocument,
     isPdfDocument,
     normalizeDocumentName,
     inferDocumentType,
 } from './detail/utils/tenderDocument.utils';
 import {
+    addressesEqual,
     EMPTY_TENDER_ADDRESS_FORM,
     EMPTY_TENDER_CUSTOMER_FORM,
     formatLocationAddress,
     locationKindOf,
     type TenderAddressCreateForm,
+    type TenderAddressSlot,
     type TenderCustomerCreateForm,
 } from './detail/utils/tenderAddress.utils';
 import { buildProductDefaults, emptyManualProduct, parseClosingImages } from './detail/utils/tenderProduct.utils';
@@ -67,7 +61,7 @@ import { attachPdfPositionImages } from './detail/utils/tenderPdfImages.utils';
 import { defaultTenderValidUntil } from './detail/utils/tenderDate.utils';
 import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
 import { computeTenderPricingSummary } from './detail/utils/tenderPricing.utils';
-import { discountDisplayName, seedTotalDiscounts } from './detail/utils/tenderDiscounts.utils';
+import { discountDisplayName, formatDiscountValue, parseDiscountList, seedTotalDiscounts } from './detail/utils/tenderDiscounts.utils';
 import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
 import { useTenderCustomers } from './detail/hooks/useTenderCustomers';
 import { useTenderCustomerLocations } from './detail/hooks/useTenderCustomerLocations';
@@ -86,21 +80,35 @@ import { TenderLineTable } from './detail/components/lines/TenderLineTable';
 import { RESET_DRAFT_EVENT } from './detail/components/TenderLineInputs';
 import { TenderCustomerSection } from './detail/components/customer/TenderCustomerSection';
 import { TenderCustomerCard, type TenderCardGroup } from './detail/components/customer/TenderCustomerCard';
+import { TenderCustomerContactPopup } from './detail/components/customer/TenderCustomerContactPopup';
 import { QuoteDatePicker } from './detail/components/common/QuoteDatePicker';
-import { TenderAddressPicker, TenderBillingAddressRow } from './detail/components/address/TenderAddressSection';
-import { TenderAddressTypeRow, type TenderAddressType } from './detail/components/address/TenderAddressTypeRow';
+import { TenderAddressPicker, TenderCustomAddressRow, TenderMainAddressRow } from './detail/components/address/TenderAddressSection';
 import { toAddressForm, toAddressPayload } from '@/components/ui-shared/addressForm';
-import { TenderProductSearchDropdown } from './detail/components/product/TenderProductSearchDropdown';
 import { useUnsavedChangesGuard } from './detail/hooks/useUnsavedChangesGuard';
 import { usePageScrollLock } from './detail/hooks/usePageScrollLock';
 import { joinAddress, renderDetailLines, splitAddress, valueOrBlank } from './detail/components/info/TenderDetailInfoRows';
 import { TenderPriceSummary } from './detail/components/info/TenderPriceSummary';
-import { TenderPaymentTab } from './detail/components/payment/TenderPaymentTab';
 import { TenderCommissionInput } from './detail/components/info/TenderCommissionInput';
 import { TenderCurrencySelect } from './detail/components/info/TenderCurrencySelect';
+import { QUOTE_READONLY_CLASS } from './detail/utils/quoteField.constants';
+
+// Toasts are only produced after a request or user action. Keeping Sonner out
+// of the initial quote module removes its runtime from the LCP/main-thread
+// path; App's delayed toaster and the first notification share this chunk.
+const toast = {
+    success: (message: string) => { void import('sonner').then((mod) => mod.toast.success(message)); },
+    error: (message: string) => { void import('sonner').then((mod) => mod.toast.error(message)); },
+};
 
 const LazyTenderSettingsModal = lazy(() =>
     import('./detail/components/modals/TenderSettingsModal').then((mod) => ({ default: mod.TenderSettingsModal }))
+);
+const LazyTenderCreate = lazy(() => import('./TenderCreate'));
+const LazyTenderPaymentTab = lazy(() =>
+    import('./detail/components/payment/TenderPaymentTab').then((mod) => ({ default: mod.TenderPaymentTab }))
+);
+const LazyTenderProductSearchDropdown = lazy(() =>
+    import('./detail/components/product/TenderProductSearchDropdown').then((mod) => ({ default: mod.TenderProductSearchDropdown }))
 );
 const LazyExportModal = lazy(() =>
     import('./detail/components/modals/ExportModal').then((mod) => ({ default: mod.ExportModal }))
@@ -125,11 +133,9 @@ const LazyTenderBulkDeleteModal = lazy(() =>
 const LazyTenderBulkDiscountModal = lazy(() =>
     import('./detail/components/bulk/TenderBulkDiscountModal').then((mod) => ({ default: mod.TenderBulkDiscountModal }))
 );
-// Stacked-discount editors: neither is on the quote's critical path, and both
-// pull in the shared list editor — kept out of the page's own bundle.
-const LazyTenderLineDiscountModal = lazy(() =>
-    import('./detail/components/discounts/TenderLineDiscountModal').then((mod) => ({ default: mod.TenderLineDiscountModal }))
-);
+// The document-total discount editor: not on the quote's critical path and it
+// pulls in the shared list editor — kept out of the page's own bundle. (Product
+// lines have no stacked-discount editor; they carry a single percentage.)
 const LazyTenderTotalDiscountModal = lazy(() =>
     import('./detail/components/discounts/TenderTotalDiscountModal').then((mod) => ({ default: mod.TenderTotalDiscountModal }))
 );
@@ -195,11 +201,7 @@ export const TenderDetail = () => {
         fetchDetail,
         ensurePdfContent,
         stockArticles,
-        stockArticlesLoading,
-        stockArticlesLoaded,
-        fetchStockArticles,
         activities,
-        fetchActivities,
         logs,
         createVersion,
         deleteTender,
@@ -228,14 +230,23 @@ export const TenderDetail = () => {
     // Quick "+ add address" popup launched from the tender's address section.
     const [addrModalOpen, setAddrModalOpen] = useState(false);
     const [addrTarget, setAddrTarget] = useState<'INSTALLATION' | 'DELIVERY' | 'BILLING' | 'CUSTOMER'>('INSTALLATION');
-    // The quote's single address slot is EITHER Projekt- or Lieferadresse.
-    const [tenderAddressType, setTenderAddressType] = useState<TenderAddressType>('INSTALLATION');
+    // Every address slot follows the customer's Hauptadresse unless the user
+    // ticked "andere Adresse verwenden" for it — that tick lives here, and the
+    // slot's picker is only rendered while it is on.
+    const [customAddrSlots, setCustomAddrSlots] = useState<Record<TenderAddressSlot, boolean>>({
+        INSTALLATION: false,
+        DELIVERY: false,
+        BILLING: false,
+    });
     const [addrForm, setAddrForm] = useState<TenderAddressCreateForm>(EMPTY_TENDER_ADDRESS_FORM);
     const [addrSaving, setAddrSaving] = useState(false);
     // Quick "+ add customer" popup launched from the tender's customer section.
     const [customerModalOpen, setCustomerModalOpen] = useState(false);
     const [customerForm, setCustomerForm] = useState<TenderCustomerCreateForm>(EMPTY_TENDER_CUSTOMER_FORM);
     const [customerSaving, setCustomerSaving] = useState(false);
+    // Kunden-/CC-Karte (Kalenderfenster): öffnet sich über den Kunden in der
+    // Offertkarte und pflegt zugleich die CC-Empfänger der Offerte.
+    const [contactPopupOpen, setContactPopupOpen] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const {
         productPickerOpen,
@@ -280,19 +291,21 @@ export const TenderDetail = () => {
     const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
     const [bulkDiscountOpen, setBulkDiscountOpen] = useState(false);
     const [bulkDiscountValue, setBulkDiscountValue] = useState<number>(0);
-    // Stacked discounts: the product line whose editor is open (null = closed),
-    // and the document-total pop-up behind "Apply discount".
-    const [lineDiscountRowId, setLineDiscountRowId] = useState<string | null>(null);
+    const noteSubmitLockRef = useRef(false);
+    const documentSubmitLockRef = useRef(false);
+    const localDocumentUrlsRef = useRef(new Set<string>());
+    // Mehrere Anhänge dürfen zusammen gewählt und mit der Notiz abgeschickt
+    // werden; hochgeladen wird erst beim Senden.
+    const [pendingDocuments, setPendingDocuments] = useState<File[]>([]);
+    // The document-total discount pop-up behind "Apply discount".
     const [totalDiscountOpen, setTotalDiscountOpen] = useState(false);
     // Bulk delete/discount are now staged instantly (persisted on Save), so this
     // never toggles — kept only so the bulk modals keep their (never-busy) state.
     const [bulkActionLoading] = useState(false);
     const {
-        chatterOpen,
-        setChatterOpen,
         logsLoading,
+        logsLoaded,
         setLogsLoaded,
-        setChatterSummary,
         tenderDocuments,
         setTenderDocuments,
         documentPreview,
@@ -306,13 +319,11 @@ export const TenderDetail = () => {
         setDocumentSaving,
         documentInputRef,
         loadTenderChatter,
-        handleOpenLogs,
-        handleCloseLogs,
     } = useTenderChatter({ activeTenderId: detail?.tender.id || id, isCreatingTender });
-    const handleOpenTenderLogs = () => {
-        handleOpenLogs();
-        if (id && id !== 'new') void fetchActivities(id);
-    };
+    useEffect(() => () => {
+        localDocumentUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        localDocumentUrlsRef.current.clear();
+    }, []);
     const [localPositions, setLocalPositions] = useState<PositionDto[]>([]);
     const {
         pendingAddrId,
@@ -371,8 +382,9 @@ export const TenderDetail = () => {
         setOrderMode,
         attachExistingProject,
         setAttachExistingProject,
-        orderProjectName,
-        setOrderProjectName,
+        orderDeliveryDate,
+        setOrderDeliveryDate,
+        notifyRecipient,
         projectSearch,
         setProjectSearch,
         projectSearchLoading,
@@ -410,17 +422,32 @@ export const TenderDetail = () => {
         customerLocationsLoaded,
         onStageDefaults: (patch) => handleTenderMetaChange(patch),
     });
-    // Derive the toggle position from which side holds the stored address when
-    // (re)opening a tender; user toggles afterwards are not fought.
+    // On (re)opening a tender, a slot counts as "andere Adresse" when what it
+    // stores differs from the customer's Hauptadresse — that is exactly what the
+    // checkbox means. Ticks the user makes afterwards are not fought.
     useEffect(() => {
         const currentTender = detail?.tender;
         if (!currentTender) return;
-        const hasInstallation = Boolean(String(currentTender.installationAddress ?? '').trim());
-        const hasDelivery = Boolean(String(currentTender.deliveryAddress ?? '').trim());
-        setTenderAddressType(hasDelivery && !hasInstallation ? 'DELIVERY' : 'INSTALLATION');
+        const main = String(currentTender.customerAddress ?? '').trim();
+        // Without a main address there is nothing to differ from, so no slot can
+        // be judged custom yet; a stored value then just shows in its own picker.
+        const differsFromMain = (value?: string | null) => {
+            const stored = String(value ?? '').trim();
+            return Boolean(stored) && Boolean(main) && !addressesEqual(stored, main);
+        };
+        setCustomAddrSlots({
+            INSTALLATION: differsFromMain(currentTender.installationAddress),
+            DELIVERY: differsFromMain(currentTender.deliveryAddress),
+            BILLING: differsFromMain((currentTender as any).billingAddress),
+        });
     }, [detail?.tender.id]);
     const [workspaceTab, setWorkspaceTab] = useState<TenderWorkspaceTabKey>('lines');
     const [settingsInitialTab, setSettingsInitialTab] = useState<TenderSettingsTabKey>('mail');
+
+    const handleWorkspaceTabSelect = (tab: TenderWorkspaceTabKey) => {
+        setWorkspaceTab(tab);
+        if (tab === 'logs' && !logsLoaded) void loadTenderChatter();
+    };
 
     useEffect(() => {
         if (
@@ -428,7 +455,10 @@ export const TenderDetail = () => {
             && detail?.tender.id
             && detail.tender.pdfContentDeferred
         ) {
-            void ensurePdfContent(detail.tender.id).catch((error: any) => {
+            void Promise.all([
+                ensurePdfContent(detail.tender.id),
+                import('./detail/components/pdf/TenderPdfContentPanel'),
+            ]).catch((error: any) => {
                 toast.error(error?.response?.data?.error || t('common.error'));
             });
         }
@@ -439,8 +469,8 @@ export const TenderDetail = () => {
             resetStaging();
             setCreatedProjectId(null);
             setTenderDocuments([]);
-            setChatterSummary(EMPTY_CHATTER_SUMMARY);
             setNoteText('');
+            setPendingDocuments([]);
             useTenderStore.setState({
                 logs: [],
                 activities: [],
@@ -449,7 +479,6 @@ export const TenderDetail = () => {
         }
         if (!id || isCreatingTender) {
             setLogsLoaded(false);
-            setChatterOpen(false);
             setLocalPositions([]);
             return;
         }
@@ -457,32 +486,19 @@ export const TenderDetail = () => {
             const store = useTenderStore.getState();
             if (store.detail?.tender.id !== id || store.loadingDetail) {
                 void fetchDetail(id);
-            } else {
+            } else if (!isDetailFresh(id)) {
                 // The cached copy renders instantly; still re-sync silently in
                 // the background so a stale cache can never hide lines that
-                // were saved on a previous visit.
+                // were saved on a previous visit. Skipped when the copy was
+                // fetched seconds ago (deep-link prefetch) — re-requesting it
+                // immediately doubled the tender API call on every cold load.
                 void fetchDetail(id, true);
             }
             setLogsLoaded(false);
-            setChatterOpen(false);
             useTenderStore.setState({ logs: [] });
         }
     }, [id, isCreatingTender, fetchDetail]);
 
-
-    // Cost basis for the per-row profit/loss icon. This is the page's heaviest
-    // request, so it is fetched only when a row can actually show a figure —
-    // i.e. an article-linked product line exists. It used to fire for ANY draft,
-    // including an empty one, putting a whole stock-article summary on the
-    // critical path of a quote that had nothing to price. Scheduled on idle so
-    // it never competes with the tender's own data for a connection.
-    useEffect(() => {
-        if (!detail?.tender.id || stockArticlesLoaded || stockArticlesLoading) return;
-        if (detail.tender.status !== 'Draft' || !canManage) return;
-        const hasProductRows = localPositions.some((position) => getLineKind(position) === 'PRODUCT' && !!position.sourceArticleId);
-        if (!hasProductRows) return;
-        return onIdle(() => { void fetchStockArticles(false, false); }, 3000);
-    }, [detail?.tender.id, detail?.tender.status, canManage, fetchStockArticles, localPositions, stockArticlesLoaded, stockArticlesLoading]);
 
     // Read-only orders are the common PDF/export path. Warm their small PDF image
     // derivatives after the page is interactive, so export never waits for a
@@ -559,10 +575,6 @@ export const TenderDetail = () => {
         }])),
         [profitabilityRows],
     );
-    const lineDiscountRow = useMemo(
-        () => (lineDiscountRowId ? localPositions.find((position) => position.id === lineDiscountRowId) ?? null : null),
-        [lineDiscountRowId, localPositions],
-    );
     const discountEligibleRows = selectedRows.filter((row) => row.kind === 'PRODUCT');
     const allRowsSelected = simpleRows.length > 0 && selectedRows.length === simpleRows.length;
     const someRowsSelected = selectedRows.length > 0;
@@ -597,7 +609,6 @@ export const TenderDetail = () => {
         || manualProductOpen
         || bulkDeleteOpen
         || bulkDiscountOpen
-        || lineDiscountRowId
         || totalDiscountOpen
         || addrModalOpen
         || customerModalOpen
@@ -605,14 +616,17 @@ export const TenderDetail = () => {
         || deleteOfferOpen
         || orderDecisionOpen
         || documentPreview
-        || chatterOpen
         || navGuard.isOpen
         || projectCreatedModalId,
     ));
 
 
     if (isCreatingTender) {
-        return <TenderCreate />;
+        return (
+            <Suspense fallback={<TenderDetailLoadingSkeleton />}>
+                <LazyTenderCreate />
+            </Suspense>
+        );
     }
 
 
@@ -622,7 +636,11 @@ export const TenderDetail = () => {
 
     const tender = detail.tender;
     const isDraft = tender.status === "Draft";
-    const isSalesOrderStatus = Boolean(projectId) || isSourceSalesOrder(tender.sourceStatus);
+    // Bu tekliften doğmuş sipariş — ana düğme varsa hedefini DOĞRUDAN açar:
+    // proje düzeyinde seçim yapılmışsa projeyi, teslimat siparişiyse siparişi.
+    const salesOrderId = tender.salesOrder?.id ?? null;
+    const orderProjectId = projectId || tender.salesOrder?.projectId || null;
+    const isSalesOrderStatus = Boolean(projectId) || Boolean(salesOrderId) || isSourceSalesOrder(tender.sourceStatus);
     const tenderStatusLabel = isSalesOrderStatus ?t('crm.tenders.statusOrdered') : getStatusLabel()[tender.status];
     const tenderStatusVariant = isSalesOrderStatus ? 'order' : STATUS_VARIANT[tender.status];
     const currentUserName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : '';
@@ -647,7 +665,7 @@ export const TenderDetail = () => {
             ],
         }));
         setLogsLoaded(true);
-        setChatterOpen(true);
+        setWorkspaceTab('logs');
     };
 
     const addLocalTenderLog = (input: {
@@ -710,7 +728,7 @@ export const TenderDetail = () => {
     };
 
     // Persist the new address, then select it on the tender (or set it as the
-    // customer's address). Installation + same-as also updates billing.
+    // customer's Hauptadresse — which every slot still following it inherits).
     const submitAddrModal = async () => {
         const customerId = detail?.tender.customerId;
         if (!customerId) { toast.error(t('tenders.address_info_not_found')); return; }
@@ -726,24 +744,26 @@ export const TenderDetail = () => {
                     addressName: addrForm.name || null,
                     ...toAddressPayload(addrForm),
                 });
+                // The Hauptadresse is the default of every slot that has not been
+                // switched to its own address — write it through to those, and show
+                // the new main address on the quote right away.
+                const inheritPatch: Record<string, string> = {};
+                if (!customAddrSlots.INSTALLATION) inheritPatch.installationAddress = formatted;
+                if (!customAddrSlots.DELIVERY) inheritPatch.deliveryAddress = formatted;
+                if (!customAddrSlots.BILLING) inheritPatch.billingAddress = formatted;
+                handleTenderMetaChange(inheritPatch, { customerAddress: formatted });
             } else {
                 await customerApi.addLocation(customerId, {
                     name: addrForm.name || formatted, kind: addrTarget, ...toAddressPayload(addrForm),
                 });
                 const rows = await customerApi.listLocations(customerId);
                 setCustomerLocations(rows);
-                const sameAs = !!(detail?.tender as any)?.billingSameAsInstallation;
-                if (addrTarget === 'INSTALLATION' || addrTarget === 'DELIVERY') {
-                    // The new address takes over the single project/delivery slot:
-                    // its type becomes active and the other side is cleared.
-                    setTenderAddressType(addrTarget);
-                    const fieldPatch = addrTarget === 'INSTALLATION'
-                        ? { installationAddress: formatted, deliveryAddress: null }
-                        : { deliveryAddress: formatted, installationAddress: null };
-                    handleTenderMetaChange(sameAs ? { ...fieldPatch, billingAddress: formatted } : fieldPatch);
-                } else {
-                    handleTenderMetaChange({ billingAddress: formatted });
-                }
+                // A freshly created address is by definition "another" address for
+                // its slot, so that slot stays open on the picker showing it.
+                setCustomAddrSlots((prev) => ({ ...prev, [addrTarget]: true }));
+                if (addrTarget === 'INSTALLATION') handleTenderMetaChange({ installationAddress: formatted });
+                else if (addrTarget === 'DELIVERY') handleTenderMetaChange({ deliveryAddress: formatted });
+                else handleTenderMetaChange({ billingAddress: formatted, billingSameAsInstallation: false });
             }
             toast.success(t('crm.addressSaved'));
             setAddrModalOpen(false);
@@ -889,7 +909,8 @@ export const TenderDetail = () => {
         setNewTenderCustomerQuery(customer.companyName);
         setNewTenderCustomerOpen(false);
         setPendingAddrId({ INSTALLATION: null, DELIVERY: null, BILLING: null });
-        setTenderAddressType('INSTALLATION');
+        // A new customer means a new Hauptadresse: every slot falls back to it.
+        setCustomAddrSlots({ INSTALLATION: false, DELIVERY: false, BILLING: false });
 
         handleTenderMetaChange(
             {
@@ -916,7 +937,7 @@ export const TenderDetail = () => {
         setNewTenderCustomerQuery('');
         setNewTenderCustomerOpen(false);
         setPendingAddrId({ INSTALLATION: null, DELIVERY: null, BILLING: null });
-        setTenderAddressType('INSTALLATION');
+        setCustomAddrSlots({ INSTALLATION: false, DELIVERY: false, BILLING: false });
         handleTenderMetaChange(
             {
                 customerId: null,
@@ -983,6 +1004,7 @@ export const TenderDetail = () => {
             onSelectCustomer={handleSelectTenderCustomer}
             onClearCustomer={handleClearTenderCustomer}
             onAddCustomer={openCustomerModal}
+            onOpenInfo={tender.customerId ? () => setContactPopupOpen(true) : undefined}
         />
     ) : null;
 
@@ -990,20 +1012,38 @@ export const TenderDetail = () => {
         valueOrBlank(tender.customerName || tender.customerId),
         ...splitAddress(tender.customerAddress),
     ];
+    // Schreibgeschützte Offerte: die Kundenzeile SELBST ist der Knopf zur
+    // Kunden-/CC-Karte (Benutzerwunsch: "Klick auf den Kunden") — Name und
+    // Adresse stehen weiterhin genauso da wie zuvor.
+    const customerFieldControl = tenderCustomerPicker ?? (
+        <button
+            type="button"
+            onClick={() => setContactPopupOpen(true)}
+            disabled={!tender.customerId}
+            title={tender.customerId ? t('tenders.customer_details') : undefined}
+            className={`${QUOTE_READONLY_CLASS} justify-between gap-2 transition-colors enabled:hover:border-[#1f2654] disabled:cursor-default`}
+        >
+            <span className="min-w-0 py-1">{renderDetailLines(customerLines)}</span>
+            {tender.customerId && <User01Icon size={13} className="shrink-0 text-slate-400" />}
+        </button>
+    );
     const commissionNumber = valueOrBlank((tender as any).commissionNumber || (tender as any).commissionNo || (tender as any).referenceNumber);
     const customerReference = valueOrBlank((tender as any).customerReference);
     const currencyCode = toCurrencyCode((tender as any).currency);
     const tenderValidityValue = tender.validUntil ? dayjs(tender.validUntil).format('YYYY-MM-DD') : minimumTenderValidUntil;
     const tenderValidityLabel = dayjs(tenderValidityValue).format('DD.MM.YYYY');
-    const billingAddressValue = valueOrBlank((tender as any).billingAddress);
-    // Projektadresse (installation); legacy tenders stored it in deliveryAddress.
+    // Projekt-/Montageadresse (installation), Lieferadresse (delivery) and
+    // Rechnungsadresse (billing) — three independent slots, each defaulting to
+    // the Hauptadresse below.
     const installationAddressValue = valueOrBlank((tender as any).installationAddress);
     const deliveryAddressValue = valueOrBlank((tender as any).deliveryAddress);
+    const billingAddressValue = valueOrBlank((tender as any).billingAddress);
     const internalDeliveryDateValue = tender.internalDeliveryDate
         ? dayjs(tender.internalDeliveryDate).format('YYYY-MM-DD')
         : '';
     // The customer's MAIN address (entered on the customer create/edit form) is
-    // the base entry of both pickers and the default for both rows.
+    // the Hauptadresse: the default of every address slot and the first entry of
+    // every picker.
     const customerMainAddress = String(tender.customerAddress ?? '').trim();
     const mainAddressOption: CustomerLocationDto | null = customerMainAddress
         ? {
@@ -1016,98 +1056,75 @@ export const TenderDetail = () => {
             isPrimary: true,
         }
         : null;
-    // Both the Projekt- and Lieferadresse rows may pick the main address or any
-    // of the customer's two non-billing address lists (installation or delivery).
-    const selectableAddressLocations = [
+    // Each slot picks from the Hauptadresse (listed first, the default) plus the
+    // saved locations that belong to it: the Rechnungsadresse from the billing
+    // list, the Projekt- and Lieferadresse from everything else.
+    const slotLocations = (slot: TenderAddressSlot) => [
         ...(mainAddressOption ? [mainAddressOption] : []),
-        ...customerLocations.filter((loc) => locationKindOf(loc) !== 'BILLING'),
+        ...customerLocations.filter((loc) => (locationKindOf(loc) === 'BILLING') === (slot === 'BILLING')),
     ];
-    // Billing may pick the customer's main address (listed first, the default) or
-    // any of their dedicated billing locations.
-    const billingLocations = [
-        ...(mainAddressOption ? [mainAddressOption] : []),
-        ...customerLocations.filter((loc) => locationKindOf(loc) === 'BILLING'),
-    ];
-    const sameAsInstallation = !!(tender as any).billingSameAsInstallation;
     // An address is one line — "Hofackerstrasse 75, 4132 Muttenz" reads as a
     // single postal line, not as a stack of fragments split on its commas.
     const renderAddressLines = (value: string) => renderDetailLines([joinAddress(value)]);
 
-    // The single project/delivery address slot: exactly one of the two fields
-    // holds the value — picking or toggling always nulls the other side.
-    const activeAddressValue = installationAddressValue || deliveryAddressValue;
-    const stageActiveAddress = (type: TenderAddressType, value: string | null) => {
-        const fieldPatch = type === 'INSTALLATION'
-            ? { installationAddress: value, deliveryAddress: null }
-            : { deliveryAddress: value, installationAddress: null };
-        handleAddressPick(sameAsInstallation ? { ...fieldPatch, billingAddress: value } : fieldPatch);
+    // Legacy quotes could mirror the billing address off the project/delivery one
+    // via `billingSameAsInstallation`; that flag is no longer written (every slot
+    // holds its own address now) but is still read so old quotes show correctly.
+    const legacyBillingMirror = (tender as any).billingSameAsInstallation
+        ? (installationAddressValue || deliveryAddressValue)
+        : '';
+    // What each slot actually holds; an empty slot means "the Hauptadresse".
+    const slotStored: Record<TenderAddressSlot, string> = {
+        INSTALLATION: installationAddressValue,
+        DELIVERY: deliveryAddressValue,
+        BILLING: billingAddressValue || legacyBillingMirror,
     };
-    const handleAddressTypeChange = (type: TenderAddressType) => {
-        if (type === tenderAddressType) return;
-        setTenderAddressType(type);
-        setPendingAddrId((prev) => ({ ...prev, INSTALLATION: null, DELIVERY: null }));
-        // Carry the chosen address over to the other side so switching the type
-        // never silently drops the selection; with no address picked yet there
-        // is nothing to stage.
-        if (activeAddressValue) stageActiveAddress(type, activeAddressValue);
+    const slotEffective = (slot: TenderAddressSlot) => slotStored[slot] || customerMainAddress;
+
+    const slotPatch = (slot: TenderAddressSlot, value: string | null) => {
+        if (slot === 'INSTALLATION') return { installationAddress: value };
+        if (slot === 'DELIVERY') return { deliveryAddress: value };
+        return { billingAddress: value, billingSameAsInstallation: false };
     };
-    const tenderAddressPicker = canEditTenderMeta ? (
+    const handleUseCustomAddress = (slot: TenderAddressSlot, checked: boolean) => {
+        setCustomAddrSlots((prev) => ({ ...prev, [slot]: checked }));
+        setPendingAddrId((prev) => ({ ...prev, [slot]: null }));
+        // Unticked, the slot follows the Hauptadresse again — so the address it
+        // was pointed at is replaced right away instead of lingering unseen.
+        if (!checked) handleAddressPick(slotPatch(slot, customerMainAddress || null));
+    };
+    const slotPicker = (slot: TenderAddressSlot) => (
         <TenderAddressPicker
-            storedValue={activeAddressValue}
-            locations={selectableAddressLocations}
-            onPick={(value) => stageActiveAddress(tenderAddressType, value)}
-            onAdd={() => openAddrModal(tenderAddressType)}
+            storedValue={slotStored[slot]}
+            locations={slotLocations(slot)}
+            onPick={(value) => handleAddressPick(slotPatch(slot, value))}
+            onAdd={() => openAddrModal(slot)}
             hasCustomer={Boolean(tender.customerId)}
             locationsLoaded={customerLocationsLoaded}
-            pendingId={pendingAddrId[tenderAddressType]}
-            onSelectPending={(id) => setPendingAddrId((prev) => ({ ...prev, [tenderAddressType]: id }))}
+            pendingId={pendingAddrId[slot]}
+            onSelectPending={(id) => setPendingAddrId((prev) => ({ ...prev, [slot]: id }))}
             renderLines={renderAddressLines}
         />
-    ) : null;
-    const tenderAddressRowContent = canEditTenderMeta ? (
-        <TenderAddressTypeRow
-            addressType={tenderAddressType}
-            onTypeChange={handleAddressTypeChange}
-            picker={tenderAddressPicker}
+    );
+    // One row for all three deviating addresses instead of a field each: the
+    // short captions keep the tick boxes on a single line.
+    const customAddressRowContent = canEditTenderMeta ? (
+        <TenderCustomAddressRow
+            options={[
+                { slot: 'INSTALLATION' as TenderAddressSlot, label:t('tenders.adresse_kurz_projekt'), active: customAddrSlots.INSTALLATION },
+                { slot: 'DELIVERY' as TenderAddressSlot, label:t('tenders.adresse_kurz_lieferung'), active: customAddrSlots.DELIVERY },
+                { slot: 'BILLING' as TenderAddressSlot, label:t('tenders.adresse_kurz_rechnung'), active: customAddrSlots.BILLING },
+            ]}
+            onToggle={handleUseCustomAddress}
+            renderPicker={slotPicker}
         />
     ) : null;
-    const billingAddressPicker = canEditTenderMeta ? (
-        <TenderAddressPicker
-            storedValue={billingAddressValue}
-            locations={billingLocations}
-            onPick={(value) => handleAddressPick({ billingAddress: value })}
-            onAdd={() => openAddrModal('BILLING')}
+    const mainAddressRowContent = canEditTenderMeta ? (
+        <TenderMainAddressRow
+            value={customerMainAddress}
             hasCustomer={Boolean(tender.customerId)}
-            locationsLoaded={customerLocationsLoaded}
-            pendingId={pendingAddrId.BILLING}
-            onSelectPending={(id) => setPendingAddrId((prev) => ({ ...prev, BILLING: id }))}
+            onAdd={() => openAddrModal('CUSTOMER')}
             renderLines={renderAddressLines}
-        />
-    ) : null;
-    const billingRowContent = canEditTenderMeta ? (
-        <TenderBillingAddressRow
-            label={t(tenderAddressType === 'INSTALLATION' ? 'crm.sameAsProject' : 'crm.sameAsDelivery')}
-            sameAsInstallation={sameAsInstallation}
-            onSameAsInstallationChange={(checked) => {
-                // Unchecking must also drop the copied-over value: it was mirrored
-                // from the installation/delivery address (line below), which isn't a
-                // billing location, so it would otherwise linger in the preview while
-                // the picker shows an empty "Select" — the input/preview mismatch.
-                if (!checked) { void handleMetaFieldChange('billing', { billingSameAsInstallation: false, billingAddress: null }); return; }
-                // Bidirectional mirror: copy whichever side is filled onto the other
-                // so ticking "same as installation" always ends with both set,
-                // regardless of which address the user entered first. The shared
-                // value lands on the ACTIVE address type only.
-                const shared = activeAddressValue || billingAddressValue || null;
-                void handleMetaFieldChange('billing', {
-                    billingSameAsInstallation: true,
-                    ...(tenderAddressType === 'INSTALLATION'
-                        ? { installationAddress: shared, deliveryAddress: null }
-                        : { deliveryAddress: shared, installationAddress: null }),
-                    billingAddress: shared,
-                });
-            }}
-            billingPicker={billingAddressPicker}
         />
     ) : null;
     const internalDeliveryDatePicker = canEditTenderMeta ? (
@@ -1132,7 +1149,7 @@ export const TenderDetail = () => {
             key: 'customer',
             title:t('tenders.kunde'),
             fields: [
-                { key: 'customer', label:t('crm.customers.companyName'), control: tenderCustomerPicker, lines: customerLines },
+                { key: 'customer', label:t('crm.customers.companyName'), control: customerFieldControl, lines: customerLines },
                 {
                     key: 'commission',
                     label:t('tenders.kommission_nr'),
@@ -1154,20 +1171,40 @@ export const TenderDetail = () => {
         {
             key: 'addresses',
             title:t('tenders.addresses'),
-            fields: [
-                {
-                    key: 'address',
-                    label: tenderAddressType === 'DELIVERY' ?t('tenders.lieferadresse') :t('tenders.projektadresse'),
-                    control: tenderAddressRowContent,
-                    lines: [joinAddress(activeAddressValue)],
-                },
-                {
-                    key: 'billing',
-                    label:t('tenders.rechnungsadresse'),
-                    control: billingRowContent,
-                    lines: [joinAddress((sameAsInstallation ? activeAddressValue : billingAddressValue) || tender.customerName || '')],
-                },
-            ],
+            // Two rows while editing — the Hauptadresse every slot uses, and the
+            // one line that says which slots deviate. Read-only quotes have no
+            // tick boxes to save space with, so there each address is spelled out.
+            fields: canEditTenderMeta
+                ? [
+                    {
+                        key: 'main',
+                        label:t('tenders.hauptadresse'),
+                        control: mainAddressRowContent,
+                        lines: [joinAddress(customerMainAddress)],
+                    },
+                    {
+                        key: 'custom',
+                        label:t('tenders.andere_adresse'),
+                        control: customAddressRowContent,
+                    },
+                ]
+                : [
+                    {
+                        key: 'address',
+                        label:t('tenders.projektadresse'),
+                        lines: [joinAddress(slotEffective('INSTALLATION'))],
+                    },
+                    {
+                        key: 'delivery',
+                        label:t('tenders.lieferadresse'),
+                        lines: [joinAddress(slotEffective('DELIVERY'))],
+                    },
+                    {
+                        key: 'billing',
+                        label:t('tenders.rechnungsadresse'),
+                        lines: [joinAddress(slotEffective('BILLING') || tender.customerName || '')],
+                    },
+                ],
         },
         {
             key: 'terms',
@@ -1194,26 +1231,29 @@ export const TenderDetail = () => {
     ];
 
     const priceLogLabels: Record<string, string> = {
-        quantity:t('common.quantity'),
-        unitPrice:t('tenders.unit_price'),
-        discount:t('common.discount'),
-        taxRate: 'KDV',
+        grandTotal: t('tenders.total_incl_vat'),
+        totalDiscounts: t('tenders.discounts'),
     };
     const formatLogValue = (fieldName?: string | null, value?: string | null) => {
         const raw = valueOrBlank(value);
         if (!raw) return t('tenders.empty');
         const numeric = Number(raw);
-        if (fieldName === 'unitPrice' && Number.isFinite(numeric)) return fmtMoney(numeric);
-        if ((fieldName === 'discount' || fieldName === 'taxRate') && Number.isFinite(numeric)) return `${numeric}%`;
+        if (fieldName === 'grandTotal' && Number.isFinite(numeric)) return fmtMoney(numeric);
+        if (fieldName === 'totalDiscounts') {
+            const discounts = parseDiscountList(raw);
+            return discounts.length > 0
+                ? discounts.map((entry, index) => `${discountDisplayName(entry, index)}: ${formatDiscountValue(entry, fmtMoney)}`).join(', ')
+                : t('tenders.empty');
+        }
         return raw;
     };
+    const visibleChangeFields = new Set(['grandTotal', 'totalDiscounts']);
     const isVisibleLog = (log: TenderChangeLog) =>
         log.actionType === 'TENDER_CREATED'
         || log.actionType === 'TENDER_APPROVED'
         || log.actionType === 'TENDER_NOTE'
         || log.actionType === 'TENDER_ATTACHMENT'
-        || log.actionType === 'POSITION_PRICE_UPDATED'
-        || Boolean(log.fieldName && priceLogLabels[log.fieldName]);
+        || Boolean(log.fieldName && visibleChangeFields.has(log.fieldName));
 
     const documentsByName = new Map<string, TenderDocumentDto>();
     tenderDocuments.forEach((document) => {
@@ -1240,13 +1280,13 @@ export const TenderDetail = () => {
     const logTimelineItems: ChatterTimelineItem[] = logs.filter(isVisibleLog).map((log) => {
         const actor = displayLogActor(log);
         if (log.actionType === 'TENDER_CREATED') {
-            return { id: log.id, date: log.createdAt, actor, tone: 'emerald', title:t('tenders.tender_created'), body: log.description || localizeTenderNumber(tender.tenderNumber) };
+            return { id: log.id, date: log.createdAt, actor, tone: 'emerald', kind: 'event', title:t('tenders.tender_created'), body: log.description || tender.tenderNumber };
         }
         if (log.actionType === 'TENDER_APPROVED') {
-            return { id: log.id, date: log.createdAt, actor, tone: 'blue', title:t('tenders.tender_onaylandi'), body: log.description || localizeTenderNumber(tender.tenderNumber) };
+            return { id: log.id, date: log.createdAt, actor, tone: 'blue', kind: 'event', title:t('tenders.tender_onaylandi'), body: log.description || tender.tenderNumber };
         }
         if (log.actionType === 'TENDER_NOTE') {
-            return { id: log.id, date: log.createdAt, actor, tone: 'amber', title:t('tenders.note_birakildi'), body: log.description || log.newValue || '' };
+            return { id: log.id, date: log.createdAt, actor, tone: 'amber', kind: 'note', title:t('tenders.note_birakildi'), body: log.description || log.newValue || '' };
         }
         if (log.actionType === 'TENDER_ATTACHMENT') {
             return {
@@ -1254,6 +1294,7 @@ export const TenderDetail = () => {
                 date: log.createdAt,
                 actor,
                 tone: 'violet',
+                kind: 'attachment',
                 title:t('tenders.additional_file_added'),
                 body: log.newValue || log.description || '',
                 document: resolveLogDocument(log),
@@ -1265,6 +1306,7 @@ export const TenderDetail = () => {
             date: log.createdAt,
             actor,
             tone: 'cyan',
+            kind: 'change',
             title:t('tenders.price_degisikligi'),
             body: `${label}: ${formatLogValue(log.fieldName, log.oldValue)} -> ${formatLogValue(log.fieldName, log.newValue)}`,
         };
@@ -1276,8 +1318,9 @@ export const TenderDetail = () => {
             date: activity.activityDate,
             actor: activity.employeeName ||t('tenders.sistem'),
             tone: 'blue',
+            kind: 'event',
             title:t('tenders.tender_onaylandi'),
-            body: activity.description || localizeTenderNumber(tender.tenderNumber),
+            body: activity.description || tender.tenderNumber,
         }));
     const hasAttachmentLogs = logActionTypes.has('TENDER_ATTACHMENT');
     const documentTimelineItems: ChatterTimelineItem[] = hasAttachmentLogs ? [] : tenderDocuments.map((doc) => ({
@@ -1285,6 +1328,7 @@ export const TenderDetail = () => {
         date: tender.createdAt,
         actor:t('tenders.sistem'),
         tone: 'violet',
+        kind: 'attachment',
         title:t('tenders.additional_file'),
         body: doc.fileName,
         document: doc,
@@ -1296,13 +1340,35 @@ export const TenderDetail = () => {
             date: tender.createdAt,
             actor: creatorName,
             tone: 'emerald',
+            kind: 'event',
             title:t('tenders.tender_created'),
-            body: localizeTenderNumber(tender.tenderNumber),
+            body: tender.tenderNumber,
         }];
     const timelineItems = [...logTimelineItems, ...activityTimelineItems, ...documentTimelineItems, ...syntheticCreatedItem]
         .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf());
+    const loadDocumentContent = async (document: TenderDocumentDto) => {
+        if (document.fileUrl) return document;
+        return tenderApi.getDocumentContent(tender.id, document.id);
+    };
+    const handlePreviewDocument = async (document: TenderDocumentDto) => {
+        try {
+            setDocumentPreview(await loadDocumentContent(document));
+        } catch (error: any) {
+            toast.error(error?.response?.data?.error || t('common.error'));
+        }
+    };
+    const handleDownloadDocument = async (document: TenderDocumentDto) => {
+        try {
+            const loaded = await loadDocumentContent(document);
+            const link = window.document.createElement('a');
+            link.href = loaded.fileUrl;
+            link.download = loaded.fileName;
+            link.click();
+        } catch (error: any) {
+            toast.error(error?.response?.data?.error || t('common.error'));
+        }
+    };
     const renderDocumentTile = (document: TenderDocumentDto, compact = false) => {
-        const image = isPreviewableDocument(document);
         const pdf = isPdfDocument(document);
         const mediaClass = compact ?"h-9 w-9" :"h-16 w-24";
 
@@ -1310,41 +1376,36 @@ export const TenderDetail = () => {
             <div className={`mt-2 flex min-w-0 items-center gap-2 ${compact ? '' : 'max-w-[420px]'}`}>
                 <button
                     type="button"
-                    onClick={() => setDocumentPreview(document)}
+                    onClick={() => void handlePreviewDocument(document)}
                     className="flex min-w-0 flex-1 items-center gap-2 rounded-[2px] border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10"
                     title={document.fileName}
                 >
-                    {image ? (
-                        <img src={document.fileUrl} alt="" loading="lazy" decoding="async" className={`${mediaClass} shrink-0 rounded border border-slate-200 object-cover`} />
-                    ) : (
-                        <span className={`${mediaClass} flex shrink-0 flex-col items-center justify-center rounded border ${pdf ?"border-rose-200 bg-rose-50 text-rose-700" :"border-slate-200 bg-slate-50 text-slate-500"}`}>
-                            <FileText size={compact ? 14 : 18} />
-                            {pdf && <span className="mt-0.5 text-[9px] font-bold leading-none">PDF</span>}
-                        </span>
-                    )}
+                    <span className={`${mediaClass} flex shrink-0 flex-col items-center justify-center rounded border ${pdf ?"border-rose-200 bg-rose-50 text-rose-700" :"border-slate-200 bg-slate-50 text-slate-500"}`}>
+                        <FileText size={compact ? 14 : 18} />
+                        {pdf && <span className="mt-0.5 text-[9px] font-bold leading-none">PDF</span>}
+                    </span>
                     <span className="min-w-0 flex-1 truncate">{document.fileName}</span>
                 </button>
-                <a
-                    href={document.fileUrl}
-                    download={document.fileName}
-                    target="_blank"
-                    rel="noreferrer"
+                <button
+                    type="button"
+                    onClick={() => void handleDownloadDocument(document)}
                     title={t('common.download')}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#1f2654] hover:bg-[#1f2654] hover:text-white"
                 >
                     <FileDown size={14} />
-                </a>
+                </button>
             </div>
         );
     };
 
-    const handleSubmitNote = async () => {
-        if (noteSaving) return;
+    const handleSubmitNote = async (): Promise<boolean> => {
+        if (noteSubmitLockRef.current || noteSaving) return false;
         const content = noteText.trim();
         if (!content) {
             toast.error(t('crm.customers.errorNoteEmpty'));
-            return;
+            return false;
         }
+        noteSubmitLockRef.current = true;
         setNoteSaving(true);
         try {
             const savedLog = await tenderApi.addNote(tender.id, { noteText: content });
@@ -1354,38 +1415,61 @@ export const TenderDetail = () => {
                 employeeEmail: savedLog.employeeEmail || user?.email || savedLog.employeeEmail,
             });
             setNoteText('');
-            void loadTenderChatter({ silent: true });
             toast.success(t('crm.customers.successNoteAdded'));
+            return true;
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('crm.customers.errorNoteAdd'));
+            return false;
         } finally {
+            noteSubmitLockRef.current = false;
             setNoteSaving(false);
         }
     };
 
-    const handleSubmitDocument = async (file?: File) => {
-        if (documentSaving) return;
+    // Dieselbe Datei zweimal zu wählen (etwa nach einem zweiten Klick auf "+")
+    // soll sie nicht doppelt anhängen — Name und Grösse zusammen genügen als
+    // Kennung für eine Auswahl, die noch gar nicht hochgeladen ist.
+    const addPendingDocuments = (files: File[]) => {
+        if (files.length === 0) return;
+        setPendingDocuments((current) => {
+            const identity = (file: File) => `${file.name}:${file.size}`;
+            const known = new Set(current.map(identity));
+            return [...current, ...files.filter((file) => !known.has(identity(file)))];
+        });
+    };
+
+    const handleSubmitDocument = async (file?: File, options?: { silent?: boolean }): Promise<boolean> => {
+        if (documentSubmitLockRef.current || documentSaving) return false;
         if (!file) {
             toast.error(t('tenders.bir_file_select'));
-            return;
+            return false;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error(`${file.name}: ${t('tenders.image_too_large').replace('6 MB', '5 MB')}`);
+            return false;
         }
         const fileType = inferDocumentType(file);
         if (!fileType) {
             toast.error(t('tenders.desteklenmiyor_pdf_png_veya_jpg_yukleyin', { name: file.name }));
-            return;
+            return false;
         }
 
+        documentSubmitLockRef.current = true;
         setDocumentSaving(true);
         try {
-            const fileUrl = await fileToDataUrl(file);
             const savedDocument = await tenderApi.addDocument(tender.id, {
                 fileName: file.name,
-                fileUrl,
+                file,
                 fileType,
                 category: 'tender',
             });
+            // The browser already has this exact File. Reusing it makes the
+            // first preview instantaneous instead of downloading it again.
+            const localFileUrl = URL.createObjectURL(file);
+            localDocumentUrlsRef.current.add(localFileUrl);
+            const locallyPreviewableDocument = { ...savedDocument, fileUrl: localFileUrl };
             setTenderDocuments((documents) => [
-                savedDocument,
+                locallyPreviewableDocument,
                 ...documents.filter((document) => document.id !== savedDocument.id),
             ]);
             addLocalTenderLog({
@@ -1394,13 +1478,41 @@ export const TenderDetail = () => {
                 value: file.name,
                 description: `Ek dosya eklendi: ${file.name}`,
             });
-            void loadTenderChatter({ silent: true });
-            toast.success(t('tenders.additional_file_added'));
+            // Bei mehreren Dateien meldet der Aufrufer EINMAL zusammenfassend.
+            if (!options?.silent) toast.success(t('tenders.additional_file_added'));
+            return true;
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.additional_file_eklenemedi'));
+            return false;
         } finally {
+            documentSubmitLockRef.current = false;
             setDocumentSaving(false);
         }
+    };
+
+    const handleSubmitComposer = async () => {
+        const hasNote = Boolean(noteText.trim());
+        const files = pendingDocuments;
+        if (!hasNote && files.length === 0) {
+            toast.error(t('crm.customers.errorNoteEmpty'));
+            return;
+        }
+
+        const notePromise = hasNote ? handleSubmitNote() : Promise.resolve(false);
+        // Nacheinander: `handleSubmitDocument` lässt jeweils nur EINEN Upload zu
+        // (Doppelklick-Sperre), parallel gestartete Dateien fielen still durch.
+        // Was scheitert (zu gross, falscher Typ), bleibt mit seiner Meldung in
+        // der Liste stehen — der Rest verschwindet.
+        const rejected: File[] = [];
+        let saved = 0;
+        for (const file of files) {
+            if (await handleSubmitDocument(file, { silent: true })) saved += 1;
+            else rejected.push(file);
+        }
+        await notePromise;
+        setPendingDocuments(rejected);
+        if (saved === 1) toast.success(t('tenders.additional_file_added'));
+        else if (saved > 1) toast.success(t('tenders.additional_files_added', { count: saved }));
     };
 
     return (
@@ -1409,7 +1521,6 @@ export const TenderDetail = () => {
                 tender={tender}
                 tenderStatusVariant={tenderStatusVariant}
                 tenderStatusLabel={tenderStatusLabel}
-                onOpenLogs={handleOpenTenderLogs}
                 onDeleteOffer={() => setDeleteOfferOpen(true)}
                 canSave={canEditTenderMeta}
                 saving={savingAll}
@@ -1421,13 +1532,17 @@ export const TenderDetail = () => {
                 canExport={canExport}
                 canApprove={canApprove}
                 isSalesOrderStatus={isSalesOrderStatus}
-                projectId={projectId}
+                projectId={orderProjectId}
+                salesOrderId={salesOrderId}
                 projectCreateLoading={projectCreateLoading}
                 onBack={() => navGuard.attempt(() => navigate('/crm/tenders'))}
                 onCreateVersion={handleCreateVersion}
                 onExport={() => setExportOpen(true)}
                 onCreateProject={handleCreateProject}
-                onOpenOrderDecision={openOrderDecision}
+                onOpenOrder={() => navGuard.attempt(() => navigate(
+                    orderProjectId ? `/projects/${orderProjectId}` : `/crm/my-orders/${salesOrderId}`,
+                ))}
+                onCreateOrder={() => void openOrderDecision()}
                 onApprove={handleApprove}
             />
 
@@ -1436,33 +1551,21 @@ export const TenderDetail = () => {
                 summary={[tender.customerName, tenderValidityLabel].filter(Boolean).join(' · ')}
             />
 
-            {chatterOpen && (
-                <Suspense fallback={null}>
-                    <LazyTenderLogsPanel
-                        open
-                        onClose={handleCloseLogs}
-                        timelineItems={timelineItems}
-                        logsLoading={logsLoading}
-                        canManage={canManage}
-                        noteText={noteText}
-                        onNoteTextChange={setNoteText}
-                        noteSaving={noteSaving}
-                        onSubmitNote={handleSubmitNote}
-                        documentInputRef={documentInputRef}
-                        documentSaving={documentSaving}
-                        onSubmitDocument={handleSubmitDocument}
-                        documentsLoading={documentsLoading}
-                        tenderDocuments={tenderDocuments}
-                        renderDocumentTile={renderDocumentTile}
-                    />
-                </Suspense>
-            )}
+            {/* Kundenkarte (Kalenderfenster) — nur Kontaktdaten; CC steht im
+                Mailbereich der Offerte, nicht hier. */}
+            <TenderCustomerContactPopup
+                open={contactPopupOpen}
+                onClose={() => setContactPopupOpen(false)}
+                customerName={tender.customerName}
+                customerEmail={tender.customerEmail}
+                customerPhone={tender.customerPhone}
+                customerAddress={tender.customerAddress}
+            />
 
             <TenderWorkspaceTabs
                 workspaceTab={workspaceTab}
-                onSelectTab={setWorkspaceTab}
+                onSelectTab={handleWorkspaceTabSelect}
                 onOpenSettingsTab={openSettingsTab}
-                lineCount={simpleRows.length}
             />
 
             {workspaceTab === 'lines' ? (
@@ -1514,7 +1617,6 @@ export const TenderDetail = () => {
                         autoFocusRowId={autoFocusProductRowId}
                         onProductComboInput={handleRowProductComboInput}
                         profitByRowId={profitByRowId}
-                        onOpenLineDiscounts={setLineDiscountRowId}
                     />
                 </div>
                 {/* Bottom of the quote: discount on the price, amount excl. VAT,
@@ -1530,16 +1632,20 @@ export const TenderDetail = () => {
             ) : workspaceTab === 'pdf' ? (
                 /* PDF version tab — the optional text/image blocks appended to the
                    offer's PDF. Their printed position is fixed regardless of where
-                   they are edited: intro text after the cover page, final text and
-                   images after the totals. */
+                   they are edited: intro text below the title on page 1, images
+                   after the totals. */
                 <Card title={t('tenders.pdf_content')} icon={<FileText size={14} />}>
+                    {/* Der gespeicherte Inhalt wird nachgeladen (pdfContentDeferred).
+                        Das Panel darf erst danach mounten: es füllt einen leeren
+                        Einleitungstext mit dem Standard-Textbaustein vor und würde
+                        sonst den noch nicht eingetroffenen Text überschreiben. */}
+                    {tender.pdfContentDeferred ? <LazyPanelFallback /> : (
                     <Suspense fallback={<LazyPanelFallback />}>
                         <LazyTenderPdfContentPanel
                             canEdit={canEditTenderMeta}
                             onError={(message) => toast.error(message)}
                             value={{
                                 coverLetter: tender.coverLetter ?? null,
-                                closingNote: tender.closingNote ?? null,
                                 closingImages: parseClosingImages(tender.closingImages),
                             }}
                             // Staged like every other quote field: nothing is sent
@@ -1557,6 +1663,7 @@ export const TenderDetail = () => {
                             })}
                         />
                     </Suspense>
+                    )}
                 </Card>
             ) : workspaceTab === 'payment' ? (
                 /* Ödeme planı tab — percentage stages (30/20/10/40) the customer
@@ -1564,13 +1671,38 @@ export const TenderDetail = () => {
                    until the user hits Save; the schedule is copied to the order
                    at conversion and drives stage-by-stage invoicing there. */
                 <Card title={t('tenders.payment_schedule_tab')} icon={<CoinsIcon size={14} />}>
-                    <TenderPaymentTab
-                        tender={tender}
-                        canEdit={canEditTenderMeta}
-                        grossTotal={pricingSummary.grossTotal}
-                        onMetaChange={(patch) => handleTenderMetaChange(patch)}
-                    />
+                    <Suspense fallback={<LazyPanelFallback />}>
+                        <LazyTenderPaymentTab
+                            tender={tender}
+                            canEdit={canEditTenderMeta}
+                            grossTotal={pricingSummary.grossTotal}
+                            onMetaChange={(patch) => handleTenderMetaChange(patch)}
+                        />
+                    </Suspense>
                 </Card>
+            ) : workspaceTab === 'logs' ? (
+                <Suspense fallback={<LazyPanelFallback />}>
+                    <LazyTenderLogsPanel
+                        open
+                        embedded
+                        onClose={() => setWorkspaceTab('lines')}
+                        timelineItems={timelineItems}
+                        logsLoading={logsLoading}
+                        canManage={canManage}
+                        noteText={noteText}
+                        onNoteTextChange={setNoteText}
+                        noteSaving={noteSaving}
+                        onSubmitNote={handleSubmitComposer}
+                        documentInputRef={documentInputRef}
+                        documentSaving={documentSaving}
+                        pendingDocuments={pendingDocuments}
+                        onAddDocuments={addPendingDocuments}
+                        onRemoveDocument={(index) => setPendingDocuments((current) => current.filter((_, position) => position !== index))}
+                        documentsLoading={documentsLoading}
+                        tenderDocuments={tenderDocuments}
+                        renderDocumentTile={renderDocumentTile}
+                    />
+                </Suspense>
             ) : (
                 <Suspense fallback={<LazyPanelFallback />}>
                     <LazyTenderSettingsModal
@@ -1601,8 +1733,9 @@ export const TenderDetail = () => {
                 onModeChange={setOrderMode}
                 attachExisting={attachExistingProject}
                 onAttachExistingChange={setAttachExistingProject}
-                projectName={orderProjectName}
-                onProjectNameChange={setOrderProjectName}
+                deliveryDate={orderDeliveryDate}
+                onDeliveryDateChange={setOrderDeliveryDate}
+                notifyRecipient={notifyRecipient}
                 projectSearch={projectSearch}
                 onProjectSearchChange={setProjectSearch}
                 projectSearchLoading={projectSearchLoading}
@@ -1615,7 +1748,8 @@ export const TenderDetail = () => {
 
             {/* Article search, anchored to the row's own name cell. */}
             {productDropdown && (
-                <TenderProductSearchDropdown
+                <Suspense fallback={null}>
+                <LazyTenderProductSearchDropdown
                     anchorEl={productDropdown.anchorEl}
                     search={comboSearch}
                     onClose={closeProductDropdown}
@@ -1635,8 +1769,8 @@ export const TenderDetail = () => {
                         setProductSearch(search);
                         setProductPickerOpen(true);
                     }}
-                    onClearSearch={() => setComboSearch('')}
                 />
+                </Suspense>
             )}
 
             {productPickerOpen && (
@@ -1720,19 +1854,6 @@ export const TenderDetail = () => {
 
             {/* Per-product discounts. Mounted only while open so each opening
                 seeds a fresh draft from the line's stored list. */}
-            {lineDiscountRow && (
-            <Suspense fallback={null}>
-            <LazyTenderLineDiscountModal
-                open
-                onClose={() => setLineDiscountRowId(null)}
-                position={lineDiscountRow}
-                fallbackTaxRate={fallbackTaxRate}
-                canEdit={isDraft && canManage}
-                onSave={(patch) => handleInlinePositionChange(lineDiscountRow.id, patch)}
-            />
-            </Suspense>
-            )}
-
             {totalDiscountOpen && detail && (
             <Suspense fallback={null}>
             <LazyTenderTotalDiscountModal

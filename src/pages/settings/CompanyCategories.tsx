@@ -17,6 +17,16 @@ import { t } from '@/i18n/translate';
 const emptyForm = { profileNumber: '', name: '', moduleKeys: [] as string[] };
 
 /**
+ * Şirket numarasının belge koduna nasıl yansıdığını gösteren örnek:
+ * numara 4 → "AN-{yıl}-40001". Numara 0 ise blok yoktur (00001).
+ * Biçim `shared/documentNumber.ts` ile aynı olmalı — 5 hane, blok = numara × 10000.
+ */
+const codeSample = (companyNumber: number): string => {
+    const safe = Number.isFinite(companyNumber) ? Math.max(0, Math.trunc(companyNumber)) : 0;
+    return `AN-${new Date().getFullYear()}-${String(safe * 10000 + 1).padStart(5, '0')}`;
+};
+
+/**
  * Company categories ("Numara" profiles): the admin defines numbered module
  * bundles (e.g. Numara 1 = CRM + Bakım) and maps each company to one. The
  * mapping drives which menus/modules that company's users see and which
@@ -32,6 +42,10 @@ export const CompanyCategories: React.FC = () => {
     const [form, setForm] = useState(emptyForm);
     const [saving, setSaving] = useState(false);
     const [assigningTenantId, setAssigningTenantId] = useState<string | null>(null);
+    // Şirket numarası alanının yerel taslağı (tenantId → yazılan değer); kayıtlı
+    // değer store'dan gelir, taslak yalnızca düzenleme sürerken tutulur.
+    const [numberDraft, setNumberDraft] = useState<Record<string, string>>({});
+    const [savingNumberId, setSavingNumberId] = useState<string | null>(null);
 
     const fetchProfiles = async () => {
         try {
@@ -123,6 +137,31 @@ export const CompanyCategories: React.FC = () => {
         }
     };
 
+    /**
+     * Şirket numarasını kaydeder (belge kodundaki blok). Yalnızca alandan
+     * çıkınca ve değer gerçekten değiştiyse istek atılır — her tuş vuruşunda
+     * değil. Hata olursa yerel taslak temizlenir ki alan kayıtlı değere dönsün.
+     */
+    const saveNumber = async (tenantId: string, raw: string) => {
+        const companyNumber = Number(raw);
+        if (!Number.isInteger(companyNumber) || companyNumber < 0 || companyNumber > 99) {
+            toast.error(t('settings.companyCategories.errorCompanyNumber', { defaultValue: 'Şirket numarası 0 ile 99 arasında bir tam sayı olmalıdır.' }));
+            setNumberDraft((prev) => { const next = { ...prev }; delete next[tenantId]; return next; });
+            return;
+        }
+        setSavingNumberId(tenantId);
+        try {
+            await moduleProfileApi.setTenantNumber(tenantId, companyNumber);
+            toast.success(t('settings.companyCategories.numberSaved', { defaultValue: 'Şirket numarası güncellendi.' }));
+            await fetchProfile();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || t('dashboard.actionFailed'));
+        } finally {
+            setSavingNumberId(null);
+            setNumberDraft((prev) => { const next = { ...prev }; delete next[tenantId]; return next; });
+        }
+    };
+
     const moduleLabel = (key: string) => {
         const moduleDef = MODULE_CATALOG.find((m) => m.key === key);
         return moduleDef ? t(moduleDef.labelKey, { defaultValue: moduleDef.labelDefault }) : key;
@@ -190,11 +229,16 @@ export const CompanyCategories: React.FC = () => {
                 </Card>
 
                 <Card title={t('settings.companyCategories.mappingTitle', { defaultValue: 'Şirket Eşleme' })} noPadding>
+                    <p className="border-b border-slate-100 px-4 py-2.5 text-[11.5px] text-slate-500">
+                        {t('settings.companyCategories.companyNumberHint', { defaultValue: 'Şirket No, o şirketin belge kodlarındaki bloğu belirler (4 → AN-2026-40001) ve modül kategorisinden bağımsızdır. Değiştirmek yalnızca BUNDAN SONRA üretilecek kodları etkiler; dağıtılmış kodlar olduğu gibi kalır.' })}
+                    </p>
                     <div className="overflow-x-auto">
                         <table className="w-full text-[12.5px]">
                             <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                                 <tr>
                                     <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCompany', { defaultValue: 'Şirket' })}</th>
+                                    <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCompanyNumber', { defaultValue: 'Şirket No' })}</th>
+                                    <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCodeBlock', { defaultValue: 'Belge kodu' })}</th>
                                     <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCategory', { defaultValue: 'Kategori' })}</th>
                                 </tr>
                             </thead>
@@ -206,6 +250,31 @@ export const CompanyCategories: React.FC = () => {
                                             <td className="px-4 py-2.5 font-semibold text-slate-900">
                                                 {tenant.parentTenantId ? <span className="mr-1 text-slate-400">↳</span> : null}
                                                 {tenant.tenantName}
+                                            </td>
+                                            {/* Şirket numarası = belge kodundaki blok. Kategoriden
+                                                bağımsız olduğu için burada, şirket satırında durur. */}
+                                            <td className="px-4 py-2.5">
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    max={99}
+                                                    size="sm"
+                                                    className="max-w-[84px]"
+                                                    disabled={savingNumberId === tenant.id}
+                                                    value={numberDraft[tenant.id] ?? String(tenant.companyNumber ?? 0)}
+                                                    onChange={(e) => setNumberDraft((prev) => ({ ...prev, [tenant.id]: e.target.value }))}
+                                                    onBlur={(e) => {
+                                                        const next = e.target.value;
+                                                        if (next === String(tenant.companyNumber ?? 0)) {
+                                                            setNumberDraft((prev) => { const copy = { ...prev }; delete copy[tenant.id]; return copy; });
+                                                            return;
+                                                        }
+                                                        void saveNumber(tenant.id, next);
+                                                    }}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-2.5 font-mono text-[11.5px] text-slate-500">
+                                                {codeSample(Number(numberDraft[tenant.id] ?? tenant.companyNumber ?? 0))}
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <Select

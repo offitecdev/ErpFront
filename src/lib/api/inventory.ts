@@ -1,4 +1,4 @@
-import { apiClient, getShared } from '../axios';
+import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import type {
     InventoryLocation,
     InventoryArticle,
@@ -44,6 +44,9 @@ import type {
     ReceivePurchaseOrderInput,
     ReceivePurchaseOrderResult,
 } from '../../types/inventory';
+
+const QUICK_PICK_CACHE_TTL_MS = 15_000;
+const quickPickCache = new Map<string, { expiresAt: number; value: ArticleQuickPickPage }>();
 
 export const inventoryApi = {
     dashboard: async (): Promise<InventoryDashboard> => {
@@ -114,7 +117,9 @@ export const inventoryApi = {
         if (params.barcode) query.set('barcode', params.barcode);
         if (params.sortBy) query.set('sortBy', params.sortBy);
         if (params.sortDirection) query.set('sortDirection', params.sortDirection);
-        const res = await apiClient.get(`/inventory/articles/summary/paged?${query.toString()}`);
+        // Liste efekti StrictMode'da yeniden bağlansa bile aynı sayfa/filtre için
+        // ikinci HTTP isteği açılmaz.
+        const res = await getShared<ArticleListPage>(`/inventory/articles/summary/paged?${query.toString()}`);
         return res.data;
     },
 
@@ -136,7 +141,17 @@ export const inventoryApi = {
         query.set('lean', 'true');
         query.set('includeDescription', 'true');
         if (params.search) query.set('search', params.search);
-        const res = await apiClient.get(`/inventory/articles/summary/paged?${query.toString()}`);
+        const tenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId') || '';
+        const url = `/inventory/articles/summary/paged?${query.toString()}`;
+        const cacheKey = `${tenantId}|${url}`;
+        const cached = quickPickCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+        const res = await getShared<ArticleQuickPickPage>(url);
+        quickPickCache.set(cacheKey, {
+            expiresAt: Date.now() + QUICK_PICK_CACHE_TTL_MS,
+            value: res.data,
+        });
         return res.data;
     },
 
@@ -174,7 +189,9 @@ export const inventoryApi = {
 
     // Tedarikçi popup'ı — yalnızca popup açıldığında çağrılır.
     getArticleSuppliersSummary: async (id: string): Promise<ArticleSuppliersSummary> => {
-        const res = await apiClient.get(`/inventory/articles/${id}/suppliers-summary`);
+        // React StrictMode sekmeyi geliştirmede iki kez bağlayabilir. Aynı URL'nin
+        // uçuşta olan isteğini paylaşarak ikinci HTTP çağrısını engelle.
+        const res = await getShared<ArticleSuppliersSummary>(`/inventory/articles/${id}/suppliers-summary`);
         return res.data;
     },
 
@@ -199,8 +216,6 @@ export const inventoryApi = {
         quantity: number;
         unitCost?: number | null;
         supplierId?: string | null;
-        itemKind?: 'PRODUCT' | 'MATERIAL';
-        materialId?: string | null;
         sourceLocationId?: string | null;
         destLocationId?: string | null;
         referenceId?: string | null;
@@ -228,14 +243,16 @@ export const inventoryApi = {
         if (params.type) query.set('type', params.type);
         if (params.dateFrom) query.set('dateFrom', params.dateFrom);
         if (params.dateTo) query.set('dateTo', params.dateTo);
-        const res = await apiClient.get(`/inventory/movements?${query.toString()}`);
+        // Filtre ve sayfa URL'nin parçasıdır; yalnızca tamamen aynı sorgular
+        // birleşir. StrictMode'un ikinci efekti yeni bir XHR oluşturmaz.
+        const res = await getShared<MovementListPage>(`/inventory/movements?${query.toString()}`);
         return res.data;
     },
 
-    // Toplu ürün/malzeme ekleme (tablo / Excel içe aktarımı). Mükerrer kodlar
+    // Toplu ürün ekleme (tablo / Excel içe aktarımı). Mükerrer kodlar
     // satır bazında reddedilir; `overwrite` ile kodu kayıtlı satır hata yerine
     // mevcut ürünü GÜNCELLER (dosya kazanır — sipariş Excel aktarımı bunu kullanır).
-    // `itemType` ekranın türünü belirtir (PRODUCT/MATERIAL).
+    // `itemType` = ürün/hizmet sınıflandırması (varsayılan PRODUCT).
     bulkCreateArticles: async (
         items: BulkArticleItemInput[],
         itemType?: ItemType,
@@ -315,15 +332,16 @@ export const inventoryApi = {
 
 // Tedarik Talepleri (Supply Requests) — yalnızca ilgili kayıtları çeker.
 export const supplyApi = {
-    // Minimum/kritik seviyeye düşen ürün + malzemeler (eşiği tanımlı olanlar).
+    // Minimum/kritik seviyeye düşen ürünler (eşiği tanımlı olanlar).
     lowStock: async (): Promise<LowStockResponse> => {
         const res = await apiClient.get('/inventory/supply/low-stock');
         return res.data;
     },
 
-    // Bir kalemin daha önce alım yaptığı tedarikçiler + son alım özeti.
-    itemSuppliers: async (kind: ItemType, id: string): Promise<ItemSuppliersResponse> => {
-        const res = await apiClient.get(`/inventory/supply/item/${kind}/${id}/suppliers`);
+    // Bir ürünün daha önce alım yaptığı tedarikçiler + son alım özeti.
+    // Yoldaki PRODUCT parçası eski API biçiminden kalan sabittir.
+    itemSuppliers: async (id: string): Promise<ItemSuppliersResponse> => {
+        const res = await apiClient.get(`/inventory/supply/item/PRODUCT/${id}/suppliers`);
         return res.data;
     },
 
@@ -333,7 +351,7 @@ export const supplyApi = {
     },
 
     createRequest: async (input: CreateSupplyRequestInput): Promise<SupplyRequestRow & { emailPreview?: boolean }> => {
-        const res = await apiClient.post('/inventory/supply/requests', input);
+        const res = await apiClient.post('/inventory/supply/requests', input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 
@@ -377,7 +395,8 @@ export const purchaseOrdersApi = {
         return res.data;
     },
 
-    // Ad değişikliği durumu etkilemez; mail sonrası içerik değişikliği UPDATED yapar.
+    // Ad değişikliği durumu etkilemez; mail sonrası içerik değişikliği yalnızca
+    // revizyon numarasını artırır (durum geri alınmaz).
     update: async (id: string, patch: UpdatePurchaseOrderInput): Promise<PurchaseOrderRow> => {
         const res = await apiClient.patch(`/inventory/purchase-orders/${id}`, patch);
         return res.data;
@@ -398,7 +417,7 @@ export const purchaseOrdersApi = {
     },
 
     sendMail: async (id: string, input: SendPurchaseOrderMailInput): Promise<SendPurchaseOrderMailResult> => {
-        const res = await apiClient.post(`/inventory/purchase-orders/${id}/send-mail`, input);
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/send-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 

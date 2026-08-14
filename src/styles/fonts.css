@@ -1,25 +1,63 @@
-/*
- * Self-hosted Inter Variable. The base Latin file covers English, German and
- * almost all Turkish characters. The UI-specific Latin slice omits control and
- * specialist typesetting glyphs that the product never renders; the five
- * missing Turkish glyphs live in a 3 KB subset. Both files retain the original
- * outlines, metrics and 100–900 variable weight axis.
- */
 @font-face {
-  font-family: "Inter Variable";
+  font-family: "Open Sans";
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url("../assets/fonts/inter-turkish-wght-normal.woff2") format("woff2-variations");
-  unicode-range: U+011E-011F, U+0130, U+015E-015F;
+  font-weight: 300;
+  src: url("../assets/fonts/OpenSans-Light-webfont.woff2") format("woff2");
 }
 
 @font-face {
-  font-family: "Inter Variable";
+  font-family: "Open Sans";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 300;
+  src: url("../assets/fonts/OpenSans-LightItalic-webfont.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Open Sans";
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url("../assets/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
-  unicode-range: U+0020-00FF, U+0131, U+0152-0153, U+2010-206F, U+20AC,
-    U+2122, U+2190-2193, U+2212, U+2215, U+FFFD;
+  font-weight: 400;
+  src: url("../assets/fonts/OpenSans-Regular-webfont.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Open Sans";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url("../assets/fonts/OpenSans-Italic-webfont.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("../assets/fonts/OpenSans-Semibold-webfont.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Open Sans";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 600;
+  src: url("../assets/fonts/OpenSans-SemiboldItalic-webfont.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("../assets/fonts/OpenSans-Bold-webfont.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Open Sans";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 700;
+  src: url("../assets/fonts/OpenSans-BoldItalic-webfont.woff2") format("woff2");
 }

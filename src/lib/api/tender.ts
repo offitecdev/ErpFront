@@ -1,4 +1,4 @@
-import { apiClient, getShared } from '../axios';
+import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import type {
     TenderListItem,
     TenderDetailDto,
@@ -10,16 +10,17 @@ import type {
     ArticleDto,
     TenderFormat,
     TenderChangeLog,
-    TenderChatterSummary,
+    TenderChatterDto,
     TenderDocumentDto,
     TenderMailDraftDto,
     TenderTextTemplateDto,
     OfferScheduleSlotDto,
     PositionArticleMappingDto,
-    PositionMaterialMappingDto,
     TenderMaterialUsageDto,
 } from '../../types/tender';
 import type { PersonLite } from '../../types/maintenance';
+
+const noteRequests = new Map<string, Promise<TenderChangeLog>>();
 
 export interface TenderListFilter {
     customerId?: string;
@@ -139,9 +140,10 @@ export const tenderApi = {
         return res.data;
     },
 
+    // Teklif kodu (AN-2026-10001) sunucuda DocumentCounter'dan üretilir; gövdede
+    // gönderilen bir `tenderNumber` backend tarafından yok sayılır.
     createManual: async (input: {
         customerId?: string | null;
-        tenderNumber: string;
         format: TenderFormat;
         validUntil?: string | null;
     }): Promise<TenderListItem> => {
@@ -173,6 +175,8 @@ export const tenderApi = {
         coverLetter?: string | null;
         closingNote?: string | null;
         closingImages?: string | null;
+        /** CC-Empfänger der Offerte; eine leere Liste löscht sie. */
+        ccEmails?: string[];
     }): Promise<TenderListItem> => {
         try {
             const res = await apiClient.patch(`/tenders/${id}/meta`, input);
@@ -242,6 +246,12 @@ export const tenderApi = {
             updates: Array<{ positionId: string; patch: Partial<PositionDto> }>;
             deleteIds: string[];
             meta: Partial<TenderListItem>;
+            summary?: {
+                previousGrandTotal: number;
+                nextGrandTotal: number;
+                previousTotalDiscounts: string;
+                nextTotalDiscounts: string;
+            };
         }
     ): Promise<{
         message: string;
@@ -355,6 +365,11 @@ export const tenderApi = {
         return res.data;
     },
 
+    /**
+     * Teklife "malzeme" (ürün) ekler. Gövde alanı geriye uyum için `materialId`
+     * adını korur — malzeme/ürün birleşmesinden (2026-08-14) beri bir ürün
+     * (Article) id'si taşır.
+     */
     mapMaterial: async (
         tenderId: string,
         materialId: string,
@@ -377,16 +392,6 @@ export const tenderApi = {
         return res.data;
     },
 
-    updateMaterialMapping: async (
-        tenderId: string,
-        positionId: string,
-        mappingId: string,
-        patch: { quantityMultiplier?: number; discount?: number | null }
-    ): Promise<{ message: string; mapping: PositionMaterialMappingDto; updatedCalculation?: CalculationItemDto | null }> => {
-        const res = await apiClient.patch(`/tenders/${tenderId}/positions/${positionId}/materials/${mappingId}`, patch);
-        return res.data;
-    },
-
     removeMaterialMapping: async (
         tenderId: string,
         mappingId: string
@@ -405,14 +410,22 @@ export const tenderApi = {
         return res.data;
     },
 
-    getChatterSummary: async (id: string): Promise<TenderChatterSummary> => {
-        const res = await apiClient.get(`/tenders/${id}/chatter-summary`);
+    getChatter: async (id: string): Promise<TenderChatterDto> => {
+        const res = await apiClient.get(`/tenders/${id}/chatter`);
         return res.data;
     },
 
     addNote: async (id: string, input: { noteText: string }): Promise<TenderChangeLog> => {
-        const res = await apiClient.post(`/tenders/${id}/notes`, input);
-        return res.data;
+        const key = `${id}|${input.noteText.trim()}`;
+        const pending = noteRequests.get(key);
+        if (pending) return pending;
+
+        const request = apiClient
+            .post<TenderChangeLog>(`/tenders/${id}/notes`, input)
+            .then((res) => res.data)
+            .finally(() => noteRequests.delete(key));
+        noteRequests.set(key, request);
+        return request;
     },
 
     getDocuments: async (id: string): Promise<TenderDocumentDto[]> => {
@@ -420,13 +433,22 @@ export const tenderApi = {
         return res.data;
     },
 
+    getDocumentContent: async (id: string, documentId: string): Promise<TenderDocumentDto> => {
+        const res = await apiClient.get(`/tenders/${id}/documents/${documentId}/content`);
+        return res.data;
+    },
+
     addDocument: async (id: string, input: {
         fileName: string;
-        fileUrl: string;
+        file: File;
         fileType: string;
         category?: string;
     }): Promise<TenderDocumentDto> => {
-        const res = await apiClient.post(`/tenders/${id}/documents`, input);
+        const form = new FormData();
+        form.append('file', input.file, input.fileName);
+        form.append('fileType', input.fileType);
+        form.append('category', input.category || 'tender');
+        const res = await apiClient.post(`/tenders/${id}/documents`, form);
         return res.data;
     },
 
@@ -502,7 +524,31 @@ export const tenderApi = {
         message: string;
         attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
     }) => {
-        const res = await apiClient.post(`/tenders/${id}/send-offer-mail`, input);
+        const res = await apiClient.post(`/tenders/${id}/send-offer-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
+        return res.data;
+    },
+
+    /** Vorschläge für das CC-Feld: der Kunde der Offerte und seine Kontaktpersonen. */
+    getMailRecipients: async (id: string): Promise<{
+        customer: { name: string; email: string } | null;
+        contacts: Array<{ id: string; name: string; title?: string | null; email: string }>;
+    }> => {
+        const res = await apiClient.get(`/tenders/${id}/mail-recipients`);
+        return res.data;
+    },
+
+    /**
+     * Auftragsbestätigung an den Kunden — läuft direkt nach dem Erstellen des
+     * Auftrags. Empfänger und CC bestimmt der Server aus der Offerte; Betreff
+     * und Text sind optional (der Server hat einen deutschen Standardtext).
+     */
+    sendOrderMail: async (id: string, input: {
+        to?: string;
+        subject?: string;
+        message?: string;
+        attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+    } = {}): Promise<{ message: string; to: string; cc: string[]; orderNumber: string; preview?: boolean }> => {
+        const res = await apiClient.post(`/tenders/${id}/send-order-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
 

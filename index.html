@@ -16,12 +16,144 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#08090a" media="(prefers-color-scheme: dark)" />
-  <link rel="preload" href="/src/assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high" />
+  <!-- Roboto Variable is bundled with the critical application stylesheet. -->
   <title>Offitec Management Panel</title>
+  <script>
+    // Paint-critical decisions that cannot wait for the app bundle: the
+    // skeleton below must match the persisted theme (no white flash in dark
+    // mode) and must not appear inside the split-view pane iframe, which
+    // renders a bare shell of its own.
+    (function () {
+      var root = document.documentElement;
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (t !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          root.classList.add('sk-dark');
+        }
+      } catch (e) { /* storage may be unavailable (privacy mode) */ }
+      if (window.name === 'offitec-split-pane') root.classList.add('sk-pane');
+    })();
+  </script>
+  <script>
+    // Deep-link data prefetch. The LCP chain used to be strictly serial:
+    // HTML → JS boot → profile round-trip → tender round-trip → render.
+    // Kicking the session + tender requests off at HTML-parse time overlaps
+    // them with the entire JS boot; the stores consume these promises via
+    // src/lib/bootPrefetch.ts and fall back to normal axios calls when a
+    // response is missing or not ok (e.g. an expired access cookie).
+    (function () {
+      if (!/^https?:$/.test(location.protocol)) return; // Electron file:// — no same-origin API
+      try {
+        if (localStorage.getItem('ofi_has_session') !== '1') return;
+        var api = '/backend/api/v1';
+        var opts = { credentials: 'same-origin' };
+        var pf = window.__ofiPrefetch = {
+          me: fetch(api + '/auth/me', opts),
+          permissions: fetch(api + '/auth/me/permissions', opts),
+          tenants: fetch(api + '/tenants', opts),
+        };
+        var m = location.pathname.match(/^\/crm\/tenders\/([^/?#]+)$/);
+        if (m && m[1] !== 'new') {
+          var tid = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
+          pf.tender = {
+            id: m[1],
+            res: fetch(
+              api + '/tenders/' + m[1] + '?includeActivities=false&deferOrderPdfContent=true',
+              tid ? { credentials: 'same-origin', headers: { 'X-Tenant-Id': tid } } : opts
+            ),
+          };
+        }
+        // Unhandled-rejection guard: consumers may never claim these.
+        Object.keys(pf).forEach(function (k) {
+          var v = pf[k];
+          (v && v.res ? v.res : v).catch(function () { });
+        });
+      } catch (e) { /* storage/fetch unavailable — the app loads normally */ }
+    })();
+  </script>
+  <style>
+    /* Boot skeleton — inline so the first paint needs nothing but this
+       document. React's first commit replaces #root's children, which
+       removes the skeleton automatically. The app stylesheet is loaded
+       without render-blocking (see the async-css plugin in vite.config). */
+    html { background: #f6f8fb; }
+    html.sk-dark { background: #08090a; }
+    /* The app stylesheet resets this too, but that file is applied after
+       first paint — without the reset here everything shifts 8px when it
+       lands (layout shift). */
+    body { margin: 0; }
+    #root { min-height: 100vh; }
+    .sk-boot {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+    }
+    /* Fixed line boxes: Open Sans arrives with font-display: swap, and
+       without a locked height the fallback→webfont swap would nudge the
+       bars below (layout shift). */
+    .sk-brand {
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      color: #272f67;
+      height: 56px;
+      line-height: 56px;
+    }
+    html.sk-dark .sk-brand { color: #e8e2d5; }
+    .sk-sub {
+      font-size: 13px;
+      letter-spacing: .3px;
+      color: #6b7280;
+      margin-top: -10px;
+      height: 18px;
+      line-height: 18px;
+    }
+    html.sk-dark .sk-sub { color: #8a8f98; }
+    /* Shimmer runs as a transform animation on a compositor layer — a
+       background-position animation here repainted on the main thread every
+       frame and alone pushed Total Blocking Time through the roof. */
+    .sk-bar {
+      position: relative;
+      overflow: hidden;
+      width: min(420px, 72vw);
+      height: 12px;
+      border-radius: 6px;
+      background: #e4e9f1;
+    }
+    .sk-bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .65), transparent);
+      animation: sk-shimmer 1.1s linear infinite;
+      will-change: transform;
+    }
+    html.sk-dark .sk-bar { background: #16181c; }
+    html.sk-dark .sk-bar::after {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent);
+    }
+    .sk-bar + .sk-bar { width: min(340px, 60vw); }
+    .sk-bar + .sk-bar + .sk-bar { width: min(260px, 48vw); }
+    @keyframes sk-shimmer { to { transform: translateX(100%); } }
+    html.sk-pane .sk-boot { display: none; }
+  </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div class="sk-boot" aria-hidden="true">
+      <div class="sk-brand">Offitec</div>
+      <div class="sk-sub">Management Panel</div>
+      <div class="sk-bar"></div>
+      <div class="sk-bar"></div>
+      <div class="sk-bar"></div>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
