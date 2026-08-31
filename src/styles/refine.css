@@ -1,0 +1,233 @@
+/* =========================================================
+   Offitec — Feinschliff (16.08.2026)
+
+   Die Anmeldeseite (styles/login.css) gibt den Ton an: ruhige
+   Titel, Eingabefelder mit klarer Kante und weichem
+   Fokusring, kurze Bewegungen beim Erscheinen. Diese Datei trägt
+   genau diese drei Dinge in den Rest des Programms — Startseite,
+   Seitenleiste und alle Module — OHNE dass jede Seite einzeln
+   angefasst werden muss.
+
+   Ladereihenfolge (main.tsx):
+     fonts.css → index.css → DIESE DATEI → dark.css (nachgeladen)
+   Sie steht also NACH index.css (darum gewinnt sie bei gleicher
+   Spezifität ohne `!important`) und VOR dark.css (das im
+   Dunkelmodus weiter das letzte Wort hat). Farben stehen als
+   Variablen, damit der Dunkelmodus sie umlenken kann statt jede
+   Regel zu wiederholen.
+   ========================================================= */
+
+:root {
+    /* Titelschrift: Open Sans — dieselbe Familie wie der Fliesstext
+       (`--font-display` aus styles/theme.css). Früher stand hier Times
+       New Roman; Überschriften und Fliesstext laufen jetzt in einer
+       Schrift. Der Klassenname `.ofi-serif` bleibt, damit die rund
+       zwei Dutzend Fundstellen im Programm nicht angefasst werden
+       müssen — er benennt seit dieser Änderung die Titelrolle, nicht
+       mehr die Schriftgattung. */
+    --ofi-serif: var(--font-display);
+
+    /* Feldkanten: 1,5px statt 1px und ein fast rechteckiger Radius —
+       das ist der Unterschied, der die Anmeldemaske „sauber" wirken
+       lässt. Der Fokusring ist weich (4px), nicht hart. */
+    --ofi-field-radius: 3px;
+    --ofi-field-border: rgba(39, 47, 103, 0.34);
+    --ofi-field-border-hover: rgba(39, 47, 103, 0.62);
+    --ofi-field-focus: #272f67;
+    --ofi-field-ring: rgba(39, 47, 103, 0.12);
+
+    --ofi-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dunkelmodus: warmes Gold für Fokus und Ring — wie `.dark .ofi-login`.
+   Die Ruhekante bleibt ein mittleres Grau statt eines hellen Warmtons:
+   dark.css färbt NICHT jedes Feld dunkel (weisse Suchfelder bleiben
+   z. B. absichtlich weiss), und eine fast weisse Kante verschwände auf
+   genau diesen Feldern. Mittelgrau trägt auf beiden Untergründen. */
+.dark {
+    --ofi-field-border: #8b93a3;
+    --ofi-field-border-hover: #aab3c2;
+    --ofi-field-focus: #e6cf9e;
+    --ofi-field-ring: rgba(230, 207, 158, 0.16);
+}
+
+/* ── 1. Titelschrift ───────────────────────────────────────
+   `.ofi-serif` gab es bisher nur auf der Anmeldeseite; jetzt gilt
+   sie überall (die Anmeldeseite erbt sie nun von hier). Sie steht
+   bewusst als Klasse und nicht auf h1–h6: die meisten Überschriften
+   im Programm sind <div>/<span> mit Tailwind-Klassen, eine
+   Element-Regel würde also nur die Hälfte treffen und den Rest
+   uneinheitlich zurücklassen.
+
+   Das `*` ist nötig, weil die globale `* { font-family }`-Regel in
+   index.css sonst jedes Kind wieder auf die Grundschrift zieht. */
+.ofi-serif,
+.ofi-serif * {
+    font-family: var(--ofi-serif);
+}
+
+/* Die zusätzliche Laufweite von 0,01em glich früher aus, dass Times
+   New Roman bei gleicher Punktzahl schmaler läuft als Open Sans. Mit
+   Open Sans als Titelschrift entfällt dieser Ausgleich — die
+   Grundlaufweite der Familie stimmt bereits. */
+
+/* ── 2. Eingabefelder ──────────────────────────────────────
+   Dieselben Selektoren wie der Formularblock am Ende von index.css
+   (gleiche Spezifität, spätere Datei → gewinnt). Hintergrund,
+   Höhe und Schriftgrösse bleiben dort stehen; hier kommen nur
+   Kante, Radius, Fokusring und die Übergänge dazu. */
+#root :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.ant-input):not([class~="bg-transparent"]),
+    select:not(.ant-select),
+    textarea:not(.ant-input)
+) {
+    border: 1.5px solid var(--ofi-field-border);
+    border-radius: var(--ofi-field-radius);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+
+/* Zeigen färbt die Kante an, ohne schon den Fokusring zu zeichnen. */
+#root :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.ant-input):not([class~="bg-transparent"]),
+    select:not(.ant-select),
+    textarea:not(.ant-input)
+):hover:not(:disabled):not(:focus) {
+    border-color: var(--ofi-field-border-hover);
+}
+
+/* Der weiche 4px-Ring der Anmeldemaske ersetzt den harten 2px-Ring. */
+#root :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select,
+    textarea
+):focus {
+    border-color: var(--ofi-field-focus) !important;
+    outline: none;
+    box-shadow: 0 0 0 4px var(--ofi-field-ring);
+}
+
+/* Platzhalter kursiv: er ist ein Hinweis, kein Inhalt — so ist er
+   auf den ersten Blick vom Eingetippten zu unterscheiden. */
+#root :where(input, textarea)::placeholder {
+    font-style: italic;
+    opacity: 0.75;
+}
+
+/* Ant-Design-Felder tragen dieselbe Kante, damit ein Formular aus
+   gemischten Bausteinen nicht zwei Rahmenstärken zeigt. */
+#root :where(
+    .ant-input,
+    .ant-input-affix-wrapper,
+    .ant-picker,
+    .ant-select-single .ant-select-selector
+),
+body > div:not(#root) :where(
+    .ant-input,
+    .ant-input-affix-wrapper,
+    .ant-picker,
+    .ant-select-single .ant-select-selector
+) {
+    border-width: 1.5px !important;
+    border-color: var(--ofi-field-border) !important;
+    border-radius: var(--ofi-field-radius) !important;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+#root :where(.ant-input, .ant-input-affix-wrapper, .ant-picker, .ant-select-single .ant-select-selector):hover,
+body > div:not(#root) :where(.ant-input, .ant-input-affix-wrapper, .ant-picker, .ant-select-single .ant-select-selector):hover {
+    border-color: var(--ofi-field-border-hover) !important;
+}
+
+#root :where(
+    .ant-input:focus,
+    .ant-input-focused,
+    .ant-input-affix-wrapper-focused,
+    .ant-input-affix-wrapper:focus-within,
+    .ant-picker-focused,
+    .ant-select-focused .ant-select-selector
+),
+body > div:not(#root) :where(
+    .ant-input:focus,
+    .ant-input-focused,
+    .ant-input-affix-wrapper-focused,
+    .ant-input-affix-wrapper:focus-within,
+    .ant-picker-focused,
+    .ant-select-focused .ant-select-selector
+) {
+    border-color: var(--ofi-field-focus) !important;
+    box-shadow: 0 0 0 4px var(--ofi-field-ring) !important;
+}
+
+/* Automatisch ausgefüllte Felder nicht gelb/blau einfärben lassen —
+   Chrome übermalt sonst den ganzen Kasten (siehe login.css). */
+#root input:-webkit-autofill,
+#root input:-webkit-autofill:hover,
+#root input:-webkit-autofill:focus {
+    transition: background-color 9999s ease-out;
+}
+
+/* ── 3. Bedienung: Druckpunkt und Tastaturfokus ────────────
+   Der leichte Druck beim Klicken und der sichtbare Fokusrahmen für
+   die Tastatur stammen 1:1 von der Anmeldeschaltfläche. */
+#root :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(:disabled):active,
+#root button.ofi-press:not(:disabled):active {
+    transform: scale(0.985);
+}
+
+#root :where(button, a[href], [role="button"], summary):focus-visible {
+    outline: 2px solid var(--ofi-field-focus);
+    outline-offset: 2px;
+}
+
+/* ── 4. Bewegung beim Erscheinen ───────────────────────────
+   Ein kurzes Aufsteigen wie beim Anmeldeformular. Als Klasse, damit
+   jede Seite selbst entscheidet, WAS sich bewegt — eine Regel auf
+   „alles" liesse die Tabellen bei jedem Nachladen zappeln. */
+@keyframes ofi-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ofi-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.ofi-rise { animation: ofi-rise 0.5s var(--ofi-ease-out) both; }
+.ofi-fade { animation: ofi-fade 0.4s ease both; }
+
+/* Gestaffelt: Kopf zuerst, Inhalt danach — dieselbe Reihenfolge,
+   in der man liest. */
+.ofi-rise-1 { animation-delay: 70ms; }
+.ofi-rise-2 { animation-delay: 140ms; }
+
+/* Begrüssung der Stempeluhr: kommt kurz herauf, steht fünf Sekunden und
+   verschwindet dann von selbst (Vorgabe Personalmodul). Die Dauer ist mit dem
+   Zeitgeber in `useTransientValue` abgestimmt — beide sind 5 s, sonst bliebe
+   entweder ein leeres Kästchen stehen oder der Text verschwände abrupt. */
+@keyframes ofi-welcome {
+    0%   { opacity: 0; transform: translateY(18px) scale(0.97); }
+    8%   { opacity: 1; transform: translateY(0) scale(1); }
+    82%  { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-8px) scale(0.99); }
+}
+
+.ofi-welcome-fade { animation: ofi-welcome 5s var(--ofi-ease-out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-rise,
+    .ofi-fade {
+        animation: none;
+    }
+
+    /* Die Begrüssung darf nicht "einfach stehen bleiben" — sie MUSS verschwinden.
+       Ohne Bewegung bleibt deshalb das Ein-/Ausblenden, nur ohne Verschiebung. */
+    .ofi-welcome-fade {
+        animation: ofi-fade 0.2s ease both;
+    }
+
+    #root :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(:disabled):active,
+    #root button.ofi-press:not(:disabled):active {
+        transform: none;
+    }
+}
