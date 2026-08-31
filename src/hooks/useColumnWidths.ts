@@ -1,27 +1,22 @@
 import { useCallback, useRef, useState } from 'react';
+import { runColumnDrag } from '@/lib/columnResizeDrag';
+import {
+    applyColumnLayout,
+    colsOf,
+    getColumnPlan,
+    resetColumnBoundary,
+    resizeColumnBoundary,
+} from '@/lib/columnLayout';
 
 /**
- * Drag-resizable column widths for a `table-layout: fixed` table, remembered
- * per browser.
+ * React-side defaults and refs for explicitly declared table columns.
  *
- * The table needs a `<colgroup>`: every resizable column gets a `<col>` with
- * `ref={setColRef(key)}` and `style={{ width: widths[key] }}`, and ONE column is
- * left without a width so it absorbs whatever the others give up — resizing then
- * never leaves dead space at the right edge. Because that flexible column comes
- * FIRST in every table using this, each handle sits on its column's LEFT border:
- * that border is the edge that actually moves, which keeps it under the cursor
- * during the drag (dragging left grows the column, right shrinks it).
- *
- * While dragging, the `<col>` width is written directly — one style write per
- * pointermove, zero React renders; the final width is committed to state +
- * localStorage on pointerup. Double-clicking a handle restores that column's
- * default (see `resetColumn`).
+ * The app-wide resize layer normally captures these handles. This hook keeps
+ * the same boundary behaviour as a safe fallback: the column on the left grows
+ * while its immediate neighbour shrinks by the same amount.
  */
 export type ColumnWidthOptions<K extends string> = {
-    /** localStorage key. Bump its version suffix when the defaults change, or
-        anyone who ever dragged a column keeps the old layout forever. */
     storageKey: string;
-    /** Starting width per resizable column, in px. */
     defaults: Record<K, number>;
     minPx?: number;
     maxPx?: number;
@@ -33,16 +28,14 @@ export const useColumnWidths = <K extends string>({
     minPx = 60,
     maxPx = 640,
 }: ColumnWidthOptions<K>) => {
+    // Old entries came from one-sided resizing and may not add up to the card.
+    const persistedStorageKey = `${storageKey}:boundary-v2`;
     const keys = Object.keys(defaults) as K[];
-    const clampWidth = useCallback(
-        (value: number) => Math.round(Math.min(maxPx, Math.max(minPx, value))),
-        [minPx, maxPx],
-    );
 
     const [widths, setWidths] = useState<Record<K, number>>(() => {
         const stored: Partial<Record<K, number>> = {};
         try {
-            const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}');
+            const parsed = JSON.parse(localStorage.getItem(persistedStorageKey) || '{}');
             if (parsed && typeof parsed === 'object') {
                 for (const key of keys) {
                     const value = Number((parsed as Record<string, unknown>)[key]);
@@ -52,14 +45,11 @@ export const useColumnWidths = <K extends string>({
                 }
             }
         } catch {
-            /* a corrupt entry just means "use the defaults" */
+            /* A corrupt entry simply means defaults. */
         }
         return { ...defaults, ...stored };
     });
 
-    // Keyed by plain string: a table may hand refs for columns it never resizes
-    // (they just never get a handle), and those must not have to appear in the
-    // width record.
     const colElsRef = useRef(new Map<string, HTMLTableColElement>());
 
     const setColRef = useCallback((key: string) => (el: HTMLTableColElement | null) => {
@@ -72,64 +62,86 @@ export const useColumnWidths = <K extends string>({
             if (current[key] === width) return current;
             const next = { ...current, [key]: width };
             try {
-                localStorage.setItem(storageKey, JSON.stringify(next));
+                localStorage.setItem(persistedStorageKey, JSON.stringify(next));
             } catch {
-                /* persistence is best-effort */
+                /* Persistence is best-effort. */
             }
             return next;
         });
-    }, [storageKey]);
+    }, [persistedStorageKey]);
 
-    /**
-     * @param side Which edge of the column the handle sits on. A column to the
-     *   LEFT of the flexible one can only be grabbed by its right edge (that is
-     *   the border that moves), so it drags the other way round.
-     */
-    const startResize = useCallback((key: K, event: React.PointerEvent, side: 'left' | 'right' = 'left') => {
+    const startResize = useCallback((key: K, event: React.PointerEvent) => {
         event.preventDefault();
         event.stopPropagation();
-        const startX = event.clientX;
-        const startWidth = colElsRef.current.get(key)?.getBoundingClientRect().width ?? widths[key];
-        let nextWidth = clampWidth(startWidth);
+        const handle = event.currentTarget as HTMLElement | null;
+        const col = colElsRef.current.get(key);
+        const table = handle?.closest('table') ?? null;
+        const cols = table ? colsOf(table) : [];
+        const index = col ? cols.indexOf(col) : -1;
+        const nextCol = index >= 0 ? cols[index + 1] : undefined;
+        const startWidth = col?.getBoundingClientRect().width ?? widths[key];
+        const nextStartWidth = nextCol?.getBoundingClientRect().width ?? 0;
+        const pairTotal = startWidth + nextStartWidth;
+        const nextFloor = Math.min(minPx, Math.max(24, nextStartWidth));
 
-        const previousCursor = document.body.style.cursor;
-        const previousUserSelect = document.body.style.userSelect;
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
+        // A terminal handle is inert: the outside edge is not a boundary.
+        if (!col || !nextCol || index < 0) return;
 
-        const onMove = (moveEvent: PointerEvent) => {
-            // Left-border handle: dragging left grows the column, right shrinks
-            // it. On the right border it is the other way round — either way the
-            // border stays under the cursor.
-            const delta = moveEvent.clientX - startX;
-            nextWidth = clampWidth(side === 'left' ? startWidth - delta : startWidth + delta);
-            const col = colElsRef.current.get(key);
-            if (col) col.style.width = `${nextWidth}px`;
+        const clamp = (value: number) => Math.round(Math.min(
+            Math.min(maxPx, pairTotal - nextFloor),
+            Math.max(minPx, value),
+        ));
+        const applyPair = (leftWidth: number) => {
+            if (table && getColumnPlan(table)) {
+                resizeColumnBoundary(table, index, leftWidth);
+                return;
+            }
+            col.style.width = `${leftWidth}px`;
+            nextCol.style.width = `${pairTotal - leftWidth}px`;
         };
-        const finish = () => {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', finish);
-            window.removeEventListener('pointercancel', finish);
-            document.body.style.cursor = previousCursor;
-            document.body.style.userSelect = previousUserSelect;
-            commitWidth(key, nextWidth);
-        };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', finish);
-        window.addEventListener('pointercancel', finish);
-    }, [clampWidth, commitWidth, widths]);
+
+        runColumnDrag({
+            table,
+            th: handle?.closest('th') ?? null,
+            startX: event.clientX,
+            startWidth,
+            clamp,
+            apply: applyPair,
+            commit: (leftWidth) => {
+                applyPair(leftWidth);
+                commitWidth(key, leftWidth);
+                const nextEntry = Array.from(colElsRef.current.entries())
+                    .find(([, candidate]) => candidate === nextCol);
+                if (nextEntry) commitWidth(nextEntry[0] as K, pairTotal - leftWidth);
+                if (table) applyColumnLayout(table);
+            },
+        });
+    }, [commitWidth, maxPx, minPx, widths]);
 
     const resetColumn = useCallback((key: K) => {
-        commitWidth(key, defaults[key]);
-        // The drag writes the <col> width inline; state alone would not undo it.
         const col = colElsRef.current.get(key);
-        if (col) col.style.width = `${defaults[key]}px`;
-    }, [commitWidth, defaults]);
+        if (!col) return;
+        const table = col.closest('table');
+        const cols = table ? colsOf(table) : [];
+        const index = cols.indexOf(col);
+        const nextCol = index >= 0 ? cols[index + 1] : undefined;
+        if (!table || !nextCol || index < 0) return;
 
-    /** Everything a `<ColResizeHandle>` in that column's header needs. */
-    const resizeProps = useCallback((key: K, side: 'left' | 'right' = 'left') => ({
-        side,
-        onResizeStart: (event: React.PointerEvent) => startResize(key, event, side),
+        if (getColumnPlan(table)) {
+            resetColumnBoundary(table, index);
+            applyColumnLayout(table);
+            return;
+        }
+
+        const pairTotal = col.getBoundingClientRect().width + nextCol.getBoundingClientRect().width;
+        const resetWidth = Math.min(pairTotal - 24, Math.max(minPx, defaults[key]));
+        col.style.width = `${resetWidth}px`;
+        nextCol.style.width = `${pairTotal - resetWidth}px`;
+        commitWidth(key, resetWidth);
+    }, [commitWidth, defaults, minPx]);
+
+    const resizeProps = useCallback((key: K) => ({
+        onResizeStart: (event: React.PointerEvent) => startResize(key, event),
         onResizeReset: () => resetColumn(key),
     }), [startResize, resetColumn]);
 

@@ -33,9 +33,9 @@ const clean = (value: string | null | undefined) => String(value || '').replace(
  * Firma adresi ayarlarda üç parça olarak durur; PDF'te pencere zarfı üstündeki
  * gönderici satırına TEK satır olarak iner:
  *
- *     OffiTec Heating & Cooling, Cores Tower - Hohenrainstrasse 24, 4133 Pratteln
+ *     Offitec GmbH, Ceres Tower - Hohenrainstrasse 24, 4133 Pratteln
  *
- * Sokak satırı `addressLine1 + addressLine2` ("Cores Tower - Hohenrainstrasse"
+ * Sokak satırı `addressLine1 + addressLine2` ("Ceres Tower - Hohenrainstrasse"
  * + "24") olarak birleşir; boş parçalar atlanır, böylece sarkan virgül/boşluk
  * kalmaz. Parçalar arası ayıraç virgüldür — sokak satırının kendisi tire
  * içerebildiği için tire ayıraç olarak kullanılmaz.

@@ -18,9 +18,14 @@ import { useDashboardStats } from './useDashboardStats';
 import { CHART_PALETTE, ConversionDonut, MonthlyBarChart, StackedSplit, chf0, compactNumber, type ChartMode } from './DashboardCharts';
 
 /* Same softened chrome as the CRM overview widgets, duplicated on purpose so
-   the home dashboard never imports from another page's folder. */
+   the home dashboard never imports from another page's folder.
+   `bg-[#fff]` statt `bg-white` mit Absicht: index.css behandelt jeden
+   `button.bg-white` als neutralen Button und erzwingt dort Schriftfarbe UND
+   `-webkit-text-fill-color` (#111827 !important). Letztere vererbt sich auf
+   alle Kinder — die Kacheln würden beim Überfahren (Navy-Fläche) weiter mit
+   dunklen Buchstaben zeichnen, obwohl `group-hover:text-white` greift. */
 const SURFACE =
-    'rounded-2xl border border-[#E3E7F0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#151616]';
+    'rounded-2xl border border-[#E3E7F0] bg-[#fff] shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#151616]';
 
 /* Dark mode wears orange icons (user request); everything else keeps its own
    ink — the accent colors never migrate onto text. */
@@ -42,7 +47,7 @@ const Card: React.FC<{
         {(title || actions) && (
             <header className="flex items-start justify-between gap-3 px-5 pb-0 pt-4">
                 <div className="min-w-0">
-                    {title && <h3 className="truncate text-[14.5px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">{title}</h3>}
+                    {title && <h3 className="ofi-serif truncate text-[15.5px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">{title}</h3>}
                     {subtitle && <p className="mt-0.5 truncate text-[12px] text-[#98A0AE] dark:text-[#8f95a1]">{subtitle}</p>}
                 </div>
                 {actions && <div className="shrink-0">{actions}</div>}
@@ -138,7 +143,12 @@ const CountTile: React.FC<{
             onClick={onClick}
             className={cx(
                 SURFACE,
-                'group relative flex min-h-[112px] cursor-pointer flex-col overflow-hidden p-4 text-left transition-colors duration-150 hover:border-[#1f2654] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#272f67]/30 dark:hover:border-[#6977c7]/60',
+                /* Hover der Startseite (Nutzerwunsch 15.08.2026): dunkles
+                   Marineblau als Fläche, Schrift weiss — dieselbe Sprache wie
+                   die Schnellzugriff-Kacheln darüber. `dark:hover:*` steht
+                   ausdrücklich daneben, sonst gewinnt im Dunkelmodus die
+                   gleich spezifische `dark:bg-*`-Regel je nach Reihenfolge. */
+                'group relative flex min-h-[112px] cursor-pointer flex-col overflow-hidden p-4 text-left transition-colors duration-150 hover:border-[#1f2654] hover:bg-[#1f2654] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#272f67]/30 dark:hover:border-[#1f2654] dark:hover:bg-[#1f2654]',
             )}
         >
             <span
@@ -151,10 +161,17 @@ const CountTile: React.FC<{
                 <Icon size={72} />
             </span>
             <DotPattern corner={watermarkCorner === 'tr' ? 'br' : 'tr'} color={toneHex} />
-            <p className="ofi-dashboard-number text-[26px] font-bold leading-none tracking-tight text-[#1A1A1A] dark:text-white">{value}</p>
-            {sub && <p className="mt-1.5 text-[11px] text-[#98A0AE] dark:text-[#8f95a1]">{sub}</p>}
-            <p className="mt-auto flex items-center gap-1.5 pt-2.5 text-[12.5px] font-medium text-[#3F4350] dark:text-[#d9dce3]">
-                <Icon size={15} style={{ color: iconHex }} />
+            <p className="ofi-dashboard-number text-[26px] font-bold leading-none tracking-tight text-[#1A1A1A] transition-colors duration-150 group-hover:text-white dark:text-white">{value}</p>
+            {sub && <p className="mt-1.5 text-[11px] text-[#98A0AE] transition-colors duration-150 group-hover:text-white/80 dark:text-[#8f95a1] dark:group-hover:text-white/80">{sub}</p>}
+            <p className="mt-auto flex items-center gap-1.5 pt-2.5 text-[12.5px] font-medium text-[#3F4350] transition-colors duration-150 group-hover:text-white dark:text-[#d9dce3] dark:group-hover:text-white">
+                {/* Die Kachelfarbe des Symbols kommt über eine CSS-Variable statt
+                    über `style="color"` — eine Inline-Farbe liesse sich beim
+                    Überfahren nicht auf Weiss umstellen. */}
+                <Icon
+                    size={15}
+                    className="text-[color:var(--ofi-tile-icon)] transition-colors duration-150 group-hover:text-white"
+                    style={{ '--ofi-tile-icon': iconHex } as React.CSSProperties}
+                />
                 <span className="underline-offset-4 group-hover:underline">{label}</span>
             </p>
         </button>
@@ -235,7 +252,7 @@ export const DashboardStats: React.FC = () => {
                             tone="navy"
                             watermarkCorner="br"
                             mode={mode}
-                            onClick={() => navigate('/crm/tenders')}
+                            onClick={() => navigate('/sales/quotes')}
                         />
                         <CountTile
                             label={t('dash.kpi.orders', { defaultValue: 'Aufträge' })}
@@ -248,7 +265,7 @@ export const DashboardStats: React.FC = () => {
                             tone="orange"
                             watermarkCorner="tr"
                             mode={mode}
-                            onClick={() => navigate('/crm/my-orders')}
+                            onClick={() => navigate('/sales/orders')}
                         />
                         <CountTile
                             label={t('dash.kpi.projects', { defaultValue: 'Projekte' })}

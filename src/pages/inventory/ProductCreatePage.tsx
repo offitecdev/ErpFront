@@ -7,7 +7,6 @@ import { ArticleSingleCreateView } from './components/ArticleSingleCreateView';
 export const ProductCreatePage = () => (
     <ArticleSingleCreateView
         copyPrefix="inv.newProduct"
-        backPath="/inventory/articles"
         detailRoot="/inventory/articles"
     />
 );

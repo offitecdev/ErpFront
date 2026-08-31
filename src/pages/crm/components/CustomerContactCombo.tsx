@@ -23,6 +23,12 @@ import type { CrmContactOption, CrmCustomerOption } from '../types/crm.types';
  * Ist ein Kunde gewählt, erscheint darunter dasselbe Feld für den
  * Ansprechpartner — seine Liste ist kurz und liegt nach dem ersten Laden im
  * Speicher, sie wird also im Browser gefiltert.
+ *
+ * `withContact={false}` lässt dieses zweite Feld weg (12.09.2026, Vorgabe
+ * Samet: «nimm den Ansprechpartner aus dem Fenster»). Es gibt Erfassungen, die
+ * nur wissen wollen, WESSEN Sache etwas ist — eine Aufgabe etwa hängt am
+ * Kunden, nicht an einer bestimmten Person darin. Dann steht dort EIN Feld,
+ * und das Fenster bleibt eine Zeile hoch.
  */
 /** Breite der Vorschlagsliste im Formular — so breit wie das Feld selbst. */
 const FIELD_LIST_WIDTH = 472;
@@ -34,12 +40,15 @@ export const CustomerContactCombo = ({
     /** Stapelhöhe des grossen Auswahlfensters (über einem offenen Formular). */
     z,
     required,
+    withContact = true,
 }: {
     customer: CrmCustomerOption | null;
     contact: CrmContactOption | null;
     onChange: (customer: CrmCustomerOption | null, contact: CrmContactOption | null) => void;
     z?: number;
     required?: boolean;
+    /** Ohne das zweite Feld: nur der Kunde (12.09.2026). */
+    withContact?: boolean;
 }) => {
     // Getippter Text; ist ein Kunde gewählt, steht sein Name darin.
     const [query, setQuery] = useState(customer?.companyName ?? '');
@@ -90,7 +99,7 @@ export const CustomerContactCombo = ({
                 }]}
             />
 
-            {customer && (
+            {withContact && customer && (
                 <ContactCombo
                     customerId={customer.id}
                     contact={contact}
@@ -98,13 +107,15 @@ export const CustomerContactCombo = ({
                 />
             )}
 
-            {/* "Alle Kunden …" — das grosse Fenster wählt Kunde UND Ansprechpartner. */}
+            {/* "Alle Kunden …" — das grosse Fenster wählt Kunde UND
+                Ansprechpartner; ohne das zweite Feld fragt es nur nach dem
+                Kunden und gibt keinen Ansprechpartner zurück. */}
             <CustomerPickerModal
                 open={allOpen}
                 onClose={() => setAllOpen(false)}
-                withContact
+                withContact={withContact}
                 z={z}
-                onSelect={(pick) => onChange(pick.customer, pick.contact)}
+                onSelect={(pick) => onChange(pick.customer, withContact ? pick.contact : null)}
             />
         </>
     );

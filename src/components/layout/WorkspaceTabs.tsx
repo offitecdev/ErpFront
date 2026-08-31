@@ -36,9 +36,9 @@ type TabDefinition = {
  */
 const TAB_CATALOG: TabDefinition[] = [
     { id: 'customers', labelKey: 'nav.customerList', path: '/crm/customers', icon: CustomersIcon },
-    { id: 'tenders', labelKey: 'nav.tenderManagement', path: '/crm/tenders', icon: TenderIcon },
+    { id: 'tenders', labelKey: 'nav.tenderManagement', path: '/sales/quotes', icon: TenderIcon },
     { id: 'projects', labelKey: 'nav.projectManagement', path: '/projects', icon: ProjectsIcon },
-    { id: 'orders', labelKey: 'nav.myOrders', path: '/crm/my-orders', icon: OrdersIcon },
+    { id: 'orders', labelKey: 'nav.myOrders', path: '/sales/orders', icon: OrdersIcon },
     { id: 'articles', labelKey: 'nav.articles', path: '/inventory/articles', icon: ProductsIcon },
     { id: 'stock', labelKey: 'nav.stock', path: '/inventory/stock', icon: StockPanelIcon },
     // 'orders' kimliği CRM'in "Siparişlerim" sekmesine ait — bu yüzden inventoryOrders.

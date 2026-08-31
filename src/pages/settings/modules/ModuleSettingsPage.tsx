@@ -2,7 +2,16 @@ import { useSearchParams } from 'react-router-dom';
 
 import { t } from '@/i18n/translate';
 import { SalesRemindersSection } from './sections/SalesRemindersSection';
+// OSP (04.09.2026): Anbindung an die Offitec Selection Platform — teilnehmende
+// Mandanten + die beiden Integrationsschlüssel.
+import { SalesOspSection } from './sections/SalesOspSection';
 import { InventoryUnitsSection } from './sections/InventoryUnitsSection';
+/* Personal (26.08.2026): Schichtplan, Feiertage und Urlaubsanspruch. Der
+   Schichtplan war ein Menüpunkt — er wird einmal im Jahr angefasst und gilt
+   fürs ganze Haus, also gehört er hierher und nicht zwischen die Listen. */
+import { PersonnelShiftSection } from './sections/PersonnelShiftSection';
+import { PersonnelHolidaysSection } from './sections/PersonnelHolidaysSection';
+import { PersonnelLeavePolicySection } from './sections/PersonnelLeavePolicySection';
 
 /**
  * MODULEINSTELLUNGEN — LINKS die Module, OBEN ihre Einstellungsarten.
@@ -24,12 +33,16 @@ import { InventoryUnitsSection } from './sections/InventoryUnitsSection';
  * direkt landet.
  */
 
-type CategoryKey = 'reminders' | 'units';
+type CategoryKey = 'reminders' | 'osp' | 'units' | 'shift' | 'holidays' | 'leavePolicy';
 type ModuleKey = 'crm' | 'sales' | 'projects' | 'inventory' | 'personnel' | 'calendar';
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
     reminders: 'settings.modules.catReminders',
+    osp: 'settings.modules.catOsp',
     units: 'settings.modules.catUnits',
+    shift: 'settings.modules.catShift',
+    holidays: 'settings.modules.catHolidays',
+    leavePolicy: 'settings.modules.catLeavePolicy',
 };
 
 /**
@@ -38,10 +51,10 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
  */
 const MODULES: ReadonlyArray<{ key: ModuleKey; labelKey: string; categories: ReadonlyArray<CategoryKey> }> = [
     { key: 'crm', labelKey: 'nav.crm', categories: [] },
-    { key: 'sales', labelKey: 'nav.sales', categories: ['reminders'] },
+    { key: 'sales', labelKey: 'nav.sales', categories: ['reminders', 'osp'] },
     { key: 'projects', labelKey: 'nav.projects', categories: [] },
     { key: 'inventory', labelKey: 'nav.inventory', categories: ['units'] },
-    { key: 'personnel', labelKey: 'nav.personnel', categories: [] },
+    { key: 'personnel', labelKey: 'nav.personnel', categories: ['shift', 'holidays', 'leavePolicy'] },
     { key: 'calendar', labelKey: 'nav.calendar', categories: [] },
 ];
 
@@ -126,6 +139,10 @@ export const ModuleSettingsPage = () => {
 
                     {category === 'units' && <InventoryUnitsSection />}
                     {category === 'reminders' && <SalesRemindersSection />}
+                    {category === 'osp' && <SalesOspSection />}
+                    {category === 'shift' && <PersonnelShiftSection />}
+                    {category === 'holidays' && <PersonnelHolidaysSection />}
+                    {category === 'leavePolicy' && <PersonnelLeavePolicySection />}
                     {!category && (
                         <div className="ofi-mset-card">
                             <p className="ofi-mset-empty">{t('settings.modules.nothingHere')}</p>

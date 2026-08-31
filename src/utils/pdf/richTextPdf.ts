@@ -80,6 +80,9 @@ export const parseRichTextParagraphs = (html: string): PdfParagraph[] => {
         current = [];
     };
 
+    /** An empty line the author typed — printed as a real blank line. */
+    const blankLine = () => paragraphs.push({ runs: [], bullet: false });
+
     const push = (text: string, style: Omit<PdfTextRun, 'text'>) => {
         if (!text) return;
         const previous = current[current.length - 1];
@@ -105,8 +108,14 @@ export const parseRichTextParagraphs = (html: string): PdfParagraph[] => {
         if (!(node instanceof Element)) return;
         if (DROP_TAGS.has(node.tagName)) return;
 
+        // LEERZEILEN BLEIBEN LEERZEILEN (Vorgabe 15.08.2026). Der Editor legt
+        // eine leere Zeile als `<div><br></div>` ab, zwei Umbrüche hintereinander
+        // als `<br><br>` — in beiden Fällen steht beim <br> nichts Offenes an.
+        // Früher lief das durch `endParagraph()`, das nichts anzufügen hatte, und
+        // die Zeile verschwand im PDF. Jetzt wird sie als leerer Absatz gedruckt.
         if (node.tagName === 'BR') {
-            endParagraph();
+            if (current.length) endParagraph();
+            else blankLine();
             return;
         }
 

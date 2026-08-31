@@ -1,0 +1,285 @@
+/**
+ * ── DER UNTERNEHMENS-WECHSLER IM KOPF (`.ofi-tsw*`) ──────────────────────────
+ *
+ * Vorgabe (28.08.2026, Samet): «Dieses Feld für die Unternehmenswahl soll viel
+ * moderner werden — wie bei Apple, Google und anderen heutigen Oberflächen —
+ * und KLEINER. Die Unternehmenswahl gehört in den Kopf des Menüs, das sich
+ * öffnet.»
+ *
+ * Vorher stand dort ein 190px breites Auswahlfeld mit Rahmen, Lupe und einem
+ * getippten Pfeil — im Kopf das breiteste Ding neben den Reitern, und es rief
+ * bei jedem Blick «Formular». Jetzt trägt der Kopf nur noch ein KENNZEICHEN:
+ * ein farbiges Kürzel der aktiven Firma (32px hoch wie Glocke und Kalender).
+ * Der Name, die Nummer und die Wahl selbst stehen im geöffneten Menü — oben,
+ * als dessen Kopf, genau wie verlangt.
+ *
+ * DIE FARBE IST DIE EIGENTLICHE AUSKUNFT. Jede Firma bekommt aus ihrer
+ * Kennung dieselbe Farbe (siehe `monogramTone` in TenantSwitcher.tsx), damit
+ * man am Kürzel ohne Lesen erkennt, in welchem Haus man gerade arbeitet — der
+ * Grund, warum hier überhaupt etwas im Kopf stehen bleibt.
+ *
+ * Gemalt wird aus den Kalender-Merkmalen (`--ofi-cal-*`, index.css). Damit ist
+ * der Dunkelmodus derselbe Variablentausch wie überall sonst und keine zweite
+ * Kopie. Radius und Schatten sind die des Apps-Felds (`.ofi-apps`,
+ * styles/personnel.css) — die beiden Menüs hängen nebeneinander und dürfen
+ * nicht auseinanderlaufen.
+ *
+ * Alle Regeln stehen mit `#root`-Vorsatz UND `body > :not(#root)`-Zwilling
+ * (MEMORY «Portal popups need a CSS twin») und mit benannten Klassen statt
+ * Hilfsklassen, weil index.css jede `rounded-*`-Klasse per !important auf
+ * 2px/7px abflacht (MEMORY «Radius utilities are flattened»).
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Das Kennzeichen im Kopf
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* DER KNOPF TRAEGT EINE FLAECHE (Vorgabe 28.08.2026: «der Auswahlknopf soll
+   deutlich sichtbar sein»). Vorher war er durchsichtig und zeigte erst beim
+   Darueberfahren, dass er ueberhaupt ein Knopf ist — auf der jetzt weissen
+   Leiste stand da nur Text.
+   Die FLAECHE selbst steht nicht hier, sondern als `.ofi-glass-ctl` in
+   styles/refine.css: das Apps-Zeichen traegt dieselbe Scheibe, und zwei
+   Kopien waeren zwei Gelegenheiten auseinanderzulaufen. Hier bleibt die
+   Anordnung. */
+#root .ofi-tsw-btn,
+body > :not(#root) .ofi-tsw-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    /* Hier stand 999px und es hat NIE gemalt: index.css zwingt jedem Knopf ohne
+       `rounded-full` die Knopfkante der Anwendung mit `!important` auf. Der
+       Knopf trug also immer 10px — und der Kalender daneben, der die Markierung
+       trug, als einziger eine Pille. Jetzt steht hier dieselbe Groesse, die auch
+       wirklich gemalt wird, damit niemand die Kante am falschen Ort sucht. */
+    border-radius: var(--ofi-button-radius);
+    padding: 0 12px 0 6px;
+}
+
+/* Der Pfeil: klein, blass, und er dreht sich beim Öffnen — das ist alles, was
+   das Kennzeichen als «hier lässt sich etwas wählen» ausweist. */
+#root .ofi-tsw-btn__caret,
+body > :not(#root) .ofi-tsw-btn__caret {
+    display: block;
+    color: var(--ofi-cal-muted);
+    transition: transform 140ms ease;
+}
+#root .ofi-tsw-btn.is-open .ofi-tsw-btn__caret,
+body > :not(#root) .ofi-tsw-btn.is-open .ofi-tsw-btn__caret { transform: rotate(180deg); }
+
+/* Die Beschriftung: der Firmenname als Wort, nicht als Feld. Er bricht nie um
+   und wird lieber beschnitten — der volle Name steht ohnehin im Kopf des
+   Menüs, das ein Klick öffnet. */
+#root .ofi-tsw-btn__label,
+body > :not(#root) .ofi-tsw-btn__label {
+    max-width: 132px;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+/* Auf schmalen Fenstern zählt jeder Punkt in der Leiste: dort bleibt das
+   Kürzel allein stehen — es sagt dieselbe Sache in einem Viertel der Breite. */
+@media (max-width: 1279px) {
+    #root .ofi-tsw-btn__label,
+    body > :not(#root) .ofi-tsw-btn__label { display: none; }
+    #root .ofi-tsw-btn,
+    body > :not(#root) .ofi-tsw-btn { padding: 0 7px 0 6px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Das Kürzel — zwei Buchstaben auf der Hausfarbe
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-tsw-mono,
+body > :not(#root) .ofi-tsw-mono {
+    display: inline-flex;
+    height: 28px;
+    width: 28px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: var(--ofi-tsw-tone, #07145c);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    color: #fff;
+}
+#root .ofi-tsw-mono--lg,
+body > :not(#root) .ofi-tsw-mono--lg {
+    height: 42px;
+    width: 42px;
+    border-radius: 14px;
+    font-size: 15px;
+}
+/* Im Dunkeln hebt jede Hausfarbe um denselben Betrag an: das Marken-Navy
+   (#07145c) stand auf dem fast schwarzen Grund als schwarzes Loch, alle
+   anderen Töne waren eine Spur zu satt. Ein Filter statt einer zweiten
+   Farbtafel — so bleibt es EINE Liste von Tönen, und die weisse Schrift
+   darauf bleibt weiss (heller als Weiss gibt es nicht). */
+.dark #root .ofi-tsw-mono,
+.dark body > :not(#root) .ofi-tsw-mono { filter: brightness(1.5); }
+
+#root .ofi-tsw-mono--sm,
+body > :not(#root) .ofi-tsw-mono--sm {
+    height: 30px;
+    width: 30px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Das Menü
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-tsw,
+body > :not(#root) .ofi-tsw {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    z-index: 60;
+    width: 300px;
+    max-width: calc(100vw - 24px);
+    border-radius: 20px;
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 12px 32px rgba(15, 23, 42, 0.16);
+    overflow: hidden;
+}
+
+/* ── Der Kopf: DIE Unternehmenswahl ──────────────────────────────────────
+   Hier steht, in welchem Haus man arbeitet — grosses Kürzel, Name, und
+   darunter die Auskunft (Kategorie oder Firmennummer). Das ist der Platz,
+   den vorher das breite Auswahlfeld im Seitenkopf belegt hat. */
+#root .ofi-tsw__head,
+body > :not(#root) .ofi-tsw__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 16px 14px;
+}
+#root .ofi-tsw__headtext,
+body > :not(#root) .ofi-tsw__headtext {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+#root .ofi-tsw__eyebrow,
+body > :not(#root) .ofi-tsw__eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-tsw__name,
+body > :not(#root) .ofi-tsw__name {
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-tsw__meta,
+body > :not(#root) .ofi-tsw__meta {
+    overflow: hidden;
+    font-size: 11.5px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Die Liste ────────────────────────────────────────────────────────── */
+
+#root .ofi-tsw__list,
+body > :not(#root) .ofi-tsw__list {
+    max-height: 316px;
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 6px;
+    overflow-y: auto;
+}
+#root .ofi-tsw__listhead,
+body > :not(#root) .ofi-tsw__listhead {
+    display: block;
+    padding: 6px 10px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-tsw__opt,
+body > :not(#root) .ofi-tsw__opt {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    padding: 7px 10px;
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+#root .ofi-tsw__opt:hover,
+body > :not(#root) .ofi-tsw__opt:hover { background: var(--ofi-cal-hover); }
+#root .ofi-tsw__opt.is-active,
+body > :not(#root) .ofi-tsw__opt.is-active { background: var(--ofi-cal-accent-tint); }
+
+/* KEINE STUFUNG (Vorgabe 28.08.2026): hier standen Tochterfirmen eingerückt
+   an einer Haarlinie. Die Liste ist jetzt flach — jede Firma eine Zeile,
+   gleiches Mass, gleiche Einrückung.
+*/
+
+#root .ofi-tsw__opttext,
+body > :not(#root) .ofi-tsw__opttext {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1px;
+}
+#root .ofi-tsw__optname,
+body > :not(#root) .ofi-tsw__optname {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-tsw__optmeta,
+body > :not(#root) .ofi-tsw__optmeta {
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-tsw__check,
+body > :not(#root) .ofi-tsw__check {
+    flex: none;
+    color: var(--ofi-cal-accent);
+}
+
+/* ── Telefon ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+    #root .ofi-tsw,
+    body > :not(#root) .ofi-tsw {
+        width: calc(100vw - 20px);
+        right: -8px;
+    }
+}

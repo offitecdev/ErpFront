@@ -9,6 +9,14 @@ export type InvoiceBillingType = 'FULL' | 'PARTIAL';
  * billingType bundan türetilir (RECHNUNG/SCHLUSS → FULL, diğerleri → PARTIAL).
  */
 export type InvoiceKind = 'RECHNUNG' | 'AKONTO' | 'ZWISCHEN' | 'SCHLUSS';
+/**
+ * Rechnungstyp der Liste — vom Server ABGELEITET, nicht gespeichert:
+ *  PROJECT  = Projektauftrag  (Rechnung hängt an einem Projekt)
+ *  DELIVERY = Lieferauftrag   (Auftrag ohne Projekt)
+ *  DIRECT   = Direktrechnung  (selbst ausgefüllte Vorlage)
+ * Siehe `deriveInvoiceCategory` im Server.
+ */
+export type InvoiceCategory = 'PROJECT' | 'DELIVERY' | 'DIRECT';
 export type InvoiceLineSourceType = 'ORDER' | 'OVERTIME' | 'EXPENSE' | 'EXTRA_MATERIAL' | 'MANUAL';
 
 export interface InvoiceLineItemDto {
@@ -20,6 +28,10 @@ export interface InvoiceLineItemDto {
     quantity: number;
     unitAmount: number;
     lineTotal: number;
+    /** Mengeneinheit (Stk., Std., Pau.) — nur Direktrechnungen füllen sie. */
+    unit?: string | null;
+    /** Platz auf dem Beleg. */
+    sortOrder?: number;
 }
 
 export interface InvoiceDto {
@@ -40,13 +52,32 @@ export interface InvoiceDto {
     amount: number;
     status: InvoiceStatus;
     notes?: string | null;
+    /** Direktrechnung: Empfänger, Einleitung und Steuersatz stehen auf der
+        Rechnung selbst — bei Auftragsrechnungen bleiben sie leer und der PDF-Bau
+        liest weiter aus der Offerte. */
+    recipientName?: string | null;
+    recipientAddress?: string | null;
+    introText?: string | null;
+    vatRate?: number | null;
     issuedByEmployeeId: string;
     createdAt: string;
     updatedAt: string;
     lineItems?: InvoiceLineItemDto[];
+    /** Vom Server abgeleitet (Listenendpunkt); ältere Antworten lassen ihn weg. */
+    category?: InvoiceCategory;
+    /** Auftragsart des hängenden Auftrags (INVOICE / REGIE / PROJECT_*). */
+    orderType?: string | null;
     customer?: { id: string; companyName: string } | null;
-    project?: { id: string; projectName: string } | null;
-    salesOrder?: { id: string; orderNumber: string } | null;
+    project?: { id: string; projectNumber?: string | null; projectName: string } | null;
+    salesOrder?: {
+        id: string;
+        orderNumber: string;
+        orderType?: string | null;
+        /** Offerte hinter dem Auftrag — die Gesamtrechnung druckt ihre Positionen. */
+        tenderId?: string | null;
+        /** Ratenplan des Auftrags als JSON-Zeichenkette (Zahlungsplan im PDF). */
+        paymentStages?: string | null;
+    } | null;
     issuedBy?: { id: string; firstName: string; lastName: string } | null;
 }
 
@@ -69,10 +100,15 @@ export interface BillingSummaryInvoice {
 export interface OrderBillingFiguresDto {
     baseAmount: number;
     billedAmount: number;
+    /**
+     * Summed share of the active invoices. Travels with the two amounts because
+     * "fully billed" is decided on the percentage — see `isFullyBilled`, which
+     * is what keeps a 100% invoiced order from showing a stray rappen open.
+     */
+    billedPercent: number;
 }
 
 export interface BillingSummaryDto extends OrderBillingFiguresDto {
-    billedPercent: number;
     /** Fiilen ödenmiş (PAID) pay — ödeme planı ilerlemesi bunu izler. */
     paidPercent?: number;
     paidAmount?: number;
@@ -171,7 +207,16 @@ export interface MyOrderDetailDto extends MyOrderDto {
     status: string;
     /** JSON percent array copied from the tender (e.g. "[30,20,10,40]"). */
     paymentStages?: string | null;
+    /** Geschäftsdatum des Auftrags; leer = `createdAt`. */
+    orderDate?: string | null;
     customerId?: string | null;
+    /**
+     * Auftragsbestätigung: Einleitungstext der Titelseite. NULL = noch nie
+     * bearbeitet, dann gilt der Einleitungstext der Offerte.
+     */
+    confirmationNote?: string | null;
+    /** «Gültig bis» der Bestätigung. NULL = Auftragsdatum + 1 Monat. */
+    confirmationValidUntil?: string | null;
     customer?: { id: string; companyName: string; mainEmail?: string | null; mainPhone?: string | null; address?: string | null } | null;
     createdBy?: { id: string; firstName: string; lastName: string; email: string } | null;
     /**
@@ -228,4 +273,34 @@ export interface CreateInvoiceInput {
     // invoiceNumber kasıtlı olarak YOK: Rechnungsnummer sunucuda üretilir
     // (RE- serisi yalnızca ileri gider), gövdeden gelen numara kabul edilmez.
     notes?: string | null;
+}
+
+/** Eine Position der Direktrechnung, so wie sie im Editor steht. */
+export interface DirectInvoiceLineInput {
+    description: string;
+    quantity?: number | null;
+    unitAmount?: number | null;
+    unit?: string | null;
+    /** Katalogartikel, aus dem die Zeile kopiert wurde (Herkunftsnachweis). */
+    articleId?: string | null;
+}
+
+/**
+ * Direktrechnung — die selbst ausgefüllte Vorlage: kein Auftrag, kein Projekt.
+ * Der Empfänger und der Steuersatz stehen darum in der Anfrage; die Positionen
+ * SIND der Betrag (Preise netto, `vatRate` schlägt darauf).
+ */
+export interface CreateDirectInvoiceInput {
+    customerId?: string | null;
+    recipientName: string;
+    /** Ganze Zeilen, wie sie im Empfängerblock stehen sollen. */
+    recipientAddress?: string | null;
+    introText?: string | null;
+    invoiceDate?: string | null;
+    dueDate?: string | null;
+    salespersonName?: string | null;
+    commissionNumber?: string | null;
+    vatRate?: number | null;
+    notes?: string | null;
+    lines: DirectInvoiceLineInput[];
 }

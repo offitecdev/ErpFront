@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AnimatePresence, motion } from 'motion/react';
-import { LuArrowLeft, LuArrowRight, LuCheck, LuGlobe, LuMoon, LuSun, LuX } from '@/components/icons/lucideLocal';
 import { toast } from 'sonner';
-import AntInput, { type InputRef } from 'antd/es/input';
-import { Button } from '@/components/ui-shared/Button';
-import { LanguageSwitcher } from '@/components/ui-shared/LanguageSwitcher';
+import { LuEye, LuEyeOff, LuMoon, LuQrCode, LuSun, LuTriangleAlert } from '@/components/icons/lucideLocal';
 import { InstallAppButton } from '@/components/ui-shared/InstallAppButton';
-import { Snowflake } from '@/components/ui-shared/Snowflake';
+import { LoginWave } from '@/components/login/LoginWave';
+import { LoginNotifications } from '@/components/login/LoginNotifications';
+import { LoginQrDialog } from '@/components/login/LoginQrDialog';
+import type { LoginQrPayload } from '@/components/login/loginQrPayload';
+import { SUPPORTED_LANGUAGES } from '@/i18n/loadResources';
 import offitecLogo from '../assets/images/offitec-1x.webp';
 import offitecLogo2x from '../assets/images/offitec-2x.webp';
 import offitecLogoDark from '../assets/images/darkmode-1x.webp';
@@ -18,15 +18,88 @@ import { useThemeStore } from '../store/themeStore';
 
 import '../styles/login.css';
 
+/**
+ * ── ANMELDESEITE (v3, 15.08.2026) ───────────────────────────────────────────
+ *
+ * Aufbau von oben nach unten:
+ *   • Kopfzeile — nicht ganz am Rand — mit Logo links und rechts Sprache
+ *     TR·EN·DE, Hell/Dunkel und (falls installierbar) dem App-Installieren-
+ *     Knopf. Darunter läuft die grosse Welle von oben herein; sie beginnt
+ *     erst unterhalb der Kopfzeile und löst sich nach unten im Verlauf auf.
+ *   • Formular: E-Mail und Passwort gleichzeitig sichtbar (kein Zwei-Schritt-
+ *     Ablauf mehr), „E-Mail merken", grosser Anmelden-Knopf, daneben der
+ *     kleine QR-Knopf, der die Kamera in einem Popup öffnet.
+ *     Fehler: das Formular schüttelt sich (am Handy zusätzlich Vibration),
+ *     rote Meldung direkt unter dem betroffenen Feld bzw. unter dem Knopf.
+ *   • Rechts (nur Desktop) eine kurze Erklärung — in der Programmschrift
+ *     Open Sans, wie das Formular. Die Titelschrift `.ofi-serif` ist seit
+ *     16.08.2026 programmweit Open Sans; die Anmeldeseite lenkt sie für
+ *     sich auf Times New Roman zurück (login.css, `--ofi-serif` im
+ *     Token-Block). Times tragen seit 17.08.2026 nur noch die Rechtezeile
+ *     unten und der Titel des QR-Popups; Erklärtext, Mitteilungen,
+ *     Überschrift und Formular laufen in Open Sans.
+ *   • Ganz unten nur noch die Rechtezeile — die Welle sitzt oben.
+ *   • Unten links die Glocke mit der herausgleitenden Mitteilungsleiste.
+ *
+ * Kein Ant Design, keine Animationsbibliothek — nur React, CSS und die
+ * lokalen Lucide-Icons.
+ */
+
 // Accepted top-level domains for the workspace.
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.(com|eu|ch|uk|tr)$/i;
-// v2: the old two-card guide popup was replaced by the prototype prompt —
-// new key so everyone sees the new prompt once.
-const LOGIN_GUIDE_DISMISSED_KEY = 'offitec-login-proto-dismissed';
-const PRODUCTION_PROTOTYPE_URL = 'https://prototip.offitec.ch/';
-const PROTOTYPE_RELEASE_DATE = '24.07.2026';
+/**
+ * Kontaktadressen im Erklärtext rechts. Adressen sind keine Übersetzung,
+ * darum stehen sie hier und nicht in den Sprachdateien.
+ */
+const CONTACT_EMAILS = ['help@offitec.ch', 'sck@offitec.eu'];
+/** Feste Servermeldung für falsche Zugangsdaten (LoginUseCase) → wird übersetzt. */
+const INVALID_CREDENTIALS_SERVER_MESSAGE = 'E-posta veya parola hatalı.';
+/** „E-Mail merken": die zuletzt verwendete Adresse, nur lokal im Browser. */
+const REMEMBER_KEY = 'offitec:login-email';
 
-type Step = 'email' | 'password';
+const readRemembered = () => {
+    try {
+        return window.localStorage.getItem(REMEMBER_KEY) ?? '';
+    } catch {
+        return '';
+    }
+};
+
+const writeRemembered = (email: string | null) => {
+    try {
+        if (email) window.localStorage.setItem(REMEMBER_KEY, email);
+        else window.localStorage.removeItem(REMEMBER_KEY);
+    } catch {
+        /* Speicher nicht verfügbar */
+    }
+};
+
+interface FieldErrors {
+    email?: string;
+    password?: string;
+    form?: string;
+}
+
+const LanguageToggle = () => {
+    const { i18n, t } = useTranslation();
+    const current = (i18n.resolvedLanguage || i18n.language || '').slice(0, 2);
+    return (
+        <div className="ofi-login__lang" role="group" aria-label={t('language.title')}>
+            {SUPPORTED_LANGUAGES.map((code) => (
+                <button
+                    key={code}
+                    type="button"
+                    className={`ofi-login__lang-btn${current === code ? ' is-active' : ''}`}
+                    aria-pressed={current === code}
+                    title={t(`language.${code}`)}
+                    onClick={() => void i18n.changeLanguage(code)}
+                >
+                    {code.toUpperCase()}
+                </button>
+            ))}
+        </div>
+    );
+};
 
 const ThemeToggle = () => {
     const { isDarkMode, toggleTheme } = useThemeStore();
@@ -35,21 +108,14 @@ const ThemeToggle = () => {
         <button
             type="button"
             onClick={toggleTheme}
+            className="ofi-login__theme"
             aria-label={isDarkMode ? t('common.lightMode') : t('common.darkMode')}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-black/[0.02] text-[#0f172a] transition-colors hover:bg-black/[0.05] dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+            title={isDarkMode ? t('common.lightMode') : t('common.darkMode')}
         >
-            <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                    key={isDarkMode ? 'moon' : 'sun'}
-                    initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
-                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                    exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.2 }}
-                    className="inline-flex"
-                >
-                    {isDarkMode ? <LuMoon size={17} /> : <LuSun size={17} />}
-                </motion.span>
-            </AnimatePresence>
+            {/* key: der Wechsel tauscht das Element aus → Einblend-Animation läuft neu */}
+            <span key={isDarkMode ? 'dark' : 'light'} className="ofi-login__theme-icon">
+                {isDarkMode ? <LuMoon size={16} /> : <LuSun size={16} />}
+            </span>
         </button>
     );
 };
@@ -57,281 +123,340 @@ const ThemeToggle = () => {
 export const Login = () => {
     const { t } = useTranslation();
     const isDarkMode = useThemeStore((state) => state.isDarkMode);
-    const [step, setStep] = useState<Step>('email');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [showGuidePopup, setShowGuidePopup] = useState(() => {
-        try {
-            return window.localStorage.getItem(LOGIN_GUIDE_DISMISSED_KEY) !== 'true';
-        } catch {
-            return true;
-        }
-    });
-    const passwordRef = useRef<InputRef>(null);
-
     const { login, fetchProfile } = useAuthStore();
 
-    const emailValid = VALID_EMAIL.test(email.trim());
+    const [email, setEmail] = useState(readRemembered);
+    const [password, setPassword] = useState('');
+    const [remember, setRemember] = useState(() => readRemembered() !== '');
+    const [showPassword, setShowPassword] = useState(false);
+    const [errors, setErrors] = useState<FieldErrors>({});
+    const [loading, setLoading] = useState(false);
+    const [shaking, setShaking] = useState(false);
+    const [qrOpen, setQrOpen] = useState(false);
 
+    const emailRef = useRef<HTMLInputElement>(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
+
+    // Gemerkte Adresse → direkt ins Passwortfeld, sonst in die E-Mail.
     useEffect(() => {
-        if (step === 'password') {
-            const id = window.setTimeout(() => passwordRef.current?.focus(), 220);
-            return () => window.clearTimeout(id);
-        }
-    }, [step]);
+        const target = readRemembered() ? passwordRef.current : emailRef.current;
+        const id = window.setTimeout(() => target?.focus(), 80);
+        return () => window.clearTimeout(id);
+    }, []);
 
-    const goToPassword = () => {
-        if (!emailValid) {
-            toast.error(t('auth.errorInvalid'));
-            return;
-        }
-        setStep('password');
-    };
-
-    const goBack = () => {
-        setStep('email');
-        setPassword('');
-    };
-
-    const handleLogin = async () => {
-        if (!email || !password) {
-            toast.error(t('auth.errorEmpty'));
-            return;
-        }
-
+    /** Schütteln neu starten, auch wenn gerade noch geschüttelt wird. */
+    const shake = useCallback(() => {
+        setShaking(false);
+        requestAnimationFrame(() => requestAnimationFrame(() => setShaking(true)));
         try {
-            setLoading(true);
-            const response = await apiClient.post('/auth/login', { email, password });
-            // Tokens arrive as HttpOnly cookies; the body only carries the employee.
-            const { employee } = response.data;
-
-            if (!employee) {
-                throw new Error(response.data?.error || response.data?.message || t('auth.errorMissingData'));
-            }
-
-            login(employee);
-            await fetchProfile();
-            toast.success(t('auth.successLogin'));
-        } catch (error: any) {
-            toast.error(error.response?.data?.error || error.response?.data?.message || error.message || t('auth.errorInvalid'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (step === 'email') goToPassword();
-        else handleLogin();
-    };
-
-    const dismissGuidePopup = () => {
-        setShowGuidePopup(false);
-        try {
-            window.localStorage.setItem(LOGIN_GUIDE_DISMISSED_KEY, 'true');
+            navigator.vibrate?.([50, 40, 50]);
         } catch {
-            // Ignore storage errors; the close action should still feel immediate.
+            /* nicht unterstützt */
         }
+    }, []);
+
+    const fail = useCallback(
+        (next: FieldErrors, focus?: HTMLInputElement | null) => {
+            setErrors(next);
+            shake();
+            focus?.focus();
+        },
+        [shake],
+    );
+
+    const submit = useCallback(
+        async (rawEmail: string, rawPassword: string) => {
+            const trimmedEmail = rawEmail.trim();
+            if (!trimmedEmail) return fail({ email: t('auth.errorEmailRequired') }, emailRef.current);
+            if (!VALID_EMAIL.test(trimmedEmail)) return fail({ email: t('auth.errorEmailFormat') }, emailRef.current);
+            if (!rawPassword) return fail({ password: t('auth.errorPasswordRequired') }, passwordRef.current);
+
+            setErrors({});
+            setLoading(true);
+            try {
+                const response = await apiClient.post('/auth/login', { email: trimmedEmail, password: rawPassword });
+                // Tokens arrive as HttpOnly cookies; the body only carries the employee.
+                const { employee } = response.data;
+                if (!employee) {
+                    throw new Error(response.data?.error || response.data?.message || t('auth.'));
+                }
+                writeRemembered(remember ? trimmedEmail : null);
+                login(employee);
+                await fetchProfile();
+                toast.success(t('auth.successLogin'));
+            } catch (error: unknown) {
+                const err = error as {
+                    response?: { status?: number; data?: { error?: string; message?: string } };
+                    message?: string;
+                    request?: unknown;
+                };
+                const serverMessage = err.response?.data?.error || err.response?.data?.message;
+                // Der Server antwortet auf falsche Zugangsdaten mit einer festen
+                // (türkischen) Meldung — die wird in die Sprache des Nutzers
+                // übersetzt; alle anderen Servermeldungen (gesperrt, zu viele
+                // Versuche …) kommen unverändert durch.
+                const message =
+                    serverMessage && serverMessage !== INVALID_CREDENTIALS_SERVER_MESSAGE
+                        ? serverMessage
+                        : serverMessage
+                          ? t('auth.errorInvalid')
+                          : err.request && !err.response
+                            ? t('auth.errorNetwork')
+                            : err.message || t('auth.errorInvalid');
+                fail({ form: message }, passwordRef.current);
+                setPassword('');
+            } finally {
+                setLoading(false);
+            }
+        },
+        [fail, fetchProfile, login, remember, t],
+    );
+
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (loading) return;
+        void submit(email, password);
     };
+
+    /**
+     * Anmeldung per Personal-Ausweis: der Code trägt NUR einen Schlüssel, den
+     * der Server gegen eine Sitzung tauscht — es gibt hier weder E-Mail noch
+     * Kennwort, die man ins Formular schreiben könnte. Deshalb ein eigener Weg
+     * neben `submit()` und nicht ein Umweg über die Felder.
+     */
+    const submitQrToken = useCallback(
+        async (token: string) => {
+            setErrors({});
+            setLoading(true);
+            try {
+                const response = await apiClient.post('/auth/qr-login', { token });
+                const { employee } = response.data;
+                if (!employee) throw new Error(response.data?.error || t('auth.errorInvalid'));
+                login(employee);
+                await fetchProfile();
+                toast.success(t('auth.successLogin'));
+            } catch (error: unknown) {
+                const err = error as {
+                    response?: { data?: { error?: string; message?: string } };
+                    message?: string;
+                    request?: unknown;
+                };
+                const message =
+                    err.response?.data?.error
+                    || err.response?.data?.message
+                    || (err.request && !err.response ? t('auth.errorNetwork') : t('auth.qrInvalid'));
+                fail({ form: message }, emailRef.current);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [fail, fetchProfile, login, t],
+    );
+
+    const handleQrCredentials = (payload: LoginQrPayload) => {
+        setQrOpen(false);
+        if (payload.kind === 'token') {
+            void submitQrToken(payload.token);
+            return;
+        }
+        setEmail(payload.email);
+        setPassword(payload.password);
+        void submit(payload.email, payload.password);
+    };
+
+    const logo = isDarkMode ? offitecLogoDark : offitecLogo;
+    const logo2x = isDarkMode ? offitecLogoDark2x : offitecLogo2x;
 
     return (
-        <main className="ofi-login2 grid min-h-screen place-items-center px-6">
-            {/* Navy logo, top-left */}
-            <img
-                src={isDarkMode ? offitecLogoDark : offitecLogo}
-                srcSet={`${isDarkMode ? offitecLogoDark : offitecLogo} 96w, ${isDarkMode ? offitecLogoDark2x : offitecLogo2x} 180w`}
-                sizes="96px"
-                alt="Offitec ERP"
-                width={96}
-                height={38}
-                className="absolute left-6 top-6 z-10 h-8 w-auto object-contain sm:left-8 sm:top-8"
-            />
+        <main className="ofi-login">
+            {/* Die Welle läuft oben herein und beginnt erst unterhalb von Logo
+                und Bedienelementen (siehe CSS). */}
+            <LoginWave className="ofi-login__wave ofi-login__wave--top" />
 
-            {/* Big detailed snowflake, right */}
-            <Snowflake className="ofi-login2__flake" />
+            {/* Top band: logo left, controls right — inset, not glued to the edge */}
+            <header className="ofi-login__bar">
+                <img
+                    src={logo}
+                    srcSet={`${logo} 96w, ${logo2x} 180w`}
+                    sizes="96px"
+                    alt="Offitec ERP"
+                    width={96}
+                    height={38}
+                    className="ofi-login__logo"
+                />
+                <div className="ofi-login__controls">
+                    <InstallAppButton />
+                    <LanguageToggle />
+                    <ThemeToggle />
+                </div>
+            </header>
 
-            {/* Top-right controls */}
-            <div className="absolute right-5 top-5 z-10 flex items-center gap-2 sm:right-8 sm:top-8">
-                <InstallAppButton />
-                <LanguageSwitcher />
-                <ThemeToggle />
-            </div>
+            <section className="ofi-login__body">
+                <div className="ofi-login__grid">
+                    {/* ── Form column ── */}
+                    <div className="ofi-login__form-col">
+                        <h1 className="ofi-login__title">{t('auth.loginTitle')}</h1>
+                        <p className="ofi-login__lead">{t('auth.loginLead')}</p>
 
-            <nav className="ofi-login2__resource-dock" aria-label="Login-Schnellzugriffe">
-                <a className="ofi-login2__resource-card" href={PRODUCTION_PROTOTYPE_URL} target="_blank" rel="noreferrer">
-                    <span className="ofi-login2__resource-icon">
-                        <LuGlobe size={18} />
-                    </span>
-                    <span className="ofi-login2__resource-copy">
-                        <span className="ofi-login2__resource-kicker">Weblink</span>
-                        <span className="ofi-login2__resource-title">Produktionsprototyp Türkei</span>
-                    </span>
-                    <LuArrowRight className="ofi-login2__resource-action" size={16} />
-                </a>
-            </nav>
-
-            {/* Prototype prompt: one solid, quiet card — no glass, no backdrop
-                layer, the page behind stays fully usable. Its single job is to
-                point at the production prototype. */}
-            <AnimatePresence>
-                {showGuidePopup && (
-                    <motion.div
-                        className="ofi-login2__proto-layer"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.14 }}
-                    >
-                        <motion.section
-                            role="dialog"
-                            aria-labelledby="ofi-login-proto-title"
-                            className="ofi-login2__proto-panel"
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                        <form
+                            onSubmit={handleSubmit}
+                            noValidate
+                            className={`ofi-login__form${shaking ? ' is-shaking' : ''}`}
+                            onAnimationEnd={() => setShaking(false)}
                         >
-                            <button type="button" className="ofi-login2__proto-close" onClick={dismissGuidePopup} aria-label="Hinweis schließen">
-                                <LuX size={16} />
-                            </button>
-
-                            <span className="ofi-login2__proto-icon">
-                                <LuGlobe size={26} />
-                            </span>
-                            <h2 id="ofi-login-proto-title">Produktionsprototyp Türkei</h2>
-                            <p>Der Web-Prototyp der Produktion ist verfügbar.</p>
-
-                            <a
-                                className="ofi-login2__proto-cta"
-                                href={PRODUCTION_PROTOTYPE_URL}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={dismissGuidePopup}
-                            >
-                                Klicken Sie hier, um den Produktionsprototyp anzusehen
-                                <LuArrowRight size={15} />
-                            </a>
-
-                            <span className="ofi-login2__proto-date">Veröffentlichung: {PROTOTYPE_RELEASE_DATE}</span>
-                            <span className="ofi-login2__proto-rights">{t('auth.demoNotice')}</span>
-                        </motion.section>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Centered minimal column */}
-            <div className="ofi-login2__enter relative z-[1] w-full max-w-[420px]">
-                <AnimatePresence mode="wait" initial={false}>
-                    {step === 'email' ? (
-                        <motion.div
-                            key="email-step"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                        >
-                            <h1 className="text-center text-[30px] font-bold tracking-tight text-[var(--l2-text)] sm:text-[36px]">
-                                {t('auth.emailQuestion')}
-                            </h1>
-
-                            <form onSubmit={handleSubmit} className="mt-8 space-y-3">
-                                <AntInput
+                            <div className={`ofi-login__field${errors.email ? ' has-error' : ''}`}>
+                                <label htmlFor="ofi-login-email" className="ofi-login__label">
+                                    {t('auth.emailLabel')}
+                                    <span className="ofi-login__req" aria-hidden="true">
+                                        *
+                                    </span>
+                                </label>
+                                <input
+                                    id="ofi-login-email"
+                                    ref={emailRef}
                                     type="email"
-                                    className="ofi-login2__input"
-                                    value={email}
-                                    onChange={(event) => setEmail(event.target.value)}
+                                    inputMode="email"
+                                    autoComplete="username"
+                                    autoCapitalize="none"
+                                    spellCheck={false}
+                                    className="ofi-login__input"
                                     placeholder={t('auth.emailPlaceholder')}
-                                    size="large"
-                                    autoFocus
-                                    autoComplete="email"
-                                    suffix={
-                                        <AnimatePresence>
-                                            {emailValid && (
-                                                <motion.span
-                                                    initial={{ scale: 0, opacity: 0 }}
-                                                    animate={{ scale: 1, opacity: 1 }}
-                                                    exit={{ scale: 0, opacity: 0 }}
-                                                    transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                                                    className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#079455] text-white"
-                                                >
-                                                    <LuCheck size={11} strokeWidth={3} />
-                                                </motion.span>
-                                            )}
-                                        </AnimatePresence>
-                                    }
+                                    value={email}
+                                    onChange={(e) => {
+                                        setEmail(e.target.value);
+                                        if (errors.email || errors.form) setErrors((prev) => ({ ...prev, email: undefined, form: undefined }));
+                                    }}
+                                    aria-invalid={Boolean(errors.email)}
+                                    aria-describedby={errors.email ? 'ofi-login-email-error' : undefined}
                                 />
+                                {errors.email && (
+                                    <p id="ofi-login-email-error" className="ofi-login__error" role="alert">
+                                        <LuTriangleAlert size={13} aria-hidden="true" />
+                                        {errors.email}
+                                    </p>
+                                )}
+                            </div>
 
-                                <Button
-                                    type="submit"
-                                    size="lg"
-                                    color="primary"
-                                    className="ofi-login2__btn h-[52px] w-full text-[15px] shadow-[0_8px_18px_rgba(26,35,97,0.18)]"
-                                    iconTrailing={<LuArrowRight size={16} />}
-                                    isDisabled={!emailValid}
-                                >
-                                    {t('auth.continue')}
-                                </Button>
-                            </form>
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="password-step"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                        >
-                            <h1 className="text-center text-[30px] font-bold tracking-tight text-[var(--l2-text)] sm:text-[36px]">
-                                {t('auth.enterPasswordTitle')}
-                            </h1>
-                            <p className="mt-2 text-center text-sm text-[var(--l2-sub)]">
-                                {t('auth.enterPasswordSubtitle')} <span className="font-medium text-[var(--l2-text)]">{email.trim()}</span>
-                            </p>
+                            <div className={`ofi-login__field${errors.password ? ' has-error' : ''}`}>
+                                <label htmlFor="ofi-login-password" className="ofi-login__label">
+                                    {t('auth.password')}
+                                    <span className="ofi-login__req" aria-hidden="true">
+                                        *
+                                    </span>
+                                </label>
+                                <div className="ofi-login__input-wrap">
+                                    <input
+                                        id="ofi-login-password"
+                                        ref={passwordRef}
+                                        type={showPassword ? 'text' : 'password'}
+                                        autoComplete="current-password"
+                                        className="ofi-login__input ofi-login__input--password"
+                                        placeholder={t('auth.passwordPlaceholder')}
+                                        value={password}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value);
+                                            if (errors.password || errors.form) setErrors((prev) => ({ ...prev, password: undefined, form: undefined }));
+                                        }}
+                                        aria-invalid={Boolean(errors.password)}
+                                        aria-describedby={errors.password ? 'ofi-login-password-error' : undefined}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="ofi-login__eye"
+                                        onClick={() => setShowPassword((v) => !v)}
+                                        aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                                        aria-pressed={showPassword}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <LuEyeOff size={18} /> : <LuEye size={18} />}
+                                    </button>
+                                </div>
+                                {errors.password && (
+                                    <p id="ofi-login-password-error" className="ofi-login__error" role="alert">
+                                        <LuTriangleAlert size={13} aria-hidden="true" />
+                                        {errors.password}
+                                    </p>
+                                )}
+                            </div>
 
-                            <form onSubmit={handleSubmit} className="mt-8 space-y-3">
-                                <AntInput.Password
-                                    ref={passwordRef}
-                                    className="ofi-login2__input"
-                                    value={password}
-                                    onChange={(event) => setPassword(event.target.value)}
-                                    placeholder={t('auth.passwordPlaceholder')}
-                                    size="large"
-                                    autoComplete="current-password"
+                            <label className="ofi-login__remember">
+                                <input
+                                    type="checkbox"
+                                    className="ofi-login__check-input"
+                                    checked={remember}
+                                    onChange={(e) => {
+                                        setRemember(e.target.checked);
+                                        if (!e.target.checked) writeRemembered(null);
+                                    }}
                                 />
+                                <span className="ofi-login__check" aria-hidden="true">
+                                    <svg viewBox="0 0 12 10" width="12" height="10" fill="none">
+                                        <path d="M1 5.2 4.2 8.4 11 1.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                </span>
+                                <span>{t('auth.rememberMe')}</span>
+                            </label>
 
-                                <Button
-                                    type="submit"
-                                    size="lg"
-                                    color="primary"
-                                    className="ofi-login2__btn h-[52px] w-full text-[15px] shadow-[0_8px_18px_rgba(26,35,97,0.18)]"
-                                    iconTrailing={<LuArrowRight size={16} />}
-                                    isLoading={loading}
-                                    showTextWhileLoading
-                                >
-                                    {t('auth.signIn')}
-                                </Button>
-
+                            <div className="ofi-login__actions">
+                                <button type="submit" className={`ofi-login__submit${loading ? ' is-loading' : ''}`} disabled={loading}>
+                                    <span className="ofi-login__submit-label">{t('auth.signIn')}</span>
+                                    {loading && <span className="ofi-login__spinner" aria-hidden="true" />}
+                                </button>
                                 <button
                                     type="button"
-                                    onClick={goBack}
-                                    className="group mx-auto flex items-center justify-center gap-1.5 pt-1 text-sm font-medium text-[var(--l2-sub)] transition-colors hover:text-[var(--l2-text)]"
+                                    className="ofi-login__qr-btn"
+                                    onClick={() => setQrOpen(true)}
+                                    aria-label={t('auth.qrLogin')}
+                                    title={t('auth.qrLogin')}
+                                    disabled={loading}
                                 >
-                                    <LuArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
-                                    {t('auth.back')}
+                                    <LuQrCode size={20} />
                                 </button>
-                            </form>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                            </div>
 
-                <p className="mt-10 text-center text-xs leading-5 text-[var(--l2-sub)]">{t('auth.demoNotice')}</p>
-            </div>
+                            {errors.form && (
+                                <p className="ofi-login__error ofi-login__error--form" role="alert">
+                                    <LuTriangleAlert size={14} aria-hidden="true" />
+                                    {errors.form}
+                                </p>
+                            )}
+                        </form>
 
-            {/* Bottom-right label */}
-            <span className="absolute bottom-5 right-6 z-[1] text-xs font-medium text-[var(--l2-sub)] max-sm:hidden">
-                offitec management panel
-            </span>
+                        <p className="ofi-login__fineprint">{t('auth.demoNotice')}</p>
+                    </div>
+
+                    {/* ── Explanatory column (desktop only) ── */}
+                    {/* Kein `.ofi-serif`: der Erklärtext läuft seit 17.08.2026
+                        ganz in der Programmschrift Open Sans (Nutzerwunsch) —
+                        Titel, Fliesstext und die beiden Adressen. */}
+                    <aside className="ofi-login__aside">
+                        <h2>Offitec ERP</h2>
+                        <p>{t('auth.asideText1')}</p>
+                        <p>{t('auth.asideText2')}</p>
+                        <p className="ofi-login__aside-mails">
+                            {CONTACT_EMAILS.map((mail, index) => (
+                                <Fragment key={mail}>
+                                    {index > 0 && (
+                                        <span className="ofi-login__aside-sep" aria-hidden="true">
+                                            ·
+                                        </span>
+                                    )}
+                                    <a href={`mailto:${mail}`} className="ofi-login__aside-link">
+                                        {mail}
+                                    </a>
+                                </Fragment>
+                            ))}
+                        </p>
+                    </aside>
+                </div>
+            </section>
+
+            <footer className="ofi-login__footer">
+                <span className="ofi-login__copyright">{t('auth.copyright')}</span>
+            </footer>
+
+            <LoginNotifications />
+            <LoginQrDialog open={qrOpen} onClose={() => setQrOpen(false)} onCredentials={handleQrCredentials} />
         </main>
     );
 };

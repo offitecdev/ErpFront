@@ -17,7 +17,7 @@ export const TemplatePickerModal = ({
     open,
     onClose,
     onSelect,
-    z = 150,
+    z = 850,
 }: {
     open: boolean;
     onClose: () => void;

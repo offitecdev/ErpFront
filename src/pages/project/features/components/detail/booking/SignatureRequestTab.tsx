@@ -10,7 +10,7 @@ import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 import type { MailSettingDto, ProjectDto, ProjectSalesOrder } from '@/types/project';
 
-import { InitialsAvatar } from '../../common/InitialsAvatar';
+import { PersonAvatar } from '@/components/ui-shared/PersonAvatar';
 import { scopedRecords } from '../../../utils/projectOrderScope';
 
 // Send field reports to signature: to the technician, the customer or both.
@@ -47,8 +47,10 @@ export const SignatureRequestTab = ({ project, order, isPrimary, settings, userE
                         return (
                         <div key={report.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                             <div className="flex min-w-0 items-center gap-3">
-                                {/* The person whose signature/report this is — visible at a glance. */}
-                                <InitialsAvatar name={employeeName || t('auto.teknisyen')} size={32} />
+                                {/* The person whose signature/report this is — visible
+                                    at a glance: their profile photo, or the initials
+                                    circle when none is stored. */}
+                                <PersonAvatar id={report.employee?.id} name={employeeName || t('auto.teknisyen')} size={32} />
                                 <div className="min-w-0">
                                     <div className="text-[13px] font-semibold text-slate-900">{dayjs(report.workDate || report.reportDate).format('DD.MM.YYYY')} · {t('auto.saha_raporu')}</div>
                                     <div className="mt-0.5 text-[12px] text-slate-500">

@@ -2,18 +2,18 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
-import { Check, CheckCircle, Coins01, Eye, FileDownload02, InfoCircle, Trash01, X } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
-import { ColResizeHandle, ResizableCols, SectionCard } from '@/components/ui-shared/TableKit';
+import { Check, CheckCircle, ChevronDown, Coins01, Eye, FileDownload02, InfoCircle, Send01, Trash01, X } from '@/components/icons/antIconCompat';
+import { openMailCompose } from '@/components/mail/mailComposeBus';
+import { ColResizeHandle, ResizableCols } from '@/components/ui-shared/TableKit';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
-import { inputClass } from '@/components/ui-shared/Field';
-import { BottomSheet } from '@/pages/inventory/components/BottomSheet';
 import { billingApi } from '@/lib/api/billing';
+import { openAmount } from '@/lib/orderBillingTotals';
 import { parsePaymentStages } from '@/lib/paymentSchedule';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
 import { t } from '@/i18n/translate';
 import type { BillingSummaryDto, InvoiceDto, InvoiceKind, InvoiceStatus } from '@/types/billing';
 import type { InvoiceOrderContext } from '@/utils/pdf/invoicePdf';
+import { InvoicePopup } from './InvoicePopup';
 import { PaymentPlanSheet } from './PaymentPlanSheet';
 
 const fmtMoney = (v: number) =>
@@ -56,6 +56,12 @@ export interface BillingDocumentRow {
 
 const lineTotal = (line: BillingLineInput) => Number(line.summary?.baseAmount ?? line.totalAmount ?? 0);
 const lineBilled = (line: BillingLineInput) => Number(line.summary?.billedAmount ?? 0);
+/**
+ * Açık bakiye — %100 faturalandırılmış bir siparişte 0.00'dır, kalan kuruş
+ * yalnızca yuvarlama tozu olduğu için (bkz. `openAmount`).
+ */
+const lineOpen = (line: BillingLineInput) =>
+    openAmount(line.summary?.billedPercent, lineTotal(line), lineBilled(line));
 const linePct = (line: BillingLineInput) => {
     const total = lineTotal(line);
     return total > 0 ? Math.max(0, Math.min(100, Math.round((lineBilled(line) / total) * 100))) : 0;
@@ -80,12 +86,14 @@ const deriveKind = (billedPct: number, percent: number, remainingPct: number): I
 
 /**
  * Zahlungseingang rozeti — küçük bir ikon YETMEZ (kullanıcı isteği): ödendi mi
- * ödenmedi mi dolgulu, renkli ve YAZILI rozetten tek bakışta anlaşılır.
+ * ödenmedi mi renkli ve YAZILI rozetten tek bakışta anlaşılır. Google-clean
+ * kılıkta (19.08.2026) rozet halka değil, YUMUŞAK dolgulu bir hap: yeşil
+ * ödendi, kehribar açık, gri iptal.
  */
-const PAYMENT_BADGE: Record<InvoiceStatus, string> = {
-    PAID: 'bg-emerald-100 text-emerald-800 ring-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/40',
-    ISSUED: 'bg-amber-100 text-amber-900 ring-amber-300 dark:bg-amber-500/20 dark:text-amber-100 dark:ring-amber-400/40',
-    CANCELLED: 'bg-slate-100 text-slate-500 ring-slate-300 dark:bg-white/10 dark:text-slate-300 dark:ring-white/20',
+const PAYMENT_STATE: Record<InvoiceStatus, string> = {
+    PAID: 'is-paid',
+    ISSUED: 'is-open',
+    CANCELLED: 'is-cancelled',
 };
 
 /**
@@ -146,15 +154,18 @@ export const OrderBillingSection = ({
      */
     activeOrderId?: string;
 }) => {
-    const { settings } = usePdfSettingsStore();
+    const settings = usePdfSettings();
     const navigate = useNavigate();
     /**
      * Sütunlar sürüklenerek genişletilip daraltılır (kullanıcı isteği).
      * "Rechnungsart" dar tutulur — içindeki rozet zaten kısa.
      */
     const grid = useColumnWidths({
-        storageKey: 'offitec:order-billing:col-widths:v1',
-        defaults: { order: 210, total: 140, billed: 160, remaining: 160, kind: 116, amount: 248 },
+        // v2 = das Google-clean Kleid (19.08.2026): die Rechnungsart-Marke ist
+        // eine Pille geworden und braucht ihre Spalte etwas breiter, sonst
+        // steht "Gesamtrechnung" halb unter dem Prozentfeld.
+        storageKey: 'offitec:order-billing:col-widths:v2',
+        defaults: { order: 210, total: 140, billed: 160, remaining: 160, kind: 150, amount: 236 },
         minPx: 72,
     });
     const [planFor, setPlanFor] = useState<BillingLineInput | null>(null);
@@ -170,7 +181,7 @@ export const OrderBillingSection = ({
     const openOrder = (orderId: string) => {
         setInvoicesOpen(false);
         if (onOpenOrder) onOpenOrder(orderId);
-        else navigate(`/crm/my-orders/${orderId}?tab=billing`);
+        else navigate(`/sales/orders/${orderId}?tab=billing`);
     };
 
     // Ana siparişler önce, ekleri altta.
@@ -183,11 +194,17 @@ export const OrderBillingSection = ({
     const totals = useMemo(() => {
         const total = round2(ordered.reduce((sum, line) => sum + lineTotal(line), 0));
         const billed = round2(ordered.reduce((sum, line) => sum + lineBilled(line), 0));
-        return { total, billed, remaining: round2(total - billed) };
+        // "Offen" satırların KENDİ açık bakiyelerinin toplamıdır: her satır
+        // yuvarlama tozunu zaten düşürdü, `total - billed` deseydik toz grup
+        // seviyesinde geri gelirdi (üç sipariş → CHF 0.03).
+        return { total, billed, remaining: round2(ordered.reduce((sum, line) => sum + lineOpen(line), 0)) };
     }, [ordered]);
 
+    // Der Zahlungsplan hängt am AUFTRAG, nicht an der Rechnung: er wird hier in
+    // den PDF-Kontext gemischt, damit die Vollrechnung ihn am Dokumentende als
+    // eigene Tabelle drucken kann.
     const contexts = useMemo(
-        () => Object.fromEntries(ordered.map((line) => [line.id, line.context])),
+        () => Object.fromEntries(ordered.map((line) => [line.id, { ...line.context, paymentStages: lineStages(line) }])),
         [ordered],
     );
     const mainLine = ordered[0] ?? null;
@@ -415,6 +432,31 @@ export const OrderBillingSection = ({
         }
     };
 
+    /** Rechnung per E-Mail: PDF wird gebaut und im Schreiben-Fenster angehängt —
+        Empfänger/Betreff vorbelegt, Kundenbezug gesetzt (landet in der
+        Kundenkommunikation). Versand über das Outlook-Postfach des Benutzers,
+        sonst SMTP. */
+    const sendByMail = async (invoice: InvoiceDto) => {
+        setBusyId(invoice.id);
+        try {
+            const { buildInvoicePdfBytes } = await import('@/utils/pdf/invoicePdf');
+            const bytes = await buildInvoicePdfBytes(invoice, contextOf(invoice), settings);
+            const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+            const customer = invoice.customer || (invoice.customerId ? { id: invoice.customerId, companyName: contextOf(invoice).customerName || '' } : null);
+            openMailCompose({
+                subject: t('mail.invoice.subject', { number: invoice.invoiceNumber }),
+                body: t('mail.invoice.body', { number: invoice.invoiceNumber }),
+                customer,
+                entity: { type: 'INVOICE', id: invoice.id, label: invoice.invoiceNumber },
+                attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, contentType: 'application/pdf', blob, size: blob.size }],
+            });
+        } catch (e) {
+            toast.error(apiError(e, t('billing.pdfError')));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
     const download = async (invoice: InvoiceDto) => {
         setBusyId(invoice.id);
         try {
@@ -455,100 +497,110 @@ export const OrderBillingSection = ({
             setBusyId(null);
         }
     };
-
-    const iconBtn = 'inline-flex h-7 w-7 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#272f67] disabled:opacity-40 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white';
     /**
-     * Vorschau / PDF — PNG görsel DEĞİL, uygulamanın kendi ikon setinden
-     * (components/icons) vektör ikonlar; çerçevesiz ama BÜYÜK düğmeler.
-     * Renk ayrımı: önizleme kurumsal lacivert, PDF kırmızı.
+     * Vorschau / PDF / Mail — die Symbole des Moduls sitzen in runden Feldern,
+     * deren Fläche erst beim Überfahren erscheint (Google-clean, 19.08.2026).
+     * Die Farbe bleibt die alte Unterscheidung: Vorschau navy, PDF rot.
      */
-    const assetBtn = 'inline-flex size-12 items-center justify-center rounded-lg transition hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-white/10';
-    const kindChip = 'inline-flex items-center rounded bg-[#272f67]/[0.08] px-1.5 py-0.5 text-[11px] font-semibold text-[#272f67] dark:bg-white/15 dark:text-white';
+    const [cardOpen, setCardOpen] = useState(true);
 
     let addonIndex = 0;
 
     return (
         <>
-            <SectionCard
-                title={t('projects.flow.billing')}
-                collapsible
-                action={
-                    mainLine ? (
-                        /* Faturalar için AYRI düğme — ödeme planının yanında durur
-                           (kullanıcı isteği); satır tıklaması da çalışmayı sürdürür. */
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" variant="secondary" onClick={() => setInvoicesOpen(true)}>
+            <section className="ofi-inv-card ofi-inv-scope">
+                <header className="ofi-inv-card__head">
+                    <button
+                        type="button"
+                        onClick={() => setCardOpen((value) => !value)}
+                        aria-expanded={cardOpen}
+                        title={cardOpen ? t('common.collapse') : t('common.expand')}
+                        className="ofi-inv-card__toggle ofi-inv-card__title"
+                    >
+                        <ChevronDown size={14} className="ofi-inv-card__chev" />
+                        <span className="truncate">{t('projects.flow.billing')}</span>
+                    </button>
+                    {/* Faturalar için AYRI düğme — ödeme planının yanında durur
+                        (kullanıcı isteği); satır tıklaması da çalışmayı sürdürür. */}
+                    {mainLine && (
+                        <div className="ofi-inv-card__actions">
+                            <button type="button" className="ofi-inv-btn" onClick={() => setInvoicesOpen(true)}>
                                 {t('billing.myInvoices')}
-                            </Button>
-                            <Button size="sm" variant="secondary" icon={<Coins01 size={13} />} onClick={() => setPlanFor(mainLine)}>
+                            </button>
+                            <button type="button" className="ofi-inv-btn" onClick={() => setPlanFor(mainLine)}>
+                                <Coins01 size={14} />
                                 {t('billing.paymentPlan')}
-                            </Button>
+                            </button>
                         </div>
-                    ) : undefined
-                }
-            >
-                {/* Sipariş başına TEK sade satır — ana sipariş üstte, ekler "1. / 2."
-                    diye ALTINDA listelenir; satır ya da ikon Details'i açar.
-                    Sığmayan sütunlar yatay kaydırılır. */}
+                    )}
+                </header>
+
+                {cardOpen && (
+                <div className="ofi-inv-card__body">
+                {/* Verkäufer + Fälligkeit — zwei Felder auf der weissen Fläche,
+                    RECHTSBÜNDIG wie jedes Feld des Moduls (Vorgabe 19.08.2026:
+                    geschrieben wird von ganz rechts her). */}
                 {mainLine && (
-                    <div className="grid gap-3 border-b border-slate-200 bg-slate-50/60 px-3 py-3 sm:grid-cols-[minmax(240px,1fr)_220px] dark:border-white/10 dark:bg-white/[0.03]">
-                        <label className="block min-w-0">
-                            <span className="mb-1 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('common.name')}</span>
+                    <div className="ofi-inv-meta">
+                        <label className="ofi-inv-field">
+                            <span className="ofi-inv-field__label">{t('common.name')}</span>
                             <input
                                 type="text"
                                 value={salesperson}
                                 onChange={(event) => setSalesperson(event.target.value)}
-                                className={`${inputClass} h-10 w-full px-3 text-[13px]`}
+                                className="ofi-inv-input"
                             />
                         </label>
-                        <label className="block">
-                            <span className="mb-1 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t('billing.dueDate')}</span>
+                        <label className="ofi-inv-field">
+                            <span className="ofi-inv-field__label">{t('billing.dueDate')}</span>
                             <input
                                 type="date"
                                 value={dueDate}
                                 onChange={(event) => setDueDate(event.target.value)}
-                                className={`${inputClass} h-10 w-full px-3 text-[13px]`}
+                                className="ofi-inv-input"
                             />
                         </label>
                     </div>
                 )}
-                <div className="overflow-x-auto">
-                <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[960px] text-[12px]">
+                {/* Sipariş başına TEK sade satır — ana sipariş üstte, ekler "1. / 2."
+                    diye ALTINDA listelenir; satır ya da ikon Details'i açar.
+                    Sığmayan sütunlar yatay kaydırılır. */}
+                <div className="ofi-inv-scroll">
+                <table data-inv-table data-unstyled-table className="w-full min-w-[960px]">
                     <colgroup>
                         <ResizableCols keys={['order', 'total', 'billed', 'remaining', 'kind', 'amount'] as const} grid={grid} />
                         {/* Düğme sütunu sabit dar. */}
-                        <col style={{ width: 124 }} />
+                        <col style={{ width: 132 }} />
                     </colgroup>
                     <thead>
                         <tr>
-                            <th className="relative px-3 py-1.5 text-left">
+                            <th className="relative text-left">
                                 {t('projects.detail.colOrder')}
-                                <ColResizeHandle {...grid.resizeProps('order', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('order')} />
                             </th>
-                            <th className="relative px-3 py-1.5 text-right">
+                            <th className="relative text-right">
                                 {t('billing.totalAmount')}
-                                <ColResizeHandle {...grid.resizeProps('total', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('total')} />
                             </th>
-                            <th className="relative px-3 py-1.5 text-right">
+                            <th className="relative text-right">
                                 {t('billing.billed')}
-                                <ColResizeHandle {...grid.resizeProps('billed', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('billed')} />
                             </th>
-                            <th className="relative px-3 py-1.5 text-right">
+                            <th className="relative text-right">
                                 {t('billing.remaining')}
-                                <ColResizeHandle {...grid.resizeProps('remaining', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('remaining')} />
                             </th>
-                            <th className="relative px-3 py-1.5 text-left">
+                            <th className="relative text-left">
                                 {t('billing.kindLabel')}
-                                <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('kind')} />
                             </th>
-                            <th className="relative px-3 py-1.5 text-right">
+                            <th className="relative text-right">
                                 {t('billing.amountLabel')}
-                                <ColResizeHandle {...grid.resizeProps('amount', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('amount')} />
                             </th>
                             {/* "Aktionen" başlığı yok — sütunda yalnızca Rechnung düğmesi
                                 var, o yüzden sütun dar tutulur. */}
-                            <th className="px-2 py-1.5" />
-
+                            <th />
                         </tr>
                     </thead>
                     <tbody>
@@ -570,40 +622,44 @@ export const OrderBillingSection = ({
                                     onClick={() => setInvoicesOpen(true)}
                                     title={t('billing.invoicesTitle')}
                                     /* Ekranın geri kalanının kapsandığı sipariş hafifçe vurgulanır. */
-                                    className={`cursor-pointer ${line.id === activeOrderId ? 'bg-[#eef4ff]/60 dark:bg-white/[0.06]' : ''}`}
+                                    className={`is-link ${line.id === activeOrderId ? 'is-current' : ''}`}
                                 >
                                     {/* Ek siparişler ananın ALTINDA içerlek listelenir. */}
-                                    <td className={`whitespace-nowrap py-1.5 pr-3 ${line.isAddon ? 'pl-8' : 'pl-3'}`}>
-                                        <span className="font-semibold text-slate-900 dark:text-white">{line.orderNumber}</span>
+                                    <td className={`whitespace-nowrap ${line.isAddon ? 'pl-8' : ''}`}>
+                                        <span className="ofi-inv-name">{line.orderNumber}</span>
                                         {(label || line.revisionNumber) && (
-                                            <span className="ml-2 text-[10.5px] text-slate-400 dark:text-slate-500">
+                                            <span className="ofi-inv-sub">
                                                 {label}
                                                 {line.revisionNumber ? `${label ? ' · ' : ''}N${line.revisionNumber}` : ''}
                                             </span>
                                         )}
                                     </td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono font-semibold text-slate-900 dark:text-white">{fmtMoney(lineTotal(line))}</td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-emerald-600">
-                                        {fmtMoney(lineBilled(line))} <span className="text-[10.5px] opacity-80">· {linePct(line)}%</span>
+                                    <td className="ofi-inv-num is-strong">{fmtMoney(lineTotal(line))}</td>
+                                    <td className="ofi-inv-num is-billed">
+                                        {fmtMoney(lineBilled(line))}<span className="ofi-inv-num__sub">· {linePct(line)}%</span>
                                     </td>
-                                    <td className={`whitespace-nowrap px-3 py-1.5 text-right font-mono ${done ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                        {fmtMoney(round2(lineTotal(line) - lineBilled(line)))} <span className="text-[10.5px] opacity-80">· {Math.round(remaining)}%</span>
+                                    <td className={`ofi-inv-num ${done ? 'is-billed' : 'is-open'}`}>
+                                        {fmtMoney(lineOpen(line))}<span className="ofi-inv-num__sub">· {Math.round(remaining)}%</span>
                                     </td>
                                     {/* Fatura girişi DOĞRUDAN tabloda: tür otomatik + % ↔ CHF. */}
                                     {done ? (
-                                        <td colSpan={2} className="whitespace-nowrap px-3 py-1.5">
-                                            <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-600">
-                                                <Check size={12} strokeWidth={3} />{t('billing.invoiceCreatedChip')}
+                                        <td colSpan={2} className="whitespace-nowrap">
+                                            <span className="ofi-inv-done">
+                                                <Check size={13} strokeWidth={3} />{t('billing.invoiceCreatedChip')}
                                             </span>
                                         </td>
                                     ) : (
                                         <>
-                                            <td className="whitespace-nowrap px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
-                                                <span className={kindChip}>{t(`billing.kind_${nextKind}`)}</span>
+                                            <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                <span className="ofi-inv-kind">{t(`billing.kind_${nextKind}`)}</span>
                                             </td>
-                                            <td className="whitespace-nowrap px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <div className="relative w-[92px]">
+                                            {/* Beide Felder werden von ganz RECHTS her
+                                                geschrieben — die Ziffern stehen beim
+                                                Tippen schon in der Spalte, in der sie
+                                                nachher gelesen werden. */}
+                                            <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                <div className="ofi-inv-entry">
+                                                    <span className="ofi-inv-unit">
                                                         <input
                                                             type="number"
                                                             min={0.01}
@@ -612,12 +668,10 @@ export const OrderBillingSection = ({
                                                             onChange={(e) => setDraftPct(line, e.target.value)}
                                                             onKeyDown={(e) => { if (e.key === 'Enter') void bill(line); }}
                                                             aria-label={t('billing.percentLabel')}
-                                                            /* inputClass'ta yatay boşluk yok — sayı kenara yapışmasın
-                                                               diye pl-3, % işaretine değmesin diye pr-7. */
-                                                            className={`${inputClass} h-9 w-full pl-3 pr-7 text-right font-mono text-[13px] font-semibold`}
+                                                            className="ofi-inv-input"
                                                         />
-                                                        <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[11px] font-semibold text-slate-500 dark:text-slate-400">%</span>
-                                                    </div>
+                                                        <span className="ofi-inv-unit__mark">%</span>
+                                                    </span>
                                                     <input
                                                         type="number"
                                                         min={0}
@@ -625,7 +679,7 @@ export const OrderBillingSection = ({
                                                         onChange={(e) => setDraftAmt(line, e.target.value)}
                                                         onKeyDown={(e) => { if (e.key === 'Enter') void bill(line); }}
                                                         aria-label={t('billing.amountLabel')}
-                                                        className={`${inputClass} h-9 w-[132px] px-3 text-right font-mono text-[13px] font-semibold`}
+                                                        className="ofi-inv-input"
                                                     />
                                                 </div>
                                             </td>
@@ -634,12 +688,17 @@ export const OrderBillingSection = ({
                                     {/* Doğrudan "Rechnung" düğmesi — başlıksız, ikonsuz
                                         (kullanıcı isteği). Faturalar ve ödeme durumu için
                                         satırın kendisi popup'ı açar. */}
-                                    {/* Dar sütun, BÜYÜK düğme: düğme sütunu doldurur. */}
-                                    <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                    <td className="whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
                                         {!done && (
-                                            <Button size="lg" variant="primary" className="w-full" loading={billingId === line.id} onClick={() => void bill(line)}>
+                                            <button
+                                                type="button"
+                                                className="ofi-inv-btn is-primary is-block"
+                                                disabled={billingId === line.id}
+                                                onClick={() => void bill(line)}
+                                            >
+                                                {billingId === line.id && <span aria-hidden className="ofi-tp-spinner" />}
                                                 {t('billing.newInvoice')}
-                                            </Button>
+                                            </button>
                                         )}
                                     </td>
                                 </tr>
@@ -654,11 +713,11 @@ export const OrderBillingSection = ({
                             );
                         })}
                         {ordered.length > 1 && (
-                            <tr className="border-t border-slate-200 dark:border-white/10">
-                                <td className="px-3 py-1.5 text-[11.5px] font-semibold text-slate-600 dark:text-slate-300">{t('common.total')}</td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-[12px] font-bold text-slate-900 dark:text-white">{fmtMoney(totals.total)}</td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-[12px] font-bold text-emerald-600">{fmtMoney(totals.billed)}</td>
-                                <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono text-[12px] font-bold text-amber-600">{fmtMoney(Math.max(0, totals.remaining))}</td>
+                            <tr className="ofi-inv-total">
+                                <td className="ofi-inv-muted">{t('common.total')}</td>
+                                <td className="ofi-inv-num is-strong">{fmtMoney(totals.total)}</td>
+                                <td className="ofi-inv-num is-strong is-billed">{fmtMoney(totals.billed)}</td>
+                                <td className="ofi-inv-num is-strong is-open">{fmtMoney(Math.max(0, totals.remaining))}</td>
                                 <td colSpan={3} />
                             </tr>
                         )}
@@ -668,88 +727,89 @@ export const OrderBillingSection = ({
 
                 {/* Raporlar & belgeler (sipariş detayı sağlıyorsa) — tek satırlar. */}
                 {documents && documents.length > 0 && (
-                    <table data-inv-table data-grid-lines data-unstyled-table className="mt-4 w-full min-w-[520px] max-w-[880px]">
+                    <div className="ofi-inv-scroll">
+                    <table data-inv-table data-unstyled-table className="w-full min-w-[520px] max-w-[880px]">
                         <thead>
                             <tr>
-                                <th className="px-3 py-1.5 text-left">{t('billing.reportsDocs')}</th>
-                                <th className="px-3 py-1.5 text-left">{t('common.type')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('common.date')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('common.status')}</th>
+                                <th className="text-left">{t('billing.reportsDocs')}</th>
+                                <th className="text-left">{t('common.type')}</th>
+                                <th className="text-right">{t('common.date')}</th>
+                                <th className="text-right">{t('common.status')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {documents.map((row) => (
                                 <tr key={row.id}>
-                                    <td className="whitespace-nowrap px-3 py-1.5 font-medium text-slate-800 dark:text-slate-100">{row.label}</td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-slate-500 dark:text-slate-400">{row.type}</td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-500 dark:text-slate-400">{fmtDate(row.date)}</td>
-                                    <td className={`whitespace-nowrap px-3 py-1.5 text-right text-[11.5px] font-semibold ${row.signed ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    <td className="whitespace-nowrap"><span className="ofi-inv-name">{row.label}</span></td>
+                                    <td className="whitespace-nowrap ofi-inv-muted">{row.type}</td>
+                                    <td className="ofi-inv-num ofi-inv-muted">{fmtDate(row.date)}</td>
+                                    <td className={`ofi-inv-num ${row.signed ? 'is-billed' : 'is-open'}`}>
                                         {row.signed ? t('projects.complete.signedLabel') : t('projects.complete.unsignedLabel')}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
-            </SectionCard>
+                </div>
+                )}
+            </section>
 
             {/* Faturalar popup'ı — ana siparişin faturaları ÜSTTE, ek siparişlerinkiler
-                kendi başlıkları altında ALTINDA (kullanıcı isteği). */}
-            <BottomSheet
+                kendi başlıkları altında ALTINDA (kullanıcı isteği). Bodenblatt YOK:
+                Kalender'in schwebende Karte'si (19.08.2026). */}
+            <InvoicePopup
                 open={invoicesOpen}
                 title={t('billing.invoicesTitle')}
                 subtitle={scope[0]?.orderNumber}
                 onClose={() => setInvoicesOpen(false)}
-                /* Geniş ama ALÇAK: tablo yayılsın, popup ekranı kaplamasın. */
-                width={1320}
-                height={520}
-                zIndex={84}
+                size="wide"
             >
                 {/* İnce satırlı, standart tablo — dolgu az, satırlar alçak. */}
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-                    <div className="overflow-x-auto">
-                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full min-w-[760px] text-[12px]">
+                <div className="ofi-inv-pop__scroll">
+                    <table data-inv-table data-unstyled-table className="w-full min-w-[760px]">
                         <thead>
                             <tr>
-                                <th className="px-3 py-1.5 text-left">{t('billing.invoiceNumber')}</th>
-                                <th className="px-3 py-1.5 text-left">{t('billing.kindLabel')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('billing.invoiceDate')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('billing.dueDate')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('billing.share')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('billing.amountLabel')}</th>
-                                <th className="px-3 py-1.5 text-left">{t('billing.paymentStatus')}</th>
-                                <th className="px-3 py-1.5 text-right">{t('common.actions')}</th>
+                                <th className="text-left">{t('billing.invoiceNumber')}</th>
+                                <th className="text-left">{t('billing.kindLabel')}</th>
+                                <th className="text-right">{t('billing.invoiceDate')}</th>
+                                <th className="text-right">{t('billing.dueDate')}</th>
+                                <th className="text-right">{t('billing.share')}</th>
+                                <th className="text-right">{t('billing.amountLabel')}</th>
+                                <th className="text-left">{t('billing.paymentStatus')}</th>
+                                <th className="text-right">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {invoicesLoading ? (
-                                <tr><td colSpan={8} className="px-3 py-4 text-center text-slate-400">{t('common.loading')}</td></tr>
+                                <tr><td colSpan={8} className="ofi-inv-empty">{t('common.loading')}</td></tr>
                             ) : invoiceGroups.every((group) => group.invoices.length === 0) ? (
-                                <tr><td colSpan={8} className="px-3 py-4 text-center text-slate-400">{t('billing.noInvoices')}</td></tr>
+                                <tr><td colSpan={8} className="ofi-inv-empty">{t('billing.noInvoices')}</td></tr>
                             ) : invoiceGroups.map((group) => [
                                 /* Sipariş başlığı: AÇIK olan sipariş düz başlıktır
                                    (tıklanmaz — zaten oradasınız), diğerleri tıklanınca
                                    o siparişe geçer. */
-                                <tr key={`head-${group.id}`} className="bg-slate-50 dark:bg-white/[0.04]">
-                                    <td colSpan={8} className="whitespace-nowrap p-0">
+                                <tr key={`head-${group.id}`} className="ofi-inv-group">
+                                    <td colSpan={8} className="whitespace-nowrap">
                                         {group.id === activeOrderId ? (
-                                            <div className="flex w-full items-center gap-2 px-3 py-1.5">
-                                                <span className="font-semibold text-slate-900 dark:text-white">{group.orderNumber}</span>
-                                                <span className="rounded bg-white px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-500 ring-1 ring-inset ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-white/15">{group.label}</span>
-                                                <span className="ml-auto text-[11px] font-semibold text-slate-400 dark:text-slate-500">{t('billing.currentOrder')}</span>
+                                            <div className="ofi-inv-group__inner">
+                                                <span className="ofi-inv-group__num">{group.orderNumber}</span>
+                                                <span className="ofi-inv-group__tag">{group.label}</span>
+                                                <span className="ofi-inv-group__here">{t('billing.currentOrder')}</span>
                                             </div>
                                         ) : (
                                             <button
                                                 type="button"
                                                 onClick={() => openOrder(group.id)}
                                                 title={t('billing.openOrderInvoices')}
-                                                className="group/order flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-[#eef4ff] dark:hover:bg-white/10"
+                                                className="ofi-inv-group__inner"
                                             >
                                                 {/* "Zur Abrechnung" etiketi YOK (kullanıcı isteği);
                                                     tıklanabilirliği altı çizilen sipariş numarası
                                                     anlatır. */}
-                                                <span className="font-semibold text-[#272f67] underline-offset-2 group-hover/order:underline dark:text-white">{group.orderNumber}</span>
-                                                <span className="rounded bg-white px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-500 ring-1 ring-inset ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-white/15">{group.label}</span>
+                                                <span className="ofi-inv-group__num">{group.orderNumber}</span>
+                                                <span className="ofi-inv-group__tag">{group.label}</span>
                                             </button>
                                         )}
                                     </td>
@@ -757,7 +817,7 @@ export const OrderBillingSection = ({
                                 ...(group.invoices.length === 0
                                     ? [(
                                         <tr key={`empty-${group.id}`}>
-                                            <td colSpan={8} className="px-3 py-2 text-center text-[11.5px] text-slate-400">{t('billing.noInvoices')}</td>
+                                            <td colSpan={8} className="ofi-inv-empty">{t('billing.noInvoices')}</td>
                                         </tr>
                                     )]
                                     : group.invoices.map((invoice) => {
@@ -768,69 +828,73 @@ export const OrderBillingSection = ({
                                         const planLine = ordered.find((line) => line.id === invoice.salesOrderId) ?? null;
                                         const stages = planLine ? lineStages(planLine) : null;
                                         return (
-                                    <tr key={invoice.id} className={cancelled ? 'opacity-45' : ''}>
-                                        <td className="whitespace-nowrap px-3 py-1.5">
-                                            <span className={`font-semibold text-slate-900 dark:text-white ${cancelled ? 'line-through' : ''}`}>
+                                    <tr key={invoice.id} className={cancelled ? 'is-muted' : ''}>
+                                        <td className="whitespace-nowrap">
+                                            <span className={`ofi-inv-name ${cancelled ? 'is-struck' : ''}`}>
                                                 {invoice.invoiceNumber}
                                             </span>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-1.5 text-slate-600 dark:text-slate-300">
+                                        <td className="whitespace-nowrap ofi-inv-muted">
                                             {t(`billing.kind_${(invoice.kind || 'RECHNUNG') as InvoiceKind}`)}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-500 dark:text-slate-400">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</td>
-                                        <td className="whitespace-nowrap px-3 py-1.5 text-right text-slate-500 dark:text-slate-400">{fmtDate(invoice.dueDate)}</td>
-                                        <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono font-semibold text-slate-700 dark:text-slate-200">{Math.round(invoice.billedPercent)}%</td>
-                                        <td className={`whitespace-nowrap px-3 py-1.5 text-right font-mono font-bold ${paid ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>{fmtMoney(invoice.amount)}</td>
+                                        <td className="ofi-inv-num ofi-inv-muted">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</td>
+                                        <td className="ofi-inv-num ofi-inv-muted">{fmtDate(invoice.dueDate)}</td>
+                                        <td className="ofi-inv-num">{Math.round(invoice.billedPercent)}%</td>
+                                        <td className={`ofi-inv-num is-strong ${paid ? 'is-billed' : ''}`}>{fmtMoney(invoice.amount)}</td>
                                         {/* Zahlungseingang: bezahlt = dolu onay rozeti, offen = boş
                                             halka (para simgesi kullanılmaz — kullanıcı isteği). */}
-                                        <td className="whitespace-nowrap px-3 py-1.5">
-                                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-wide ring-1 ring-inset ${PAYMENT_BADGE[invoice.status]}`}>
+                                        <td className="whitespace-nowrap">
+                                            <span className={`ofi-inv-state ${PAYMENT_STATE[invoice.status]}`}>
                                                 {paid ? (
                                                     <CheckCircle size={13} />
                                                 ) : cancelled ? (
                                                     <X size={13} />
                                                 ) : (
-                                                    <span aria-hidden className="inline-block size-2.5 rounded-full border-[2px] border-current" />
+                                                    <span aria-hidden className="ofi-inv-state__ring" />
                                                 )}
                                                 {cancelled ? t('billing.groupCancelled') : paid ? t('billing.groupPaid') : t('billing.groupOpen')}
                                             </span>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-1.5">
+                                        <td className="whitespace-nowrap">
                                             {cancelled ? (
                                                 /* Storniert: yalnızca kalıcı silme (çöp kutusu). */
-                                                <div className="flex items-center justify-end">
+                                                <div className="ofi-inv-glyphs">
                                                     <button
                                                         type="button"
-                                                        className={`${iconBtn} rounded-md hover:!text-red-600`}
+                                                        className="ofi-inv-glyph is-danger"
                                                         title={t('billing.deleteForever')}
                                                         disabled={busyId === invoice.id}
                                                         onClick={() => void removeForever(invoice)}
                                                     >
-                                                        <Trash01 size={13} />
+                                                        <Trash01 size={16} />
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center justify-end gap-1.5">
-                                                    {/* Vorschau / PDF: küçük çizgi ikonlar yerine BELİRGİN
-                                                        renkli görseller (kullanıcı isteği). */}
-                                                    <button type="button" className={`${assetBtn} text-[#272f67] dark:text-white`} title={t('billing.previewBtn')} aria-label={t('billing.previewBtn')} disabled={busyId === invoice.id} onClick={() => void preview(invoice)}>
-                                                        <Eye size={28} strokeWidth={1.8} />
+                                                <div className="ofi-inv-glyphs">
+                                                    {/* Vorschau / PDF / Mail — die drei Symbole
+                                                        des Dokuments, gleich gross und ruhig;
+                                                        die Farbe unterscheidet sie. */}
+                                                    <button type="button" className="ofi-inv-glyph is-accent" title={t('billing.previewBtn')} aria-label={t('billing.previewBtn')} disabled={busyId === invoice.id} onClick={() => void preview(invoice)}>
+                                                        <Eye size={17} strokeWidth={1.8} />
                                                     </button>
-                                                    <button type="button" className={`${assetBtn} text-red-600 dark:text-red-400`} title={t('billing.downloadBtn')} aria-label={t('billing.downloadBtn')} disabled={busyId === invoice.id} onClick={() => void download(invoice)}>
-                                                        <FileDownload02 size={28} strokeWidth={1.8} />
+                                                    <button type="button" className="ofi-inv-glyph is-pdf" title={t('billing.downloadBtn')} aria-label={t('billing.downloadBtn')} disabled={busyId === invoice.id} onClick={() => void download(invoice)}>
+                                                        <FileDownload02 size={17} strokeWidth={1.8} />
+                                                    </button>
+                                                    <button type="button" className="ofi-inv-glyph is-accent" title={t('mail.invoice.sendBtn')} aria-label={t('mail.invoice.sendBtn')} disabled={busyId === invoice.id} onClick={() => void sendByMail(invoice)}>
+                                                        <Send01 size={17} strokeWidth={1.8} />
                                                     </button>
                                                     {stages && stages.length > 0 && planLine && (
-                                                        <button type="button" className={`${iconBtn} rounded-md`} title={t('billing.paymentPlan')} onClick={() => setPlanFor(planLine)}>
-                                                            <InfoCircle size={13} />
+                                                        <button type="button" className="ofi-inv-glyph" title={t('billing.paymentPlan')} onClick={() => setPlanFor(planLine)}>
+                                                            <InfoCircle size={16} />
                                                         </button>
                                                     )}
                                                     {!paid && (
                                                         <>
-                                                            <button type="button" className={`${iconBtn} rounded-md hover:!text-emerald-600`} title={t('billing.markPaid')} disabled={busyId === invoice.id} onClick={() => void setStatus(invoice, 'PAID')}>
-                                                                <Check size={13} strokeWidth={2.5} />
+                                                            <button type="button" className="ofi-inv-glyph is-ok" title={t('billing.markPaid')} disabled={busyId === invoice.id} onClick={() => void setStatus(invoice, 'PAID')}>
+                                                                <Check size={16} strokeWidth={2.5} />
                                                             </button>
-                                                            <button type="button" className={`${iconBtn} rounded-md`} title={t('crm.invoiceCancel')} disabled={busyId === invoice.id} onClick={() => void setStatus(invoice, 'CANCELLED')}>
-                                                                <X size={13} />
+                                                            <button type="button" className="ofi-inv-glyph is-danger" title={t('crm.invoiceCancel')} disabled={busyId === invoice.id} onClick={() => void setStatus(invoice, 'CANCELLED')}>
+                                                                <X size={16} />
                                                             </button>
                                                         </>
                                                     )}
@@ -844,27 +908,23 @@ export const OrderBillingSection = ({
                             ])}
                         </tbody>
                     </table>
-                    </div>
                 </div>
-            </BottomSheet>
+            </InvoicePopup>
 
             {/* PDF önizleme popup'ı — YALNIZCA kesilmiş bir faturanın göz
                 ikonundan açılır; faturalama artık popup açmaz. */}
-            <BottomSheet
+            <InvoicePopup
                 open={previewUrl !== null}
                 title={previewInvoice?.invoiceNumber || t('billing.previewBtn')}
                 subtitle={previewInvoice ? t(`billing.kind_${(previewInvoice.kind || 'RECHNUNG') as InvoiceKind}`) : undefined}
                 onClose={releasePreview}
-                width={920}
-                height={760}
-                zIndex={88}
+                size="compact"
+                fill
             >
-                <div className="min-h-0 flex-1 p-3">
-                    {previewUrl && (
-                        <iframe title={t('billing.previewBtn')} src={previewUrl} className="size-full rounded-lg border border-slate-200 dark:border-white/10" />
-                    )}
-                </div>
-            </BottomSheet>
+                {previewUrl && (
+                    <iframe title={t('billing.previewBtn')} src={previewUrl} className="ofi-inv-frame" />
+                )}
+            </InvoicePopup>
 
             <PaymentPlanSheet
                 open={activePlanLine !== null}

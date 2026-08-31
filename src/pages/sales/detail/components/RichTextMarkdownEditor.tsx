@@ -252,6 +252,16 @@ export const RichTextMarkdownEditor: React.FC<{
     // Last value we emitted: matching parent updates must not reset the DOM and
     // drop the caret.
     const lastEmitted = useRef<string | null>(null);
+    // Latest user-edited HTML. The unmount flush below reads it because the
+    // editable DOM node is already detached from the ref by the time the
+    // cleanup runs.
+    const dirtyHtmlRef = useRef<string | null>(null);
+    const valueRef = useRef(value);
+    const onChangeRef = useRef(onChange);
+    useEffect(() => {
+        valueRef.current = value;
+        onChangeRef.current = onChange;
+    }, [value, onChange]);
     const [isEmpty, setIsEmpty] = useState(true);
     const [focused, setFocused] = useState(false);
     const [active, setActive] = useState<ActiveState>(EMPTY_ACTIVE);
@@ -310,14 +320,23 @@ export const RichTextMarkdownEditor: React.FC<{
     // Keep typing and keyboard shortcuts independent from potentially heavy
     // parent form renders. The editable DOM updates immediately; state follows
     // after the user pauses very briefly, and blur always flushes it.
+    // commitOnBlur editors also commit on an idle pause, only slower: text that
+    // existed solely in the editable DOM was invisible to the dirty flag, so the
+    // Save button stayed disabled and the exit guards stayed unarmed while the
+    // user was still inside the field — a refresh or close at that moment lost
+    // the whole entry.
     const scheduleEmit = useCallback(() => {
         syncEmpty();
-        if (commitOnBlur) return;
+        // Every user mutation (typing, paste, toolbar command) passes through
+        // here — snapshot it for the unmount flush. External value adoption
+        // deliberately does not, so untouched editors never emit on unmount.
+        const el = editorRef.current;
+        if (el) dirtyHtmlRef.current = normalizeEmptyHtml(el.innerHTML);
         if (pendingEmitRef.current !== null) window.clearTimeout(pendingEmitRef.current);
         pendingEmitRef.current = window.setTimeout(() => {
             pendingEmitRef.current = null;
-            emit();
-        }, 90);
+            emit(true);
+        }, commitOnBlur ? 600 : 90);
     }, [commitOnBlur, emit, syncEmpty]);
 
     const flushEmit = useCallback(() => {
@@ -328,8 +347,15 @@ export const RichTextMarkdownEditor: React.FC<{
         emit(true);
     }, [emit]);
 
+    // Unmount safety net: the editor can be unmounted before its blur commit
+    // ran (row collapse, tab switch, navigation) or while a debounced emit is
+    // still pending. Whatever the user last typed must still reach the parent.
     useEffect(() => () => {
         if (pendingEmitRef.current !== null) window.clearTimeout(pendingEmitRef.current);
+        const html = dirtyHtmlRef.current;
+        if (html === null || html === lastEmitted.current || html === valueRef.current) return;
+        lastEmitted.current = html;
+        onChangeRef.current(html);
     }, []);
 
     const refreshActiveStates = useCallback(() => {

@@ -42,7 +42,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewTask }) => {
             labelKey: 'crmOverview.quick.newOffer',
             defaultLabel: 'Yeni Teklif',
             icon: Briefcase01,
-            onClick: () => navigate('/crm/tenders/new'),
+            onClick: () => navigate('/sales/quotes/new'),
         },
         {
             id: 'task',
@@ -56,7 +56,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewTask }) => {
             labelKey: 'crmOverview.quick.newOrder',
             defaultLabel: 'Yeni Sipariş',
             icon: ShoppingCart01,
-            onClick: () => navigate('/crm/my-orders'),
+            onClick: () => navigate('/sales/orders'),
         },
     ];
 

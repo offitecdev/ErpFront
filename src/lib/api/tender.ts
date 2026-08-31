@@ -163,6 +163,13 @@ export const tenderApi = {
         commissionNumber?: string | null;
         /** Kundenreferenz — "Referenz" on the offer PDF. */
         customerReference?: string | null;
+        /* ── Kundenangaben NUR dieser Offerte (05.09.2026) ──────────────────
+           Name / E-Mail / Adresse von Hand: ohne CRM-Kunden tragen sie die
+           Offerte allein, mit CRM-Kunden sind sie die hier geltende Abweichung.
+           Im Kundenstamm wird davon NICHTS gespeichert. */
+        manualCustomerName?: string | null;
+        manualCustomerEmail?: string | null;
+        manualCustomerAddress?: string | null;
         priceList?: string | null;
         currency?: string | null;
         directDiscount?: number | null;
@@ -290,6 +297,15 @@ export const tenderApi = {
 
     createVersion: async (id: string): Promise<{ message: string; tender: TenderListItem }> => {
         const res = await apiClient.post(`/tenders/${id}/version`);
+        return res.data;
+    },
+
+    /**
+     * Kopie der Offerte — ein EIGENER Beleg (frische AN-Nummer, Version 1,
+     * Entwurf), nicht die naechste Version derselben Nummer.
+     */
+    duplicate: async (id: string): Promise<{ message: string; tender: TenderListItem }> => {
+        const res = await apiClient.post(`/tenders/${id}/duplicate`);
         return res.data;
     },
 

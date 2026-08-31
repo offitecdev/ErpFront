@@ -10,12 +10,12 @@ import { useColumnWidths } from '../../hooks/useColumnWidths';
 import { tenderApi } from '../../lib/api/tender';
 import type { ProjectDto } from '../../types/project';
 import type { TenderDetailDto } from '../../types/tender';
-import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
-import { DEFAULT_VAT } from '../tender/detail/utils/tenderDetail.constants';
-import { buildSimpleTenderLines } from '../tender/detail/utils/tenderLine.utils';
-import { lineNetTotal } from '../tender/detail/utils/tenderCalculation.utils';
-import { computeTenderPricingSummary, formatDiscountPercent } from '../tender/detail/utils/tenderPricing.utils';
-import { discountDisplayName, seedTotalDiscounts } from '../tender/detail/utils/tenderDiscounts.utils';
+import { usePdfSettings } from '../../store/pdfSettingsStore';
+import { DEFAULT_VAT } from '../sales/detail/utils/tenderDetail.constants';
+import { buildSimpleTenderLines } from '../sales/detail/utils/tenderLine.utils';
+import { lineNetTotal } from '../sales/detail/utils/tenderCalculation.utils';
+import { computeTenderPricingSummary, formatDiscountPercent } from '../sales/detail/utils/tenderPricing.utils';
+import { discountDisplayName, seedTotalDiscounts } from '../sales/detail/utils/tenderDiscounts.utils';
 import { formatMoney, toCurrencyCode } from '../../utils/currency';
 
 import { t } from '@/i18n/translate';
@@ -45,7 +45,7 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
         const id = project.tenderId || project.tender?.id;
         return id ? detailCache.get(id) : undefined;
     });
-    const { settings: pdfSettings } = usePdfSettingsStore();
+    const pdfSettings = usePdfSettings();
     const fallbackTaxRate = pdfSettings.vatRate ?? DEFAULT_VAT;
 
     const tenderId = project.tenderId || project.tender?.id || null;

@@ -1,16 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ChevronRight,
     ChevronDown,
     DotsVertical,
-    SearchLg as SearchOutlined,
     XClose as CloseOutlined,
 } from '../icons/antIconCompat';
 import { hrefFor, isModifiedClick } from '../../lib/navLink';
 
 /* ── Shared menu types (also consumed by MainLayout) ── */
-export type MenuLeaf = { key: string; label: string; permission?: string; module?: string };
+export type MenuLeaf = {
+    key: string;
+    label: string;
+    permission?: string;
+    module?: string;
+    /** Eigenes Zeichen vor dem Namen — z. B. das Outlook-Zeichen bei E-Mail. */
+    icon?: (props: { size?: number; className?: string }) => React.JSX.Element;
+};
 export type MenuIcon = React.ComponentType<any>;
 export type MenuSection =
     | { type: 'single'; key: string; path: string; label: string; icon: MenuIcon; feature?: 'projects' }
@@ -24,7 +29,9 @@ export type QuickCreateItem = {
 };
 
 /* The shell card geometry — MainLayout derives `--app-shell-inset` and the
-   content spacer from these, keep them in sync with its comments. */
+   content spacer from these, keep them in sync with its comments.
+   Der Inhalt richtet sich IMMER an der schmalen Leiste aus: das Untermenü
+   legt sich beim Zeigen darüber, es schiebt die Seite nie zur Seite. */
 export const SIDEBAR_RAIL_WIDTH = 84;
 export const SIDEBAR_PANEL_WIDTH = 232;
 const HEADER_HEIGHT = 64; // matches the fixed header (h-16)
@@ -51,9 +58,10 @@ const PANEL_BG = 'bg-[#FBFBFA] dark:bg-[#151616]';
 
 /* Desktop rail module button (large icon + caption). */
 const RAIL_BTN_IDLE = 'text-black/75 hover:bg-black/4 hover:text-[#1f2654] dark:text-white/75 dark:hover:bg-white/6 dark:hover:text-white';
-/* The rail now sits on the same canvas as the page, so the selected module
-   lifts off it as a white chip instead of the old near-white tint. */
-const RAIL_BTN_ACTIVE = 'bg-white text-[#272f67] shadow-[0_1px_2px_rgba(16,24,40,0.06)] dark:!bg-white/10 dark:text-[#e6cf9e] dark:shadow-none';
+/* Seit die Leiste WEISS ist (Vorgabe 28.08.2026), kann der gewählte Modul
+   nicht mehr als weisser Chip aus ihr heraustreten — er trägt denselben
+   blauen Auswahlton, den die Kopfleiste für ihre Knöpfe benutzt. */
+const RAIL_BTN_ACTIVE = 'bg-[#d3e3fd] text-[#1f2654] dark:!bg-white/10 dark:text-[#e6cf9e] dark:shadow-none';
 
 type AppSidebarProps = {
     /** Pre-filtered by MainLayout: company-category / personal module package
@@ -63,13 +71,7 @@ type AppSidebarProps = {
     permissions: string[];
     projectModuleEnabled: boolean;
     onNavigate: (path: string) => void;
-    /** Pinned-open state, controlled by MainLayout (persisted to localStorage). */
-    pinnedOpen: boolean;
-    /** Rail KİLİTLİ dar kalır (takvim + ana sayfa): hover paneli açılmaz,
-        pin tutamacı çizilmez. MainLayout bu sayfalarda pinnedOpen'ı da false yollar. */
-    lockCollapsed?: boolean;
-    onTogglePin: () => void;
-    onOpenSearch: () => void;
+    /** Rail KİLİTLİ dar kalır (takvim + ana sayfa): hover paneli hiç açılmaz. */
     quickCreateItems: QuickCreateItem[];
     onQuickCreate: (item: QuickCreateItem) => void;
     /** Mobile drawer renders the always-expanded accordion (no rail / panel). */
@@ -79,10 +81,12 @@ type AppSidebarProps = {
 /**
  * The sidebar half of the white shell card. Desktop is a full-height narrow
  * rail — the fav icon on top, then one large icon + caption per module.
- * Hovering a module slides out a flush submenu panel beside the rail; the
- * chevron-in-a-square handle on the card's edge pins that panel open (then it
- * follows the active module). Clicking a module icon jumps straight to its
- * first submenu page. The rail itself never changes width.
+ * Hovering a module slides out a flush submenu panel beside the rail; that
+ * panel is ALWAYS an overlay — it floats over the page and disappears again
+ * when the pointer leaves. Es gibt kein Anheften mehr (Nutzerwunsch
+ * 16.08.2026): die Seite wird nie zur Seite geschoben, die Leiste bleibt
+ * immer schmal. Clicking a module icon jumps straight to its first submenu
+ * page.
  */
 export const AppSidebar: React.FC<AppSidebarProps> = ({
     sections,
@@ -90,10 +94,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     permissions,
     projectModuleEnabled,
     onNavigate,
-    pinnedOpen,
-    lockCollapsed = false,
-    onTogglePin,
-    onOpenSearch,
     quickCreateItems,
     onQuickCreate,
     variant = 'desktop',
@@ -108,13 +108,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     /* Tablets run the desktop rail (≥1024px) but have no pointer to hover with:
        there the submenu panel opens on TAP instead of hover-intent, and the
        edge handles grow to a finger-sized target. */
-    const [isTouch, setIsTouch] = useState(
-        () => typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches,
-    );
+    const [isTouch, setIsTouch] = useState(() => typeof window !== 'undefined' && (
+        navigator.maxTouchPoints > 0
+        || window.matchMedia('(hover: none)').matches
+        || window.matchMedia('(any-pointer: coarse)').matches
+    ));
+    // Some Elo Android panels advertise a hover-capable pointer even though the
+    // user is touching the screen. Keep the latest real pointer type in a ref so
+    // the very first tap already follows the tablet path (before React rerenders).
+    const touchInputRef = useRef(isTouch);
 
     const asideRef = useRef<HTMLElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
-    const handleRef = useRef<HTMLButtonElement>(null);
     const quickCreateRef = useRef<HTMLDivElement>(null);
     const openTimer = useRef<number | null>(null);
     const closeTimer = useRef<number | null>(null);
@@ -153,8 +158,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         if (closeTimer.current !== null) { window.clearTimeout(closeTimer.current); closeTimer.current = null; }
     };
     const scheduleOpen = (key: string) => {
-        // Kilitli rail'de hover paneli hiç açılmaz (takvim + ana sayfa).
-        if (lockCollapsed) return;
         cancelClose();
         cancelOpen();
         openTimer.current = window.setTimeout(() => setPanelKey(key), PANEL_OPEN_DELAY);
@@ -162,24 +165,41 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     const scheduleClose = () => {
         cancelOpen();
         cancelClose();
-        // Pinned panels never disappear — they just fall back to the active module.
         closeTimer.current = window.setTimeout(() => setPanelKey(null), PANEL_CLOSE_DELAY);
     };
     useEffect(() => () => { cancelOpen(); cancelClose(); }, []);
 
-    // A tablet can be docked to a mouse (and back) mid-session.
+    // A tablet can be docked to a mouse (and back) mid-session. Pointer events
+    // are authoritative; media queries are only the initial/fallback signal.
     useEffect(() => {
-        const mql = window.matchMedia('(hover: none)');
-        const onChange = (event: MediaQueryListEvent) => setIsTouch(event.matches);
-        mql.addEventListener('change', onChange);
-        return () => mql.removeEventListener('change', onChange);
+        const hoverMql = window.matchMedia('(hover: none)');
+        const coarseMql = window.matchMedia('(any-pointer: coarse)');
+        const syncCapabilities = () => {
+            const next = navigator.maxTouchPoints > 0 || hoverMql.matches || coarseMql.matches;
+            touchInputRef.current = next;
+            setIsTouch(next);
+        };
+        const onPointerDown = (event: PointerEvent) => {
+            const next = event.pointerType === 'touch' || event.pointerType === 'pen';
+            touchInputRef.current = next;
+            setIsTouch(next);
+            if (next) {
+                // Cancel a synthetic mouseenter timer fired immediately before
+                // pointerdown by Android WebView.
+                cancelOpen();
+                cancelClose();
+            }
+        };
+
+        hoverMql.addEventListener('change', syncCapabilities);
+        coarseMql.addEventListener('change', syncCapabilities);
+        window.addEventListener('pointerdown', onPointerDown, true);
+        return () => {
+            hoverMql.removeEventListener('change', syncCapabilities);
+            coarseMql.removeEventListener('change', syncCapabilities);
+            window.removeEventListener('pointerdown', onPointerDown, true);
+        };
     }, []);
-
-    // Unpinning collapses the panel until the next hover.
-    useEffect(() => {
-        if (!pinnedOpen) setPanelKey(null);
-    }, [pinnedOpen]);
-
 
     // Mobile drawer: keep the active module's accordion open.
     useEffect(() => {
@@ -191,30 +211,28 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     // Dismiss the quick-create card on outside click / Escape (mobile drawer).
     useEffect(() => {
         if (!quickCreateOpen) return;
-        const onDown = (e: MouseEvent) => {
+        const onDown = (e: PointerEvent) => {
             if (quickCreateRef.current && !quickCreateRef.current.contains(e.target as Node)) setQuickCreateOpen(false);
         };
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setQuickCreateOpen(false); };
-        document.addEventListener('mousedown', onDown);
+        document.addEventListener('pointerdown', onDown);
         document.addEventListener('keydown', onKey);
-        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+        return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
     }, [quickCreateOpen]);
 
-    // Unpinned panel: dismiss on outside click / Escape.
+    // The flyout is an overlay: an outside click / Escape dismisses it.
     useEffect(() => {
-        if (pinnedOpen || !panelKey) return;
-        const onDown = (e: MouseEvent) => {
+        if (!panelKey) return;
+        const onDown = (e: PointerEvent) => {
             const target = e.target as Node;
-            const inside = asideRef.current?.contains(target)
-                || panelRef.current?.contains(target)
-                || handleRef.current?.contains(target);
+            const inside = asideRef.current?.contains(target) || panelRef.current?.contains(target);
             if (!inside) setPanelKey(null);
         };
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPanelKey(null); };
-        document.addEventListener('mousedown', onDown);
+        document.addEventListener('pointerdown', onDown);
         document.addEventListener('keydown', onKey);
-        return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-    }, [pinnedOpen, panelKey]);
+        return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
+    }, [panelKey]);
 
     // Navigation clears transient panels; the pinned panel then follows the route.
     const go = (path: string) => {
@@ -224,10 +242,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         onNavigate(path);
     };
 
-    /* Pinned with nothing hovered → show the active module's submenu.
-       Kilitli rail'de panel HİÇ çözülmez (hover/tap zaten kapalı; bu, kalan
-       kenar durumları da örter — efektle temizlemeye gerek kalmaz). */
-    const resolvedPanelKey = lockCollapsed ? null : (panelKey ?? (pinnedOpen ? activeGroupKey : null));
+    /* Nur was gerade gezeigt wird, steht offen — ohne Zeiger kein Untermenü.
+       DAS UNTERMENÜ HÄNGT AM EINTRAG, NICHT AN DER SEITE (Vorgabe
+       28.08.2026): «für Startseite und Kalender soll es nicht aufgehen, für
+       die anderen schon». Startseite und Kalender sind `single`-Einträge und
+       haben ohnehin kein Untermenü — gesperrt war bis dahin die ganze SEITE
+       (`lockCollapsed`, 07.08.2026), sodass dort auch CRM oder Verkauf stumm
+       blieben. Diese Sperre ist weg. */
+    const resolvedPanelKey = panelKey;
     const panelData = resolvedPanelKey ? items.find((i) => i.section.key === resolvedPanelKey) : null;
     const panelVisible = !isMobile && !!panelData && panelData.section.type === 'group';
 
@@ -235,17 +257,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     if (isMobile) {
         const topSection = (
             <div className="px-2 pt-2 pb-1.5">
-                <button
-                    type="button"
-                    onClick={onOpenSearch}
-                    className="flex min-h-11 w-full items-center gap-2.5 rounded-lg bg-black/6 px-3 py-2.5 text-black/80 transition-colors hover:bg-black/10 hover:text-black dark:bg-white/8 dark:text-white/85 dark:hover:bg-white/12 dark:hover:text-white"
-                >
-                    <SearchOutlined size={19} className={`shrink-0 ${ICON_IDLE}`} />
-                    <span className="text-[14px] font-medium">{t('nav.search')}</span>
-                </button>
-
+                {/* Die Lupe stand hier (11.09.2026, Vorgabe Samet: «Entfernt die
+                    Lupe aus dem Kopf»). Sie öffnete ein Suchfeld über der
+                    ganzen Seite, das nur die MODULE durchsuchte — dasselbe, was
+                    die Schublade darunter ohnehin auflistet. Geblieben ist der
+                    Schnellzugriff; die Programme stehen im Apps-Feld im Kopf. */}
                 {/* Quick-access bar: three-dot opens the quick-create card */}
-                <div ref={quickCreateRef} className="relative mt-1.5">
+                <div ref={quickCreateRef} className="relative">
                     <button
                         type="button"
                         aria-haspopup="menu"
@@ -336,7 +354,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go(child.key); }}
                                                         className={`flex min-h-10 items-center gap-2.5 rounded-lg py-2 pl-3 pr-2 text-left text-[14px] transition-colors duration-100 ${active ? `${ROW_ACTIVE} font-semibold` : `${ROW_IDLE} font-medium`}`}
                                                     >
-                                                        <span className={`size-1.5 shrink-0 rounded-full ${active ? DOT_ACTIVE : DOT_IDLE}`} />
+                                                        {child.icon
+                                                            ? <child.icon size={16} className="shrink-0" />
+                                                            : <span className={`size-1.5 shrink-0 rounded-full ${active ? DOT_ACTIVE : DOT_IDLE}`} />}
                                                         <span className="truncate">{t(child.label)}</span>
                                                     </a>
                                                 );
@@ -353,10 +373,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     }
 
     /* ══════════ Desktop — icon rail + flush submenu panel ══════════ */
-    /* On touch the pin handle grows from 26 to 40px (a finger target), so the
-       offset that centres it on the card edge grows with it. */
-    const handleSize = isTouch ? 40 : 26;
-    const handleLeft = (panelVisible ? SIDEBAR_RAIL_WIDTH + SIDEBAR_PANEL_WIDTH : SIDEBAR_RAIL_WIDTH) - handleSize / 2;
     /* Hover-intent timers belong to a pointer. On touch the tap opens the
        panel and an outside tap (or the close button) dismisses it — letting
        the emulated mouseleave run would snatch the panel away mid-tap. */
@@ -369,9 +385,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             <aside
                 ref={asideRef}
                 {...hoverProps}
-                className="hidden bg-[#f6f8fb] lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[84px] lg:flex-col"
+                /* `ofi-fade`: die Leiste blendet beim Start einmal ein — der
+                   ruhige Auftakt der Anmeldeseite, weitergetragen. */
+                className="ofi-fade ofi-shell-white hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[84px] lg:flex-col"
             >
-                {/* Brand icon — same height as the header so the card corner is seamless. */}
+                {/* Brand icon — same height as the header so the card corner is
+                    seamless. Das Zeichen bleibt das Zeichen (Vorgabe 28.08.2026):
+                    den Rückweg trägt der Blitz gleich rechts daneben in der
+                    Kopfleiste, nicht die Marke (siehe QuickBackButton). */}
                 <a
                     href={hrefFor('/')}
                     aria-label="Offitec"
@@ -405,7 +426,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         // flyout stays reachable by finger. Single pages
                                         // have no submenu and navigate straight away.
                                         // Kilitli rail'de dokunuş da panel açmaz — direkt gider.
-                                        if (isTouch && !isSingle && !lockCollapsed) {
+                                        if (touchInputRef.current && !isSingle) {
                                             cancelOpen();
                                             cancelClose();
                                             setPanelKey((current) => (current === section.key ? null : section.key));
@@ -413,7 +434,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         }
                                         go(target);
                                     }}
-                                    onMouseEnter={() => { if (isTouch) return; if (!isSingle) scheduleOpen(section.key); else cancelOpen(); }}
+                                    onMouseEnter={() => { if (touchInputRef.current) return; if (!isSingle) scheduleOpen(section.key); else cancelOpen(); }}
                                     onMouseLeave={cancelOpen}
                                     className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
                                 >
@@ -433,28 +454,26 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 <div
                     ref={panelRef}
                     id="oi-sidebar-panel"
-                    style={{ left: SIDEBAR_RAIL_WIDTH, top: HEADER_HEIGHT }}
+                    style={{ left: SIDEBAR_RAIL_WIDTH, top: HEADER_HEIGHT, width: SIDEBAR_PANEL_WIDTH }}
                     {...hoverProps}
-                    className={`fixed bottom-0 z-[45] hidden w-[232px] flex-col border-l border-black/5 bg-[#f6f8fb] dark:border-white/8 lg:flex ${pinnedOpen
-                        ? ''
-                        : 'shadow-[28px_0_56px_-28px_rgba(16,24,40,0.25)] dark:shadow-[28px_0_56px_-28px_rgba(0,0,0,0.8)] animate-in fade-in slide-in-from-left-2 duration-150'}`}
+                    /* Immer schwebend: Schatten + Einblenden, weil die Seite
+                       darunter stehen bleibt. */
+                    className="ofi-shell-white fixed bottom-0 z-[45] hidden flex-col border-l border-black/5 shadow-[28px_0_56px_-28px_rgba(16,24,40,0.25)] animate-in fade-in slide-in-from-left-2 duration-150 dark:border-white/8 dark:shadow-[28px_0_56px_-28px_rgba(0,0,0,0.8)] lg:flex"
                 >
                     {/* The panel butts straight against the header (top = 64px), so
                         the title starts tight — extra top padding read as a gap. */}
                     <div className="flex items-center justify-between pb-1 pl-5 pr-3 pt-2">
-                        <h2 className="truncate text-[14px] font-bold tracking-tight text-black dark:text-white">
+                        <h2 className="ofi-serif truncate text-[15px] font-bold tracking-tight text-black dark:text-white">
                             {t(panelData.section.label)}
                         </h2>
-                        {!pinnedOpen && (
-                            <button
-                                type="button"
-                                aria-label={t('common.close')}
-                                onClick={() => setPanelKey(null)}
-                                className="flex size-7 items-center justify-center rounded-lg text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/50 dark:hover:bg-white/8 dark:hover:text-white"
-                            >
-                                <CloseOutlined size={15} />
-                            </button>
-                        )}
+                        <button
+                            type="button"
+                            aria-label={t('common.close')}
+                            onClick={() => setPanelKey(null)}
+                            className="flex size-7 items-center justify-center rounded-lg text-black/45 transition-colors hover:bg-black/5 hover:text-black dark:text-white/50 dark:hover:bg-white/8 dark:hover:text-white"
+                        >
+                            <CloseOutlined size={15} />
+                        </button>
                     </div>
                     <div className="flex-1 overflow-y-auto px-3 pb-4 pt-1">
                         <div className="flex flex-col gap-1">
@@ -469,6 +488,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                             ? 'bg-[#272f67] text-white shadow-[0_10px_24px_-12px_rgba(39,47,103,0.55)]'
                                             : 'text-black/80 hover:translate-x-[3px] hover:bg-[#eef1fa] hover:text-[#1f2654] dark:text-white/80 dark:hover:bg-white/8 dark:hover:text-white'}`}
                                     >
+                                        {child.icon && <child.icon size={16} className="mr-2.5 shrink-0" />}
                                         <span className="truncate">{t(child.label)}</span>
                                     </a>
                                 );
@@ -478,22 +498,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 </div>
             )}
 
-            {/* Pin handle — the chevron-in-a-square riding the card's edge.
-                Kilitli rail'de çizilmez: pin bu sayfalarda genişletemez, ölü
-                bir düğme bırakmak kafa karıştırırdı. */}
-            {!lockCollapsed && <button
-                ref={handleRef}
-                type="button"
-                aria-label={pinnedOpen ? t('nav.sidebarCollapse') : t('nav.sidebarPin')}
-                aria-pressed={pinnedOpen}
-                title={pinnedOpen ? t('nav.sidebarCollapse') : t('nav.sidebarPin')}
-                onClick={onTogglePin}
-                {...hoverProps}
-                style={{ left: handleLeft, width: handleSize, height: handleSize }}
-                className="fixed top-1/2 z-[55] hidden -translate-y-1/2 items-center justify-center rounded-lg border border-black/8 bg-white text-black/50 shadow-[0_2px_8px_rgba(16,24,40,0.12)] transition-[left,color,background-color] duration-200 hover:text-[#272f67] dark:border-white/12 dark:text-[#e6cf9e]/80 dark:hover:text-[#f0dcae] lg:flex"
-            >
-                <ChevronRight size={isTouch ? 18 : 15} className={`transition-transform duration-200 ${pinnedOpen ? 'rotate-180' : ''}`} />
-            </button>}
+            {/* Kein Anheft-Griff mehr (16.08.2026): das Untermenü öffnet nur
+                beim Zeigen und legt sich über die Seite — sie rückt nie zur
+                Seite. */}
         </>
     );
 };

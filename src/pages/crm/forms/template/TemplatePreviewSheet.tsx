@@ -34,7 +34,7 @@ export const TemplatePreviewSheet = ({
             onClose={onClose}
             width={820}
             height={800}
-            zIndex={120}
+            zIndex={800}
             headerActions={(
                 <button type="button" className={BTN_SECONDARY} onClick={() => setValues({})}>
                     <X size={13} />{t('forms.builder.resetPreview')}

@@ -1,11 +1,16 @@
 import { memo } from 'react';
 import dayjs from 'dayjs';
 
-import { SectionCard } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import type { DeliveryReportDto } from '@/lib/api/project';
 
+import type { ProjectDetailView } from '../../../../types/projectDetailNavigation';
+import { CardLink } from './CardLink';
+import { linkRow } from './linkRow';
+import { OverviewCard } from './OverviewCard';
 import { Chip } from './overviewChips';
+
+const DELIVERY: ProjectDetailView = { section: 'field', subSection: 'delivery' };
 
 /**
  * The small box under the add-on orders: does this order have a delivery report,
@@ -16,8 +21,14 @@ import { Chip } from './overviewChips';
  * parent, and the reports section is not even offered for it (see
  * `ProjectSectionRenderer`). Listing add-ons here would ask a question that
  * cannot have an answer.
+ *
+ * Alle drei Zeilen führen zum Übergabe-Rapport selbst — hier steht die Frage,
+ * dort steht die Antwort (und das Fehlende lässt sich dort nachholen).
  */
-export const DeliveryStatusBox = memo(({ reports }: { reports: DeliveryReportDto[] }) => {
+export const DeliveryStatusBox = memo(({ reports, onNavigate }: {
+    reports: DeliveryReportDto[];
+    onNavigate: (view: ProjectDetailView) => void;
+}) => {
     const exists = reports.length > 0;
     const signed = reports.some((report) => report.isSigned);
     // The newest report is the one that speaks for the order.
@@ -25,30 +36,32 @@ export const DeliveryStatusBox = memo(({ reports }: { reports: DeliveryReportDto
         .map((report) => report.createdAt)
         .sort((a, b) => dayjs(b).valueOf() - dayjs(a).valueOf())[0];
 
+    const yesNoText = (value: boolean) => (value ? t('common.yes') : t('common.no'));
     const yesNo = (value: boolean) => (
-        <Chip tone={value ? 'active' : 'passive'}>{value ? t('common.yes') : t('common.no')}</Chip>
+        <Chip tone={value ? 'active' : 'passive'}>{yesNoText(value)}</Chip>
     );
+    const shownDate = latest ? dayjs(latest).format('DD.MM.YYYY') : '-';
+    const open = () => onNavigate(DELIVERY);
+    const title = t('projects.detail.overview.deliveryTitle');
 
     return (
-        <SectionCard title={t('projects.detail.overview.deliveryTitle')}>
-            <table data-inv-table data-grid-lines data-unstyled-table className="ofi-compact-table w-full">
+        <OverviewCard title={title} action={<CardLink label={title} onOpen={open} />}>
+            <table data-inv-table data-unstyled-table data-no-col-resize className="w-full">
                 <tbody>
-                    <tr>
-                        <td className="text-[13px] text-slate-500 dark:text-white/60">{t('projects.flow.deliveryReport')}</td>
+                    <tr {...linkRow(open, `${t('projects.flow.deliveryReport')}: ${yesNoText(exists)}`)}>
+                        <td className="ofi-prj-key">{t('projects.flow.deliveryReport')}</td>
                         <td className="text-right">{yesNo(exists)}</td>
                     </tr>
-                    <tr>
-                        <td className="text-[13px] text-slate-500 dark:text-white/60">{t('projects.detail.overview.signed')}</td>
+                    <tr {...linkRow(open, `${t('projects.detail.overview.signed')}: ${yesNoText(signed)}`)}>
+                        <td className="ofi-prj-key">{t('projects.detail.overview.signed')}</td>
                         <td className="text-right">{yesNo(signed)}</td>
                     </tr>
-                    <tr>
-                        <td className="text-[13px] text-slate-500 dark:text-white/60">{t('common.date')}</td>
-                        <td className="whitespace-nowrap text-right font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
-                            {latest ? dayjs(latest).format('DD.MM.YYYY') : '-'}
-                        </td>
+                    <tr {...linkRow(open, `${t('common.date')}: ${shownDate}`)}>
+                        <td className="ofi-prj-key">{t('common.date')}</td>
+                        <td className="ofi-prj-num">{shownDate}</td>
                     </tr>
                 </tbody>
             </table>
-        </SectionCard>
+        </OverviewCard>
     );
 });

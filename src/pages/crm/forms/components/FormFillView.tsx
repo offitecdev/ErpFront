@@ -341,7 +341,7 @@ export const FormFillView = ({
             {linkOpen && (
                 <ChecklistLinkSheet
                     open
-                    z={150}
+                    z={900}
                     submitLabel={t('forms.link.save')}
                     busy={linking}
                     initial={presetsFromLinks(submission.links || [])}

@@ -16,6 +16,7 @@
  * Auf einem Tablet ohne Kamera ist das oft der einzige Weg.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatCameraError } from '@/lib/cameraError';
 
 export type ScannerState = 'starting' | 'running' | 'error';
 
@@ -37,6 +38,7 @@ export const useQrScanner = ({
     listenKeyboard = true,
 }: Options) => {
     const [state, setState] = useState<ScannerState>('starting');
+    const [errorDetails, setErrorDetails] = useState('');
     const [busy, setBusy] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -74,6 +76,7 @@ export const useQrScanner = ({
 
         let alive = true;
         let instance: { stop: () => Promise<void>; clear: () => void; isScanning?: boolean } | null = null;
+        setErrorDetails('');
 
         // `html5-qrcode` wiegt einige hundert Kilobyte; erst hier nachladen,
         // damit es keine andere Seite des Bündels belastet.
@@ -84,14 +87,17 @@ export const useQrScanner = ({
                 const scanner = new Html5Qrcode(element.id, false);
                 instance = scanner as unknown as typeof instance;
                 await scanner.start(
-                    { facingMode: 'environment' },
+                    { facingMode: { exact: 'user' } },
                     { fps: 12, aspectRatio: 1 },
                     (decoded) => { void handle(decoded); },
                     () => { /* kein Fund in diesem Einzelbild — normal */ },
                 );
                 if (alive) setState('running');
-            } catch {
-                if (alive) setState('error');
+            } catch (error) {
+                if (alive) {
+                    setErrorDetails(formatCameraError(error));
+                    setState('error');
+                }
             }
         })();
 
@@ -136,5 +142,5 @@ export const useQrScanner = ({
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [active, listenKeyboard, handle]);
 
-    return { containerRef, state, busy, submit: handle };
+    return { containerRef, state, errorDetails, busy, submit: handle };
 };

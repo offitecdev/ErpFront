@@ -1,3 +1,7 @@
+/* RETIRED 18.08.2026 — the project's appointment section is the calendar page
+   now (see booking/AppointmentList.tsx). Kept for reference only: nothing
+   imports this file any more.
+   ------------------------------------------------------------------------ */
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 
@@ -204,7 +208,7 @@ export const DayPopup = ({
                                 <tr>
                                     <th className="relative text-left">
                                         {t('projects.schedule.time')}
-                                        <ColResizeHandle {...grid.resizeProps('time', 'right')} />
+                                        <ColResizeHandle {...grid.resizeProps('time')} />
                                     </th>
                                     <th className="text-left">{t('projects.schedule.customer')}</th>
                                     <th className="relative text-left">

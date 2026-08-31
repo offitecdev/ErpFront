@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, User01, XClose } from '@/components/icons/antIconCompat';
+import { Edit01, Plus, User01, XClose } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 import { QUOTE_CONTROL_CLASS } from '../../utils/quoteField.constants';
@@ -14,9 +14,16 @@ type TenderCustomerSectionProps = {
     loadingFlashLabel: string;
     dropdownVisible: boolean;
     customers: CustomerOption[];
+    /** Der Name, den die Offerte HEUTE trägt — ein unveränderter Text beim
+        Verlassen des Feldes wird nicht erneut als freie Erfassung gebucht. */
+    committedName: string;
     onSelectCustomer: (customer: CustomerOption) => void;
     onClearCustomer: () => void;
     onAddCustomer: () => void;
+    /** Übernimmt den eingetippten Namen als Kundschaft NUR dieser Offerte. */
+    onUseManualCustomer: (name: string) => void;
+    /** Öffnet die Kundenangaben der Offerte (Name / E-Mail / Adresse). */
+    onEditCustomerData: () => void;
     /** Öffnet die Kunden-/CC-Karte; fehlt, solange keine Kundschaft gewählt ist. */
     onOpenInfo?: () => void;
 };
@@ -29,6 +36,13 @@ type TenderCustomerSectionProps = {
  *
  * The list is portalled (AnchoredPopup) rather than absolutely positioned inside
  * the field, so it floats over the card instead of being clipped by it.
+ *
+ * FREIE ERFASSUNG (Benutzerwunsch): Das Feld IST die freie Eingabe. Was
+ * getippt dasteht, wird beim Verlassen des Feldes (oder mit Enter) direkt der
+ * Name der Kundschaft DIESER Offerte — ohne eigenen "«…» frei übernehmen"-
+ * Eintrag in der Liste und ohne dass im CRM irgendetwas angelegt wird. Die
+ * Liste zeigt weiterhin die CRM-Treffer; ein Klick darauf verknüpft wie bisher
+ * den bestehenden Kunden.
  */
 export const TenderCustomerSection = ({
     query,
@@ -38,12 +52,23 @@ export const TenderCustomerSection = ({
     loadingFlashLabel,
     dropdownVisible,
     customers,
+    committedName,
     onSelectCustomer,
     onClearCustomer,
     onAddCustomer,
+    onUseManualCustomer,
+    onEditCustomerData,
     onOpenInfo,
 }: TenderCustomerSectionProps) => {
     const [fieldEl, setFieldEl] = useState<HTMLDivElement | null>(null);
+    const typed = query.trim();
+    // Der getippte Text wird direkt zum Namen der Offerte — aber nur, wenn er
+    // sich wirklich geändert hat: ein unverändertes Feld darf einen verknüpften
+    // CRM-Kunden nicht stillschweigend in eine freie Erfassung verwandeln.
+    const commitTyped = () => {
+        if (!typed || typed === committedName.trim()) return;
+        onUseManualCustomer(typed);
+    };
 
     return (
         <div className="flex items-start gap-1.5">
@@ -60,7 +85,22 @@ export const TenderCustomerSection = ({
                     // the input already holds focus (e.g. right after selecting a
                     // customer) — onFocus alone wouldn't fire again in that case.
                     onClick={() => onOpenChange(true)}
-                    onBlur={() => window.setTimeout(() => onOpenChange(false), 120)}
+                    // Verlassen des Feldes = freie Übernahme des Getippten. Das
+                    // Übernehmen passiert SOFORT (nicht im Timeout), damit ein
+                    // direkt folgender Klick auf "Speichern" den Namen noch
+                    // mitnimmt; nur das Schliessen der Liste wartet, damit ein
+                    // Klick auf einen Treffer nicht ins Leere geht.
+                    onBlur={() => {
+                        commitTyped();
+                        window.setTimeout(() => onOpenChange(false), 120);
+                    }}
+                    // Eingabe bestätigen = den getippten Namen frei übernehmen.
+                    onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return;
+                        event.preventDefault();
+                        commitTyped();
+                        onOpenChange(false);
+                    }}
                     placeholder={loading ? t('tenders.musteriler_loading') : t('tenders.customer_adi_yazin')}
                     // Don't disable on metaSaving: changing an address / date must not
                     // make the customer field look like it is reloading. Re-selecting a
@@ -113,7 +153,7 @@ export const TenderCustomerSection = ({
                                     event.preventDefault();
                                     onSelectCustomer(customer);
                                 }}
-                                className="ofi-option-row cursor-pointer truncate px-2.5 py-1.5 text-[13px] text-slate-800 transition-colors hover:bg-[#1f2654] hover:!text-white"
+                                className="ofi-option-row cursor-pointer truncate px-2.5 py-1.5 text-[13px] text-slate-800 transition-colors"
                             >
                                 {customer.companyName}
                             </li>
@@ -134,6 +174,17 @@ export const TenderCustomerSection = ({
                     <User01 size={13} />
                 </button>
             )}
+            {/* Name / E-Mail / Adresse DIESER Offerte von Hand — auch für
+                Kundschaft, die es im System nicht gibt. */}
+            <button
+                type="button"
+                onClick={onEditCustomerData}
+                title={t('tenders.manualCustomer.title')}
+                aria-label={t('tenders.manualCustomer.title')}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+            >
+                <Edit01 size={13} />
+            </button>
             <button
                 type="button"
                 onClick={onAddCustomer}

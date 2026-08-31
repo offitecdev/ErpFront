@@ -23,7 +23,7 @@ import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { t } from '@/i18n/translate';
 import { purchaseOrdersApi } from '@/lib/api/inventory';
 import { isRequestTimeout } from '@/lib/axios';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
 import type { PurchaseOrderRow } from '@/types/inventory';
 // CC penceresi takvim modülünde yaşar ve TEK KOPYADIR: aynı pencere hem randevu
 // hem sipariş mailinde kullanılır (kullanıcı isteği 2026-08-02 — "takvimde
@@ -146,7 +146,7 @@ export const OrderSheet = ({
     onDeleted: (id: string) => void;
 }) => {
     const navigate = useNavigate();
-    const settings = usePdfSettingsStore((state) => state.settings);
+    const settings = usePdfSettings();
     const statusMeta = ORDER_STATUS_META[order.status] ?? ORDER_STATUS_META.PENDING;
     // Fiyat talebi aşaması: fiyat sütunları gizlenir, PDF/mail "Preisanfrage" olur.
     const priceRequest = isPriceRequestStage(order.status);

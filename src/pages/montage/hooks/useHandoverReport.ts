@@ -33,6 +33,8 @@ export const useHandoverReport = (projectId?: string) => {
     const [notes, setNotes] = useState('');
     const [images, setImages] = useState<string[]>([]);
     const [signature, setSignature] = useState<string | null>(null);
+    /** Unterschrift des Technikers selbst — zweite Signatur des Rapports. */
+    const [technicianSignature, setTechnicianSignature] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
 
     const currentReport = useMemo(() => reports.find((r) => r.id === reportId) || null, [reports, reportId]);
@@ -49,19 +51,28 @@ export const useHandoverReport = (projectId?: string) => {
             setTemplates(tpls);
             setReports(rows);
             // Prefer the project-level report (no salesOrderId), like the old screen.
-            const projectReport = rows.find((r) => !r.salesOrderId) || rows[0] || null;
+            const listed = rows.find((r) => !r.salesOrderId) || rows[0] || null;
             setSignature(null);
-            if (projectReport) {
+            if (listed) {
+                // Die LISTE trägt weder `responses` noch die Signaturen (schwere
+                // Felder, absichtlich weggelassen) — der geöffnete Rapport wird
+                // deshalb einzeln nachgeladen, sonst stünde die Checkliste leer.
+                const projectReport = await deliveryReportApi.getOne(listed.id).catch(() => listed);
+                // Der volle Satz ersetzt die magere Listenzeile, damit
+                // `currentReport` auch Signaturen und Antworten trägt.
+                setReports(rows.map((row) => (row.id === projectReport.id ? projectReport : row)));
                 setReportId(projectReport.id);
                 setTemplateId(projectReport.checklistTemplateId || '');
                 setResponses((projectReport.responses || []).map((x) => ({ ...x })));
                 setNotes(projectReport.notes || '');
+                setTechnicianSignature(projectReport.technicianSignature || null);
             } else {
                 const tpl = tpls[0] || null;
                 setReportId(null);
                 setTemplateId(tpl?.id || '');
                 setResponses(tpl ? buildResponses(tpl) : []);
                 setNotes('');
+                setTechnicianSignature(null);
             }
         } finally {
             setLoading(false);
@@ -106,7 +117,11 @@ export const useHandoverReport = (projectId?: string) => {
         setSending(true);
         try {
             if (reportId) {
-                await deliveryReportApi.update(reportId, { responses, notes: notes.trim() || null });
+                await deliveryReportApi.update(reportId, {
+                    responses,
+                    notes: notes.trim() || null,
+                    technicianSignature,
+                });
                 if (signature) await deliveryReportApi.sign(reportId, signature);
             } else {
                 await deliveryReportApi.create({
@@ -118,6 +133,7 @@ export const useHandoverReport = (projectId?: string) => {
                     responses,
                     notes: notes.trim() || null,
                     signatureBase64: signature,
+                    technicianSignatureBase64: technicianSignature,
                 });
             }
             toast.success(t('projects.delivery.sentOk'), { position: 'top-center' });
@@ -150,6 +166,8 @@ export const useHandoverReport = (projectId?: string) => {
         setImages,
         signature,
         setSignature,
+        technicianSignature,
+        setTechnicianSignature,
         sending,
         send,
         buildSnapshot,

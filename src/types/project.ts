@@ -128,6 +128,19 @@ export interface AppointmentDto {
     status: AppointmentStatus;
     notes?: string | null;
     installationReminderSentAt?: string | null;
+    /** Set once the calendar invitation was sent to the customer (never on save). */
+    inviteSentAt?: string | null;
+    ccEmails?: string[] | null;
+    /** Kalender-Etikett (25.08.2026) — die Farbe der Karte im Kalender. */
+    labelId?: string | null;
+    /**
+     * MEHRTÄGIGER EINSATZ (24.08.2026). Ein Einsatz über mehrere Tage ist EINE
+     * ZEILE JE TAG — `seriesId` ist das Band dazwischen, `dayIndex` die Nummer
+     * des Tages darin ("Tag 2 von 4"). Ein gewöhnlicher Termin ist ein Einsatz
+     * mit einem Tag; alte Zeilen haben noch gar keine Serie (null).
+     */
+    seriesId?: string | null;
+    dayIndex?: number | null;
     assignedTechnician?: { id: string; firstName: string; lastName: string; email?: string | null; phone?: string | null; roleName?: string | null } | null;
     technicianAssignments?: Array<{
         id: string;
@@ -156,6 +169,14 @@ export interface ProjectSalesOrder {
     // appointment date the extra work belongs to. Falls back to createdAt when null.
     orderDate?: string | null;
     updatedAt?: string;
+    /**
+     * Auftragsbestätigung: der Einleitungstext der Titelseite. NULL heisst
+     * «noch nie bearbeitet» — gedruckt wird dann der Einleitungstext der
+     * Offerte, von dem der Text startet.
+     */
+    confirmationNote?: string | null;
+    /** «Gültig bis» der Bestätigung. NULL = Auftragsdatum + 1 Monat. */
+    confirmationValidUntil?: string | null;
     customer?: ProjectCustomer | null;
     tender?: ProjectDto['tender'];
     parentSalesOrder?: { id: string; orderNumber: string } | null;
@@ -273,6 +294,37 @@ export interface MailSettingDto {
     signatureImage?: string | null;
     hasPassword?: boolean;
     hasImapPassword?: boolean;
+    /** POSTEINGANG DES EIGENEN SERVERS (18.08.2026): der IMAP-Abruf holt nur
+        Kundenbezogenes (Antworten auf ERP-Mails + bekannte Kundenadressen). */
+    imapCaptureEnabled?: boolean;
+    /** Zu überwachender Ordner; leer = INBOX. */
+    imapInboxFolder?: string | null;
+    /** Streng: nur Antworten auf ERP-Mails aufnehmen. */
+    imapCaptureRepliesOnly?: boolean;
+    /** Wie weit das Postfach zurueckreicht, in Monaten (1 oder 2; Vorgabe 2). */
+    imapWindowMonths?: number;
+    /** Nur in der ANTWORT auf das Speichern: entfernte Nachrichten nach einem
+        Postfachwechsel. */
+    purgedMessages?: number;
+    imapLastSyncAt?: string | null;
+    imapLastSummary?: string | null;
+    imapLastError?: string | null;
+    /** DER KALENDER DESSELBEN KONTOS (CalDAV, 31.08.2026). Ohne das holt der
+        Kalender nur, wozu jemand das Postfach EINGELADEN hat — was sich jemand
+        selbst einträgt, erzeugt keine Mail und käme nie an. Benutzer, Passwort
+        und Adresse dürfen leer bleiben: dann gelten die des IMAP-Kontos, und
+        die Adresse wird über /.well-known/caldav gesucht. */
+    caldavEnabled?: boolean;
+    caldavUrl?: string | null;
+    caldavUser?: string | null;
+    hasCaldavPassword?: boolean;
+    caldavCalendars?: Array<{ href: string; displayName: string }> | null;
+    caldavLastSyncAt?: string | null;
+    caldavLastSummary?: string | null;
+    caldavLastError?: string | null;
+    /** Nur in der ANTWORT auf das Speichern: entfernte Kalendertermine, die
+        einem anderen Konto gehörten. */
+    purgedMeetings?: number;
 }
 
 /** /mail/send yanıtındaki gönderilenler-kopyası sonucu. */

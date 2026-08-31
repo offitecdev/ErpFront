@@ -4,8 +4,9 @@ import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight } from '@/components/icons/antIconCompat';
 import { dayKey, type CalEvent } from '../calendarShared';
 
-/* Outlook-style small month: picking a day moves the big calendar; the tiny
-   dot row under a number marks days that have events. */
+/* Compact month picker at the top of the rail. Picking a day moves the big
+   calendar; a dot under a number marks a day that has entries. Deliberately
+   small (28px rows) — the rail is chrome, not a second calendar. */
 export const MiniMonth = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: {
     anchor: dayjs.Dayjs;
     selectedDay: dayjs.Dayjs;
@@ -21,16 +22,30 @@ export const MiniMonth = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: 
     const weekDays = Array.from({ length: 7 }, (_, index) => gridStart.add(index, 'day').format('dd'));
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#151616]">
-            <div className="mb-2 flex items-center justify-between">
-                <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-white/60 dark:hover:bg-white/10" onClick={() => setCursor((c) => c.subtract(1, 'month'))}><ChevronLeft size={15} /></button>
-                <span className="text-[13px] font-semibold capitalize text-slate-800 dark:text-white/90">{cursor.format('MMMM YYYY')}</span>
-                <button type="button" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-white/60 dark:hover:bg-white/10" onClick={() => setCursor((c) => c.add(1, 'month'))}><ChevronRight size={15} /></button>
+        <div className="ofi-cal-rail-block px-1.5 pb-1.5 pt-1">
+            <div className="mb-0.5 flex items-center justify-between">
+                <button
+                    type="button"
+                    aria-label={cursor.subtract(1, 'month').format('MMMM YYYY')}
+                    className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                    onClick={() => setCursor((current) => current.subtract(1, 'month'))}
+                >
+                    <ChevronLeft size={13} />
+                </button>
+                <span className="text-[11.5px] font-bold capitalize text-slate-800 dark:text-white/90">{cursor.format('MMMM YYYY')}</span>
+                <button
+                    type="button"
+                    aria-label={cursor.add(1, 'month').format('MMMM YYYY')}
+                    className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
+                    onClick={() => setCursor((current) => current.add(1, 'month'))}
+                >
+                    <ChevronRight size={13} />
+                </button>
             </div>
-            <div className="grid grid-cols-7 text-center text-[10px] font-medium uppercase text-slate-400 dark:text-white/40">
-                {weekDays.map((day, index) => <div key={`${day}-${index}`} className="py-1">{day}</div>)}
+            <div className="grid grid-cols-7 text-center text-[9px] font-semibold uppercase text-slate-400 dark:text-white/35">
+                {weekDays.map((day, index) => <div key={`${day}-${index}`} className="py-0.5">{day}</div>)}
             </div>
-            <div className="grid grid-cols-7 gap-0.5">
+            <div className="grid grid-cols-7">
                 {days.map((day) => {
                     const key = dayKey(day);
                     const isSelected = key === dayKey(selectedDay);
@@ -42,18 +57,10 @@ export const MiniMonth = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: 
                             key={key}
                             type="button"
                             onClick={() => onPickDay(day)}
-                            className={`relative flex h-8 flex-col items-center justify-center rounded-md text-[11.5px] font-medium transition-colors ${isSelected
-                                ? 'bg-[#07145c] text-white dark:bg-[#d48f16] dark:text-[#151616]'
-                                : isToday
-                                    ? 'bg-[#07145c]/8 text-[#07145c] dark:bg-[#d48f16]/12 dark:text-[#d48f16]'
-                                    : outside
-                                        ? 'text-slate-300 hover:bg-slate-100 dark:text-white/25 dark:hover:bg-white/8'
-                                        : 'text-slate-700 hover:bg-slate-100 dark:text-white/85 dark:hover:bg-white/8'}`}
+                            className={`ofi-cal-mini-day ${isSelected ? 'is-selected' : ''} ${isToday && !isSelected ? 'is-today' : ''} ${outside ? 'is-outside' : ''}`}
                         >
                             {day.date()}
-                            {hasEvents && !isSelected && (
-                                <span className="absolute bottom-[3px] h-[3px] w-[3px] rounded-full bg-[#f59e0b]" />
-                            )}
+                            {hasEvents && !isSelected && <span className="ofi-cal-mini-day__dot" />}
                         </button>
                     );
                 })}

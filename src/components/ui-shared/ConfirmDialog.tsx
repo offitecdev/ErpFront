@@ -31,7 +31,7 @@ export const ConfirmDialog = ({
     busy = false,
     onConfirm,
     onCancel,
-    zIndex = 160,
+    zIndex = 900,
 }: {
     open: boolean;
     title: ReactNode;
@@ -71,9 +71,11 @@ export const ConfirmDialog = ({
 
     if (!open) return null;
 
-    const confirmClass = tone === 'danger'
-        ? 'bg-red-600 hover:bg-red-700'
-        : 'bg-[#272f67] hover:bg-[#1f2654]';
+    /* Die Knöpfe sind die Kalenderpille (`.ofi-cal-btn`) — derselbe Knopf, den
+       das Aufgabenfenster im Fuss trägt. Vorher stand hier `bg-[#272f67]`, und
+       das ist in dieser Anwendung nicht eine Farbe, sondern ein ganzer Knopf:
+       er zog den orangen Schwall der Seitenknöpfe mit ins Fenster. */
+    const confirmClass = tone === 'danger' ? 'is-danger' : 'is-primary';
 
     return createPortal(
         <div className="fixed inset-0 flex items-center justify-center px-3" style={{ zIndex }}>
@@ -85,7 +87,12 @@ export const ConfirmDialog = ({
             <section
                 role="alertdialog"
                 aria-modal="true"
-                className="ofi-rise-in relative flex w-full max-w-[440px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/15 dark:bg-[#151616]"
+                /* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
+                   "FENSTER-OBERFLÄCHE"): Fläche, Haarlinie, Schatten und die
+                   14px-Kante des Kalenderfensters. Kein `rounded-*` und kein
+                   `bg-white` mehr — das erste kam als 8px an, das zweite hat im
+                   Dunkeln den Schatten des Fensters gelöscht. */
+                className="ofi-rise-in ofi-pop relative flex w-full max-w-[440px] flex-col overflow-hidden"
             >
                 <header className="flex items-start gap-3 px-4 pb-2 pt-4">
                     <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
@@ -97,6 +104,9 @@ export const ConfirmDialog = ({
                         <AlertTriangle size={17} />
                     </span>
                     <div className="min-w-0 flex-1 pt-0.5">
+                        {/* Ohne `.ofi-serif`: der Kalender schreibt seine
+                            Fenstertitel in der Grundschrift, und eine zweite
+                            Schrift in einem 440px-Fenster war der Bruch. */}
                         <h2 className="text-[14px] font-bold leading-snug text-slate-900 dark:text-white">{title}</h2>
                         {message && (
                             <p className="mt-1 text-[12.5px] leading-relaxed text-slate-500 dark:text-white/60">{message}</p>
@@ -107,9 +117,9 @@ export const ConfirmDialog = ({
                         aria-label={t('common.close')}
                         disabled={busy}
                         onClick={onCancel}
-                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+                        className="ofi-float-card__iconbtn shrink-0 disabled:opacity-40"
                     >
-                        <X size={14} />
+                        <X size={16} />
                     </button>
                 </header>
 
@@ -118,7 +128,7 @@ export const ConfirmDialog = ({
                         type="button"
                         disabled={busy}
                         onClick={onCancel}
-                        className="h-9 rounded-md border border-slate-200 px-4 text-[12.5px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/70 dark:hover:bg-white/10"
+                        className="ofi-cal-btn"
                     >
                         {cancelLabel ?? t('common.cancel')}
                     </button>
@@ -127,7 +137,7 @@ export const ConfirmDialog = ({
                         type="button"
                         disabled={busy}
                         onClick={onConfirm}
-                        className={`flex h-9 items-center gap-1.5 rounded-md px-4 text-[12.5px] font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${confirmClass}`}
+                        className={`ofi-cal-btn ${confirmClass}`}
                     >
                         {busy && <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />}
                         {confirmLabel ?? t('common.confirm')}

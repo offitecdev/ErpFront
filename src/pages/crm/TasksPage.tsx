@@ -20,7 +20,7 @@ import { defaultRange, type TaskRange, type TaskScope } from './tasks/taskBoardM
 
 /**
  * Aufgaben (19.08.2026) — ein BRETT aus zwei grossen Spalten (Vorgabe):
- * "Nicht erledigt" links, "Erledigt" rechts, beide füllen ihre Hälfte des
+ * "Ausstehend" links, "Erledigt" rechts, beide füllen ihre Hälfte des
  * Schirms. Eine Karte in die andere Spalte zu ziehen setzt den Zustand; läuft
  * eine Spalte über, blättert sie selbst weiter.
  *
@@ -31,9 +31,15 @@ import { defaultRange, type TaskRange, type TaskScope } from './tasks/taskBoardM
  * Zwei Sichten, kein "Alle": "Mit mir" (ich bin verantwortlich) und "Ohne mich"
  * (ich habe zugewiesen, bin selbst nicht verantwortlich).
  *
- * Ein Klick auf eine Karte öffnet die Erledigungskarte als POPUP mit zwei
- * Reitern — Angaben, und Notizen mit Bildern. Keine neue Seite. Angelegt wird
- * über "Neue Aufgabe" mit Datumswahl im Formular.
+ * FILTER IN DIE TIEFE (11.09.2026, Vorgabe Samet): Mitarbeitende UND Kunden
+ * nehmen jetzt MEHRERE Einträge — leer heisst weiterhin alle, eine Wahl heisst
+ * genau diese, mehrere heissen diese Gruppe. Der Zeitraum steht schon da und
+ * fängt seit demselben Tag auch mehrtägige Aufgaben (Überschneidung statt
+ * Endtermin).
+ *
+ * Ein Klick auf eine Karte öffnet die Erledigungskarte als POPUP — Angaben,
+ * Anleitung, Anhänge und Notizen hinter EINER Zeichenreihe. Keine neue Seite.
+ * Angelegt wird über "Neue Aufgabe" mit derselben Zeichenreihe.
  *
  * Erinnerungen haben weiterhin ihre eigene Seite.
  */
@@ -47,18 +53,26 @@ export const TasksPage = () => {
 
     const [scope, setScope] = useState<TaskScope>('me');
     const [range, setRange] = useState<TaskRange>(() => defaultRange());
-    const [customer, setCustomer] = useState<TaskCustomerPick | null>(null);
+    const [customers, setCustomers] = useState<TaskCustomerPick[]>([]);
     /* Der Mitarbeiterfilter: leer heisst alle. Er verschärft die gewählte
        Sicht, statt sie zu ersetzen (siehe TaskBoardBar). */
-    const [staff, setStaff] = useState<TaskStaffPick | null>(null);
+    const [staff, setStaff] = useState<TaskStaffPick[]>([]);
     const [quickOpen, setQuickOpen] = useState(false);
     const [picked, setPicked] = useState<{ id: string; anchor: FloatAnchor } | null>(null);
 
-    const board = useTaskBoard({ range, scope, customerId: customer?.id, assigneeId: staff?.id });
+    const board = useTaskBoard({
+        range,
+        scope,
+        customerIds: customers.map((row) => row.id),
+        assigneeIds: staff.map((row) => row.id),
+    });
 
     // Die geöffnete Karte kommt aus der frischen Liste, nicht aus dem Zustand des
     // Klicks — sonst zeigte das Popup nach dem Abhaken noch den alten Stand.
     const pickedTask: CrmTaskRow | null = picked ? board.tasks.find((row) => row.id === picked.id) ?? null : null;
+
+    // Die Filterwahl als Schlüssel: sie setzt das Brett auf Seite 1 zurück.
+    const filterKey = `${customers.map((row) => row.id).join('|')}:${staff.map((row) => row.id).join('|')}`;
 
     return (
         /* `ofi-taskpage` drückt den Listenkopf flacher (siehe index.css): der
@@ -87,17 +101,18 @@ export const TasksPage = () => {
                 19.08.2026): er brauchte einen Eintrag "Alle Verantwortlichen",
                 und ein Filter, dessen Grundzustand "alle" heisst, ist keiner.
                 An seiner Stelle steht in der Leiste ein TIPPFELD: leer heisst
-                alle, getippt kommen die ersten sieben Personen als Fenster. */}
+                alle, getippt kommen die ersten sieben Personen als Fenster —
+                und seit dem 11.09.2026 nimmt es MEHRERE davon. */}
             <TaskBoardBar range={range} onRange={setRange} scope={scope} onScope={setScope} staff={staff} onStaff={setStaff}>
                 {/* Der Kundenfilter ist DASSELBE Feld wie der Mitarbeiterfilter
                     daneben (Vorgabe 19.08.2026) — nur die Quelle der Vorschlaege
                     ist eine andere. Er steht weiterhin nur denen offen, die die
                     Kundenkartei sehen duerfen. */}
-                {canSeeAll && <TaskCustomerFilter value={customer} onChange={setCustomer} />}
+                {canSeeAll && <TaskCustomerFilter values={customers} onChange={setCustomers} />}
             </TaskBoardBar>
 
             <TaskBoard
-                key={`${range.from}:${range.to}:${scope}:${staff?.id ?? ''}:${customer?.id ?? ''}`}
+                key={`${range.from}:${range.to}:${scope}:${filterKey}`}
                 tasks={board.tasks}
                 loading={board.loading}
                 busyIds={board.busyIds}
@@ -117,9 +132,10 @@ export const TasksPage = () => {
                 anchor={picked?.anchor ?? null}
                 onClose={() => setPicked(null)}
                 onSetDone={board.setDone}
-                onMoveToDay={board.moveToDay}
+                onSaveSpan={board.saveSpan}
                 onDeleted={(task) => void board.remove(task)}
                 onChanged={board.setNoteCount}
+                onPatched={board.patchRow}
             />
 
             <NewTaskCard open={quickOpen} onClose={() => setQuickOpen(false)} onSaved={() => void board.reload()} />

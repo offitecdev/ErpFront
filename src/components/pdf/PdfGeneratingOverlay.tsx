@@ -19,7 +19,9 @@ export const PdfGeneratingOverlay = ({ open, detail, progress }: PdfGeneratingOv
 
     return createPortal(
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-4 rounded-2xl bg-white px-10 py-8 shadow-2xl">
+            {/* `.ofi-pop` — die gemeinsame Fensteroberfläche, siehe index.css
+                "FENSTER-OBERFLÄCHE". `rounded-2xl` kam als 8px an. */}
+            <div className="ofi-pop flex flex-col items-center gap-4 px-10 py-8">
                 <div className="relative flex h-14 w-14 items-center justify-center">
                     <span className="absolute inset-0 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#1f2654]" />
                     <FileText size={22} className="text-[#1f2654]" />

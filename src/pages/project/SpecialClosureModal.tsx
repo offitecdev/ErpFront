@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle } from '@/components/icons/antIconCompat';
 
-import { Modal } from '../../components/ui-shared/Modal';
-import { Button } from '../../components/ui-shared/Button';
-import { Field, Input } from '../../components/ui-shared/Field';
+import {
+    PopupActions,
+    PopupButton,
+    PopupDialog,
+    PopupField,
+    PopupNote,
+} from '../../components/ui-shared/PopupKit';
 import { projectApi } from '../../lib/api/project';
 import type { ProjectDto } from '../../types/project';
 
@@ -14,6 +18,9 @@ import { t } from '@/i18n/translate';
 // fixed all-caps token (like a "DELETE to confirm" gate), not translated, so the
 // prompt shows the literal word to type in every language.
 export const SPECIAL_CLOSURE_KEYWORD = 'CLOSED';
+
+/* Opened from the completion wizard (dialog z 150) — it has to sit above it. */
+const Z = 210;
 
 /**
  * Manager-only "Special Closure" (Sonderabschluss) confirmation dialog. Force-closes
@@ -51,55 +58,57 @@ export const SpecialClosureModal = ({
     };
 
     return (
-        <Modal
+        <PopupDialog
             open
-            width="sm"
             title={t('projects.specialClosure.title')}
-            description={t('projects.specialClosure.subtitle')}
+            subtitle={t('projects.specialClosure.subtitle')}
+            icon={<AlertTriangle size={20} />}
+            tone="danger"
+            width={460}
+            z={Z}
             onClose={() => { if (!submitting) onClose(); }}
             closeOnBackdrop={!submitting}
+            closeOnEscape={!submitting}
             footer={(
-                <>
-                    <Button variant="ghost" onClick={onClose} disabled={submitting}>
-                        {t('common.cancel')}
-                    </Button>
-                    <Button
+                <PopupActions>
+                    <PopupButton disabled={submitting} onClick={onClose}>{t('common.cancel')}</PopupButton>
+                    <PopupButton
                         variant="danger"
                         loading={submitting}
                         disabled={!keywordMatches}
                         onClick={() => void submitClosure()}
                     >
                         {t('projects.specialClosure.confirm')}
-                    </Button>
-                </>
+                    </PopupButton>
+                </PopupActions>
             )}
         >
-            <div className="space-y-4">
-                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
-                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-600" />
-                    <div>
-                        <div className="text-[13px] font-semibold text-red-700">{t('projects.specialClosure.warningTitle')}</div>
-                        <div className="mt-0.5 text-[12px] text-red-700/80">{t('projects.specialClosure.warningDesc')}</div>
-                    </div>
-                </div>
+            <PopupNote tone="danger">
+                <b>{t('projects.specialClosure.warningTitle')}</b>
+                <div>{t('projects.specialClosure.warningDesc')}</div>
+            </PopupNote>
 
-                <Field label={t('projects.specialClosure.confirmPrompt', { keyword: SPECIAL_CLOSURE_KEYWORD })}>
-                    <Input
-                        value={confirmText}
-                        autoFocus
-                        placeholder={SPECIAL_CLOSURE_KEYWORD}
-                        spellCheck={false}
-                        autoCapitalize="characters"
-                        onChange={(e) => setConfirmText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && keywordMatches) void submitClosure(); }}
-                    />
-                    {confirmText.length > 0 && !keywordMatches && (
-                        <div className="mt-1 text-[11.5px] font-medium text-red-600">
-                            {t('projects.specialClosure.mismatch', { keyword: SPECIAL_CLOSURE_KEYWORD })}
-                        </div>
-                    )}
-                </Field>
-            </div>
-        </Modal>
+            <PopupField
+                className="pt-3"
+                label={t('projects.specialClosure.confirmPrompt', { keyword: SPECIAL_CLOSURE_KEYWORD })}
+                required
+            >
+                <input
+                    className="ofi-cal-input ofi-tp-keyword w-full"
+                    value={confirmText}
+                    autoFocus
+                    placeholder={SPECIAL_CLOSURE_KEYWORD}
+                    spellCheck={false}
+                    autoCapitalize="characters"
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && keywordMatches) void submitClosure(); }}
+                />
+            </PopupField>
+            {confirmText.length > 0 && !keywordMatches && (
+                <div className="ofi-tp-required pt-1 text-[11.5px] font-medium">
+                    {t('projects.specialClosure.mismatch', { keyword: SPECIAL_CLOSURE_KEYWORD })}
+                </div>
+            )}
+        </PopupDialog>
     );
 };

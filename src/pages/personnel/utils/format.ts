@@ -185,3 +185,70 @@ export const firstDayOfMonth = (reference = new Date()): string =>
 /** Letzter Tag des laufenden Monats als "YYYY-MM-DD". */
 export const lastDayOfMonth = (reference = new Date()): string =>
     toInputDate(new Date(reference.getFullYear(), reference.getMonth() + 1, 0));
+
+/* ── ANTRAGSARTEN UND ABWESENHEITEN (26.08.2026) ─────────────────────────────── */
+
+/**
+ * Die Antragsart, wie sie auf dem Reiter, im Filter und auf der Karte steht.
+ * Bei «Sonstiges» gewinnt der FREITEXT, in dem die Person die Art selbst
+ * benannt hat — dieselbe Regel wie bei `leaveTypeLabel`.
+ */
+export const requestTypeLabel = (requestType: string, customLabel?: string | null): string => {
+    const custom = String(customLabel ?? '').trim();
+    if (requestType === 'OTHER' && custom) return custom;
+    return t(`personnel.requestType.${requestType}`);
+};
+
+/**
+ * Die Farbe einer Antragsart. Sie ist überall dieselbe — Reiter, Karte,
+ * Kalenderpunkt —, weil die Farbe beim Überfliegen die Art trägt und nicht
+ * je Seite etwas anderes bedeuten darf.
+ */
+export const requestTypeChipClass = (requestType: string): string => {
+    switch (requestType) {
+        case 'VACATION':
+            return 'bg-[#eef2fb] text-[#1f2654] ring-[#c9d5f0] dark:bg-white/10 dark:text-white/85 dark:ring-white/15';
+        case 'REMOTE':
+            return 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/30';
+        case 'SICK':
+            return 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30';
+        default:
+            return 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/15';
+    }
+};
+
+export const absenceKindLabel = (kind: string, customLabel?: string | null): string => {
+    const custom = String(customLabel ?? '').trim();
+    if (kind === 'OTHER' && custom) return custom;
+    return t(`personnel.absence.${kind}`);
+};
+
+/** Der unerklärte Fehltag ist der einzige, der ROT steht — er ist die Frage. */
+export const absenceKindChipClass = (kind: string): string => {
+    switch (kind) {
+        case 'ABSENT':
+            return 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30';
+        case 'VACATION':
+            return 'bg-[#eef2fb] text-[#1f2654] ring-[#c9d5f0] dark:bg-white/10 dark:text-white/85 dark:ring-white/15';
+        case 'SICK':
+            return 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30';
+        case 'REMOTE':
+            return 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/30';
+        default:
+            return 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/15';
+    }
+};
+
+/** Dateigrösse in KB/MB — die Unterlagen der Personalakte. */
+export const formatFileSize = (bytes: number | null | undefined): string => {
+    if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return EMPTY_CELL;
+    if (bytes < 1024) return t('personnel.doc.bytes', { count: bytes });
+    if (bytes < 1024 * 1024) return t('personnel.doc.kilobytes', { count: Math.round(bytes / 1024) });
+    return t('personnel.doc.megabytes', { count: (bytes / (1024 * 1024)).toFixed(1) });
+};
+
+/** Tageszahl eines Urlaubskontos: halbe Tage bleiben halb, ganze bleiben ganz. */
+export const formatLeaveDays = (days: number | null | undefined): string => {
+    if (days == null || !Number.isFinite(days)) return '0';
+    return Number.isInteger(days) ? String(days) : days.toFixed(1);
+};

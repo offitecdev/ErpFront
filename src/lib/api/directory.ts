@@ -3,6 +3,10 @@ import { apiClient } from '../axios';
 /* Company staff directory — the people source of every picker that is not the
    HR module itself (meeting participants, appointment technicians, CC lists).
 
+   It answers for the SELECTED company only (31.08.2026). Staff of a sister
+   company in the same group are a different company's people and never appear
+   in these pickers.
+
    It deliberately hangs off /employees/directory and not the HR listing: that
    one is gated behind `employees.view`, so a colleague without HR rights got a
    403 and the pickers silently showed no staff at all — only customers. */

@@ -3,11 +3,17 @@ import { toast } from 'sonner';
 import { Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { personnelApi, readStaffBulkError } from '@/lib/api/personnel';
-import type { StaffDraftRow, StaffRole, WorkLocation } from '../types/personnel';
-import { STAFF_ROLES, WORK_LOCATIONS } from '../utils/personnel';
-import { staffRoleLabel, workLocationLabel } from '../utils/format';
+import type { StaffDraftRow, WorkLocation } from '../types/personnel';
+import { WORK_LOCATIONS } from '../utils/personnel';
+import { workLocationLabel } from '../utils/format';
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { PersonnelSheet } from './PersonnelSheet';
 import { CELL_INPUT_CLASS, GhostButton, PrimaryButton } from './primitives';
+
+/* Das Zellenkleid für die Auswahlfelder — `bg-[#fff]` statt `bg-white`, weil
+   index.css jedem `button.bg-white` dunkle Schrift aufzwingt (!important) und
+   das Feld im Dunkelmodus unlesbar würde. */
+const CELL_SELECT_CLASS = CELL_INPUT_CLASS.replace('bg-white', 'bg-[#fff]');
 
 /**
  * ── PERSONAL ANLEGEN: ZEILE FÜR ZEILE ────────────────────────────────────────
@@ -28,7 +34,6 @@ const emptyRow = (): StaffDraftRow => ({
     lastName: '',
     email: '',
     password: '',
-    staffRole: 'STAFF',
     workLocation: 'OFFICE',
 });
 
@@ -82,7 +87,6 @@ export const StaffCreateSheet = ({
                 lastName: row.lastName.trim(),
                 email: row.email.trim(),
                 password: row.password,
-                staffRole: row.staffRole,
                 workLocation: row.workLocation,
             })));
             toast.success(t('personnel.create.saved', { count: result.created.length }));
@@ -129,7 +133,6 @@ export const StaffCreateSheet = ({
                         <col style={{ width: '22%' }} />
                         <col style={{ width: 190 }} />
                         <col style={{ width: 150 }} />
-                        <col style={{ width: 150 }} />
                         <col style={{ width: 56 }} />
                     </colgroup>
                     <thead>
@@ -139,7 +142,6 @@ export const StaffCreateSheet = ({
                             <th className="text-left">{t('personnel.field.lastName')}</th>
                             <th className="text-left">{t('personnel.field.email')}</th>
                             <th className="text-left">{t('personnel.field.password')}</th>
-                            <th className="text-left">{t('personnel.field.staffRole')}</th>
                             <th className="text-left">{t('personnel.field.workLocation')}</th>
                             <th />
                         </tr>
@@ -191,27 +193,18 @@ export const StaffCreateSheet = ({
                                             className={CELL_INPUT_CLASS}
                                         />
                                     </td>
+                                    {/* Die Personalrolle ist abgelöst — Rechte
+                                        vergibt die Rollenzuweisung auf der
+                                        Personenseite (Vorgabe 27.08.2026). */}
                                     <td>
-                                        <select
-                                            value={row.staffRole}
-                                            onChange={(event) => patch(row.key, { staffRole: event.target.value as StaffRole })}
-                                            className={CELL_INPUT_CLASS}
-                                        >
-                                            {STAFF_ROLES.map((role) => (
-                                                <option key={role} value={role}>{staffRoleLabel(role)}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select
+                                        <SelectMenu
                                             value={row.workLocation}
-                                            onChange={(event) => patch(row.key, { workLocation: event.target.value as WorkLocation })}
-                                            className={CELL_INPUT_CLASS}
-                                        >
-                                            {WORK_LOCATIONS.map((location) => (
-                                                <option key={location} value={location}>{workLocationLabel(location)}</option>
-                                            ))}
-                                        </select>
+                                            onChange={(next) => patch(row.key, { workLocation: next as WorkLocation })}
+                                            ariaLabel={t('personnel.field.workLocation')}
+                                            buttonClassName={CELL_SELECT_CLASS}
+                                            listWidth={170}
+                                            options={WORK_LOCATIONS.map((location) => ({ value: location, label: workLocationLabel(location) }))}
+                                        />
                                     </td>
                                     <td className="text-right">
                                         <button

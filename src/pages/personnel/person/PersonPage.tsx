@@ -12,40 +12,41 @@ import type { PersonOverview } from '../types/personnel';
 import { useLanguageTick } from '../hooks/usePersonnel';
 import { PersonHero, type PersonTab } from './PersonHero';
 import { PersonPhotoSheet } from './PersonPhotoSheet';
-import { PersonOverviewTab } from './tabs/PersonOverviewTab';
-import { PersonAccessTab } from './tabs/PersonAccessTab';
-import { PersonTasksTab } from './tabs/PersonTasksTab';
-import { PersonAppointmentsTab } from './tabs/PersonAppointmentsTab';
-import { PersonMeetingsTab } from './tabs/PersonMeetingsTab';
-import { PersonLeavesTab } from './tabs/PersonLeavesTab';
+import { PersonProfileTab } from './tabs/PersonProfileTab';
+import { PersonLeaveYearTab } from './tabs/PersonLeaveYearTab';
+import { PersonAbsencesTab } from './tabs/PersonAbsencesTab';
+import { PersonTimeTab } from './tabs/PersonTimeTab';
 
 /**
- * ── DIE PERSONENSEITE ────────────────────────────────────────────────────────
+ * ── DIE PERSONALDETAILSEITE ──────────────────────────────────────────────────
  *
- * Ein Klick auf eine Zeile der Personalliste führt hierher (Vorgabe
- * 17.08.2026): „für jede angestellte Person eine Seite — Kennwort und Rolle,
- * zugewiesene Aufgaben, Termine und Urlaub (Anträge, Freigaben)".
+ * Ein Klick auf eine Zeile der Personalliste führt hierher. SEIT DEM
+ * 27.08.2026 VIER REITER (Vorgabe: «die allgemeinen Reiter entfernen; den
+ * Zugang auflösen; Urlaub und Abwesenheiten sind GETRENNTE Seiten»):
  *
- * DIESELBE Seite ist das eigene Profil (`self`): dann steht sie unter /profile,
- * zeigt die Rolle nur an und bietet statt des direkten Kennwortwechsels den
- * Antrag. Zwei Adressen, ein Bauteil — sonst liefen die beiden Ansichten
- * auseinander.
+ *   Profil          Grunddaten, Rolle/Kennwort/Firmen, Vertrag, Unterlagen
+ *   Arbeitszeiten   der Arbeitszeitnachweis der Person (max. ein Monat)
+ *   Urlaub          Anspruch (jahresweise ab EINTRITT), Feiertage, Anträge
+ *   Abwesenheiten   die Fehltage (max. ein Monat) samt Nachtrag ab Eintritt
+ *
+ * Aufgaben, Erinnerungen, Termine und Besprechungen stehen im EIGENEN Profil
+ * (/profile) — sie sind Arbeitsvorrat der Person, keine Akte der Verwaltung.
  *
  * ALLE Reiter kommen aus EINEM Serveraufruf; das Umschalten kostet danach
  * keinen Rundgang mehr.
  */
 
-type TabKey = 'overview' | 'access' | 'tasks' | 'appointments' | 'meetings' | 'leaves';
+type TabKey = 'profile' | 'time' | 'leaves' | 'absences';
 
-export const PersonPage = ({ self = false }: { self?: boolean }) => {
+export const PersonPage = () => {
     useLanguageTick();
     const { id = '' } = useParams();
     const navigate = useNavigate();
     const currentUserId = useAuthStore((state) => state.user?.id ?? '');
     const permissions = useAuthStore((state) => state.permissions);
-    const employeeId = self ? currentUserId : id;
+    const employeeId = id;
 
-    const [tab, setTab] = useState<TabKey>('overview');
+    const [tab, setTab] = useState<TabKey>('profile');
     const [data, setData] = useState<PersonOverview | null>(null);
     const [loading, setLoading] = useState(true);
     const [photoOpen, setPhotoOpen] = useState(false);
@@ -60,18 +61,17 @@ export const PersonPage = ({ self = false }: { self?: boolean }) => {
                 toast.error(status === 403
                     ? t('personnel.person.forbidden')
                     : t('personnel.person.loadFailed'));
-                if (!self) navigate('/personnel', { replace: true });
+                navigate('/personnel', { replace: true });
             })
             .finally(() => setLoading(false));
-    }, [employeeId, navigate, self]);
+    }, [employeeId, navigate]);
 
     useEffect(load, [load]);
 
     if (loading && !data) return <PageSkeleton />;
     if (!data) {
-        // Der Fehlerfall der EIGENEN Seite: dort wird nicht zurückgeworfen
-        // (es gibt keine Liste, auf die man zurückfiele), also braucht es hier
-        // etwas Sichtbares statt einer weissen Fläche.
+        // Zwischen Abweisung und Rücksprung: etwas Sichtbares statt einer
+        // weissen Fläche.
         return (
             <div className="flex w-full flex-col items-center gap-3 py-16">
                 <p className="text-[13px] text-slate-500 dark:text-white/60">{t('personnel.person.loadFailed')}</p>
@@ -91,28 +91,16 @@ export const PersonPage = ({ self = false }: { self?: boolean }) => {
     // Berechtigung, die der Server für den Aufruf verlangt.
     const canEditPhoto = isSelf || permissions.includes('employees.update');
     const tabs: PersonTab[] = [
-        { key: 'overview', label: t('personnel.person.tabOverview') },
-        { key: 'access', label: t('personnel.person.tabAccess'), badge: data.pendingPasswordRequest ? 1 : undefined },
-        { key: 'tasks', label: t('personnel.person.tabTasks') },
-        { key: 'appointments', label: t('personnel.person.tabAppointments') },
-        { key: 'meetings', label: t('personnel.person.tabMeetings') },
+        { key: 'profile', label: t('personnel.person.tabProfile'), badge: data.pendingPasswordRequest ? 1 : undefined },
+        { key: 'time', label: t('personnel.person.tabTime') },
         { key: 'leaves', label: t('personnel.person.tabLeaves'), badge: data.approvals.length || undefined },
+        { key: 'absences', label: t('personnel.leaveYear.absencesTile') },
     ];
 
     return (
         <div className="ofi-person flex w-full flex-col gap-4">
-            {!self && (
-                <div className="flex justify-end">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/personnel')}
-                        className="text-[12.5px] font-semibold text-slate-500 underline-offset-2 hover:underline dark:text-white/60"
-                    >
-                        ← {t('personnel.person.backToList')}
-                    </button>
-                </div>
-            )}
-
+            {/* Der Rückweg in die Personalliste steht im Blitz ganz vorn in
+                der Kopfleiste (QuickBackButton) — die Seite beginnt sofort. */}
             <PersonHero
                 person={data.person}
                 tabs={tabs}
@@ -134,24 +122,26 @@ export const PersonPage = ({ self = false }: { self?: boolean }) => {
                 ))}
             />
 
-            {tab === 'overview' && <PersonOverviewTab data={data} />}
-            {tab === 'access' && (
-                <PersonAccessTab
-                    person={data.person}
+            {tab === 'profile' && (
+                <PersonProfileTab
+                    employeeId={data.person.id}
                     isSelf={isSelf}
                     pendingRequest={data.pendingPasswordRequest}
                     onChanged={load}
                 />
             )}
-            {tab === 'tasks' && <PersonTasksTab tasks={data.tasks} />}
-            {tab === 'appointments' && <PersonAppointmentsTab appointments={data.appointments ?? []} />}
-            {tab === 'meetings' && <PersonMeetingsTab meetings={data.meetings} />}
-            {tab === 'leaves' && <PersonLeavesTab leaves={data.leaves} approvals={data.approvals} />}
+            {tab === 'time' && <PersonTimeTab employeeId={data.person.id} />}
+            {tab === 'leaves' && (
+                <PersonLeaveYearTab
+                    employeeId={data.person.id}
+                    hireDate={data.person.hireDate}
+                    leaves={data.leaves}
+                    approvals={data.approvals}
+                />
+            )}
+            {tab === 'absences' && (
+                <PersonAbsencesTab employeeId={data.person.id} hireDate={data.person.hireDate} />
+            )}
         </div>
     );
 };
-
-/** Das eigene Profil (/profile) — dieselbe Seite, auf die angemeldete Person
-    gerichtet. Eigener Ausgang, weil die Routen-Hilfe `page()` keine Eigenschaften
-    durchreicht (RouteComponent nimmt bewusst keine). */
-export const ProfilePage = () => <PersonPage self />;

@@ -96,10 +96,12 @@ export const SignatureField = ({
 
             {open && createPortal(
                 <div className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-900/60 p-4 animate-in fade-in duration-150" onClick={() => setOpen(false)}>
-                    <div className="w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200 dark:bg-[#151616]" onClick={(event) => event.stopPropagation()}>
-                        <div className="mb-3 flex items-center justify-between">
-                            <div className="text-[14px] font-semibold text-slate-900 dark:text-white">{label || t('signaturePad.title')}</div>
-                            <button type="button" onClick={() => setOpen(false)} aria-label={t('common.close')} className="flex size-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10"><X size={16} /></button>
+                    {/* `.ofi-pop` — die gemeinsame Fensteroberfläche, siehe
+                        index.css "FENSTER-OBERFLÄCHE". */}
+                    <div className="ofi-pop w-full max-w-3xl p-5 animate-in fade-in zoom-in-95 duration-200" onClick={(event) => event.stopPropagation()}>
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                            <div className="ofi-pop__title">{label || t('signaturePad.title')}</div>
+                            <button type="button" onClick={() => setOpen(false)} aria-label={t('common.close')} className="ofi-float-card__iconbtn shrink-0"><X size={16} /></button>
                         </div>
                         <input
                             value={name}

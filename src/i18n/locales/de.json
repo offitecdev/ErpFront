@@ -15,7 +15,17 @@
             "action": "Aktion",
             "pageTitle": "Rapporte anzeigen oder erstellen",
             "pageHint": "Wählen Sie einen Auftrag für Gesamt- und Abnahme-Rapport."
-        }
+        },
+        "documents": {
+            "appointmentPdfs": "Termin-PDFs",
+            "openOrCreate": "Termindokument öffnen oder jetzt erstellen.",
+            "reports": "Rapporte",
+            "title": "Dokumente"
+        },
+        "home": {
+            "notificationsHint": "Neuigkeiten zu Ihren Montagen und Rapporten"
+        },
+        "myDocuments": "Meine Dokumente"
     },
     "supply": {
         "title": "Beschaffungsanfragen",
@@ -161,8 +171,6 @@
         "profile": "Mein Profil",
         "settingsMenu": "Einstellungen",
         "logout": "Abmelden",
-        "sidebarPin": "Seitenleiste anheften",
-        "sidebarCollapse": "Seitenleiste einklappen",
         "quickCreate": "Schnell erstellen",
         "online": "Online",
         "serviceReports": "Rapporte",
@@ -188,7 +196,9 @@
             "add": "Tab hinzufügen",
             "menuTitle": "Neuen Tab öffnen",
             "close": "Tab schließen"
-        }
+        },
+        "backTo": "Zurück zu {{page}}",
+        "sidebarOpen": "Menü öffnen"
     },
     "common": {
         "appTitle": "Offitec Verwaltungspanel",
@@ -491,7 +501,7 @@
             "role": "Systemrolle",
             "roleSelect": "Rolle auswählen",
             "companies": "Zugängliche Firmen",
-            "companiesHint": "Wählen Sie die Firmen, in denen die Person arbeiten und die sie in der Firmenauswahl sehen darf. Ohne Auswahl bleiben alle Firmen des Firmenbaums zugänglich.",
+            "companiesHint": "Wählen Sie die Firmen, in denen die Person arbeitet und die sie in der Firmenauswahl sieht. Ohne Auswahl gilt nur die Firma, unter der sie angelegt wurde.",
             "modulePackageMovedHint": "Zugängliche Seiten werden pro Rolle festgelegt, nicht pro Person: Bearbeiten Sie das Modulpaket der Rolle in der Rollenverwaltung.",
             "errorRequired": "Vorname, Nachname, E-Mail und temporäres Passwort sind erforderlich.",
             "successUpdate": "Mitarbeiter aktualisiert.",
@@ -991,7 +1001,8 @@
             "successImageSave": "Bild gespeichert.",
             "errorPdfOnly": "Es können nur PDF-Dateien hochgeladen werden.",
             "errorPdfSize": "PDF überschreitet die 5-MB-Grenze.",
-            "successPdfSave": "Briefkopf-PDF gespeichert."
+            "successPdfSave": "Briefkopf-PDF gespeichert.",
+            "companyNameHint": "Wird aus der Firmenauswahl oben rechts übernommen: gedruckt wird immer der Name des aktiven Mandanten."
         },
         "mail": {
             "breadcrumb": "Einstellungen › E-Mail",
@@ -1236,8 +1247,6 @@
         "line_loglari": "Zeile Loglari",
         "line_price": "Zeile Preis",
         "line_select": "Zeile auswählen",
-        "move_up": "Nach oben verschieben",
-        "move_down": "Nach unten verschieben",
         "line_sil": "Zeile Sil",
         "line_silindi": "Zeile gelöscht.",
         "linked_products": "Linked Produkte",
@@ -1293,6 +1302,8 @@
         "order_create": "Auftrag erstellen",
         "order_create_with_options": "Auftrag mit Optionen erstellen…",
         "order_created": "Auftrag erstellt",
+        "order_already_created": "Für dieses Angebot wurde bereits ein Auftrag erstellt.",
+        "project_created_from_tender": "Auftrag/Projekt erstellt. Die Terminvorschläge aus der Angebots-Mail wurden als gesperrte Termine ins Projekt übernommen.",
         "order_olusturulamadi": "Auftrag konnte nicht erstellt werden",
         "order_project_or_direct_question": "Wird es dem Projekt hinzugefügt oder direkt verrechnet?",
         "order_choice_required": "Hier müssen Sie eine Auswahl treffen.",
@@ -1302,6 +1313,10 @@
         "output_formati": "Ausgabeformat",
         "pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor": "PDF Ciktisinda Duz Metin Ve Madde Isaretleri Kor",
         "pdf_export": "PDF exportieren",
+        "pdf_export_de": "PDF exportieren",
+        "pdf_export_en": "PDF Export",
+        "pdf_export_tr": "PDF dışa aktar",
+        "pdf_language_question": "In welcher Sprache soll das Angebot erstellt werden?",
         "pdf_gorsel_add": "PDF-Bild hinzufügen",
         "pdf_ile_tender_maili_gonder": "Angebots-E-Mail mit PDF senden",
         "pdf_indirildi": "PDF Indirildi",
@@ -1495,7 +1510,11 @@
         "mail_not_sent": "Nicht gesendet",
         "delivery_order_create": "Rechnung für Auftrag erstellen",
         "project_code_auto_hint": "Der Projektcode wird automatisch vergeben (z. B. PR-2026-10001) und ist zugleich der Projektname.",
-        "delivery_date_required": "Für einen Lieferauftrag ist das Lieferdatum erforderlich."
+        "delivery_date_required": "Für einen Lieferauftrag ist das Lieferdatum erforderlich.",
+        "move_line_hint": "Zeile verschieben: an die gewünschte Stelle ziehen oder die Zielposition anklicken (Esc bricht ab)",
+        "copy_offer": "Angebot kopieren",
+        "tender_kopyalandi": "Angebot als {{number}} kopiert.",
+        "tender_kopyalanamadi": "Angebot konnte nicht kopiert werden."
     },
     "auto": {
         "0_ise_hareket_yok": "Keine Bewegung bei 0",

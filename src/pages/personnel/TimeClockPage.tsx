@@ -48,6 +48,11 @@ export const TimeClockPage = () => {
     const activity = useClockActivity();
 
     const handleScan = useCallback(async (token: string) => {
+        /* SOLANGE DIE BEGRÜSSUNG STEHT, WIRD NICHT GESCANNT (Vorgabe
+           27.08.2026): erst wenn die Karte wieder verschwunden ist, nimmt die
+           Fläche den nächsten Code an. Sonst stempelte ein noch vorgehaltener
+           Ausweis sich nach der Sperrzeit gleich wieder aus. */
+        if (welcome) return;
         try {
             const result = await personnelApi.scan(token);
             showWelcome(result);
@@ -61,7 +66,7 @@ export const TimeClockPage = () => {
                 || t('personnel.clock.scanFailed'),
             );
         }
-    }, [showWelcome, weekOpen, week, activity]);
+    }, [welcome, showWelcome, weekOpen, week, activity]);
 
     const scanner = useQrScanner({ onScan: handleScan });
 
@@ -111,6 +116,11 @@ export const TimeClockPage = () => {
                     <p className="mt-1 text-center text-[12.5px] text-slate-400 dark:text-white/45">
                         {t('personnel.clock.alwaysOnHint')}
                     </p>
+                    {scanner.state === 'error' && scanner.errorDetails && (
+                        <pre className="mt-4 max-h-44 w-full max-w-[760px] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-red-300 bg-red-50 p-3 text-left font-mono text-[12px] leading-relaxed text-red-900">
+                            {scanner.errorDetails}
+                        </pre>
+                    )}
                 </section>
 
                 <aside className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/15 dark:bg-transparent">

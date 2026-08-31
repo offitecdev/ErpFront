@@ -14,6 +14,10 @@
   --ofi-d-surface: #17191c;     /* cards / tables / charts / structures */
   --ofi-d-surface-2: #1d2024;   /* table headers */
   --ofi-d-surface-3: #22242a;   /* wells / subtle raised */
+  /* The shell — header + module rail. It sits BELOW the page, not above it:
+     see the `.ofi-shell-white` block in styles/refine.css for why the frame
+     darkens in the dark theme where it lightens in the light one. */
+  --ofi-d-shell: #0a0b0d;       /* header + rail: the frame around the canvas */
   --ofi-d-hover: #2b2721;       /* every hover — warm, gold-cast */
   --ofi-d-hover-strong: #35301f; /* pressed / selected rows */
   --ofi-d-glass: rgba(23, 25, 28, 0.78); /* frosted overlays only */
@@ -842,6 +846,35 @@ html.dark body,
   background-color: var(--ofi-d-hover) !important;
 }
 
+/* Long-press move (index.css): the lifted row and the drop line take the
+   app's gold instead of navy; the greyed rows need nothing extra — grayscale
+   plus opacity reads the same on the dark surface. */
+.dark table[data-tender-detail-table] tbody tr[data-row-moving] td {
+  background-color: var(--ofi-d-hover-strong) !important;
+  box-shadow: inset 0 1px 0 var(--ofi-d-wheat-border), inset 0 -1px 0 var(--ofi-d-wheat-border);
+}
+.dark table[data-tender-detail-table] tbody tr[data-row-moving] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ofi-d-wheat), inset 0 1px 0 var(--ofi-d-wheat-border), inset 0 -1px 0 var(--ofi-d-wheat-border) !important;
+}
+.dark table[data-tender-detail-table] tbody tr[data-drop-before] td {
+  box-shadow: inset 0 2px 0 0 var(--ofi-d-wheat) !important;
+}
+.dark table[data-tender-detail-table] tbody tr[data-drop-after] td {
+  box-shadow: inset 0 -2px 0 0 var(--ofi-d-wheat) !important;
+}
+.dark .ofi-quote-move-hint {
+  background: var(--ofi-d-wheat-solid);
+  color: var(--ofi-d-on-accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.dark .ofi-quote-move-hint > button {
+  background: rgba(20, 15, 5, 0.16);
+  color: var(--ofi-d-on-accent);
+}
+.dark .ofi-quote-move-hint > button:hover {
+  background: rgba(20, 15, 5, 0.28);
+}
+
 /* ── Text selection & caret ──
    The browser default is blue, and index.css paints the light-mode selection
    navy (`.ant-input::selection`) — neither belongs on a dark, gold-accented UI.
@@ -1056,17 +1089,189 @@ html.dark body,
   border-bottom-color: var(--ofi-d-border);
 }
 
-/* ── Unified calendar chips ── */
-.dark .ofi-ucal-chip--planned { background: transparent; border-color: #8fa2ff; color: #b9c5ff; }
-.dark .ofi-ucal-chip--planned:hover { background: rgba(143, 162, 255, 0.12); }
-.dark .ofi-ucal-chip--ongoing { background: #23307f; color: #fff; }
-.dark .ofi-ucal-chip--done { background: #0c8a60; color: #eafff6; }
-.dark .ofi-ucal-chip--cancelled { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.4); }
-.dark .ofi-ucal-chip--meeting { background: #5d4bc4; color: #f1eeff; }
-.dark .ofi-ucal-chip--maintenance { background: #9a4a08; color: #ffedd7; }
-.dark .ofi-ucal-dot--planned { background: transparent; box-shadow: inset 0 0 0 1.5px #8fa2ff; }
-.dark .ofi-ucal-dot--ongoing { background: #8fa2ff; }
-.dark .ofi-ucal-slot:hover { background: rgba(230, 207, 158, 0.1); }
+/* ── Übersichtslisten (index.css "ÜBERSICHTSLISTEN (`data-list-table`)") ──
+   Nur die Farbnamen werden umgehängt; Maße, Kartenaufbau und Umbrüche stehen
+   einmal in index.css und gelten für beide Themen. */
+.dark table[data-list-table] {
+  --ofi-list-card-bg: var(--ofi-d-surface-2);
+  --ofi-list-card-border: var(--ofi-d-border);
+  --ofi-list-strip-bg: var(--ofi-d-surface);
+  --ofi-list-strip-border: var(--ofi-d-border);
+  --ofi-list-label: rgba(255, 246, 232, 0.55);
+  --ofi-list-rule: var(--ofi-d-border);
+}
+
+/* ── Sütun genişletme tutamacı (index.css "SÜTUN GENİŞLETME TUTAMACI") ──
+   Karanlıkta gri yerine sıcak beyaz tonları; etkin kulp altın olur. Sürükleme
+   sırasındaki gri-tonlama filtresi tema bağımsızdır, burada tekrarlanmaz. */
+.dark .ofi-col-grip::before { background: rgba(255, 246, 232, 0.22); }
+.dark .ofi-col-grip:hover::before { background: rgba(255, 246, 232, 0.42); }
+.dark .ofi-col-grip:active::before,
+.dark th[data-resize-active] .ofi-col-grip::before { background: var(--ofi-d-wheat-solid); }
+
+/* ── Unified calendar chips ──
+   Same Google palette as light mode (see index.css), only lifted off the
+   #151616 grid: hues that Google keeps dark for white paper — Blueberry,
+   Basil, Grape — move up one step, the already bright ones (Peacock,
+   Tangerine, Sage) stay exactly as they are. Borderless like the reference;
+   the 2px the grid leaves between two cards does the separating. Text is pure
+   white on every filled card, never a dimmed rgba (user request 17.08.2026 —
+   as legible as the reference calendar, in dark mode too). */
+.dark .ofi-ucal-chip--planned { background: #039be5; border-color: transparent; color: #fff; }
+.dark .ofi-ucal-chip--planned:hover { background: #29a8ea; }
+
+.dark .ofi-ucal-chip--ongoing { background: #5c6bc0; border-color: transparent; color: #fff; }
+.dark .ofi-ucal-chip--ongoing:hover { background: #7986cb; }
+
+.dark .ofi-ucal-chip--done { background: #0e964d; border-color: transparent; color: #fff; }
+.dark .ofi-ucal-chip--done:hover { background: #12ad5a; }
+
+.dark .ofi-ucal-chip--cancelled { background: rgba(255, 255, 255, 0.1); border-color: transparent; color: rgba(255, 255, 255, 0.72); }
+.dark .ofi-ucal-chip--cancelled .ofi-ucal-chip__meta { color: rgba(255, 255, 255, 0.6); }
+.dark .ofi-ucal-chip--cancelled:hover { background: rgba(255, 255, 255, 0.13); }
+
+.dark .ofi-ucal-chip--meeting { background: #a63bc4; border-color: transparent; color: #fff; }
+.dark .ofi-ucal-chip--meeting:hover { background: #b451d0; }
+
+.dark .ofi-ucal-chip--maintenance { background: #f4511e; border-color: transparent; color: #fff; }
+.dark .ofi-ucal-chip--maintenance:hover { background: #ff6a3d; }
+
+.dark .ofi-ucal-chip:focus-visible { outline-color: var(--ofi-d-wheat-solid); }
+
+.dark .ofi-ucal-dot--planned { background: #039be5; box-shadow: none; }
+.dark .ofi-ucal-dot--ongoing { background: #5c6bc0; }
+.dark .ofi-ucal-dot--done { background: #0e964d; }
+.dark .ofi-ucal-dot--cancelled { background: rgba(255, 255, 255, 0.28); }
+.dark .ofi-ucal-dot--meeting { background: #a63bc4; }
+.dark .ofi-ucal-dot--maintenance { background: #f4511e; }
+
+.dark .ofi-ucal-chip--task { background: #33b679; border-color: transparent; color: #fff; }
+.dark .ofi-ucal-chip--task:hover { background: #46c98c; }
+.dark .ofi-ucal-chip--taskDone { background: rgba(255, 255, 255, 0.1); border-color: transparent; color: rgba(255, 255, 255, 0.72); }
+.dark .ofi-ucal-chip--taskDone .ofi-ucal-chip__meta { color: rgba(255, 255, 255, 0.6); }
+.dark .ofi-ucal-chip--taskDone:hover { background: rgba(255, 255, 255, 0.12); }
+.dark .ofi-ucal-dot--task { background: #33b679; }
+.dark .ofi-ucal-dot--taskDone { background: rgba(255, 255, 255, 0.28); }
+/* Der Aufgabenkreis der erledigten Karte ist gefuellt — das Haekchen darin
+   muss darum die FLAECHE der Karte tragen, nicht Weiss: auf dem hellen Grau
+   von Hell ist das Weiss, im Dunkeln der dunkle Grund. */
+.dark .ofi-ucal-chip--taskDone .ofi-ucal-chip__mark path { stroke: var(--ofi-d-surface); }
+
+/* ── Calendar module (pages/calendar) ──────────────────────────────────────
+   The module paints exclusively from the `--ofi-cal-*` tokens declared in
+   index.css, so dark mode is this table and nothing else — no second copy of
+   the rules. `html.dark` (0,1,1) is required to beat index.css's `:root`. */
+html.dark {
+  --ofi-cal-surface: var(--ofi-d-surface);
+  --ofi-cal-surface-2: var(--ofi-d-surface-2);
+  /* Days outside the shown month sit one step DOWN, towards the page, so the
+     month keeps its shape instead of flattening into one slab. */
+  --ofi-cal-surface-3: #131518;
+  --ofi-cal-hover: var(--ofi-d-hover);
+  --ofi-cal-border: var(--ofi-d-border);
+  --ofi-cal-border-soft: rgba(255, 246, 232, 0.07);
+  --ofi-cal-line: rgba(255, 246, 232, 0.05);
+  --ofi-cal-text: var(--ofi-d-text);
+  --ofi-cal-text-2: var(--ofi-d-text-2);
+  --ofi-cal-muted: var(--ofi-d-text-4);
+  --ofi-cal-faint: rgba(255, 255, 255, 0.3);
+  --ofi-cal-accent: var(--ofi-d-wheat-solid);
+  --ofi-cal-accent-hover: var(--ofi-d-wheat-strong);
+  --ofi-cal-on-accent: var(--ofi-d-on-accent);
+  --ofi-cal-accent-soft: var(--ofi-d-wheat-soft);
+  --ofi-cal-accent-tint: var(--ofi-d-wheat-softer);
+  --ofi-cal-accent-line: var(--ofi-d-wheat-border);
+  --ofi-cal-tab-active-bg: var(--ofi-d-wheat-soft);
+  --ofi-cal-tab-active-text: var(--ofi-d-wheat-strong);
+  --ofi-cal-shadow: 0 22px 56px rgba(0, 0, 0, 0.62), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --ofi-cal-shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.5);
+  --ofi-cal-task: #17b7a6;
+  --ofi-cal-danger: #f87171;
+  --ofi-cal-now: #fb7185;
+  /* Draft = the same Peacock as a saved card, exactly as the reference. */
+  --ofi-cal-draft: #039be5;
+  --ofi-cal-draft-border: transparent;
+}
+/* A floating card is an OVERLAY, not a panel: it needs the raised tone, or it
+   reads as a hole cut in the page. */
+.dark .ofi-float-card { background: var(--ofi-d-surface-3); }
+.dark .ofi-cal-input,
+.dark .ofi-cal-search { background: rgba(255, 255, 255, 0.07); }
+/* ETIKETTEN (25.08.2026). Der Wahlknopf ist ein FELD und trägt darum dieselbe
+   durchscheinende Fläche wie die Eingabefelder daneben — eine helle Fläche
+   leuchtete aus der Karte heraus. Die Pille selbst behält ihre gewählte Farbe:
+   sie IST die Aussage und wird im Dunkeln nicht abgedunkelt. */
+.dark #root .ofi-cal-labelpick,
+.dark body > :not(#root) .ofi-cal-labelpick { background: rgba(255, 255, 255, 0.07); }
+.dark #root .ofi-cal-labelpick:hover,
+.dark body > :not(#root) .ofi-cal-labelpick:hover { background: rgba(255, 255, 255, 0.1); }
+.dark .ofi-cal-labelmenu,
+.dark .ofi-cal-addmenu { background: var(--ofi-d-surface-3); border-color: rgba(255, 255, 255, 0.12); }
+.dark .ofi-cal-labellist__head { border-color: rgba(255, 255, 255, 0.1); }
+.dark .ofi-cal-swatch { border-color: rgba(255, 255, 255, 0.14); }
+.dark #root .ofi-cal-swatch.is-on,
+.dark body > :not(#root) .ofi-cal-swatch.is-on { box-shadow: 0 0 0 2px var(--ofi-d-surface-3), 0 0 0 4px var(--ofi-cal-accent); }
+.dark .ofi-cal-labelcard__warn { background: rgba(248, 113, 113, 0.16); color: #f87171; }
+.dark .ofi-cal-input:hover { background: rgba(255, 255, 255, 0.1); }
+.dark .ofi-cal-input:focus { background: var(--ofi-d-surface); }
+.dark .ofi-cal-search:focus-within { background: var(--ofi-d-surface); box-shadow: 0 0 0 1px var(--ofi-d-border-strong); }
+/* Der Papierkorb einer Tageszeile im Einsatzplan: im Dunkeln trägt das Rot
+   keine helle Fläche, sonst leuchtet es aus der Karte heraus. */
+.dark #root .ofi-cal-dayrow__drop:hover,
+.dark body > :not(#root) .ofi-cal-dayrow__drop:hover { background: rgba(248, 113, 113, 0.14); color: #f87171; }
+/* Terminunterlagen: die Bühne ist eine Fläche AUF der Karte, kein Loch — im
+   Dunkeln braucht sie deshalb den gehobenen Ton, nicht den der Seite. Die
+   Pfeile bleiben hell: sie liegen über dem Bild und müssen sich davon
+   abheben, auch wenn das Bild dunkel ist. */
+.dark .ofi-docs__note { background: rgba(255, 255, 255, 0.06); color: var(--ofi-d-text); }
+.dark .ofi-docs-stage__frame { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+.dark #root .ofi-docs-stage__nav,
+.dark body > :not(#root) .ofi-docs-stage__nav { background: rgba(20, 22, 26, .92); border-color: rgba(255, 255, 255, 0.16); color: var(--ofi-d-text); }
+.dark #root .ofi-docs-stage__nav:hover,
+.dark body > :not(#root) .ofi-docs-stage__nav:hover { background: rgba(30, 33, 38, .96); }
+.dark #root .ofi-docs-strip__chip,
+.dark body > :not(#root) .ofi-docs-strip__chip { background: transparent; border-color: rgba(255, 255, 255, 0.12); }
+/* Die Spalten der Auskunftskarte: Flächen AUF der Karte, nicht Löcher darin. */
+.dark .ofi-cal-detailcol { border-color: rgba(255, 255, 255, 0.1); }
+.dark #root .ofi-cal-detailfoot .ofi-cal-btn,
+.dark body > :not(#root) .ofi-cal-detailfoot .ofi-cal-btn { border-color: rgba(255, 255, 255, 0.14); background: transparent; }
+/* Die Seitenspalte trägt im Dunkeln einen DECKENDEN Ton, keinen durchsichtigen:
+   ihr Kopf bleibt beim Rollen stehen und muss den Inhalt darunter verdecken —
+   mit einer durchscheinenden Fläche läse man beides übereinander. */
+.dark .ofi-cal-detailcol.is-pane,
+.dark .ofi-cal-panehead { background: var(--ofi-d-surface-3); }
+.dark .ofi-cal-extnote { background: rgba(255, 255, 255, 0.05); }
+/* Die Tagesleiste des Montagebildschirms. */
+.dark .ofi-montage-days { border-color: rgba(255, 255, 255, 0.1); background: #17191c; }
+.dark #root .ofi-montage-days__day { border-color: rgba(255, 255, 255, 0.1); background: #17191c; }
+.dark #root .ofi-montage-days__day:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+.dark .ofi-montage-days__date { color: var(--ofi-d-text); }
+.dark #root .ofi-cal-createbtn { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+.dark #root .ofi-cal-createbtn:hover { background: var(--ofi-d-hover); }
+.dark .ofi-cal-warn { background: rgba(245, 158, 11, 0.14); color: #f4c15f; }
+
+/* Aufgaben-Stapel (pages/crm/tasks): er lebt von den `--ofi-cal-*` Werten
+   oben — eigene Farben hat nur die HERKUNFT einer Karte. Im Dunkeln werden die
+   hellen Tönungen zu durchscheinenden Schleiern, sonst leuchteten sie als
+   weisse Kästen aus dem Stapel heraus. Weizen statt Marineblau für "selbst
+   zugewiesen", damit es mit dem Akzent des Dunkelmodus zusammenpasst.
+
+   Die Erledigungskarte hängt im Portal an <body> — `.dark` sitzt am
+   <html>-Element, <body> erbt es also. Ihre Flächen kommen aus den Tokens; hier
+   steht nur der rote Löschstreifen, der eine eigene Deckkraft braucht. */
+.dark .ofi-taskcard-pop__confirm { background: rgba(248, 113, 113, 0.16); }
+.dark .ofi-taskboard,
+.dark .ofi-taskbar {
+  --ofi-task-self: var(--ofi-d-wheat-strong);
+  --ofi-task-self-bg: var(--ofi-d-wheat-softer);
+  --ofi-task-self-border: var(--ofi-d-wheat-border);
+  --ofi-task-incoming: #b79bff;
+  --ofi-task-incoming-bg: rgba(139, 92, 246, 0.14);
+  --ofi-task-incoming-border: rgba(139, 92, 246, 0.3);
+}
+.dark .ofi-taskchip__legend.is-self { background: var(--ofi-d-wheat-solid); }
+.dark .ofi-taskchip__legend.is-incoming { background: #b79bff; }
+
 
 /* Quote address read-back: a raised translucent well so the block still reads as
    a block against the card it sits in, with its text at full secondary contrast
@@ -1200,3 +1405,62 @@ html.dark body,
 .dark body > div:not(#root) .ant-btn-default :where(span, svg) {
   color: inherit !important;
 }
+
+/* Ein/Aus-Schalter (ui-shared/Switch) — wie der Dunkelmodus-Schalter im
+   Profilmenü: ein = Weizen, aus = gedämpftes Weiß. */
+.dark button.ofi-switch {
+  background: rgba(255, 255, 255, 0.2);
+}
+.dark button.ofi-switch[aria-checked="true"] {
+  background: var(--ofi-d-wheat);
+}
+.dark button.ofi-switch:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+/* ── Quote page fresh look (index.css "QUOTE PAGE — FRESH LOOK") ──
+   The page paints from the calendar tokens, which this file already re-points
+   for dark; only the places where earlier rules in this file force their own
+   colours (tabs, table header, grey fields) are corrected here. */
+.dark #root .ofi-quote-page .ofi-quote-control { background: rgba(255, 255, 255, 0.07); }
+.dark #root .ofi-quote-page .ofi-quote-control:hover { background: rgba(255, 255, 255, 0.1); }
+.dark #root .ofi-quote-page .ofi-quote-control:focus,
+.dark #root .ofi-quote-page .ofi-quote-control:focus-within { background: var(--ofi-d-surface); border-color: var(--ofi-d-wheat) !important; }
+/* The workspace tabs are NOT re-tinted per page: the quote strip and the
+   project workflow menu are the same component style, and the gold active-tab
+   rules further up this file already cover both. */
+.dark .ofi-quote-page table[data-tender-detail-table] th {
+  background: var(--ofi-d-surface) !important;
+  border-bottom-color: var(--ofi-d-border) !important;
+}
+.dark .ofi-quote-page table[data-tender-detail-table] { --quote-grid-line: var(--ofi-d-border); }
+.dark .ofi-quote-page table[data-tender-detail-table] tbody tr[data-row-selected='true'] td:first-child { box-shadow: inset 3px 0 0 var(--ofi-d-wheat) !important; }
+.dark .ofi-quote-page .ofi-addr-box { background: rgba(255, 255, 255, 0.06); border-color: transparent; }
+.dark #root .ofi-quote-page .ofi-quote-btn.is-secondary,
+.dark #root .ofi-quote-topbar .ofi-quote-btn.is-secondary { color: var(--ofi-d-wheat-strong) !important; }
+/* Tender popups: menus and dialogs sit on the raised dark surface. */
+.dark .ofi-tp-menu { border-color: var(--ofi-d-border); }
+.dark #root .ofi-cal-input,
+.dark #root select.ofi-cal-input,
+.dark #root textarea.ofi-cal-input { background: rgba(255, 255, 255, 0.07); color: var(--ofi-d-text); }
+.dark #root .ofi-cal-input:hover:not(:disabled):not(:focus) { background: rgba(255, 255, 255, 0.1); border-color: transparent; }
+.dark #root .ofi-cal-input:focus { background: var(--ofi-d-surface); border-color: var(--ofi-d-wheat) !important; }
+.dark .ofi-quote-page { --ofi-q-text: var(--ofi-d-text); }
+
+/* ── Mail / Outlook (pages/crm/mail) — liest die `--ofi-cal-*`-Tokens; hier nur
+   die Tönungen, die im Dunkeln als helle Kästen herausleuchten würden. */
+.dark .ofi-mail-split,
+.dark .ofi-mail-account { background: var(--ofi-d-surface-2); }
+.dark .ofi-mail-attachment,
+.dark .ofi-mail-linkpanel { background: var(--ofi-d-surface-3); }
+.dark .ofi-mail-tag.is-entity { background: rgba(3, 155, 229, 0.22); color: #7cc8f5; }
+.dark .ofi-mail-tag.is-owner { background: rgba(142, 36, 170, 0.28); color: #d7a3ea; }
+.dark .ofi-mail-account__ok { color: #4ade80; }
+.dark #root .ofi-mail-row.is-active { background: var(--ofi-d-wheat-soft); }
+.dark body > :not(#root) .ofi-mailc__chip button:hover { background: rgba(255, 255, 255, 0.12); }
+.dark .ofi-mail-tag.is-internal { background: rgba(23, 183, 166, 0.22); color: #6ee7d3; }
+.dark .ofi-quick-pop.ofi-mail-pop { background: var(--ofi-d-surface-3) !important; }
+.dark .ofi-mailc__recipient { background: var(--ofi-d-wheat-soft); color: var(--ofi-d-wheat-strong); }
+.dark .ofi-mailc__recipient button:hover { background: rgba(255, 255, 255, 0.14); }
+.dark .ofi-mailconfirm__row { background: var(--ofi-d-surface-3); }
+.dark .ofi-mailconfirm-card { background: var(--ofi-d-surface-3); }

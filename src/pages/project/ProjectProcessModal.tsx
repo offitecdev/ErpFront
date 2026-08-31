@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-    AlertTriangle,
     Check,
-    CheckCircle as CheckCircle2,
     Plus,
     Receipt as ReceiptText,
 } from '@/components/icons/antIconCompat';
 
-import { Modal } from '../../components/ui-shared/Modal';
-import { Button } from '../../components/ui-shared/Button';
-import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { BillingButton } from '../../components/billing/BillingButton';
+import { SkeletonBar } from '../../components/ui-shared/Loader';
+import {
+    PopupActions,
+    PopupButton,
+    PopupCaption,
+    PopupDialog,
+    PopupEmpty,
+    PopupNote,
+} from '../../components/ui-shared/PopupKit';
+import { BillingDialog } from '../../components/billing/BillingDialog';
 import { SpecialClosureModal } from './SpecialClosureModal';
 import { useAuthStore } from '../../store/authStore';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
@@ -21,6 +25,10 @@ import type { InvoiceDto, MyOrderDto } from '../../types/billing';
 import type { ProjectDto } from '../../types/project';
 
 import { t } from '@/i18n/translate';
+
+/* The billing sheet is opened from INSIDE this dialog, so it has to stack above
+   it (the dialog itself sits at 150). */
+const BILLING_SHEET_Z = 200;
 
 type Phase = 'overview' | 'technical' | 'billing' | 'done';
 
@@ -37,22 +45,31 @@ interface BillItem {
     isAddon: boolean;
 }
 
-const DoneChip = ({ done, pendingLabel }: { done: boolean; pendingLabel?: string }) => (
-    <StatusChip variant={done ? 'active' : 'warning'}>
-        {done ? <Check size={14} strokeWidth={3} aria-label={t('projects.flow.stateCompleted')} /> : (pendingLabel || t('projects.flow.statePending'))}
-    </StatusChip>
-);
-
-/** Plain "label: ✓ / Pending" line — no colored badge, used on the orders side. */
-const OrderStat = ({ label, done }: { label: string; done: boolean }) => (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px] text-slate-600">
-        <span className="font-medium">{label}:</span>
+/** Done / still open, in the popup's own palette. */
+const StatePill = ({ done, pendingLabel }: { done: boolean; pendingLabel?: string }) => (
+    <span className={`ofi-tp-pill ${done ? 'is-done' : 'is-open'}`}>
         {done
-            ? <Check size={14} strokeWidth={3} className="text-emerald-600" aria-label={t('projects.flow.stateCompleted')} />
-            : <span className="text-slate-400">{t('projects.flow.statePending')}</span>}
+            ? <><Check size={12} strokeWidth={3} />{t('projects.flow.stateCompleted')}</>
+            : (pendingLabel || t('projects.flow.statePending'))}
     </span>
 );
 
+/** "Technik: ✓ / offen" readout on the right of an order row. */
+const OrderStat = ({ label, done }: { label: string; done: boolean }) => (
+    <span className="ofi-tp-state">
+        {label}
+        {done
+            ? <Check size={13} strokeWidth={3} className="ofi-tp-state__value is-done" aria-label={t('projects.flow.stateCompleted')} />
+            : <span className="ofi-tp-state__value is-open">{t('projects.flow.statePending')}</span>}
+    </span>
+);
+
+/**
+ * The project completion wizard — a centred dialog of the app popup kit
+ * (18.08.2026): it asks a question that must be answered, so unlike the details
+ * readout it dims the page behind it. Three stops at most: the process picture,
+ * the unfinished handovers, the unbilled orders — then the completion curtain.
+ */
 export const ProjectProcessModal = ({
     project,
     mode,
@@ -73,6 +90,8 @@ export const ProjectProcessModal = ({
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [showSpecialClosure, setShowSpecialClosure] = useState(false);
+    /** The order currently being invoiced from the billing step. */
+    const [billTarget, setBillTarget] = useState<BillItem | null>(null);
 
     const permissions = useAuthStore((state) => state.permissions);
     // "Special Closure" (Sonderabschluss) is a project-manager-only privilege.
@@ -181,216 +200,232 @@ export const ProjectProcessModal = ({
     };
 
     const generalDone = flow?.technicalStatus === 'completed' && billingComplete;
-    const generalStatusChip = (
-        <StatusChip variant={alreadyCompleted || generalDone ? 'active' : 'info'}>
-            {alreadyCompleted || generalDone ? t('projects.flow.stateCompleted') : t('projects.flow.stateOngoing')}
-        </StatusChip>
-    );
 
     const footer = (() => {
-        if (loading) return <Button variant="ghost" onClick={onClose}>{t('projects.complete.close')}</Button>;
+        if (loading) {
+            return (
+                <PopupActions>
+                    <PopupButton onClick={onClose}>{t('projects.complete.close')}</PopupButton>
+                </PopupActions>
+            );
+        }
         if (phase === 'done') {
-            return <Button variant="primary" onClick={() => (onCompleted ? onCompleted() : onClose())}>{t('projects.complete.close')}</Button>;
+            return (
+                <PopupActions>
+                    <PopupButton variant="primary" onClick={() => (onCompleted ? onCompleted() : onClose())}>
+                        {t('projects.complete.close')}
+                    </PopupButton>
+                </PopupActions>
+            );
         }
         if (phase === 'overview') {
             return (
-                <>
-                    {mode === 'complete' && canSpecialClose && !alreadyClosed && (
-                        // Pushed to the left of the footer; the rest stay right-aligned.
-                        <Button variant="danger" className="mr-auto" onClick={() => setShowSpecialClosure(true)}>
+                <PopupActions
+                    start={mode === 'complete' && canSpecialClose && !alreadyClosed && (
+                        // Left of the strip — a way out, not the way forward.
+                        <PopupButton variant="danger" onClick={() => setShowSpecialClosure(true)}>
                             {t('projects.specialClosure.button')}
-                        </Button>
+                        </PopupButton>
                     )}
-                    <Button variant="ghost" onClick={onClose}>{t('projects.complete.close')}</Button>
+                >
+                    <PopupButton onClick={onClose}>{t('projects.complete.close')}</PopupButton>
                     {mode === 'complete' && (
-                        <Button variant="primary" disabled={alreadyClosed} onClick={evaluate}>
+                        <PopupButton variant="primary" disabled={alreadyClosed} onClick={evaluate}>
                             {t('projects.complete.completeProject')}
-                        </Button>
+                        </PopupButton>
                     )}
-                </>
+                </PopupActions>
             );
         }
         if (phase === 'technical') {
             return (
-                <>
-                    <Button variant="ghost" onClick={() => setPhase('overview')}>{t('projects.complete.back')}</Button>
-                    <Button variant="primary" disabled={technicalIncomplete.length > 0} onClick={evaluate}>
+                <PopupActions>
+                    <PopupButton onClick={() => setPhase('overview')}>{t('projects.complete.back')}</PopupButton>
+                    <PopupButton variant="primary" disabled={technicalIncomplete.length > 0} onClick={evaluate}>
                         {t('projects.complete.continue')}
-                    </Button>
-                </>
+                    </PopupButton>
+                </PopupActions>
             );
         }
         // billing
         return (
-            <>
-                <Button variant="ghost" onClick={() => setPhase('overview')}>{t('projects.complete.back')}</Button>
-                <Button variant="primary" loading={submitting} disabled={!billingComplete} onClick={() => void doComplete()}>
+            <PopupActions>
+                <PopupButton onClick={() => setPhase('overview')}>{t('projects.complete.back')}</PopupButton>
+                <PopupButton variant="primary" loading={submitting} disabled={!billingComplete} onClick={() => void doComplete()}>
                     {t('projects.complete.completeProject')}
-                </Button>
-            </>
+                </PopupButton>
+            </PopupActions>
         );
     })();
 
     return (
         <>
-        <Modal
-            open
-            onClose={onClose}
-            title={project.projectName}
-            description={t('projects.complete.processDesc')}
-            width="lg"
-            footer={footer}
-        >
-            {loading && <div className="h-40 animate-pulse rounded-lg bg-slate-100" />}
-
-            {!loading && phase === 'overview' && flow && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">{t('projects.complete.generalStatus')}</span>
-                        {generalStatusChip}
+            <PopupDialog
+                open
+                onClose={onClose}
+                title={project.projectName}
+                subtitle={t('projects.complete.processDesc')}
+                width={680}
+                footer={footer}
+            >
+                {loading && (
+                    <div className="space-y-2.5 py-1">
+                        <SkeletonBar className="h-10 rounded-lg" />
+                        <SkeletonBar className="h-24 rounded-lg" delayMs={120} />
                     </div>
+                )}
 
-                    <div className="grid grid-cols-2 gap-2.5">
-                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/70 bg-slate-50/50 px-3 py-2.5">
-                            <span className="text-[12px] font-semibold text-slate-600">{t('projects.flow.colTechnical')}</span>
-                            <DoneChip done={flow.technicalStatus === 'completed'} pendingLabel={t('projects.flow.stateOngoing')} />
+                {!loading && phase === 'overview' && flow && (
+                    <div className="space-y-1">
+                        <div className="ofi-tp-list">
+                            <div className="ofi-tp-row">
+                                <span className="ofi-tp-row__main">
+                                    <span className="ofi-tp-row__title">{t('projects.complete.generalStatus')}</span>
+                                </span>
+                                <span className={`ofi-tp-pill ${alreadyCompleted || generalDone ? 'is-done' : ''}`}>
+                                    {alreadyCompleted || generalDone ? t('projects.flow.stateCompleted') : t('projects.flow.stateOngoing')}
+                                </span>
+                            </div>
+                            <div className="ofi-tp-row">
+                                <span className="ofi-tp-row__main">
+                                    <span className="ofi-tp-row__title">{t('projects.flow.colTechnical')}</span>
+                                </span>
+                                <StatePill done={flow.technicalStatus === 'completed'} pendingLabel={t('projects.flow.stateOngoing')} />
+                            </div>
+                            <div className="ofi-tp-row">
+                                <span className="ofi-tp-row__main">
+                                    <span className="ofi-tp-row__title">{t('projects.flow.colBilling')}</span>
+                                </span>
+                                <StatePill done={billingComplete} />
+                            </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/70 bg-slate-50/50 px-3 py-2.5">
-                            <span className="text-[12px] font-semibold text-slate-600">{t('projects.flow.colBilling')}</span>
-                            <DoneChip done={billingComplete} />
-                        </div>
-                    </div>
 
-                    <div>
-                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.complete.orders')}</div>
-                        <div className="space-y-2">
-                            {flow.orders.length === 0 ? (
-                                <div className="rounded-md border border-slate-200 bg-white px-3 py-6 text-center text-[12px] text-slate-400">{t('projects.flow.noOrders')}</div>
-                            ) : flow.orders.map((order) => {
-                                const addonCount = orders.find((o) => o.id === order.id)?.addonSalesOrders?.length || 0;
-                                return (
-                                    <div key={order.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#272f67] text-white"><ReceiptText size={14} /></span>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="truncate font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</span>
+                        <PopupCaption>{t('projects.complete.orders')}</PopupCaption>
+                        {flow.orders.length === 0 ? (
+                            <PopupEmpty>{t('projects.flow.noOrders')}</PopupEmpty>
+                        ) : (
+                            <div className="ofi-tp-list">
+                                {flow.orders.map((order) => {
+                                    const addonCount = orders.find((o) => o.id === order.id)?.addonSalesOrders?.length || 0;
+                                    return (
+                                        <div key={order.id} className="ofi-tp-row">
+                                            <span className="ofi-tp-icon"><ReceiptText size={14} /></span>
+                                            <span className="ofi-tp-row__main">
+                                                <span className="ofi-tp-row__title ofi-tp-code">{order.orderNumber}</span>
                                                 {addonCount > 0 && (
-                                                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
-                                                        <Plus size={9} />{t('projects.complete.addonCount', { count: addonCount })}
+                                                    <span className="ofi-tp-row__meta">
+                                                        {t('projects.complete.addonCount', { count: addonCount })}
                                                     </span>
                                                 )}
-                                            </div>
+                                            </span>
+                                            <OrderStat label={t('projects.flow.colTechnical')} done={order.deliveryReport === 'completed'} />
+                                            <OrderStat label={t('projects.flow.colBilling')} done={billedForOrder(order.id) >= 100} />
                                         </div>
-                                        <OrderStat label={t('projects.flow.colTechnical')} done={order.deliveryReport === 'completed'} />
-                                        <OrderStat label={t('projects.flow.colBilling')} done={billedForOrder(order.id) >= 100} />
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {!loading && phase === 'technical' && flow && (
+                    <div className="space-y-1">
+                        <PopupNote tone="danger">
+                            <b>{t('projects.complete.technicalIncompleteTitle')}</b>
+                            <div>{t('projects.complete.technicalIncompleteDesc')}</div>
+                        </PopupNote>
+
+                        <div className="ofi-tp-list mt-3">
+                            {flow.orders.filter((o) => o.deliveryReport !== 'completed').map((order) => {
+                                const isSkipped = skipped.has(order.id);
+                                return (
+                                    <div key={order.id} className="ofi-tp-row">
+                                        <span className="ofi-tp-row__main">
+                                            <span className="ofi-tp-row__title ofi-tp-code">{order.orderNumber}</span>
+                                        </span>
+                                        <span className={`ofi-tp-pill ${isSkipped ? '' : 'is-open'}`}>
+                                            {isSkipped ? t('projects.complete.skipped') : t('projects.complete.technicalIncompleteBadge')}
+                                        </span>
+                                        {!isSkipped && (
+                                            <PopupButton onClick={() => skipOrder(order.id)}>
+                                                {t('projects.complete.skip')}
+                                            </PopupButton>
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {!loading && phase === 'technical' && flow && (
-                <div className="space-y-4">
-                    <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
-                        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-600" />
-                        <div>
-                            <div className="text-[13px] font-semibold text-red-700">{t('projects.complete.technicalIncompleteTitle')}</div>
-                            <div className="mt-0.5 text-[12px] text-red-700/80">{t('projects.complete.technicalIncompleteDesc')}</div>
-                        </div>
-                    </div>
+                {!loading && phase === 'billing' && (
+                    <div className="space-y-1">
+                        <PopupNote tone="success">
+                            <b>{t('projects.complete.billingGateTitle')}</b>
+                            <div>{t('projects.complete.billingGateDesc')}</div>
+                        </PopupNote>
 
-                    <div className="space-y-2">
-                        {flow.orders.filter((o) => o.deliveryReport !== 'completed').map((order) => {
-                            const isSkipped = skipped.has(order.id);
-                            return (
-                                <div key={order.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="font-mono text-[12.5px] font-semibold text-slate-800">{order.orderNumber}</div>
-                                        <div className="mt-0.5">
-                                            <StatusChip variant={isSkipped ? 'passive' : 'warning'}>
-                                                {isSkipped ? t('projects.complete.skipped') : t('projects.complete.technicalIncompleteBadge')}
-                                            </StatusChip>
+                        {billingComplete ? (
+                            <PopupNote tone="success" className="mt-3">{t('projects.complete.allBilled')}</PopupNote>
+                        ) : (
+                            <>
+                                <PopupCaption>{t('projects.complete.unbilledItems')}</PopupCaption>
+                                <div className="ofi-tp-list">
+                                    {unbilledItems.map((item) => (
+                                        <div key={item.id} className={`ofi-tp-row ${item.isAddon ? 'is-child' : ''}`}>
+                                            <span className={`ofi-tp-icon ${item.isAddon ? 'is-addon' : ''}`}>
+                                                {item.isAddon ? <Plus size={14} /> : <ReceiptText size={14} />}
+                                            </span>
+                                            <span className="ofi-tp-row__main">
+                                                <span className="ofi-tp-row__title ofi-tp-code">{item.label}</span>
+                                                <span className="ofi-tp-row__meta">
+                                                    {money(item.amount)}
+                                                    {item.isAddon ? ` · ${t('projects.complete.addonLabel')}` : ''}
+                                                </span>
+                                            </span>
+                                            <PopupButton onClick={() => setBillTarget(item)}>
+                                                {t('billing.buttonLabel')}
+                                            </PopupButton>
                                         </div>
-                                    </div>
-                                    {!isSkipped && (
-                                        <Button variant="secondary" size="sm" onClick={() => skipOrder(order.id)}>
-                                            {t('projects.complete.skip')}
-                                        </Button>
-                                    )}
-                                    {isSkipped && <CheckCircle2 size={18} className="shrink-0 text-slate-400" />}
+                                    ))}
                                 </div>
-                            );
-                        })}
+                            </>
+                        )}
                     </div>
-                </div>
-            )}
+                )}
 
-            {!loading && phase === 'billing' && (
-                <div className="space-y-4">
-                    <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#059669]" />
+                {!loading && phase === 'done' && (
+                    <div className="ofi-tp-done">
+                        <span className="ofi-tp-done__mark"><Check size={34} strokeWidth={3} /></span>
                         <div>
-                            <div className="text-[13px] font-semibold text-[#047857]">{t('projects.complete.billingGateTitle')}</div>
-                            <div className="mt-0.5 text-[12px] text-[#047857]/80">{t('projects.complete.billingGateDesc')}</div>
+                            <div className="ofi-tp-done__title">{t('projects.complete.projectCompleted')}</div>
+                            <div className="ofi-tp-done__desc">{t('projects.complete.projectCompletedDesc')}</div>
                         </div>
                     </div>
+                )}
+            </PopupDialog>
 
-                    {billingComplete ? (
-                        <div className="rounded-md border border-emerald-200/70 bg-emerald-50/60 px-3 py-2 text-[12px] font-medium text-[#047857]">{t('projects.complete.allBilled')}</div>
-                    ) : (
-                        <div>
-                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.complete.unbilledItems')}</div>
-                            <div className="space-y-2">
-                                {unbilledItems.map((item) => (
-                                    <div key={item.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                                        <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${item.isAddon ? 'bg-amber-100 text-amber-700' : 'bg-[#272f67] text-white'}`}>
-                                            {item.isAddon ? <Plus size={14} /> : <ReceiptText size={14} />}
-                                        </span>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="truncate font-mono text-[12.5px] font-semibold text-slate-800">{item.label}</span>
-                                                {item.isAddon && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">{t('projects.complete.addonLabel')}</span>}
-                                            </div>
-                                            <div className="mt-0.5 font-mono text-[11px] text-slate-400">{money(item.amount)}</div>
-                                        </div>
-                                        <BillingButton
-                                            target={{ type: 'order', id: item.id, label: item.label }}
-                                            onBilled={() => void reloadInvoices()}
-                                            size="sm"
-                                            variant="secondary"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {!loading && phase === 'done' && (
-                <div className="flex flex-col items-center justify-center gap-4 py-8 text-center">
-                    <Check size={80} strokeWidth={3} className="text-[#059669] duration-500 animate-in zoom-in-50" />
-                    <div>
-                        <div className="text-[16px] font-bold text-slate-900">{t('projects.complete.projectCompleted')}</div>
-                        <div className="mt-1 text-[13px] text-slate-500">{t('projects.complete.projectCompletedDesc')}</div>
-                    </div>
-                </div>
-            )}
-        </Modal>
-
-        {showSpecialClosure && (
-            <SpecialClosureModal
-                project={project}
-                onClose={() => setShowSpecialClosure(false)}
-                onClosed={() => {
-                    setShowSpecialClosure(false);
-                    if (onCompleted) onCompleted();
-                    else onClose();
-                }}
+            {/* Invoicing an order from the billing step — the sheet stacks above
+                this dialog and refreshes only the invoice figures on success. */}
+            <BillingDialog
+                open={Boolean(billTarget)}
+                target={billTarget ? { type: 'order', id: billTarget.id, label: billTarget.label } : null}
+                zIndex={BILLING_SHEET_Z}
+                onClose={() => setBillTarget(null)}
+                onSuccess={() => { setBillTarget(null); void reloadInvoices(); }}
             />
-        )}
+
+            {showSpecialClosure && (
+                <SpecialClosureModal
+                    project={project}
+                    onClose={() => setShowSpecialClosure(false)}
+                    onClosed={() => {
+                        setShowSpecialClosure(false);
+                        if (onCompleted) onCompleted();
+                        else onClose();
+                    }}
+                />
+            )}
         </>
     );
 };

@@ -11,14 +11,12 @@ import {
     XClose as X,
 } from '@/components/icons/antIconCompat';
 
-import { Button } from '@/components/ui-shared/Button';
-import { Field, Input, Select } from '@/components/ui-shared/Field';
-import { Modal } from '@/components/ui-shared/Modal';
 import { projectApi } from '@/lib/api/project';
 import { tenderApi } from '@/lib/api/tender';
 import { isRequestTimeout } from '@/lib/axios';
+import { parsePaymentStages } from '@/lib/paymentSchedule';
 import { useAuthStore } from '@/store/authStore';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
 import { useTenderStore } from '@/store/tenderStore';
 import type { OfferScheduleSlotDto, TenderMaterialUsageDto } from '@/types/tender';
 import type { ProjectMaterial } from '@/types/project';
@@ -33,7 +31,8 @@ import {
 } from '../../tenderDetailUtils';
 import { useMoneyFormat } from '../../utils/useMoneyFormat';
 import { RichTextMarkdownEditor, looksLikeRichHtml } from '../../TenderRichText';
-import { MailDraftsDrawer } from '../mail/MailDraftsDrawer';
+import { MailDraftsPopup } from '../../popups/MailDraftsPopup';
+import { PopupButton, PopupField, PopupNote, TenderDialog } from '../../popups/shell/TenderPopupShell';
 import { TenderCcField } from '../mail/TenderCcField';
 // Eski (klasik, sablon.pdf antetli) şablon — geri dönmek için bu satırı aç:
 // import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
@@ -68,7 +67,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
     // Prices in the modal (position list, material costs) follow the offer's currency.
     const fmtMoney = useMoneyFormat();
     const { user } = useAuthStore();
-    const { settings } = usePdfSettingsStore();
+    const settings = usePdfSettings();
     const [slots, setSlots] = useState<OfferScheduleSlotDto[]>([]);
     const [slotForm, setSlotForm] = useState({ date: dayjs().format('YYYY-MM-DD'), start: '09:00', end: '17:00', notes: '' });
     const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
@@ -262,6 +261,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 positions,
                 grandTotal,
                 totals: pdfTotals ?? null,
+                paymentStages: parsePaymentStages(detail.tender.paymentStages),
                 // The mailed PDF must be the same document as the exported one.
                 coverLetter: pdfContent.coverLetter,
                 closingImages: parseClosingImages(pdfContent.closingImages),
@@ -332,44 +332,33 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                 )}
 
                 {activeTab === 'mail' && (
-                    <div className="space-y-3">
+                    <div className="space-y-1">
                         <div className="flex items-center justify-end">
-                            <button
-                                type="button"
-                                title={t('tenders.mail_drafts')}
-                                onClick={() => setDraftsOpen(true)}
-                                className={`flex items-center gap-1.5 rounded-[2px] border px-2 py-1 text-[12px] font-medium transition-colors ${
-                                    draftsOpen
-                                        ? 'border-blue-700 bg-blue-50 text-blue-700'
-                                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800'
-                                }`}
-                            >
-                                <FileText size={13} />
+                            <PopupButton title={t('tenders.mail_drafts')} onClick={() => setDraftsOpen(true)} icon={<FileText size={14} />} className={draftsOpen ? 'is-open' : ''}>
                                 {t('tenders.mail_drafts')}
-                            </button>
+                            </PopupButton>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <Field label={t('settings.mail.senderName')}><Input value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} /></Field>
-                            <Field label={t('settings.mail.senderEmail')}><Input value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></Field>
+                        <div className="grid grid-cols-2 gap-x-3">
+                            <PopupField label={t('settings.mail.senderName')}><input className="ofi-cal-input w-full" value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} /></PopupField>
+                            <PopupField label={t('settings.mail.senderEmail')}><input className="ofi-cal-input w-full" value={form.fromEmail} onChange={(e) => setForm({ ...form, fromEmail: e.target.value })} /></PopupField>
                         </div>
-                        <Field label={t('tenders.alici')}><Input value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></Field>
+                        <PopupField label={t('tenders.alici')}><input className="ofi-cal-input w-full" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></PopupField>
                         {/* CC der Offerte: Tippen schlägt Kunde, Kontaktpersonen
                             und Mitarbeitende vor. Gilt auch für die
                             Auftragsbestätigung. */}
-                        <Field label={t('calendar.detail.cc')} hint={t('tenders.cc_hint')}>
+                        <PopupField label={t('calendar.detail.cc')} hint={t('tenders.cc_hint')}>
                             <TenderCcField tenderId={tenderId} value={ccEmails} onChange={handleCcChange} />
-                        </Field>
-                        <Field label={t('tenders.konu')}><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></Field>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-sm font-medium text-secondary">{t('tenders.additional_mesaj')}</span>
+                        </PopupField>
+                        <PopupField label={t('tenders.konu')}><input className="ofi-cal-input w-full" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} /></PopupField>
+                        <PopupField label={t('tenders.additional_mesaj')}>
                             <RichTextMarkdownEditor
                                 value={form.message}
                                 onChange={(message) => setForm((prev) => ({ ...prev, message }))}
                                 minHeight={220}
                                 placeholder=""
                             />
-                        </div>
-                        <div className="rounded-[2px] border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">{t('tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i')}</div>
+                        </PopupField>
+                        <PopupNote>{t('tenders.mail_gondermek_opsiyoneldir_order_olusturmak_i')}</PopupNote>
                     </div>
                 )}
 
@@ -377,18 +366,18 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
                         <div className="xl:col-span-2">
                             <div className="space-y-3 rounded-[2px] border border-slate-200 bg-white p-4">
-                                <Field label={t('common.date')}><Input type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} /></Field>
+                                <PopupField label={t('common.date')}><input className="ofi-cal-input w-full" type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} /></PopupField>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Field label={t('common.start')}><Input type="time" value={slotForm.start} onChange={(e) => setSlotForm({ ...slotForm, start: e.target.value })} /></Field>
-                                    <Field label={t('common.end')}><Input type="time" value={slotForm.end} onChange={(e) => setSlotForm({ ...slotForm, end: e.target.value })} /></Field>
+                                    <PopupField label={t('common.start')}><input className="ofi-cal-input w-full" type="time" value={slotForm.start} onChange={(e) => setSlotForm({ ...slotForm, start: e.target.value })} /></PopupField>
+                                    <PopupField label={t('common.end')}><input className="ofi-cal-input w-full" type="time" value={slotForm.end} onChange={(e) => setSlotForm({ ...slotForm, end: e.target.value })} /></PopupField>
                                 </div>
-                                <Field label={t('tenders.note')}><Input value={slotForm.notes} onChange={(e) => setSlotForm({ ...slotForm, notes: e.target.value })} /></Field>
+                                <PopupField label={t('tenders.note')}><input className="ofi-cal-input w-full" value={slotForm.notes} onChange={(e) => setSlotForm({ ...slotForm, notes: e.target.value })} /></PopupField>
                                 <div className="flex gap-2">
-                                    <Button className="flex-1" icon={<CalendarPlus size={13} />} onClick={saveSlot}>
+                                    <PopupButton variant="primary" className="flex-1 justify-center" icon={<CalendarPlus size={14} />} onClick={saveSlot}>
                                         {editingSlotId ?t('tenders.randevuyu_update') :t('tenders.appointment_add')}
-                                    </Button>
+                                    </PopupButton>
                                     {editingSlotId && (
-                                        <Button variant="secondary" icon={<X size={13} />} onClick={resetSlotForm}>{t('common.cancel')}</Button>
+                                        <PopupButton icon={<X size={14} />} onClick={resetSlotForm}>{t('common.cancel')}</PopupButton>
                                     )}
                                 </div>
                             </div>
@@ -440,16 +429,16 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
 
                 {activeTab === 'overtime' && (
                     <div className="max-w-xl space-y-4">
-                        <Field label={t('tenders.15_uzeri_fazla_work_saat_ucreti_chf')}>
-                            <Input
+                        <PopupField label={t('tenders.15_uzeri_fazla_work_saat_ucreti_chf')}>
+                            <input className="ofi-cal-input w-full"
                                 type="number"
                                 value={localOvertimeRate}
                                 onChange={(event) => setLocalOvertimeRate(Number(event.target.value) || 0)}
                                 placeholder="0"
                             />
-                        </Field>
-                        <div className="rounded-[2px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">{t('tenders.bu_field_empty_when_empty_ya_da_0_girilirse_15_uze')}</div>
-                        <Button onClick={() => { onOvertimeHourlyRateChange(Math.max(0, Number(localOvertimeRate || 0))); toast.success(t('tenders.fazla_work_saat_ucreti_hazir')); }}>{t('tenders.ucreti_uygula')}</Button>
+                        </PopupField>
+                        <PopupNote tone="warning">{t('tenders.bu_field_empty_when_empty_ya_da_0_girilirse_15_uze')}</PopupNote>
+                        <PopupButton variant="primary" onClick={() => { onOvertimeHourlyRateChange(Math.max(0, Number(localOvertimeRate || 0))); toast.success(t('tenders.fazla_work_saat_ucreti_hazir')); }}>{t('tenders.ucreti_uygula')}</PopupButton>
                     </div>
                 )}
 
@@ -487,8 +476,8 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                 <p className="mt-0.5 text-[11px] text-slate-500">{t('tenders.material_stock_duser_price_only_info_amacli')}</p>
                             </div>
                             <div className="space-y-3 p-3">
-                                <Field label={t('tenders.material')}>
-                                    <Select
+                                <PopupField label={t('tenders.material')}>
+                                    <select className="ofi-cal-input w-full"
                                         value={materialForm.materialId}
                                         onChange={(event) => setMaterialForm({ ...materialForm, materialId: event.target.value })}
                                         disabled={materialLoading || materialSaving}
@@ -498,8 +487,8 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                             <option key={material.id} value={material.id}>
                                                 {material.serialId} Â· {material.name}{t('tenders.mevcut')}{fmtNumber(material.stockQuantity)}{t('tenders.adet')}</option>
                                         ))}
-                                    </Select>
-                                </Field>
+                                    </select>
+                                </PopupField>
                                 {selectedTenderMaterial && (
                                     <div className="rounded-[2px] border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
                                         <div className="flex items-center justify-between gap-3">
@@ -509,13 +498,13 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                         <div className="mt-1 font-mono text-[11px] text-slate-500">{t('tenders.stock')}{fmtNumber(selectedTenderMaterial.stockQuantity)}{t('tenders.adet')}</div>
                                     </div>
                                 )}
-                                <Field label={t('common.quantity')}>
-                                    <Input type="number" min={1} step="1" value={materialForm.quantity} onChange={(event) => setMaterialForm({ ...materialForm, quantity: Number(event.target.value) || 0 })} />
-                                </Field>
-                                <Field label={t('common.description')}>
-                                    <Input value={materialForm.description} onChange={(event) => setMaterialForm({ ...materialForm, description: event.target.value })} />
-                                </Field>
-                                <Button className="w-full" icon={<Plus size={13} />} loading={materialSaving} disabled={!materialForm.materialId || materialForm.quantity <= 0} onClick={addTenderMaterial}>{t('tenders.material_add')}</Button>
+                                <PopupField label={t('common.quantity')}>
+                                    <input className="ofi-cal-input w-full" type="number" min={1} step="1" value={materialForm.quantity} onChange={(event) => setMaterialForm({ ...materialForm, quantity: Number(event.target.value) || 0 })} />
+                                </PopupField>
+                                <PopupField label={t('common.description')}>
+                                    <input className="ofi-cal-input w-full" value={materialForm.description} onChange={(event) => setMaterialForm({ ...materialForm, description: event.target.value })} />
+                                </PopupField>
+                                <PopupButton variant="primary" className="w-full justify-center" icon={<Plus size={14} />} loading={materialSaving} disabled={!materialForm.materialId || materialForm.quantity <= 0} onClick={addTenderMaterial}>{t('tenders.material_add')}</PopupButton>
                             </div>
                         </div>
                     </div>
@@ -523,15 +512,15 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
 
                 {(!inline || activeTab === 'mail') && (
                 <div className={`${inline ? 'mt-6' : 'mt-auto'} flex items-center justify-end gap-2 border-t border-slate-200 pt-4`}>
-                    {!inline && <Button variant="secondary" onClick={onClose}>{t('common.close')}</Button>}
+                    {!inline && <PopupButton onClick={onClose}>{t('common.close')}</PopupButton>}
                     {activeTab === 'mail' && (
-                        <Button variant="primary" loading={loading} icon={<Mail size={13} />} onClick={send}>{t('tenders.pdf_ile_tender_maili_gonder')}</Button>
+                        <PopupButton variant="primary" loading={loading} icon={<Mail size={14} />} onClick={send}>{t('tenders.pdf_ile_tender_maili_gonder')}</PopupButton>
                     )}
                 </div>
                 )}
 
-                {/* Side pop-up: database-backed mail drafts, shared by all offers. */}
-                <MailDraftsDrawer
+                {/* Floating card beside the button: database-backed mail drafts, shared by all offers. */}
+                <MailDraftsPopup
                     open={draftsOpen}
                     onClose={() => setDraftsOpen(false)}
                     currentSubject={form.subject}
@@ -544,24 +533,23 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
     if (inline) {
         if (!open) return null;
         return (
-            <div className="rounded-[2px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="ofi-quote-card rounded-lg border border-[#e6e8eb] bg-white p-4">
                 {content}
             </div>
         );
     }
 
     return (
-        <Modal
+        <TenderDialog
             open={open}
             title={t('tenders.tender_settings')}
-            description={t('tenders.mail_additional_fee_ve_appointment_ayarlarini_tek_place_y')}
+            subtitle={t('tenders.mail_additional_fee_ve_appointment_ayarlarini_tek_place_y')}
             onClose={onClose}
-            placement="drawer"
-            drawerWidth="wide"
+            width={1100}
             closeOnBackdrop={false}
             closeOnEscape={false}
         >
             {content}
-        </Modal>
+        </TenderDialog>
     );
 };

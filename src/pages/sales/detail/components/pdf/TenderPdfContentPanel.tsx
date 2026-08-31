@@ -1,18 +1,16 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import {
-    Check,
-    Edit01,
     File05 as FileText,
     Plus,
     Trash01,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import { BottomSheet } from '@/pages/inventory/components/BottomSheet';
 
 import { tenderApi } from '../../../../../lib/api/tender';
 import type { TenderTextTemplateDto } from '../../../../../types/tender';
 import { PlainButton as Button } from '../common/PlainUi';
+import { TextTemplatesPopup } from '../../popups/TextTemplatesPopup';
 
 const LazyRichTextEditor = lazy(() =>
     import('../RichTextMarkdownEditor').then((mod) => ({ default: mod.RichTextMarkdownEditor })),
@@ -64,8 +62,8 @@ const BlockShell = ({
     headerAction?: React.ReactNode;
     children: React.ReactNode;
 }) => (
-    <section className="rounded-[3px] border border-slate-300 bg-white">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5">
+    <section className="ofi-quote-card rounded-lg border border-[#e6e8eb] bg-white">
+        <header className="ofi-quote-card__head flex items-center justify-between gap-3 border-b border-[#eef0f2] bg-white px-3.5 py-2">
             <span className="min-w-0">
                 <span className="block text-[12.5px] font-semibold text-[#1f2654]">{title}</span>
                 <span className="block text-[11.5px] text-slate-500">{hint}</span>
@@ -336,130 +334,28 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
                 }}
             />
 
-            {/* ── Textbausteine: Popup von UNTEN, Inhalt gleitet links/rechts ──── */}
-            <BottomSheet
+            {/* ── Textbausteine: floating card beside the button (popups/TextTemplatesPopup) ── */}
+            <TextTemplatesPopup
                 open={templatesOpen}
-                title={t('tenders.text_templates')}
-                subtitle={templateView === 'form'
-                    ? (editingTemplate ? editingTemplate.title : t('tenders.text_template_add'))
-                    : t('tenders.text_templates_hint')}
                 onClose={() => setTemplatesOpen(false)}
-                onBack={templateView === 'form' ? () => setTemplateView('list') : undefined}
-                width={820}
-                height={640}
-                footer={templateView === 'list' ? (
-                    <>
-                        <span className="text-[11.5px] text-slate-400">{t('tenders.text_templates_hint')}</span>
-                        {canEdit && (
-                            <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={startNewTemplate}>
-                                {t('tenders.text_template_add')}
-                            </Button>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        <Button size="sm" variant="secondary" onClick={() => setTemplateView('list')}>
-                            {t('common.back')}
-                        </Button>
-                        <Button size="sm" variant="primary" disabled={templateBusy} onClick={() => void saveTemplateForm()}>
-                            {t('common.save')}
-                        </Button>
-                    </>
-                )}
-            >
-                {templateView === 'list' ? (
-                    <div key="list" className="ofi-slide-in-left flex min-h-0 flex-1 flex-col p-3">
-                        {templatesLoading && (
-                            <div className="space-y-2">
-                                <div className="ofi-shimmer h-12 rounded-[3px] bg-slate-100" />
-                                <div className="ofi-shimmer h-12 rounded-[3px] bg-slate-100" />
-                            </div>
-                        )}
-                        {!templatesLoading && (templates?.length ?? 0) === 0 && (
-                            <p className="py-10 text-center text-[12.5px] text-slate-400">
-                                {t('tenders.text_templates_empty')}
-                            </p>
-                        )}
-                        {!templatesLoading && (templates ?? []).map((template) => (
-                            <div
-                                key={template.id}
-                                className="mb-1.5 flex items-center gap-2 rounded-[3px] border border-slate-200 px-2.5 py-2 transition-colors hover:border-[#1f2654]/40 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => applyTemplate(template)}
-                                    className="min-w-0 flex-1 text-left"
-                                    title={t('tenders.text_template_apply')}
-                                >
-                                    <span className="block truncate text-[12.5px] font-medium text-slate-800 dark:text-white/90">
-                                        {template.title || t('tenders.text_template_untitled')}
-                                        {template.isDefault && (
-                                            <span className="ml-2 rounded-[2px] bg-[#1f2654] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                                {t('tenders.text_template_default')}
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className="block truncate text-[11.5px] text-slate-400">
-                                        {(template.content ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 110)}
-                                    </span>
-                                </button>
-                                {canEdit && (
-                                    <button
-                                        type="button"
-                                        onClick={() => startEditTemplate(template)}
-                                        title={t('common.edit')}
-                                        aria-label={t('common.edit')}
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] text-slate-300 transition-colors hover:text-[#1f2654]"
-                                    >
-                                        <Edit01 size={13} />
-                                    </button>
-                                )}
-                                {canEdit && !template.isDefault && (
-                                    <button
-                                        type="button"
-                                        disabled={templateBusy}
-                                        onClick={() => void makeDefaultTemplate(template)}
-                                        title={t('tenders.text_template_make_default')}
-                                        aria-label={t('tenders.text_template_make_default')}
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] text-slate-300 transition-colors hover:text-emerald-600"
-                                    >
-                                        <Check size={13} />
-                                    </button>
-                                )}
-                                {canEdit && (
-                                    <button
-                                        type="button"
-                                        disabled={templateBusy}
-                                        onClick={() => void deleteTemplate(template)}
-                                        title={t('common.delete')}
-                                        aria-label={t('common.delete')}
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] text-slate-300 transition-colors hover:text-rose-600"
-                                    >
-                                        <Trash01 size={13} />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div key="form" className="ofi-slide-in-right flex min-h-0 flex-1 flex-col gap-2.5 p-3">
-                        <label className="flex flex-col gap-1">
-                            <span className="text-[12px] font-semibold text-slate-600 dark:text-white/70">
-                                {t('tenders.text_template_title_placeholder')}
-                            </span>
-                            <input
-                                autoFocus
-                                value={formTitle}
-                                onChange={(event) => setFormTitle(event.target.value)}
-                                className="h-9 w-full rounded-[3px] border border-slate-200 bg-white px-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-[#1f2654] focus:outline-none dark:border-white/15 dark:bg-transparent dark:text-white"
-                            />
-                        </label>
-                        <Suspense fallback={<div className="ofi-shimmer h-40 rounded-[3px] bg-slate-100" />}>
-                            <LazyRichTextEditor value={formContent} onChange={setFormContent} minHeight={240} />
-                        </Suspense>
-                    </div>
-                )}
-            </BottomSheet>
+                canEdit={canEdit}
+                view={templateView}
+                onViewChange={setTemplateView}
+                templates={templates}
+                loading={templatesLoading}
+                busy={templateBusy}
+                editingTemplate={editingTemplate}
+                formTitle={formTitle}
+                onFormTitleChange={setFormTitle}
+                formContent={formContent}
+                onFormContentChange={setFormContent}
+                onApply={applyTemplate}
+                onStartNew={startNewTemplate}
+                onStartEdit={startEditTemplate}
+                onMakeDefault={(template) => void makeDefaultTemplate(template)}
+                onDelete={(template) => void deleteTemplate(template)}
+                onSave={() => void saveTemplateForm()}
+            />
         </div>
     );
 };

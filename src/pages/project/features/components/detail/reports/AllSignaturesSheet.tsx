@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
 import { Send01 as Send } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import {
@@ -15,8 +14,8 @@ import {
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 
-import { ReportsSheet } from './ReportsSheet';
-import { SignatureDispatchPanel, type SignatureDispatchChannels } from './SignatureDispatchPanel';
+import { ReportPopup } from './ReportPopup';
+import { SignatureDispatchDialog, type SignatureDispatchChannels } from './SignatureDispatchDialog';
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 import { orderPayloadId, scopedRecords } from '../../../utils/projectOrderScope';
 import type { SignatureDispatchTarget } from '../../../projects/types/signatureTypes';
@@ -228,7 +227,7 @@ export const AllSignaturesSheet = ({
     };
 
     return (
-        <ReportsSheet
+        <ReportPopup
             open={open}
             title={t('projects.reportsHub.signaturesAll')}
             subtitle={project.projectName || undefined}
@@ -242,7 +241,7 @@ export const AllSignaturesSheet = ({
                                 <th className="text-left">{t('projects.reportsHub.document')}</th>
                                 <th className="w-28 text-left">{t('common.date')}</th>
                                 <th className="w-36 text-left">{t('common.status')}</th>
-                                <th className="w-44 text-right" />
+                                <th className="w-52 text-right" />
                             </tr>
                         </thead>
                         <tbody>
@@ -274,14 +273,15 @@ export const AllSignaturesSheet = ({
                                         <td>
                                             <div className="flex items-center justify-end">
                                                 {canSend && (
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        icon={<Send size={12} />}
+                                                    <button
+                                                        type="button"
+                                                        className="ofi-sigbtn"
+                                                        title={t('signatures.sendForSignature')}
                                                         onClick={() => setSelectedKey(row.key === selectedKey ? null : row.key)}
                                                     >
-                                                        {t('signatures.sendForSignature')}
-                                                    </Button>
+                                                        <Send size={13} />
+                                                        <span className="ofi-sigbtn__text">{t('signatures.sendForSignature')}</span>
+                                                    </button>
                                                 )}
                                             </div>
                                         </td>
@@ -293,7 +293,7 @@ export const AllSignaturesSheet = ({
                 </SectionCard>
 
                 {selected && (
-                    <SignatureDispatchPanel
+                    <SignatureDispatchDialog
                         key={selected.key}
                         title={`${selected.label} · ${selected.date}`}
                         signatories={selected.signatories}
@@ -304,6 +304,6 @@ export const AllSignaturesSheet = ({
                     />
                 )}
             </div>
-        </ReportsSheet>
+        </ReportPopup>
     );
 };

@@ -1,3 +1,7 @@
+/* RETIRED 18.08.2026 — the project's appointment section is the calendar page
+   now (see booking/AppointmentList.tsx). Kept for reference only: nothing
+   imports this file any more.
+   ------------------------------------------------------------------------ */
 import { useMemo } from 'react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';

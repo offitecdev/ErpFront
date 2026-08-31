@@ -17,13 +17,16 @@ type Tab = 'employees' | 'customers';
    checkbox column. Feeds meeting participants and the CC lists:
    - participants: employees + customers, rows may lack an e-mail
    - cc: rows must resolve to an e-mail; free addresses can be typed in. */
-export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, title }: {
+export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, title, staffOnly = false }: {
     open: boolean;
     onClose: () => void;
     mode: 'participants' | 'cc';
     initial: PickedPerson[];
     onConfirm: (picked: PickedPerson[]) => void;
     title?: string;
+    /* CC of an invitation = staff only (19.08.2026): no customers tab, no free
+       addresses — the customer is the To of that mail, never a CC. */
+    staffOnly?: boolean;
 }) => {
     const [tab, setTab] = useState<Tab>('employees');
     const [query, setQuery] = useState('');
@@ -146,18 +149,22 @@ export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, tit
             )}
         >
             <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-white/10">
-                <ToggleGroup<Tab>
-                    options={[
-                        { key: 'employees', label: t('calendar.picker.staff') },
-                        { key: 'customers', label: t('calendar.picker.customers') },
-                    ]}
-                    value={tab}
-                    onChange={setTab}
-                />
+                {staffOnly ? (
+                    <span className="text-[12px] font-semibold text-slate-500 dark:text-white/60">{t('calendar.picker.staff')}</span>
+                ) : (
+                    <ToggleGroup<Tab>
+                        options={[
+                            { key: 'employees', label: t('calendar.picker.staff') },
+                            { key: 'customers', label: t('calendar.picker.customers') },
+                        ]}
+                        value={tab}
+                        onChange={setTab}
+                    />
+                )}
                 <SearchBox value={query} onChange={setQuery} placeholder={t('calendar.picker.searchPerson')} className="min-w-52 flex-1" autoFocus />
             </div>
 
-            {mode === 'cc' && (
+            {mode === 'cc' && !staffOnly && (
                 <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-white/10">
                     <input
                         value={freeEmail}

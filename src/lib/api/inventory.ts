@@ -1,4 +1,5 @@
 import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
+import { itGateHeaders } from '../itGate';
 import type {
     InventoryLocation,
     InventoryArticle,
@@ -266,6 +267,41 @@ export const inventoryApi = {
         return res.data;
     },
 
+    /**
+     * IT-Produktupload (CSV/Excel) — derselbe Rumpf wie `bulkCreateArticles`,
+     * aber hinter der IT-Schleuse statt hinter dem Lagerrecht, und der Bestand
+     * ist auf dem Server auf 0 festgenagelt (die Menge aus der Datei zählt
+     * nicht). Der Ausweis der Schleuse reist im Kopf `x-it-gate` mit.
+     */
+    importArticles: async (
+        items: BulkArticleItemInput[],
+        options?: { overwrite?: boolean },
+    ): Promise<BulkArticlesResult> => {
+        const res = await apiClient.post(
+            '/inventory/articles/import',
+            { items, ...(options?.overwrite ? { overwrite: true } : {}) },
+            { headers: itGateHeaders() },
+        );
+        return res.data;
+    },
+
+    /**
+     * Produktliste der GEWÄHLTEN Firma zurücksetzen — alles in den Papierkorb.
+     * Einzige Schranke ist die IT-Schleuse: ihr Ausweis reist im Kopf mit und
+     * gilt für die ganze Sitzung, ein persönliches Kennwort wird hier NICHT
+     * verlangt (Vorgabe 17.08.2026). `RESET_PRODUCTS` ist das feste Wort, das
+     * der Server sehen will — der getippte Satz im Fenster ist seine Anzeige in
+     * der Sprache des Anwenders.
+     */
+    purgeArticles: async (): Promise<{ deleted: number }> => {
+        const res = await apiClient.post(
+            '/inventory/articles/purge',
+            { confirm: 'RESET_PRODUCTS' },
+            { headers: itGateHeaders() },
+        );
+        return res.data;
+    },
+
     // Toplu stok hareketi (giriş/çıkış). Satır bazında hata döner.
     bulkCreateMovements: async (items: BulkMovementItemInput[]): Promise<BulkMovementsResult> => {
         const res = await apiClient.post('/inventory/movements/bulk', { items });
@@ -503,7 +539,22 @@ export const articleApi = {
         return res.data;
     },
 
-    delete: async (id: string): Promise<void> => {
-        await apiClient.delete(`/articles/${id}`);
+    /**
+     * Produktkarte in den Papierkorb. Das Kennwort reist im Rumpf mit: jedes
+     * Konto ausser der Administratorrolle bestätigt eine Löschung damit
+     * (Vorgabe 17.08.2026, siehe `DangerConfirmDialog`). Der Server prüft die
+     * Rolle selbst — hier steht nur, was das Fenster eingesammelt hat.
+     */
+    delete: async (id: string, password?: string): Promise<void> => {
+        await apiClient.delete(`/articles/${id}`, { data: password ? { password } : {} });
+    },
+
+    /** Sammellöschung aus der Produktliste — ein Aufruf für die ganze Auswahl. */
+    bulkDelete: async (ids: string[], password?: string): Promise<{ deleted: number; requested: number }> => {
+        const res = await apiClient.post('/articles/bulk-delete', {
+            ids,
+            ...(password ? { password } : {}),
+        });
+        return res.data;
     },
 };

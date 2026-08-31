@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
     AlertTriangle,
-    ArrowLeft,
     Check,
     CheckCircle as CheckCircle2,
     ChevronDown,
@@ -18,7 +17,7 @@ import {
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 import { money } from '../../utils/projectFormatters';
-import { ProjectStatusBadge } from '../common/ProjectStatusBadge';
+import { ProjectStatusChip } from './tabs/overview/overviewChips';
 import { calculateTotals } from '../../utils/projectTotals';
 
 const LazyProjectSettingsMenu = lazy(() =>
@@ -48,42 +47,40 @@ const OrderRow = ({
     const deletable = Boolean(canManage && onDelete && !order.id.startsWith('project-main-'));
 
     return (
-        <div className={`relative flex w-full items-center transition-colors ${selected ? 'bg-[#eef4ff]' : 'hover:bg-slate-50'}`}>
+        <div className="ofi-prj-menu__item">
             <button
                 type="button"
                 onClick={onClick}
-                className={`flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-1 text-left ${isMain ? 'pl-3' : 'pl-8'}`}
+                className={`ofi-prj-menu__row ${selected ? 'is-selected' : ''} ${isMain ? '' : 'is-addon'}`}
             >
-                <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${isMain ? 'bg-[#272f67] text-white' : 'bg-amber-100 text-amber-700'}`}>
+                <span className={`ofi-prj-order__mark ${isMain ? '' : 'is-addon'}`}>
                     {isMain ? <ReceiptText size={14} /> : <Plus size={14} />}
                 </span>
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className={`truncate text-[13px] font-semibold ${selected ? 'text-[#272f67]' : 'text-slate-800'}`}>{order.orderNumber}</span>
-                        <span className={`shrink-0 rounded px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide ${isMain ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>
+                <span className="ofi-prj-order__main">
+                    <span className="ofi-prj-order__num">
+                        <span>{order.orderNumber}</span>
+                        <span className={`ofi-prj-tag ${isMain ? 'is-main' : 'is-addon'}`}>
                             {isMain ? t('projects.mainOrder') : t('projects.addonOrder')}
                         </span>
-                        {attention && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-slate-400">{dayjs(order.orderDate || order.createdAt).format('DD.MM.YYYY')}</div>
-                </div>
-                <div className="shrink-0 font-mono text-[12px] font-semibold text-slate-700">{money(total)}</div>
-                {selected && <CheckCircle2 size={15} className="shrink-0 text-[#272f67]" />}
+                        {attention && <span className="ofi-prj-dot" />}
+                    </span>
+                    <span className="ofi-prj-order__meta">
+                        {dayjs(order.orderDate || order.createdAt).format('DD.MM.YYYY')}
+                    </span>
+                </span>
+                <span className="ofi-prj-menu__amount">{money(total)}</span>
             </button>
 
             {deletable && (
-                <div className="relative flex shrink-0 items-center pl-1 pr-2">
-                    {/* Both main and additional orders: a dedicated delete button. */}
-                    <button
-                        type="button"
-                        aria-label={t('projects.deleteOrder')}
-                        title={t('projects.deleteOrder')}
-                        onClick={() => onDelete!(order)}
-                        className="flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                    >
-                        <Trash01 size={15} />
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    aria-label={t('projects.deleteOrder')}
+                    title={t('projects.deleteOrder')}
+                    onClick={() => onDelete!(order)}
+                    className="ofi-prj-glyph"
+                >
+                    <Trash01 size={15} />
+                </button>
             )}
         </div>
     );
@@ -138,49 +135,50 @@ const OrderDropdown = ({
     const orderTotal = (order: ProjectSalesOrder) => totalsByOrderId.get(order.id) ?? 0;
 
     return (
-        <div className="relative w-full max-w-md">
-            <div className="flex items-stretch gap-2">
-                <button
-                    type="button"
-                    onClick={() => setOpen((value) => !value)}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-xs transition-colors hover:border-slate-300"
-                >
-                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-[#272f67] text-white'}`}>
-                        {selectedIsAddon ? <Plus size={14} /> : <ReceiptText size={14} />}
+        <div className="ofi-prj-picker">
+            {/* One quiet pill: the order, its date and its total — the only
+                chrome is a hairline, the way the calendar's controls look. */}
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen((value) => !value)}
+                className={`ofi-prj-order ${open ? 'is-open' : ''}`}
+            >
+                <span className={`ofi-prj-order__mark ${selectedIsAddon ? 'is-addon' : ''}`}>
+                    {selectedIsAddon ? <Plus size={14} /> : <ReceiptText size={14} />}
+                </span>
+                <span className="ofi-prj-order__main">
+                    <span className="ofi-prj-order__num">
+                        <span>{selectedOrder?.orderNumber ? selectedOrder.orderNumber : '-'}</span>
+                        <span className={`ofi-prj-tag ${selectedIsAddon ? 'is-addon' : 'is-main'}`}>
+                            {selectedIsAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
+                        </span>
+                        {addonAttention && !selectedIsAddon && <span className="ofi-prj-dot" />}
                     </span>
-                    <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                            <span className="truncate text-[13px] font-bold text-slate-900">{selectedOrder?.orderNumber ? selectedOrder.orderNumber : '-'}</span>
-                            <span className={`shrink-0 rounded px-1.5 py-px text-[8.5px] font-semibold uppercase tracking-wide ${selectedIsAddon ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                {selectedIsAddon ? t('projects.addonOrder') : t('projects.mainOrder')}
-                            </span>
-                            {addonAttention && !selectedIsAddon && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-600" />}
-                        </div>
-                        <div className="mt-0.5 truncate text-[10.5px] text-slate-400">
-                            {selectedOrder ? dayjs(selectedOrder.orderDate || selectedOrder.createdAt).format('DD.MM.YYYY') : ''} · {orders.length} {t('projects.orders')}
-                        </div>
-                    </div>
-                    <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-                </button>
-                <div className="flex shrink-0 flex-col items-end justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-                    <div className="font-mono text-[13px] font-bold text-[#272f67]">{selectedOrder ? money(orderTotal(selectedOrder)) : '-'}</div>
-                    <div className="text-[8.5px] font-semibold uppercase tracking-wide text-slate-400">{t('projects.orderTotal')}</div>
-                </div>
-            </div>
+                    <span className="ofi-prj-order__meta">
+                        {selectedOrder ? dayjs(selectedOrder.orderDate || selectedOrder.createdAt).format('DD.MM.YYYY') : ''} · {orders.length} {t('projects.orders')}
+                    </span>
+                </span>
+                <span className="ofi-prj-order__sum">
+                    <span className="ofi-prj-order__amount">{selectedOrder ? money(orderTotal(selectedOrder)) : '-'}</span>
+                    <span className="ofi-prj-order__label">{t('projects.orderTotal')}</span>
+                </span>
+                <ChevronDown size={16} className="ofi-prj-order__chev" />
+            </button>
 
             {open && (
                 <>
                     <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-                    <div className="absolute inset-x-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2">
-                            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500">{t('projects.orders')}</span>
+                    <div className="ofi-prj-menu">
+                        <div className="ofi-prj-menu__head">
+                            <span>{t('projects.orders')}</span>
                             <button
                                 type="button"
-                                onClick={() => { setOpen(false); navigate('/crm/my-orders'); }}
-                                className="text-[11px] font-medium text-slate-400 transition-colors hover:text-[#272f67]"
+                                onClick={() => { setOpen(false); navigate('/sales/orders'); }}
+                                className="ofi-prj-menu__link"
                             >{t('projects.myOrdersCrm')}</button>
                         </div>
-                        <div className="max-h-[360px] overflow-y-auto py-1">
+                        <div className="ofi-prj-menu__list">
                             {baseOrders.map((order) => (
                                 <div key={order.id}>
                                     <OrderRow
@@ -211,7 +209,7 @@ const OrderDropdown = ({
                             type="button"
                             onClick={() => { if (selectedBaseId) onCreateAddon(selectedBaseId); setOpen(false); }}
                             disabled={!selectedBaseId}
-                            className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-3 text-[12.5px] font-semibold text-[#272f67] transition-colors hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="ofi-prj-menu__foot"
                         >
                             <Plus size={15} />{t('projects.createAddonOrder')}
                         </button>
@@ -222,8 +220,13 @@ const OrderDropdown = ({
     );
 };
 
-// ERP-style detail header: project identity on the left, the order selector in
-// the middle and the primary actions on the right.
+/**
+ * Detail header, Google-clean (19.08.2026): project identity on the left, the
+ * order selector exactly centred, the actions on the right. There is no fill
+ * and no coloured block up here — a hairline, quiet grey type and the brand
+ * navy as the single accent, all of it painted from the `--ofi-cal-*` tokens
+ * so dark mode is a variable swap.
+ */
 export const ProjectDetailHeader = memo(({
     project,
     orders,
@@ -237,7 +240,6 @@ export const ProjectDetailHeader = memo(({
     onDeleteProject,
     onOpenDetails,
     onComplete,
-    onBack,
 }: {
     project: ProjectDto;
     orders: ProjectSalesOrder[];
@@ -252,35 +254,30 @@ export const ProjectDetailHeader = memo(({
     onDeleteProject: () => Promise<void> | void;
     onOpenDetails: () => void;
     onComplete: () => void;
-    onBack: () => void;
 }) => {
     const detailsLabel = t('common.detail');
     const [settingsLoaded, setSettingsLoaded] = useState(false);
     return (
-        // Başlığın altındaki ayraç çizgisi de kaldırıldı (kullanıcı isteği).
-        // Üç sütunlu grid: yan sütunlar eşit (1fr) olduğundan sipariş seçici
-        // ÜSTTE ve ekranın TAM ortasında durur (kullanıcı isteği; seçicinin
-        // kendisi — kutu + fiyat — olduğu gibi kaldı).
-        <div className="mb-4 flex flex-col gap-4 pb-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(auto,28rem)_minmax(0,1fr)] lg:items-center">
-            {/* Identity — BÜYÜK proje adı/numarası ve hemen yanında bilgi +
-                dişli (kullanıcı isteği); sorumlu kişi satırdan kaldırıldı.
-                Altında küçük satırda müşteri + durum. Geri ok yerine sağdaki
-                "Projektliste" bağlantısı kullanılır. */}
-            <div className="flex min-w-0 flex-col justify-center gap-0.5">
-                <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate font-mono text-[19px] font-bold leading-tight text-slate-900">{project.projectNumber || project.projectName}</span>
+        // Kein Trennstrich unter dem Kopf (Benutzerwunsch) und weiterhin drei
+        // gleich breite Spalten, damit der Auftragswähler mittig steht.
+        <div className="ofi-prj-head">
+            {/* Identität — grosse Projektnummer, daneben Info und Zahnrad als
+                runde, randlose Symbolknöpfe; darunter Kunde und Zustand. */}
+            <div className="min-w-0">
+                <div className="ofi-prj-head__id">
+                    <span className="ofi-prj-head__num">{project.projectNumber || project.projectName}</span>
                     {/* Bilgi düğmesi dişlinin SOLUNDA (kullanıcı isteği). */}
                     <button
                         type="button"
                         aria-label={detailsLabel}
                         title={detailsLabel}
-                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#272f67]"
+                        className="ofi-prj-glyph"
                         onClick={onOpenDetails}
                     >
-                        <InfoCircle size={16} strokeWidth={1.9} />
+                        <InfoCircle size={17} strokeWidth={1.8} />
                     </button>
                     {canManageOrders && (settingsLoaded ? (
-                        <Suspense fallback={<span className="size-7 shrink-0" />}>
+                        <Suspense fallback={<span className="size-8 shrink-0" />}>
                             <LazyProjectSettingsMenu
                                 deleting={deletingProject}
                                 onDeleteProject={onDeleteProject}
@@ -293,15 +290,18 @@ export const ProjectDetailHeader = memo(({
                             aria-label={t('nav.settings')}
                             title={t('nav.settings')}
                             onClick={() => setSettingsLoaded(true)}
-                            className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#272f67]"
+                            className="ofi-prj-glyph"
                         >
                             <Settings size={16} />
                         </button>
                     ))}
                 </div>
-                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-slate-600">
-                    <span className="inline-flex items-center gap-1"><UserRound size={12} /> {project.customer?.companyName || project.customerId}</span>
-                    <ProjectStatusBadge status={project.status} />
+                <div className="ofi-prj-head__sub">
+                    <span className="ofi-prj-head__cust">
+                        <UserRound size={13} />
+                        <span>{project.customer?.companyName || project.customerId}</span>
+                    </span>
+                    <ProjectStatusChip status={project.status} />
                 </div>
             </div>
 
@@ -319,37 +319,27 @@ export const ProjectDetailHeader = memo(({
                 />
             </div>
 
-            {/* Actions — tamamlama/durum + sağda ürün listesindeki geri
-                düğmesiyle aynı biçimde "Projektliste" bağlantısı. */}
-            <div className="flex items-center gap-2 lg:justify-end">
+            {/* Aktionen — Abschluss bzw. Zustand des Projekts. Der Weg zurück
+                zur Projektliste stand hier daneben; er sitzt jetzt im Blitz
+                ganz vorn in der Kopfleiste, der auf jeder Unterseite zum Pfeil
+                wird (QuickBackButton). */}
+            <div className="ofi-prj-head__actions">
                 {project.status === 'COMPLETED' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2 text-[13px] font-semibold text-[#059669]">
-                        <Check size={26} strokeWidth={3} />
+                    <span className="ofi-prj-head__state is-done">
+                        <Check size={17} strokeWidth={3} />
                         {t('projects.complete.projectCompleted')}
                     </span>
                 ) : project.status === 'SPECIALLY_CLOSED' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2 text-[13px] font-semibold text-[#dc2626]">
-                        <AlertTriangle size={18} strokeWidth={2.5} />
+                    <span className="ofi-prj-head__state is-closed">
+                        <AlertTriangle size={16} strokeWidth={2.4} />
                         {t('projects.specialClosure.closedIndicator')}
                     </span>
                 ) : (
-                    <button
-                        type="button"
-                        onClick={onComplete}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
-                    >
-                        <CheckCircle2 size={14} />
+                    <button type="button" onClick={onComplete} className="ofi-prj-btn is-primary">
+                        <CheckCircle2 size={15} />
                         {t('projects.complete.completeProject')}
                     </button>
                 )}
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
-                >
-                    <ArrowLeft size={14} />
-                    {t('projects.projectList')}
-                </button>
             </div>
         </div>
     );

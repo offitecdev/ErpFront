@@ -4,6 +4,9 @@ import dayjs from 'dayjs';
 
 import {
     Briefcase01 as FundProjectionScreenOutlined,
+    // Verkauf/Angebote: steigende Kurve (Nutzerwunsch 15.08.2026); der Koffer
+    // bleibt den Projekten, sonst tragen beide Kacheln dasselbe Bild.
+    TrendUp01 as SalesIcon,
     Building02 as BankOutlined,
     Building03 as ContactsOutlined,
     Calendar as CalendarOutlined,
@@ -14,6 +17,7 @@ import {
 
 import { useAuthStore } from '../store/authStore';
 import { getRoleProfile, isKeyAllowedForProfile } from '../lib/access';
+import { isPathAllowed } from '../lib/pageAccess';
 import { moduleForPath } from '../lib/moduleCatalog';
 import { useModuleAccess } from '../lib/useEnabledModules';
 import AnalogClock from '../components/home/AnalogClock';
@@ -36,10 +40,10 @@ const TILES: Tile[] = [
     { key: '/calendar', labelKey: 'nav.calendar', defaultLabel: 'Takvim', descKey: 'home.tiles.calendar', defaultDesc: 'Randevular ve planlama', icon: CalendarOutlined },
     // Mesai (/attendance) is hidden here too, matching the sidebar.
     { key: '/crm/customers', labelKey: 'nav.customerList', defaultLabel: 'Müşteriler', descKey: 'home.tiles.customers', defaultDesc: 'CRM müşteri listesi', icon: ContactsOutlined, permission: 'crm.customers.view' },
-    { key: '/crm/tenders', labelKey: 'nav.tenderManagement', defaultLabel: 'Teklifler', descKey: 'home.tiles.tenders', defaultDesc: 'Teklif yönetimi', icon: FundProjectionScreenOutlined, permission: 'tenders.view' },
+    { key: '/sales/quotes', labelKey: 'nav.tenderManagement', defaultLabel: 'Teklifler', descKey: 'home.tiles.tenders', defaultDesc: 'Teklif yönetimi', icon: SalesIcon, permission: 'tenders.view' },
     { key: '/inventory/articles', labelKey: 'nav.articles', defaultLabel: 'Ürünler', descKey: 'home.tiles.articles', defaultDesc: 'Ürün / stok kartları', icon: InboxOutlined, permission: 'inventory.view' },
     { key: '/projects', labelKey: 'nav.projectManagement', defaultLabel: 'Projeler', descKey: 'home.tiles.projects', defaultDesc: 'Proje yönetimi', icon: FundProjectionScreenOutlined, permission: 'projects.view', feature: 'projects' },
-    { key: '/crm/my-orders', labelKey: 'nav.myOrders', defaultLabel: 'Siparişler', descKey: 'home.tiles.orders', defaultDesc: 'Satış siparişleri', icon: BankOutlined, permission: 'crm.customers.view' },
+    { key: '/sales/orders', labelKey: 'nav.myOrders', defaultLabel: 'Siparişler', descKey: 'home.tiles.orders', defaultDesc: 'Satış siparişleri', icon: BankOutlined, permission: 'crm.customers.view' },
     { key: '/employees', labelKey: 'nav.employeeList', defaultLabel: 'Personel', descKey: 'home.tiles.employees', defaultDesc: 'Çalışan listesi', icon: TeamOutlined },
     { key: '/maintenance', labelKey: 'nav.maintenance', defaultLabel: 'Bakım', descKey: 'home.tiles.maintenance', defaultDesc: 'Bakım panosu', icon: CalendarOutlined, permission: 'maintenance.contracts.manage' },
     { key: '/logistics/shipments', labelKey: 'nav.shipments', defaultLabel: 'Lojistik', descKey: 'home.tiles.logistics', defaultDesc: 'Sevkiyatlar', icon: CarOutlined, permission: 'logistics.view' },
@@ -51,6 +55,7 @@ export const Home = () => {
     const { projectModuleEnabled, isModuleEnabled, canSeePermissionItem } = useModuleAccess();
 
     const profile = useMemo(() => getRoleProfile(user), [user]);
+    const pageAccess = useAuthStore((state) => state.pageAccess);
 
     const tiles = useMemo<QuickMenuTile[]>(() => {
         return TILES.filter((tile) => {
@@ -62,6 +67,9 @@ export const Home = () => {
             // not be offered at all. This gate comes FIRST — it outranks both the
             // role profile and the raw permission list.
             if (!isModuleEnabled(moduleForPath(tile.key) ?? undefined)) return false;
+            // Seitenrechte der Rolle (17.08.2026) — dieselbe Regel wie im Menü,
+            // damit Kachel und Seitenleiste nie auseinandergehen.
+            if (!isPathAllowed(pageAccess, tile.key)) return false;
             if (profile !== 'full') return isKeyAllowedForProfile(profile, tile.key);
             // Same package-grants-pages rule as the sidebar.
             return canSeePermissionItem(tile.permission);
@@ -72,7 +80,7 @@ export const Home = () => {
             icon: tile.icon,
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [profile, projectModuleEnabled, isModuleEnabled, canSeePermissionItem, t]);
+    }, [profile, projectModuleEnabled, isModuleEnabled, canSeePermissionItem, pageAccess, t]);
 
     const firstName = user?.firstName?.trim() || t('home.there', { defaultValue: 'orada' });
     const hour = dayjs().hour();
@@ -87,13 +95,17 @@ export const Home = () => {
     return (
         <div className="w-full lg:flex lg:items-start lg:gap-8">
           <div className="min-w-0 flex-1">
-            {/* Welcome row: greeting left, the swipeable quick-menu boxes beside it */}
-            <div className="mb-8 flex flex-col gap-6 border-b border-[#EAEAEC] pb-6 dark:border-white/10 xl:flex-row xl:items-start">
+            {/* Welcome row: greeting left, the swipeable quick-menu boxes beside it.
+                `ofi-rise` (styles/refine.css) lässt Gruss und Kacheln beim
+                Öffnen kurz aufsteigen — gestaffelt wie beim Anmelden. */}
+            <div className="ofi-rise mb-8 flex flex-col gap-6 border-b border-[#EAEAEC] pb-6 dark:border-white/10 xl:flex-row xl:items-start">
                 <div className="shrink-0 xl:w-[280px]">
                     <p className="text-[12px] font-medium uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
                         {dayjs().format('dddd, DD MMMM YYYY')}
                     </p>
-                    <h1 className="ofi-home-greeting mt-1.5 text-[20px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">
+                    {/* Begrüssung in der Titelschrift — wie der Titel der
+                        Anmeldeseite, mit der die Sitzung begonnen hat. */}
+                    <h1 className="ofi-home-greeting ofi-serif mt-1.5 text-[23px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">
                         {t(greetingKey, { defaultValue: greetingDefaults[greetingKey] })},{' '}
                         {/* The name pops: a step larger, in the signature navy (light
                             step of the same ramp in dark mode for contrast). */}
@@ -107,11 +119,13 @@ export const Home = () => {
             </div>
 
             {/* Kennzahlen & Charts */}
-            <DashboardStats />
+            <div className="ofi-rise ofi-rise-1">
+                <DashboardStats />
+            </div>
           </div>
 
           {/* Right column: analog clock + Anstehend cards (Montagen · Besprechungen · Lieferungen) */}
-          <aside className="mt-8 space-y-6 lg:mt-0 lg:w-80 lg:shrink-0">
+          <aside className="ofi-rise ofi-rise-2 mt-8 space-y-6 lg:mt-0 lg:w-80 lg:shrink-0">
             {/* Background-tinted "surface" card — the reference's non-white card variant */}
             <div className="rounded-xl border border-[#E7E8EC] bg-[#F4F5F7] p-5 dark:border-white/10 dark:bg-[#151616]">
                 <AnalogClock />

@@ -10,7 +10,7 @@ import { STAFF_PAGE_SIZE, useLanguageTick, useStaffList } from './hooks/usePerso
 import { StaffCreateSheet } from './components/StaffCreateSheet';
 import { StaffQrSheet } from './components/StaffQrSheet';
 import { Chip, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
-import { formatDate, fullName, staffRoleLabel, workLocationLabel } from './utils/format';
+import { formatDate, fullName, workLocationLabel } from './utils/format';
 
 /**
  * ── PERSONALLISTE ────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ export const PersonnelListPage = () => {
                             <th className="text-right">{t('personnel.field.staffNumber')}</th>
                             <th className="text-left">{t('personnel.field.name')}</th>
                             <th className="text-left">{t('personnel.field.email')}</th>
-                            <th className="text-left">{t('personnel.field.staffRole')}</th>
+                            <th className="text-left">{t('settings.roles.colRole')}</th>
                             <th className="text-left">{t('personnel.field.workLocation')}</th>
                             <th className="text-left">{t('personnel.field.createdAt')}</th>
                             <th className="text-right">{t('personnel.field.qr')}</th>
@@ -118,8 +118,13 @@ export const PersonnelListPage = () => {
                                 <td className="text-[13px] text-slate-500 dark:text-white/60">
                                     <span className="block truncate">{person.email}</span>
                                 </td>
+                                {/* Die Rolle aus den Einstellungen — die alte
+                                    Personalrolle (STAFF/ADMIN/ACCOUNTANT) ist
+                                    abgelöst (Vorgabe 27.08.2026). */}
                                 <td className="text-[12.5px] text-slate-600 dark:text-white/70">
-                                    {staffRoleLabel(person.staffRole)}
+                                    {person.roleName
+                                        ? <span className="block truncate">{person.roleName}</span>
+                                        : <span className="text-slate-400 dark:text-white/40">{t('personnel.person.noRole')}</span>}
                                 </td>
                                 <td>
                                     {person.workLocation === 'REMOTE' ? (

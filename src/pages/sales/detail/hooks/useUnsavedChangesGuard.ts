@@ -136,7 +136,18 @@ export const useUnsavedChangesGuard = (when: boolean, options?: UnsavedChangesGu
         if (!when || sentinelPushedRef.current) return;
         sentinelPushedRef.current = true;
         window.history.pushState(null, '', window.location.href);
+        /* Ab jetzt liegt ein Eintrag mit DERSELBEN Adresse auf dem Stapel. Der
+           Zurück-Pfeil im Kopf darf darum keinen Verlaufsschritt mehr gehen —
+           er käme auf diesem Eintrag heraus und bliebe im Angebot statt in die
+           Liste zu gehen (Vorgabe Samet, 12.09.2026). */
+        useNavGuardStore.getState().setHistoryPinned(true);
     }, [when]);
+
+    /* Die Marke gilt, solange diese Seite steht: der Zwischen-Eintrag bleibt im
+       Verlauf, auch nachdem gespeichert wurde. */
+    useEffect(() => () => {
+        useNavGuardStore.getState().setHistoryPinned(false);
+    }, []);
 
     useEffect(() => {
         const onPop = () => {

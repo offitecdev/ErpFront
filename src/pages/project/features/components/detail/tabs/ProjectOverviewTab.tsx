@@ -54,6 +54,7 @@ export const ProjectOverviewTab = memo(({
     addonAttention,
     canCreateAddon,
     onNavigate,
+    onSelectOrder,
     onOrderCreated,
 }: {
     project: ProjectDto;
@@ -64,6 +65,8 @@ export const ProjectOverviewTab = memo(({
     addonAttention: boolean;
     canCreateAddon: boolean;
     onNavigate: (view: ProjectDetailView) => void;
+    /** Eine Zeile der Zusatzauftrags-/Kommissionsliste stellt die Seite um. */
+    onSelectOrder: (orderId: string) => void;
     onOrderCreated: (orderId: string) => Promise<void>;
 }) => {
     const { byOrderId: deliveryByOrderId } = useProjectDeliveryReports(project.id);
@@ -177,19 +180,20 @@ export const ProjectOverviewTab = memo(({
     );
 
     return (
-        <div className="space-y-3">
+        <div className="ofi-prj-overview">
             {/* Projektadresse ganz oben, als eigene Zeile (Benutzerwunsch). */}
             <ProjectAddressLine project={project} order={order} />
             <OrderHeaderTable project={project} order={order} notifications={notifications} />
 
             {/* Two narrow columns: the order's own figures on the left, what its
                 add-ons and reports say on the right. */}
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div className="flex flex-col gap-3">
+            <div className="ofi-prj-grid">
+                <div className="ofi-prj-col">
                     <OrderSummaryTable
                         total={selectedTotal}
                         summary={orderSummary}
                         deliveryRows={orderDeliveries}
+                        onNavigate={onNavigate}
                     />
                     <AddonOrdersBox
                         project={project}
@@ -199,18 +203,26 @@ export const ProjectOverviewTab = memo(({
                         pendingCount={pendingCount}
                         canCreate={canCreateAddon}
                         onCreated={onOrderCreated}
+                        onSelectOrder={onSelectOrder}
+                        onNavigate={onNavigate}
                     />
                 </div>
                 {/* Two boxes stacked vertically — the delivery one deliberately the
                     smaller of the pair, since it answers a single yes/no. */}
-                <div className="flex flex-col gap-3">
-                    <OverviewPieCharts order={orderFigures} addons={addonFigures} />
-                    <DeliveryStatusBox reports={orderDeliveries} />
+                <div className="ofi-prj-col">
+                    <OverviewPieCharts
+                        order={orderFigures}
+                        addons={addonFigures}
+                        onOpenBilling={() => onNavigate(viewForSection('billing'))}
+                    />
+                    <DeliveryStatusBox reports={orderDeliveries} onNavigate={onNavigate} />
                     {/* Die Kommission steht bereits in der Kopfzeile neben Kunde und
                         Auftrag. Diese Liste erscheint nur, wenn das Projekt WIRKLICH
                         mehrere verschiedene Kommissionen trägt (Benutzerwunsch:
                         eine einzelne Kommission wird nicht doppelt gezeigt). */}
-                    {distinctCommissions > 1 && <CommissionsBox orders={orders} />}
+                    {distinctCommissions > 1 && (
+                        <CommissionsBox orders={orders} onSelectOrder={onSelectOrder} />
+                    )}
                 </div>
             </div>
         </div>

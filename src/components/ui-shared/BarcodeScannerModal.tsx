@@ -7,6 +7,7 @@ import { Button } from './Button';
 import { Input } from './Field';
 
 import { t } from '@/i18n/translate';
+import { formatCameraError } from '@/lib/cameraError';
 
 type DetectedBarcode = { rawValue?: string };
 type BarcodeDetectorInstance = {
@@ -121,7 +122,7 @@ export const BarcodeScannerModal: React.FC<{
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { ideal: 'environment' },
+                    facingMode: { exact: 'user' },
                     width: { ideal: 1280 },
                     height: { ideal: 720 },
                 },
@@ -150,13 +151,13 @@ export const BarcodeScannerModal: React.FC<{
             stopCamera();
             const name = String(err?.name || '');
             const message = String(err?.message || err || '');
-            setCameraError(
+            const friendlyMessage =
                 name === "NotAllowedError" || name === "PermissionDeniedError"
                     ?t('auto.kamera_izni_reddedildi_tarayici_adres_cubugundak')
                     : message.includes('secure') || message.includes('HTTPS')
                       ?t('auto.kamera_icin_sayfa_https_veya_localhost_uzerinden')
-                      :t('auto.kamera_acilamadi_baska_bir_uygulama_kamerayi_kul')
-            );
+                      :t('auto.kamera_acilamadi_baska_bir_uygulama_kamerayi_kul');
+            setCameraError(`${friendlyMessage}\n\n${formatCameraError(err)}`);
         } finally {
             startingRef.current = false;
             setIsStarting(false);
@@ -193,10 +194,14 @@ export const BarcodeScannerModal: React.FC<{
             onClick={onClose}
         >
             <div
-                className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-secondary bg-primary text-primary shadow-xl animate-in slide-in-from-top-2 duration-200"
+                /* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
+                   "FENSTER-OBERFLÄCHE"). Das Fenster malte sich vorher aus einer
+                   fremden Token-Familie (`bg-primary` / `border-secondary`) und
+                   kam mit `rounded-xl` bei 8px an. */
+                className="ofi-pop flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden animate-in slide-in-from-top-2 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-start justify-between gap-4 border-b border-secondary px-6 py-4">
+                <div className="ofi-pop__rule flex items-start justify-between gap-4 border-b px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className={cx("flex size-10 items-center justify-center rounded-lg text-white", isSerial ? 'bg-brand-solid' : 'bg-success-solid')}>
                             {isSerial ? <ScanOutlined style={{ fontSize: 19 }} /> : <NumberOutlined style={{ fontSize: 19 }} />}
@@ -211,7 +216,7 @@ export const BarcodeScannerModal: React.FC<{
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex size-8 items-center justify-center rounded-lg text-fg-quaternary transition-colors hover:bg-secondary hover:text-fg-secondary"
+                        className="ofi-float-card__iconbtn shrink-0"
                         aria-label={t('common.close')}
                     >
                         <CloseOutlined style={{ fontSize: 16 }} />
@@ -241,7 +246,7 @@ export const BarcodeScannerModal: React.FC<{
                     {(cameraError || scanHint) && (
                         <div className={cx("mt-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm", cameraError ?"border-utility-yellow-200 bg-warning-primary text-warning-primary" :"border-secondary bg-secondary text-tertiary")}>
                             {cameraError && <WarningOutlined style={{ fontSize: 14, marginTop: 2 }} />}
-                            <span>{cameraError || scanHint}</span>
+                            <span className="whitespace-pre-wrap break-words">{cameraError || scanHint}</span>
                         </div>
                     )}
 

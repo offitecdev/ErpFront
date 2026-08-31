@@ -36,7 +36,7 @@ export const Card: React.FC<CardProps> = ({
                 <div className="flex min-w-0 items-center gap-2.5">
                     {icon && <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#272f67]">{icon}</span>}
                     <div className="min-w-0">
-                        {title && <h3 className="truncate text-md font-semibold text-primary">{title}</h3>}
+                        {title && <h3 className="ofi-serif truncate text-md font-semibold text-primary">{title}</h3>}
                         {description && <p className="mt-0.5 truncate text-sm text-tertiary">{description}</p>}
                     </div>
                 </div>

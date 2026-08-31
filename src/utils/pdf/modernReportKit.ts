@@ -7,11 +7,28 @@
  *    IBAN bandı) kod ile çizilir — sablon.pdf arka plan birleştirmesi YOKTUR.
  *  - Ferah tablolar: dikey ızgara yok, yumuşak başlık bandı, ince ayraçlar ve
  *    çok hafif zebra tonlaması.
- *  - Bölüm başlıklarında ALT ÇİZGİ YOKTUR (kırmızı vurgu yalnızca belge
- *    başlığındadır — kullanıcı isteği).
- *  - İmza kartı YALNIZCA müşteri içindir; kenarlıklıdır ama iç zemini BEYAZDIR
- *    (kullanıcı isteği).
+ *  - İmza kartları: solda TEKNİSYEN, sağda MÜŞTERİ (kullanıcı isteği
+ *    19.08.2026); kenarlıklıdır ama iç zeminleri BEYAZDIR.
  * Üç üretici de buradan beslenir; tasarım değişiklikleri TEK yerden yapılır.
+ *
+ * ── BAŞLIK BASAMAKLARI (kullanıcı isteği 19.08.2026) ─────────────────────────
+ * "Hangi başlık hangisi" sorusu kalmasın diye belgede YALNIZCA dört basamak
+ * vardır; her basamak boyut + renk + biçim olarak diğerlerinden açıkça ayrılır:
+ *   1. `drawDocTitle`     — belge adı. 17 pt lacivert, TEK kırmızı vurgu.
+ *                           Sayfa 1'de bir kez; rapor numarası kapak kartında.
+ *   2. `drawSectionTitle` — NUMARALI bölüm başlığı ("1  Arbeitszeiten").
+ *                           11.5 pt lacivert + içerik genişliğinde ince ayraç.
+ *   3. `drawSubTitle`     — bölüm içi grup başlığı (checklist adı, montaj günü).
+ *                           8.8 pt gri-mavi, zeminsiz — asla toplam bandı gibi
+ *                           görünmez.
+ *   4. Tablo başlığı      — gri bant, 8.4 pt (`drawModernTableHeader`).
+ * `drawBandRow` artık YALNIZCA toplam satırıdır (tablonun altında, üst çizgili).
+ *
+ * ── RENK DİSİPLİNİ ───────────────────────────────────────────────────────────
+ * Kart kenarlarındaki üç renkli şerit KALDIRILDI (kullanıcı isteği): tüm
+ * kartlar tek lacivert kenar taşır. Belgede kırmızı SADECE belge başlığındadır.
+ * Dolgu olarak yalnızca iki gri kullanılır: tablo başlığı/toplam (COLOR_HEAD_BG)
+ * ve zebra/not kartı (COLOR_ZEBRA). Kartların içi BEYAZ kalır.
  */
 import { jsPDF } from 'jspdf';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
@@ -44,6 +61,8 @@ export const FS_HEADER = 8.4;
 export const LH_BODY = 4.4;
 
 // ── Renk paleti ──────────────────────────────────────────────────────────────
+// Tek renk ailesi: lacivert (+ açık tonu) ve griler. Kırmızı yalnızca belge
+// başlığında kullanılır; başka hiçbir yerde ikinci bir vurgu rengi yoktur.
 export const COLOR_TEXT = [30, 32, 40] as const;
 export const COLOR_MUTED = [120, 126, 140] as const;
 export const COLOR_LABEL = [88, 95, 114] as const;
@@ -51,9 +70,12 @@ export const COLOR_NAVY = [31, 42, 84] as const;
 export const COLOR_RED = [211, 32, 38] as const;
 export const COLOR_NAVY_SOFT = [104, 116, 158] as const;
 export const COLOR_HAIRLINE = [226, 229, 237] as const;
+/** Tek gri dolgu #1 — tablo başlığı ve toplam satırı. */
 export const COLOR_HEAD_BG = [238, 241, 247] as const;
+/** Tek gri dolgu #2 — zebra satırı ve not kartı. */
 export const COLOR_ZEBRA = [249, 250, 252] as const;
-export const COLOR_BAND_BG = [244, 246, 250] as const;
+/** Yalnızca personel raporunun rakam kutucukları içindir — rapor gövdesinde
+ *  kartların içi BEYAZDIR. */
 export const COLOR_CARD_BG = [248, 249, 252] as const;
 export const COLOR_CARD_BORDER = [226, 230, 238] as const;
 
@@ -280,22 +302,32 @@ export function decoratePages(doc: jsPDF, assets: BrandAssets, settings: PdfComp
 export const EMPTY = '—';
 export const clean = (value: unknown) => String(value ?? '').trim();
 
+/**
+ * Tarihler belgelerde HER YERDE "19.08.2026" biçiminde basılır (kullanıcı
+ * isteği 19.08.2026 — teklif/fatura PDF'leriyle aynı okunuş). `toLocaleDateString`
+ * de-CH'de "19.8.2026" üretiyordu; gün/ay sıfırla doldurulur.
+ */
+const dotted = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}.${mm}.${d.getFullYear()}`;
+};
+
 export const dateFmt = (value?: string | Date | null, locale = 'de-CH') => {
     if (!value) return EMPTY;
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return EMPTY;
-    return d.toLocaleDateString(locale);
+    // Türkçe/İngilizce yazışmalarda da noktalı biçim okunaklıdır; locale yalnız
+    // saat biçimlendirmesinde ayrışır.
+    return locale.startsWith('en') ? d.toLocaleDateString('en-GB') : dotted(d);
 };
 
-// Kısa tarih: "26-06-15" (YY-MM-DD) — kapak kartı ve dosya adı.
+// Kapak kartı tarihi — belge boyunca aynı okunuş: "19.08.2026".
 export const dateShort = (value?: string | Date | null) => {
     if (!value) return EMPTY;
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return EMPTY;
-    const yy = String(d.getFullYear()).slice(-2);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yy}-${mm}-${dd}`;
+    return dotted(d);
 };
 
 export const timeFmt = (value?: string | Date | null, locale = 'de-CH') => {
@@ -341,32 +373,110 @@ export function fitFontSize(doc: jsPDF, text: string, maxW: number, base: number
     return size;
 }
 
+// ── Başlık basamakları ───────────────────────────────────────────────────────
 /**
- * Bölüm başlığı: lacivert bold metin — ALT ÇİZGİSİZ (kullanıcı isteği).
- * Başlığın üstünde belirgin bir nefes payı bırakılır ki bölümler sıkışık
- * durmasın; sayfa başında (taze sayfada) bu pay otomatik düşer.
+ * Bölüm sayacı. Numaralandırma BELGE BAŞINA açılır: `drawCover`a
+ * `numberedSections: true` veren belgeler ("1 Arbeitszeiten", "2 …") numara
+ * alır. Tek başlıklı belgeler (personel raporunun "Absenzen" bölümü gibi)
+ * numarasız kalır — orada "1" olmayan bir sıralamayı ima ederdi.
+ */
+let sectionNumber = 0;
+let sectionNumbering = false;
+
+export const resetSectionNumbering = (enabled = false) => {
+    sectionNumber = 0;
+    sectionNumbering = enabled;
+};
+
+/**
+ * Bir bölüm başlığının kapladığı toplam yükseklik (üst nefes payı dâhil).
+ * Yer ayıran çağrılar bunu kullanır — sabiti elle tekrar etmek, imza kartlarının
+ * başlığından koparak boş bir sayfaya düşmesine yol açmıştı.
+ */
+export const SECTION_TITLE_H = 18.5;
+
+/**
+ * BASAMAK 2 — bölüm başlığı. Numaralıdır ("1  Arbeitszeiten"): okuyucu hem
+ * hangi basamakta olduğunu hem de raporun kaç bölümden oluştuğunu tek bakışta
+ * görür (kullanıcı isteği 19.08.2026 — "hangi başlık hangisi anlaşılmıyor").
+ * Numara lacivertin açık tonunda, başlık koyu lacivert; altında içerik
+ * genişliğinde İNCE GRİ ayraç — kırmızı çizgi YOKTUR.
  */
 export function drawSectionTitle(doc: jsPDF, title: string, y: number): number {
     const before = ensureSpace(doc, y, 30);
-    const topGap = before === y ? 4.5 : 0;
+    // Bölümler arasında belirgin nefes payı; taze sayfada pay otomatik düşer.
+    const topGap = before === y ? SECTION_TITLE_H - 11.5 : 0;
     y = before;
+    sectionNumber += 1;
+
+    const baseline = y + topGap + 5;
     doc.setFont(FONT, 'bold');
-    doc.setFontSize(10.4);
+    doc.setFontSize(11.5);
+    let numW = 0;
+    if (sectionNumbering) {
+        const label = String(sectionNumber);
+        doc.setTextColor(...COLOR_NAVY_SOFT);
+        doc.text(label, ML, baseline);
+        numW = doc.getTextWidth(label) + 3.6;
+    }
     doc.setTextColor(...COLOR_NAVY);
-    doc.text(title, ML, y + topGap + 4.6);
-    return y + topGap + 10.5;
+    fitFontSize(doc, title, CONTENT_W - numW, 11.5, 8);
+    doc.text(title, ML + numW, baseline);
+    doc.setFontSize(FS_BASE);
+
+    doc.setDrawColor(...COLOR_HAIRLINE);
+    doc.setLineWidth(0.25);
+    doc.line(ML, baseline + 2.8, MR, baseline + 2.8);
+
+    return y + topGap + 11.5;
 }
 
-/** Belge başlığı: büyük lacivert başlık + kısa kırmızı vurgu (yalnızca burada). */
+/**
+ * BASAMAK 3 — bölüm içi grup başlığı (checklist adı, montaj günü, form grubu).
+ * Zeminsiz, küçük ve gri-mavi: altındaki gri tablo başlığıyla da, tablonun
+ * altındaki toplam bandıyla da karıştırılamaz. Sağdaki `meta` isteğe bağlıdır
+ * (tarih, "5/8" gibi).
+ */
+export function drawSubTitle(doc: jsPDF, title: string, meta: string, y: number): number {
+    y = ensureSpace(doc, y, 16);
+    const metaText = clean(meta);
+
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(8.2);
+    const metaW = metaText ? doc.getTextWidth(metaText) + 6 : 0;
+
+    doc.setFont(FONT, 'bold');
+    doc.setTextColor(...COLOR_LABEL);
+    fitFontSize(doc, title, CONTENT_W - metaW, 8.8, 6.4);
+    doc.text(title, ML, y + 3.9);
+
+    if (metaText) {
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(8.2);
+        doc.setTextColor(...COLOR_MUTED);
+        doc.text(metaText, MR, y + 3.9, { align: 'right' });
+    }
+
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    doc.setTextColor(...COLOR_TEXT);
+    return y + 6.4;
+}
+
+/**
+ * BASAMAK 1 — belge başlığı. Sayfa 1'de bir kez; belgedeki TEK kırmızı öge
+ * kısa vurgu çizgisidir. Rapor numarası başlığa EKLENMEZ, kapak kartında durur
+ * (üç rapor türünde de aynı okunuş).
+ */
 export function drawDocTitle(doc: jsPDF, title: string, y: number): number {
     doc.setFont(FONT, 'bold');
-    doc.setFontSize(16.5);
+    doc.setFontSize(17);
     doc.setTextColor(...COLOR_NAVY);
     doc.text(title, ML, y);
     doc.setDrawColor(...COLOR_RED);
-    doc.setLineWidth(0.8);
-    doc.line(ML, y + 2.6, ML + 14, y + 2.6);
-    return y + 10;
+    doc.setLineWidth(1);
+    doc.line(ML, y + 3, ML + 16, y + 3);
+    return y + 11;
 }
 
 // ── Modern tablo (dikey ızgarasız; yumuşak başlık bandı + zebra + ayraçlar) ──
@@ -436,7 +546,13 @@ export function drawModernTable(
     columns: ModernColumn[],
     rows: string[][],
     y: number,
-    opts?: { mergeFirstColumn?: boolean },
+    /**
+     * `reserveAfter`: tablonun hemen ardından gelecek toplam satır(lar)ı için
+     * ayrılan yükseklik (mm). Son satır bu payla birlikte sığmıyorsa satır da
+     * toplam da yeni sayfaya geçer — toplam, tablosundan kopup boş bir sayfanın
+     * tepesinde tek başına kalmaz.
+     */
+    opts?: { mergeFirstColumn?: boolean; reserveAfter?: number },
 ): number {
     y = ensureSpace(doc, y, TBL_HEAD_H + 14);
     y = drawModernTableHeader(doc, columns, y);
@@ -453,12 +569,18 @@ export function drawModernTable(
         const printed = merge ? [continuesGroup ? '' : row[0], ...row.slice(1)] : row;
         const cellLines = columns.map((col, ci) => {
             const maxW = col.w - TBL_PAD_X * 2;
-            return doc.splitTextToSize(breakLongWords(doc, printed[ci] || EMPTY, maxW), maxW) as string[];
+            // Birleşmiş hücrenin devamı BOŞ kalır — "—" basılırsa sütun
+            // birleşmiş değil, verisi eksikmiş gibi görünür.
+            const blankByMerge = merge && ci === 0 && continuesGroup;
+            const value = blankByMerge ? '' : (printed[ci] || EMPTY);
+            return doc.splitTextToSize(breakLongWords(doc, value, maxW), maxW) as string[];
         });
         const maxLines = Math.max(1, ...cellLines.map((l) => l.length));
         const rowH = Math.max(8, maxLines * LH_BODY + 3.8);
 
-        if (y + rowH > CONTENT_BOTTOM) {
+        // Son satır, kendisinden sonra gelecek toplam bandıyla BİRLİKTE ölçülür.
+        const keepWithNext = index === rows.length - 1 ? Number(opts?.reserveAfter || 0) : 0;
+        if (y + rowH + keepWithNext > CONTENT_BOTTOM) {
             doc.addPage();
             y = drawModernTableHeader(doc, columns, CONTENT_TOP_REST);
             // Yeni sayfada grup etiketi yeniden yazılır.
@@ -500,24 +622,53 @@ export function drawModernTable(
     return y;
 }
 
-/** Tablo altına yumuşak vurgu bandı — sola etiket, sağa değer. */
+/**
+ * TOPLAM SATIRI — yalnızca bir tablonun altındaki ara/genel toplam içindir
+ * (kullanıcı isteği 19.08.2026: eskiden aynı bant hem grup başlığı hem toplam
+ * olarak kullanılıyordu, bu yüzden hangisinin ne olduğu anlaşılmıyordu; grup
+ * başlıkları artık `drawSubTitle`).
+ * Gri zemin + ÜST ÇİZGİ: tablonun kapanışı olduğu görülür; değer, tablonun sağ
+ * kenarıyla aynı hizada biter. Değer boşsa satır bir "kayıt yok" notu gibi
+ * sade basılır.
+ */
+/** Toplam satırı yükseklikleri — `reserveAfter` hesapları bunları kullanır. */
+export const BAND_ROW_H = 9;
+export const BAND_ROW_STRONG_H = 10.5;
+
 export function drawBandRow(doc: jsPDF, label: string, value: string, y: number, strong = false): number {
-    const h = strong ? 11 : 9;
+    const text = clean(value);
+
+    if (!text) {
+        y = ensureSpace(doc, y, 10);
+        doc.setFont(FONT, 'italic');
+        doc.setFontSize(FS_BASE);
+        doc.setTextColor(...COLOR_MUTED);
+        doc.text(label, ML, y + 4.8);
+        doc.setFont(FONT, 'normal');
+        doc.setTextColor(...COLOR_TEXT);
+        return y + 8;
+    }
+
+    const h = strong ? BAND_ROW_STRONG_H : BAND_ROW_H;
+    const size = strong ? 10.4 : FS_BASE;
     y = ensureSpace(doc, y, h + 2);
-    if (strong) doc.setFillColor(...COLOR_HEAD_BG);
-    else doc.setFillColor(...COLOR_BAND_BG);
-    doc.rect(ML, y + 0.5, CONTENT_W, h - 1, 'F');
+
+    doc.setFillColor(...COLOR_HEAD_BG);
+    doc.rect(ML, y, CONTENT_W, h, 'F');
     doc.setFillColor(...COLOR_NAVY);
-    doc.rect(ML, y + 0.5, 1.2, h - 1, 'F');
+    doc.rect(ML, y, CONTENT_W, strong ? 0.5 : 0.3, 'F');
+
     doc.setFont(FONT, 'bold');
-    doc.setFontSize(strong ? 10.6 : FS_BASE);
+    doc.setFontSize(size);
     doc.setTextColor(...COLOR_NAVY);
+    const baseline = y + h / 2 + 1.4;
+    const valueW = doc.getTextWidth(text);
     // Etiket, değerin soluna sığdırılır — uzun liste adları bandı taşırmaz.
-    const valueW = doc.getTextWidth(value);
-    fitFontSize(doc, label, CONTENT_W - valueW - 10, strong ? 10.6 : FS_BASE, 6.4);
-    doc.text(label, ML + 4, y + h / 2 + 1.4);
-    doc.setFontSize(strong ? 10.6 : FS_BASE);
-    doc.text(value, MR - TBL_PAD_X, y + h / 2 + 1.4, { align: 'right' });
+    fitFontSize(doc, label, CONTENT_W - valueW - TBL_PAD_X * 3, size, 6.4);
+    doc.text(label, ML + TBL_PAD_X, baseline);
+    doc.setFontSize(size);
+    doc.text(text, MR - TBL_PAD_X, baseline, { align: 'right' });
+
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
     doc.setTextColor(...COLOR_TEXT);
@@ -531,14 +682,14 @@ export interface CoverRow {
     emphasize?: boolean;
 }
 
-/** Kart sol kenarındaki kırmızı→lacivert vurgu şeridi. */
-function drawAccentStrip(doc: jsPDF, x: number, y: number, h: number) {
-    doc.setFillColor(...COLOR_RED);
-    doc.rect(x, y, 1.2, h * 0.32, 'F');
+/**
+ * Kart sol kenarı — TEK renk (kullanıcı isteği 19.08.2026). Eskiden kırmızı →
+ * lacivert → açık lacivert üç parçalı bir şeritti; sayfada dört-beş kart yan
+ * yana gelince belge alacalı görünüyordu.
+ */
+export function drawCardEdge(doc: jsPDF, x: number, y: number, h: number) {
     doc.setFillColor(...COLOR_NAVY);
-    doc.rect(x, y + h * 0.32, 1.2, h * 0.44, 'F');
-    doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(x, y + h * 0.76, 1.2, h * 0.24, 'F');
+    doc.rect(x, y, 1, h, 'F');
 }
 
 export interface CoverOptions {
@@ -549,10 +700,14 @@ export interface CoverOptions {
     recipientLines?: string[];
     title: string;
     subtitle?: string | null;
+    /** Bölüm başlıkları numaralansın mı ("1 Arbeitszeiten")? Bkz. drawSectionTitle. */
+    numberedSections?: boolean;
 }
 
 /** Ortak kapak düzeni. Dönen değer: içerik akışının başlayacağı Y. */
 export function drawCover(doc: jsPDF, opts: CoverOptions): number {
+    // Her belge kapakla başlar; bölüm sayacı burada sıfırlanır.
+    resetSectionNumbering(Boolean(opts.numberedSections));
     const y0 = CONTENT_TOP_FIRST;
 
     // ── Sol: bilgi kartı — boş satırlar HİÇ çizilmez ─────────────────────────
@@ -563,11 +718,12 @@ export function drawCover(doc: jsPDF, opts: CoverOptions): number {
     const cardY = y0 - 4;
     const cardH = rows.length * rowH + 2.4;
 
-    doc.setFillColor(...COLOR_CARD_BG);
+    // Kart içi BEYAZ: belgede gri dolgu yalnızca tablolara ayrılmıştır.
+    doc.setFillColor(255, 255, 255);
     doc.setDrawColor(...COLOR_CARD_BORDER);
     doc.setLineWidth(0.25);
     doc.rect(cardX, cardY, cardW, cardH, 'FD');
-    drawAccentStrip(doc, cardX, cardY, cardH);
+    drawCardEdge(doc, cardX, cardY, cardH);
 
     let ry = cardY + 1.2;
     rows.forEach((row, idx) => {
@@ -775,83 +931,140 @@ export function drawImagesGrid(doc: jsPDF, images: string[], y: number): number 
     return y + 4;
 }
 
-// ── Onay bölümü: metin + YALNIZCA müşteri imza kartı ─────────────────────────
-export interface ApprovalOptions {
-    title: string;
-    confirmText: string;
+// ── Not kartı: yumuşak zeminli, vurgu şeritli serbest metin bloğu ───────────
+/**
+ * Serbest metni (not / bemerkung) çıplak satırlar yerine yumuşak bir karta
+ * koyar: kenarlık + sol vurgu şeridi + hafif zemin. Belge "sunulabilir"
+ * görünsün diye (kullanıcı isteği 19.08.2026) notlar artık hep böyle çizilir.
+ */
+export function drawNoteBlock(doc: jsPDF, text: string, y: number): number {
+    const body = clean(text);
+    if (!body) return y;
+
+    const padX = 5;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    const lines = doc.splitTextToSize(body, CONTENT_W - padX * 2) as string[];
+    const boxH = lines.length * (LH_BODY + 0.2) + 7;
+
+    y = ensureSpace(doc, y, boxH + 3);
+    doc.setFillColor(...COLOR_ZEBRA);
+    doc.setDrawColor(...COLOR_CARD_BORDER);
+    doc.setLineWidth(0.25);
+    doc.rect(ML, y, CONTENT_W, boxH, 'FD');
+    drawCardEdge(doc, ML, y, boxH);
+
+    doc.setTextColor(...COLOR_TEXT);
+    doc.text(lines, ML + padX, y + 5.4);
+    return y + boxH + 4;
+}
+
+// ── Onay bölümü: metin + imza kartları (Techniker / Kunde) ──────────────────
+/** Ein Unterzeichner = eine Karte. */
+export interface ApprovalSigner {
     roleLabel: string;
-    customerName: string;
+    name: string;
     dateLabel: string;
     dateText: string;
     signatureLabel: string;
     signatureData?: string | null;
 }
 
-/**
- * Onay metni + sağa yaslı müşteri imza kartı. Kart kenarlıklıdır ama iç zemini
- * BEYAZDIR (kullanıcı isteği); sol kenarda kırmızı→lacivert vurgu şeridi durur.
- */
-export function drawApprovalSection(doc: jsPDF, opts: ApprovalOptions, y: number): number {
-    const cardW = 80;
-    const cardH = 46;
+export interface ApprovalOptions {
+    title: string;
+    confirmText: string;
+    /**
+     * Ein oder ZWEI Karten. Zwei stehen nebeneinander (links Techniker, rechts
+     * Kunde), eine bleibt rechtsbündig wie bisher. Karten ohne Namen UND ohne
+     * Unterschrift werden weggelassen — leere Kästen sind kein Dokument.
+     */
+    signers: ApprovalSigner[];
+}
 
-    y = ensureSpace(doc, y, 14 + cardH + 14);
-    y = drawSectionTitle(doc, opts.title, y);
-
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(FS_BASE);
-    doc.setTextColor(...COLOR_TEXT);
-    const confirmLines = doc.splitTextToSize(opts.confirmText, CONTENT_W) as string[];
-    doc.text(confirmLines, ML, y + 3.6);
-    y += confirmLines.length * 4.6 + 5;
-
-    const cardX = MR - cardW;
-    y = ensureSpace(doc, y, cardH + 4);
-
+/** Eine Unterschriftenkarte: weisser Innenraum, Rahmen, EIN Akzentstreifen. */
+function drawSignatureCard(doc: jsPDF, signer: ApprovalSigner, x: number, y: number, w: number, h: number) {
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(...COLOR_CARD_BORDER);
     doc.setLineWidth(0.25);
-    doc.rect(cardX, y, cardW, cardH, 'FD');
-    drawAccentStrip(doc, cardX, y, cardH);
+    doc.rect(x, y, w, h, 'FD');
+    drawCardEdge(doc, x, y, h);
 
     doc.setFont(FONT, 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...COLOR_LABEL);
-    doc.text(opts.roleLabel, cardX + 4.5, y + 5.4);
-    doc.text(`${opts.dateLabel}: ${opts.dateText}`, cardX + cardW - 3.5, y + 5.4, { align: 'right' });
+    doc.text(signer.roleLabel, x + 4.5, y + 5.4);
+    if (clean(signer.dateText)) {
+        doc.text(`${signer.dateLabel}: ${signer.dateText}`, x + w - 3.5, y + 5.4, { align: 'right' });
+    }
 
-    const customerName = clean(opts.customerName) || EMPTY;
+    const name = clean(signer.name) || EMPTY;
     doc.setFont(FONT, 'bold');
     doc.setTextColor(...COLOR_NAVY);
-    fitFontSize(doc, customerName, cardW - 9, 9.4, 6.4);
-    doc.text(customerName, cardX + 4.5, y + 10.6);
+    fitFontSize(doc, name, w - 9, 9.4, 6.4);
+    doc.text(name, x + 4.5, y + 10.6);
 
     // İmza alanı: yakalanmış imza görseli varsa gömülür; yoksa elle imza için
     // boş kalır. Altında ince çizgi + imza etiketi.
     const sigTop = y + 13.5;
-    const sigLineY = y + cardH - 8;
-    if (opts.signatureData) {
+    const sigLineY = y + h - 8;
+    if (signer.signatureData) {
         try {
-            const sig = String(opts.signatureData);
+            const sig = String(signer.signatureData);
             const fmt = sig.includes('image/png') ? 'PNG' : 'JPEG';
-            const boxW = cardW - 16;
+            const boxW = w - 16;
             const boxH = sigLineY - sigTop - 1.5;
             const props = doc.getImageProperties(sig);
             const ratio = Math.min(boxW / props.width, boxH / props.height);
-            const w = props.width * ratio;
-            const h = props.height * ratio;
-            doc.addImage(sig, fmt, cardX + (cardW - w) / 2, sigTop + (boxH - h) / 2, w, h, undefined, 'FAST');
+            const iw = props.width * ratio;
+            const ih = props.height * ratio;
+            doc.addImage(sig, fmt, x + (w - iw) / 2, sigTop + (boxH - ih) / 2, iw, ih, undefined, 'FAST');
         } catch { /* bozuk imza verisi kartı düşürmesin */ }
     }
 
     doc.setDrawColor(...COLOR_NAVY_SOFT);
     doc.setLineWidth(0.3);
-    doc.line(cardX + 4.5, sigLineY, cardX + cardW - 4.5, sigLineY);
+    doc.line(x + 4.5, sigLineY, x + w - 4.5, sigLineY);
     doc.setFont(FONT, 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...COLOR_LABEL);
-    doc.text(opts.signatureLabel, cardX + 4.5, sigLineY + 3.8);
+    doc.text(signer.signatureLabel, x + 4.5, sigLineY + 3.8);
     doc.setTextColor(...COLOR_TEXT);
+}
+
+/**
+ * Onay metni + imza kartları. Rapor artık İKİ imza taşır (kullanıcı isteği
+ * 19.08.2026): solda işi yapan TEKNİSYEN, sağda MÜŞTERİ. Tek imzacı verilirse
+ * kart eskisi gibi sağa yaslanır.
+ */
+export function drawApprovalSection(doc: jsPDF, opts: ApprovalOptions, y: number): number {
+    const signers = opts.signers.filter((signer) => clean(signer.name) || signer.signatureData);
+    if (signers.length === 0) return y;
+
+    const gap = 8;
+    const cardH = 46;
+    const cardW = signers.length > 1 ? (CONTENT_W - gap) / 2 : 80;
+
+    // Der Platzbedarf wird GEMESSEN, nicht geschätzt — zu knapp gerechnet
+    // landeten Titel und Text unten auf der Seite und die Karten allein auf der
+    // nächsten; zu grosszügig schob es alles auf eine fast leere Seite.
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    const confirmLines = doc.splitTextToSize(opts.confirmText, CONTENT_W) as string[];
+    y = ensureSpace(doc, y, SECTION_TITLE_H + confirmLines.length * 4.6 + 9 + cardH + 4);
+    y = drawSectionTitle(doc, opts.title, y);
+
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    doc.setTextColor(...COLOR_TEXT);
+    doc.text(confirmLines, ML, y + 3.6);
+    y += confirmLines.length * 4.6 + 5;
+
+    y = ensureSpace(doc, y, cardH + 4);
+    // Bir kart sağa yaslanır; iki kart içerik genişliğini paylaşır.
+    const firstX = signers.length > 1 ? ML : MR - cardW;
+    signers.forEach((signer, index) => {
+        drawSignatureCard(doc, signer, firstX + index * (cardW + gap), y, cardW, cardH);
+    });
 
     return y + cardH + 6;
 }

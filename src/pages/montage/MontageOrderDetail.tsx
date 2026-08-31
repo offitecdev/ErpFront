@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { CheckCircle, Send01 } from '@/components/icons/antIconCompat';
+import { CheckCircle, File05 as FileIcon, Send01 } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
+import { useAppointmentSeries } from '@/components/ui-shared/AppointmentDocuments';
 import { SignatureSheet } from '@/components/ui-shared/SignatureSheet';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
@@ -19,6 +20,7 @@ import { buildDraftFieldSnapshot, buildFieldSnapshot } from '@/pages/project/fea
 import type { SignatureSnapshot } from '@/lib/api/project';
 
 import { BigButton } from './components/BigButton';
+import { InstallationDocumentsSheet } from './components/InstallationDocumentsSheet';
 import { MontageHeader } from './components/MontageHeader';
 import { StatusPill } from './components/StatusPill';
 import { dateFmt, timeRange } from './utils/montageFormat';
@@ -52,6 +54,11 @@ export const MontageOrderDetail = () => {
     const [capturedSignature, setCapturedSignature] = useState<string | null>(null);
     /** Editör yalnızca yükleme sonrası taze veriyle KURULUR; her reload yeni kurulumdur. */
     const [editorEpoch, setEditorEpoch] = useState(0);
+    /* MEHRTÄGIGER EINSATZ (24.08.2026): die Tage des Einsatzes und seine
+       Unterlagen. Der Tagesrapport bleibt, was er war — einer JE TAG —, und die
+       Leiste unten wechselt zwischen ihnen, ohne dass die Monteurin über die
+       Liste zurückgehen müsste (Vorgabe: «keine eigene Seite dafür»). */
+    const [docsOpen, setDocsOpen] = useState(false);
     const editorHandle = useRef<FieldReportSaveHandle | null>(null);
 
     // Tenant context is set asynchronously by fetchProfile(); gating the fetch on
@@ -107,6 +114,11 @@ export const MontageOrderDetail = () => {
         void load();
     }, [appointmentId, userId, selectedTenantId, load]);
 
+    const { series } = useAppointmentSeries(appointmentId, { technician: true, enabled: Boolean(userId && selectedTenantId) });
+    const seriesDays = series?.days ?? [];
+    const multiDay = seriesDays.length > 1;
+    const documentCount = series?.documents.length ?? 0;
+
     const row = useMemo(() => (selected ? toMontageOrderRow(selected) : null), [selected]);
     const report = useMemo(() => (selected ? findReport(selected) : null), [selected]);
     const finished = selected?.status === 'COMPLETED';
@@ -131,7 +143,8 @@ export const MontageOrderDetail = () => {
                 images: payload.images,
                 startedAt: payload.startedAt,
                 endedAt: payload.endedAt,
-                signatureBase64: capturedSignature ?? undefined,
+                signatureBase64: capturedSignature ?? payload.customerSignature ?? undefined,
+                technicianSignature: payload.technicianSignature,
                 resourceMode: 'replace',
                 expenses: payload.expenses,
                 materials: payload.extraMaterials,
@@ -201,6 +214,17 @@ export const MontageOrderDetail = () => {
                     <div className="text-[12.5px] text-slate-500 dark:text-slate-400">{dateFmt(row.start)}</div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {/* TERMINUNTERLAGEN (Vorgabe 24.08.2026): der Begleitzettel
+                        und die Pläne, die das Büro an den Einsatz gehängt hat.
+                        Sie gehen an keinen Kunden — sie stehen hier, auf dem
+                        Bildschirm, an dem gearbeitet wird. */}
+                    <BigButton
+                        tone={docsOpen ? 'navy' : 'neutral'}
+                        icon={<FileIcon size={15} />}
+                        onClick={() => setDocsOpen(true)}
+                    >
+                        {documentCount > 0 ? `${t('calendar.docs.title')} (${documentCount})` : t('calendar.docs.title')}
+                    </BigButton>
                     <BigButton tone="neutral" onClick={() => navigate(`/montage/reports/general/${selected.id}`)}>
                         {t('projects.reportsHub.generalSection')}
                     </BigButton>
@@ -237,6 +261,33 @@ export const MontageOrderDetail = () => {
                 </div>
             </div>
 
+            {/* MEHRTÄGIGER EINSATZ: die Tage nebeneinander. Jeder Tag hat SEINEN
+                eigenen Rapport (und seine eigenen Überstunden) — die Leiste
+                wechselt zwischen ihnen, ohne den Umweg über die Auftragsliste.
+                Der Tag, auf dem man steht, ist hervorgehoben. */}
+            {multiDay && (
+                <div className="ofi-montage-days">
+                    <span className="ofi-montage-days__label">{t('calendar.days.plan')}</span>
+                    {seriesDays.map((day, index) => (
+                        <button
+                            key={day.id}
+                            type="button"
+                            disabled={day.id === selected.id}
+                            onClick={() => navigate(`/montage/orders/${day.id}`)}
+                            className={`ofi-montage-days__day ${day.id === selected.id ? 'is-current' : ''} ${day.status === 'COMPLETED' ? 'is-done' : ''}`}
+                        >
+                            <span className="ofi-montage-days__num">{t('calendar.days.dayNumber', { index: index + 1 })}</span>
+                            <span className="ofi-montage-days__date">{dayjs(day.startTime).format('dd DD.MM.')}</span>
+                            <span className="ofi-montage-days__time">
+                                {dayjs(day.startTime).format('HH:mm')}–{dayjs(day.endTime).format('HH:mm')}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            <InstallationDocumentsSheet row={docsOpen ? row : null} onClose={() => setDocsOpen(false)} />
+
             {/* Projektleiter-Popup'taki editörün TA KENDİSİ (kullanıcı isteği —
                 iki yüzeyde birebir aynı akış ve yerleşim). */}
             <div className="rounded-[3px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#17191c]">
@@ -252,6 +303,9 @@ export const MontageOrderDetail = () => {
                     images={images}
                     setImages={setImages}
                     disabled={finished}
+                    /* Die EINZIGE Fläche, die unterschreiben darf: der Techniker
+                       steht beim Kunden und signiert auf seinem eigenen Gerät. */
+                    canSign
                     saveHandleRef={editorHandle}
                     // Editör kayıttan sonra sunucu durumunu kendisi benimser; ayrıca
                     // tam sayfa yenileme (remount) düzenlemeyi kesintiye uğratırdı.

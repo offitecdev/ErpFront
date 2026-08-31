@@ -1,5 +1,3 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
 import type { MovementKind } from '@/types/inventory';
@@ -40,7 +38,6 @@ type MovementColumn = keyof typeof MOVEMENT_COLUMN_WIDTHS;
 
 export const StockMovementsPage = () => {
     useLanguageTick();
-    const navigate = useNavigate();
     const list = useMovementsList();
     // Sütunlar sürüklenerek genişletilir; ürün adının solundakiler sağ
     // kenarlarından, sağındakiler sol kenarlarından tutulur.
@@ -53,19 +50,7 @@ export const StockMovementsPage = () => {
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
-                title={(
-                    <span className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            aria-label={t('common.back')}
-                            onClick={() => navigate('/inventory/stock')}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
-                        {t('inv.movements.title')}
-                    </span>
-                )}
+                title={t('inv.movements.title')}
             />
 
             <div className="flex flex-wrap items-center gap-2">
@@ -116,11 +101,11 @@ export const StockMovementsPage = () => {
                             <tr>
                                 <th className="relative text-left">
                                     {t('common.date')}
-                                    <ColResizeHandle {...grid.resizeProps('date', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('date')} />
                                 </th>
                                 <th className="relative text-left">
                                     {t('inv.columns.serialCode')}
-                                    <ColResizeHandle {...grid.resizeProps('code', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('code')} />
                                 </th>
                                 <th className="text-left">{t('inv.columns.productName')}</th>
                                 <th className="relative text-left">

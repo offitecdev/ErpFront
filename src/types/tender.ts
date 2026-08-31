@@ -13,6 +13,14 @@ export interface TenderListItem {
     customerEmail?: string | null;
     customerPhone?: string | null;
     customerTaxNumber?: string | null;
+    /* ── Von Hand erfasste Kundschaft (05.09.2026) ──────────────────────────
+       Name / E-Mail / Adresse, die NUR an dieser Offerte gelten. Ohne CRM-Kunden
+       tragen sie die Offerte allein, mit CRM-Kunden sind sie die hier geltende
+       Abweichung — `customerName` / `customerAddress` / `customerEmail` oben
+       zeigen bereits das Ergebnis. Der Kundenstamm bleibt unberührt. */
+    manualCustomerName?: string | null;
+    manualCustomerEmail?: string | null;
+    manualCustomerAddress?: string | null;
     projectId?: string | null;
     /**
      * Teklifin siparişi (1:1) — yalnızca detay ucunda doldurulur. Varsa teklif
@@ -72,6 +80,15 @@ export interface TenderListItem {
      */
     ccEmails?: string[] | null;
     offerMailSentAt?: string | null;
+    /* ── Herkunft aus der OSP (19.09.2026) ──────────────────────────────────
+       Gesetzt, wenn die Offerte aus einer Anfrage der Offitec Selection
+       Platform entstanden ist: die Liste zeichnet dann das OSP-Zeichen neben
+       die Offertnummer. `ospRevisedAt` sagt zusätzlich, dass die Einheit
+       drüben NEU GERECHNET wurde (§1a) — das Zeichen warnt dann, bis jemand
+       es an der Offerte zur Kenntnis genommen hat (`ospRevisionSeenAt`). */
+    ospReference?: string | null;
+    ospRevisedAt?: string | null;
+    ospRevisionSeenAt?: string | null;
     offerAcceptedAt?: string | null;
     offerMailRecipient?: string | null;
     offerAcceptanceToken?: string | null;

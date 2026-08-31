@@ -9,6 +9,9 @@ import { BarcodeScannerModal } from '../../../components/ui-shared/BarcodeScanne
 import { Button } from '../../../components/ui-shared/Button';
 import { Field, Input } from '../../../components/ui-shared/Field';
 import { Modal } from '../../../components/ui-shared/Modal';
+// Dieses Formular legt einen LAGERARTIKEL an -- die Einheit kommt deshalb aus
+// derselben Liste wie im Lager (Einstellungen -> Module -> Lager -> Einheiten).
+import { UnitSelect } from '../../../components/ui-shared/UnitSelect';
 import { RichTextMarkdownEditor } from './TenderRichText';
 import { t } from '@/i18n/translate';
 import { useLanguageRefresh } from './hooks/useLanguageRefresh';
@@ -119,8 +122,11 @@ export const NewArticleModal: React.FC<{
                             onChange={(e) => setForm({ ...form, articleCode: e.target.value })} />
                     </Field>
                     <Field label={t('tenders.unit')} required>
-                        <Input value={form.unit}
-                            onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder={t('tenders.m_kg')} />
+                        <UnitSelect
+                            value={form.unit}
+                            onChange={(next) => setForm({ ...form, unit: next })}
+                            ariaLabel={t('tenders.unit')}
+                        />
                     </Field>
                     <Field label={t('tenders.product_adi')} required className="col-span-2">
                         <Input value={form.name}

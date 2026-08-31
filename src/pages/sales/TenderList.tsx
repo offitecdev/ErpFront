@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
+    AlertTriangle,
     Building02 as Building2,
     CheckCircle,
     File05 as FileSpreadsheet,
@@ -11,10 +12,10 @@ import {
     XClose,
 } from '@/components/icons/antIconCompat';
 
+import { OspMark } from '../../components/icons/OspMark';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { Button } from '../../components/ui-shared/Button';
-import { Field } from '../../components/ui-shared/Field';
-import { Modal } from '../../components/ui-shared/Modal';
+import { PersonAvatar } from '../../components/ui-shared/PersonAvatar';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { BlockingDialog } from '../../components/ui-shared/BlockingDialog';
 import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
@@ -32,15 +33,30 @@ import { t as i18nT } from '@/i18n/translate';
 // de kullanıldığından ortak yardımcıya taşındı.
 import { tenderStatusLabel, tenderStatusVariant } from './detail/utils/tenderStatus.utils';
 import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
+import { ImportOrdersPopup } from './detail/popups/ImportOrdersPopup';
 
 const tenderCreatorName = (tender: TenderListItem) =>
     tender.createdByName || tender.createdByEmail || tender.createdByEmployeeId || '—';
+
+/* Offerten aus der OSP tragen deren Zeichen neben der Offertnummer (Vorgabe
+   19.09.2026) — man sieht in der Liste sofort, welche von drüben kommen.
+
+   Wurde die Einheit drüben inzwischen NEU GERECHNET (§1a), warnt daneben ein
+   Dreieck: das Datenblatt, aus dem offeriert wurde, gilt nicht mehr. Es
+   verschwindet, sobald jemand die Überarbeitung an der Offerte selbst zur
+   Kenntnis genommen hat. */
+const hasOpenOspRevision = (tender: TenderListItem): boolean => {
+    if (!tender.ospRevisedAt) return false;
+    if (!tender.ospRevisionSeenAt) return true;
+    return dayjs(tender.ospRevisedAt).isAfter(dayjs(tender.ospRevisionSeenAt));
+};
 
 // Sürüklenebilir sütun genişlikleri (quote-lines tablosundaki ile aynı mekanik).
 // Teklif no sütunu listede YOKTUR: genişliği olmayan tek sütun odur, artan yeri
 // o emer — böylece bir sütun genişletilince sağda boşluk kalmaz.
 const TENDER_LIST_COLUMN_WIDTHS = {
     customer: 224,
+    commission: 160,
     status: 128,
     creator: 176,
     amount: 144,
@@ -49,14 +65,6 @@ const TENDER_LIST_COLUMN_WIDTHS = {
 };
 type TenderListColumn = keyof typeof TENDER_LIST_COLUMN_WIDTHS;
 const TENDER_LIST_COLUMNS = Object.keys(TENDER_LIST_COLUMN_WIDTHS) as TenderListColumn[];
-
-const initialsFromName = (value?: string | null) => {
-    const cleaned = value?.trim();
-    if (!cleaned || cleaned === '—') return '?';
-    const parts = cleaned.split(/\s+/).filter(Boolean);
-    const source = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : [cleaned];
-    return source.map((part) => part.charAt(0)).join('').slice(0, 2).toUpperCase();
-};
 
 const fmtMoney = (v?: number | null, currency?: string | null) =>
     typeof v === 'number' ? formatMoney(v, toCurrencyCode(currency)) : '—';
@@ -294,6 +302,10 @@ export const TenderList = () => {
                         <tr>
                             <SortableTh label={i18nT('tenders.tender_no')} sortKey="tenderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
                             <SortableTh label={i18nT('nav.quickActionsGroup.customers')} sortKey="customerName" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('customer', event)} onResizeReset={() => resetColumn('customer')} />
+                            <th className="relative text-left">
+                                {i18nT('tenders.kommission_nr')}
+                                <ColResizeHandle onResizeStart={(event) => startResize('commission', event)} onResizeReset={() => resetColumn('commission')} />
+                            </th>
                             <SortableTh label={i18nT('common.status')} sortKey="status" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" onResizeStart={(event) => startResize('status', event)} onResizeReset={() => resetColumn('status')} />
                             <th className="relative text-left">
                                 {i18nT('tenders.olusturan')}
@@ -331,6 +343,7 @@ export const TenderList = () => {
                                 />
                             </th>
                             <th />
+                            <th />
                             <th className="pb-1.5">
                                 <input
                                     value={creatorFilter}
@@ -351,7 +364,7 @@ export const TenderList = () => {
                     <tbody>
                         {(loadingList || list.length === 0) && (
                             <TableStateRow
-                                colSpan={7}
+                                colSpan={8}
                                 loading={loadingList}
                                 emptyText={hasFilters ?i18nT('crmOverview.picker.empty') :i18nT('tenders.no_tenders_yet')}
                             />
@@ -368,7 +381,28 @@ export const TenderList = () => {
                                             <FileSpreadsheet size={14} />
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="truncate font-semibold text-slate-900 dark:text-white">{t.tenderNumber}</div>
+                                            <div className="flex min-w-0 items-center gap-1.5">
+                                                <span className="truncate font-semibold text-slate-900 dark:text-white">{t.tenderNumber}</span>
+                                                {/* Ohne Fläche und gross genug zum Lesen (Vorgabe
+                                                    19.09.2026): eine dunkle Kachel wäre in der
+                                                    Zeile ein Loch. Der Schriftzug nimmt die
+                                                    Markenfarbe, im Dunkelmodus die helle. */}
+                                                {t.ospReference && (
+                                                    <OspMark
+                                                        size={14}
+                                                        className="shrink-0 text-[#272f67] dark:text-white/85"
+                                                        title={`${i18nT('osp.title')} · ${t.ospReference}`}
+                                                    />
+                                                )}
+                                                {hasOpenOspRevision(t) && (
+                                                    <span
+                                                        className="inline-flex shrink-0 text-amber-500"
+                                                        title={i18nT('osp.origin.revisedShort')}
+                                                    >
+                                                        <AlertTriangle size={13} />
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="mt-0.5 font-mono text-[11.5px] text-slate-400">v{t.version}</div>
                                         </div>
                                     </div>
@@ -379,6 +413,12 @@ export const TenderList = () => {
                                         <span className="truncate">{t.customerName || <span className="text-slate-300 dark:text-white/30">—</span>}</span>
                                     </div>
                                 </td>
+                                {/* Kommission — der Freitext des Kunden zur Offerte. */}
+                                <td className="text-[12.5px] text-slate-700 dark:text-white/80">
+                                    <span className="block truncate" title={t.commissionNumber || undefined}>
+                                        {t.commissionNumber || <span className="text-slate-300 dark:text-white/30">—</span>}
+                                    </span>
+                                </td>
                                 <td>
                                     <StatusChip variant={tenderStatusVariant(t)}>
                                         {tenderStatusLabel(t)}
@@ -386,9 +426,16 @@ export const TenderList = () => {
                                 </td>
                                 <td>
                                     <div className="flex min-w-0 items-center gap-2">
-                                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/70">
-                                            {initialsFromName(tenderCreatorName(t))}
-                                        </span>
+                                        {/* Profilbild des Erstellers; ohne
+                                            hinterlegtes Bild bleibt es beim
+                                            Kreis mit den Initialen. */}
+                                        <PersonAvatar
+                                            id={t.createdByEmployeeId}
+                                            name={tenderCreatorName(t)}
+                                            size={24}
+                                            ring={false}
+                                            tone="subtle"
+                                        />
                                         <span className="truncate text-[12.5px] text-slate-700 dark:text-white/80">
                                             {tenderCreatorName(t)}
                                         </span>
@@ -433,41 +480,15 @@ export const TenderList = () => {
             </SectionCard>
 
             {/* Excel'den içe aktarma (Odoo satış siparişi CSV) — sipariş kayıtları oluşturur. */}
-            <Modal
+            <ImportOrdersPopup
                 open={importOpen}
-                title={i18nT('tenders.import_from_excel')}
-                description={i18nT('tenders.odoo_sales_order_csv_dosyasindaki_customer_uru')}
                 onClose={() => { setImportOpen(false); setImportAttempted(false); }}
-                width="lg"
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => { setImportOpen(false); setImportAttempted(false); }}>{i18nT('common.cancel')}</Button>
-                        <Button variant="primary" loading={importing} onClick={handleImport}>{i18nT('tenders.import_from_excel')}</Button>
-                    </>
-                }
-            >
-                <div className="grid grid-cols-1 gap-3">
-                    {importMissing && (
-                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-utility-yellow-200 bg-warning-primary px-3 py-2 text-[12px] text-warning-primary">
-                            <StatusChip variant="warning">{i18nT('common.required')}</StatusChip>
-                            <span className="font-medium">{i18nT('tenders.cannot_import_without_csv_file')}</span>
-                        </div>
-                    )}
-                    <Field label={i18nT('tenders.csv_file')} required hint={i18nT('tenders.csv_uzantili_sales_order_dosyasini_select')} error={importMissing ?i18nT('tenders.csv_file_zorunludur') : null}>
-                        <input
-                            type="file"
-                            accept=".csv,text/csv"
-                            onChange={handleImportUpload}
-                            className="w-full text-[12px] file:mr-3 file:rounded file:border-0 file:bg-[#272f67]/10 file:px-3 file:py-1.5 file:font-medium file:text-[#272f67] hover:file:bg-[#272f67]/15"
-                        />
-                    </Field>
-                    {importForm.fileName && (
-                        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-slate-700">
-                            {importForm.fileName}
-                        </div>
-                    )}
-                </div>
-            </Modal>
+                importing={importing}
+                fileName={importForm.fileName}
+                missing={importMissing}
+                onFileChange={handleImportUpload}
+                onImport={handleImport}
+            />
         </div>
     );
 };

@@ -46,12 +46,20 @@ const FALLBACK_CATALOG: CatalogModuleDto[] = PAGE_MODULES.map((moduleDef) => ({
 export const RoleEditorPage = () => {
     const { id = '' } = useParams();
     const navigate = useNavigate();
-    const isNew = id === 'new';
+    /* «Neue Rolle» kommt über die FESTE Route /settings/authorization/new an —
+       sie hat KEIN :id-Segment, useParams liefert also ''. Der alte Vergleich
+       `id === 'new'` war deshalb immer falsch: die Seite suchte eine Rolle mit
+       leerer id, fand nichts und warf einen mit «Rolle nicht gefunden» zur
+       Liste zurück — der Knopf «Rolle anlegen» war damit tot. */
+    const isNew = !id || id === 'new';
 
     const [catalog, setCatalog] = useState<CatalogModuleDto[]>(FALLBACK_CATALOG);
     const [role, setRole] = useState<RoleTemplate | null>(null);
     const [roleName, setRoleName] = useState('');
     const [levels, setLevels] = useState<Record<string, PageLevel>>({});
+    /* Der Firmenwechsel steht NEBEN der Stufenkarte, nicht darin: er ist keine
+       Seite, sondern die Reichweite des Umschalters im Kopf (31.08.2026). */
+    const [canSwitchTenant, setCanSwitchTenant] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -79,6 +87,7 @@ export const RoleEditorPage = () => {
                 setRole(found);
                 setRoleName(found.roleName);
                 setLevels(found.pageLevels ?? {});
+                setCanSwitchTenant(Boolean(found.canSwitchTenant));
             })
             .catch(() => { if (!cancelled) toast.error(t('settings.roles.errorLoad')); })
             .finally(() => { if (!cancelled) setLoading(false); });
@@ -87,6 +96,10 @@ export const RoleEditorPage = () => {
     }, [id, isNew, navigate]);
 
     const readOnly = Boolean(role?.isSystemAdmin);
+    /* Die Purser-Rolle: die STUFEN bleiben bearbeitbar (welche Seiten der
+       Purser sieht, entscheidet das Haus), Name und Bestand sind fest — die
+       Antragslogik erkennt die Rolle an ihrer Flagge. */
+    const isPurser = Boolean(role?.isPurser);
     const grantedCount = useMemo(() => countGrantedPages(levels), [levels]);
 
     const setLevel = (pageKey: string, level: PageLevel) => {
@@ -107,11 +120,11 @@ export const RoleEditorPage = () => {
         try {
             setSaving(true);
             if (isNew) {
-                const created = await roleTemplateApi.create({ roleName: name, pageLevels: levels });
+                const created = await roleTemplateApi.create({ roleName: name, pageLevels: levels, canSwitchTenant });
                 toast.success(t('settings.roles.created'));
                 navigate(`/settings/authorization/${created.id}`, { replace: true });
             } else {
-                await roleTemplateApi.update(id, { roleName: name, pageLevels: levels });
+                await roleTemplateApi.update(id, { roleName: name, pageLevels: levels, canSwitchTenant });
                 toast.success(t('settings.roles.saved'));
             }
         } catch (error: unknown) {
@@ -150,13 +163,6 @@ export const RoleEditorPage = () => {
                         </Chip>
                     )}
                 </h1>
-                <button
-                    type="button"
-                    onClick={() => navigate('/settings/authorization')}
-                    className="shrink-0 text-[12.5px] font-semibold text-slate-500 underline-offset-2 hover:underline dark:text-white/60"
-                >
-                    ← {t('settings.roles.backToList')}
-                </button>
             </div>
 
             {loading ? (
@@ -167,7 +173,7 @@ export const RoleEditorPage = () => {
                         <Labelled label={t('settings.roles.roleName')} className="w-72">
                             <input
                                 value={roleName}
-                                disabled={readOnly}
+                                disabled={readOnly || isPurser}
                                 onChange={(event) => setRoleName(event.target.value)}
                                 placeholder={t('settings.roles.roleNamePlaceholder')}
                                 className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#272f67] disabled:bg-slate-50 disabled:text-slate-400 dark:border-white/15 dark:bg-transparent dark:text-white"
@@ -183,6 +189,39 @@ export const RoleEditorPage = () => {
                             {t('settings.roles.adminHint')}
                         </p>
                     )}
+                    {isPurser && (
+                        <p className="rounded-md bg-sky-50 px-3 py-2 text-[12px] text-sky-800 dark:bg-sky-500/10 dark:text-sky-200">
+                            {t('settings.roles.purserHint')}
+                        </p>
+                    )}
+
+                    {/* ── FIRMENWECHSEL (31.08.2026, Vorgabe) ────────────────
+                        «Der Firmenwechsel gehört den Administratoren und der
+                        Projektleitung.» Er steht bewusst NICHT in der
+                        Stufenkarte darunter: die vergibt Seiten, dieser
+                        Schalter dagegen sagt, wie weit der Umschalter im Kopf
+                        reicht — der ganze eigene Konzernbaum statt nur der
+                        Firmen, die unter Person → Zugang angehakt sind. Die
+                        Administratorrolle trägt ihn fest und zeigt ihn nur an. */}
+                    <label
+                        className={`flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 dark:border-white/15 ${readOnly ? '' : 'cursor-pointer'}`}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={readOnly ? true : canSwitchTenant}
+                            disabled={readOnly}
+                            onChange={(event) => setCanSwitchTenant(event.target.checked)}
+                            className="mt-0.5 accent-[#272f67]"
+                        />
+                        <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="text-[12.5px] font-semibold text-slate-800 dark:text-white/85">
+                                {t('settings.roles.tenantSwitch')}
+                            </span>
+                            <span className="text-[11.5px] text-slate-500 dark:text-white/50">
+                                {readOnly ? t('settings.roles.tenantSwitchAdminHint') : t('settings.roles.tenantSwitchHint')}
+                            </span>
+                        </span>
+                    </label>
 
                     <SectionCard title={t('settings.roles.tableTitle')}>
                         <p className="px-3 pt-2 text-[11.5px] text-slate-500 dark:text-white/50">
@@ -200,7 +239,7 @@ export const RoleEditorPage = () => {
 
                     {!readOnly && (
                         <div className="flex items-center justify-between gap-3 pb-2">
-                            {!isNew && (role?.userCount ?? 0) === 0 ? (
+                            {!isNew && !isPurser && (role?.userCount ?? 0) === 0 ? (
                                 <GhostButton
                                     icon={<Trash size={13} />}
                                     onClick={() => setConfirmDelete(true)}

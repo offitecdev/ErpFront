@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowUp, Check, CheckCircle, Plus, RefreshCcw01, Save01, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
+import { ArrowUp, Check, CheckCircle, Plus, RefreshCcw01, Save01, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingDots } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
@@ -582,14 +582,6 @@ export const OrderReceivePage = () => {
             <InventoryListHeader
                 title={(
                     <span className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            aria-label={t('common.back')}
-                            onClick={() => navigate('/inventory/orders')}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
                         {t('inv.orders.receive.title')}
                         <span className="font-mono text-[13px] text-slate-500 dark:text-white/60">{order.referenceNumber}</span>
                         {statusMeta && (

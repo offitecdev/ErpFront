@@ -1,17 +1,20 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { ArrowLeft, Building02, CheckCircle, List, SwitchHorizontal01 } from '@/components/icons/antIconCompat';
+import { Building02, CheckCircle, List, SwitchHorizontal01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { Spinner } from '@/components/ui-shared/Loader';
 import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
+// Die Einheit wird GEWAEHLT (Stueck, Meter, kg, Liter, Set, Packung ...) --
+// die Liste pflegt der Mandant unter Einstellungen -> Module -> Lager.
+import { UnitSelect } from '@/components/ui-shared/UnitSelect';
 // Uygulamanın TEK biçimli metin editörü — teklif açıklamalarıyla aynı bileşen.
 // Kalın/italik ve "- " + boşluk → madde kısayolu (madde satır başında Backspace
 // ile geri sökülür) burada zaten çözülmüş durumda; ürün açıklaması da HTML
 // olarak saklandığı için aynı PDF/görüntüleme hattından geçer.
-import { RichTextMarkdownEditor } from '@/pages/tender/detail/components/RichTextMarkdownEditor';
-import { richTextToHtml } from '@/pages/tender/detail/utils/markdown.utils';
+import { RichTextMarkdownEditor } from '@/pages/sales/detail/components/RichTextMarkdownEditor';
+import { richTextToHtml } from '@/pages/sales/detail/utils/markdown.utils';
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
@@ -50,13 +53,11 @@ const errorMessage = (error: unknown, fallback: string) =>
  * (`PATCH /articles/:id/detail`) gider. Böylece alanları yazıp görseli düşüren
  * yarım kayıt oluşamaz; yalnızca DEĞİŞEN alanlar gönderilir.
  */
-export const ArticleDetailView = ({ copyPrefix, listPath }: {
+export const ArticleDetailView = ({ copyPrefix }: {
     /** 'inv.products'. */
     copyPrefix: string;
-    listPath: string;
 }) => {
     useLanguageTick();
-    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const { detail, setDetail, loading, error } = useArticleDetail(id);
 
@@ -134,20 +135,9 @@ export const ArticleDetailView = ({ copyPrefix, listPath }: {
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
-                title={(
-                    <span className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            aria-label={t('common.back')}
-                            title={t('common.back')}
-                            onClick={() => navigate(listPath)}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
-                        {detail?.name || t(`${copyPrefix}.detailTitle`)}
-                    </span>
-                )}
+                /* Der Pfeil vor dem Titel ist weg: der Rückweg in die
+                   Produktliste sitzt oben links in der Marke. */
+                title={detail?.name || t(`${copyPrefix}.detailTitle`)}
                 action={canUpdate && tab === 'detail' && detail && (
                     // ORTAK kaydet: alanlar + açıklama + görsel tek istekte gider.
                     <div className="flex items-center gap-2">
@@ -267,7 +257,13 @@ export const ArticleDetailView = ({ copyPrefix, listPath }: {
                                             </Row>
                                             <Row label={t('inv.columns.unit')}>
                                                 {canUpdate
-                                                    ? <input aria-label={t('inv.columns.unit')} {...field('unit', 'max-w-[8rem]')} />
+                                                    ? (
+                                                        <UnitSelect
+                                                            value={draft.unit}
+                                                            onChange={(next) => editDraft({ unit: next })}
+                                                            className="max-w-[12rem]"
+                                                        />
+                                                    )
                                                     : detail.unit}
                                             </Row>
                                             {/* Stok, ortalama maliyet ve sipariş adedi TÜRETİLMİŞ

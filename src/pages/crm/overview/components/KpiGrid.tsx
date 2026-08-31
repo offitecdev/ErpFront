@@ -65,7 +65,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ stats, filters }) => {
                 info={t('crmOverview.kpi.openOffersInfo', {
                     defaultValue: 'Henüz kabul edilmemiş ve siparişe dönüşmemiş tüm teklifler.',
                 })}
-                onClick={() => navigate('/crm/tenders')}
+                onClick={() => navigate('/sales/quotes')}
             />
             <KpiCard
                 label={t('crmOverview.kpi.approachingDeadline', { defaultValue: 'Yaklaşan son tarihler' })}
@@ -74,7 +74,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ stats, filters }) => {
                 count={stats.approachingDeadline.count}
                 money={money(stats.approachingDeadline.totalChf)}
                 footnote={t('crmOverview.kpi.approachingDeadlineNote', { defaultValue: 'Önümüzdeki 7 gün içinde' })}
-                onClick={() => navigate('/crm/tenders')}
+                onClick={() => navigate('/sales/quotes')}
             />
             <KpiCard
                 label={t('crmOverview.kpi.pendingApproval', { defaultValue: 'Onay bekleyen' })}
@@ -83,7 +83,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ stats, filters }) => {
                 count={stats.pendingApproval.count}
                 money={money(stats.pendingApproval.totalChf)}
                 footnote={t('crmOverview.kpi.pendingApprovalNote', { defaultValue: 'Taslak durumundaki teklifler' })}
-                onClick={() => navigate('/crm/tenders')}
+                onClick={() => navigate('/sales/quotes')}
             />
             <KpiCard
                 label={t('crmOverview.kpi.salesWon', { defaultValue: 'Bu ay kazanılan satış' })}
@@ -96,7 +96,7 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ stats, filters }) => {
                 info={t('crmOverview.kpi.salesWonInfo', {
                     defaultValue: 'Seçilen ayda kabul edilen teklifler + teklife bağlı olmayan satış siparişleri.',
                 })}
-                onClick={() => navigate('/crm/my-orders')}
+                onClick={() => navigate('/sales/orders')}
             />
             <KpiCard
                 label={t('crmOverview.kpi.estimatedSales', { defaultValue: 'Tahmini satış' })}

@@ -6,9 +6,9 @@ import { useEffect } from 'react';
  * out from under the user.
  *
  * The app scrolls in MainLayout's content column, not the window, so the lock
- * targets the element marked `data-page-scrollport`. Its scrollbar width is
- * added back as padding while frozen: without that the content would jump
- * sideways by the scrollbar's width the moment the overflow is hidden.
+ * targets the element marked `data-page-scrollport`. MainLayout permanently
+ * reserves its scrollbar gutter, so freezing it needs no synchronous geometry
+ * or computed-style reads.
  *
  * Nested overlays are safe: each lock records the inline values it replaced and
  * restores exactly those, so an inner overlay closing cannot unfreeze a page an
@@ -21,18 +21,10 @@ export const usePageScrollLock = (active: boolean) => {
         if (!scrollport) return;
 
         const previousOverflow = scrollport.style.overflow;
-        const previousPaddingRight = scrollport.style.paddingRight;
-        const scrollbarWidth = scrollport.offsetWidth - scrollport.clientWidth;
-
-        if (scrollbarWidth > 0) {
-            const currentPadding = Number.parseFloat(window.getComputedStyle(scrollport).paddingRight) || 0;
-            scrollport.style.paddingRight = `${currentPadding + scrollbarWidth}px`;
-        }
         scrollport.style.overflow = 'hidden';
 
         return () => {
             scrollport.style.overflow = previousOverflow;
-            scrollport.style.paddingRight = previousPaddingRight;
         };
     }, [active]);
 };

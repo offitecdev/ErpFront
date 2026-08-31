@@ -30,7 +30,6 @@ const LazyCostsTab = lazy(() =>
 const LazyReportsTab = lazy(() =>
     import('./tabs/ReportsTab').then((module) => ({ default: module.ReportsTab })),
 );
-
 const deferredSection = (content: ReactNode) => (
     <Suspense
         fallback={(
@@ -64,6 +63,9 @@ export type RenderSectionArgs = {
     /** Sipariş seçimini bölüm içinden değiştirir; aktif sekme KORUNUR. */
     onSelectOrder: (orderId: string) => void;
     onReload: () => Promise<void>;
+    /** Termin gespeichert/gelöscht: der Kalender hat sich selbst nachgeladen,
+        die Seite entwertet nur ihre Zwischenspeicher (kein Neuaufbau). */
+    onAppointmentChanged: () => void;
     onOrderCreated: (orderId: string) => Promise<void>;
 };
 
@@ -71,7 +73,7 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
     const {
         view, project, order, orders, isPrimary, isAddon, totals, materials,
         mailSettings, userEmail, awaitingAppointments, addonAttention, canCreateAddon,
-        onNavigate, onSelectOrder, onReload, onOrderCreated,
+        onNavigate, onSelectOrder, onReload, onAppointmentChanged, onOrderCreated,
     } = args;
 
     const goFieldReports = () => onNavigate({ section: 'field', subSection: 'fieldReports' });
@@ -108,6 +110,7 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
                     addonAttention={addonAttention}
                     canCreateAddon={canCreateAddon}
                     onNavigate={onNavigate}
+                    onSelectOrder={onSelectOrder}
                     onOrderCreated={onOrderCreated}
                 />
             );
@@ -123,6 +126,7 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
                     settings={mailSettings}
                     userEmail={userEmail}
                     onSaved={onReload}
+                    onAppointmentChanged={onAppointmentChanged}
                     leaf="schedule"
                 />,
             );

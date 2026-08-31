@@ -78,7 +78,7 @@ export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, ordered
             actions={
                 <button
                     type="button"
-                    onClick={() => navigate('/crm/tenders')}
+                    onClick={() => navigate('/sales/quotes')}
                     className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-[#07145c] transition-colors hover:bg-[#07145c]/6 dark:text-[#e6cf9e] dark:hover:bg-[#e6cf9e]/10"
                 >
                     {t('crmOverview.followUp.allOffers', { defaultValue: 'Tüm teklifler' })}
@@ -123,9 +123,9 @@ export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, ordered
                             key={tender.id}
                             role="button"
                             tabIndex={0}
-                            onClick={() => navigate(`/crm/tenders/${tender.id}`)}
+                            onClick={() => navigate(`/sales/quotes/${tender.id}`)}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') navigate(`/crm/tenders/${tender.id}`);
+                                if (e.key === 'Enter' || e.key === ' ') navigate(`/sales/quotes/${tender.id}`);
                             }}
                             className="group flex cursor-pointer items-center gap-3 rounded-xl border border-[#E3E7F0] bg-[#F7F8FC] px-3 py-2.5 transition-colors hover:border-[#C9D0DF] dark:border-white/8 dark:bg-white/4 dark:hover:bg-white/8"
                         >

@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-    ArrowLeft,
     Plus as PlusIcon,
     Trash01 as TrashIcon,
     Save01 as SaveIcon,
@@ -158,10 +157,6 @@ export const ServiceReportAdd = () => {
                 title={t('services.newReportTitle')}
                 description={t('services.newReportDesc')}
             />
-
-            <div className="mb-4">
-                <Button variant="ghost" size="sm" icon={<ArrowLeft size={14} />} onClick={() => navigate(returnTo)}>{t('auth.back')}</Button>
-            </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-4">

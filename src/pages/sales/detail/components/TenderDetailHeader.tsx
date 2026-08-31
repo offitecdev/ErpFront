@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
-    ArrowLeft,
     Briefcase01 as BriefcaseBusiness,
     File05 as FileText,
     FileCheck02 as FileCheck2,
@@ -27,12 +26,10 @@ type TenderDetailHeaderProps = {
     canManage: boolean;
     canExport: boolean;
     canApprove: boolean;
-    isSalesOrderStatus: boolean;
     projectId?: string | null;
     /** Bu tekliften doğmuş sipariş — varsa ana düğme "Zum Auftrag" olur. */
     salesOrderId?: string | null;
     projectCreateLoading: boolean;
-    onBack: () => void;
     onCreateVersion: () => void;
     onExport: () => void;
     onCreateProject: () => void;
@@ -44,6 +41,8 @@ type TenderDetailHeaderProps = {
     /** İki seçenekli karar popup'ını açar (proje siparişi / teslimat siparişi). */
     onCreateOrder: () => void;
     onApprove: () => void;
+    /** Copies the quote into a new one, from the settings gear menu. */
+    onCopyOffer: () => void;
     /** Opens the "delete offer" confirmation, from the settings gear menu. */
     onDeleteOffer: () => void;
     canSave: boolean;
@@ -90,17 +89,16 @@ export const TenderDetailHeader = ({
     canManage,
     canExport,
     canApprove,
-    isSalesOrderStatus,
     projectId,
     salesOrderId,
     projectCreateLoading,
-    onBack,
     onCreateVersion,
     onExport,
     onCreateProject,
     onOpenOrder,
     onCreateOrder,
     onApprove,
+    onCopyOffer,
     onDeleteOffer,
     canSave,
     saving,
@@ -109,13 +107,15 @@ export const TenderDetailHeader = ({
     creatorName,
 }: TenderDetailHeaderProps) => {
     const barRef = useRef<HTMLDivElement>(null);
-    // One-line bar: 40px controls + 16px vertical padding + 1px border. Using
-    // the real common-case height on the first paint avoids a spacer correction
-    // (and therefore CLS) before ResizeObserver reports wrapped narrow layouts.
-    // Below ~640px the toolbar always wraps to two rows (92px measured), so a
-    // narrow viewport starts from the wrapped height for the same reason.
+    // One-line bar: 32px controls + 16px vertical padding. Using the real
+    // common-case height on the first paint avoids a spacer correction (and
+    // therefore CLS) before ResizeObserver reports wrapped narrow layouts.
+    // Below ~640px the toolbar always wraps to two rows, so a narrow viewport
+    // starts from the wrapped height for the same reason. (Seit dem
+    // 28.08.2026 ohne Haarlinie und mit 32px-Knöpfen — beides steckt hier
+    // drin, sonst springt der Platzhalter beim ersten Bild.)
     const [barHeight, setBarHeight] = useState(() =>
-        typeof window !== 'undefined' && window.innerWidth < 640 ? 92 : 57);
+        typeof window !== 'undefined' && window.innerWidth < 640 ? 80 : 48);
 
     useEffect(() => {
         const bar = barRef.current;
@@ -126,8 +126,8 @@ export const TenderDetailHeader = ({
         const observer = new ResizeObserver(([entry]) => {
             const measured = entry.borderBoxSize[0]?.blockSize;
             // Legacy ResizeObserver only exposes the content box. The bar has
-            // 8px vertical padding and a 1px bottom border.
-            const height = measured || entry.contentRect.height + 17;
+            // 8px vertical padding and no border.
+            const height = measured || entry.contentRect.height + 16;
             setBarHeight((current) => current === height ? current : height);
         });
         observer.observe(bar);
@@ -138,19 +138,13 @@ export const TenderDetailHeader = ({
         <>
         <div
             ref={barRef}
-            className="fixed left-[var(--app-shell-inset,0px)] right-0 top-[var(--app-header-height,0px)] z-40 border-b border-slate-200 bg-[#f6f8fb] px-[var(--page-gutter,1rem)] py-2 transition-[left] duration-300 ease-in-out"
+            className="ofi-quote-topbar fixed left-[var(--app-shell-inset,0px)] right-0 top-[var(--app-header-height,0px)] z-40 bg-[#f6f8fb] px-[var(--page-gutter,1rem)] py-2 transition-[left] duration-300 ease-in-out"
         >
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <button
-                type="button"
-                onClick={onBack}
-                title={t('tenders.list_back')}
-                aria-label={t('tenders.list_back')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] border border-transparent text-slate-500 transition-colors hover:border-slate-300 hover:bg-[#272f67]/15 hover:text-[#1f2654]"
-            >
-                <ArrowLeft size={16} />
-            </button>
-
+        <div className="flex flex-nowrap items-center gap-x-3 gap-y-2">
+            {/* Hier stand der Zurück-Pfeil vor der Angebotsnummer. Der
+                Rückweg in die Angebotsliste sitzt jetzt im Blitz ganz vorn in
+                der Kopfleiste (QuickBackButton) — samt der Nachfrage nach
+                ungespeicherten Änderungen, die er dort ebenso durchläuft. */}
             {/* Quote identity — number, version, status. */}
             <span className="flex min-w-0 items-center gap-2.5">
                 <FileText size={16} className="shrink-0 text-slate-400" />
@@ -170,7 +164,7 @@ export const TenderDetailHeader = ({
                         disabled={!isDirty || saving}
                         title={t('common.save')}
                         aria-label={t('common.save')}
-                        className={`flex h-10 items-center gap-2 rounded-[3px] px-4 text-[14px] font-semibold transition-colors ${
+                        className={`ofi-quote-btn flex items-center gap-1.5 rounded-full font-semibold transition-colors ${
                             saving
                                 ? 'cursor-wait bg-[#1f2654] text-white'
                                 : isDirty
@@ -181,25 +175,30 @@ export const TenderDetailHeader = ({
                         {saving ? (
                             <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                         ) : (
-                            <Save size={14} />
+                            <Save size={13} />
                         )}
                         {t('common.save')}
                     </button>
                 )}
                 {/* Sipariş türü sorusu artık ANA düğmenin popup'ında sorulur —
                     ayarlar menüsünde saklanmaz (kullanıcı isteği). */}
-                <TenderSettingsMenu onDeleteOffer={onDeleteOffer} />
+                <TenderSettingsMenu onCopyOffer={onCopyOffer} onDeleteOffer={onDeleteOffer} />
             </span>
 
             {/* Primary actions, right-aligned on the same line. */}
-            <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                {!isDraft && canManage && (!isSalesOrderStatus || projectId) && (
-                    <Button size="sm" className="h-10 px-4 text-[14px]" variant="secondary" icon={<GitBranch size={15} />} onClick={onCreateVersion}>
+            <span className="ml-auto flex flex-nowrap items-center justify-end gap-2">
+                {/* "Neue Version" steht auf JEDER Offerte im Verkauf
+                    (Benutzerwunsch 31.08.2026). Vorher war der Knopf an
+                    Entwuerfen und an Auftraegen ohne Projekt versteckt, sodass
+                    genau die Faelle, in denen man nachbessert, keinen Weg zu
+                    einer neuen Version hatten. */}
+                {canManage && (
+                    <Button size="sm" variant="secondary" icon={<GitBranch size={14} />} onClick={onCreateVersion}>
                         {t('tenders.new_versiyon')}
                     </Button>
                 )}
                 {canExport && (
-                    <Button size="sm" className="h-10 px-4 text-[14px]" variant="secondary" icon={<FileDown size={15} />} onClick={onExport}>
+                    <Button size="sm" variant="secondary" icon={<FileDown size={14} />} onClick={onExport}>
                         {t('tenders.pdf_export')}
                     </Button>
                 )}
@@ -210,9 +209,9 @@ export const TenderDetailHeader = ({
                        seçenekli karar popup'ı açılır. */
                     <Button
                         size="sm"
-                        className="h-10 px-4 text-[14px]"
+                       
                         variant="primary"
-                        icon={<BriefcaseBusiness size={15} />}
+                        icon={<BriefcaseBusiness size={14} />}
                         loading={projectCreateLoading}
                         onClick={salesOrderId ? onOpenOrder : projectId ? onCreateProject : onCreateOrder}
                     >
@@ -222,7 +221,7 @@ export const TenderDetailHeader = ({
                     </Button>
                 )}
                 {isDraft && canApprove && (
-                    <Button size="sm" className="h-10 px-4 text-[14px]" variant="primary" icon={<FileCheck2 size={15} />} onClick={onApprove}>
+                    <Button size="sm" variant="primary" icon={<FileCheck2 size={14} />} onClick={onApprove}>
                         {t('common.confirm')}
                     </Button>
                 )}

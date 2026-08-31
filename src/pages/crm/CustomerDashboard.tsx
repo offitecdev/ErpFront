@@ -4,7 +4,6 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import {
     AlertTriangle,
-    ArrowLeft,
     Briefcase01 as BriefcaseBusiness,
     ChevronRight,
     Hash01 as Hash,
@@ -53,8 +52,19 @@ const CustomerNotesTable = lazy(() =>
 const CustomerActivitiesTable = lazy(() =>
     import('./detail/CustomerActivitiesTable').then((module) => ({ default: module.CustomerActivitiesTable }))
 );
+// Kommunikationsverlauf des Kunden — dieselbe Quelle wie Schnellerfassung und
+// modulweite Liste, hier auf diesen Kunden gefiltert.
+const CustomerCommunicationTable = lazy(() =>
+    import('./detail/CustomerCommunicationTable').then((module) => ({ default: module.CustomerCommunicationTable }))
+);
 const CustomerReports = lazy(() =>
     import('./CustomerReports').then((module) => ({ default: module.CustomerReports }))
+);
+// Checklisten / Formulare des Kunden (alle, die an ihm oder seinen Belegen
+// hängen) samt Einsatz-Hinweisen — derselbe Baustein wie in Angebot/Auftrag/
+// Projekt/Technikerbildschirm.
+const FormsContextPanel = lazy(() =>
+    import('./forms/components/FormsContextPanel').then((module) => ({ default: module.FormsContextPanel }))
 );
 
 interface CustomerDashboardDto {
@@ -145,7 +155,7 @@ const apiErrorMessage = (error: unknown, fallback: string): string => {
 
 // 'billing' ist entfallen: Rechnungen gehören zum Auftrag und stehen im
 // Raten-Sheet der Auftragszeile, nicht in einer zweiten, parallelen Liste.
-type CustomerTabId = 'profile' | 'contacts' | 'locations' | 'discounts' | 'offers' | 'orders' | 'projects' | 'reports' | 'notes' | 'activities';
+type CustomerTabId = 'profile' | 'contacts' | 'locations' | 'discounts' | 'offers' | 'orders' | 'projects' | 'reports' | 'forms' | 'notes' | 'communication' | 'activities';
 const DASHBOARD_DETAIL_TABS: CustomerTabId[] = ['contacts', 'locations', 'notes', 'activities'];
 // Reiter, die die Angebotsliste des Kunden brauchen. Sie wird BEIM ÖFFNEN des
 // Reiters geladen, nicht beim Betreten der Seite: der Reiter "Angebote" holt
@@ -385,7 +395,12 @@ export const CustomerDashboard = () => {
         { id: 'orders', label: i18nT('crm.tab_orders'), count: ordersCount ?? undefined },
         { id: 'projects', label: i18nT('nav.projects'), count: tendersLoaded ? projectTenders.length : undefined },
         { id: 'reports', label: i18nT('crm.tab_reports') },
+        // Checklisten laden ihre Zeilen selbst (Kontext-Abfrage) — kein Zähler.
+        { id: 'forms', label: i18nT('nav.crmForms') },
         { id: 'notes', label: i18nT('crm.internal_notes'), count: detailsLoaded ? data.notes?.length ?? 0 : undefined },
+        // Kommunikation lädt seine Zeilen selbst (eigene, geblätterte Liste),
+        // darum hier keine Zahl — sie stünde vor dem Öffnen ohnehin nicht fest.
+        { id: 'communication', label: i18nT('nav.crmCommunication') },
         { id: 'activities', label: i18nT('crm.activities_label'), count: detailsLoaded ? data.activities?.length ?? 0 : undefined },
     ];
 
@@ -408,10 +423,10 @@ export const CustomerDashboard = () => {
                     </span>
                 }
                 actions={
-                    <>
-                        <Button variant="danger" icon={<TrashIcon size={13} />} onClick={() => setConfirmDelete(true)}>{i18nT('common.delete')}</Button>
-                        <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/crm/customers')}>{i18nT('crm.list_back')}</Button>
-                    </>
+                    /* Kein Zurück-Knopf mehr: der Weg in die Kundenliste liegt
+                       im Blitz ganz vorn in der Kopfleiste, der auf jeder
+                       Unterseite zum Pfeil wird (QuickBackButton). */
+                    <Button variant="danger" icon={<TrashIcon size={13} />} onClick={() => setConfirmDelete(true)}>{i18nT('common.delete')}</Button>
                 }
             />
 
@@ -425,6 +440,7 @@ export const CustomerDashboard = () => {
                                 key={tab.id}
                                 data-tab-key={tab.id}
                                 type="button"
+                                aria-current={active ? 'page' : undefined}
                                 onClick={() => selectCustomerTab(tab.id)}
                                 className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                     active
@@ -550,6 +566,13 @@ export const CustomerDashboard = () => {
                 </DeferredTab>
             )}
 
+            {/* ---- CHECKLISTEN / FORMULARE ---- */}
+            {activeCustomerTab === 'forms' && id && (
+                <DeferredTab>
+                    <FormsContextPanel kind="customer" id={id} />
+                </DeferredTab>
+            )}
+
             {/* ---- NOTIZEN ---- */}
             {activeCustomerTab === 'notes' && id && (
                 detailsLoaded ? (
@@ -557,6 +580,15 @@ export const CustomerDashboard = () => {
                         <CustomerNotesTable customerId={id} items={data.notes ?? []} onChanged={fetchData} />
                     </DeferredTab>
                 ) : dashboardDetailsPlaceholder
+            )}
+
+            {/* ---- KOMMUNIKATION ---- */}
+            {/* Holt seine Zeilen selbst und hängt NICHT am Dashboard-Ladevorgang:
+                die Liste ist serverseitig geblättert und kundengefiltert. */}
+            {activeCustomerTab === 'communication' && id && (
+                <DeferredTab>
+                    <CustomerCommunicationTable customerId={id} />
+                </DeferredTab>
             )}
 
             {/* ---- AKTIVITAETEN ---- */}

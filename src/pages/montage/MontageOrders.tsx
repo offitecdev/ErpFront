@@ -1,18 +1,23 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Clipboard } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { t } from '@/i18n/translate';
+import type { MontageOrderRow } from './types/montage';
 
 import { MontageHeader } from './components/MontageHeader';
 import { MontagePager } from './components/MontagePager';
 import { OrdersTable } from './components/OrdersTable';
+import { InstallationDocumentsSheet } from './components/InstallationDocumentsSheet';
 import { useMontageOrdersPaged } from './hooks/useMontageOrdersPaged';
 
 const OrdersPage = ({ mode }: { mode: 'active' | 'completed' }) => {
     const navigate = useNavigate();
     // Sunucuda sayfalanır: her sayfa yalnızca 10 satırlık tablo verisi indirir.
     const { rows, total, loading, page, setPage } = useMontageOrdersPaged(mode);
+    // Checklisten eines Termins — direkt aus der Liste, ohne den Rapport zu öffnen.
+    const [documentsFor, setDocumentsFor] = useState<MontageOrderRow | null>(null);
 
     return (
         <div className="space-y-4">
@@ -44,11 +49,14 @@ const OrdersPage = ({ mode }: { mode: 'active' | 'completed' }) => {
                             }
                             if (mode === 'active') navigate(`/montage/orders/${row.id}`);
                         }}
+                        onOpenDocuments={setDocumentsFor}
                         showSignature={mode === 'completed'}
                     />
                     <MontagePager page={page} total={total} pageSize={mode === 'completed' ? 5 : 10} onPage={setPage} />
                 </>
             )}
+
+            <InstallationDocumentsSheet row={documentsFor} onClose={() => setDocumentsFor(null)} />
         </div>
     );
 };

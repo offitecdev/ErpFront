@@ -75,6 +75,8 @@ interface TenderState {
     saveCalculation: (tenderId: string, positionId: string, cost: CostInput) => Promise<void>;
     approveTender: (id: string) => Promise<void>;
     createVersion: (id: string) => Promise<TenderListItem>;
+    /** Angebot kopieren — liefert die KOPIE (eigene Nummer, Version 1). */
+    duplicateTender: (id: string) => Promise<TenderListItem>;
     deletePosition: (tenderId: string, positionId: string) => Promise<void>;
     mapArticle: (
         tenderId: string,
@@ -381,6 +383,12 @@ export const useTenderStore = create<TenderState>((set, get) => ({
 
     createVersion: async (id) => {
         const res = await tenderApi.createVersion(id);
+        await get().fetchList();
+        return res.tender;
+    },
+
+    duplicateTender: async (id) => {
+        const res = await tenderApi.duplicate(id);
         await get().fetchList();
         return res.tender;
     },

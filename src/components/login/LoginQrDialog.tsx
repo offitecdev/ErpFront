@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { LuQrCode, LuX } from '@/components/icons/lucideLocal';
+import { formatCameraError } from '@/lib/cameraError';
 import { parseLoginQr, type LoginQrPayload } from './loginQrPayload';
 
 /**
@@ -35,6 +36,7 @@ type ScannerHandle = { stop: () => Promise<void>; clear: () => void; isScanning:
 const QrDialogBody = ({ onClose, onCredentials }: Omit<LoginQrDialogProps, 'open'>) => {
     const { t } = useTranslation();
     const [phase, setPhase] = useState<Phase>('starting');
+    const [cameraErrorDetails, setCameraErrorDetails] = useState('');
     const reactId = useId().replace(/:/g, '');
     const regionId = `ofi-login-qr-${reactId}`;
 
@@ -54,7 +56,10 @@ const QrDialogBody = ({ onClose, onCredentials }: Omit<LoginQrDialogProps, 'open
 
         const start = async () => {
             if (!navigator.mediaDevices?.getUserMedia) {
-                if (alive) setPhase('camera-error');
+                if (alive) {
+                    setCameraErrorDetails('navigator.mediaDevices.getUserMedia is unavailable');
+                    setPhase('camera-error');
+                }
                 return;
             }
             try {
@@ -63,7 +68,7 @@ const QrDialogBody = ({ onClose, onCredentials }: Omit<LoginQrDialogProps, 'open
                 const instance = new Html5Qrcode(regionId, false);
                 scanner = instance;
                 await instance.start(
-                    { facingMode: 'environment' },
+                    { facingMode: { exact: 'user' } },
                     // Kein qrbox: html5-qrcode zeichnet sonst eine eigene graue
                     // Schattenmaske — der Rahmen kommt von unseren Ecken.
                     { fps: 10, aspectRatio: 1 },
@@ -96,8 +101,11 @@ const QrDialogBody = ({ onClose, onCredentials }: Omit<LoginQrDialogProps, 'open
                     () => {},
                 );
                 if (alive) setPhase('scanning');
-            } catch {
-                if (alive) setPhase('camera-error');
+            } catch (error) {
+                if (alive) {
+                    setCameraErrorDetails(formatCameraError(error));
+                    setPhase('camera-error');
+                }
             }
         };
 
@@ -171,6 +179,11 @@ const QrDialogBody = ({ onClose, onCredentials }: Omit<LoginQrDialogProps, 'open
                 >
                     {message}
                 </p>
+                {phase === 'camera-error' && cameraErrorDetails && (
+                    <pre className="mx-4 mb-4 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-red-300 bg-red-50 p-3 text-left text-[11px] leading-relaxed text-red-900">
+                        {cameraErrorDetails}
+                    </pre>
+                )}
             </section>
         </div>
     );

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { apiClient, getShared } from '../lib/axios';
 import { takePrefetched } from '../lib/bootPrefetch';
+import { clearPersonPhotos } from '../lib/personPhotos';
 
 interface User {
     id: string;
@@ -52,11 +53,35 @@ for (const storage of [localStorage, sessionStorage]) {
 
 export const hasSessionHint = () => localStorage.getItem(HAS_SESSION_KEY) === '1';
 
+/** Antwort von `/auth/me/permissions` (auch die vorgeladene Fassung). */
+interface PermissionsResponse {
+    permissions: string[];
+    pageAccess?: Record<string, number>;
+    isSystemAdmin?: boolean;
+}
+
 interface AuthState {
     user: User | null;
     tenants: TenantOption[];
     selectedTenantId: string | null;
     permissions: string[];
+    /**
+     * Stufe je SEITE aus der zugewiesenen Rolle (17.08.2026) — 1 ansehen /
+     * 2 bearbeiten / 3 löschen; fehlender Schlüssel = kein Zugriff. Menü und
+     * Seitenwächter lesen daraus; `permissions` regelt weiterhin, was
+     * INNERHALB einer Seite geht, und ist das, was der Server prüft.
+     *
+     * Leere Karte = keine Rolle bzw. eine Altrolle ohne Stufen; dann greift
+     * die Seitenprüfung NICHT (sonst stünde man vor einem leeren Programm).
+     */
+    pageAccess: Record<string, number>;
+    /**
+     * Trägt die angemeldete Person die Administratorrolle (`Role.isSystemAdmin`)?
+     * Nur die ANZEIGE hängt daran: gefährliche Aktionen (Produkte löschen,
+     * Produktliste zurücksetzen) fragen jedes andere Konto nach dem Kennwort und
+     * blenden das Feld für den Administrator aus. Geprüft wird beides am Server.
+     */
+    isSystemAdmin: boolean;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (user: User) => void;
@@ -70,6 +95,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     tenants: [],
     selectedTenantId: sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId'),
     permissions: [],
+    pageAccess: {},
+    isSystemAdmin: false,
     isAuthenticated: hasSessionHint(),
     isLoading: hasSessionHint(),
 
@@ -84,7 +111,10 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.removeItem(HAS_SESSION_KEY);
         sessionStorage.removeItem('selectedTenantId');
         localStorage.removeItem('selectedTenantId');
-        set({ user: null, tenants: [], selectedTenantId: null, permissions: [], isAuthenticated: false });
+        // Profilbilder sind Personendaten: sie dürfen die Abmeldung nicht
+        // überleben und der nächsten Anmeldung am selben Rechner gehören.
+        clearPersonPhotos();
+        set({ user: null, tenants: [], selectedTenantId: null, permissions: [], pageAccess: {}, isSystemAdmin: false, isAuthenticated: false });
     },
 
     fetchProfile: async () => {
@@ -96,8 +126,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             const [userData, permData, tenantData] = await Promise.all([
                 takePrefetched<User>('me')
                     .then((data) => data ?? getShared<User>('/auth/me').then((r) => r.data)),
-                takePrefetched<{ permissions: string[] }>('permissions')
-                    .then((data) => data ?? getShared<{ permissions: string[] }>('/auth/me/permissions').then((r) => r.data)),
+                takePrefetched<PermissionsResponse>('permissions')
+                    .then((data) => data ?? getShared<PermissionsResponse>('/auth/me/permissions').then((r) => r.data)),
                 takePrefetched<{ tenants: TenantOption[] }>('tenants')
                     .then((data) => data ?? getShared<{ tenants: TenantOption[] }>('/tenants').then((r) => r.data)),
             ]);
@@ -122,12 +152,14 @@ export const useAuthStore = create<AuthState>((set) => ({
                 tenants,
                 selectedTenantId,
                 permissions: permData.permissions,
+                pageAccess: permData.pageAccess ?? {},
+                isSystemAdmin: Boolean(permData.isSystemAdmin),
                 isAuthenticated: true
             });
         } catch (error) {
             localStorage.removeItem(HAS_SESSION_KEY);
             sessionStorage.removeItem('selectedTenantId');
-            set({ user: null, tenants: [], selectedTenantId: null, permissions: [], isAuthenticated: false });
+            set({ user: null, tenants: [], selectedTenantId: null, permissions: [], pageAccess: {}, isSystemAdmin: false, isAuthenticated: false });
         } finally {
             set({ isLoading: false });
         }

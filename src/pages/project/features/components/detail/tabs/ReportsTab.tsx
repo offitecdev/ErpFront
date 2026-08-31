@@ -1,16 +1,13 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { Clipboard, Edit01 as PenLine, File05 as FilePdf } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
+import { Clipboard, Edit01 as PenLine, File05 as FilePdf, FileCheck02 } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
-import { StatusChip } from '@/components/ui-shared/StatusBadge';
-import { ColResizeHandle, ResizableCols } from '@/components/ui-shared/TableKit';
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
-import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { t } from '@/i18n/translate';
 import { deliveryReportApi, projectApi, type DeliveryReportDto } from '@/lib/api/project';
+import { dayjsLocaleTag } from '@/lib/utils/dayjsLocale';
 import type { ProjectDto, ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 
 import { AllSignaturesSheet } from '../reports/AllSignaturesSheet';
@@ -20,53 +17,50 @@ import { scopedRecords } from '../../../utils/projectOrderScope';
 import { findAppointmentReport } from '../../../utils/projectAppointments';
 
 /**
- * The consolidated "Reports" section: appointments in two clean lists (ongoing /
- * completed, tender-table styling — appointment times instead of technician
- * names, no appointment colors). Each row carries a PDF glyph (dimmed until a
- * field report exists); clicking a row opens the square bottom-sheet where the
- * whole flow — field report, delivery checklist, signatures, PDFs — slides
- * sideways inside one popup.
+ * The "Rapporte" hub of the project detail screen — rebuilt 18.08.2026 on the
+ * calendar's visual language (user request: "ongoing and completed side by
+ * side as cards, like the calendar's appointment view; Google-clean").
+ *
+ * Three levels, top to bottom, so the hierarchy matches what the documents
+ * actually belong to:
+ *   1. PROJECT documents — Gesamtrapport, Abnahme-Rapport, Unterschriften.
+ *   2. APPOINTMENT lanes — "Laufend" and "Abgeschlossen" BESIDE each other
+ *      (they used to share one table behind a toggle, so half the work was
+ *      always hidden).
+ *   3. The agenda CARD — a status rail in the calendar's event palette, the
+ *      day number, the time as the headline and the report's state as a pill.
+ *
+ * Clicking a card opens the appointment popup (`AppointmentReportSheet`) — the
+ * calendar's floating card, large but draggable, stretchable and maximisable.
  */
 export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved }: { project: ProjectDto; order: ProjectSalesOrder | null; isPrimary: boolean; materials: ProjectMaterial[]; onSaved: () => Promise<void> }) => {
     const [selectedApptId, setSelectedApptId] = useState<string | null>(null);
-    // Sipariş sütunu esnektir; diğerleri sürüklenerek genişletilir.
-    const grid = useColumnWidths({
-        storageKey: 'offitec:project-reports:col-widths:v1',
-        defaults: { date: 112, time: 144, section: 160, status: 112, action: 56 },
-        minPx: 56,
-    });
     const [sheetInitialView, setSheetInitialView] = useState<'overview' | 'pdf' | 'delivery'>('overview');
     const [signaturesOpen, setSignaturesOpen] = useState(false);
-    /** Welche Termine die eine Tabelle zeigt — laufend (Vorgabe) oder erledigt. */
-    const [scope, setScope] = useState<'ongoing' | 'completed'>('ongoing');
 
     const appointments = useMemo(
         () => scopedRecords(project.appointments, order, isPrimary, project.salesOrders)
             .sort((a: any, b: any) => dayjs(b.startTime).valueOf() - dayjs(a.startTime).valueOf()),
         [project.appointments, project.salesOrders, order, isPrimary],
     );
-    // EINE Tabelle, zwei Ansichten (Benutzerwunsch): "Laufend" zeigt nur die
-    // aktuellen Termine — der Normalfall beim Öffnen —, "Abgeschlossen" hält die
-    // Historie erreichbar, ohne eine zweite Tabelle daneben zu stellen.
+    // Two lanes, both open at once (Benutzerwunsch): "Laufend" is the working
+    // set, "Abgeschlossen" the history — neither hides behind the other.
     const ongoing = appointments.filter((a: any) => a.status !== 'COMPLETED' && a.status !== 'CANCELLED');
     const completed = appointments.filter((a: any) => a.status === 'COMPLETED' || a.status === 'CANCELLED');
-    const rows = scope === 'ongoing' ? ongoing : completed;
 
     const selectedAppt = useMemo(
         () => appointments.find((a: any) => a.id === selectedApptId) || null,
         [appointments, selectedApptId],
     );
 
-    // ── Werkzeugleisten-Knöpfe links neben "Unterschriften" (Benutzerwunsch:
-    // aus dem Termin-Popup hierher gewandert). ──
-
     // Gesamtrapport: erst ansehbar, wenn im Auftragsumfang ein Montage-Rapport
-    // existiert — dieselbe Sperre wie zuvor im Popup.
+    // existiert.
     const fieldReports = useMemo(
         () => scopedRecords(((project as any).reports || []) as any[], order, isPrimary, project.salesOrders),
         [project, order, isPrimary],
     );
     const hasFieldReports = fieldReports.length > 0;
+    const signedReports = fieldReports.filter((report: any) => report.isSigned).length;
 
     const [generalOpen, setGeneralOpen] = useState(false);
     const [generalBusy, setGeneralBusy] = useState(false);
@@ -104,7 +98,7 @@ export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved 
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
-    // Abnahme-Rapport: der Knopf öffnet das Termin-Blatt direkt auf der
+    // Abnahme-Rapport: die Kachel öffnet das Termin-Blatt direkt auf der
     // Checkliste — beim vorhandenen Rapport auf dessen Termin, sonst auf dem
     // jüngsten Termin. Nach dem Schliessen wird neu geladen, damit die
     // Beschriftung (ansehen/erstellen) stimmt.
@@ -138,159 +132,161 @@ export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved 
         setSelectedApptId(appointmentId);
     };
 
-    const AppointmentTable = ({ rows }: { rows: any[] }) => (
-        <table data-montage-table data-grid-lines data-unstyled-table className="w-full">
-            <colgroup>
-                <ResizableCols keys={['date', 'time'] as const} grid={grid} />
-                {/* Sipariş sütunu: genişliği yok, kalan yeri emer. */}
-                <col />
-                <ResizableCols keys={['section', 'status', 'action'] as const} grid={grid} />
-            </colgroup>
-            <thead>
-                <tr>
-                    <th className="relative text-left">
-                        {t('common.date')}
-                        <ColResizeHandle {...grid.resizeProps('date', 'right')} />
-                    </th>
-                    <th className="relative text-left">
-                        {t('projects.schedule.time')}
-                        <ColResizeHandle {...grid.resizeProps('time', 'right')} />
-                    </th>
-                    <th className="text-left">{t('projects.reportsHub.order')}</th>
-                    <th className="relative text-left">
-                        {t('projects.reportsHub.fieldSection')}
-                        <ColResizeHandle {...grid.resizeProps('section')} />
-                    </th>
-                    <th className="relative text-left">
-                        {t('common.status')}
-                        <ColResizeHandle {...grid.resizeProps('status')} />
-                    </th>
-                    <th className="relative text-right">
-                        <ColResizeHandle {...grid.resizeProps('action')} />
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((appt: any) => {
-                    const report = findAppointmentReport(project, appt);
-                    const kind = appointmentStatusKind(appt);
-                    return (
-                        <tr
-                            key={appt.id}
-                            onClick={() => openSheet(appt.id, 'overview')}
-                            className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
-                        >
-                            <td className="text-[12.5px] font-semibold tabular-nums text-slate-800">{dayjs(appt.startTime).format('DD.MM.YYYY')}</td>
-                            <td className="text-[12.5px] tabular-nums text-slate-700">{dayjs(appt.startTime).format('HH:mm')} – {dayjs(appt.endTime).format('HH:mm')}</td>
-                            <td className="text-[12.5px] text-slate-600">{orderNumberFor(appt.salesOrderId)}</td>
-                            <td>
-                                {report
-                                    ? <StatusChip variant={report.isSigned ? 'active' : 'info'}>{report.isSigned ? t('projects.reportsHub.signed') : t('projects.reportAvailable')}</StatusChip>
-                                    : <span className="text-[11.5px] text-slate-400">{t('projects.reportUnavailable')}</span>}
-                            </td>
-                            <td className="text-[12px] text-slate-600">{statusLabel(kind)}</td>
-                            <td>
-                                {/* PDF glyph: lit when a field report exists, dimmed until then. */}
-                                <div className="flex items-center justify-end">
-                                    <button
-                                        type="button"
-                                        title={report ? t('projects.reportsHub.preview') : t('projects.reportUnavailable')}
-                                        aria-label={t('projects.reportsHub.preview')}
-                                        disabled={!report}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            openSheet(appt.id, 'pdf');
-                                        }}
-                                        className={`inline-flex size-7 items-center justify-center rounded-[2px] border transition-colors ${report ? 'ofi-rs-pdf' : 'ofi-rs-pdf-dim cursor-default'}`}
-                                    >
-                                        <FilePdf size={14} />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    );
-                })}
-            </tbody>
-        </table>
+    /* ── level 1: the project's own documents ───────────────────────────── */
+    const DocumentTile = ({ icon, title, state, disabled, hint, onClick }: {
+        icon: ReactNode;
+        title: string;
+        state: string;
+        disabled?: boolean;
+        hint?: string;
+        onClick: () => void;
+    }) => (
+        <button type="button" className="ofi-rep-doc" disabled={disabled} title={hint || title} onClick={onClick}>
+            <span className="ofi-rep-doc__icon">{icon}</span>
+            <span className="ofi-rep-doc__main">
+                <span className="ofi-rep-doc__title">{title}</span>
+                <span className="ofi-rep-doc__state">{state}</span>
+            </span>
+        </button>
     );
 
-    const SectionCard = ({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) => (
-        <section className="overflow-hidden rounded-[3px] border border-slate-200 bg-white dark:border-white/15 dark:bg-transparent">
-            <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                <span className="text-[12.5px] font-semibold text-slate-800">{title}</span>
-                {action}
+    /* ── level 3: one appointment, in the calendar's card language ──────── */
+    const AppointmentCard = ({ appointment }: { appointment: any }) => {
+        const report = findAppointmentReport(project, appointment);
+        const kind = appointmentStatusKind(appointment);
+        // Month and weekday are read in the language the user picked — the
+        // global dayjs locale is English, so the instance carries its own.
+        const start = dayjs(appointment.startTime).locale(dayjsLocaleTag());
+        const end = dayjs(appointment.endTime);
+        return (
+            <button
+                type="button"
+                onClick={() => openSheet(appointment.id, 'overview')}
+                className={`ofi-rep-card ${kind === 'cancelled' ? 'is-cancelled' : ''}`}
+            >
+                <span className={`ofi-rep-card__rail is-${kind}`} aria-hidden />
+                <span className="ofi-rep-card__date">
+                    <span className="ofi-rep-card__day">{start.format('DD')}</span>
+                    <span className="ofi-rep-card__month">{start.format('MMM')}</span>
+                </span>
+                <span className="ofi-rep-card__main">
+                    <span className="ofi-rep-card__time">{start.format('HH:mm')} – {end.format('HH:mm')}</span>
+                    <span className="ofi-rep-card__meta">
+                        {start.format('ddd')} · {orderNumberFor(appointment.salesOrderId)} · {statusLabel(kind)}
+                    </span>
+                    <span className="ofi-rep-card__tags">
+                        {report
+                            ? (
+                                <span className={`ofi-rep-tag ${report.isSigned ? 'is-signed' : 'is-open'}`}>
+                                    {report.isSigned ? t('projects.reportsHub.signed') : t('projects.reportsHub.reportOpen')}
+                                </span>
+                            )
+                            : <span className="ofi-rep-tag is-none">{t('projects.reportsHub.reportMissing')}</span>}
+                    </span>
+                </span>
+                <span className="ofi-rep-card__side">
+                    {/* PDF glyph: lit when a field report exists, dimmed until then. */}
+                    <span
+                        role="button"
+                        tabIndex={report ? 0 : -1}
+                        aria-disabled={!report}
+                        title={report ? t('projects.reportsHub.preview') : t('projects.reportUnavailable')}
+                        aria-label={t('projects.reportsHub.preview')}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            if (report) openSheet(appointment.id, 'pdf');
+                        }}
+                        onKeyDown={(event) => {
+                            if (!report || (event.key !== 'Enter' && event.key !== ' ')) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openSheet(appointment.id, 'pdf');
+                        }}
+                        className={`ofi-rep-glyph ${report ? '' : 'is-off'}`}
+                    >
+                        <FilePdf size={15} />
+                    </span>
+                </span>
+            </button>
+        );
+    };
+
+    /* ── level 2: a lane ────────────────────────────────────────────────── */
+    const Lane = ({ kind, title, rows, emptyText }: { kind: 'ongoing' | 'completed'; title: string; rows: any[]; emptyText: string }) => (
+        <section className="ofi-rep-lane">
+            <header className="ofi-rep-lane__head">
+                <span className={`ofi-rep-lane__dot is-${kind}`} aria-hidden />
+                <span className="ofi-rep-lane__title">{title}</span>
+                <span className="ofi-rep-lane__count">{rows.length}</span>
             </header>
-            {children}
+            <div className="ofi-rep-lane__body">
+                {rows.length === 0
+                    ? <div className="ofi-rep-empty">{emptyText}</div>
+                    : rows.map((appointment: any) => <AppointmentCard key={appointment.id} appointment={appointment} />)}
+            </div>
         </section>
     );
 
     return (
         <div className="space-y-4">
-            {/* Toolbar: "Auftragsrapporte" ist entfallen (Benutzerwunsch) — die
-                Rapporte hängen an ihren Terminen. Gesamtrapport & Abnahme-Rapport
-                stehen LINKS neben "Unterschriften" (Benutzerwunsch, zuvor im
-                Termin-Popup). */}
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<FilePdf size={13} />}
+            {/* Ebene 1 — was dem PROJEKT gehört. */}
+            <div className="ofi-rep-level">{t('projects.reportsHub.documents')}</div>
+            <div className="ofi-rep-docs">
+                <DocumentTile
+                    icon={<FilePdf size={15} />}
+                    title={t('projects.reportsHub.generalSection')}
+                    state={hasFieldReports
+                        ? t('projects.reportsHub.reportCount', { count: fieldReports.length })
+                        : t('projects.reportsHub.generalNeedsField')}
                     disabled={!hasFieldReports}
-                    title={hasFieldReports ? t('projects.reportsHub.generalSection') : t('projects.reportsHub.generalNeedsField')}
+                    hint={hasFieldReports ? t('projects.reportsHub.reviewGeneral') : t('projects.reportsHub.generalNeedsField')}
                     onClick={() => { void openGeneralPreview(); }}
-                >
-                    {hasFieldReports ? t('projects.reportsHub.reviewGeneral') : t('projects.reportsHub.createGeneral')}
-                </Button>
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<Clipboard size={13} />}
+                />
+                <DocumentTile
+                    icon={<Clipboard size={15} />}
+                    title={t('projects.reportsHub.deliverySection')}
+                    state={latestDelivery
+                        ? t('projects.reportsHub.createdOn', { date: dayjs(latestDelivery.createdAt).format('DD.MM.YYYY') })
+                        : t('projects.reportsHub.notCreated')}
                     disabled={!deliveryAppt}
-                    title={deliveryAppt ? t('projects.reportsHub.deliverySection') : t('projects.reportsHub.noAppointments')}
+                    hint={deliveryAppt
+                        ? (latestDelivery ? t('projects.reportsHub.reviewDelivery') : t('projects.reportsHub.createDelivery'))
+                        : t('projects.reportsHub.noAppointments')}
                     onClick={() => { if (deliveryAppt) openSheet(deliveryAppt.id, 'delivery'); }}
-                >
-                    {latestDelivery ? t('projects.reportsHub.reviewDelivery') : t('projects.reportsHub.createDelivery')}
-                </Button>
-                <Button variant="secondary" size="sm" icon={<PenLine size={13} />} onClick={() => setSignaturesOpen(true)}>
-                    {t('nav.signatures')}
-                </Button>
+                />
+                <DocumentTile
+                    icon={signedReports > 0 ? <FileCheck02 size={15} /> : <PenLine size={15} />}
+                    title={t('nav.signatures')}
+                    state={hasFieldReports
+                        ? t('projects.reportsHub.signedCount', { signed: signedReports, total: fieldReports.length })
+                        : t('projects.reportsHub.noSignedYet')}
+                    hint={t('projects.reportsHub.signaturesAll')}
+                    onClick={() => setSignaturesOpen(true)}
+                />
             </div>
 
+            {/* Ebene 2 — was den TERMINEN gehört. */}
+            <div className="ofi-rep-level">{t('projects.reportsHub.appointmentsSection')}</div>
             {appointments.length === 0 ? (
                 <EmptyState title={t('projects.reportsHub.noAppointments')} description={t('auto.bu_proje_icin_henuz_saha_raporu_girilmemis')} />
             ) : (
-                <SectionCard
-                    title={scope === 'ongoing' ? t('projects.reportsHub.ongoing') : t('projects.reportsHub.completed')}
-                    action={(
-                        <div className="flex items-center gap-1">
-                            {([
-                                { key: 'ongoing' as const, label: t('projects.reportsHub.ongoing'), count: ongoing.length },
-                                { key: 'completed' as const, label: t('projects.reportsHub.completed'), count: completed.length },
-                            ]).map((option) => (
-                                <button
-                                    key={option.key}
-                                    type="button"
-                                    onClick={() => setScope(option.key)}
-                                    aria-pressed={scope === option.key}
-                                    className={`rounded-[2px] border px-2 py-0.5 text-[11.5px] font-semibold transition-colors ${
-                                        scope === option.key
-                                            ? 'border-[#272f67] bg-[#272f67] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
-                                            : 'border-slate-200 bg-white text-slate-500 hover:text-slate-800 dark:border-white/15 dark:bg-transparent dark:text-white/60'
-                                    }`}
-                                >
-                                    {option.label} · {option.count}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                >
-                    {rows.length === 0
-                        ? <div className="px-3 py-4 text-center text-[12px] text-slate-400">{t('projects.reportsHub.noAppointments')}</div>
-                        : <AppointmentTable rows={rows} />}
-                </SectionCard>
+                <div className="ofi-rep-lanes">
+                    <Lane
+                        kind="ongoing"
+                        title={t('projects.reportsHub.ongoing')}
+                        rows={ongoing}
+                        emptyText={t('projects.reportsHub.laneOngoingEmpty')}
+                    />
+                    <Lane
+                        kind="completed"
+                        title={t('projects.reportsHub.completed')}
+                        rows={completed}
+                        emptyText={t('projects.reportsHub.laneCompletedEmpty')}
+                    />
+                </div>
             )}
 
-            {/* Sheets — everything mounts only while open, so the tab stays light. */}
+            {/* Popups — everything mounts only while open, so the tab stays light. */}
             {selectedAppt && (
                 <AppointmentReportSheet
                     open
@@ -304,7 +300,7 @@ export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved 
                     onClose={() => {
                         setSelectedApptId(null);
                         // Im Blatt kann ein Abnahme-Rapport entstanden sein —
-                        // die Knopf-Beschriftung oben muss dann kippen.
+                        // die Kachel-Beschriftung oben muss dann kippen.
                         setDeliveryReloadKey((key) => key + 1);
                     }}
                 />

@@ -86,16 +86,16 @@ export const TenderCustomerCard = ({ groups, summary }: TenderCustomerCardProps)
     return (
         <section
             data-ui-card
-            className="ofi-tender-customer-card relative z-10 mb-2 overflow-hidden rounded-lg border border-slate-300 bg-white"
+            className="ofi-tender-customer-card ofi-quote-card relative z-10 mb-2 overflow-hidden rounded-lg border border-[#e6e8eb] bg-white"
         >
             <button
                 type="button"
                 onClick={toggle}
                 aria-expanded={!collapsed}
-                className="ofi-tender-card-toggle flex w-full items-center gap-2.5 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5 text-left transition-colors hover:bg-[#e9effb]"
+                className="ofi-tender-card-toggle ofi-quote-card__head flex w-full items-center gap-2.5 border-b border-[#eef0f2] bg-white px-4 py-2 text-left transition-colors hover:bg-[#f8f9fb]"
             >
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-[2px] bg-[#1f2654] text-white">
-                    <User size={12} />
+                <span className="ofi-quote-card__icon flex size-6 shrink-0 items-center justify-center rounded-full text-[#1f2654]">
+                    <User size={13} />
                 </span>
                 <span className="text-[13px] font-semibold tracking-[0.01em] text-[#1f2654]">
                     {t('tenders.customer_details')}

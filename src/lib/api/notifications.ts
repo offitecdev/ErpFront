@@ -1,5 +1,8 @@
 import { apiClient, getShared } from '../axios';
 
+/** Shared signal used by the notification bell and the deferred reminder host. */
+export const NOTIFICATIONS_CHANGED_EVENT = 'ofi:notifications-changed';
+
 export interface NotificationDto {
     id: string;
     tenantId: string;
@@ -15,7 +18,8 @@ export interface NotificationDto {
 }
 
 export const notificationApi = {
-    list: async (params?: { unreadOnly?: boolean; limit?: number }): Promise<NotificationDto[]> => {
+    /** `since` (ISO) = nur Neues seit dem letzten Blick — die Einblendungen fragen so im Takt nach. */
+    list: async (params?: { unreadOnly?: boolean; limit?: number; since?: string }): Promise<NotificationDto[]> => {
         const res = await getShared<NotificationDto[]>('/notifications', { params });
         return res.data;
     },

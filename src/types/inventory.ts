@@ -401,7 +401,10 @@ export interface BulkRowError {
 }
 
 export interface BulkArticlesResult {
+    /** Geschriebene Zeilen INSGESAMT — die aktualisierten sind mitgezählt. */
     createdCount: number;
+    /** Davon auf eine bereits vorhandene Artikelnummer getroffen (`overwrite`). */
+    updatedCount?: number;
     created: Array<{ id: string; articleCode: string; name: string }>;
     errors: BulkRowError[];
 }

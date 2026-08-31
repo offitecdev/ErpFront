@@ -8,9 +8,9 @@
 export type StaffRole = 'STAFF' | 'ADMIN' | 'ACCOUNTANT';
 export type WorkLocation = 'OFFICE' | 'REMOTE';
 export type LeaveKind = 'LEAVE' | 'REMOTE';
-/** 'ANNUAL_PAID' steht nur noch in Altanträgen — der Jahresurlaub wird seit
-    dem 16.08.2026 als 'OTHER' mit Freitext erfasst. */
-export type LeaveTypeKey = 'OTHER' | 'EXCUSE' | 'SICK_SHORT' | 'SICK_LONG' | 'REMOTE_WORK' | 'ANNUAL_PAID';
+/** 'ANNUAL_PAID' ist seit dem 26.08.2026 wieder die tragende Art: nur ein als
+    Jahresurlaub erkennbarer Antrag lässt sich gegen den Anspruch verrechnen. */
+export type LeaveTypeKey = 'ANNUAL_PAID' | 'OTHER' | 'EXCUSE' | 'SICK_SHORT' | 'SICK_LONG' | 'REMOTE_WORK';
 export type LeaveStatus = 'PENDING_MANAGER' | 'PENDING_ACCOUNTING' | 'APPROVED' | 'REJECTED';
 export type TimeEntrySource = 'QR' | 'MANUAL' | 'REMOTE';
 
@@ -26,6 +26,9 @@ export interface StaffRow {
     qrToken: string | null;
     staffRole: StaffRole;
     workLocation: WorkLocation;
+    /** Die Rolle aus den Einstellungen — sie steht in der Liste anstelle der
+        abgelösten Personalrolle (Vorgabe 27.08.2026). */
+    roleName: string | null;
 }
 
 export interface StaffPage {
@@ -43,7 +46,6 @@ export interface StaffDraftRow {
     lastName: string;
     email: string;
     password: string;
-    staffRole: StaffRole;
     workLocation: WorkLocation;
 }
 
@@ -253,8 +255,14 @@ export interface LeaveRequestRow {
 }
 
 export interface LeaveCounts {
+    /** Was auf mich als freigebende Person wartet. */
     approver: number;
+    /** Was in der Buchhaltungsstufe liegt (nur für die Buchhaltung besetzt). */
     accounting: number;
+    /** Eigene Anträge ohne Entscheid — die Plakette am Reiter «Meine Anträge». */
+    mine: number;
+    /** approver + accounting: der farbige Punkt am Anträge-Zeichen im Kopf. */
+    incoming: number;
 }
 
 export interface PersonnelMe {
@@ -381,4 +389,218 @@ export interface PersonOverview {
     leaves: PersonLeave[];
     approvals: PersonApproval[];
     pendingPasswordRequest: { id: string; createdAt: string; note: string | null } | null;
+}
+
+/* ── PERSONALAKTE, FEIERTAGE, ARBEITSZEITERFASSUNG (26.08.2026) ───────────────
+   Die Formen des zweiten Personal-Routers (`personnelHr.routes.ts`). */
+
+/** Urlaub · Homeoffice · Krankheit · Sonstiges — die Filterarten der Anträge. */
+export type RequestTypeKey = 'VACATION' | 'REMOTE' | 'SICK' | 'OTHER';
+
+export interface StaffDocumentRow {
+    id: string;
+    /** CONTRACT = Arbeitsvertrag (genau einer) | DOCUMENT = alles Weitere. */
+    kind: 'CONTRACT' | 'DOCUMENT';
+    title: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    createdAt: string;
+}
+
+/** Der Inhalt einer Unterlage — erst beim Öffnen geholt. */
+export interface StaffDocumentContent extends StaffDocumentRow {
+    /** Daten-URL. */
+    data: string;
+}
+
+export interface PersonProfile {
+    person: {
+        id: string;
+        staffNumber: number | null;
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone: string | null;
+        title: string | null;
+        isActive: boolean;
+        staffRole: StaffRole;
+        workLocation: WorkLocation;
+        hireDate: string | null;
+        terminationDate: string | null;
+        createdAt: string;
+        profilePictureUrl: string | null;
+        roleId: string | null;
+        roleName: string | null;
+        isSystemAdminRole: boolean;
+    };
+    /** true = die Verwaltung sieht die Seite; sonst stehen die Felder gesperrt. */
+    canEdit: boolean;
+    isSelf: boolean;
+    roles: Array<{ id: string; name: string }>;
+    contract: StaffDocumentRow | null;
+    documents: StaffDocumentRow[];
+}
+
+export interface PersonProfilePatch {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string | null;
+    title?: string | null;
+    hireDate?: string | null;
+    staffRole?: StaffRole;
+    workLocation?: WorkLocation;
+}
+
+// ── Feiertage ────────────────────────────────────────────────────────────────
+
+export interface HolidayRow {
+    id: string;
+    /** YYYY-MM-DD */
+    date: string;
+    name: string;
+    catalogKey: string | null;
+    countryCode: string;
+    religious: boolean;
+    halfDay: boolean;
+}
+
+export interface HolidayCatalogEntry {
+    key: string;
+    date: string;
+    names: { tr: string; de: string; en: string };
+    religious: boolean;
+    halfDay: boolean;
+}
+
+export interface HolidayYear {
+    year: number;
+    country: string;
+    holidays: HolidayRow[];
+    catalog: HolidayCatalogEntry[];
+    /** Jahre, für die der Katalog auch die religiösen Feste kennt. */
+    catalogYears: number[];
+}
+
+// ── Urlaubsanspruch ──────────────────────────────────────────────────────────
+
+export interface LeavePolicy {
+    annualWorkdays: number;
+    annualLeaveDays: number;
+    accrueByWorkdays: boolean;
+    carryOverDays: number;
+}
+
+export interface LeaveEntitlement {
+    year: number;
+    workedDays: number;
+    referenceWorkdays: number;
+    earnedDays: number;
+    usedDays: number;
+    pendingDays: number;
+    remainingDays: number;
+    fullYearDays: number;
+    carryOverDays: number;
+}
+
+/** Wofür ein Fehltag steht. ABSENT = unerklärt. */
+export type AbsenceKind = 'ABSENT' | 'VACATION' | 'SICK' | 'REMOTE' | 'OTHER';
+
+export interface AbsenceDay {
+    /** YYYY-MM-DD */
+    date: string;
+    kind: AbsenceKind;
+    requestId: string | null;
+    label: string | null;
+    /** true = der erklärende Antrag ist noch nicht bewilligt. */
+    pending: boolean;
+}
+
+/** Eine Abwesenheit in der Gesamtliste — mit der Person daran. */
+export interface AbsenceRow extends AbsenceDay {
+    employeeId: string;
+    staffNumber: number | null;
+    firstName: string;
+    lastName: string;
+}
+
+export interface LeaveYear {
+    year: number;
+    policy: LeavePolicy;
+    entitlement: LeaveEntitlement;
+    holidays: HolidayRow[];
+    absences: AbsenceDay[];
+    workedDays: number;
+    referenceWorkdays: number;
+    plan: ShiftPlan;
+}
+
+// ── Arbeitszeiterfassung ─────────────────────────────────────────────────────
+
+export interface TimeRecordBasis {
+    /** Arbeitstage im Zeitraum, Feiertage bereits abgezogen. */
+    workdays: number;
+    publicHolidays: number;
+    dailyNetHours: number;
+    targetHours: number;
+    totalPeople?: number;
+}
+
+export interface TimeRecordPerson {
+    employeeId: string;
+    staffNumber: number | null;
+    firstName: string;
+    lastName: string;
+    email: string;
+    workLocation: WorkLocation;
+    totalSeconds: number;
+    totalHours: number;
+    grossSeconds: number;
+    breakSeconds: number;
+    presentDays: number;
+    absentDays: number;
+    leaveDays: number;
+    sickDays: number;
+    targetHours: number;
+    daysShort: number;
+    extraDays: number;
+}
+
+export interface TimeRecordResult {
+    plan: ShiftPlan;
+    basis: TimeRecordBasis | null;
+    people: TimeRecordPerson[];
+    days: ReportDay[];
+    holidays: HolidayRow[];
+}
+
+/** Der Arbeitszeitnachweis EINER Person (Reiter «Arbeitszeiten»). */
+export interface PersonTimeLog {
+    person: { id: string; staffNumber: number | null; firstName: string; lastName: string; email: string };
+    plan: ShiftPlan;
+    basis: TimeRecordBasis;
+    days: ReportDay[];
+    holidays: HolidayRow[];
+    absences: AbsenceDay[];
+    totals: {
+        actualSeconds: number;
+        grossSeconds: number;
+        breakSeconds: number;
+        totalHours: number;
+        presentDays: number;
+        absentDays: number;
+        daysShort: number;
+        extraDays: number;
+    };
+}
+
+/** Die Filter der einen Antragsseite. */
+export interface LeaveQuery {
+    scope: 'mine' | 'incoming' | 'approver' | 'accounting' | 'all';
+    requestType?: RequestTypeKey | '';
+    status?: LeaveStatus | '';
+    from?: string;
+    to?: string;
+    search?: string;
 }

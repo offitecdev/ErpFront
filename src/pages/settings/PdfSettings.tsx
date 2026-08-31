@@ -7,12 +7,15 @@ import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Textarea, Select } from '../../components/ui-shared/Field';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
-import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
+import { usePdfSettings, usePdfSettingsStore } from '../../store/pdfSettingsStore';
 
 import { t } from '@/i18n/translate';
 
 export const PdfSettings = () => {
     const { settings, setSettings, resetSettings } = usePdfSettingsStore();
+    // Gedruckt wird der Name des aktiven Mandanten, nicht der gespeicherte —
+    // deshalb steht hier genau das im Feld, was auf dem PDF landet.
+    const printed = usePdfSettings();
     const pdfInputRef = useRef<HTMLInputElement>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,8 +66,8 @@ export const PdfSettings = () => {
                 <div className="lg:col-span-8 flex flex-col gap-4">
                     <Card title={t('settings.pdf.companyInfo')} icon={<FileText size={13} />}>
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label={t('crm.customers.companyName')} required className="col-span-2">
-                                <Input value={settings.companyName} onChange={(e) => setSettings({ companyName: e.target.value })} />
+                            <Field label={t('crm.customers.companyName')} required className="col-span-2" hint={t('settings.pdf.companyNameHint')}>
+                                <Input value={printed.companyName} readOnly />
                             </Field>
                             <Field label={t('settings.pdf.addressLine1')}>
                                 <Input value={settings.addressLine1} onChange={(e) => setSettings({ addressLine1: e.target.value })} />

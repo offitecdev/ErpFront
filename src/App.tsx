@@ -81,7 +81,7 @@ const ToastProvider = () => {
 function App() {
     const fetchProfile = useAuthStore((state) => state.fetchProfile);
     const isDarkMode = useThemeStore((state) => state.isDarkMode);
-    const [languageVersion, setLanguageVersion] = useState(0);
+    const [, setLanguageVersion] = useState(0);
 
     useEffect(() => {
         // Auth cookies are HttpOnly (invisible to JS); a non-sensitive marker
@@ -91,10 +91,12 @@ function App() {
 
             // Start direct tender visits in parallel with profile validation.
             // This removes the old profile -> route JS -> tender API waterfall.
-            const match = window.location.pathname.match(/^\/crm\/tenders\/([^/?#]+)$/);
+            const match = window.location.pathname.match(
+                /^\/(?:sales\/quotes|crm\/tenders)\/([^/?#]+)\/?$/,
+            );
             const tenderId = match?.[1];
             if (tenderId && tenderId !== 'new') {
-                void import('./pages/tender/TenderDetail').catch(() => undefined);
+                void import('./pages/sales/TenderDetail').catch(() => undefined);
                 void import('./store/tenderStore')
                     .then(({ useTenderStore }) => {
                         const state = useTenderStore.getState();
@@ -168,7 +170,12 @@ function App() {
         >
             <Router>
                 <ToastProvider />
-                <AppRouter key={languageVersion} />
+                {/* A language event only needs a normal render so direct t()
+                    calls receive the new strings. Giving the router a changing
+                    key unmounted and rebuilt the entire shell/detail table when
+                    the initial locale chunk arrived, producing a second DOM
+                    insertion, forced layout work and visible footer movement. */}
+                <AppRouter />
             </Router>
         </ConfigProvider>
     );

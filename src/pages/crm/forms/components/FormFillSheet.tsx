@@ -34,7 +34,7 @@ export const FormFillSheet = ({
 
     if (!open || !submissionId) return null;
     return (
-        <BottomSheet open title={title || t('forms.fill.title')} onClose={() => void close()} width={1100} height={860} zIndex={120}>
+        <BottomSheet open title={title || t('forms.fill.title')} onClose={() => void close()} width={1100} height={860} zIndex={800}>
             <div className="p-5">
                 <FormFillView
                     submissionId={submissionId}

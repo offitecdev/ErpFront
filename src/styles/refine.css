@@ -231,3 +231,352 @@ body > div:not(#root) :where(
         transform: none;
     }
 }
+
+
+/* =========================================================
+   KOPFLEISTE: EINE HÖHE FÜR ALLE BEDIENELEMENTE (28.08.2026)
+
+   Vorgabe Samet: «Die obere Leiste soll modern wirken — weiss,
+   nicht übertrieben. Und alles muss auf derselben Höhe stehen,
+   keine gestaffelten Höhen.»
+
+   Gemessen war die Leiste vorher dreistufig: die Werkzeuge links
+   standen auf 40px (`.ofi-header-icon-button` zieht sie auf
+   `--ofi-control-height`), Apps-Zeichen, Kalender, Glocke und
+   Sprachwähler auf 31,5px (`size-9` × 14px Grundschrift) und das
+   Bild der angemeldeten Person auf 39px — es sass als einziges
+   3px höher als seine Nachbarn. Genau das las sich als Versatz.
+
+   Jetzt trägt jedes Bedienelement der Leiste `.ofi-hdr-ctl` und
+   damit DIESELBE Höhe wie die Werkzeuge links; was neben dem
+   Zeichen noch Text führt (Kalender, Firmenfeld), bekommt
+   zusätzlich `--wide` und behält seine eigene Breite.
+
+   Ohne `!important`: diese Datei steht ausserhalb jeder Schicht
+   und schlägt Tailwinds `size-9` schon deshalb. Wo index.css das
+   Mass mit `!important` setzt (`.ofi-header-icon-button`), bleibt
+   es dabei — dort steht ohnehin dasselbe Mass.
+   ========================================================= */
+
+/* «Mach das Glas eine Spur groesser» (28.08.2026): die Bedienhoehe steigt von
+   40 auf 44px — aber NUR in der Kopfleiste. Sie steht als Variable, und
+   `.ofi-header-icon-button` (index.css) liest dieselbe Variable; ein
+   Uebersteuern auf der Leiste hebt darum die Werkzeuge links gleich mit, ohne
+   irgendein Feld ausserhalb des Kopfes anzufassen. */
+#root .ofi-topbar { --ofi-control-height: 44px; }
+
+#root .ofi-topbar .ofi-hdr-ctl {
+    height: var(--ofi-control-height);
+    min-height: var(--ofi-control-height);
+    flex: none;
+}
+#root .ofi-topbar .ofi-hdr-ctl:not(.ofi-hdr-ctl--wide) {
+    width: var(--ofi-control-height);
+    min-width: var(--ofi-control-height);
+    padding: 0;
+}
+
+
+/* =========================================================
+   SCHALE IN WEISS (28.08.2026)
+
+   Vorgabe Samet: «Der Grund von Kopfleiste und Seitenleiste soll
+   ebenfalls weiss sein.» Kopf, Modulleiste und deren Aufklappfeld
+   standen bis dahin auf dem Leinwandgrau #f6f8fb, das weiterhin
+   die INHALTSSPALTE trägt — die weissen Karten heben sich davon
+   ab, und die Schale rahmt sie jetzt in Weiss.
+
+   Warum eine eigene Klasse und nicht `bg-white`: dark.css zieht
+   JEDE `.bg-white`-Fläche per `!important` auf die Kartenfarbe
+   (`--ofi-d-surface`). Die Schale trüge im Dunkelmodus dann
+   GENAU den Ton der Karten darin — die Modulleiste stünde so hell
+   wie die Tabelle daneben und stritte mit ihr. Mit eigener Klasse
+   greift dort keine wichtige Regel, und die Zeilen darunter setzen
+   den Dunkelmodus selbst.
+
+
+   DIESELBE TRENNUNG IM DUNKELN (29.08.2026)
+
+   Vorgabe Samet: «Im Hellen heben sich Kopf- und Seitenleiste jetzt
+   von der Inhaltsfläche ab — mach das im Dunkeln auch, aber
+   harmonisch, augenschonend, mit klarer Grenze.»
+
+   RICHTUNG: Hell rückt die Schale eine Stufe NACH OBEN (Weiss auf
+   dem Leinwandgrau). Dunkel rückt sie eine Stufe NACH UNTEN —
+   #0a0b0d unter dem Seitengrund #0f1113. Beide Male entsteht
+   derselbe Unterschied, aber nur so bleibt die Reihenfolge der
+   Tiefe erhalten:
+
+       Schale #0a0b0d  <  Seite #0f1113  <  Karten #17191c
+
+   Die Karten bleiben also das Hellste und damit das Oberste — sie
+   liegen auf der Seite, die Seite liegt im Rahmen. Der umgekehrte
+   Weg (Schale auf die Kartenfarbe #17191c) wurde ausprobiert und
+   verworfen: die Modulleiste stand dann im selben Ton wie die
+   Tabelle daneben, der Bildschirm wurde als Ganzes heller, und
+   genau das ermüdet die Augen. Nach unten zu gehen nimmt Licht
+   weg statt welches hinzuzufügen — dasselbe Argument, das oben in
+   index.html schon die Fensterfarbe des Browsers (`theme-color`
+   #08090a) auf denselben Ton gestellt hat: Browserrahmen und
+   Programmrahmen laufen jetzt ineinander.
+
+   KEINE LINIEN. Eine Haarlinie unter dem Kopf und rechts neben der
+   Leiste war da und ist auf Ansage wieder weg: «Linien braucht es
+   nicht, auch im Dunkeln nicht.» Damit gilt im Dunkeln, was oben
+   schon fürs Helle steht — der Tonsprung IST die Grenze, gezogen
+   wird sie nie. Wer hier später eine Kante vermisst, vertieft den
+   Schalenton, statt einen `border` oder Innenschatten zu setzen.
+
+   DAS AUFKLAPPFELD ist die Ausnahme. Es SCHWEBT über der Seite
+   (Schlagschatten, die Seite bleibt darunter stehen), und was
+   schwebt, muss heller sein als der Grund — sonst liest sich der
+   Schatten als Loch. Es steht darum auf der Kartenfarbe, genau wie
+   die Schublade auf dem Telefon, die dieselbe Rolle spielt.
+   ========================================================= */
+
+#root .ofi-shell-white { background-color: #ffffff; }
+html.dark #root .ofi-shell-white { background-color: var(--ofi-d-shell); }
+
+/* Das Aufklappfeld schwebt — es steht eine Stufe HÖHER als die
+   Seite, nicht tiefer. Sonst läse sich sein Schlagschatten als Loch. */
+html.dark #root #oi-sidebar-panel.ofi-shell-white {
+    background-color: var(--ofi-d-surface);
+}
+
+
+/* =========================================================
+   GLAS-BEDIENELEMENTE DER KOPFLEISTE (`.ofi-glass-ctl`)
+
+   Vorgabe Samet, 28.08.2026: erst «der Auswahlknopf soll deutlich
+   sichtbar sein, im Dunkelmodus mit Glas-Aussehen», dann
+   «das Glas soll KEINE eigene Farbe haben — Glas ist
+   durchsichtig», zuletzt «im Dunkeln duerfen Aufbau und Kanten
+   besser sein, ruhig unschaerfer».
+
+   WER SIE TRAEGT: das Firmenfeld und der Kalender («der Kalender
+   koennte wie das Firmenfeld aussehen»). Das Apps-Zeichen
+   ausdruecklich NICHT — «das muss gar nicht eingekreist werden»;
+   es steht frei und wechselt nur die Farbe (siehe
+   `.ofi-apps-glyph` weiter unten).
+
+   Hell: kein Farbton, nur ein Hauch Gefaelle von Weiss nach dem
+   Leinwandgrau plus Haarkante — auf der weissen Leiste reicht
+   das, damit man den Knopf als Knopf liest.
+
+   Dunkel: echtes Glas, in drei Schichten. Die Flaeche ist NUR
+   Weiss mit wenig Deckung; `backdrop-filter` unschaerft, was
+   dahinter liegt (24px — die Leiste ist ruhig, da darf es weich
+   sein); und DIE KANTE ist das eigentliche Glas: ein heller Saum
+   auf der Oberkante, ein zarter Gegensaum unten, ein Innenring
+   ringsum und ein tiefer, weicher Schlagschatten. Ohne den
+   Innenring endet die Scheibe im Dunkeln einfach, statt eine
+   Dicke zu haben. Kein Blau, kein Gold — eine getoente Scheibe
+   waere lackiertes Glas und genau das war der Einwand.
+   ========================================================= */
+
+#root .ofi-topbar .ofi-glass-ctl {
+    border: 1px solid #e1e5ee;
+    background: linear-gradient(180deg, #ffffff, #f1f4f9);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-topbar .ofi-glass-ctl:hover {
+    border-color: #ccd3e2;
+    background: linear-gradient(180deg, #ffffff, #e8ecf5);
+}
+#root .ofi-topbar .ofi-glass-ctl.is-open,
+#root .ofi-topbar .ofi-glass-ctl[aria-expanded="true"] {
+    border-color: #bfc8db;
+    background: linear-gradient(180deg, #f7f9fc, #e3e8f3);
+    box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+/* Die offene Seite (Kalender): DIE KANTE BLEIBT, nur die Fuellung nimmt den
+   Markenton auf. So trägt jeder Knopf der Leiste denselben Rand. */
+#root .ofi-topbar .ofi-glass-ctl.is-current {
+    background: linear-gradient(180deg, #eef2fd, #e1e8fa);
+}
+
+html.dark #root .ofi-topbar .ofi-glass-ctl {
+    border-color: rgba(255, 255, 255, 0.13);
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 255, 255, 0.07) 45%,
+        rgba(255, 255, 255, 0.03) 100%
+    );
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.34),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.07),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 10px 26px rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(24px) saturate(1.7);
+    backdrop-filter: blur(24px) saturate(1.7);
+}
+html.dark #root .ofi-topbar .ofi-glass-ctl:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(255, 255, 255, 0.10) 45%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+}
+html.dark #root .ofi-topbar .ofi-glass-ctl.is-open,
+html.dark #root .ofi-topbar .ofi-glass-ctl[aria-expanded="true"] {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.26) 0%,
+        rgba(255, 255, 255, 0.12) 45%,
+        rgba(255, 255, 255, 0.06) 100%
+    );
+}
+html.dark #root .ofi-topbar .ofi-glass-ctl.is-current {
+    background: linear-gradient(
+        180deg,
+        rgba(230, 207, 158, 0.26) 0%,
+        rgba(230, 207, 158, 0.12) 45%,
+        rgba(230, 207, 158, 0.06) 100%
+    );
+}
+
+/* =========================================================
+   DAS APPS-ZEICHEN (`.ofi-apps-glyph`)
+
+   Frei stehend, ohne Scheibe — und darum ist die FARBE alles,
+   was es hat. Sie steht hier und nicht am SVG, weil nur eine
+   CSS-Regel sie im Dunkelmodus tauschen kann: `stop-color` ist
+   eine CSS-Eigenschaft, ein `var()` in einem SVG-Attribut
+   dagegen wirkungslos.
+
+   HELL (Vorgabe 28.08.2026): die drei Kaestchen im Marken-Navy
+   nach Blau, das aufgestellte Karo in ORANGE — «die Farbe der
+   Raute oben soll orange sein». Blau und Orange sind der
+   Gegensatz, der das Karo ueberhaupt erst als das Besondere am
+   Zeichen liest.
+
+   DUNKEL: dort dreht das Zeichen ins Warme — «zwei orange
+   L-Bloecke, das obere aber rot». Also die beiden unteren
+   Kaestchen orange, das obere rot, das Karo orange. Auf dem fast
+   schwarzen Grund traegt Warm besser als Blau, und die Leiste ist
+   dort ohnehin golden.
+
+   Die Kaestchen deckend statt durchscheinend («das Zeichen soll
+   heller sein»): `fill-opacity` ist raus, die Toene stehen voll.
+   ========================================================= */
+
+#root .ofi-apps-glyph .ofi-apps-a { stop-color: #2b3a8f; }
+#root .ofi-apps-glyph .ofi-apps-b { stop-color: #0b57d0; }
+#root .ofi-apps-glyph .ofi-apps-c { stop-color: #ffb02e; }
+#root .ofi-apps-glyph .ofi-apps-d { stop-color: #f28c14; }
+
+html.dark #root .ofi-apps-glyph .ofi-apps-tl { fill: #ef4b3c; }
+html.dark #root .ofi-apps-glyph .ofi-apps-bl,
+html.dark #root .ofi-apps-glyph .ofi-apps-br { fill: #f79009; }
+html.dark #root .ofi-apps-glyph .ofi-apps-dia { fill: #ffb02e; }
+
+/* Ohne Flaeche braucht der Knopf trotzdem eine Antwort auf den Zeiger: das
+   Zeichen wird eine Spur heller und heber sich leicht. */
+#root .ofi-topbar .ofi-apps-btn .ofi-apps-glyph {
+    transition: filter 140ms ease, transform 140ms ease;
+}
+#root .ofi-topbar .ofi-apps-btn:hover .ofi-apps-glyph {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   BLITZ ⇄ ZURÜCK (`.ofi-quickback`)
+
+   Vorgabe Samet, 28.08.2026: «Nehmt die Zurück-Knöpfe von den
+   Seiten. Die drei Punkte — das Schnellmenü — kommen ganz nach
+   vorn, als Blitz, gleich rechts neben unser Zeichen; und wenn
+   man auf eine Unterseite geht, verwandelt sich der Blitz mit
+   einer Bewegung in den Zurück-Pfeil.»
+
+   Deshalb EIN Knopf mit zwei Gesichtern und nicht zwei, die sich
+   abwechseln: nur ein bleibendes Element kann sich verwandeln.
+   Blitz und Pfeil liegen im selben Rasterfeld übereinander; der
+   Blitz dreht sich klein nach links weg, der Pfeil kommt von
+   rechts hereingeglitten. Die Kurve ist die des Apfel-Vorbilds
+   (schnell an, weich aus) — darum steht sie als eigene Grösse
+   und nicht als `ease`.
+
+   Die Knopfschale selbst (Kreis, Kante, Hover) kommt unverändert
+   von `.ofi-header-icon-button` aus index.css — hier steht NUR
+   die Verwandlung, sonst stünde derselbe Knopf plötzlich anders
+   da als der Doppelbildschirm und das Reitermenü daneben.
+   ========================================================= */
+
+:root {
+    /* schnell an, weich aus — die Kurve der Apfel-Oberfläche */
+    --ofi-back-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --ofi-back-glyph: 19px;
+}
+
+#root .ofi-quickback__stack {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--ofi-back-glyph);
+    height: var(--ofi-back-glyph);
+}
+
+#root .ofi-quickback__glyph,
+#root .ofi-quickback__arrow {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: 100%;
+    transition:
+        opacity 240ms var(--ofi-back-ease),
+        transform 420ms var(--ofi-back-ease);
+}
+
+/* Ruhe: der Blitz steht, der Pfeil wartet rechts ausserhalb —
+   klein und angekippt, damit er nicht bloss eingeblendet wird,
+   sondern ankommt. */
+#root .ofi-quickback__arrow {
+    opacity: 0;
+    transform: translateX(8px) scale(0.5) rotate(-20deg);
+}
+
+#root .ofi-quickback.is-back .ofi-quickback__glyph {
+    opacity: 0;
+    transform: translateX(-7px) scale(0.45) rotate(-16deg);
+}
+#root .ofi-quickback.is-back .ofi-quickback__arrow {
+    opacity: 1;
+    transform: none;
+}
+
+/* Die kleine Geste des Vorbilds: beim Zeigen rutscht der Pfeil
+   ein Stück in seine Richtung, beim Drücken noch etwas weiter. */
+#root .ofi-quickback.is-back:hover .ofi-quickback__arrow,
+#root .ofi-quickback.is-back:focus-visible .ofi-quickback__arrow {
+    transform: translateX(-2px);
+}
+#root .ofi-quickback.is-back:active .ofi-quickback__arrow {
+    transform: translateX(-3px) scale(0.92);
+}
+
+/* Zweitfenster des Doppelbildschirms: dieselbe Schale, aber eine
+   Spur kleiner — dort steht der Pfeil allein über dem Inhalt und
+   soll ihn nicht überragen. */
+#root .ofi-quickback--pane {
+    --ofi-control-height: 34px;
+    --ofi-back-glyph: 16px;
+}
+
+/* Wer Bewegung abbestellt hat, bekommt denselben Wechsel ohne Weg. */
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-quickback__glyph,
+    #root .ofi-quickback__arrow {
+        transition-duration: 1ms;
+        transform: none;
+    }
+    #root .ofi-quickback.is-back .ofi-quickback__glyph {
+        transform: none;
+    }
+}

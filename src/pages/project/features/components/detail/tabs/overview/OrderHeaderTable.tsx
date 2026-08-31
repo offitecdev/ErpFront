@@ -1,20 +1,34 @@
 import { memo } from 'react';
 import dayjs from 'dayjs';
 
-import { SectionCard } from '@/components/ui-shared/TableKit';
+import { OrderConfirmationButton } from '@/components/orders/OrderConfirmationButton';
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 
 import { OrderNotifications, type OrderNotification } from './OrderNotifications';
-import { ProjectStatusChip } from './overviewChips';
+import { OverviewCard } from './OverviewCard';
 
 const day = (value?: string | null) => (value ? dayjs(value).format('DD.MM.YYYY') : '-');
 
+type Fact = { label: string; value: string; strong?: boolean; mono?: boolean };
+
 /**
- * The single row at the very top: who the order is for and what it is. Nothing
+ * The single block at the very top: who the order is for and what it is. Nothing
  * else on the screen repeats this, so everything below can stay narrow. The bell
  * sits in the card header — its notifications play as single pop-ups at the
- * bottom of the screen.
+ * bottom of the screen — and to its LEFT the order's ONE document, the navy
+ * "Verkaufs-PDF" button (which prints the Auftragsbestätigung). There used to be
+ * a second, red one beside it; it was retired on 29.08.2026.
+ *
+ * BESCHRIFTUNG ÜBER WERT, KEINE TABELLE (Benutzerwunsch 19.08.2026: "unter der
+ * Kundenzeile soll nichts seitwärts rollen"). Sieben Angaben zu EINER Sache
+ * sind eine Liste und keine Tabelle mit einer einzigen Zeile: sieben feste
+ * Spalten müssen auf einer schmalen Karte irgendwann rollen, das Raster
+ * (`.ofi-prj-facts`) bricht stattdessen um. Damit fällt auch der automatische
+ * Spaltenzieher weg, der den Rollbalken überhaupt erst gesetzt hat.
+ *
+ * KEIN Zustand in diesem Block (Benutzerwunsch 19.08.2026): die Kopfzeile der
+ * Seite trägt ihn bereits neben dem Kundennamen, hier war er eine Wiederholung.
  */
 export const OrderHeaderTable = memo(({ project, order, notifications }: {
     project: ProjectDto;
@@ -25,48 +39,56 @@ export const OrderHeaderTable = memo(({ project, order, notifications }: {
     // Kommission — kendi teklifinden, yoksa projenin teklifinden. Projede tek
     // bir kommission olduğu için müşteri/sipariş satırının yanında durur.
     const commission = (order?.tender?.commissionNumber || project.tender?.commissionNumber || '').trim();
+    const facts: Fact[] = [
+        {
+            label: t('projects.delivery.colCustomer'),
+            value: project.customer?.companyName || '-',
+            strong: true,
+        },
+        { label: t('projects.order'), value: order?.orderNumber || '-', strong: true },
+        {
+            label: t('projects.tender'),
+            value: order?.tender?.tenderNumber || project.tender?.tenderNumber || '-',
+        },
+        { label: t('tenders.kommission_nr'), value: commission || '-', mono: Boolean(commission) },
+        { label: t('common.start'), value: day(project.startDate) },
+        { label: t('common.end'), value: day(project.endDate) },
+        {
+            label: t('projects.detail.overview.creator'),
+            value: creator ? `${creator.firstName} ${creator.lastName}`.trim() : '-',
+        },
+    ];
+
     return (
-        <SectionCard
+        <OverviewCard
             title={`${t('projects.delivery.colCustomer')} · ${t('projects.order')}`}
-            action={<OrderNotifications items={notifications} />}
+            /* Der Beleg des Auftrags steht links neben der Glocke: beides sind
+               Wege aus dieser Kopfzeile heraus. */
+            action={(
+                <span className="ofi-prj-card__actions">
+                    <OrderConfirmationButton order={order} fallbackTenderId={project.tenderId} />
+                    <OrderNotifications items={notifications} />
+                </span>
+            )}
         >
-            <table data-inv-table data-grid-lines data-unstyled-table className="ofi-compact-table w-full">
-                <thead>
-                    <tr>
-                        <th className="text-left">{t('projects.delivery.colCustomer')}</th>
-                        <th className="text-left">{t('projects.order')}</th>
-                        <th className="text-left">{t('projects.tender')}</th>
-                        <th className="text-left">{t('tenders.kommission_nr')}</th>
-                        <th className="w-28 text-left">{t('common.start')}</th>
-                        <th className="w-28 text-left">{t('common.end')}</th>
-                        <th className="text-left">{t('projects.detail.overview.creator')}</th>
-                        <th className="w-32 text-left">{t('common.status')}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td className="truncate font-semibold text-slate-900 dark:text-white">
-                            {project.customer?.companyName || '-'}
-                        </td>
-                        <td className="truncate font-semibold text-slate-800 dark:text-white/90">
-                            {order?.orderNumber ? order.orderNumber : '-'}
-                        </td>
-                        <td className="truncate">
-                            {order?.tender?.tenderNumber || project.tender?.tenderNumber || '' || '-'}
-                        </td>
-                        <td className={commission
-                            ? 'truncate font-mono font-semibold text-slate-900 dark:text-white'
-                            : 'truncate text-slate-400 dark:text-white/40'}
+            <dl className="ofi-prj-facts">
+                {facts.map((fact) => (
+                    <div key={fact.label} className="ofi-prj-facts__cell">
+                        <dt className="ofi-prj-facts__label">{fact.label}</dt>
+                        <dd
+                            className={[
+                                'ofi-prj-facts__value',
+                                fact.strong ? 'is-strong' : '',
+                                fact.mono ? 'ofi-prj-mono' : '',
+                                fact.value === '-' ? 'is-empty' : '',
+                            ].filter(Boolean).join(' ')}
+                            title={fact.value}
                         >
-                            {commission || '-'}
-                        </td>
-                        <td className="tabular-nums">{day(project.startDate)}</td>
-                        <td className="tabular-nums">{day(project.endDate)}</td>
-                        <td className="truncate">{creator ? `${creator.firstName} ${creator.lastName}` : '-'}</td>
-                        <td><ProjectStatusChip status={project.status} /></td>
-                    </tr>
-                </tbody>
-            </table>
-        </SectionCard>
+                            {fact.value}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+        </OverviewCard>
     );
 });

@@ -9,14 +9,11 @@ import { Chip } from '../components/primitives';
 /**
  * ── DER KOPF DER PERSONENSEITE ───────────────────────────────────────────────
  *
- * Die Anmeldewelle, zweimal: OBEN als Kopfband (gespiegelt, hoch genug, um als
- * Welle gelesen zu werden — nicht als Streifen) und unten aufrecht. Dazwischen
- * die Bildfläche — Foto oder Initialen — mit Namen, Personalnummer und Rolle;
- * ganz unten das Reiterband (Vorgabe 17.08.2026).
- *
- * Die Wellen sind zwei EIGENE Instanzen von `LoginWave`, keine gedrehte Kopie
- * derselben: das Bauteil vergibt seinem Farbverlauf je Instanz eine eigene id,
- * zwei gleiche ids im Dokument wären ungültig.
+ * SEIT DEM 27.08.2026 KOMPAKT (Vorgabe: «die Vorlage verkleinern, nur der
+ * obere Teil bleibt sichtbar — der Inhalt rückt nach oben»): NUR noch das
+ * obere Wellenband, darunter Bildfläche, Name und Reiter. Die zweite Welle am
+ * Fuss ist weg — sie kostete Höhe, und der eigentliche Inhalt begann erst weit
+ * unter der Falzlinie.
  *
  * Auf der Bildfläche sitzt der Knopf für das Profilbild — aber nur, wenn diese
  * Person es auch ändern darf; sonst wäre es ein Versprechen, das der Server
@@ -31,18 +28,22 @@ export interface PersonTab {
 
 export const PersonHero = ({
     person,
-    tabs,
-    activeKey,
+    tabs = [],
+    activeKey = '',
     onTab,
     canEditPhoto = false,
     onEditPhoto,
+    action,
 }: {
     person: PersonHeader;
-    tabs: PersonTab[];
-    activeKey: string;
-    onTab: (key: string) => void;
+    /** Ohne Reiter (eigenes Profil) bleibt das Band einfach weg. */
+    tabs?: PersonTab[];
+    activeKey?: string;
+    onTab?: (key: string) => void;
     canEditPhoto?: boolean;
     onEditPhoto?: () => void;
+    /** Der eine Handgriff der Seite — rechts neben dem Namen. */
+    action?: React.ReactNode;
 }) => {
     const name = fullName(person) || person.email;
     const initials = `${person.firstName.charAt(0)}${person.lastName.charAt(0)}`.toUpperCase();
@@ -109,24 +110,26 @@ export const PersonHero = ({
                         )}
                     </div>
                 </div>
+
+                {action && <div className="ofi-person-hero__action">{action}</div>}
             </div>
 
-            <LoginWave className="ofi-person-hero__wave ofi-person-hero__wave--bottom" />
-
-            <nav className="ofi-person-hero__tabs" aria-label={name}>
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.key}
-                        type="button"
-                        className="ofi-person-tab"
-                        aria-current={tab.key === activeKey ? 'page' : undefined}
-                        onClick={() => onTab(tab.key)}
-                    >
-                        {tab.label}
-                        {Boolean(tab.badge) && <span className="ofi-person-tab__badge">{tab.badge}</span>}
-                    </button>
-                ))}
-            </nav>
+            {tabs.length > 0 && (
+                <nav className="ofi-person-hero__tabs" aria-label={name}>
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            className="ofi-person-tab"
+                            aria-current={tab.key === activeKey ? 'page' : undefined}
+                            onClick={() => onTab?.(tab.key)}
+                        >
+                            {tab.label}
+                            {Boolean(tab.badge) && <span className="ofi-person-tab__badge">{tab.badge}</span>}
+                        </button>
+                    ))}
+                </nav>
+            )}
         </section>
     );
 };

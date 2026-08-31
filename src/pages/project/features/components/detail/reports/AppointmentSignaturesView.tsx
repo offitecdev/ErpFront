@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
 import { Send01 as Send } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import {
@@ -15,7 +14,7 @@ import {
 import { t } from '@/i18n/translate';
 import type { ProjectDto } from '@/types/project';
 
-import { SignatureDispatchPanel, type SignatureDispatchChannels } from './SignatureDispatchPanel';
+import { SignatureDispatchDialog, type SignatureDispatchChannels } from './SignatureDispatchDialog';
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 import type { SignatureDispatchTarget } from '../../../projects/types/signatureTypes';
 import {
@@ -44,7 +43,7 @@ type TargetRow = {
  * Signatures for the documents of one appointment, as a plain gray-bordered
  * table: field report, delivery report and the project's general report, each
  * with its signed/unsigned state. Selecting a sendable row opens the channel
- * checkboxes (notify technician in-app / email the customer) below the table.
+ * popup (notify technician in-app / email the customer) in front of the list.
  */
 export const AppointmentSignaturesView = ({
     project,
@@ -197,7 +196,7 @@ export const AppointmentSignaturesView = ({
                             <th className="text-left">{t('projects.reportsHub.document')}</th>
                             <th className="w-32 text-left">{t('common.date')}</th>
                             <th className="w-36 text-left">{t('common.status')}</th>
-                            <th className="w-44 text-right" />
+                            <th className="w-52 text-right" />
                         </tr>
                     </thead>
                     <tbody>
@@ -220,9 +219,15 @@ export const AppointmentSignaturesView = ({
                                             {/* Same rule as the project-wide signature desk:
                                                 a signed document is never offered again. */}
                                             {status !== 'signed' && status !== 'notReady' ? (
-                                                <Button variant="secondary" size="sm" icon={<Send size={12} />} onClick={() => selectRow(row)}>
-                                                    {t('signatures.sendForSignature')}
-                                                </Button>
+                                                <button
+                                                    type="button"
+                                                    className="ofi-sigbtn"
+                                                    title={t('signatures.sendForSignature')}
+                                                    onClick={() => selectRow(row)}
+                                                >
+                                                    <Send size={13} />
+                                                    <span className="ofi-sigbtn__text">{t('signatures.sendForSignature')}</span>
+                                                </button>
                                             ) : (
                                                 <span className="text-[11.5px] text-slate-400 dark:text-white/50">{getSignatureStatusLabel(status)}</span>
                                             )}
@@ -235,9 +240,10 @@ export const AppointmentSignaturesView = ({
                 </table>
             </SectionCard>
 
-            {/* Channel selection for the selected row — the dual send option. */}
+            {/* Channel selection for the selected row — the dual send option,
+                as a popup over the list (user request 19.08.2026). */}
             {selected && (
-                <SignatureDispatchPanel
+                <SignatureDispatchDialog
                     key={selected.key}
                     title={selected.label}
                     signatories={signatories}

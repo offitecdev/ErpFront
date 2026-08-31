@@ -259,9 +259,13 @@ export const TenderLogsPanel = ({
                 role="dialog"
                 aria-modal="true"
                 aria-label={t('tenders.loglar_notlar_ekler')}
-                className="absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col bg-white shadow-2xl animate-in slide-in-from-right"
+                /* `.ofi-pop.is-drawer` = die gemeinsame Fensteroberfläche
+                   (index.css, "FENSTER-OBERFLÄCHE") als Seitenfenster: die zwei
+                   LINKEN Ecken gerundet, rechts sitzt es am Bildrand. Vorher
+                   war das Fenster rundum scharfkantig. */
+                className="ofi-pop is-drawer absolute right-0 top-0 flex h-full w-full max-w-[440px] flex-col animate-in slide-in-from-right"
             >
-                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <div className="ofi-pop__rule flex items-center justify-between gap-3 border-b px-4 py-3">
                     <span className="flex min-w-0 items-center gap-2">
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#1f2654]">
                             <History size={14} />

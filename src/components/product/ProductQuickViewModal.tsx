@@ -12,7 +12,7 @@ import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { articleApi } from '@/lib/api/inventory';
 import { t } from '@/i18n/translate';
 import type { ArticleStatus, InventoryArticle } from '@/types/inventory';
-import { richTextToHtml } from '@/pages/tender/detail/TenderRichText';
+import { richTextToHtml } from '@/pages/sales/detail/TenderRichText';
 
 // A single, reusable "quick view" for a product. Opened by the tag icon in the
 // product lists (inventory list + tender picker). It is the one list-side place

@@ -22,19 +22,29 @@ import { PersonJumpSheet, type JumpTarget } from '../PersonJumpSheet';
  * ZWEI Listen (Vorgabe „Urlaub — Anträge und Freigaben"): oben die eigenen
  * Anträge mit ihrem Stand, darunter die Anträge, die auf DIESE Person warten.
  *
- * Entschieden wird weiterhin in den Postfächern — und genau dorthin führt jetzt
+ * Entschieden wird weiterhin auf der Antragsseite — und genau dorthin führt
  * der Klick (Vorgabe 17.08.2026: „auf Urlaubsanträge klicken soll den Bereich
  * öffnen"): eine Zeile öffnet das Sprungfenster mit den Einzelheiten und dem
- * Weg in den zuständigen Bereich. Welcher das ist, hängt am Stand — ein
- * Urlaubsantrag in der Buchhaltungsstufe liegt NICHT im Postfach der
- * Vorgesetzten, und ein Link dorthin liefe ins Leere.
+ * Weg in den zuständigen Reiter.
+ *
+ * Diese beiden Listen stehen seit dem 26.08.2026 UNTER dem Urlaubskonto
+ * (PersonLeaveYearTab) — Anspruch oben, Anträge darunter.
  */
 
-/** Der Bereich, in dem dieser Antrag bearbeitet wird. */
-const inboxFor = (status: string): { label: string; to: string } =>
-    status === 'PENDING_ACCOUNTING'
-        ? { label: t('personnel.person.jumpIncoming'), to: '/personnel/incoming' }
-        : { label: t('personnel.person.jumpApprovals'), to: '/personnel/approvals' };
+/**
+ * Der Bereich, in dem dieser Antrag bearbeitet wird.
+ *
+ * Seit dem 26.08.2026 ist das EINE Seite mit Reitern; der Stand entscheidet
+ * nur noch über die Beschriftung, nicht mehr über die Adresse. Die alten
+ * Adressen (/personnel/approvals, /personnel/incoming) leiten zwar hierher,
+ * aber ein Sprung soll nicht durch eine Weiterleitung laufen.
+ */
+const inboxFor = (status: string): { label: string; to: string } => ({
+    label: status === 'PENDING_ACCOUNTING'
+        ? t('personnel.person.jumpIncoming')
+        : t('personnel.person.jumpApprovals'),
+    to: '/personnel/requests?tab=incoming',
+});
 
 type Selection =
     | { mode: 'own'; leave: PersonLeave }
@@ -105,7 +115,7 @@ export const PersonLeavesTab = ({
     const sheetTargets: JumpTarget[] = !selected
         ? []
         : selected.mode === 'own'
-            ? [{ key: 'leaves', label: t('personnel.person.jumpLeaves'), to: '/personnel/leaves' }]
+            ? [{ key: 'leaves', label: t('personnel.person.jumpLeaves'), to: '/personnel/requests?tab=mine' }]
             : [{ key: 'inbox', ...inboxFor(selected.request.status) }];
 
     return (

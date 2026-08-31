@@ -1,4 +1,14 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    lazy,
+    Suspense,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type Dispatch,
+    type SetStateAction,
+} from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { LuTable2 as MdTableChart } from '@/components/icons/lucideLocal';
@@ -13,9 +23,8 @@ import { PlainButton as Button, PlainCard as Card } from './detail/components/co
 
 import { useTenderStore, isDetailFresh } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
-import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
+import { usePdfSettings } from '../../store/pdfSettingsStore';
 import { apiClient } from '../../lib/axios';
-import { onIdle } from '../../lib/utils/onIdle';
 import { tenderApi } from '../../lib/api/tender';
 import { customerApi, type CustomerLocationDto } from '../../lib/api/customer';
 import type { PositionDto, TenderChangeLog, TenderDocumentDto } from '../../types/tender';
@@ -57,9 +66,8 @@ import {
     type TenderCustomerCreateForm,
 } from './detail/utils/tenderAddress.utils';
 import { buildProductDefaults, emptyManualProduct, parseClosingImages } from './detail/utils/tenderProduct.utils';
-import { attachPdfPositionImages } from './detail/utils/tenderPdfImages.utils';
 import { defaultTenderValidUntil } from './detail/utils/tenderDate.utils';
-import { isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
+import { isExpiredTender, isSourceSalesOrder } from './detail/utils/tenderStatus.utils';
 import { computeTenderPricingSummary } from './detail/utils/tenderPricing.utils';
 import { discountDisplayName, formatDiscountValue, parseDiscountList, seedTotalDiscounts } from './detail/utils/tenderDiscounts.utils';
 import { useLanguageRefresh } from './detail/hooks/useLanguageRefresh';
@@ -74,15 +82,15 @@ import { useTenderChatter } from './detail/hooks/useTenderChatter';
 import { useTenderOrderDecision } from './detail/hooks/useTenderOrderDecision';
 import { useTenderLineStaging } from './detail/hooks/useTenderLineStaging';
 import { TenderDetailLoadingSkeleton } from './detail/components/TenderDetailLoadingSkeleton';
+import { OspOriginCard } from './detail/components/OspOriginCard';
 import { TenderDetailHeader } from './detail/components/TenderDetailHeader';
 import { TenderWorkspaceTabs } from './detail/components/TenderWorkspaceTabs';
 import { TenderLineTable } from './detail/components/lines/TenderLineTable';
 import { RESET_DRAFT_EVENT } from './detail/components/TenderLineInputs';
 import { TenderCustomerSection } from './detail/components/customer/TenderCustomerSection';
 import { TenderCustomerCard, type TenderCardGroup } from './detail/components/customer/TenderCustomerCard';
-import { TenderCustomerContactPopup } from './detail/components/customer/TenderCustomerContactPopup';
 import { QuoteDatePicker } from './detail/components/common/QuoteDatePicker';
-import { TenderAddressPicker, TenderCustomAddressRow, TenderMainAddressRow } from './detail/components/address/TenderAddressSection';
+import { TenderAddressFreeText, TenderAddressPicker, TenderCustomAddressRow, TenderMainAddressRow } from './detail/components/address/TenderAddressSection';
 import { toAddressForm, toAddressPayload } from '@/components/ui-shared/addressForm';
 import { useUnsavedChangesGuard } from './detail/hooks/useUnsavedChangesGuard';
 import { usePageScrollLock } from './detail/hooks/usePageScrollLock';
@@ -110,8 +118,8 @@ const LazyTenderPaymentTab = lazy(() =>
 const LazyTenderProductSearchDropdown = lazy(() =>
     import('./detail/components/product/TenderProductSearchDropdown').then((mod) => ({ default: mod.TenderProductSearchDropdown }))
 );
-const LazyExportModal = lazy(() =>
-    import('./detail/components/modals/ExportModal').then((mod) => ({ default: mod.ExportModal }))
+const LazyExportPopup = lazy(() =>
+    import('./detail/popups/ExportPopup').then((mod) => ({ default: mod.ExportPopup }))
 );
 // Lazily loaded: it pulls in the rich-text editor, which must not sit in the
 // quote page's own bundle for a panel most offers never open.
@@ -121,55 +129,57 @@ const LazyTenderPdfContentPanel = lazy(() =>
 const LazyTenderLogsPanel = lazy(() =>
     import('./detail/TenderLogsPanel').then((mod) => ({ default: mod.TenderLogsPanel }))
 );
-const LazyTenderProductPickerModal = lazy(() =>
-    import('./detail/components/product/TenderProductPickerModal').then((mod) => ({ default: mod.TenderProductPickerModal }))
+const LazyProductPickerPopup = lazy(() =>
+    import('./detail/popups/ProductPickerPopup').then((mod) => ({ default: mod.ProductPickerPopup }))
 );
-const LazyTenderManualProductModal = lazy(() =>
-    import('./detail/components/product/TenderManualProductModal').then((mod) => ({ default: mod.TenderManualProductModal }))
+const LazyManualProductPopup = lazy(() =>
+    import('./detail/popups/ManualProductPopup').then((mod) => ({ default: mod.ManualProductPopup }))
 );
-const LazyTenderBulkDeleteModal = lazy(() =>
-    import('./detail/components/bulk/TenderBulkDeleteModal').then((mod) => ({ default: mod.TenderBulkDeleteModal }))
+const LazyBulkDeletePopup = lazy(() =>
+    import('./detail/popups/BulkDeletePopup').then((mod) => ({ default: mod.BulkDeletePopup }))
 );
-const LazyTenderBulkDiscountModal = lazy(() =>
-    import('./detail/components/bulk/TenderBulkDiscountModal').then((mod) => ({ default: mod.TenderBulkDiscountModal }))
+const LazyBulkDiscountPopup = lazy(() =>
+    import('./detail/popups/BulkDiscountPopup').then((mod) => ({ default: mod.BulkDiscountPopup }))
 );
 // The document-total discount editor: not on the quote's critical path and it
 // pulls in the shared list editor — kept out of the page's own bundle. (Product
 // lines have no stacked-discount editor; they carry a single percentage.)
-const LazyTenderTotalDiscountModal = lazy(() =>
-    import('./detail/components/discounts/TenderTotalDiscountModal').then((mod) => ({ default: mod.TenderTotalDiscountModal }))
+const LazyTotalDiscountPopup = lazy(() =>
+    import('./detail/popups/TotalDiscountPopup').then((mod) => ({ default: mod.TotalDiscountPopup }))
 );
-const LazyTenderCustomerCreateModal = lazy(() =>
-    import('./detail/components/customer/TenderCustomerCreateModal').then((mod) => ({ default: mod.TenderCustomerCreateModal }))
+const LazyCustomerCreatePopup = lazy(() =>
+    import('./detail/popups/CustomerCreatePopup').then((mod) => ({ default: mod.CustomerCreatePopup }))
 );
-const LazyTenderAddressCreateModal = lazy(() =>
-    import('./detail/components/address/TenderAddressCreateModal').then((mod) => ({ default: mod.TenderAddressCreateModal }))
+const LazyCustomerContactPopup = lazy(() =>
+    import('./detail/popups/CustomerContactPopup').then((mod) => ({ default: mod.CustomerContactPopup }))
 );
-const LazyTenderDocumentPreviewModal = lazy(() =>
-    import('./detail/components/documents/TenderDocumentPreviewModal').then((mod) => ({ default: mod.TenderDocumentPreviewModal }))
+const LazyAddressCreatePopup = lazy(() =>
+    import('./detail/popups/AddressCreatePopup').then((mod) => ({ default: mod.AddressCreatePopup }))
 );
-const LazyTenderOrderDecisionModal = lazy(() =>
-    import('./detail/components/order/TenderOrderDecisionModal').then((mod) => ({ default: mod.TenderOrderDecisionModal }))
+const LazyManualCustomerPopup = lazy(() =>
+    import('./detail/popups/ManualCustomerPopup').then((mod) => ({ default: mod.ManualCustomerPopup }))
 );
-const LazyUnsavedChangesModal = lazy(() =>
-    import('./detail/components/UnsavedChangesModal').then((mod) => ({ default: mod.UnsavedChangesModal }))
+const LazyDocumentPreviewPopup = lazy(() =>
+    import('./detail/popups/DocumentPreviewPopup').then((mod) => ({ default: mod.DocumentPreviewPopup }))
 );
-const LazyProjectCreatedModal = lazy(() =>
-    import('./detail/components/ProjectCreatedModal').then((mod) => ({ default: mod.ProjectCreatedModal }))
+const LazyOrderDecisionPopup = lazy(() =>
+    import('./detail/popups/OrderDecisionPopup').then((mod) => ({ default: mod.OrderDecisionPopup }))
 );
-const LazyDeleteOfferModal = lazy(() =>
-    import('./detail/components/modals/DeleteOfferModal').then((mod) => ({ default: mod.DeleteOfferModal }))
+const LazyUnsavedChangesPopup = lazy(() =>
+    import('./detail/popups/UnsavedChangesPopup').then((mod) => ({ default: mod.UnsavedChangesPopup }))
+);
+const LazyProjectCreatedPopup = lazy(() =>
+    import('./detail/popups/ProjectCreatedPopup').then((mod) => ({ default: mod.ProjectCreatedPopup }))
+);
+const LazyDeleteOfferPopup = lazy(() =>
+    import('./detail/popups/DeleteOfferPopup').then((mod) => ({ default: mod.DeleteOfferPopup }))
 );
 
 const LazyPanelFallback = () => (
     <div className="min-h-[280px] animate-pulse rounded-[2px] border border-slate-100 bg-slate-50" />
 );
 
-
-
-
-
-
+const EMPTY_POSITIONS: PositionDto[] = [];
 export const TenderDetail = () => {
     useLanguageRefresh();
     const fmtMoney = useMoneyFormat();
@@ -189,7 +199,7 @@ export const TenderDetail = () => {
         setAutoSaveOnExit(flagged && !window.sessionStorage.getItem(initialEntryDoneKey));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
-    const { settings: pdfSettings } = usePdfSettingsStore();
+    const pdfSettings = usePdfSettings();
     const { permissions, user } = useAuthStore();
     const canManage = permissions.length === 0 || permissions.includes('tenders.manage');
     const canApprove = permissions.length === 0 || permissions.includes('tenders.approve');
@@ -204,6 +214,7 @@ export const TenderDetail = () => {
         activities,
         logs,
         createVersion,
+        duplicateTender,
         deleteTender,
     } = useTenderStore();
 
@@ -247,6 +258,10 @@ export const TenderDetail = () => {
     // Kunden-/CC-Karte (Kalenderfenster): öffnet sich über den Kunden in der
     // Offertkarte und pflegt zugleich die CC-Empfänger der Offerte.
     const [contactPopupOpen, setContactPopupOpen] = useState(false);
+    // Kundenangaben DIESER Offerte (Name / E-Mail / Adresse von Hand). Ohne
+    // CRM-Kunden tragen sie die Offerte allein; mit CRM-Kunden sind sie die nur
+    // hier geltende Abweichung — der Kundenstamm bleibt unberührt.
+    const [manualCustomerOpen, setManualCustomerOpen] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const {
         productPickerOpen,
@@ -284,6 +299,7 @@ export const TenderDetail = () => {
     const [manualProductOpen, setManualProductOpen] = useState(false);
     const [manualProduct, setManualProduct] = useState<ManualProductForm>(() => emptyManualProduct('', fallbackTaxRate));
     const [exportOpen, setExportOpen] = useState(false);
+    const [copyingOffer, setCopyingOffer] = useState(false);
     const [deleteOfferOpen, setDeleteOfferOpen] = useState(false);
     const [deletingOffer, setDeletingOffer] = useState(false);
     const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(0);
@@ -324,7 +340,37 @@ export const TenderDetail = () => {
         localDocumentUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
         localDocumentUrlsRef.current.clear();
     }, []);
-    const [localPositions, setLocalPositions] = useState<PositionDto[]>([]);
+    // Keep staged lines scoped to their tender. On a cold detail fetch React
+    // first receives `detail.positions` and the staging effect mirrors them to
+    // local state after commit. Rendering an empty local array during that one
+    // commit used to paint an empty table/CHF 0 footer and then move the real
+    // footer down on the next frame (the dominant quote-page CLS entry).
+    //
+    // Until the local copy belongs to the current tender, render the positions
+    // already present in the fetched detail. The effect can still merge pending
+    // creates/patches into the local copy without producing a different first
+    // paint.
+    const detailPositions = detail && detail.tender.id === id ? detail.positions : EMPTY_POSITIONS;
+    const positionSourceId = detail && detail.tender.id === id ? id ?? null : null;
+    const [localPositionState, setLocalPositionState] = useState<{
+        tenderId: string | null;
+        positions: PositionDto[];
+    }>({ tenderId: null, positions: [] });
+    const localPositions = localPositionState.tenderId === positionSourceId
+        ? localPositionState.positions
+        : detailPositions;
+    const setLocalPositions = useCallback<Dispatch<SetStateAction<PositionDto[]>>>((update) => {
+        setLocalPositionState((current) => {
+            const currentPositions = current.tenderId === positionSourceId
+                ? current.positions
+                : detailPositions;
+            const positions = typeof update === 'function'
+                ? update(currentPositions)
+                : update;
+            if (current.tenderId === positionSourceId && current.positions === positions) return current;
+            return { tenderId: positionSourceId, positions };
+        });
+    }, [detailPositions, positionSourceId]);
     const {
         pendingAddrId,
         setPendingAddrId,
@@ -341,7 +387,7 @@ export const TenderDetail = () => {
         handleAddressPick,
         handleSaveAll,
         handleAddRow,
-        handleMoveRow,
+        handleMoveRowTo,
         handleDeleteRow,
         handleBulkDelete,
         handleBulkDiscount,
@@ -499,27 +545,6 @@ export const TenderDetail = () => {
         }
     }, [id, isCreatingTender, fetchDetail]);
 
-
-    // Read-only orders are the common PDF/export path. Warm their small PDF image
-    // derivatives after the page is interactive, so export never waits for a
-    // legacy multi-megabyte original. The helper de-duplicates an export click
-    // against this in-flight request and keeps the result in the session cache.
-    useEffect(() => {
-        const currentTender = detail?.tender;
-        if (!currentTender?.id) return;
-        const isOrder = Boolean(currentTender.projectId)
-            || isSourceSalesOrder(currentTender.sourceStatus);
-        if (!isOrder || localPositions.length === 0) return;
-        return onIdle(() => {
-            void attachPdfPositionImages(currentTender.id, localPositions);
-        }, 1200);
-    }, [
-        detail?.tender.id,
-        detail?.tender.projectId,
-        detail?.tender.sourceStatus,
-        localPositions,
-    ]);
-
     const tree = useMemo(() => buildTree(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const simpleRows = useMemo(() => buildSimpleTenderLines(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const displayRows = simpleRows;
@@ -612,6 +637,7 @@ export const TenderDetail = () => {
         || totalDiscountOpen
         || addrModalOpen
         || customerModalOpen
+        || manualCustomerOpen
         || exportOpen
         || deleteOfferOpen
         || orderDecisionOpen
@@ -641,8 +667,12 @@ export const TenderDetail = () => {
     const salesOrderId = tender.salesOrder?.id ?? null;
     const orderProjectId = projectId || tender.salesOrder?.projectId || null;
     const isSalesOrderStatus = Boolean(projectId) || Boolean(salesOrderId) || isSourceSalesOrder(tender.sourceStatus);
-    const tenderStatusLabel = isSalesOrderStatus ?t('crm.tenders.statusOrdered') : getStatusLabel()[tender.status];
-    const tenderStatusVariant = isSalesOrderStatus ? 'order' : STATUS_VARIANT[tender.status];
+    // "Abgelaufen": Entwurf, dessen "gültig bis" vor heute liegt (Vorgabe 15.08.2026).
+    const isExpired = !isSalesOrderStatus && isExpiredTender(tender);
+    const tenderStatusLabel = isSalesOrderStatus
+        ? t('crm.tenders.statusOrdered')
+        : isExpired ? t('crm.tenders.statusExpired') : getStatusLabel()[tender.status];
+    const tenderStatusVariant = isSalesOrderStatus ? 'order' : isExpired ? 'danger' : STATUS_VARIANT[tender.status];
     const currentUserName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : '';
     // When the creator's display name isn't stored on the tender, fall back to the
     // current user's name if they are the creator (createdByEmployeeId matches), so
@@ -703,6 +733,27 @@ export const TenderDetail = () => {
             navigate(`/sales/quotes/${next.id}`);
         } catch (e: any) {
             toast.error(e.response?.data?.error ||t('tenders.versiyon_olusturulamadi'));
+        }
+    };
+
+    /**
+     * Angebot KOPIEREN (Zahnrad → "Angebot kopieren"). Der Server legt einen
+     * eigenen Beleg an (frische AN-Nummer, Version 1, Entwurf) und wir springen
+     * direkt hinein. Kopiert wird der GESPEICHERTE Stand, darum dieselbe
+     * Nachfrage nach ungesicherten Aenderungen wie bei der neuen Version.
+     */
+    const handleCopyOffer = async () => {
+        if (isDirty) { toast.error(t('tenders.once_kaydedin')); return; }
+        if (copyingOffer) return;
+        setCopyingOffer(true);
+        try {
+            const copy = await duplicateTender(tender.id);
+            toast.success(t('tenders.tender_kopyalandi', { number: copy.tenderNumber }));
+            navigate(`/sales/quotes/${copy.id}`);
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || t('tenders.tender_kopyalanamadi'));
+        } finally {
+            setCopyingOffer(false);
         }
     };
 
@@ -896,7 +947,10 @@ export const TenderDetail = () => {
     const canEditTenderMeta = isDraft && canManage;
 
     const customerLoadingFlashLabel = t('common.loading').replace(/[.…\s]+$/, '');
-    const tenderCustomerDropdownVisible = newTenderCustomerOpen && filteredNewTenderCustomers.length > 0;
+    // Das Feld selbst IST die freie Erfassung (der Freihand-Listeneintrag ist
+    // weg) — die Liste öffnet deshalb nur noch, wenn sie CRM-Treffer trägt.
+    const tenderCustomerDropdownVisible = newTenderCustomerOpen
+        && filteredNewTenderCustomers.length > 0;
     const handleSelectTenderCustomer = (customer: CustomerOption) => {
         if (!customer.id) return;
         // Default the tender's address slot from the customer's structured primary
@@ -919,6 +973,11 @@ export const TenderDetail = () => {
                 deliveryAddress: null,
                 billingAddress: null,
                 billingSameAsInstallation: false,
+                // Eine neu gewählte Kundschaft bringt ihre eigenen Angaben mit —
+                // eine frühere freie Erfassung gilt dann nicht mehr.
+                manualCustomerName: null,
+                manualCustomerEmail: null,
+                manualCustomerAddress: null,
             },
             {
                 customerName: customer.companyName,
@@ -926,6 +985,64 @@ export const TenderDetail = () => {
                 customerEmail: customer.mainEmail ?? null,
                 customerPhone: customer.mainPhone ?? null,
                 customerTaxNumber: customer.taxNumber ?? null,
+            },
+        );
+    };
+
+    // Kundschaft, die es im System NICHT gibt: der eingetippte Name bleibt als
+    // Name DIESER Offerte stehen (Tender.manualCustomer*) — es wird nichts im
+    // CRM angelegt. Adresse und E-Mail dazu kommen aus dem Kundenfenster.
+    const handleUseManualCustomer = (rawName: string) => {
+        const name = rawName.trim();
+        if (!name) return;
+        setNewTenderCustomerQuery(name);
+        setNewTenderCustomerOpen(false);
+        // War bisher ein CRM-Kunde verknüpft, gehen dessen Adresse und E-Mail
+        // MIT ihm: die neue, freie Firma bekäme sonst still die Anschrift der
+        // alten — und die stünde auf dem PDF. Sie wird stattdessen im
+        // Stiftfenster erfasst. Ohne CRM-Kunden bleibt alles Erfasste stehen.
+        const hadCrmCustomer = Boolean(tender.customerId);
+        handleTenderMetaChange(
+            {
+                customerId: null,
+                manualCustomerName: name,
+                ...(hadCrmCustomer ? { manualCustomerEmail: null, manualCustomerAddress: null } : {}),
+            },
+            {
+                customerName: name,
+                customerTaxNumber: null,
+                customerPhone: null,
+                ...(hadCrmCustomer ? { customerEmail: null, customerAddress: null } : {}),
+            },
+        );
+    };
+
+    // Speichern aus dem Kundenfenster: `values` = was die Offerte zeigen soll,
+    // `base` = die Angaben des verknüpften CRM-Kunden. Was dem Stamm gleicht,
+    // wird NICHT als Abweichung gespeichert; so folgt die Offerte weiterhin dem
+    // Kunden, wenn dort etwas korrigiert wird.
+    const handleSaveManualCustomer = (
+        values: { name: string; email: string; address: string },
+        base: { name: string; email: string; address: string },
+    ) => {
+        const deviation = (value: string, baseValue: string) => {
+            const trimmed = value.trim();
+            if (!trimmed) return null;
+            return trimmed === baseValue.trim() ? null : trimmed;
+        };
+        const manualName = deviation(values.name, base.name);
+        const manualEmail = deviation(values.email, base.email);
+        const manualAddress = deviation(values.address, base.address);
+        handleTenderMetaChange(
+            {
+                manualCustomerName: manualName,
+                manualCustomerEmail: manualEmail,
+                manualCustomerAddress: manualAddress,
+            },
+            {
+                customerName: manualName || base.name || null,
+                customerEmail: manualEmail || base.email || null,
+                customerAddress: manualAddress || base.address || null,
             },
         );
     };
@@ -945,6 +1062,11 @@ export const TenderDetail = () => {
                 deliveryAddress: null,
                 billingAddress: null,
                 billingSameAsInstallation: false,
+                // Auch die frei erfassten Angaben gehen mit — das Feld ist leer,
+                // also trägt die Offerte gar keine Kundschaft mehr.
+                manualCustomerName: null,
+                manualCustomerEmail: null,
+                manualCustomerAddress: null,
             },
             {
                 customerName: null,
@@ -1001,9 +1123,12 @@ export const TenderDetail = () => {
             loadingFlashLabel={customerLoadingFlashLabel}
             dropdownVisible={tenderCustomerDropdownVisible}
             customers={filteredNewTenderCustomers}
+            committedName={String(tender.customerName ?? '')}
             onSelectCustomer={handleSelectTenderCustomer}
             onClearCustomer={handleClearTenderCustomer}
             onAddCustomer={openCustomerModal}
+            onUseManualCustomer={handleUseManualCustomer}
+            onEditCustomerData={() => setManualCustomerOpen(true)}
             onOpenInfo={tender.customerId ? () => setContactPopupOpen(true) : undefined}
         />
     ) : null;
@@ -1019,12 +1144,14 @@ export const TenderDetail = () => {
         <button
             type="button"
             onClick={() => setContactPopupOpen(true)}
-            disabled={!tender.customerId}
-            title={tender.customerId ? t('tenders.customer_details') : undefined}
+            // Auch eine frei erfasste Kundschaft (ohne CRM-Kunden) hat eine
+            // Karte — Name, Adresse und E-Mail stehen an der Offerte selbst.
+            disabled={!tender.customerId && !tender.customerName}
+            title={tender.customerId || tender.customerName ? t('tenders.customer_details') : undefined}
             className={`${QUOTE_READONLY_CLASS} justify-between gap-2 transition-colors enabled:hover:border-[#1f2654] disabled:cursor-default`}
         >
             <span className="min-w-0 py-1">{renderDetailLines(customerLines)}</span>
-            {tender.customerId && <User01Icon size={13} className="shrink-0 text-slate-400" />}
+            {(tender.customerId || tender.customerName) && <User01Icon size={13} className="shrink-0 text-slate-400" />}
         </button>
     );
     const commissionNumber = valueOrBlank((tender as any).commissionNumber || (tender as any).commissionNo || (tender as any).referenceNumber);
@@ -1093,7 +1220,16 @@ export const TenderDetail = () => {
         // was pointed at is replaced right away instead of lingering unseen.
         if (!checked) handleAddressPick(slotPatch(slot, customerMainAddress || null));
     };
-    const slotPicker = (slot: TenderAddressSlot) => (
+    const slotLabel: Record<TenderAddressSlot, string> = {
+        INSTALLATION: t('tenders.adresse_kurz_projekt'),
+        DELIVERY: t('tenders.adresse_kurz_lieferung'),
+        BILLING: t('tenders.adresse_kurz_rechnung'),
+    };
+    // FREI ERFASSTE KUNDSCHAFT (kein CRM-Kunde): Es gibt keine gespeicherten
+    // Adressen zum Auswählen — Projekt-, Liefer- und Rechnungsadresse werden
+    // DIREKT als Text an der Offerte getippt (Benutzerwunsch). Mit CRM-Kunden
+    // bleibt der gewohnte Picker.
+    const slotPicker = (slot: TenderAddressSlot) => (tender.customerId ? (
         <TenderAddressPicker
             storedValue={slotStored[slot]}
             locations={slotLocations(slot)}
@@ -1105,7 +1241,14 @@ export const TenderDetail = () => {
             onSelectPending={(id) => setPendingAddrId((prev) => ({ ...prev, [slot]: id }))}
             renderLines={renderAddressLines}
         />
-    );
+    ) : (
+        <TenderAddressFreeText
+            value={slotStored[slot]}
+            onCommit={(value) => handleAddressPick(slotPatch(slot, value))}
+            ariaLabel={slotLabel[slot]}
+            placeholder={t('tenders.addressFreeEntry')}
+        />
+    ));
     // One row for all three deviating addresses instead of a field each: the
     // short captions keep the tick boxes on a single line.
     const customAddressRowContent = canEditTenderMeta ? (
@@ -1124,7 +1267,21 @@ export const TenderDetail = () => {
             value={customerMainAddress}
             hasCustomer={Boolean(tender.customerId)}
             onAdd={() => openAddrModal('CUSTOMER')}
+            onEdit={() => setManualCustomerOpen(true)}
+            isOwn={Boolean(tender.customerId && tender.manualCustomerAddress)}
             renderLines={renderAddressLines}
+            // Frei erfasste Kundschaft: die Hauptadresse wird direkt hier
+            // getippt (Tender.manualCustomerAddress) — und wie beim "+‑Adresse"-
+            // Fenster erben die NICHT abweichend markierten Slots sie sofort.
+            editable={!tender.customerId}
+            editPlaceholder={t('tenders.addressFreeEntry')}
+            onCommit={(value) => {
+                const inheritPatch: Record<string, string | null> = { manualCustomerAddress: value };
+                if (!customAddrSlots.INSTALLATION) inheritPatch.installationAddress = value;
+                if (!customAddrSlots.DELIVERY) inheritPatch.deliveryAddress = value;
+                if (!customAddrSlots.BILLING) inheritPatch.billingAddress = value;
+                handleTenderMetaChange(inheritPatch, { customerAddress: value });
+            }}
         />
     ) : null;
     const internalDeliveryDatePicker = canEditTenderMeta ? (
@@ -1516,11 +1673,15 @@ export const TenderDetail = () => {
     };
 
     return (
-        <div>
+        // `ofi-quote-page` scopes the quote page's fresh look (index.css "QUOTE
+        // PAGE — FRESH LOOK"): rounded hairline cards, soft grey fields, a
+        // table with horizontal rules only, pill buttons.
+        <div className="ofi-quote-page">
             <TenderDetailHeader
                 tender={tender}
                 tenderStatusVariant={tenderStatusVariant}
                 tenderStatusLabel={tenderStatusLabel}
+                onCopyOffer={() => void handleCopyOffer()}
                 onDeleteOffer={() => setDeleteOfferOpen(true)}
                 canSave={canEditTenderMeta}
                 saving={savingAll}
@@ -1531,12 +1692,13 @@ export const TenderDetail = () => {
                 canManage={canManage}
                 canExport={canExport}
                 canApprove={canApprove}
-                isSalesOrderStatus={isSalesOrderStatus}
                 projectId={orderProjectId}
                 salesOrderId={salesOrderId}
                 projectCreateLoading={projectCreateLoading}
-                onBack={() => navGuard.attempt(() => navigate('/sales/quotes'))}
                 onCreateVersion={handleCreateVersion}
+                // KEIN Vorschau-Tab mehr (Benutzerwunsch): der Klick fragt nur
+                // noch die Dokumentsprache, danach fällt die Datei direkt in
+                // den Download-Ordner — siehe ExportPopup.
                 onExport={() => setExportOpen(true)}
                 onCreateProject={handleCreateProject}
                 onOpenOrder={() => navGuard.attempt(() => navigate(
@@ -1546,6 +1708,12 @@ export const TenderDetail = () => {
                 onApprove={handleApprove}
             />
 
+            {/* Kam die Offerte aus einer OSP-Anfrage, steht die Herkunft ganz
+                oben — mitsamt dem Datenblatt ("OSP PDF") und der Warnung, wenn
+                die Einheit drüben inzwischen neu gerechnet wurde (§1a). Ohne
+                OSP-Zeile zeichnet die Karte nichts. */}
+            <OspOriginCard tenderId={tender.id} />
+
             <TenderCustomerCard
                 groups={tenderDetailGroups}
                 summary={[tender.customerName, tenderValidityLabel].filter(Boolean).join(' · ')}
@@ -1553,14 +1721,18 @@ export const TenderDetail = () => {
 
             {/* Kundenkarte (Kalenderfenster) — nur Kontaktdaten; CC steht im
                 Mailbereich der Offerte, nicht hier. */}
-            <TenderCustomerContactPopup
-                open={contactPopupOpen}
-                onClose={() => setContactPopupOpen(false)}
-                customerName={tender.customerName}
-                customerEmail={tender.customerEmail}
-                customerPhone={tender.customerPhone}
-                customerAddress={tender.customerAddress}
-            />
+            {contactPopupOpen && (
+                <Suspense fallback={null}>
+                    <LazyCustomerContactPopup
+                        open
+                        onClose={() => setContactPopupOpen(false)}
+                        customerName={tender.customerName}
+                        customerEmail={tender.customerEmail}
+                        customerPhone={tender.customerPhone}
+                        customerAddress={tender.customerAddress}
+                    />
+                </Suspense>
+            )}
 
             <TenderWorkspaceTabs
                 workspaceTab={workspaceTab}
@@ -1611,7 +1783,7 @@ export const TenderDetail = () => {
                         registerCell={registerCellHandle}
                         onArrowNav={navigateCell}
                         onAddRow={handleAddRow}
-                        onMoveRow={handleMoveRow}
+                        onMoveRowTo={handleMoveRowTo}
                         onDeleteRow={handleDeleteRow}
                         onAddProductRow={addBlankProductRow}
                         autoFocusRowId={autoFocusProductRowId}
@@ -1724,7 +1896,7 @@ export const TenderDetail = () => {
 
             {orderDecisionOpen && (
             <Suspense fallback={null}>
-            <LazyTenderOrderDecisionModal
+            <LazyOrderDecisionPopup
                 open={orderDecisionOpen}
                 onClose={() => setOrderDecisionOpen(false)}
                 loading={orderDecisionLoading}
@@ -1775,7 +1947,7 @@ export const TenderDetail = () => {
 
             {productPickerOpen && (
             <Suspense fallback={null}>
-            <LazyTenderProductPickerModal
+            <LazyProductPickerPopup
                 open={productPickerOpen}
                 onClose={() => {
                     setProductPickerOpen(false);
@@ -1816,7 +1988,7 @@ export const TenderDetail = () => {
 
             {manualProductOpen && (
             <Suspense fallback={null}>
-            <LazyTenderManualProductModal
+            <LazyManualProductPopup
                 open={manualProductOpen}
                 onClose={() => setManualProductOpen(false)}
                 manualProduct={manualProduct}
@@ -1828,7 +2000,7 @@ export const TenderDetail = () => {
 
             {bulkDeleteOpen && (
             <Suspense fallback={null}>
-            <LazyTenderBulkDeleteModal
+            <LazyBulkDeletePopup
                 open={bulkDeleteOpen}
                 onClose={() => setBulkDeleteOpen(false)}
                 loading={bulkActionLoading}
@@ -1840,7 +2012,7 @@ export const TenderDetail = () => {
 
             {bulkDiscountOpen && (
             <Suspense fallback={null}>
-            <LazyTenderBulkDiscountModal
+            <LazyBulkDiscountPopup
                 open={bulkDiscountOpen}
                 onClose={() => setBulkDiscountOpen(false)}
                 loading={bulkActionLoading}
@@ -1856,7 +2028,7 @@ export const TenderDetail = () => {
                 seeds a fresh draft from the line's stored list. */}
             {totalDiscountOpen && detail && (
             <Suspense fallback={null}>
-            <LazyTenderTotalDiscountModal
+            <LazyTotalDiscountPopup
                 open
                 onClose={() => setTotalDiscountOpen(false)}
                 tender={detail.tender}
@@ -1869,16 +2041,18 @@ export const TenderDetail = () => {
 
             {documentPreview && (
             <Suspense fallback={null}>
-            <LazyTenderDocumentPreviewModal
+            <LazyDocumentPreviewPopup
                 document={documentPreview}
                 onClose={() => setDocumentPreview(null)}
             />
             </Suspense>
             )}
 
+            {/* PDF-Export: nur die Sprachwahl, dann der Fortschritts-Schleier
+                — danach landet die Datei direkt im Download-Ordner. */}
             {exportOpen && (
                 <Suspense fallback={null}>
-                    <LazyExportModal
+                    <LazyExportPopup
                         open={exportOpen}
                         onClose={() => setExportOpen(false)}
                         tenderId={tender.id}
@@ -1893,7 +2067,7 @@ export const TenderDetail = () => {
             {/* Inline "+ add address" popup (installation / billing / customer) */}
             {addrModalOpen && (
                 <Suspense fallback={null}>
-                    <LazyTenderAddressCreateModal
+                    <LazyAddressCreatePopup
                         open
                         onClose={() => setAddrModalOpen(false)}
                         saving={addrSaving}
@@ -1906,9 +2080,27 @@ export const TenderDetail = () => {
                 </Suspense>
             )}
 
+            {/* Kundenangaben DIESER Offerte: Name / E-Mail / Adresse von Hand —
+                auch ohne CRM-Kunden. Nichts davon geht in den Kundenstamm. */}
+            {manualCustomerOpen && (
+                <Suspense fallback={null}>
+                    <LazyManualCustomerPopup
+                        open
+                        onClose={() => setManualCustomerOpen(false)}
+                        customerId={tender.customerId}
+                        current={{
+                            name: String(tender.customerName ?? ''),
+                            email: String(tender.customerEmail ?? ''),
+                            address: String(tender.customerAddress ?? ''),
+                        }}
+                        onSave={handleSaveManualCustomer}
+                    />
+                </Suspense>
+            )}
+
             {customerModalOpen && (
                 <Suspense fallback={null}>
-                    <LazyTenderCustomerCreateModal
+                    <LazyCustomerCreatePopup
                         open
                         onClose={() => setCustomerModalOpen(false)}
                         saving={customerSaving}
@@ -1922,7 +2114,7 @@ export const TenderDetail = () => {
             {/* Custom "unsaved changes" prompt shown when leaving via menu / links / Back. */}
             {navGuard.isOpen && (
                 <Suspense fallback={null}>
-                    <LazyUnsavedChangesModal
+                    <LazyUnsavedChangesPopup
                         open
                         saving={savingAll}
                         autoSaving={navGuard.autoSaving}
@@ -1936,7 +2128,7 @@ export const TenderDetail = () => {
             {/* "Project created successfully" popup with go-to / stay choices. */}
             {projectCreatedModalId && (
                 <Suspense fallback={null}>
-                    <LazyProjectCreatedModal
+                    <LazyProjectCreatedPopup
                         open
                         onGoToProject={goToCreatedProject}
                         onStay={dismissProjectCreated}
@@ -1947,7 +2139,7 @@ export const TenderDetail = () => {
             {/* Destructive "are you sure?" confirmation for deleting the offer. */}
             {deleteOfferOpen && (
                 <Suspense fallback={null}>
-                    <LazyDeleteOfferModal
+                    <LazyDeleteOfferPopup
                         open
                         deleting={deletingOffer}
                         onConfirm={() => void handleDeleteOffer()}

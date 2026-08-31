@@ -1,63 +1,68 @@
+/* Subset builds (scripts: pyftsubset, Latin + Latin Extended + punctuation +
+   currency — everything German/Turkish/French text needs) weigh ~12 KB per
+   weight instead of the 46-64 KB full builds; the originals stay next to them
+   in assets/fonts as *-webfont.woff2. Characters outside the subset (Cyrillic,
+   Greek, CJK) render in the Arial fallback. */
 @font-face {
   font-family: "Open Sans";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 300;
-  src: url("../assets/fonts/OpenSans-Light-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-Light-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: italic;
-  font-display: swap;
+  font-display: optional;
   font-weight: 300;
-  src: url("../assets/fonts/OpenSans-LightItalic-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-LightItalic-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
-  src: url("../assets/fonts/OpenSans-Regular-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-Regular-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: italic;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
-  src: url("../assets/fonts/OpenSans-Italic-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-Italic-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600;
-  src: url("../assets/fonts/OpenSans-Semibold-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-Semibold-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: italic;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600;
-  src: url("../assets/fonts/OpenSans-SemiboldItalic-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-SemiboldItalic-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 700;
-  src: url("../assets/fonts/OpenSans-Bold-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-Bold-subset.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "Open Sans";
   font-style: italic;
-  font-display: swap;
+  font-display: optional;
   font-weight: 700;
-  src: url("../assets/fonts/OpenSans-BoldItalic-webfont.woff2") format("woff2");
+  src: url("../assets/fonts/OpenSans-BoldItalic-subset.woff2") format("woff2");
 }

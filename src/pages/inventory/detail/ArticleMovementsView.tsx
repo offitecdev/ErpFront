@@ -85,23 +85,23 @@ export const ArticleMovementsView = ({
                             <tr>
                                 <th className="relative text-left">
                                     {t('common.date')}
-                                    <ColResizeHandle {...grid.resizeProps('date', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('date')} />
                                 </th>
                                 <th className="relative text-left">
                                     {t('inv.columns.movementType')}
-                                    <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('kind')} />
                                 </th>
                                 <th className="relative text-right">
                                     {t('inv.columns.quantity')}
-                                    <ColResizeHandle {...grid.resizeProps('quantity', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
                                 </th>
                                 <th className="relative text-right">
                                     {t('inv.columns.unitCost')}
-                                    <ColResizeHandle {...grid.resizeProps('unitCost', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('unitCost')} />
                                 </th>
                                 <th className="relative text-right">
                                     {t('inv.columns.total')}
-                                    <ColResizeHandle {...grid.resizeProps('total', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('total')} />
                                 </th>
                                 <th className="text-left">{t('inv.columns.description')}</th>
                             </tr>

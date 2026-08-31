@@ -17,7 +17,7 @@ import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from '
 import QRCode from 'qrcode';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
-import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
+import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/sales/detail/utils/markdown.utils';
 import { BULLET_INDENT, drawRichText, fontStyleOf, parseRichTextParagraphs, wrapRichParagraph } from './richTextPdf';
 import type { RichVisualLine } from './richTextPdf';
 
@@ -75,6 +75,20 @@ export interface TenderPdfData {
     grandTotal: number;
     /** Belge düzeyi (toplu) indirim özeti — ekrandaki fiyat özetiyle birebir. */
     totals?: TenderPdfTotals | null;
+    /**
+     * Ödeme planı taksitleri (`Tender.paymentStages` / `SalesOrder.paymentStages`).
+     * Doluysa belgenin EN SONUNA "Zahlungsplan" tablosu eklenir; tutarlar burada
+     * DEĞİL, basılan genel toplamdan türetilir — plan ile toplam asla ayrışmaz.
+     * Vade tarihleri yalnızca siparişte vardır; teklif tarafında `date` null olur
+     * ve tablo o sütunu hiç çizmez.
+     */
+    paymentStages?: Array<{ percent: number; date?: string | null }> | null;
+    /**
+     * "Zahlungsbedingungen" kartını basar. Ödeme koşulu bir ödeme talimatıdır ve
+     * ancak FATURA aşamasında anlamlıdır; teklif belgesi bunu göstermez
+     * (kullanıcı isteği 16.08.2026). Teklifin ödeme cevabı Zahlungsplan'dır.
+     */
+    showPaymentTerms?: boolean;
     referenceNumber?: string;
     qrBillEnabled?: boolean;
     /** PDF dili (indirmeden önce seçilir). Varsayılan: Almanca. */
@@ -140,14 +154,36 @@ export interface TenderPdfTotals {
 
 export type PdfLang = 'tr' | 'de' | 'en';
 
-interface PdfStrings {
+export interface PdfStrings {
     offerNumber: string;
     kommission: string;
     referenz: string;
     offerDate: string;
     validUntil: string;
+    /**
+     * Die Zeile «wer betreut diesen Beleg». Sie heißt in ALLEN drei Sprachen
+     * «Salesperson» (Benutzerwunsch 29.08.2026: «Verkaufer» soll nicht mehr
+     * dastehen) — das ist die einzige Beschriftung des Dokuments, die nicht
+     * übersetzt wird, und sie stimmt damit mit der Rechnung überein, die diese
+     * Zeile schon immer fest als 'Salesperson' gedruckt hat (`invoicePdf.ts`).
+     */
     seller: string;
     offerTitle: string;
+    /** Sipariş belgesinin başlığı ve numara etiketi (satış PDF'i kullanır). */
+    orderTitle: string;
+    orderNumber: string;
+    /**
+     * AUFTRAGSBESTÄTIGUNG — Titel und Nummernbeschriftung des Belegs, den der
+     * Auftrag dem Kunden schickt. Bewusst NICHT `orderTitle`: das rote
+     * Verkaufsdokument ist ein INTERNER Ausdruck und heisst weiterhin
+     * «Auftrag», die Bestätigung geht nach draussen.
+     */
+    confirmationTitle: string;
+    confirmationNumber: string;
+    /** Datum der Auftragsbestätigung (Entstehung des Auftrags). */
+    confirmationDate: string;
+    /** Yansız tarih etiketi — "Angebotsdatum" yalnızca teklif için doğrudur. */
+    docDate: string;
     greeting: string;
     intro: string;
     colPos: string;
@@ -164,6 +200,15 @@ interface PdfStrings {
     totalDiscount: string;
     grandTotal: string;
     paymentTerms: string;
+    /** Ayarlarda ödeme koşulu boşsa basılan varsayılan cümle. */
+    paymentTermsFallback: string;
+    planTitle: string;
+    planIntro: string;
+    planStage: string;
+    planDue: string;
+    planShare: string;
+    planAmount: string;
+    planTotal: string;
     vatIdLabel: string;
     pageWord: string;
     pageOf: string;
@@ -185,8 +230,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         referenz: 'Referans:',
         offerDate: 'Teklif Tarihi:',
         validUntil: 'Teklif Bitiş Tarihi:',
-        seller: 'Satıcı:',
+        seller: 'Salesperson:',
         offerTitle: 'Teklif',
+        orderTitle: 'Sipariş',
+        orderNumber: 'Sipariş Numarası :',
+        confirmationTitle: 'Sipariş Onayı',
+        confirmationNumber: 'Sipariş Onay No :',
+        confirmationDate: 'Sipariş Tarihi:',
+        docDate: 'Tarih:',
         greeting: 'Sayın Yetkili,',
         intro: 'Talebiniz için teşekkür ederiz. Aşağıda teklifimizi memnuniyetle sunarız. Pozisyonların ayrıntılı dökümünü ilerleyen sayfalarda bulabilirsiniz.',
         colPos: 'Pos',
@@ -203,6 +254,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         totalDiscount: 'Toplam İndirim',
         grandTotal: 'TOPLAM',
         paymentTerms: 'Ödeme Koşulları',
+        paymentTermsFallback: '30 gün içinde net ödenir.',
+        planTitle: 'Ödeme Planı',
+        planIntro: 'Faturalandırma aşağıdaki ödeme planına göre yapılır.',
+        planStage: 'Taksit',
+        planDue: 'Vade',
+        planShare: 'Oran',
+        planAmount: 'Tutar',
+        planTotal: 'Toplam',
         vatIdLabel: 'Vergi No',
         pageWord: 'Sayfa',
         pageOf: '/',
@@ -222,8 +281,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         referenz: 'Referenz:',
         offerDate: 'Angebotsdatum:',
         validUntil: 'Gültig bis:',
-        seller: 'Verkäufer:',
+        seller: 'Salesperson:',
         offerTitle: 'Angebot',
+        orderTitle: 'Auftrag',
+        orderNumber: 'Auftrags-Nr. :',
+        confirmationTitle: 'Auftragsbestätigung',
+        confirmationNumber: 'Auftragsbestätigung-Nr. :',
+        confirmationDate: 'Auftragsdatum:',
+        docDate: 'Datum:',
         greeting: 'Sehr geehrte Damen und Herren',
         intro: 'Vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen nachfolgend unser Angebot. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten.',
         colPos: 'Pos',
@@ -240,7 +305,15 @@ const I18N: Record<PdfLang, PdfStrings> = {
         totalDiscount: 'Gesamtrabatt',
         grandTotal: 'GESAMT',
         paymentTerms: 'Zahlungsbedingungen',
-        vatIdLabel: 'MwSt-Nr.',
+        paymentTermsFallback: 'Zahlbar innert 30 Tagen netto.',
+        planTitle: 'Zahlungsplan',
+        planIntro: 'Die Rechnungsstellung erfolgt gemäss nachstehendem Zahlungsplan.',
+        planStage: 'Rate',
+        planDue: 'Fällig am',
+        planShare: 'Anteil',
+        planAmount: 'Betrag',
+        planTotal: 'Gesamt',
+        vatIdLabel: 'MWST-Nr.',
         pageWord: 'Seite',
         pageOf: 'von',
         qrReceipt: 'Empfangsschein',
@@ -261,6 +334,12 @@ const I18N: Record<PdfLang, PdfStrings> = {
         validUntil: 'Valid Until:',
         seller: 'Salesperson:',
         offerTitle: 'Offer',
+        orderTitle: 'Order',
+        orderNumber: 'Order No. :',
+        confirmationTitle: 'Order Confirmation',
+        confirmationNumber: 'Order Confirmation No. :',
+        confirmationDate: 'Order Date:',
+        docDate: 'Date:',
         greeting: 'Dear Sir or Madam,',
         intro: 'Thank you for your enquiry. We are pleased to submit our offer below. A detailed breakdown of the positions can be found on the following pages.',
         colPos: 'Pos',
@@ -277,6 +356,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         totalDiscount: 'Total Discount',
         grandTotal: 'TOTAL',
         paymentTerms: 'Payment Terms',
+        paymentTermsFallback: 'Payable net within 30 days.',
+        planTitle: 'Payment Schedule',
+        planIntro: 'Invoicing follows the payment schedule set out below.',
+        planStage: 'Instalment',
+        planDue: 'Due on',
+        planShare: 'Share',
+        planAmount: 'Amount',
+        planTotal: 'Total',
         vatIdLabel: 'VAT No.',
         pageWord: 'Page',
         pageOf: 'of',
@@ -324,19 +411,32 @@ const C_DISC_R = 154;     // İndirim (sağa hizalı)
 const C_VAT_R = 167;      // Vergi (sağa hizalı)
 const C_PRICE_R = MR - 1; // Tutar (sağa hizalı) — ~28 mm alan, taşma yok
 
-const HEAD_H = 9;             // Tablo başlık bandı yüksekliği
+const HEAD_H = 9.6;           // Tablo başlık bandı yüksekliği
 const HEAD_GAP = 2;           // Başlık bandı ile ilk satır arası nefes payı
 const ROW_PAD = 3;            // Satır üst/alt iç boşluğu (ferah görünüm)
 const FIRST_BASELINE = 5.8;   // Satır üstünden ilk metin taban çizgisine
 const ROW_MIN_H = 11;
 const MIN_ROW_START = 16;     // Bir satıra başlamak için sayfada gereken asgari yer
+// Kapitel bandının ÜSTÜNDEKİ boşluk: bir önceki bölümün son pozisyonundan
+// görsel olarak kopar (band bu boşluğun altında başlar, satır yüksekliğine dahil).
+const CHAPTER_GAP_ABOVE = 3.2;
+const CHAPTER_ACCENT_W = 1.2; // Bandın sol kenarındaki lacivert şerit
+/** Devam sayfalarında tablo başlığından sonraki ilk satırın y'si. */
+const TABLE_TOP_Y = CONTENT_TOP_REST + HEAD_H + HEAD_GAP;
 
 // ── Yazı tipi boyutları (puan) ───────────────────────────────────────────────
 const FS_BASE = 9;
-const FS_TITLE = 10;
+// Kapitel (Titel) ve Position dürfen NIE gleich aussehen: das Kapitel ist
+// grösser, fett und marineblau auf grauem Band; die Position darunter ist eine
+// normale, dunkle Zeile mit Zahlen. Vorher teilten sich beide FS_TITLE und
+// waren im PDF nicht auseinanderzuhalten.
+const FS_CHAPTER = 11.4;  // Kapitel/Titel satırı
+const LH_CHAPTER = 5.4;
+const FS_POSITION = 9.4;  // Pozisyon başlığı — kapitelden belirgin şekilde küçük
 const FS_POS = 8.2;       // Pos numarası küçültüldü — sayısal sütunlara yer açar
+const FS_CHAPTER_POS = 9.6; // Kapitel numarası ("1", "2") — başlıkla aynı ağırlıkta
 const FS_LONG_DESC = 9;
-const FS_HEADER = 8.4;
+const FS_HEADER = 8.9;    // Sütun adları — gövdeden ayırt edilecek kadar iri
 const LH_TITLE = 4.7;
 const LH_BODY = 4.4;
 const UNIT_GAP = 4.2;
@@ -353,21 +453,69 @@ const ROW_BLOCK_GAP = 1.4;
 const IMAGE_TOP_GAP = -0.9;
 const IMAGE_BOTTOM_GAP = 2.6;
 
-// ── Renk paleti (Offitec lacivert + marka kırmızısı + yumuşak griler) ────────
-const COLOR_TEXT = [30, 32, 40] as const;
-const COLOR_MUTED = [120, 126, 140] as const;
-const COLOR_LABEL = [88, 95, 114] as const;      // Etiketler — muted'tan okunaklı
-const COLOR_NAVY = [31, 42, 84] as const;       // Logo laciverti
-const COLOR_RED = [211, 32, 38] as const;       // Logo kırmızısı (vurgu)
-// Antet / alt bilgi şeridinin açık tonları — düz blok yerine incelerek biten,
-// sakin bir marka bandı oluştururlar.
-const COLOR_NAVY_SOFT = [104, 116, 158] as const;
-const COLOR_HAIRLINE = [226, 229, 237] as const; // Satır ayraçları
-const COLOR_HEAD_BG = [238, 241, 247] as const;  // Tablo başlığı (hafif lacivert ton)
-const COLOR_ZEBRA = [249, 250, 252] as const;    // Çok hafif satır tonlaması
-const COLOR_BAND_BG = [244, 246, 250] as const;  // Ara toplam / genel toplam bandı
-const COLOR_CARD_BG = [248, 249, 252] as const;  // Kapak bilgi kartı & alt bilgi kutusu
-const COLOR_CARD_BORDER = [226, 230, 238] as const;
+// ── Renk paleti ──────────────────────────────────────────────────────────────
+// Belgenin TÜM renkleri tek bir palet nesnesinden okunur: Offitec laciverti +
+// marka kırmızısı. Müşteriye giden her belge (teklif, AUFTRAGSBESTÄTIGUNG,
+// fatura) bunu kullanır.
+//
+// ⚠ Bir zamanlar İKİNCİ bir palet vardı ('sales', baştan sona kırmızı) ve
+// `theme` alanı aralarında seçim yapıyordu. Satış belgesi 29.08.2026'da
+// emekliye ayrıldı (kullanıcı: «sipariş onayı diye bir buton yok, satış PDF'i
+// var — o da lacivert olacak»), yerini aynı içeriği MARKA renkleriyle basan
+// Auftragsbestätigung aldı. Palet artık değişmediği için `C` de sabittir.
+
+type Rgb = readonly [number, number, number];
+
+interface PdfPalette {
+    TEXT: Rgb;
+    MUTED: Rgb;
+    /** Etiketler — muted'tan okunaklı. */
+    LABEL: Rgb;
+    /** Ana marka rengi: başlıklar, bantlar, sol şerit. */
+    NAVY: Rgb;
+    /** Vurgu rengi: başlık altındaki kısa çizgi. */
+    RED: Rgb;
+    /** Antet / alt bilgi şeridinin açık tonu — sakin bir marka bandı. */
+    NAVY_SOFT: Rgb;
+    /** Satır ayraçları. */
+    HAIRLINE: Rgb;
+    /** Tablo başlığı. */
+    HEAD_BG: Rgb;
+    /** Çok hafif satır tonlaması. */
+    ZEBRA: Rgb;
+    /** Ara toplam / genel toplam bandı. */
+    BAND_BG: Rgb;
+    /** Kapitel bandı: zebra tonundan BELİRGİN şekilde koyu — başlık satırı bir
+     *  fiyat satırı gibi okunmasın diye tek bakışta ayrılır. */
+    CHAPTER_BG: Rgb;
+    /** Kapak bilgi kartı & alt bilgi kutusu. */
+    CARD_BG: Rgb;
+    CARD_BORDER: Rgb;
+    /** Antet dalgasının iki ucu (SVG gradyanı bu renklerle yeniden boyanır). */
+    WAVE_FROM: string;
+    WAVE_TO: string;
+}
+
+const BRAND_PALETTE: PdfPalette = {
+    TEXT: [30, 32, 40],
+    MUTED: [120, 126, 140],
+    LABEL: [88, 95, 114],
+    NAVY: [31, 42, 84],
+    RED: [211, 32, 38],
+    NAVY_SOFT: [104, 116, 158],
+    HAIRLINE: [226, 229, 237],
+    HEAD_BG: [238, 241, 247],
+    ZEBRA: [249, 250, 252],
+    BAND_BG: [244, 246, 250],
+    CHAPTER_BG: [230, 234, 242],
+    CARD_BG: [248, 249, 252],
+    CARD_BORDER: [226, 230, 238],
+    WAVE_FROM: '#1f2a54',
+    WAVE_TO: '#d32026',
+};
+
+/** Belgenin paleti — tek palet kaldı (bkz. yukarıdaki not). */
+const C: PdfPalette = BRAND_PALETTE;
 
 // ── Marka sabitleri (antet & alt bilgi) ──────────────────────────────────────
 const CONTACT_PHONE = '+41 56 556 24 68';
@@ -433,6 +581,9 @@ async function loadLogo(doc: jsPDF): Promise<{ dataUrl: string; w: number; h: nu
 // SVG'nin kendisi vektör; jsPDF gradient/mask desteklemediği için şeridi bir kez
 // hedef ölçüsünde rasterleştirip PNG olarak gömüyoruz. Aynı takma adla
 // eklendiğinden jsPDF görseli tek sefer saklar, her sayfada yeniden yazmaz.
+// Anahtar ölçüYE ve PALETE göredir: satış belgesi aynı şeridi altın/turuncu
+// gradyanla ister, marka belgesi laciverti — ikisi aynı önbellek satırını
+// paylaşamaz.
 let wavePngCache: { key: string; dataUrl: string } | null = null;
 
 async function loadHeaderWave(wMm: number, hMm: number): Promise<string | null> {
@@ -445,6 +596,8 @@ async function loadHeaderWave(wMm: number, hMm: number): Promise<string | null> 
         const pxW = Math.round((wMm / 25.4) * WAVE_RASTER_DPI);
         const pxH = Math.round((hMm / 25.4) * WAVE_RASTER_DPI);
 
+        // Şerit olduğu gibi kullanılır; ikinci palet gittiğinden yeniden
+        // boyama adımı da gitti (gradyan zaten marka renklerini taşıyor).
         const svgText = await fetch(headerWaveUrl).then((r) => r.text());
         // Yalnızca kök <svg> çerçevesi değişir; yollar, gradyan ve maske olduğu
         // gibi kalır. viewBox şeridin canlı alanına kırpılır (bkz. WAVE_VIEW) ve
@@ -501,17 +654,28 @@ const fmtDiscount = (v: number) =>
 const fmtVatRate = (v: number) =>
     `${new Intl.NumberFormat('de-CH', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v)}%`;
 
+/**
+ * Bilgi kartındaki tarihler. Belge GENELİNDE tek biçim: 16.08.2026 — fatura
+ * kartı (`invoicePdf.fmtDay`) ve ödeme planı tablosu da böyle yazar. Eskiden
+ * teklif kartı "26-08-16" basıyordu ve aynı belgede üç ayrı tarih biçimi
+ * görünüyordu.
+ */
 const fmtDateShort = (iso?: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
-    const yy = String(d.getFullYear()).slice(-2);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    return `${yy}-${mm}-${dd}`;
+    return `${dd}.${mm}.${d.getFullYear()}`;
 };
 
 /** Live status of the PDF pipeline, for download-progress UIs. */
+/**
+ * Belge metinleri, dil koduyla. Satış PDF'i kendi bilgi kartı satırlarını
+ * (Auftrags-Nr. / Datum / Verkäufer) burada kurduğu için tablo dışarı açıktır.
+ */
+export const pdfStringsFor = (lang: PdfLang = 'de'): PdfStrings => I18N[lang] ?? I18N.de;
+
 export type TenderPdfProgress =
     | { stage: 'positions'; done: number; total: number }
     | { stage: 'finalize' }
@@ -529,7 +693,7 @@ const drawRichTextFlow = (doc: jsPDF, html: string, startY: number): number =>
         fontFamily: FONT,
         fontSize: FS_BASE + 0.5,
         lineHeight: LH_BODY + 0.6,
-        defaultColor: COLOR_TEXT,
+        defaultColor: C.TEXT,
         maxY: CONTENT_BOTTOM,
         onOverflow: () => {
             doc.addPage();
@@ -574,7 +738,28 @@ const appendClosingBlocks = async (doc: jsPDF, data: TenderPdfData, contentY: nu
     }
 };
 
-export async function buildTenderPdfBytes(
+/**
+ * Belge kuyruğu. Etkin palet (`C`) modül düzeyinde bir değişkendir; iki belge
+ * aynı anda üretilirse (ör. biri marka, biri satış) `await` noktalarında
+ * birbirlerinin rengini çalarlardı. Kuyruk bunu imkânsız kılar: bir belge
+ * bitmeden diğeri başlamaz. Zaten CPU'ya bağlı bir iş olduğu için paralellikten
+ * kazanılacak bir şey de yok.
+ */
+let buildQueue: Promise<unknown> = Promise.resolve();
+
+export function buildTenderPdfBytes(
+    data: TenderPdfData,
+    settings: PdfCompanySettings,
+    onProgress?: (p: TenderPdfProgress) => void
+): Promise<Uint8Array> {
+    // Önceki belge hata verse bile sıradaki çalışır (`.catch` ile zincir
+    // temizlenir); dönen söz ise çağıranın kendi hatasını taşır.
+    const run = buildQueue.then(() => renderTenderPdfBytes(data, settings, onProgress));
+    buildQueue = run.catch(() => undefined);
+    return run;
+}
+
+async function renderTenderPdfBytes(
     data: TenderPdfData,
     settings: PdfCompanySettings,
     onProgress?: (p: TenderPdfProgress) => void
@@ -611,15 +796,27 @@ export async function buildTenderPdfBytes(
             st.rowIdx++;
         } else {
             const h = measureRow(doc, pos);
+            // Kapitel satırı zebra sırasını TÜKETMEZ: kendi bandı vardır, sayacı
+            // ilerletirse altındaki pozisyonların şeritlenmesi keyfi görünür.
+            const isChapter = isChapterRow(pos);
+            const zebraStep = isChapter ? 0 : 1;
+            // Dul başlık yok: bir kapitel bandı sayfanın en altında TEK BAŞINA
+            // kalmamalı — altına en az bir pozisyon satırı sığmıyorsa başlık
+            // baştan yeni sayfaya alınır.
+            // `st.y > TABLE_TOP_Y`: yeni sayfanın başındaysak zaten taşınacak
+            // yer yok — koşul olmasa boş bir sayfa açılırdı.
+            if (isChapter && st.y + h + MIN_ROW_START > CONTENT_BOTTOM && st.y > TABLE_TOP_Y) {
+                newTablePage(doc, st, L);
+            }
             if (st.y + h <= CONTENT_BOTTOM) {
                 st.y = drawRowAtomic(doc, pos, st.y, h, fmt, st.rowIdx);
-                st.rowIdx++;
+                st.rowIdx += zebraStep;
             } else if (CONTENT_BOTTOM - st.y < MIN_ROW_START) {
                 // Kalan yer bir satıra başlamaya bile yetmiyor → yeni sayfa.
                 newTablePage(doc, st, L);
                 if (st.y + h <= CONTENT_BOTTOM) {
                     st.y = drawRowAtomic(doc, pos, st.y, h, fmt, st.rowIdx);
-                    st.rowIdx++;
+                    st.rowIdx += zebraStep;
                 } else {
                     drawRowFlowing(doc, pos, fmt, L, st);
                 }
@@ -637,14 +834,11 @@ export async function buildTenderPdfBytes(
     }
     onProgress?.({ stage: 'finalize' });
 
-    // ── Toplamlar ────────────────────────────────────────────────────────────
-    // İskonto listesi + ara toplam satırı bloğu uzatır; birleşik satır yalnızca
-    // birden fazla iskonto varsa çizilir. Toplam bandı 12 mm.
-    const discountRowCount = (data.totals?.discounts ?? []).filter((entry) => (entry?.amount ?? 0) > 0).length;
-    const totalsBlockHeight = 50
-        + (discountRowCount > 0 ? 8 : 0)
-        + discountRowCount * 8
-        + (discountRowCount > 1 ? 8 : 0);
+    // ── Toplamlar + ödeme koşulu kartı ───────────────────────────────────────
+    // Blok ÖLÇÜLEREK yerleştirilir: sağdaki toplam sütunu ile soldaki
+    // "Zahlungsbedingungen" kartı aynı hizada başlar, sayfaya sığmıyorsa
+    // ikisi birlikte yeni sayfaya taşınır.
+    const totalsBlockHeight = measureTotalsBlock(doc, data, settings, L);
     let y = st.y;
     if (y + totalsBlockHeight > CONTENT_BOTTOM) {
         doc.addPage();
@@ -652,8 +846,10 @@ export async function buildTenderPdfBytes(
     } else {
         y += 9;
     }
-    drawTotals(doc, y, data, settings, fmt, L);
-    const contentBottomY = y + totalsBlockHeight;
+    let contentBottomY = drawTotals(doc, y, data, settings, fmt, L);
+
+    // ── Ödeme planı — belgenin EN SONUNDA, kendi tablosunda ──────────────────
+    contentBottomY = drawPaymentPlan(doc, contentBottomY, data, fmt, L);
 
     // ── Opsiyonel: Schlusstext & Schlussbild ─────────────────────────────────
     await appendClosingBlocks(doc, data, contentBottomY);
@@ -693,8 +889,8 @@ type ContactIcon = 'phone' | 'mail' | 'web';
 
 /** Küçük vektör ikonlar (telefon / e-posta / web) — 3 mm kutuya çizilir. */
 function drawContactIcon(doc: jsPDF, kind: ContactIcon, x: number, top: number, s: number) {
-    doc.setDrawColor(...COLOR_NAVY);
-    doc.setFillColor(...COLOR_NAVY);
+    doc.setDrawColor(...C.NAVY);
+    doc.setFillColor(...C.NAVY);
     doc.setLineWidth(0.26);
 
     if (kind === 'phone') {
@@ -704,7 +900,7 @@ function drawContactIcon(doc: jsPDF, kind: ContactIcon, x: number, top: number, 
         // Ekran boşluğu — dolu blok yerine gerçek bir ahize silueti verir.
         doc.setFillColor(255, 255, 255);
         doc.rect(bx + 0.22, top + 0.42, w - 0.44, s - 1.2, 'F');
-        doc.setFillColor(...COLOR_NAVY);
+        doc.setFillColor(...C.NAVY);
     } else if (kind === 'mail') {
         const h = s * 0.74;
         const ty = top + (s - h) / 2;
@@ -754,6 +950,18 @@ function drawHeaderWave(doc: jsPDF, wave: string | null) {
     } catch { /* şerit çizilemezse antet logo + iletişim satırı olarak kalır */ }
 }
 
+/**
+ * Sütun adlarını taşıyan bant: hafif lacivert tonlu zemin + altında ince
+ * lacivert hat. Pozisyon tablosu, ödeme planı tablosu ve bilgi kartının başlığı
+ * AYNI biçimi kullanır — belge tek bir görsel dile oturur.
+ */
+function drawBandHeader(doc: jsPDF, y: number, x: number, w: number, h: number) {
+    doc.setFillColor(...C.HEAD_BG);
+    doc.rect(x, y, w, h, 'F');
+    doc.setFillColor(...C.NAVY_SOFT);
+    doc.rect(x, y + h - 0.35, w, 0.35, 'F');
+}
+
 /** Tek, ince ayraç çizgisi. */
 function drawHairline(doc: jsPDF, y: number, tone: readonly [number, number, number], thickness = 0.2) {
     doc.setFillColor(tone[0], tone[1], tone[2]);
@@ -773,7 +981,7 @@ function drawPageHeader(
     } else {
         doc.setFont(FONT, 'bold');
         doc.setFontSize(15);
-        doc.setTextColor(...COLOR_NAVY);
+        doc.setTextColor(...C.NAVY);
         doc.text(s.companyName, ML, 19);
     }
 
@@ -802,7 +1010,7 @@ function drawPageHeader(
         drawContactIcon(doc, it.icon, x, baseline - 2.6, ICON);
         doc.setFont(FONT, 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(...COLOR_LABEL);
+        doc.setTextColor(...C.LABEL);
         doc.text(it.text, x + ICON + ICON_GAP, baseline);
         x += widths[i] + ITEM_GAP;
     });
@@ -817,16 +1025,16 @@ function drawPageFooter(doc: jsPDF, page: number, total: number, L: PdfStrings) 
 
     doc.setFont(FONT, 'normal');
     doc.setFontSize(7.8);
-    doc.setTextColor(...COLOR_NAVY);
+    doc.setTextColor(...C.NAVY);
     const details = `BIC: ${FOOTER_BIC}     ${L.vatIdLabel}: ${FOOTER_VAT}     IBAN: ${FOOTER_IBAN}`;
     doc.text(details, ML, textY);
 
     doc.setFontSize(7.2);
-    doc.setTextColor(...COLOR_NAVY_SOFT);
+    doc.setTextColor(...C.NAVY_SOFT);
     doc.text(`${L.pageWord} ${page} ${L.pageOf} ${total}`, MR, textY, { align: 'right' });
 
     // Sayfayı kapatan tek çizgi — alt bilginin altında.
-    drawHairline(doc, 278.5, COLOR_NAVY, 0.4);
+    drawHairline(doc, 278.5, C.NAVY, 0.4);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -837,15 +1045,21 @@ function drawPageFooter(doc: jsPDF, page: number, total: number, L: PdfStrings) 
 function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings): number {
     const y0 = CONTENT_TOP_FIRST;
 
-    // ── Sol: teklif bilgi kartı (köşe yuvarlatması yok, net kenarlar) ────────
+    // ── Sol: belge bilgi kartı ───────────────────────────────────────────────
+    // Aufbau wie ein sauberer Datenkopf, nicht wie eine gedrängte Liste:
+    //  • getöntes KOPFBAND für die Belegnummer, unten mit derselben Kante wie
+    //    der Tabellenkopf (`drawBandHeader`),
+    //  • darunter weisse Datenzeilen (Beschriftung links, Wert fett rechts),
+    //    getrennt von eingerückten Haarlinien,
+    //  • EIN durchgehender marineblauer Streifen an der linken Kante.
+    // Rechnungs-PDFs liefern ihre Zeilen über `infoRows`; dann bleiben die
+    // Offertzeilen ungenutzt. Referenz steht direkt über dem Verkäufer.
     const cardX = ML;
-    const cardW = 78;
-    // Enge Zeilen: die Karte soll wie eine kompakte Tabelle wirken, nicht wie
-    // eine Liste mit Luft dazwischen.
-    const rowH = 5.6;
-    // Referenz steht DIREKT ÜBER dem Verkäufer — beide gehören zur "wer/woher"
-    // Angabe und werden zusammen gelesen. Fatura PDF'leri kendi satırlarını
-    // `infoRows` ile verir; o zaman teklif satırları hiç kullanılmaz.
+    const cardW = 82;
+    const CARD_ACCENT_W = 1.2;
+    const CARD_PAD_X = 4.4;
+    const CARD_HEAD_H = 9.6;
+    const CARD_ROW_H = 6.4;
     const rows: Array<[string, string, boolean]> = (
         data.infoRows?.length
             ? data.infoRows.map((row): [string, string, boolean] => [row.label, row.value || '', Boolean(row.emphasize)])
@@ -859,62 +1073,76 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
             ] as Array<[string, string, boolean]>)
     ).filter(([, value]) => value.trim().length > 0);
     const cardY = y0 - 4;
-    const cardH = rows.length * rowH + 2.4;
+    const cardH = rows.reduce((sum, [, , emphasize]) => sum + (emphasize ? CARD_HEAD_H : CARD_ROW_H), 0);
 
-    doc.setFillColor(...COLOR_CARD_BG);
-    doc.setDrawColor(...COLOR_CARD_BORDER);
-    doc.setLineWidth(0.25);
-    doc.rect(cardX, cardY, cardW, cardH, 'FD');
+    // Gövde beyaz kalır ki tonlu kopfband gerçekten öne çıksın. Çerçeve EN SON
+    // çizilir (aşağıda), aksi hâlde kopfband üst kenarı örter.
+    doc.setFillColor(255, 255, 255);
+    doc.rect(cardX, cardY, cardW, cardH, 'F');
 
-    // Sol kenarda antetteki bandın dikey yankısı: kırmızı başlangıç, lacivert gövde.
-    doc.setFillColor(...COLOR_RED);
-    doc.rect(cardX, cardY, 1.2, cardH * 0.32, 'F');
-    doc.setFillColor(...COLOR_NAVY);
-    doc.rect(cardX, cardY + cardH * 0.32, 1.2, cardH * 0.44, 'F');
-    doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(cardX, cardY + cardH * 0.76, 1.2, cardH * 0.24, 'F');
-
-    let ry = cardY + 1.2;
+    const textLeft = cardX + CARD_ACCENT_W + CARD_PAD_X;
+    const textRight = cardX + cardW - CARD_PAD_X;
+    let ry = cardY;
     rows.forEach(([label, value, emphasize], idx) => {
-        const base = ry + rowH / 2 + 1.15;
+        const h = emphasize ? CARD_HEAD_H : CARD_ROW_H;
+        if (emphasize) drawBandHeader(doc, ry, cardX, cardW, h);
+
+        const base = ry + h / 2 + (emphasize ? 1.4 : 1.2);
+        const inner = textRight - textLeft;
         doc.setFont(FONT, 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(...COLOR_LABEL);
-        doc.text(label, cardX + 3.5, base);
-        doc.setFont(FONT, 'bold');
+        doc.setTextColor(...C.LABEL);
+        // Auch die BESCHRIFTUNG wird gesetzt: eine lange
+        // («Auftragsbestätigung-Nr.», «Order Confirmation No.») darf dem Wert
+        // nicht den Platz nehmen, also bekommt sie höchstens die Hälfte der
+        // Karte und schrumpft davor.
+        fitFontSize(doc, label, inner * 0.56, 7.4, 5.6);
+        const labelW = doc.getTextWidth(label);
+        doc.text(label, textLeft, base);
+
         // Der Wert wird bei Bedarf verkleinert, damit er in der schmaleren
         // Karte nicht mit der Beschriftung kollidiert.
-        const labelW = doc.getTextWidth(label);
-        const valueMaxW = cardW - 7 - labelW - 2;
-        doc.setFontSize(emphasize ? 8.6 : 7.8);
-        fitFontSize(doc, value, valueMaxW, emphasize ? 8.6 : 7.8, 5.6);
-        if (emphasize) doc.setTextColor(...COLOR_NAVY);
-        else doc.setTextColor(...COLOR_TEXT);
-        doc.text(value, cardX + cardW - 3.5, base, { align: 'right' });
-        ry += rowH;
-        if (idx < rows.length - 1) {
-            doc.setDrawColor(...COLOR_HAIRLINE);
+        doc.setFont(FONT, 'bold');
+        const valueBase = emphasize ? 10 : 8.2;
+        const valueMaxW = inner - labelW - 3;
+        fitFontSize(doc, value, valueMaxW, valueBase, 5.8);
+        if (emphasize) doc.setTextColor(...C.NAVY);
+        else doc.setTextColor(...C.TEXT);
+        doc.text(value, textRight, base, { align: 'right' });
+
+        ry += h;
+        // Haarlinie NUR zwischen zwei Datenzeilen — das Kopfband bringt seine
+        // eigene Unterkante mit.
+        if (idx < rows.length - 1 && !emphasize) {
+            doc.setDrawColor(...C.HAIRLINE);
             doc.setLineWidth(0.12);
-            doc.line(cardX + 3.5, ry + 0.3, cardX + cardW - 3.5, ry + 0.3);
+            doc.line(textLeft, ry, textRight, ry);
         }
     });
 
+    // Durchgehender Streifen + Rahmen zuletzt: beide liegen über den Füllungen
+    // (das Kopfband reicht sonst bis an die Kante und überdeckt sie).
+    doc.setFillColor(...C.NAVY);
+    doc.rect(cardX, cardY, CARD_ACCENT_W, cardH, 'F');
+    doc.setDrawColor(...C.CARD_BORDER);
+    doc.setLineWidth(0.25);
+    doc.rect(cardX, cardY, cardW, cardH, 'S');
+
     // ── Sağ: tek satır gönderici + montaj/alıcı adresi ───────────────────────
-    // "OffiTec Heating & Cooling, Cores Tower - Hohenrainstrasse 24, 4133 Pratteln"
+    // "Offitec GmbH, Ceres Tower - Hohenrainstrasse 24, 4133 Pratteln"
     // — küçük punto, TEK satır (sığmazsa punto küçülür, satır bölünmez); hemen
     // altında müşterinin (montaj yerinin) adresi.
     const addrX = 112;
     const addrW = MR - addrX;
     const sender = companySenderLine(s);
     doc.setFont(FONT, 'normal');
-    doc.setTextColor(...COLOR_MUTED);
+    doc.setTextColor(...C.MUTED);
     drawFittedSingleLine(doc, sender, addrX, y0, addrW, 7.5, 5.8);
-    doc.setDrawColor(...COLOR_HAIRLINE);
+    doc.setDrawColor(...C.HAIRLINE);
     doc.setLineWidth(0.2);
     doc.line(addrX, y0 + 1.6, MR, y0 + 1.6);
 
     let addrY = y0 + 8;
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
     if (data.customerName) {
         doc.setFont(FONT, 'bold');
         doc.setFontSize(10.5);
@@ -935,9 +1163,9 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     let yTitle = Math.max(addrY, cardY + cardH) + 16;
     doc.setFont(FONT, 'bold');
     doc.setFontSize(16.5);
-    doc.setTextColor(...COLOR_NAVY);
+    doc.setTextColor(...C.NAVY);
     doc.text(`${data.docTitle || L.offerTitle} ${data.tenderNumber}`, ML, yTitle);
-    doc.setDrawColor(...COLOR_RED);
+    doc.setDrawColor(...C.RED);
     doc.setLineWidth(0.8);
     doc.line(ML, yTitle + 2.6, ML + 14, yTitle + 2.6);
 
@@ -946,7 +1174,7 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     if (s.footerNote) {
         doc.setFont(FONT, 'italic');
         doc.setFontSize(8.5);
-        doc.setTextColor(...COLOR_MUTED);
+        doc.setTextColor(...C.MUTED);
         const note = doc.splitTextToSize(s.footerNote, CONTENT_W);
         doc.text(note, ML, CONTENT_BOTTOM - 4 - note.length * 4);
         doc.setFont(FONT, 'normal');
@@ -955,7 +1183,7 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     yTitle += 12;
     doc.setFont(FONT, 'normal');
     doc.setFontSize(10);
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
 
     if (hasRichContent(data.coverLetter)) {
         // Kullanıcının (şablondan gelen) giriş metni — "Sehr geehrte …" dahil
@@ -986,16 +1214,14 @@ function newTablePage(doc: jsPDF, st: TableState, L: PdfStrings) {
 }
 
 function drawTableHeader(doc: jsPDF, y: number, L: PdfStrings): number {
-    // Sert lacivert blok yerine hafif tonlu bant — köşeler net (yuvarlatma yok).
-    doc.setFillColor(...COLOR_HEAD_BG);
-    doc.rect(ML, y, CONTENT_W, HEAD_H, 'F');
-    // Bandın altında ince lacivert hat: tablonun başladığını net gösterir.
-    doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(ML, y + HEAD_H - 0.35, CONTENT_W, 0.35, 'F');
+    // Hafif lacivert tonlu bant + altında ince lacivert hat. Sütun adları
+    // gövdeden bir tık büyük yazılır (FS_HEADER 8.4 → 8.9): eski punto bandın
+    // üstünde zor okunuyordu (kullanıcı geri bildirimi).
+    drawBandHeader(doc, y, ML, CONTENT_W, HEAD_H);
 
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_HEADER);
-    doc.setTextColor(...COLOR_NAVY);
+    doc.setTextColor(...C.NAVY);
 
     // Başlıklar da sütun genişliğine sığdırılır — hiçbir dilde taşma olmaz.
     const ty = y + HEAD_H / 2 + 1.3;
@@ -1027,26 +1253,73 @@ function splitPosLabel(short: string): { pos: string; text: string } {
     return { pos: '', text: short || '' };
 }
 
+/**
+ * Satırın KENDİ tutarı var mı — sayısal sütunlarda (Menge/E. Preis/Rabatt/
+ * MwSt./Preis) yazılacak bir şey bulunup bulunmadığı. `drawNumerics` ile
+ * BİREBİR aynı koşul: ikisi ayrışırsa başlık bandı fiyatlı bir satırın altına
+ * girer.
+ */
+function rowHasOwnAmount(pos: TenderPdfData['positions'][number]): boolean {
+    const qty = pos.quantity || 0;
+    const unitPrice = pos.unitPrice ?? 0;
+    return (pos.lineTotal ?? 0) > 0 || (qty > 0 && unitPrice > 0);
+}
+
+/** Bu satır türleri her zaman POZİSYON/metin satırıdır — asla kapitel olmaz. */
+const NEVER_CHAPTER_ROW_TYPES = new Set(['DESCRIPTION', 'PRODUCT', 'CUSTOM']);
+
+/**
+ * ── KAPITEL Mİ POZİSYON MU ───────────────────────────────────────────────────
+ * Kapitel (Titel/Bölüm) = "1 Kältemaschine R290" gibi, ALTINDAKİ pozisyonları
+ * toplayan başlık satırı; kendi fiyatı yoktur. Pozisyon = "1.1 OffiTec
+ * AWSC-900.2CI290" — miktarı, birim fiyatı ve tutarı olan satış kalemi.
+ *
+ * Ölçüt satır TÜRÜ değil, KENDİ TUTARININ olup olmamasıdır: eski kayıtlarda
+ * başlıklar 'SECTION', yenilerde 'TITLE' olarak durur; buna karşılık fatura
+ * PDF'inin tek satırlık "Anzahlung von 50%" kalemi de 'TITLE' türündedir ama
+ * fiyatı vardır — o bir pozisyondur ve fiyat sütunlarını KAYBETMEMELİDİR.
+ */
+function isChapterRow(pos: TenderPdfData['positions'][number]): boolean {
+    const rowType = (pos.rowType || 'SECTION').toUpperCase();
+    if (NEVER_CHAPTER_ROW_TYPES.has(rowType)) return false;
+    return !rowHasOwnAmount(pos);
+}
+
 function rowVisualMeta(pos: TenderPdfData['positions'][number]) {
     const rowType = (pos.rowType || 'SECTION').toUpperCase();
     const rawLevel = pos.hierarchyLevel ?? (pos.isTopLevel ? 1 : 2);
     const level = Math.max(0, rawLevel - 1);
     const indent = Math.min(level * 4, 16);
 
-    if (rowType === 'TITLE' || (pos.isParent && rowType !== 'DESCRIPTION')) {
-        return { rowType, indent, titleFontSize: FS_TITLE, titleLineHeight: LH_TITLE, titleStyle: 'bold' as const, longFontSize: FS_LONG_DESC };
+    if (isChapterRow(pos)) {
+        return {
+            rowType, indent, isChapter: true,
+            titleFontSize: FS_CHAPTER, titleLineHeight: LH_CHAPTER,
+            titleStyle: 'bold' as const, titleColor: C.NAVY,
+            longFontSize: FS_LONG_DESC,
+        };
     }
     if (rowType === 'DESCRIPTION') {
-        return { rowType, indent, titleFontSize: FS_BASE, titleLineHeight: LH_BODY, titleStyle: 'normal' as const, longFontSize: FS_LONG_DESC };
+        return {
+            rowType, indent, isChapter: false,
+            titleFontSize: FS_BASE, titleLineHeight: LH_BODY,
+            titleStyle: 'normal' as const, titleColor: C.TEXT,
+            longFontSize: FS_LONG_DESC,
+        };
     }
-    return { rowType, indent, titleFontSize: FS_TITLE, titleLineHeight: LH_TITLE, titleStyle: 'bold' as const, longFontSize: FS_BASE };
+    return {
+        rowType, indent, isChapter: false,
+        titleFontSize: FS_POSITION, titleLineHeight: LH_TITLE,
+        titleStyle: 'bold' as const, titleColor: C.TEXT,
+        longFontSize: FS_BASE,
+    };
 }
 
 // ── Satır içeriği "atom" listesi olarak kurulur ───────────────────────────────
 // Atomlar hem ölçüm hem çizim için tek kaynak: uzun satırlar sayfa sınırında
 // atom (satır/görsel) bazında bölünebilir.
 type RowAtom =
-    | { kind: 'lines'; lines: string[]; font: 'normal' | 'bold'; size: number; lineH: number; indent: number }
+    | { kind: 'lines'; lines: string[]; font: 'normal' | 'bold'; size: number; lineH: number; indent: number; color?: readonly [number, number, number] }
     // Zengin metin paragrafı: kalın/italik/renk KORUNUR, madde imleri desteklenir.
     | { kind: 'rich'; lines: RichVisualLine[]; bullet: boolean; size: number; lineH: number }
     | { kind: 'image'; url: string; alias?: string; h: number }
@@ -1159,14 +1432,20 @@ function buildRichAtoms(doc: jsPDF, rawHtml: string, maxW: number, fontSize: num
 function buildRowAtoms(doc: jsPDF, pos: TenderPdfData['positions'][number]): { atoms: RowAtom[]; descX: number; descW: number } {
     const meta = rowVisualMeta(pos);
     const descX = C_DESC + meta.indent;
-    const descW = C_DESC_END - descX;
+    // Kapitel satırında sayısal sütun YOKTUR; başlık bandın tamamını kullanır ve
+    // "Beschreibung" sütununun dar sınırında gereksiz yere sarmaz.
+    const descW = (meta.isChapter ? C_PRICE_R : C_DESC_END) - descX;
     const atoms: RowAtom[] = [];
 
     const { text: titleText } = splitPosLabel(pos.shortDescription || '');
     doc.setFont(FONT, meta.titleStyle);
     doc.setFontSize(meta.titleFontSize);
     const titleLines = doc.splitTextToSize(normalizePdfText(titleText, { dropCatalogCodes: true }), descW);
-    atoms.push({ kind: 'lines', lines: titleLines, font: meta.titleStyle, size: meta.titleFontSize, lineH: meta.titleLineHeight, indent: 0 });
+    atoms.push({
+        kind: 'lines', lines: titleLines, font: meta.titleStyle,
+        size: meta.titleFontSize, lineH: meta.titleLineHeight, indent: 0,
+        color: meta.titleColor,
+    });
 
     if (pos.longDescription) {
         atoms.push({ kind: 'gap', h: ROW_BLOCK_GAP });
@@ -1207,8 +1486,14 @@ function measureRow(doc: jsPDF, pos: TenderPdfData['positions'][number]): number
     const unitDrop = (pos.quantity || 0) > 0 && pos.unit ? UNIT_GAP : 0;
     const discountDrop = Math.max(0, discountColumnLines(pos).length - 1) * DISC_LINE_H;
     const numericsH = FIRST_BASELINE - 2 + Math.max(unitDrop, discountDrop);
-    return Math.max(ROW_MIN_H, Math.max(contentH, numericsH) + ROW_PAD * 2);
+    // Kapitel bandının üstündeki ayırıcı boşluk satır yüksekliğine dahildir;
+    // band bu boşluğun ALTINDA başlar (bkz. `drawRowAtomic`).
+    return chapterTopGap(pos) + Math.max(ROW_MIN_H, Math.max(contentH, numericsH) + ROW_PAD * 2);
 }
+
+/** Kapitel satırının üstüne bırakılan ayırıcı boşluk (pozisyonlarda 0). */
+const chapterTopGap = (pos: TenderPdfData['positions'][number]) =>
+    (isChapterRow(pos) ? CHAPTER_GAP_ABOVE : 0);
 
 /**
  * Metni sütununa sığdırır: gerekiyorsa punto kademeli küçültülür. Böylece
@@ -1240,16 +1525,33 @@ function drawFittedRight(
     doc.setFontSize(FS_BASE);
 }
 
-/** Pos numarası dar sütuna sığdırılarak yazılır (açıklamaya taşmaz). */
-function drawPosLabel(doc: jsPDF, label: string, baseY: number, isParent: boolean) {
+/**
+ * Pos numarası dar sütuna sığdırılarak yazılır (açıklamaya taşmaz). Kapitel
+ * numarası ("1") başlığın ağırlığını taşır: büyük, kalın, lacivert ve sol
+ * şeritten sonra başlar; pozisyon numarası ("1.1") küçük ve normaldir.
+ */
+function drawPosLabel(doc: jsPDF, label: string, baseY: number, isChapter: boolean) {
     if (!label) return;
-    doc.setFont(FONT, isParent ? 'bold' : 'normal');
-    fitFontSize(doc, label, C_DESC - C_POS_X - 1, FS_POS, 5.8);
-    if (isParent) doc.setTextColor(...COLOR_NAVY);
-    else doc.setTextColor(...COLOR_TEXT);
-    doc.text(label, C_POS_X, baseY, { baseline: 'alphabetic' });
+    const x = isChapter ? C_POS_X + CHAPTER_ACCENT_W + 0.6 : C_POS_X;
+    doc.setFont(FONT, isChapter ? 'bold' : 'normal');
+    fitFontSize(doc, label, C_DESC - x - 1, isChapter ? FS_CHAPTER_POS : FS_POS, 5.8);
+    if (isChapter) doc.setTextColor(...C.NAVY);
+    else doc.setTextColor(...C.TEXT);
+    doc.text(label, x, baseY, { baseline: 'alphabetic' });
     doc.setFontSize(FS_BASE);
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
+}
+
+/**
+ * Kapitel bandı: açık gri zemin + sol kenarda lacivert şerit. Fiyat satırlarının
+ * zebra tonundan ayrı bir renktir, bu yüzden başlık satırı asla bir pozisyonla
+ * karıştırılmaz.
+ */
+function drawChapterBand(doc: jsPDF, y: number, h: number) {
+    doc.setFillColor(...C.CHAPTER_BG);
+    doc.rect(ML, y, CONTENT_W, h, 'F');
+    doc.setFillColor(...C.NAVY);
+    doc.rect(ML, y, CHAPTER_ACCENT_W, h, 'F');
 }
 
 // Sayısal sütunların kullanılabilir genişlikleri (komşuya 2 mm nefes payı).
@@ -1290,20 +1592,21 @@ function drawNumerics(doc: jsPDF, pos: TenderPdfData['positions'][number], baseY
     const discount = pos.discount ?? 0;
     const taxRate = pos.taxRate ?? 0;
     const fallbackLineTotal = qty * unitPrice * (1 - discount / 100) * (1 + (taxRate || 8.1) / 100);
-    const hasOwnAmount = (pos.lineTotal ?? 0) > 0 || (qty > 0 && unitPrice > 0);
     const total = pos.lineTotal ?? (!pos.isParent ? (pos.total ?? fallbackLineTotal) : 0);
-    if (!hasOwnAmount) return;
+    // Kapitel/Titel satırında Menge · E. Preis · Rabatt · MwSt. · Preis sütunları
+    // HİÇ çizilmez (kullanıcı isteği): başlık bir fiyat satırı gibi görünmemeli.
+    if (!rowHasOwnAmount(pos)) return;
 
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
 
     if (qty > 0) {
         drawFittedRight(doc, fmtQty(qty), C_QTY_R, W_QTY, baseY, 'normal');
         if (unit) {
-            doc.setTextColor(...COLOR_LABEL);
+            doc.setTextColor(...C.LABEL);
             drawFittedRight(doc, unit, C_QTY_R, W_QTY, baseY + UNIT_GAP, 'normal', FS_BASE - 0.4);
-            doc.setTextColor(...COLOR_TEXT);
+            doc.setTextColor(...C.TEXT);
         }
     } else {
         drawFittedRight(doc, '—', C_QTY_R, W_QTY, baseY, 'normal');
@@ -1313,9 +1616,9 @@ function drawNumerics(doc: jsPDF, pos: TenderPdfData['positions'][number], baseY
     discountColumnLines(pos).forEach((line, index) => {
         drawFittedRight(doc, line, C_DISC_R, W_DISC, baseY + index * DISC_LINE_H, 'normal');
     });
-    doc.setTextColor(...COLOR_LABEL);
+    doc.setTextColor(...C.LABEL);
     drawFittedRight(doc, fmtVatRate(taxRate || 8.1), C_VAT_R, W_VAT, baseY, 'normal');
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
     if (total > 0) {
         drawFittedRight(doc, fmt(total), C_PRICE_R, W_PRICE, baseY, 'bold');
         doc.setFont(FONT, 'normal');
@@ -1325,7 +1628,7 @@ function drawNumerics(doc: jsPDF, pos: TenderPdfData['positions'][number], baseY
 function drawAtomLines(doc: jsPDF, atom: Extract<RowAtom, { kind: 'lines' }>, x: number, startBaseY: number): number {
     doc.setFont(FONT, atom.font);
     doc.setFontSize(atom.size);
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...(atom.color ?? C.TEXT));
     let cy = startBaseY;
     for (const line of atom.lines) {
         doc.text(line, x + atom.indent, cy);
@@ -1345,27 +1648,27 @@ function drawRichAtomLine(
     doc.setFontSize(atom.size);
     if (atom.bullet && lineIdx === 0) {
         doc.setFont(FONT, 'normal');
-        doc.setTextColor(...COLOR_TEXT);
+        doc.setTextColor(...C.TEXT);
         doc.text('•', x, baseY);
     }
     let cursorX = x + (atom.bullet ? BULLET_INDENT : 0);
     for (const { run, text } of atom.lines[lineIdx] ?? []) {
         doc.setFont(FONT, fontStyleOf(run));
-        const [r, g, b] = run.color ?? COLOR_TEXT;
+        const [r, g, b] = run.color ?? C.TEXT;
         doc.setTextColor(r, g, b);
         doc.text(text, cursorX, baseY);
         cursorX += doc.getTextWidth(text);
     }
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
 }
 
 function drawRowHairline(doc: jsPDF, y: number) {
-    doc.setDrawColor(...COLOR_HAIRLINE);
+    doc.setDrawColor(...C.HAIRLINE);
     doc.setLineWidth(0.15);
     doc.line(ML, y, MR, y);
 }
 
-/** Sayfaya sığan satır: hafif zebra zemin + tek parça çizim. */
+/** Sayfaya sığan satır: kapitel bandı ya da hafif zebra zemin + tek parça çizim. */
 function drawRowAtomic(
     doc: jsPDF,
     pos: TenderPdfData['positions'][number],
@@ -1374,16 +1677,23 @@ function drawRowAtomic(
     fmt: (v: number) => string,
     rowIdx: number
 ): number {
-    if (rowIdx % 2 === 1) {
-        doc.setFillColor(...COLOR_ZEBRA);
+    const isChapter = isChapterRow(pos);
+    const topGap = isChapter ? CHAPTER_GAP_ABOVE : 0;
+    const bandY = y + topGap;
+    const bandH = rowH - topGap;
+
+    if (isChapter) {
+        drawChapterBand(doc, bandY, bandH);
+    } else if (rowIdx % 2 === 1) {
+        doc.setFillColor(...C.ZEBRA);
         doc.rect(ML, y, CONTENT_W, rowH, 'F');
     }
 
     const { atoms, descX } = buildRowAtoms(doc, pos);
     const { pos: posLabel } = splitPosLabel(pos.shortDescription || '');
-    const baseY = y + FIRST_BASELINE;
+    const baseY = bandY + FIRST_BASELINE;
 
-    drawPosLabel(doc, posLabel, baseY, Boolean(pos.isParent));
+    drawPosLabel(doc, posLabel, baseY, isChapter);
 
     let cy = baseY;
     for (const atom of atoms) {
@@ -1406,7 +1716,9 @@ function drawRowAtomic(
     }
 
     drawNumerics(doc, pos, baseY, fmt);
-    drawRowHairline(doc, y + rowH);
+    // Kapitel bandının kendi kenarı zaten ayraçtır — altına ikinci bir çizgi
+    // çekmek bandı çerçeveye çevirir.
+    if (!isChapter) drawRowHairline(doc, y + rowH);
     return y + rowH;
 }
 
@@ -1424,6 +1736,17 @@ function drawRowFlowing(
 ) {
     const { atoms, descX } = buildRowAtoms(doc, pos);
     const { pos: posLabel } = splitPosLabel(pos.shortDescription || '');
+    const isChapter = isChapterRow(pos);
+
+    // Bölünen kapitel: bandın yüksekliği ölçümden gelir, sayfa sonunda kırpılır.
+    // (Kapitel satırları kısadır; bu yol yalnızca çok uzun başlık + açıklama
+    // birleşiminde çalışır.)
+    if (isChapter) {
+        const measured = measureRow(doc, pos) - CHAPTER_GAP_ABOVE;
+        const bandY = st.y + CHAPTER_GAP_ABOVE;
+        drawChapterBand(doc, bandY, Math.min(measured, CONTENT_BOTTOM - bandY));
+        st.y = bandY;
+    }
 
     let baseY = st.y + FIRST_BASELINE;
     const breakPage = () => {
@@ -1432,7 +1755,7 @@ function drawRowFlowing(
         return baseY;
     };
 
-    drawPosLabel(doc, posLabel, baseY, Boolean(pos.isParent));
+    drawPosLabel(doc, posLabel, baseY, isChapter);
     drawNumerics(doc, pos, baseY, fmt);
 
     let cy = baseY;
@@ -1454,24 +1777,26 @@ function drawRowFlowing(
             }
             continue;
         }
+        const atomColor = atom.color ?? C.TEXT;
         doc.setFont(FONT, atom.font);
         doc.setFontSize(atom.size);
-        doc.setTextColor(...COLOR_TEXT);
+        doc.setTextColor(...atomColor);
         for (const line of atom.lines) {
             if (cy > CONTENT_BOTTOM - 1.5) {
                 cy = breakPage();
                 // Sayfa kırılınca font durumu tablo başlığından kalır — geri yükle.
                 doc.setFont(FONT, atom.font);
                 doc.setFontSize(atom.size);
-                doc.setTextColor(...COLOR_TEXT);
+                doc.setTextColor(...atomColor);
             }
             doc.text(line, descX + atom.indent, cy);
             cy += atom.lineH;
         }
+        doc.setTextColor(...C.TEXT);
     }
 
     st.y = Math.min(cy + ROW_PAD - 3, CONTENT_BOTTOM);
-    drawRowHairline(doc, st.y);
+    if (!isChapter) drawRowHairline(doc, st.y);
     st.rowIdx++;
 }
 
@@ -1483,22 +1808,102 @@ function drawSectionSubtotal(
     L: PdfStrings
 ): number {
     const h = 9;
-    doc.setFillColor(...COLOR_BAND_BG);
+    doc.setFillColor(...C.BAND_BG);
     doc.rect(ML, y + 0.5, CONTENT_W, h - 1, 'F');
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_BASE);
-    doc.setTextColor(...COLOR_NAVY);
+    doc.setTextColor(...C.NAVY);
     doc.text(L.subtotal, C_VAT_R, y + 5.6, { align: 'right' });
     doc.text(fmt(total), C_PRICE_R, y + 5.6, { align: 'right' });
     doc.setFont(FONT, 'normal');
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setTextColor(...C.TEXT);
     return y + h;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOPLAMLAR — sağa yaslı, ince ayraçlı blok; genel toplam yumuşak bantta
+// TOPLAMLAR — sağda toplam sütunu, solda ödeme koşulu kartı (aynı hizada)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Toplam sütununun sol kenarı — solunda kalan alan ödeme koşulu kartınındır. */
+const TOTALS_BLOCK_X = 116;
+const TOTALS_ROW_H = 5.4 + 2.8;   // `totalRow` bir satırda ne kadar ilerliyor
+const TOTALS_BAND_H = 12;         // GESAMT bandı
+const TERMS_CARD_W = TOTALS_BLOCK_X - ML - 8;
+const TERMS_PAD = 3.2;
+const TERMS_LINE_H = 4.4;
+
+/**
+ * ── ÖDEME KOŞULU YALNIZCA FATURADA ──────────────────────────────────────────
+ * "Zahlbar innert 30 Tagen netto" bir ödeme TALİMATIDIR: ancak ödenecek bir
+ * tutar doğduğunda, yani faturalama aşamasında anlamlıdır. Teklifte ödemenin
+ * nasıl yapılacağını Zahlungsplan tablosu (yüzdeler) anlatır; koşul cümlesi
+ * teklife basılmaz (kullanıcı isteği 16.08.2026). `invoicePdf.ts`
+ * `showPaymentTerms: true` gönderir.
+ */
+const wantsPaymentTerms = (data: TenderPdfData) => data.showPaymentTerms === true;
+
+/** Ayarlarda metin varsa o, boşsa belge dilinin varsayılan cümlesi. */
+const paymentTermsText = (s: PdfCompanySettings, L: PdfStrings) =>
+    (s.paymentTerms || '').trim() || L.paymentTermsFallback;
+
+/**
+ * Ödeme koşulu kartının yüksekliği. Sarma genişliği `drawTermsCard` ile
+ * BİREBİR aynı olmalı — ayrışırsa ölçü bir satır eksik çıkar ve kart taşar.
+ */
+function measureTermsCard(doc: jsPDF, s: PdfCompanySettings, L: PdfStrings): number {
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    const lines = doc.splitTextToSize(paymentTermsText(s, L), TERMS_CARD_W - TERMS_PAD * 2 - 2) as string[];
+    return TERMS_PAD * 2 + 4.6 + lines.length * TERMS_LINE_H;
+}
+
+/**
+ * Toplam bloğunun (sağdaki sütun ile soldaki koşul kartının yükseği hangisiyse)
+ * gerçek yüksekliği. Sayfa sonu kararı bu ölçüye göre verilir.
+ */
+function measureTotalsBlock(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings): number {
+    const discountRows = (data.totals?.discounts ?? []).filter((entry) => (entry?.amount ?? 0) > 0).length;
+    const rowCount = (discountRows > 0 ? 1 + discountRows : 0) + 2; // [Zwischensumme + Rabatte] + Netto + MwSt.
+    const totalsH = rowCount * TOTALS_ROW_H + 1 + TOTALS_BAND_H;
+    const termsH = wantsPaymentTerms(data) ? measureTermsCard(doc, s, L) : 0;
+    return Math.max(totalsH, termsH) + 4;
+}
+
+/**
+ * "Zahlungsbedingungen" kartı — toplam sütununun SOLUNDA, onunla aynı hizada;
+ * bilgi kartıyla aynı dil: açık zemin, ince çerçeve, solda lacivert şerit.
+ */
+function drawTermsCard(doc: jsPDF, y: number, s: PdfCompanySettings, L: PdfStrings): number {
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    const lines = doc.splitTextToSize(paymentTermsText(s, L), TERMS_CARD_W - TERMS_PAD * 2 - 2) as string[];
+    const h = TERMS_PAD * 2 + 4.6 + lines.length * TERMS_LINE_H;
+
+    doc.setFillColor(...C.CARD_BG);
+    doc.setDrawColor(...C.CARD_BORDER);
+    doc.setLineWidth(0.25);
+    doc.rect(ML, y, TERMS_CARD_W, h, 'FD');
+    doc.setFillColor(...C.NAVY);
+    doc.rect(ML, y, 1.2, h, 'F');
+
+    const textX = ML + 1.2 + TERMS_PAD;
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(8.4);
+    doc.setTextColor(...C.NAVY);
+    doc.text(L.paymentTerms, textX, y + TERMS_PAD + 2.6);
+
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    doc.setTextColor(...C.TEXT);
+    let ty = y + TERMS_PAD + 4.6 + 2.6;
+    for (const line of lines) {
+        doc.text(line, textX, ty);
+        ty += TERMS_LINE_H;
+    }
+    return y + h;
+}
+
+/** Toplam bloğunu çizer ve içeriğin bittiği y'yi döndürür. */
 function drawTotals(
     doc: jsPDF,
     y: number,
@@ -1506,7 +1911,8 @@ function drawTotals(
     s: PdfCompanySettings,
     fmt: (v: number) => string,
     L: PdfStrings
-) {
+): number {
+    const blockTop = y;
     const p = data.totals ?? null;
     const net = p ? p.netTotal : (s.vatRate > 0 ? data.grandTotal / (1 + s.vatRate / 100) : data.grandTotal);
     const vat = p ? p.vatTotal : data.grandTotal - net;
@@ -1514,7 +1920,7 @@ function drawTotals(
     const discounts = (p?.discounts ?? []).filter((entry) => (entry?.amount ?? 0) > 0);
     const subtotal = p?.subtotal ?? net;
 
-    const blockX = 116;
+    const blockX = TOTALS_BLOCK_X;
     const labelX = blockX + 4;
     const valueX = C_PRICE_R;
 
@@ -1522,7 +1928,7 @@ function drawTotals(
     // yüzden tutarın soluna kalan boşluğa sığdırılır: önce punto küçültülür,
     // hâlâ taşıyorsa kırpılır. Aksi hâlde ad tutarın üstüne biner.
     const totalRow = (label: string, value: string) => {
-        doc.setDrawColor(...COLOR_HAIRLINE);
+        doc.setDrawColor(...C.HAIRLINE);
         doc.setLineWidth(0.15);
         doc.line(blockX, y, MR, y);
         y += 5.4;
@@ -1536,11 +1942,11 @@ function drawTotals(
             const lines = doc.splitTextToSize(text, labelMaxW) as string[];
             text = `${(lines[0] ?? text).trim()}…`;
         }
-        doc.setTextColor(...COLOR_LABEL);
+        doc.setTextColor(...C.LABEL);
         doc.text(text, labelX, y);
         doc.setFontSize(FS_BASE);
         doc.setFont(FONT, 'bold');
-        doc.setTextColor(...COLOR_TEXT);
+        doc.setTextColor(...C.TEXT);
         doc.text(value, valueX, y, { align: 'right' });
         y += 2.8;
     };
@@ -1565,30 +1971,158 @@ function drawTotals(
     // Genel toplam: sert blok yerine yumuşak tonlu bant + lacivert vurgu.
     // Bant, ekrandaki büyütülmüş toplam satırıyla uyumlu olsun diye eskisinden
     // daha yüksek ve daha büyük puntolu.
+    // Genel toplam: yumuşak tonlu bant + sol kenarda lacivert vurgu.
     y += 1;
-    const bandH = 12;
-    doc.setFillColor(...COLOR_HEAD_BG);
+    const bandH = TOTALS_BAND_H;
+    doc.setFillColor(...C.HEAD_BG);
     doc.rect(blockX, y, MR - blockX, bandH, 'F');
-    doc.setFillColor(...COLOR_NAVY);
+    doc.setFillColor(...C.NAVY);
     doc.rect(blockX, y, 1.2, bandH, 'F');
     doc.setFont(FONT, 'bold');
     doc.setFontSize(12.5);
-    doc.setTextColor(...COLOR_NAVY);
+    doc.setTextColor(...C.NAVY);
     doc.text(L.grandTotal, labelX, y + bandH / 2 + 1.8);
     doc.text(fmt(grand), valueX, y + bandH / 2 + 1.8, { align: 'right' });
     y += bandH;
 
-    y += 10;
-    const terms = s.paymentTerms ? `${L.paymentTerms}: ${s.paymentTerms}` : '';
-    if (terms && y < CONTENT_BOTTOM - 4) {
-        doc.setFont(FONT, 'italic');
-        doc.setFontSize(FS_BASE);
-        doc.setTextColor(...COLOR_MUTED);
-        const lines = doc.splitTextToSize(terms, CONTENT_W - 10);
-        doc.text(lines, ML, y);
-        doc.setFont(FONT, 'normal');
-    }
+    // Ödeme koşulu kartı toplam sütunuyla AYNI hizada başlar (soldaki boş alan)
+    // ve yalnızca faturada çizilir.
+    const termsBottom = wantsPaymentTerms(data) ? drawTermsCard(doc, blockTop, s, L) : 0;
+    doc.setFont(FONT, 'normal');
+    doc.setTextColor(...C.TEXT);
+    return Math.max(y, termsBottom);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ÖDEME PLANI — belgenin en sonunda, taksit başına bir satır
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PLAN_HEAD_H = 8;
+const PLAN_ROW_H = 7;
+const PLAN_TITLE_H = 11;
+// Sütunlar: Rate (sol) · Fällig am (sol) · Anteil (sağ) · Betrag (sağ).
+const PLAN_C_DUE = 62;
+const PLAN_C_SHARE_R = 132;
+const PLAN_C_AMOUNT_R = C_PRICE_R;
+
+/** Geçerli taksitler: yüzdesi olan satırlar; hiç yoksa tablo çizilmez. */
+const planStages = (data: TenderPdfData) =>
+    (data.paymentStages ?? []).filter((stage) => Number(stage?.percent) > 0);
+
+/**
+ * "Wie wird bezahlt" tablosu: her taksit kendi satırında — sıra numarası,
+ * (siparişte) vade tarihi, oranı ve genel toplamdan türetilen tutarı. Tutarlar
+ * plan verisinden DEĞİL basılan brüt toplamdan hesaplanır, böylece plan ile
+ * belge toplamı asla ayrışmaz. Plan yoksa fonksiyon hiçbir şey çizmez.
+ */
+function drawPaymentPlan(
+    doc: jsPDF,
+    y: number,
+    data: TenderPdfData,
+    fmt: (v: number) => string,
+    L: PdfStrings
+): number {
+    const stages = planStages(data);
+    if (stages.length === 0) return y;
+
+    const grand = data.totals?.grossTotal ?? data.grandTotal;
+    const showDue = stages.some((stage) => Boolean(stage.date));
+    const blockH = PLAN_TITLE_H + 6 + PLAN_HEAD_H + stages.length * PLAN_ROW_H + PLAN_ROW_H + 2;
+
+    y += 12;
+    if (y + blockH > CONTENT_BOTTOM) {
+        doc.addPage();
+        y = CONTENT_TOP_REST;
+    }
+
+    // Başlık + kısa kırmızı vurgu — kapak başlığıyla aynı işaret.
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...C.NAVY);
+    doc.text(L.planTitle, ML, y + 4.4);
+    doc.setDrawColor(...C.RED);
+    doc.setLineWidth(0.8);
+    doc.line(ML, y + 7, ML + 14, y + 7);
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_BASE);
+    doc.setTextColor(...C.LABEL);
+    doc.text(L.planIntro, ML, y + 12.6);
+    y += PLAN_TITLE_H + 6;
+
+    // Başlık bandı — pozisyon tablosunun bandıyla AYNI biçim.
+    drawBandHeader(doc, y, ML, CONTENT_W, PLAN_HEAD_H);
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(FS_HEADER);
+    doc.setTextColor(...C.NAVY);
+    const headY = y + PLAN_HEAD_H / 2 + 1.3;
+    doc.text(L.planStage, ML + 3, headY);
+    if (showDue) doc.text(L.planDue, PLAN_C_DUE, headY);
+    doc.text(L.planShare, PLAN_C_SHARE_R, headY, { align: 'right' });
+    doc.text(L.planAmount, PLAN_C_AMOUNT_R, headY, { align: 'right' });
+    y += PLAN_HEAD_H;
+
+    stages.forEach((stage, index) => {
+        if (index % 2 === 1) {
+            doc.setFillColor(...C.ZEBRA);
+            doc.rect(ML, y, CONTENT_W, PLAN_ROW_H, 'F');
+        }
+        const baseY = y + PLAN_ROW_H / 2 + 1.3;
+        const amount = (grand * Number(stage.percent)) / 100;
+
+        doc.setFont(FONT, 'bold');
+        doc.setFontSize(FS_BASE);
+        doc.setTextColor(...C.TEXT);
+        doc.text(`${index + 1}. ${L.planStage}`, ML + 3, baseY);
+
+        if (showDue) {
+            doc.setFont(FONT, 'normal');
+            doc.setTextColor(...C.LABEL);
+            doc.text(fmtPlanDate(stage.date) || '—', PLAN_C_DUE, baseY);
+        }
+
+        doc.setFont(FONT, 'normal');
+        doc.setTextColor(...C.TEXT);
+        doc.text(fmtStagePercent(Number(stage.percent)), PLAN_C_SHARE_R, baseY, { align: 'right' });
+        doc.setFont(FONT, 'bold');
+        doc.text(fmt(amount), PLAN_C_AMOUNT_R, baseY, { align: 'right' });
+
+        drawRowHairline(doc, y + PLAN_ROW_H);
+        y += PLAN_ROW_H;
+    });
+
+    // Kapanış satırı: taksitlerin toplamı = belgenin genel toplamı.
+    doc.setFillColor(...C.BAND_BG);
+    doc.rect(ML, y, CONTENT_W, PLAN_ROW_H + 1, 'F');
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(FS_BASE + 0.4);
+    doc.setTextColor(...C.NAVY);
+    const totalY = y + (PLAN_ROW_H + 1) / 2 + 1.4;
+    doc.text(L.planTotal, ML + 3, totalY);
+    doc.text(
+        fmtStagePercent(stages.reduce((sum, stage) => sum + Number(stage.percent), 0)),
+        PLAN_C_SHARE_R, totalY, { align: 'right' },
+    );
+    doc.text(fmt(grand), PLAN_C_AMOUNT_R, totalY, { align: 'right' });
+    doc.setFont(FONT, 'normal');
+    doc.setTextColor(...C.TEXT);
+
+    return y + PLAN_ROW_H + 1;
+}
+
+/**
+ * "30" → "30,00 %". Ondalık ayıracı KOMŞU "Betrag" sütunuyla aynı olmalı
+ * (`fmtMoneyForCurrency` de-DE kullanır), yoksa aynı satırda "30.00 %" ile
+ * "17.732,37" yan yana düşer.
+ */
+const fmtStagePercent = (value: number) =>
+    `${new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0)} %`;
+
+/** Taksit vadesi ISO gün olarak durur; belgede 31.12.2026 biçiminde yazılır. */
+const fmtPlanDate = (date?: string | null): string => {
+    if (!date) return '';
+    const [year, month, day] = String(date).slice(0, 10).split('-');
+    return year && month && day ? `${day}.${month}.${year}` : String(date);
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // QR Fatura (Swiss QR-Bill) — klasik şablonla birebir; antet/alt bilgi almaz

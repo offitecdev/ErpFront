@@ -140,9 +140,11 @@ export const DrawingPad = ({
 
             {open && createPortal(
                 <div className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-900/60 p-3 animate-in fade-in duration-150">
-                    <div className="flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 dark:bg-[#151616]">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-white/10">
-                            <div className="text-[14px] font-semibold text-slate-900 dark:text-white">{label || t('forms.drawing.title')}</div>
+                    {/* `.ofi-pop` — die gemeinsame Fensteroberfläche, siehe
+                        index.css "FENSTER-OBERFLÄCHE". */}
+                    <div className="ofi-pop flex h-[min(92vh,900px)] w-full max-w-6xl flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="ofi-pop__rule flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                            <div className="ofi-pop__title">{label || t('forms.drawing.title')}</div>
                             <div className="flex flex-wrap items-center gap-3">
                                 <div className="flex items-center gap-1.5">
                                     {COLORS.map((candidate) => (

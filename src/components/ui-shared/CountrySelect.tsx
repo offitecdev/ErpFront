@@ -162,8 +162,8 @@ export const CountrySelect = ({
                                     event.preventDefault();
                                     commit(option);
                                 }}
-                                className={`ofi-option-row group flex w-full items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-[#1f2654] ${
-                                    index === activeIndex ? 'bg-amber-100 ring-1 ring-inset ring-amber-400' : ''
+                                className={`ofi-option-row group flex w-full items-center gap-2 px-2 py-1 text-left transition-colors ${
+                                    index === activeIndex ? 'is-active' : ''
                                 }`}
                             >
                                 <span className="min-w-0 flex-1 truncate text-[12.5px] text-slate-900 group-hover:!text-white dark:text-white">

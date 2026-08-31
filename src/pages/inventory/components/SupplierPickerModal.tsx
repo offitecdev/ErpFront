@@ -60,15 +60,16 @@ export const SupplierPickerModal = ({
             <section
                 role="dialog"
                 aria-modal="true"
-                className="ofi-rise-in relative flex max-h-[80vh] w-full max-w-[640px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl dark:border-white/15 dark:bg-[#151616]"
+                /* `.ofi-pop` — siehe index.css, "FENSTER-OBERFLÄCHE". */
+                className="ofi-rise-in ofi-pop relative flex max-h-[80vh] w-full max-w-[640px] flex-col overflow-hidden"
             >
-                <header className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-white/10">
-                    <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-white">{t('inv.orders.supplierModal.title')}</h3>
+                <header className="ofi-pop__rule flex items-center justify-between gap-2 border-b px-4 py-3">
+                    <h3 className="ofi-pop__title">{t('inv.orders.supplierModal.title')}</h3>
                     <button
                         type="button"
                         aria-label={t('common.close')}
                         onClick={close}
-                        className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
+                        className="ofi-float-card__iconbtn shrink-0"
                     >
                         <X size={15} />
                     </button>

@@ -1,23 +1,28 @@
 import type React from 'react';
 
+/**
+ * One contact line inside the customer card: icon, then the value as a link
+ * when it can be acted on. Painted from the popup tokens (`--ofi-cal-*`) — it
+ * only ever renders inside {@link CustomerContactModal}.
+ *
+ * An empty value renders nothing: a card with two lines beats a card with a
+ * dash standing in for the third.
+ */
 export const ContactRow = ({ icon, value, href }: { icon: React.ReactNode; value?: string | null; href?: string }) => {
-    if (!value) {
-        return (
-            <div className="flex items-center gap-2 text-slate-300">
-                <span className="shrink-0">{icon}</span>
-                <span>-</span>
-            </div>
-        );
-    }
+    if (!value) return null;
+
     const content = (
         <>
-            <span className="shrink-0 text-slate-400">{icon}</span>
-            <span className="truncate">{value}</span>
+            <span className="mt-0.5 shrink-0" style={{ color: 'var(--ofi-cal-muted)' }}>{icon}</span>
+            <span className="min-w-0 whitespace-pre-line break-words">{value}</span>
         </>
     );
+
     return href ? (
-        <a href={href} className="flex items-center gap-2 text-slate-700 transition-colors hover:text-[#272f67]">{content}</a>
+        <a href={href} className="flex items-start gap-2.5 text-[13px] hover:underline" style={{ color: 'var(--ofi-cal-text)' }}>
+            {content}
+        </a>
     ) : (
-        <div className="flex items-center gap-2 text-slate-700">{content}</div>
+        <div className="flex items-start gap-2.5 text-[13px]" style={{ color: 'var(--ofi-cal-text)' }}>{content}</div>
     );
 };

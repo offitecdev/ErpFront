@@ -6,15 +6,16 @@
  *  - Alıcı blok müşteri değil TEDARİKÇİdir; bilgi kartı sipariş no / tarih /
  *    sipariş adı / tedarikçi satırlarını taşır.
  *  - Gönderici TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — gün içinde
- *    üç satıra bölünmüştü, geri alındı): "OffiTec Heating & Cooling, Cores Tower
- *    - Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa sarılmaz, puntosu küçülür.
+ *    üç satıra bölünmüştü, geri alındı): "Offitec GmbH, Ceres Tower -
+ *    Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa sarılmaz, puntosu küçülür.
  *  - Kapak KARTI teklif belgesindeki DAR TABLONUN aynısıdır (78 mm, 5.6 mm
  *    satır): Bestellung / Besteller / Datum / Angebots-Nr / Projekt / EMPFÄNGER /
  *    Lieferant. Alıcı adı sağdaki adres bloğunda DEĞİL bu kartta durur; DURUM
  *    SATIRI YOKTUR (kısa süre denendi, kullanıcı isteğiyle kaldırıldı).
  *    `tenderPdfModern` + `priceRequestPdf` ile birlikte güncellenir.
- *  - Giriş metni "sipariş detayları" ifadesidir; kapak sayfasının ALT KISMI
- *    BOŞ bırakılır (footerNote yazılmaz — kullanıcı isteği).
+ *  - Giriş metni TAM BİR TİCARİ ÖN YAZIDIR (AB + Liefertermin ricası, AGB
+ *    bağlantısı, imza bloğu — kullanıcı isteği 2026-08-21); kapak sayfasının
+ *    kalan alt kısmı boş bırakılır (footerNote yazılmaz — kullanıcı isteği).
  *  - Satırlar düz listedir (hiyerarşi / ara toplam / görsel / QR fatura yok);
  *    kolonlar sipariş tablosuyla (OrderSheet kalem tablosu) aynıdır: Pos,
  *    Açıklama (seri no ikinci satırda), Seri Kod, Miktar, Brüt Fiyat, Net Fiyat,
@@ -82,11 +83,11 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         orderNumber: 'Sipariş No',
         orderDate: 'Sipariş Tarihi',
         orderedBy: 'Sipariş veren',
-        quoteNumber: 'Teklif No',
+        quoteNumber: 'Teklif Numaranız',
         project: 'Proje',
         supplier: 'Tedarikçi',
         greeting: 'Sayın Yetkili,',
-        intro: 'Sipariş detaylarımızı aşağıda bilgilerinize sunarız. Pozisyonların ayrıntılı dökümünü ilerleyen sayfalarda bulabilirsiniz. Teslimat ve teyit için bu e-postaya yanıt verebilirsiniz.',
+        intro: 'Siparişimizi bilgilerinize sunarız. Sipariş edilen pozisyonlara, miktarlara ve spesifikasyonlara ilişkin ayrıntılı bilgileri lütfen aşağıdaki siparişten veya ekli belgeden alınız.\n\nSizden yazılı bir sipariş onayı (AB) ile bağlayıcı veya öngörülen teslim tarihinin bildirilmesini rica ederiz. Tek tek pozisyonların sipariş edildiği şekilde teslim edilememesi ya da fiyat, miktar, spesifikasyon veya teslim tarihi bakımından sapmaların bulunması hâlinde, siparişin ifasından önce tarafımıza bilgi verilmesini rica ederiz.\n\nTarafınızdan aksi yönde bir geri bildirim almadığımız sürece, siparişin siparişimizde belirtilen koşullarla yerine getirileceğini varsayarız.\n\nBu siparişe ilişkin tüm yazışmalarda lütfen sipariş numaramızı belirtiniz.\n\nGenel İşlem Koşullarımız (AGB) siparişimizin ayrılmaz bir parçasıdır ve sözleşme ilişkisi için geçerlidir. Güncel AGB\'ye https://offitec.ch/agb adresinden ulaşabilirsiniz. Tedarikçinin aykırı veya farklı koşulları, yalnızca açıkça ve yazılı olarak onayladığımız takdirde geçerlidir.\n\nİlginiz için teşekkür eder, sorunsuz bir süreç dileriz.\n\nSaygılarımızla\nOffiTec Ekibi',
         colPos: 'Pos',
         colDesc: 'Ürün / Malzeme',
         colCode: 'Seri Kod',
@@ -116,11 +117,11 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         orderNumber: 'Bestellung',
         orderDate: 'Bestelldatum',
         orderedBy: 'Besteller',
-        quoteNumber: 'Angebots-Nr.',
+        quoteNumber: 'Ihre Angebots-Nr.',
         project: 'Projekt',
         supplier: 'Lieferant',
         greeting: 'Sehr geehrte Damen und Herren',
-        intro: 'Hiermit erhalten Sie die Details unserer Bestellung. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten. Für Terminbestätigung und Rückfragen können Sie auf diese Nachricht antworten.',
+        intro: 'Hiermit erhalten Sie unsere Bestellung. Die detaillierten Angaben zu den bestellten Positionen, Mengen und Spezifikationen entnehmen Sie bitte der nachfolgenden Bestellung bzw. dem beigefügten Dokument.\n\nWir bitten Sie um eine schriftliche Auftragsbestätigung (AB) sowie um Mitteilung des verbindlichen bzw. voraussichtlichen Liefertermins. Sollten einzelne Positionen nicht wie bestellt lieferbar sein oder Abweichungen bezüglich Preis, Menge, Spezifikation oder Liefertermin bestehen, bitten wir um entsprechende Mitteilung vor Ausführung der Bestellung.\n\nSofern wir von Ihnen keine anderslautende Rückmeldung erhalten, gehen wir davon aus, dass die Bestellung zu den in unserer Bestellung aufgeführten Konditionen ausgeführt wird.\n\nBitte geben Sie bei sämtlicher Korrespondenz zu dieser Bestellung unsere Bestellnummer an.\n\nUnsere Allgemeinen Geschäftsbedingungen (AGB) sind Bestandteil unserer Bestellung und gelten für das Vertragsverhältnis. Die jeweils gültigen AGB finden Sie unter https://offitec.ch/agb. Entgegenstehende oder abweichende Geschäftsbedingungen des Lieferanten gelten nur, wenn wir diesen ausdrücklich und schriftlich zugestimmt haben.\n\nWir danken Ihnen für die Bearbeitung und freuen uns auf eine reibungslose Abwicklung.\n\nFreundliche Grüsse\nDas OffiTec Team',
         colPos: 'Pos',
         colDesc: 'Produkt / Material',
         colCode: 'Seriencode',
@@ -135,7 +136,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         netSubtotal: 'Zwischensumme (Netto)',
         vat: 'MwSt',
         grandTotal: 'GESAMT',
-        vatIdLabel: 'MwSt-Nr.',
+        vatIdLabel: 'MWST-Nr.',
         pageWord: 'Seite',
         pageOf: 'von',
         serialShort: 'Serien-Nr.',
@@ -146,11 +147,11 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         orderNumber: 'Order no.',
         orderDate: 'Order Date',
         orderedBy: 'Ordered by',
-        quoteNumber: 'Quote No.',
+        quoteNumber: 'Your Quote No.',
         project: 'Project',
         supplier: 'Supplier',
         greeting: 'Dear Sir or Madam,',
-        intro: 'Please find the details of our order below. A detailed breakdown of the positions can be found on the following pages. You may reply to this message for confirmation and delivery questions.',
+        intro: 'Please find our purchase order enclosed. For detailed information on the ordered positions, quantities and specifications, please refer to the following order or the attached document.\n\nWe kindly ask you for a written order confirmation as well as notification of the binding or expected delivery date. Should individual positions not be available as ordered, or should there be any deviations regarding price, quantity, specification or delivery date, please inform us before executing the order.\n\nUnless we receive notice to the contrary from you, we assume that the order will be executed under the conditions stated in our purchase order.\n\nPlease quote our order number in all correspondence relating to this order.\n\nOur General Terms and Conditions (GTC) form an integral part of our order and govern the contractual relationship. The current version is available at https://offitec.ch/agb. Conflicting or deviating terms of the supplier apply only if we have expressly agreed to them in writing.\n\nThank you for processing our order — we look forward to a smooth handling.\n\nKind regards\nThe OffiTec Team',
         colPos: 'Pos',
         colDesc: 'Product / Material',
         colCode: 'Serial Code',
@@ -188,10 +189,13 @@ const CONTENT_TOP_REST = 38;
 const CONTENT_BOTTOM = 266;
 /**
  * ÖN YAZI (Anschreiben) kapak sayfasının son bloğudur ve sayfa taşırmamalıdır:
- * blok ~160 mm'de başlar, satır yüksekliği ~4.8 mm → alt kenara kadar ~22 satır
- * sığar. 20'de kesilir (emniyet payı); fazlası basılmaz.
+ * blok kart/adres bloğunun altında (~110 mm) başlar ve EN GEÇ bu çizgide biter.
+ * Satır tavanı SABİT DEĞİLDİR: kalan boşluğa kaç satır sığıyorsa o kadar
+ * basılır, fazlası sessizce kırpılır (standart ön yazı ~25 satırdır ve sığar).
  */
-const COVER_LETTER_MAX_LINES = 20;
+const COVER_LETTER_BOTTOM = 266;
+/** Ön yazının satır yüksekliği: 10 pt × 1.35 satır aralığı (mm). */
+const COVER_LETTER_LH = 10 * 0.3528 * 1.35;
 
 // Tablo hizalama noktaları. Pos/açıklama sabit; kalan sütunlar SAĞDAN SOLA
 // sabit genişliklerle yerleşir, böylece çizilmeyen bir sütunun (seri kod, brüt
@@ -304,7 +308,6 @@ const FS_POS = 8.2;
 const FS_HEADER = 8.4;
 const LH_TITLE = 4.7;
 const LH_BODY = 4.4;
-const UNIT_GAP = 4.2;
 /** İndirim sütununda alt alta yazılan yüzdelerin satır aralığı. */
 const DISC_LH = 4.2;
 
@@ -445,7 +448,9 @@ const fmtDateShort = (iso?: string | null) => {
     const yy = String(d.getFullYear()).slice(-2);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    return `${yy}-${mm}-${dd}`;
+    // GG.AA.YY — "21.08.26" (kullanıcı isteği 2026-08-21: yy-mm-dd sıralaması
+    // karşı tarafça anlaşılmıyordu; müşteri teklif PDF'i de GG.AA.YYYY kullanır).
+    return `${dd}.${mm}.${yy}`;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -711,7 +716,7 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     const addrX = 112;
     const addrW = MR - addrX;
     // GÖNDERİCİ TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — arada üç
-    // satıra bölünmüştü, geri alındı): "OffiTec Heating & Cooling, Cores Tower -
+    // satıra bölünmüştü, geri alındı): "Offitec GmbH, Ceres Tower -
     // Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa SARILMAZ, puntosu küçülür
     // (`companySenderLine` + `drawFittedSingleLine`) — teklif belgesiyle aynı.
     const sender = companySenderLine(s);
@@ -764,21 +769,19 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     // buradaki STANDART METİN basılır — varsayılan metin belgede yaşar, kayıtta
     // değil (kullanıcı isteği 2026-08-02), bu yüzden dil değiştirildiğinde
     // dokunulmamış siparişler de doğru dilde çıkar.
-    const coverLetter = (order.coverLetter || '').trim();
-    if (coverLetter) {
-        const coverLines = coverLetter
-            .split('\n')
-            .flatMap((line) => (line.trim() ? (doc.splitTextToSize(line, CONTENT_W) as string[]) : ['']))
-            // Kapak sayfası taşmasın: fazlası sessizce kırpılır (uzun metin
-            // zaten ön yazı değil, pozisyon açıklamasıdır).
-            .slice(0, COVER_LETTER_MAX_LINES);
-        doc.text(coverLines, ML, yTitle, { lineHeightFactor: 1.35 });
-    } else {
-        doc.text(L.greeting, ML, yTitle);
-        yTitle += 6.4;
-        const introLines = doc.splitTextToSize(L.intro, CONTENT_W);
-        doc.text(introLines, ML, yTitle, { lineHeightFactor: 1.35 });
-    }
+    // Siparişin kendi metni de standart metin de AYNI yoldan basılır: standart
+    // metin artık çok paragraflı TAM bir ticari ön yazıdır (hitap `greeting` +
+    // gövde/imza `intro` — kullanıcı isteği 2026-08-21) ve arayüzdeki
+    // `inv.orders.coverLetter.defaultText` yer tutucusuyla birlikte güncellenir.
+    const coverLetter = (order.coverLetter || '').trim() || `${L.greeting}\n\n${L.intro}`;
+    // Kapak sayfası taşmasın: kalan boşluğa sığan satır sayısı kadar basılır,
+    // fazlası sessizce kırpılır.
+    const maxLines = Math.max(4, Math.floor((COVER_LETTER_BOTTOM - yTitle) / COVER_LETTER_LH));
+    const coverLines = coverLetter
+        .split('\n')
+        .flatMap((line) => (line.trim() ? (doc.splitTextToSize(line, CONTENT_W) as string[]) : ['']))
+        .slice(0, maxLines);
+    doc.text(coverLines, ML, yTitle, { lineHeightFactor: 1.35 });
 
     // Kapak sayfasının alt kısmı bilinçli olarak boş bırakılır (kullanıcı isteği):
     // teklifteki footerNote bloğu burada YOKTUR.
@@ -903,11 +906,11 @@ function buildRowLines(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: 
 function measureRow(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: TableLayout): number {
     const { title, meta } = buildRowLines(doc, item, L, layout);
     const contentH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
-    // Sayısal sütunların yüksekliği: miktarın altındaki birim satırı ve indirim
-    // sütununda ALT ALTA yazılan yüzdeler (en fazla üç) satırı büyütebilir.
+    // Sayısal sütunların yüksekliği: indirim sütununda ALT ALTA yazılan yüzdeler
+    // (en fazla üç) satırı büyütebilir. BİRİM SATIRI YOKTUR (kullanıcı isteği
+    // 2026-08-21: "adet vs. yazmasın") — miktar çıplak sayıdır.
     const stackedDiscounts = layout.discR === null ? 0 : Math.max(0, discountLines(item).length - 1);
-    const numericsH = FIRST_BASELINE - 2
-        + Math.max(item.unit ? UNIT_GAP : 0, stackedDiscounts * DISC_LH);
+    const numericsH = FIRST_BASELINE - 2 + stackedDiscounts * DISC_LH;
     return Math.max(ROW_MIN_H, Math.max(contentH, numericsH) + ROW_PAD * 2);
 }
 
@@ -967,16 +970,12 @@ function drawRow(
         doc.setTextColor(...COLOR_TEXT);
     }
 
-    // Sayısal sütunlar: miktar (+birim), brüt fiyat, net fiyat, indirim(ler),
-    // KDV, tutar. Tutar İNDİRİMLİ NET satır tutarıdır (`lineTotal`).
+    // Sayısal sütunlar: miktar, brüt fiyat, net fiyat, indirim(ler), KDV, tutar.
+    // Tutar İNDİRİMLİ NET satır tutarıdır (`lineTotal`). Miktarın altına BİRİM
+    // YAZILMAZ (kullanıcı isteği 2026-08-21: "adet vs. yazmasın").
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
     drawFittedRight(doc, fmtQty(item.quantity || 0), layout.qtyR, layout.wQty, baseY, 'normal');
-    if (item.unit) {
-        doc.setTextColor(...COLOR_LABEL);
-        drawFittedRight(doc, item.unit, layout.qtyR, layout.wQty, baseY + UNIT_GAP, 'normal', FS_BASE - 0.4);
-        doc.setTextColor(...COLOR_TEXT);
-    }
     if (layout.grossR !== null) {
         drawFittedRight(doc, (item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—', layout.grossR, layout.wGross, baseY, 'normal');
     }

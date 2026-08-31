@@ -1,7 +1,30 @@
 import path from "path"
+import compression from "compression"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "vite"
+
+const backendProxy = {
+  '/backend': {
+    target: 'http://localhost:3000',
+    changeOrigin: true,
+    rewrite: (requestPath: string) => requestPath.replace(/^\/backend/, ''),
+  },
+}
+
+// Lighthouse is often run against the local HMR/preview server. Production
+// nginx already compresses HTML, CSS, JS and JSON; applying the same response
+// middleware locally keeps those audits representative and avoids shipping the
+// 20+ KiB entry document uncompressed.
+const responseCompressionPlugin = () => ({
+  name: 'offitec:response-compression',
+  configureServer(server: { middlewares: { use: (middleware: ReturnType<typeof compression>) => void } }) {
+    server.middlewares.use(compression())
+  },
+  configurePreviewServer(server: { middlewares: { use: (middleware: ReturnType<typeof compression>) => void } }) {
+    server.middlewares.use(compression())
+  },
+})
 
 // The app stylesheet is ~54 KB gzipped; as a render-blocking <head> link it
 // held the first paint hostage for the whole download (mobile-throttled
@@ -28,11 +51,12 @@ const asyncCssPlugin = () => ({
   },
 })
 
-// Open Sans ships with font-display: swap, so text paints in the fallback
-// (Arial) until the woff2 arrives. Preloading the three weights the UI is
-// actually set in (400/600/700 upright) makes that window effectively
-// invisible on a warm connection. The files are content-hashed, so the tags
-// can only be written here, where the emitted bundle is known.
+// Open Sans uses font-display: optional: a fast/preloaded font is used on the
+// first paint, while a delayed font never replaces Arial after layout and
+// therefore cannot shift the quote table. Preloading the three upright weights
+// used above the fold makes Open Sans win that window on normal connections.
+// The files are content-hashed, so production tags are written where the final
+// emitted names are known.
 const fontPreloadPlugin = () => {
   let base = '/'
   return {
@@ -44,7 +68,7 @@ const fontPreloadPlugin = () => {
       handler: (html: string, ctx: { bundle?: Record<string, unknown> }) => ({
         html,
         tags: Object.keys(ctx.bundle ?? {})
-          .filter((file) => /OpenSans-(Regular|Semibold|Bold)-webfont-[^/]+\.woff2$/.test(file))
+          .filter((file) => /OpenSans-(Regular|Semibold|Bold)-subset-[^/]+\.woff2$/.test(file))
           .map((file) => ({
             tag: 'link',
             // Font preloads need `crossorigin` even same-origin; without it the
@@ -58,12 +82,46 @@ const fontPreloadPlugin = () => {
   }
 }
 
+// Production preloads use the hashed bundle names above. During development
+// there is no final bundle to inspect, so inject equivalent source URLs. Vite
+// serves those files directly and the browser can start the three fonts used
+// on the quote page while it is still parsing the document, before fonts.css
+// and the large detail module have been evaluated.
+const fontDevPreloadPlugin = () => ({
+  name: 'offitec:font-dev-preload',
+  apply: 'serve' as const,
+  transformIndexHtml: {
+    order: 'pre' as const,
+    handler: (html: string) => ({
+      html,
+      tags: ['Regular', 'Semibold', 'Bold'].map((weight) => ({
+        tag: 'link',
+        attrs: {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          crossorigin: true,
+          href: `/src/assets/fonts/OpenSans-${weight}-subset.woff2`,
+        },
+        injectTo: 'head-prepend' as const,
+      })),
+    }),
+  },
+})
+
 export default defineConfig(({ mode }) => ({
   // Web (nginx) needs an absolute base so assets resolve to /assets/... on
   // deep routes after a refresh. Electron loads via file:// and needs a
   // relative base. Desktop builds pass `--mode electron`.
   base: mode === 'electron' ? './' : '/',
-  plugins: [react(), tailwindcss(), asyncCssPlugin(), fontPreloadPlugin()],
+  plugins: [
+    responseCompressionPlugin(),
+    react(),
+    tailwindcss(),
+    asyncCssPlugin(),
+    fontPreloadPlugin(),
+    fontDevPreloadPlugin(),
+  ],
   server: {
     // Hot Module Replacement is on by default so the dev server (`npm run dev`)
     // live-updates the browser on every save. Set VITE_DISABLE_HMR=true to
@@ -72,15 +130,12 @@ export default defineConfig(({ mode }) => ({
     // Same-origin API, exactly like production nginx (/backend/... → backend).
     // Cross-origin localhost:5173 → localhost:3000 added a CORS preflight
     // round-trip to every API call — including the ones on the LCP path.
-    // `preview` inherits this proxy, so `npm run dev` (build + preview) and
-    // `npm run dev:hmr` both serve the API from the page's own origin.
-    proxy: {
-      '/backend': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/backend/, ''),
-      },
-    },
+    proxy: backendProxy,
+  },
+  preview: {
+    // Vite preview does not inherit `server.proxy`; keep production audits
+    // same-origin without falling back to the development transform server.
+    proxy: backendProxy,
   },
   build: {
     modulePreload: {
@@ -137,7 +192,7 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 }))

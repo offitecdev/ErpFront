@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { Plus, Save01 as Save, Trash01 as Trash } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
-import { Modal } from '@/components/ui-shared/Modal';
-import { Field, Input } from '@/components/ui-shared/Field';
-import { CELL_INPUT_CLASS } from '@/components/ui-shared/TableKit';
+import { Plus, Trash01 as Trash } from '@/components/icons/antIconCompat';
+import { PopupActions, PopupButton, PopupDialog, PopupField } from '@/components/ui-shared/PopupKit';
 import { checklistApi, type ChecklistTemplateDto } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 
@@ -14,11 +11,16 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 type Check = { id: string; label: string; measurement: boolean };
 
 /**
- * Büyük kontrol-listesi düzenleme popup'ı — hem Ayarlar sayfası hem de teslim
- * raporu editörü buradan yeni liste oluşturur / düzenler. Kategori kavramı
- * KALDIRILDI (kullanıcı isteği): liste, yalnızca liste adı + düz kontrol
- * maddelerinden oluşan DAR bir tablodur; her satırın sonundaki "+" ve Enter
- * tuşu kesintisiz yeni madde ekler.
+ * Checklisten-VORLAGE anlegen / bearbeiten — neu gebaut 19.08.2026 auf dem
+ * App-Popup-Kit (Vorgabe: "moderner, sauberer, einfacher"). Der alte
+ * AntD-`Modal` mit Tabellenkopf ist weg; die Liste liest sich jetzt wie im
+ * Rapport-Editor:
+ *
+ *   Name  →  nummerierte Kontrollpunkte  →  EIN "+" unten.
+ *
+ * Die Beschreibungs-Option steht DIREKT UNTER dem Punkt, nicht als Spalte am
+ * Kopf. Kategorien gibt es weiterhin nicht (Vorgabe 03.08.2026): eine Vorlage
+ * ist Name + flache Punkte.
  */
 export const ChecklistTemplateModal = ({
     open,
@@ -27,7 +29,7 @@ export const ChecklistTemplateModal = ({
     onSaved,
 }: {
     open: boolean;
-    /** null = yeni liste oluşturma. */
+    /** null = neue Liste. */
     template: ChecklistTemplateDto | null;
     onClose: () => void;
     onSaved: (saved: ChecklistTemplateDto) => void;
@@ -57,18 +59,19 @@ export const ChecklistTemplateModal = ({
         setFocusIndex(null);
     }, [focusIndex, checks.length]);
 
-    const patch = (id: string, p: Partial<Check>) => setChecks((rows) => rows.map((r) => (r.id === id ? { ...r, ...p } : r)));
+    const patch = (id: string, next: Partial<Check>) => setChecks((rows) => rows.map((row) => (row.id === id ? { ...row, ...next } : row)));
     const insertAfter = (index: number) => {
         setChecks((rows) => [...rows.slice(0, index + 1), { id: newId(), label: '', measurement: true }, ...rows.slice(index + 1)]);
         setFocusIndex(index + 1);
     };
-    const remove = (id: string) => setChecks((rows) => (rows.length > 1 ? rows.filter((r) => r.id !== id) : rows));
+    const remove = (id: string) => setChecks((rows) => (rows.length > 1 ? rows.filter((row) => row.id !== id) : rows));
 
     const save = async () => {
         if (!name.trim()) return toast.error(t('settings.checklist.nameRequired'));
         const items = checks
-            .filter((c) => c.label.trim())
-            .map((c) => ({ id: c.id, category: '', label: c.label.trim(), measurement: c.measurement }));
+            .filter((check) => check.label.trim())
+            .map((check) => ({ id: check.id, category: '', label: check.label.trim(), measurement: check.measurement }));
+        if (items.length === 0) return toast.error(t('projects.delivery.needCheck'));
         setSaving(true);
         try {
             const payload = { name: name.trim(), description: null, items, isActive };
@@ -86,94 +89,82 @@ export const ChecklistTemplateModal = ({
     };
 
     return (
-        <Modal
+        <PopupDialog
             open={open}
-            title={template ? (template.name || t('settings.checklist.title')) : t('settings.checklist.newList')}
             onClose={onClose}
-            width="full"
+            title={template ? (template.name || t('settings.checklist.title')) : t('settings.checklist.newList')}
+            subtitle={t('projects.delivery.editChecklistHint')}
+            width={620}
             footer={(
-                <>
-                    <label className="mr-auto flex items-center gap-2 text-[12.5px] text-slate-600 dark:text-white/70">
-                        <input type="checkbox" checked={!isActive} onChange={(e) => setIsActive(!e.target.checked)} />
+                <PopupActions start={(
+                    <label className="ofi-tp-checkrow">
+                        <input type="checkbox" checked={!isActive} onChange={(event) => setIsActive(!event.target.checked)} />
                         {t('settings.checklist.saveAsDraft')}
                     </label>
-                    <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
-                    <Button variant="primary" icon={<Save size={13} />} loading={saving} onClick={() => void save()}>
+                )}>
+                    <PopupButton onClick={onClose}>{t('common.cancel')}</PopupButton>
+                    <PopupButton variant="primary" loading={saving} onClick={() => void save()}>
                         {t('settings.checklist.save')}
-                    </Button>
-                </>
+                    </PopupButton>
+                </PopupActions>
             )}
         >
-            <div className="space-y-4">
-                <Field label={t('settings.checklist.listName')} required>
-                    <Input value={name} placeholder={t('settings.checklist.listNamePlaceholder')} onChange={(e) => setName(e.target.value)} />
-                </Field>
+            <PopupField label={t('settings.checklist.listName')} required>
+                <input
+                    className="ofi-cal-input w-full"
+                    value={name}
+                    placeholder={t('settings.checklist.listNamePlaceholder')}
+                    onChange={(event) => setName(event.target.value)}
+                />
+            </PopupField>
 
-                {/* Dar madde tablosu: yalnızca madde metni + ölçüm alanı işareti. */}
-                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/15">
-                    <table data-inv-table data-unstyled-table className="w-full">
-                        <thead>
-                            <tr>
-                                <th className="w-10 text-left">#</th>
-                                <th className="text-left">{t('settings.checklist.controlStep')}</th>
-                                <th className="w-24 text-center">{t('settings.checklist.measurement')}</th>
-                                <th className="w-20 text-right" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {checks.map((check, index) => (
-                                <tr key={check.id}>
-                                    <td className="tabular-nums text-slate-400 dark:text-white/50">{index + 1}</td>
-                                    <td>
-                                        <input
-                                            ref={(el) => { inputRefs.current[index] = el; }}
-                                            className={CELL_INPUT_CLASS}
-                                            value={check.label}
-                                            placeholder={t('settings.checklist.controlStepPlaceholder')}
-                                            onChange={(e) => patch(check.id, { label: e.target.value })}
-                                            onKeyDown={(e) => {
-                                                // Enter = kesintisiz yeni madde: altına satır açıp odaklanır.
-                                                if (e.key === 'Enter') { e.preventDefault(); insertAfter(index); }
-                                            }}
-                                        />
-                                    </td>
-                                    <td className="text-center">
-                                        <input
-                                            type="checkbox"
-                                            title={t('settings.checklist.measurementHint')}
-                                            checked={check.measurement}
-                                            onChange={(e) => patch(check.id, { measurement: e.target.checked })}
-                                        />
-                                    </td>
-                                    <td>
-                                        <div className="flex items-center justify-end gap-1">
-                                            <button
-                                                type="button"
-                                                title={t('common.delete')}
-                                                aria-label={t('common.delete')}
-                                                disabled={checks.length === 1}
-                                                onClick={() => remove(check.id)}
-                                                className="inline-flex size-6 items-center justify-center rounded-[2px] text-slate-300 transition-colors hover:text-rose-600 disabled:opacity-30"
-                                            >
-                                                <Trash size={13} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                title={t('settings.checklist.addStep')}
-                                                aria-label={t('settings.checklist.addStep')}
-                                                onClick={() => insertAfter(index)}
-                                                className="ofi-rs-iconbtn inline-flex size-6 items-center justify-center rounded-[2px] border transition-colors"
-                                            >
-                                                <Plus size={13} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+            <div className="ofi-dlv-editlist">
+                {checks.map((check, index) => (
+                    <div key={check.id} className="ofi-dlv-editrow">
+                        <span className="ofi-tp-ordinal">{index + 1}</span>
+                        <div className="ofi-dlv-editrow__main">
+                            <input
+                                ref={(el) => { inputRefs.current[index] = el; }}
+                                className="ofi-cal-input w-full"
+                                value={check.label}
+                                placeholder={t('settings.checklist.controlStepPlaceholder')}
+                                onChange={(event) => patch(check.id, { label: event.target.value })}
+                                onKeyDown={(event) => {
+                                    // Enter = kesintisiz yeni madde: altına satır açıp odaklanır.
+                                    if (event.key !== 'Enter') return;
+                                    event.preventDefault();
+                                    insertAfter(index);
+                                }}
+                            />
+                            {/* Die Beschreibungs-Option steht DIREKT UNTER dem Punkt. */}
+                            <label className="ofi-dlv-editrow__opt" title={t('settings.checklist.measurementHint')}>
+                                <input
+                                    type="checkbox"
+                                    checked={check.measurement}
+                                    onChange={(event) => patch(check.id, { measurement: event.target.checked })}
+                                />
+                                {t('projects.delivery.withDescription')}
+                            </label>
+                        </div>
+                        <button
+                            type="button"
+                            className="ofi-dlv-iconbtn is-danger"
+                            title={t('common.delete')}
+                            aria-label={t('common.delete')}
+                            disabled={checks.length === 1}
+                            onClick={() => remove(check.id)}
+                        >
+                            <Trash size={18} />
+                        </button>
+                    </div>
+                ))}
+
+                {/* Der EINE "+"-Knopf, immer unten. */}
+                <button type="button" className="ofi-dlv-add is-inline" onClick={() => insertAfter(checks.length - 1)}>
+                    <Plus size={16} />
+                    {t('settings.checklist.addStep')}
+                </button>
             </div>
-        </Modal>
+        </PopupDialog>
     );
 };

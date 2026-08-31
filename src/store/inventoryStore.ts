@@ -49,7 +49,7 @@ interface InventoryState {
 
     createArticle: (data: Partial<InventoryArticle>) => Promise<InventoryArticle>;
     updateArticle: (id: string, patch: Partial<InventoryArticle>) => Promise<InventoryArticle>;
-    deleteArticle: (id: string) => Promise<void>;
+    deleteArticle: (id: string, password?: string) => Promise<void>;
 
     balances: StockBalanceRow[];
     fetchBalances: (locationId?: string) => Promise<void>;
@@ -133,8 +133,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         await get().fetchArticlesSummary();
         return updated;
     },
-    deleteArticle: async (id) => {
-        await articleApi.delete(id);
+    // The password travels with the call: every account except the admin role
+    // confirms a product deletion with it (see DangerConfirmDialog).
+    deleteArticle: async (id, password) => {
+        await articleApi.delete(id, password);
         // Drop the row from every in-memory list (full + current page) so the table
         // updates in place — no page refetch/reload needed.
         set({
