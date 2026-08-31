@@ -1,0 +1,275 @@
+/* =========================================================
+   Offitec — Personenseite (/personnel/:id und /profile)
+   Namensraum: .ofi-person
+
+   Der Kopf ist die Anmeldewelle, zweimal: oben gespiegelt, unten
+   aufrecht. DAZWISCHEN steht die Bildfläche (Foto oder Initialen)
+   mit Namen und Rolle, UNTEN das Reiterband (Vorgabe 17.08.2026).
+
+   Die Wellen laufen im normalen Fluss (kein `position:absolute`):
+   so liegt die Bildfläche wirklich ZWISCHEN ihnen und das Band
+   bleibt an der Unterkante, egal wie hoch der Inhalt wird.
+
+   `LoginWave` zeichnet seinen Farbverlauf aus --lg-wave-a/--lg-wave-b;
+   die beiden Variablen stehen deshalb hier noch einmal — die
+   Anmeldeseite setzt sie nur in ihrem eigenen Namensraum.
+   ========================================================= */
+
+.ofi-person-hero {
+    --lg-wave-a: #1f2a54;
+    --lg-wave-b: #d32026;
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 14px;
+    background: linear-gradient(160deg, #eef2fb 0%, #f7f9fd 55%, #fdf1f1 100%);
+    border: 1px solid rgb(226 232 240 / 0.9);
+}
+
+.dark .ofi-person-hero {
+    --lg-wave-a: #8ea3dc;
+    --lg-wave-b: #e05656;
+
+    background: linear-gradient(160deg, #171a1f 0%, #14161a 55%, #1c1618 100%);
+    border-color: rgb(255 255 255 / 0.1);
+}
+
+.ofi-person-hero__wave {
+    display: block;
+    width: 100%;
+    height: clamp(46px, 7vw, 76px);
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+/* Oben gespiegelt: die Kämme zeigen nach unten, die Fläche sitzt an der
+   Oberkante — dasselbe Bild wie das Kopfband der Anmeldeseite.
+
+   Deutlich HÖHER als die untere Welle (Vorgabe 17.08.2026: „oben auch eine
+   Welle"): auf 46 px las sich das Band als farbiger Streifen, erst ab rund
+   100 px sieht man das Auf und Ab. Die Maske löst die Welle nach unten hin
+   auf, statt sie an einer waagrechten Kante abzuschneiden — wie auf der
+   Anmeldeseite. Doppelt notiert (`-webkit-` zuerst) wegen Safari. */
+.ofi-person-hero__wave--top {
+    transform: scaleY(-1);
+    height: clamp(78px, 9.5vw, 118px);
+    -webkit-mask-image: linear-gradient(to top, #000 0%, #000 46%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 0%, #000 46%, transparent 100%);
+}
+
+/* Die Bildfläche zwischen den Wellen. Der negative Rand zieht sie in die
+   Wellenbänder hinein, damit kein leerer Streifen entsteht — oben stärker,
+   weil das Kopfband deutlich höher ist als die Fusswelle. */
+.ofi-person-hero__body {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 2.5vw, 22px);
+    margin: clamp(-40px, -5vw, -26px) 0 clamp(-22px, -3vw, -14px);
+    padding: 0 clamp(16px, 3vw, 32px);
+}
+
+.ofi-person-hero__avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: clamp(64px, 9vw, 92px);
+    height: clamp(64px, 9vw, 92px);
+    border-radius: 999px;
+    overflow: hidden;
+    background: #272f67;
+    color: #ffffff;
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 10px 26px rgb(15 28 69 / 0.22);
+    /* Ein heller Ring trennt das Bild von der Welle dahinter. */
+    outline: 3px solid rgb(255 255 255 / 0.9);
+    outline-offset: 0;
+}
+
+.dark .ofi-person-hero__avatar {
+    outline-color: rgb(255 255 255 / 0.16);
+}
+
+.ofi-person-hero__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ── Der Platz für das Profilbild ─────────────────────────────────────────────
+   Die Bildfläche ist ein Knopf, sobald die Person das Bild ändern darf. Zwei
+   Hinweise darauf: das Kamerazeichen unten rechts steht IMMER da (sonst wüsste
+   niemand, dass hier etwas anzuklicken ist), der dunkle Schleier erscheint
+   erst beim Darüberfahren. */
+.ofi-person-hero__avatar--editable {
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    border: 0;
+    /* Das Kamerazeichen sitzt AUF der Kante — mit `overflow: hidden` wäre es
+       halb abgeschnitten. Das Foto rundet sich stattdessen selbst. */
+    overflow: visible;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ofi-person-hero__avatar--editable img {
+    border-radius: inherit;
+}
+
+.ofi-person-hero__avatar--editable:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgb(15 28 69 / 0.28);
+}
+
+.ofi-person-hero__avatar-veil {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+    background: rgb(15 23 42 / 0.45);
+    color: #ffffff;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.ofi-person-hero__avatar--editable:hover .ofi-person-hero__avatar-veil,
+.ofi-person-hero__avatar--editable:focus-visible .ofi-person-hero__avatar-veil {
+    opacity: 1;
+}
+
+.ofi-person-hero__avatar-badge {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #272f67;
+    box-shadow: 0 2px 8px rgb(15 28 69 / 0.28);
+}
+
+.dark .ofi-person-hero__avatar-badge {
+    background: #1c1f26;
+    color: #e6cf9e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-person-hero__avatar--editable,
+    .ofi-person-hero__avatar-veil {
+        transition: none;
+    }
+
+    .ofi-person-hero__avatar--editable:hover {
+        transform: none;
+    }
+}
+
+/* Das Reiterband an der Unterkante — durchscheinend, damit die Welle
+   darunter noch zu ahnen ist. */
+.ofi-person-hero__tabs {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 0 clamp(10px, 2vw, 20px);
+    background: rgb(255 255 255 / 0.72);
+    border-top: 1px solid rgb(226 232 240 / 0.8);
+    backdrop-filter: blur(6px);
+    scrollbar-width: none;
+}
+
+.ofi-person-hero__tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.dark .ofi-person-hero__tabs {
+    background: rgb(10 11 13 / 0.62);
+    border-top-color: rgb(255 255 255 / 0.1);
+}
+
+.ofi-person-tab {
+    position: relative;
+    flex-shrink: 0;
+    padding: 11px 16px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: rgb(100 116 139);
+    white-space: nowrap;
+    transition: color 0.15s ease;
+}
+
+.ofi-person-tab:hover {
+    color: #1f2654;
+}
+
+.dark .ofi-person-tab {
+    color: rgb(255 255 255 / 0.6);
+}
+
+.dark .ofi-person-tab:hover {
+    color: #ffffff;
+}
+
+.ofi-person-tab[aria-current='page'] {
+    color: #1f2654;
+    font-weight: 700;
+}
+
+.dark .ofi-person-tab[aria-current='page'] {
+    color: #ffffff;
+}
+
+/* Der Balken unter dem gewählten Reiter. */
+.ofi-person-tab[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 2.5px;
+    border-radius: 2px 2px 0 0;
+    background: #272f67;
+}
+
+.dark .ofi-person-tab[aria-current='page']::after {
+    background: #e6cf9e;
+}
+
+/* Plakette am Reiter (offene Freigaben). */
+.ofi-person-tab__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: rgb(254 226 226);
+    color: rgb(185 28 28);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.dark .ofi-person-tab__badge {
+    background: rgb(239 68 68 / 0.18);
+    color: rgb(252 165 165);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-person-tab {
+        transition: none;
+    }
+}
