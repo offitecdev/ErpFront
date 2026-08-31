@@ -4,20 +4,20 @@
  * kod ile çizilen antet/alt bilgi, yumuşak tablo bantları, ince ayraçlar —
  * sablon.pdf arka plan birleştirmesi YOKTUR.
  *  - VERİSİ OLMAYAN BÖLÜM HİÇ ÇİZİLMEZ (not/görsel/checklist boşsa atlanır).
- *  - İmza alanı YALNIZCA müşteri içindir (teknisyen imzası kaldırıldı).
+ *  - İmza alanı İKİ karttır: solda teknisyen, sağda müşteri.
  */
 import { jsPDF } from 'jspdf';
-import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
+import { getPdfSettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
 import type { DeliveryReportDto, DeliveryResponseItem } from '../../lib/api/project';
 import { getReportTranslator, type FixedTranslator } from '@/i18n/reportLanguage';
 import {
-    CONTENT_W, EMPTY, ML,
+    CONTENT_W, EMPTY,
     addressLines, clean, dateFmt, dateShort, decoratePages, downloadPdf,
-    drawApprovalSection, drawBandRow, drawCover, drawImagesGrid,
-    drawModernTable, drawSectionTitle, ensureSpace,
+    drawApprovalSection, drawCover, drawImagesGrid,
+    drawModernTable, drawNoteBlock, drawSectionTitle, drawSubTitle, ensureSpace,
     loadBrandAssets, registerFonts,
-    COLOR_TEXT, FONT, FS_BASE, LH_BODY, type ModernColumn,
+    type ModernColumn,
 } from './modernReportKit';
 
 // ── Checklist: kategori bandı + modern durum tablosu ─────────────────────────
@@ -26,19 +26,17 @@ const drawResponses = (doc: jsPDF, report: DeliveryReportDto, responses: Deliver
 
     y = drawSectionTitle(doc, t('projects.delivery.checklist'), y);
 
-    // Kontrol maddesi açıklamasına OLABİLDİĞİNCE geniş alan: durum sütunları
-    // dar tutulur (kullanıcı isteği — "madde açıklama alanı çok küçüktü").
+    // Sauberere Tabelle (Vorgabe 19.08.2026): statt drei Kreuzchen-Spalten EINE
+    // Status-Spalte mit dem ausgeschriebenen Wort — der Kontrollpunkt und seine
+    // Beschreibung bekommen dadurch spürbar mehr Platz.
     const columns: ModernColumn[] = [
-        { header: t('projects.delivery.pdf.colStep'), w: 90 },
-        { header: t('projects.delivery.yes'), w: 11, align: 'center' },
-        { header: t('projects.delivery.no'), w: 11, align: 'center' },
-        { header: t('projects.delivery.na'), w: 15, align: 'center' },
-        { header: t('projects.delivery.pdf.colMeasurement'), w: CONTENT_W - 90 - 11 - 11 - 15 },
+        { header: t('projects.delivery.pdf.colStep'), w: 96 },
+        { header: t('common.status'), w: 22, align: 'center' },
+        { header: t('projects.delivery.pdf.colMeasurement'), w: CONTENT_W - 96 - 22 },
     ];
 
-    // Her kontrol listesi kendi adıyla (kategori = liste adı) yumuşak bir bantla
-    // açılır; düz listelerde kategori boş kalır ve liste adına düşer. Ek alt
-    // başlık YOKTUR (kullanıcı isteği).
+    // Her kontrol listesi kendi adıyla (kategori = liste adı) bir ALT BAŞLIKLA
+    // açılır; düz listelerde kategori boş kalır ve liste adına düşer.
     const catOf = (r: DeliveryResponseItem) =>
         r.category?.trim() || report.checklistName || t('projects.delivery.uncategorized');
     const categories: string[] = [];
@@ -47,18 +45,22 @@ const drawResponses = (doc: jsPDF, report: DeliveryReportDto, responses: Deliver
         if (!categories.includes(key)) categories.push(key);
     }
 
-    const mark = (on: boolean) => (on ? 'X' : '');
+    const statusText = (status: DeliveryResponseItem['status']) => {
+        if (status === 'YES') return t('projects.delivery.yes');
+        if (status === 'NO') return t('projects.delivery.no');
+        if (status === 'NA') return t('projects.delivery.na');
+        return EMPTY;
+    };
     for (const category of categories) {
         const items = responses.filter((r) => catOf(r) === category);
         if (items.length === 0) continue;
         y = ensureSpace(doc, y, 30);
-        y = drawBandRow(doc, category, '', y);
-        y += 1;
+        // Die Zwischenüberschrift trägt den Erledigungsstand der Liste.
+        const done = items.filter((item) => item.status !== null).length;
+        y = drawSubTitle(doc, category, `${done}/${items.length}`, y);
         const rows = items.map((item) => [
             clean(item.label) || EMPTY,
-            mark(item.status === 'YES'),
-            mark(item.status === 'NO'),
-            mark(item.status === 'NA'),
+            statusText(item.status),
             clean(item.measurement),
         ]);
         y = drawModernTable(doc, columns, rows, y);
@@ -74,13 +76,7 @@ const drawNotes = (doc: jsPDF, notes: string | null | undefined, y: number, t: F
     if (!text) return y;
 
     y = drawSectionTitle(doc, t('projects.delivery.notes'), y);
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(FS_BASE);
-    doc.setTextColor(...COLOR_TEXT);
-    const lines = doc.splitTextToSize(text, CONTENT_W - 2) as string[];
-    y = ensureSpace(doc, y, Math.min(lines.length, 4) * (LH_BODY + 0.2) + 6);
-    doc.text(lines, ML + 1, y + 3.6);
-    return y + lines.length * (LH_BODY + 0.2) + 8;
+    return drawNoteBlock(doc, text, y) + 2;
 };
 
 export interface DeliveryReportPdfParams {
@@ -93,7 +89,7 @@ export interface DeliveryReportPdfParams {
 }
 
 export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [], preparedBy = '', output }: DeliveryReportPdfParams) => {
-    const settings = usePdfSettingsStore.getState().settings;
+    const settings = getPdfSettings();
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     await registerFonts(doc);
     const assets = await loadBrandAssets(doc);
@@ -116,6 +112,7 @@ export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [
         // Yalnızca başlık + kontrol listesi tabloları (kullanıcı isteği) — liste
         // adı zaten her tablonun kendi bandında durur, alt başlık yazılmaz.
         title: t('projects.delivery.pdf.title'),
+        numberedSections: true,
     });
 
     y = drawResponses(doc, report, Array.isArray(report.responses) ? report.responses : [], y, t);
@@ -126,19 +123,35 @@ export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [
     const borrowed = fieldImages.map((img) => img?.imageData).filter(Boolean) as string[];
     const images = [...ownImages, ...borrowed.filter((src) => !ownImages.includes(src))];
     if (images.length > 0) {
-        y = drawSectionTitle(doc, t('projects.delivery.pdf.visuals'), y);
+        // Bölüm adları üç rapor türünde de AYNI kaynaktan gelir: "Bilder" ve
+        // "Bestätigung" artık her yerde tek anahtardan okunur (kullanıcı isteği
+        // 19.08.2026 — teslim raporu İngilizcede "Images", montaj raporu
+        // "Photos" diyordu).
+        y = drawSectionTitle(doc, t('projects.field.pdf.imagesTitle'), y);
         y = drawImagesGrid(doc, images, y);
     }
 
     drawApprovalSection(doc, {
-        title: t('projects.delivery.pdf.approvalTitle'),
+        title: t('projects.field.pdf.approvalTitle'),
         confirmText: t('projects.delivery.pdf.approvalConfirm'),
-        roleLabel: t('projects.delivery.pdf.customerRole'),
-        customerName: clean(project?.customer?.companyName) || EMPTY,
-        dateLabel: t('projects.delivery.pdf.date'),
-        dateText: dateFmt(report.signedAt || report.sentAt || report.createdAt, locale),
-        signatureLabel: t('projects.delivery.pdf.signature'),
-        signatureData: report.customerSignature,
+        signers: [
+            {
+                roleLabel: t('projects.delivery.pdf.technicianRole'),
+                name: clean(preparedBy) || EMPTY,
+                dateLabel: t('projects.delivery.pdf.date'),
+                dateText: dateFmt(report.technicianSignedAt || report.sentAt || report.createdAt, locale),
+                signatureLabel: t('projects.delivery.pdf.signature'),
+                signatureData: report.technicianSignature,
+            },
+            {
+                roleLabel: t('projects.delivery.pdf.customerRole'),
+                name: clean(project?.customer?.companyName) || EMPTY,
+                dateLabel: t('projects.delivery.pdf.date'),
+                dateText: dateFmt(report.signedAt || report.sentAt || report.createdAt, locale),
+                signatureLabel: t('projects.delivery.pdf.signature'),
+                signatureData: report.customerSignature,
+            },
+        ],
     }, y);
 
     decoratePages(doc, assets, settings, t);
@@ -149,7 +162,7 @@ export const exportDeliveryReportPdf = async ({ report, project, fieldImages = [
         return new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
     }
     const safeName = (clean(project?.projectName) || 'teslim').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80);
-    const dateLabel = dateShort(report.createdAt).replace(/[^0-9-]/g, '');
+    const dateLabel = dateShort(report.createdAt).replace(/\./g, '-');
     downloadPdf(finalBytes, `${safeName}-teslim-raporu-${dateLabel}.pdf`);
     return null;
 };

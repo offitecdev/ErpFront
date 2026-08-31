@@ -187,7 +187,7 @@ export const TenderCcField = ({ tenderId, value, onChange, disabled }: {
                                     event.preventDefault();
                                     add(row.email);
                                 }}
-                                className="ofi-option-row group cursor-pointer px-2.5 py-1.5 transition-colors hover:bg-[#1f2654]"
+                                className="ofi-option-row group cursor-pointer px-2.5 py-1.5 transition-colors"
                             >
                                 <div className="truncate text-[13px] text-slate-800 group-hover:!text-white">{row.name}</div>
                                 <div className="truncate text-[11.5px] text-slate-500 group-hover:!text-white/70">
@@ -202,7 +202,7 @@ export const TenderCcField = ({ tenderId, value, onChange, disabled }: {
                                     event.preventDefault();
                                     add(query);
                                 }}
-                                className="ofi-option-row group cursor-pointer border-t border-slate-100 px-2.5 py-1.5 transition-colors hover:bg-[#1f2654]"
+                                className="ofi-option-row group cursor-pointer border-t border-slate-100 px-2.5 py-1.5 transition-colors"
                             >
                                 <span className="text-[13px] text-slate-800 group-hover:!text-white">
                                     {t('calendar.picker.addEmail')}: {query.trim()}

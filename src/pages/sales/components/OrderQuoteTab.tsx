@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 
 import { t } from '@/i18n/translate';
 import { Card } from '@/components/ui-shared/Card';
+import { OrderConfirmationButton } from '@/components/orders/OrderConfirmationButton';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { SectionCard } from '@/components/ui-shared/TableKit';
 import { tenderApi } from '@/lib/api/tender';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
 import { formatMoney, toCurrencyCode, type CurrencyCode } from '@/utils/currency';
 import type { SimpleTenderLine } from '@/pages/sales/detail/types/tenderDetail.types';
 import { lineNetTotal } from '@/pages/sales/detail/utils/tenderCalculation.utils';
@@ -89,7 +90,7 @@ const QuoteTotalsFooter = ({ summary, fmt }: { summary: TenderPricingSummary; fm
  */
 export const OrderQuoteTab = ({ order }: { order: MyOrderDetailDto }) => {
     const navigate = useNavigate();
-    const { settings } = usePdfSettingsStore();
+    const settings = usePdfSettings();
     const tender = order.tender || null;
     const cost = order.costSummary;
     // Ek siparişin maliyet özetinde "Zusatzmaterial" satırı GÖSTERİLMEZ
@@ -145,10 +146,16 @@ export const OrderQuoteTab = ({ order }: { order: MyOrderDetailDto }) => {
     return (
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <SectionCard
-                title={t('projects.tender')}
+                /* Die Karte heisst AUFTRAG, nicht mehr «Angebot» — sie zeigt
+                   zwar die Positionen der Offerte, aber es ist der Auftrag,
+                   der hier gelesen wird (Benutzerwunsch, 29.08.2026). */
+                title={t('projects.order')}
                 action={tender ? (
-                    // Nummer öffnet die Offerte, das Auge das Angebots-PDF
-                    // (Vorschau + Download) — ohne die Seite zu verlassen.
+                    // Die Nummer öffnet weiterhin die Offerte; daneben steht
+                    // jetzt das VERKAUFS-PDF des Auftrags — genau derselbe
+                    // Beleg wie auf der Übersicht, nur grösser, weil er hier
+                    // das Hauptdokument der Karte ist. Das Angebots-PDF ist
+                    // dafür an den Fuss der Registerkarte gewandert.
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
@@ -157,7 +164,19 @@ export const OrderQuoteTab = ({ order }: { order: MyOrderDetailDto }) => {
                         >
                             {tender.tenderNumber}
                         </button>
-                        <QuotePdfButton tenderId={tender.id} tenderNumber={tender.tenderNumber} label="PDF" />
+                        <OrderConfirmationButton
+                            order={{
+                                id: order.id,
+                                orderNumber: order.orderNumber,
+                                tenderId: tender.id,
+                                orderDate: order.orderDate ?? null,
+                                createdAt: order.createdAt,
+                                confirmationNote: order.confirmationNote ?? null,
+                                confirmationValidUntil: order.confirmationValidUntil ?? null,
+                                createdBy: order.createdBy ?? null,
+                            }}
+                            className="ofi-ordconf-btn--lg"
+                        />
                     </div>
                 ) : undefined}
             >
@@ -246,6 +265,22 @@ export const OrderQuoteTab = ({ order }: { order: MyOrderDetailDto }) => {
                     <p className="text-sm text-tertiary">{t('crm.cost_info_not_found')}</p>
                 )}
             </Card>
+
+            {/* Ganz unten, über die volle Breite: der Weg zum ANGEBOTS-PDF.
+                Oben in der Kopfzeile liegt jetzt das Verkaufs-PDF des
+                Auftrags — wer stattdessen die Offerte sucht, findet sie hier
+                in einem Satz und öffnet dieselbe Vorschau wie zuvor. */}
+            {tender && (
+                <div className="ofi-quote-pdf-hint col-span-full">
+                    <span>{t('crm.quotePdfPrompt.question')}</span>
+                    <QuotePdfButton
+                        tenderId={tender.id}
+                        tenderNumber={tender.tenderNumber}
+                        label={t('crm.quotePdfPrompt.link')}
+                        variant="link"
+                    />
+                </div>
+            )}
         </div>
     );
 };

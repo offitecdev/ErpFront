@@ -33,7 +33,9 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         labelKey: 'nav.personnel',
         labelDefault: 'Personel',
         menuKeys: ['personel'],
-        pathPrefixes: ['/employees', '/attendance-records'],
+        // Der Neubau (16.08.2026) lebt unter '/personnel'; die alten Adressen
+        // bleiben als Weiterleitungen bestehen und deshalb auch hier gelistet.
+        pathPrefixes: ['/personnel', '/employees', '/attendance-records', '/attendance-settings'],
         actions: {
             read: ['employees.view', 'attendance.read', 'leaves.read'],
             write: ['employees.create', 'employees.update', 'attendance.create', 'attendance.update', 'leaves.create', 'leaves.approve'],
@@ -44,8 +46,12 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         key: 'crm',
         labelKey: 'nav.crm',
         labelDefault: 'CRM',
-        menuKeys: ['crm'],
-        pathPrefixes: ['/crm'],
+        // "Verkauf" (Angebote/Aufträge) ist seit 2026-08-14 eine eigene
+        // Menügruppe, bleibt aber IM CRM-Modul: ein neuer Modulschlüssel stünde
+        // in keiner bestehenden Firmenkategorie und hätte Verkauf damit für
+        // alle ausgeblendet.
+        menuKeys: ['crm', 'sales'],
+        pathPrefixes: ['/crm', '/sales'],
         actions: {
             read: ['crm.customers.view', 'tenders.view'],
             write: [
@@ -155,7 +161,19 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         // Company categories are configured here: the page must stay reachable
         // even for a company whose category disables the settings module,
         // otherwise a category could lock the admin out of editing it.
-        pathPrefixes: ['/settings/company-categories'],
+        // Same for the authorization page (Berechtigungen): WITHOUT the longer
+        // prefix here it falls to the settings module ('/settings'), and a
+        // category or role package without 'settings' bounced the click back
+        // to '/' — the menu item was visible (administration is always
+        // available) but the page never opened.
+        // Erinnerungs-Einstellungen ebenfalls: eine Mandanten-Richtlinie, die
+        // Manager pflegen — sie darf nicht daran hängen, ob die Kategorie das
+        // settings-Modul führt.
+        // Der Upload gehört ebenfalls hierher: er ist die Fläche der
+        // IT-Administration und hängt an einem Kennwort, nicht an einem Recht —
+        // ohne diesen längeren Präfix fiele er an das settings-Modul und eine
+        // Firmenkategorie ohne 'settings' würde die IT aussperren.
+        pathPrefixes: ['/settings/company-categories', '/settings/authorization', '/settings/modules', '/settings/reminders', '/settings/upload'],
         actions: {
             write: ['roles.manage', 'users.manage', 'tenants.create', 'tenants.update'],
         },

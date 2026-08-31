@@ -6,7 +6,6 @@ import {
     Send01 as Send,
 } from '@/components/icons/antIconCompat';
 
-import { Button } from '@/components/ui-shared/Button';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import type { DeliveryReportDto, SignatureRequestDto } from '@/lib/api/project';
 import type { ProjectDto } from '@/types/project';
@@ -88,9 +87,15 @@ export const SignatureTargetList = ({
         const status = computeSignatureStatus({ signed, request, ready });
         if (status === 'ready') {
             return (
-                <Button variant="secondary" size="sm" icon={<Send size={12} />} onClick={() => onSend(target())}>
-                    {t('signatures.sendForSignature')}
-                </Button>
+                <button
+                    type="button"
+                    className="ofi-sigbtn"
+                    title={t('signatures.sendForSignature')}
+                    onClick={() => onSend(target())}
+                >
+                    <Send size={13} />
+                    <span className="ofi-sigbtn__text">{t('signatures.sendForSignature')}</span>
+                </button>
             );
         }
         return <StatusChip variant={getSignatureStatusVariant(status)}>{getSignatureStatusLabel(status)}</StatusChip>;

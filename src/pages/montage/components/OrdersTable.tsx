@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { LuFolderOpen } from 'react-icons/lu';
 
 import { CheckCircle } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
@@ -19,14 +20,22 @@ const HIGHLIGHT: Record<MontageOrderRow['highlight'], string> = {
  * compact 13px rows, hairline column separators, small uppercase header band.
  * Rows still open the appointment sheet on tap. `showSignature` (completed
  * page) adds a customer-signature column derived from the row status.
+ *
+ * Sobald ein Rapport erfasst ist (`fieldReportId`), steht in der Zeile das
+ * Checklisten-Zeichen — unabhängig vom Termindatum (Vorgabe 16.08.2026): der
+ * Monteur kommt so an die Checklisten des Termins, auch wenn der Termin noch
+ * gar nicht dran ist. Ein Klick darauf öffnet NUR die Checklisten, nicht die
+ * Zeile.
  */
 export const OrdersTable = ({
     rows,
     onOpen,
+    onOpenDocuments,
     showSignature = false,
 }: {
     rows: MontageOrderRow[];
     onOpen: (row: MontageOrderRow) => void;
+    onOpenDocuments?: (row: MontageOrderRow) => void;
     showSignature?: boolean;
 }) => (
     <div className="overflow-x-auto rounded-[3px] border border-slate-300 bg-white dark:border-white/10 dark:bg-[#17191c]" data-unstyled-table>
@@ -83,7 +92,21 @@ export const OrdersTable = ({
                             </td>
                         )}
                         <td className="text-right">
-                            <StatusPill status={row.status} className="!px-2 !py-0.5 !text-[10.5px] !font-semibold" />
+                            <span className="inline-flex items-center justify-end gap-2">
+                                {onOpenDocuments && (
+                                    <button
+                                        type="button"
+                                        title={t('calendar.docs.title')}
+                                        aria-label={t('calendar.docs.title')}
+                                        onClick={(event) => { event.stopPropagation(); onOpenDocuments(row); }}
+                                        className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 text-[11.5px] font-semibold text-[#1f2654] transition-colors hover:border-[#1f2654]/45 hover:bg-[#eef2fb] dark:border-white/15 dark:bg-transparent dark:text-amber-300 dark:hover:bg-white/10"
+                                    >
+                                        <LuFolderOpen size={14} />
+                                        {t('calendar.docs.title')}
+                                    </button>
+                                )}
+                                <StatusPill status={row.status} className="!px-2 !py-0.5 !text-[10.5px] !font-semibold" />
+                            </span>
                         </td>
                     </tr>
                 ))}

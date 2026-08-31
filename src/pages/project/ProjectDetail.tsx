@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Briefcase01 as BriefcaseBusiness } from '@/components/icons/antIconCompat';
+import { SkeletonBar } from '@/components/ui-shared/Loader';
 
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
@@ -16,7 +17,7 @@ import {
     hasAddonAttention,
 } from './features/utils/projectTotals';
 import { getAwaitingTechnicianAppointments } from './features/utils/projectAppointments';
-import { type ProjectDetailView, viewForSection } from './features/types/projectDetailNavigation';
+import { type ProjectDetailView, viewForSection, viewFromSearch } from './features/types/projectDetailNavigation';
 
 import { t } from '@/i18n/translate';
 import { lazyToast as toast } from '@/lib/lazyToast';
@@ -34,9 +35,19 @@ const LazyProjectDeleteOrderModal = lazy(() =>
 export const ProjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { search } = useLocation();
     const { user, permissions } = useAuthStore();
-    const [activeView, setActiveView] = useState<ProjectDetailView>({ section: 'overview' });
-    const { project, materials, mailSettings, loading, sectionLoading, loadError, load } = useProjectDetailData(id, activeView);
+    // ?section=&sub= — Benachrichtigungen landen direkt im passenden Bereich.
+    const [activeView, setActiveView] = useState<ProjectDetailView>(() => viewFromSearch(search));
+    // Ein weiterer Sprung (andere Benachrichtigung, gleiche Seite) wechselt den
+    // Bereich mit — Zustand beim Rendern nachziehen, wie React es für "Wert
+    // hängt an einer Prop" vorsieht (kein Effekt, kein Zusatz-Render).
+    const [seenSearch, setSeenSearch] = useState(search);
+    if (seenSearch !== search) {
+        setSeenSearch(search);
+        if (new URLSearchParams(search).has('section')) setActiveView(viewFromSearch(search));
+    }
+    const { project, materials, mailSettings, loading, sectionLoading, loadError, load, invalidate } = useProjectDetailData(id, activeView);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [showComplete, setShowComplete] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
@@ -119,6 +130,12 @@ export const ProjectDetail = () => {
 
     const handleReload = useCallback(() => load(true), [load]);
 
+    /* Der Terminbereich IST der Kalender: er lädt seine Termine selbst nach. Die
+       Seite entwertet darum nur ihren Zwischenspeicher, statt das ganze Projekt
+       neu zu holen — sonst frischte hinter dem geschlossenen Fenster die ganze
+       Seite auf (Vorgabe 19.08.2026). */
+    const handleAppointmentChanged = useCallback(() => { invalidate(); }, [invalidate]);
+
     const handleOrderCreated = useCallback(async (orderId: string) => {
         await load(true);
         setSelectedOrderId(orderId);
@@ -128,7 +145,6 @@ export const ProjectDetail = () => {
     // re-run its per-order totals) when unrelated modal state toggles.
     const handleOpenDetails = useCallback(() => setShowDetails(true), []);
     const handleComplete = useCallback(() => setShowComplete(true), []);
-    const handleBack = useCallback(() => navigate('/projects'), [navigate]);
 
     // Dişli menüsünden, "DELETE" yazılarak onaylanmış proje silme. Faturalanmış
     // projeyi sunucu reddeder; başarıda listeye dönülür.
@@ -184,7 +200,6 @@ export const ProjectDetail = () => {
                 onCreateAddon={handleCreateAddon}
                 onOpenDetails={handleOpenDetails}
                 onComplete={handleComplete}
-                onBack={handleBack}
             />
 
             {/* Top workflow menu with hover sub-menus; content spans the full width. */}
@@ -193,11 +208,11 @@ export const ProjectDetail = () => {
                 onChange={setActiveView}
                 addonAttention={addonAttention}
             />
-            <div className="min-w-0 overflow-x-hidden rounded-xl border border-slate-200/70 bg-white p-4 shadow-xs md:p-6">
+            <div className="ofi-prj-stage">
                 {sectionLoading ? (
                     <div className="space-y-3" aria-busy="true">
-                        <div className="h-10 animate-pulse rounded-md bg-slate-100" />
-                        <div className="h-64 animate-pulse rounded-md bg-slate-100" />
+                        <SkeletonBar className="h-10 rounded-md" />
+                        <SkeletonBar className="h-64 rounded-md" delayMs={120} />
                     </div>
                 ) : renderProjectSection({
                     view: activeView,
@@ -216,6 +231,7 @@ export const ProjectDetail = () => {
                     onNavigate: setActiveView,
                     onSelectOrder: handleSelectOrder,
                     onReload: handleReload,
+                    onAppointmentChanged: handleAppointmentChanged,
                     onOrderCreated: handleOrderCreated,
                 })}
             </div>

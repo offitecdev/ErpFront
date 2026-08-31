@@ -107,12 +107,16 @@ export const SignatureSheet = ({
             <div
                 role="dialog"
                 aria-modal="true"
-                className="ofi-signature-pop w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200"
+                /* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
+                   "FENSTER-OBERFLÄCHE"). Das eigene `rounded-xl` kam als 8px an
+                   und der eigene Schatten wurde im Dunkeln von der
+                   `.bg-white`-Decke gelöscht. */
+                className="ofi-signature-pop ofi-pop w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200"
                 onClick={(event) => event.stopPropagation()}
             >
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
-                    <div className="truncate text-[13.5px] font-semibold text-slate-900">{title}</div>
-                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={16} /></button>
+                <div className="ofi-pop__rule flex items-center justify-between gap-2 border-b px-4 py-2.5">
+                    <div className="ofi-pop__title">{title}</div>
+                    <button type="button" onClick={onClose} aria-label={t('common.close')} className="ofi-float-card__iconbtn shrink-0"><X size={16} /></button>
                 </div>
 
                 <div className="max-h-[70vh] overflow-y-auto px-5 py-5 sm:px-6">
@@ -148,7 +152,7 @@ export const SignatureSheet = ({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-2.5">
+                <div className="ofi-pop__rule flex items-center justify-end gap-2 border-t px-4 py-2.5">
                     <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
                     <Button variant="primary" icon={<CheckCircle size={16} />} loading={saving} onClick={save}>{t('signatures.complete')}</Button>
                 </div>

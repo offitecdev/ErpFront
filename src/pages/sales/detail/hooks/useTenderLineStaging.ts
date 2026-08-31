@@ -629,34 +629,56 @@ export const useTenderLineStaging = ({
         return optimisticId;
     };
 
-    // Move a quote line one slot up or down by swapping its displayOrder with the
-    // adjacent sibling. Both rows are staged as ordinary inline `displayOrder`
-    // patches, so the new order persists with the next Save and re-sorts the
-    // local view immediately.
-    const handleMoveRow = (rowId: string, direction: 'up' | 'down') => {
+    // Move a quote line to any slot (long-press + drop in the table). `slot` is
+    // an insert-before index over the CURRENT sorted order, 0..rows.length.
+    // The new order is staged as ordinary inline `displayOrder` patches, so it
+    // persists with the next Save and re-sorts the local view immediately.
+    // Normally only the moved row is patched — it takes an order that fits
+    // between its new neighbours; the whole list is renumbered only when there
+    // is no room left or legacy rows carry null / duplicate orders.
+    const handleMoveRowTo = (rowId: string, slot: number) => {
         if (!tender || !isDraft || !canManage) return;
         const rows = sortPositions(localPositions);
-        const index = rows.findIndex((row) => row.id === rowId);
-        if (index < 0) return;
-        const targetIndex = direction === 'up' ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= rows.length) return;
+        const from = rows.findIndex((row) => row.id === rowId);
+        if (from < 0) return;
+        const clampedSlot = Math.max(0, Math.min(rows.length, Math.floor(slot)));
+        // Index in the list once the row has been taken out.
+        const to = clampedSlot > from ? clampedSlot - 1 : clampedSlot;
+        if (to === from) return;
 
-        const current = rows[index];
-        const target = rows[targetIndex];
-        // Fall back to the sorted position for legacy rows with a null order.
-        const orderOf = (row: PositionDto, idx: number) =>
-            row.displayOrder == null ? (idx + 1) * 1000 : Number(row.displayOrder);
-        let currentOrder = orderOf(current, index);
-        let targetOrder = orderOf(target, targetIndex);
-        // Legacy rows can share an order; derive distinct values from their
-        // sorted positions so the swap actually changes the sequence.
-        if (currentOrder === targetOrder) {
-            currentOrder = (index + 1) * 1000;
-            targetOrder = (targetIndex + 1) * 1000;
+        const reordered = [...rows];
+        const [moved] = reordered.splice(from, 1);
+        reordered.splice(to, 0, moved);
+
+        const orders = rows.map((row) => (row.displayOrder == null ? null : Number(row.displayOrder)));
+        const ordersUsable = orders.every((order, index) =>
+            order != null && Number.isFinite(order) && (index === 0 || order > (orders[index - 1] as number)));
+
+        if (ordersUsable) {
+            const orderOf = (row: PositionDto) => Number(row.displayOrder);
+            const prev = reordered[to - 1];
+            const next = reordered[to + 1];
+            let newOrder: number | null = null;
+            if (prev && next) {
+                const gap = orderOf(next) - orderOf(prev);
+                if (gap > 1) newOrder = orderOf(prev) + Math.floor(gap / 2);
+            } else if (next) {
+                if (orderOf(next) > 1) newOrder = Math.floor(orderOf(next) / 2);
+            } else if (prev) {
+                newOrder = orderOf(prev) + 1000;
+            }
+            if (newOrder != null) {
+                handleInlinePositionChange(moved.id, { displayOrder: newOrder });
+                return;
+            }
         }
 
-        handleInlinePositionChange(current.id, { displayOrder: targetOrder });
-        handleInlinePositionChange(target.id, { displayOrder: currentOrder });
+        // No usable gap: renumber in steps of 1000, touching only rows whose
+        // order actually changes.
+        reordered.forEach((row, index) => {
+            const order = (index + 1) * 1000;
+            if (Number(row.displayOrder) !== order) handleInlinePositionChange(row.id, { displayOrder: order });
+        });
     };
 
     // Shared by the per-row trash button and the bulk-delete modal: drops the
@@ -731,7 +753,7 @@ export const useTenderLineStaging = ({
         handleAddressPick,
         handleSaveAll,
         handleAddRow,
-        handleMoveRow,
+        handleMoveRowTo,
         handleDeleteRow,
         handleBulkDelete,
         handleBulkDiscount,

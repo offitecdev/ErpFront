@@ -9,6 +9,7 @@ const Login = lazyNamed(() => import('../pages/Login'), 'Login');
 const BookingPage = lazyNamed(() => import('../pages/project/BookingPage'), 'BookingPage');
 const ReportSigningPage = lazyNamed(() => import('../pages/services/ReportSigningPage'), 'ReportSigningPage');
 const MaintenanceBookingPage = lazyNamed(() => import('../pages/maintenance/MaintenanceBookingPage'), 'MaintenanceBookingPage');
+const PublicEnquiryPage = lazyNamed(() => import('../pages/PublicEnquiryPage'), 'PublicEnquiryPage');
 
 export const AppRouter = () => {
     return (
@@ -20,6 +21,10 @@ export const AppRouter = () => {
             <Route path="/booking/:token" element={page(BookingPage)} />
             <Route path="/maintenance-booking/:token" element={page(MaintenanceBookingPage)} />
             <Route path="/report-sign/:token" element={page(ReportSigningPage)} />
+            {/* Das oeffentliche Anfrageformular (10.09.2026): der Link, der auf
+                der Anfragenseite steht und verschickt wird. Ohne Anmeldung,
+                ohne App-Rahmen — wer ihn oeffnet, ist noch kein Kunde. */}
+            <Route path="/anfrage/:token" element={page(PublicEnquiryPage)} />
 
             <Route element={<ProtectedRoute />}>
                 <Route element={<MainLayout />}>

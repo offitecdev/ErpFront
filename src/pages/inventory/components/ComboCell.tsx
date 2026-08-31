@@ -45,7 +45,9 @@ export const ComboCell = ({
     emptyText,
     autoFocus,
     inputClassName = '',
+    panelClassName = '',
     keepOpenOnSelect = false,
+    listWidth = 260,
 }: {
     /** Açık/kapalı durum çağıranda durur: veri çekmeyi de o kapatır. */
     open: boolean;
@@ -63,9 +65,14 @@ export const ComboCell = ({
     emptyText?: string;
     autoFocus?: boolean;
     inputClassName?: string;
+    /** Zusätzliche Klasse für das aufklappende Panel (eigenes Kleid je Modul). */
+    panelClassName?: string;
     /** Çoklu seçim alanları (CC gibi): seçim listeyi KAPATMAZ, art arda
         seçilebilsin diye açık kalır. Odak da input'ta durur. */
     keepOpenOnSelect?: boolean;
+    /** Açılır listenin genişliği. Tablo hücresinde dar (260) doğrudur; form
+        alanında liste alanın kendisi kadar geniş olmalıdır. */
+    listWidth?: number;
 }) => {
     // Vurgulanan satır index yerine ID ile tutulur: liste her yazışta yeniden
     // kurulduğu için index kayardı; kayıt listeden düşerse vurgu kendiliğinden söner.
@@ -141,7 +148,8 @@ export const ComboCell = ({
             <AnchoredPicker
                 anchorEl={open ? inputEl : null}
                 onClose={() => onOpenChange(false)}
-                width={260}
+                width={listWidth}
+                panelClassName={panelClassName}
                 maxHeight={320}
                 footer={enabledActions.length ? (
                     <div className="py-0.5">
@@ -156,7 +164,7 @@ export const ComboCell = ({
                                     action.onSelect();
                                     onOpenChange(false);
                                 }}
-                                className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[12px] font-medium text-[#1f2654] transition-colors hover:bg-[#1f2654] hover:!text-white dark:text-white/80"
+                                className="ofi-option-action flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[12px] font-medium text-[#1f2654] transition-colors dark:text-white/80"
                             >
                                 {action.icon}
                                 <span className="truncate">{action.label}</span>
@@ -191,8 +199,15 @@ export const ComboCell = ({
                                 event.preventDefault();
                                 pick(option);
                             }}
-                            className={`ofi-option-row group flex w-full items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-[#1f2654] ${
-                                index === activeIdx ? 'bg-amber-100 ring-1 ring-inset ring-amber-400' : ''
+                            /* Farbe und Schrift der angesteuerten Zeile stehen
+                               app-weit in index.css (.ofi-option-row) — hell
+                               marineblau, dunkel orange, Schrift immer weiss.
+                               Die mit den Pfeiltasten angesteuerte Zeile traegt
+                               dieselbe Fuellung wie die ueberfahrene: zwei
+                               verschiedene Markierungen fuer dieselbe Sache
+                               waren nur zu lernen. */
+                            className={`ofi-option-row group flex w-full items-center gap-2 px-2 py-1 text-left transition-colors ${
+                                index === activeIdx ? 'is-active' : ''
                             }`}
                         >
                             <span className="min-w-0 flex-1 truncate text-[12.5px] text-slate-900 group-hover:!text-white dark:text-white">

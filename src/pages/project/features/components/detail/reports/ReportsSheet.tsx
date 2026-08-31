@@ -21,7 +21,7 @@ export const ReportsSheet = ({
     headerActions,
     footer,
     width,
-    zIndex = 80,
+    zIndex = 600,
     children,
 }: {
     open: boolean;

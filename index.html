@@ -20,9 +20,9 @@
   <title>Offitec Management Panel</title>
   <script>
     // Paint-critical decisions that cannot wait for the app bundle: the
-    // skeleton below must match the persisted theme (no white flash in dark
-    // mode) and must not appear inside the split-view pane iframe, which
-    // renders a bare shell of its own.
+    // boot splash below must match the persisted theme (no white flash in
+    // dark mode) and must not appear inside the split-view pane iframe,
+    // which renders a bare shell of its own.
     (function () {
       var root = document.documentElement;
       try {
@@ -32,6 +32,17 @@
         }
       } catch (e) { /* storage may be unavailable (privacy mode) */ }
       if (window.name === 'offitec-split-pane') root.classList.add('sk-pane');
+      // Zwei Bereiche öffnen mit IHREM Zeichen statt mit dem Marken-Stern:
+      // die Aufgaben mit dem Häkchen, das Postfach mit dem Outlook-Zeichen —
+      // entschieden aus der Adresse beim Einlesen; unter Electrons file://
+      // steht sie hinter dem Rautezeichen. src/lib/bootSplash.ts liest die
+      // Klasse zurück.
+      var path = location.protocol === 'file:' ? (location.hash || '').replace(/^#/, '') : location.pathname;
+      if (/^\/crm\/tasks(\/|$)/.test(path)) root.classList.add('sk-tasks');
+      else if (/^\/crm\/mail(\/|$)/.test(path)) root.classList.add('sk-mail');
+      // When the splash started showing — src/lib/bootSplash.ts keeps it on
+      // screen long enough for the intro animation to finish before fading.
+      window.__ofiSplashT0 = performance.now();
     })();
   </script>
   <script>
@@ -52,7 +63,10 @@
           permissions: fetch(api + '/auth/me/permissions', opts),
           tenants: fetch(api + '/tenants', opts),
         };
-        var m = location.pathname.match(/^\/crm\/tenders\/([^/?#]+)$/);
+        // The canonical route moved from /crm/tenders/:id to
+        // /sales/quotes/:id. Keep the legacy path for old bookmarks, but make
+        // the current route take the same HTML-parse-time fast path too.
+        var m = location.pathname.match(/^\/(?:sales\/quotes|crm\/tenders)\/([^/?#]+)\/?$/);
         if (m && m[1] !== 'new') {
           var tid = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
           pf.tender = {
@@ -72,10 +86,21 @@
     })();
   </script>
   <style>
-    /* Boot skeleton — inline so the first paint needs nothing but this
-       document. React's first commit replaces #root's children, which
-       removes the skeleton automatically. The app stylesheet is loaded
-       without render-blocking (see the async-css plugin in vite.config). */
+    /* Boot splash — inline so the first paint needs nothing but this
+       document. It only exists in this HTML, so it plays on full document
+       loads (fresh session, F5, new tab) and never on in-app navigation.
+       It sits OUTSIDE #root as a fixed overlay: React mounts underneath and
+       src/lib/bootSplash.ts fades it out once the app shell has committed
+       and the intro animation has had its minimum time on screen. The app
+       stylesheet is loaded without render-blocking (see the async-css
+       plugin in vite.config).
+
+       The `.ofi-splash-*` stage rules (halo, waves, marks, keyframes) are
+       SHARED: they stay in <head> for the page's lifetime and the sections'
+       own opening splashes (components/ui-shared/SectionSplash.tsx — the
+       tasks check, the mailbox's Outlook mark) reuse them with their own
+       palette. Rename here = rename there.
+       Dark mode keys on `html.sk-dark` (boot-time) OR `html.dark` (runtime). */
     html { background: #f6f8fb; }
     html.sk-dark { background: #08090a; }
     /* The app stylesheet resets this too, but that file is applied after
@@ -83,75 +108,393 @@
        lands (layout shift). */
     body { margin: 0; }
     #root { min-height: 100vh; }
-    .sk-boot {
-      min-height: 100vh;
+
+    #ofi-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f6f8fb;
+      font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+      transition: opacity .38s ease, visibility 0s linear .38s;
+    }
+    html.sk-dark #ofi-splash { background: #08090a; }
+    html.sk-pane #ofi-splash { display: none; }
+    #ofi-splash.is-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .ofi-splash-inner {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 18px;
-      font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+      gap: 22px;
+      transition: transform .38s ease;
+    }
+    #ofi-splash.is-out .ofi-splash-inner { transform: scale(1.06); }
+
+    /* Stage = halo footprint; the mark sits in its centre, the waves
+       radiate from its edge. Everything animates transform/opacity only,
+       so it all runs on the compositor (main-thread repaints during boot
+       inflate Total Blocking Time — see the old shimmer note in git). */
+    .ofi-splash-stage {
+      /* Palette per host: the tasks check splash keeps the reference's sky
+         blue, the boot overlay wears the company palette (see the brand
+         mark below). */
+      --ofi-splash-halo: #d3e1ff;
+      --ofi-splash-wave: 58, 112, 255;
+      position: relative;
+      width: 168px;
+      height: 168px;
+      display: grid;
+      place-items: center;
+    }
+    #ofi-splash .ofi-splash-stage {
+      --ofi-splash-halo: rgba(215, 213, 221, .72); /* #d7d5dd, softened */
+      --ofi-splash-wave: 82, 88, 129; /* #525881 */
+    }
+    /* Section routes: the boot overlay wears THAT section's mark and its
+       palette, and drops the wordmark — "only the icon animation". All three
+       marks are in the markup; the class picks one. */
+    html.sk-tasks #ofi-splash .ofi-splash-stage {
+      --ofi-splash-halo: #d3e1ff;
+      --ofi-splash-wave: 58, 112, 255;
+    }
+    html.sk-mail #ofi-splash .ofi-splash-stage {
+      --ofi-splash-halo: #d2e6ff;
+      --ofi-splash-wave: 20, 98, 199;
+    }
+    #ofi-splash .ofi-splash-mark--check,
+    #ofi-splash .ofi-splash-mark--mail,
+    html.sk-tasks #ofi-splash .ofi-splash-mark--brand,
+    html.sk-tasks #ofi-splash .ofi-splash-text,
+    html.sk-mail #ofi-splash .ofi-splash-mark--brand,
+    html.sk-mail #ofi-splash .ofi-splash-text { display: none; }
+    html.sk-tasks #ofi-splash .ofi-splash-mark--check { display: grid; }
+    html.sk-mail #ofi-splash .ofi-splash-mark--mail { display: grid; }
+    /* Dark: one palette for both hosts (listed with the id too, or the
+       boot override above outranks it). */
+    html.sk-dark .ofi-splash-stage,
+    html.dark .ofi-splash-stage {
+      --ofi-splash-halo: rgba(96, 140, 255, .14);
+      --ofi-splash-wave: 120, 160, 255;
+    }
+    html.sk-dark #ofi-splash .ofi-splash-stage,
+    html.dark #ofi-splash .ofi-splash-stage {
+      --ofi-splash-halo: rgba(147, 149, 173, .16);
+      --ofi-splash-wave: 147, 149, 173;
+    }
+    html.sk-dark.sk-tasks #ofi-splash .ofi-splash-stage,
+    html.dark.sk-tasks #ofi-splash .ofi-splash-stage {
+      --ofi-splash-halo: rgba(96, 140, 255, .14);
+      --ofi-splash-wave: 120, 160, 255;
+    }
+    html.sk-dark.sk-mail #ofi-splash .ofi-splash-stage,
+    html.dark.sk-mail #ofi-splash .ofi-splash-stage {
+      --ofi-splash-halo: rgba(58, 132, 240, .16);
+      --ofi-splash-wave: 96, 158, 245;
+    }
+    /* Dieselbe Palette für die Bühne IN der Seite (ui-shared/SectionSplash
+       setzt die Klasse). Muss NACH den Dunkel-Regeln oben stehen: sonst
+       gewönne deren höhere Gewichtung im Dunkelmodus. */
+    .ofi-splash-stage--mail {
+      --ofi-splash-halo: #d2e6ff;
+      --ofi-splash-wave: 20, 98, 199;
+    }
+    html.sk-dark .ofi-splash-stage--mail,
+    html.dark .ofi-splash-stage--mail {
+      --ofi-splash-halo: rgba(58, 132, 240, .16);
+      --ofi-splash-wave: 96, 158, 245;
+    }
+    .ofi-splash-halo,
+    .ofi-splash-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    /* Soft blue disc that blooms out from behind the mark. */
+    .ofi-splash-halo {
+      background: var(--ofi-splash-halo);
+      opacity: 0;
+      transform: scale(.55);
+      animation:
+        ofi-splash-bloom .7s cubic-bezier(.2, .8, .3, 1) .16s forwards,
+        ofi-splash-breathe 2.4s ease-in-out .9s infinite;
+    }
+    /* Three staggered waves rolling outward — soft edge inside, thin crest
+       outside; they loop so the splash keeps "working" on a slow boot. */
+    .ofi-splash-ring {
+      border: 1.5px solid rgba(var(--ofi-splash-wave), .45);
+      background: radial-gradient(closest-side, rgba(var(--ofi-splash-wave), 0) 68%, rgba(var(--ofi-splash-wave), .22) 100%);
+      opacity: 0;
+      transform: scale(1);
+      animation: ofi-splash-wave 2.4s cubic-bezier(.16, .7, .3, 1) .7s infinite;
+      will-change: transform, opacity;
+    }
+    .ofi-splash-ring:nth-child(3) { animation-delay: 1.5s; }
+    .ofi-splash-ring:nth-child(4) { animation-delay: 2.3s; }
+    /* The mark pops in (scale .5 → 1.08 → 1). Two variants share the box:
+       boot = the Offitec star shape (after fav4.svg: six blunt spokes with
+       chevron tips + centre dot) on a white disc in the COMPANY palette
+       (#06145c #d30f15 #d7d5dd #5d6388 #525881 #9395ad #d9484a #e38384
+       #e89899): navy / red / slate-blue spokes, coral centre dot, #d7d5dd
+       halo; tasks section = the reference's check on an azure→indigo
+       squircle. */
+    /* The mark is on screen from the FIRST frame — it grows into place, it
+       does not fade in. Fading it up from `opacity: 0` meant the browser had
+       nothing contentful to paint for the first few frames, and First
+       Contentful Paint waited for the fade instead of for the splash. */
+    .ofi-splash-mark {
+      position: relative;
+      width: 74px;
+      height: 74px;
+      display: grid;
+      place-items: center;
+      transform: scale(.5);
+      animation: ofi-splash-pop .6s cubic-bezier(.2, .9, .3, 1.25) forwards;
+    }
+    .ofi-splash-mark svg { display: block; overflow: visible; }
+    .ofi-splash-mark--brand {
+      --ofi-spoke-1: #06145c;
+      --ofi-spoke-2: #d30f15;
+      --ofi-spoke-3: #5d6388;
+      --ofi-dot: #e38384;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #ffffff 0%, #f4f4f8 100%);
+      box-shadow:
+        0 18px 30px -12px rgba(6, 20, 92, .45),
+        0 3px 8px rgba(6, 20, 92, .14),
+        inset 0 0 0 1px rgba(6, 20, 92, .07);
+    }
+    html.sk-dark .ofi-splash-mark--brand,
+    html.dark .ofi-splash-mark--brand {
+      --ofi-spoke-1: #eeeef4;
+      --ofi-spoke-2: #e38384;
+      --ofi-spoke-3: #9395ad;
+      --ofi-dot: #d30f15;
+      background: linear-gradient(180deg, #1c2140 0%, #06145c 100%);
+      box-shadow:
+        0 18px 30px -12px rgba(0, 0, 0, .55),
+        0 3px 8px rgba(0, 0, 0, .4),
+        inset 0 0 0 1px rgba(255, 255, 255, .07);
+    }
+    .ofi-splash-mark--brand svg { width: 100%; height: 100%; }
+    /* The star blooms out of the centre once the disc has landed. */
+    .ofi-splash-star {
+      fill: none;
+      stroke-width: 5;
+      stroke-linecap: square;
+      stroke-linejoin: miter;
+      transform-box: fill-box;
+      transform-origin: center;
+      transform: scale(.25) rotate(-45deg);
+      animation: ofi-splash-star .55s cubic-bezier(.2, .8, .3, 1.15) .26s forwards;
+    }
+    .ofi-splash-star path:nth-child(1) { stroke: var(--ofi-spoke-1); }
+    .ofi-splash-star path:nth-child(2) { stroke: var(--ofi-spoke-2); }
+    .ofi-splash-star path:nth-child(3) { stroke: var(--ofi-spoke-3); }
+    .ofi-splash-dot {
+      fill: var(--ofi-dot);
+      transform-box: fill-box;
+      transform-origin: center;
+      transform: scale(0);
+      animation: ofi-splash-dot .32s cubic-bezier(.2, .9, .3, 1.4) .62s forwards;
+    }
+    .ofi-splash-mark--check {
+      border-radius: 34%;
+      background: linear-gradient(165deg, #2f8dff 0%, #3f6cff 52%, #7457ff 100%);
+      box-shadow:
+        0 18px 32px -12px rgba(116, 87, 255, .7),
+        0 6px 14px -4px rgba(47, 141, 255, .45),
+        inset 0 1px 0 rgba(255, 255, 255, .28);
+    }
+    .ofi-splash-mark--check svg { width: 40px; height: 40px; }
+    .ofi-splash-tick {
+      fill: none;
+      stroke: #fff;
+      stroke-width: 7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: ofi-splash-draw .5s cubic-bezier(.3, .7, .3, 1) .3s forwards;
+    }
+    /* E-Mail-Bereich: DASSELBE Zeichen wie im Menü
+       (src/components/icons/OutlookMark.tsx) — gleiche Kurven, nur gross und
+       nacheinander aufgebaut, wie Outlook selbst beim Öffnen. Es liegt auf
+       einer weissen Kachel, damit es wie ein Programmsymbol wirkt und nicht
+       wie eine Zeichnung, die auf der Fläche schwebt. Ändert sich hier eine
+       Kurve, muss sie im Menüzeichen mitgehen. */
+    .ofi-splash-mark--mail {
+      border-radius: 26%;
+      background: linear-gradient(180deg, #ffffff 0%, #f2f6fd 100%);
+      box-shadow:
+        0 18px 32px -12px rgba(10, 63, 150, .5),
+        0 5px 12px -4px rgba(20, 98, 199, .3),
+        inset 0 0 0 1px rgba(10, 63, 150, .08);
+    }
+    html.sk-dark .ofi-splash-mark--mail,
+    html.dark .ofi-splash-mark--mail {
+      background: linear-gradient(180deg, #16224a 0%, #0a1533 100%);
+      box-shadow:
+        0 18px 32px -12px rgba(0, 0, 0, .58),
+        0 5px 12px -4px rgba(0, 0, 0, .42),
+        inset 0 0 0 1px rgba(255, 255, 255, .08);
+    }
+    .ofi-splash-mark--mail svg { width: 52px; height: 52px; }
+    /* Erst schiebt sich das Briefblatt hinter der Kachel hervor … */
+    .ofi-splash-mail-sheet {
+      transform-box: fill-box;
+      transform-origin: left center;
+      transform: translateX(-3px) scaleX(.8);
+      opacity: 0;
+      animation: ofi-splash-mail-sheet .5s cubic-bezier(.2, .8, .3, 1.05) .26s forwards;
+    }
+    /* … dann wird das "O" in einem Zug gezogen. */
+    .ofi-splash-mail-o {
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2.9;
+      stroke-linecap: round;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: ofi-splash-draw .6s cubic-bezier(.3, .7, .3, 1) .44s forwards;
     }
     /* Fixed line boxes: Open Sans arrives with font-display: swap, and
        without a locked height the fallback→webfont swap would nudge the
-       bars below (layout shift). */
-    .sk-brand {
-      font-size: 44px;
+       block (layout shift). */
+    .ofi-splash-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .ofi-splash-brand {
+      font-size: 24px;
       font-weight: 700;
-      letter-spacing: .5px;
-      color: #272f67;
-      height: 56px;
-      line-height: 56px;
+      letter-spacing: .4px;
+      color: #06145c;
+      height: 30px;
+      line-height: 30px;
+      opacity: 0;
+      animation: ofi-splash-rise .55s ease-out .34s forwards;
     }
-    html.sk-dark .sk-brand { color: #e8e2d5; }
-    .sk-sub {
-      font-size: 13px;
+    html.sk-dark .ofi-splash-brand, html.dark .ofi-splash-brand { color: #d7d5dd; }
+    .ofi-splash-sub {
+      font-size: 12px;
       letter-spacing: .3px;
-      color: #6b7280;
-      margin-top: -10px;
-      height: 18px;
-      line-height: 18px;
+      color: #5d6388;
+      height: 16px;
+      line-height: 16px;
+      opacity: 0;
+      animation: ofi-splash-rise .55s ease-out .46s forwards;
     }
-    html.sk-dark .sk-sub { color: #8a8f98; }
-    /* Shimmer runs as a transform animation on a compositor layer — a
-       background-position animation here repainted on the main thread every
-       frame and alone pushed Total Blocking Time through the roof. */
-    .sk-bar {
-      position: relative;
-      overflow: hidden;
-      width: min(420px, 72vw);
-      height: 12px;
-      border-radius: 6px;
-      background: #e4e9f1;
+    html.sk-dark .ofi-splash-sub, html.dark .ofi-splash-sub { color: #9395ad; }
+
+    @keyframes ofi-splash-pop {
+      0% { transform: scale(.5); }
+      65% { transform: scale(1.08); }
+      100% { transform: scale(1); }
     }
-    .sk-bar::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      transform: translateX(-100%);
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .65), transparent);
-      animation: sk-shimmer 1.1s linear infinite;
-      will-change: transform;
+    @keyframes ofi-splash-bloom {
+      to { opacity: 1; transform: scale(1); }
     }
-    html.sk-dark .sk-bar { background: #16181c; }
-    html.sk-dark .sk-bar::after {
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent);
+    @keyframes ofi-splash-breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.045); }
     }
-    .sk-bar + .sk-bar { width: min(340px, 60vw); }
-    .sk-bar + .sk-bar + .sk-bar { width: min(260px, 48vw); }
-    @keyframes sk-shimmer { to { transform: translateX(100%); } }
-    html.sk-pane .sk-boot { display: none; }
+    @keyframes ofi-splash-wave {
+      0% { opacity: .6; transform: scale(1); }
+      100% { opacity: 0; transform: scale(2.35); }
+    }
+    @keyframes ofi-splash-draw {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes ofi-splash-star {
+      to { transform: none; }
+    }
+    @keyframes ofi-splash-dot {
+      to { transform: scale(1); }
+    }
+    @keyframes ofi-splash-mail-sheet {
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes ofi-splash-rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #ofi-splash *, .ofi-splash-stage * { animation: none !important; transition: none !important; }
+      .ofi-splash-mark, .ofi-splash-halo, .ofi-splash-star, .ofi-splash-dot,
+      .ofi-splash-brand, .ofi-splash-sub, .ofi-splash-mail-sheet { opacity: 1; transform: none; }
+      .ofi-splash-tick, .ofi-splash-mail-o { stroke-dashoffset: 0; }
+      .ofi-splash-ring { display: none; }
+    }
   </style>
 </head>
 
 <body>
-  <div id="root">
-    <div class="sk-boot" aria-hidden="true">
-      <div class="sk-brand">Offitec</div>
-      <div class="sk-sub">Management Panel</div>
-      <div class="sk-bar"></div>
-      <div class="sk-bar"></div>
-      <div class="sk-bar"></div>
+  <div id="root"></div>
+  <div id="ofi-splash" aria-hidden="true">
+    <div class="ofi-splash-inner">
+      <div class="ofi-splash-stage">
+        <span class="ofi-splash-halo"></span>
+        <span class="ofi-splash-ring"></span>
+        <span class="ofi-splash-ring"></span>
+        <span class="ofi-splash-ring"></span>
+        <div class="ofi-splash-mark ofi-splash-mark--brand">
+          <svg viewBox="0 0 64 64" focusable="false">
+            <g class="ofi-splash-star">
+              <path d="M32 7v50M32 18 23 9m9 9 9-9M32 46l-9 9m9-9 9 9" />
+              <path d="M32 7v50M32 18 23 9m9 9 9-9M32 46l-9 9m9-9 9 9" transform="rotate(60 32 32)" />
+              <path d="M32 7v50M32 18 23 9m9 9 9-9M32 46l-9 9m9-9 9 9" transform="rotate(120 32 32)" />
+            </g>
+            <circle class="ofi-splash-dot" cx="32" cy="32" r="4.6" />
+          </svg>
+        </div>
+        <div class="ofi-splash-mark ofi-splash-mark--check">
+          <svg viewBox="0 0 96 96" focusable="false">
+            <path class="ofi-splash-tick" d="M27 50l14 14 28-30" pathLength="1" />
+          </svg>
+        </div>
+        <!-- Outlook-Zeichen: gleiche Kurven wie src/components/icons/OutlookMark.tsx
+             (dort mit eigenen Verlauf-Kennungen, damit sich beide nicht in die
+             Quere kommen). -->
+        <div class="ofi-splash-mark ofi-splash-mark--mail">
+          <svg viewBox="0 0 32 32" fill="none" focusable="false">
+            <defs>
+              <linearGradient id="ofiSplashOlTile" x1="0" y1="0" x2="0.65" y2="1">
+                <stop offset="0" stop-color="#2a7fe0" />
+                <stop offset="0.55" stop-color="#1462c7" />
+                <stop offset="1" stop-color="#0a3f96" />
+              </linearGradient>
+              <linearGradient id="ofiSplashOlSheet" x1="0.1" y1="0" x2="0.9" y2="1">
+                <stop offset="0" stop-color="#57b2f6" />
+                <stop offset="1" stop-color="#1b7fd8" />
+              </linearGradient>
+              <linearGradient id="ofiSplashOlFlap" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#a4dbfb" />
+                <stop offset="1" stop-color="#68bcf4" />
+              </linearGradient>
+            </defs>
+            <g class="ofi-splash-mail-sheet">
+              <path d="M12.6 7.2h16A2.2 2.2 0 0 1 30.8 9.4v13.2a2.2 2.2 0 0 1-2.2 2.2H12.6z" fill="url(#ofiSplashOlSheet)" />
+              <path d="M12.6 7.2h16A2.2 2.2 0 0 1 30.8 9.4v2.2l-9.1 5.7-9.1-5.7z" fill="url(#ofiSplashOlFlap)" />
+            </g>
+            <rect x="1.4" y="4.2" width="17.2" height="23.6" rx="3.5" fill="url(#ofiSplashOlTile)" />
+            <path d="M4.9 4.2h10.2a3.5 3.5 0 0 1 3.5 3.5v.5H1.4v-.5a3.5 3.5 0 0 1 3.5-3.5z" fill="#ffffff" opacity="0.16" />
+            <path class="ofi-splash-mail-o" d="M10 10.8a4.3 5.2 0 0 1 0 10.4 4.3 5.2 0 0 1 0-10.4z" pathLength="1" />
+          </svg>
+        </div>
+      </div>
+      <div class="ofi-splash-text">
+        <div class="ofi-splash-brand">Offitec</div>
+        <div class="ofi-splash-sub">Management Panel</div>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.tsx"></script>

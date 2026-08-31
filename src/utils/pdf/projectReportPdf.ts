@@ -6,17 +6,20 @@
  *  - VERİSİ OLMAYAN BÖLÜM HİÇ ÇİZİLMEZ.
  *  - İmza alanı YALNIZCA müşteri içindir (teknisyen imzası kaldırıldı).
  * Saha raporundan farkı: bu rapor TÜM saha raporlarının imzalı toplamıdır ve
- * tutarları (ek çalışma / ek malzeme / harici gider) İÇERİR.
+ * tutarları (ek çalışma / ek malzeme / harici gider) İÇERİR. Tutarlar kalem
+ * kalem toplanmaz: bölüm toplamı bandı yoktur, en altta TEK blok hâlinde
+ * "Zwischensumme" + "Gesamtbetrag" yazar (kullanıcı isteği 19.08.2026).
  */
 import { jsPDF } from 'jspdf';
-import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
+import { getPdfSettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
 import { getReportTranslator, type FixedTranslator } from '../../i18n/reportLanguage';
 import {
     CONTENT_W, EMPTY,
+    BAND_ROW_H, BAND_ROW_STRONG_H,
     addressLines, clean, dateFmt, dateShort, decoratePages, downloadPdf,
     drawApprovalSection, drawBandRow, drawCover, drawImagesGrid, drawJobList,
-    drawModernTable, drawSectionTitle, durationFmt,
+    drawModernTable, drawSectionTitle, drawSubTitle, durationFmt, ensureSpace,
     loadBrandAssets, minutesBetween, registerFonts, timeFmt,
     type JobItem, type ModernColumn,
 } from './modernReportKit';
@@ -34,8 +37,10 @@ export interface ProjectGeneralReportOptions {
 }
 
 // ── Biçimleyiciler / veri seçimi (eski üreticiyle birebir aynı mantık) ───────
+// İsviçre okunuşu: 1'234.50 (de-DE "1.234,50" veriyordu ve aynı sütun montaj
+// raporunda noktalı, genel raporda virgüllü çıkıyordu — kullanıcı isteği).
 const numFmt = (value?: number | null) =>
-    new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
+    new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value || 0));
 const moneyFmt = (value: number | null | undefined, currency: string = 'CHF') => `${currency} ${numFmt(value)}`;
 
 // Yerel tarih anahtarı (YYYY-MM-DD). toISOString (UTC) kullanılmaz; aksi halde
@@ -224,9 +229,10 @@ const drawJobs = (
         const jobs = jobsFromReports(group.reports);
         if (jobs.length === 0) return;
         if (kind === 'general' && groups.length > 1) {
-            // Gün ara başlığı — yumuşak bant, gün numarası + tarih.
-            y = drawBandRow(doc, t('projects.general.pdf.dayHeading', { n: gi + 1 }), dateFmt(group.key, locale), y);
-            y += 2;
+            // Gün ara başlığı — BÖLÜM İÇİ grup başlığı (basamak 3). Eskiden
+            // toplam bandıyla aynı görünüyordu; artık zeminsiz alt başlık.
+            y = drawSubTitle(doc, t('projects.general.pdf.dayHeading', { n: gi + 1 }), dateFmt(group.key, locale), y);
+            y += 1;
         }
         y = drawJobList(doc, jobs, y, t('projects.field.pdf.technicalNote'));
         y += 2;
@@ -275,8 +281,9 @@ const drawOvertime = (
         { header: t('projects.general.pdf.hourlyRate'), w: 38, align: 'right' },
         { header: t('projects.general.pdf.overtimeAmount'), w: CONTENT_W - 30 - 36 - 36 - 38, align: 'right' },
     ];
+    // Bölüm toplamı bandı KALDIRILDI (kullanıcı isteği 19.08.2026): genel rapor
+    // tutarları kalem kalem toplamaz — tek toplam bloğu belgenin en altındadır.
     y = drawModernTable(doc, columns, rows, y);
-    y = drawBandRow(doc, t('projects.general.pdf.overtimeTotal'), moneyFmt(total, currency), y + 1);
     return { y: y + 6, total };
 };
 
@@ -304,35 +311,39 @@ const drawResources = (
     // DÜZ tek tablo (kullanıcı isteği — grup bandı yok): satır türü ilk sütunda.
     y = drawSectionTitle(doc, t('projects.field.pdf.resourcesTitle'), y);
 
+    // Sütun düzeni MONTAJ RAPORUYLA BİREBİR aynıdır (kullanıcı isteği).
     const columns: ModernColumn[] = [
         { header: t('projects.field.pdf.colType'), w: 32 },
         { header: t('projects.field.pdf.materialName'), w: 46 },
         { header: t('projects.field.pdf.expenseDescription'), w: CONTENT_W - 32 - 46 - 22 - 16 - 28 },
         { header: t('projects.field.pdf.colDate'), w: 22, align: 'right' },
         { header: t('projects.field.pdf.colQty'), w: 16, align: 'right' },
-        { header: t('projects.general.pdf.colAmount'), w: 28, align: 'right' },
+        { header: t('common.amount'), w: 28, align: 'right' },
     ];
 
     let extraTotal = 0;
     const extraRows = extraMaterials.map((item) => {
         const amount = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
         extraTotal += amount;
-        return [t('projects.field.pdf.extraMaterials'), String(materialName(item, t)), clean(item.description) || EMPTY, EMPTY, String(Number(item.quantity) || 0), numFmt(amount)];
+        return [t('projects.field.pdf.extraMaterials'), String(materialName(item, t)), clean(item.description) || EMPTY, EMPTY, String(Number(item.quantity) || 0), moneyFmt(amount, currency)];
     });
     let expenseTotal = 0;
     const expenseRows = expenses.map((expense) => {
         const amount = Number(expense.amount) || 0;
         expenseTotal += amount;
-        return [t('projects.field.pdf.expensesTitle'), clean(expense.expenseType) || EMPTY, clean(expense.description) || EMPTY, dateFmt(expense.expenseDate, locale), EMPTY, numFmt(amount)];
+        return [t('projects.field.pdf.expensesTitle'), clean(expense.expenseType) || EMPTY, clean(expense.description) || EMPTY, dateFmt(expense.expenseDate, locale), EMPTY, moneyFmt(amount, currency)];
     });
+    // Kullanılan malzeme projeye bedel yazmaz; tutar boş değil, açıkça 0
+    // basılır — montaj raporundaki okunuşun aynısı.
     const usedRows = usedMaterials.map((item) => [
         t('projects.field.pdf.usedMaterials'), String(materialName(item, t)), clean(item.description) || EMPTY, EMPTY,
-        String(Number(item.quantity ?? item.qty) || 0) || EMPTY, EMPTY,
+        String(Number(item.quantity ?? item.qty) || 0) || EMPTY, moneyFmt(0, currency),
     ]);
 
-    y = drawModernTable(doc, columns, [...usedRows, ...extraRows, ...expenseRows], y);
-    if (extraTotal > 0) y = drawBandRow(doc, t('projects.general.pdf.extraMaterialTotal'), moneyFmt(extraTotal, currency), y + 1);
-    if (expenseTotal > 0) y = drawBandRow(doc, t('projects.general.pdf.expenseTotal'), moneyFmt(expenseTotal, currency), y + 1);
+    // Tür sütunu montaj raporundaki gibi birleşiktir: etiket bir kez yazılır.
+    // Kalem bazlı ara toplam bantları KALDIRILDI (kullanıcı isteği 19.08.2026);
+    // tutarlar yalnızca en alttaki tek toplam bloğunda özetlenir.
+    y = drawModernTable(doc, columns, [...usedRows, ...extraRows, ...expenseRows], y, { mergeFirstColumn: true });
 
     return { y: y + 6, extraTotal, expenseTotal };
 };
@@ -361,7 +372,7 @@ const saveReport = async (
     kind: ReportKind,
     options: ProjectGeneralReportOptions = {}
 ) => {
-    const settings = usePdfSettingsStore.getState().settings;
+    const settings = getPdfSettings();
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     // The general report is a signed aggregate of every field report up to now,
     // so the range is open-ended (all history) capped at today.
@@ -416,7 +427,9 @@ const saveReport = async (
         settings,
         recipientName: clean(project.customer?.companyName) || clean(project.customerId),
         recipientLines: addressLines(project.customer?.address),
-        title: `${titleWord} ${reportNo}`,
+        // Yalnızca rapor adı — numara kapak kartında (bkz. fieldReportPdf).
+        title: titleWord,
+        numberedSections: true,
     });
 
     y = drawScheduleTable(doc, groups, appointments, y, t, locale);
@@ -426,26 +439,49 @@ const saveReport = async (
     const resources = drawResources(doc, usedMaterials, extraMaterials, expenses, currency, y, t, locale);
     y = resources.y;
 
-    // Genel toplam bandı — yalnızca faturalanacak bir tutar gerçekten varsa.
+    // Belgenin TEK toplam bloğu (kullanıcı isteği 19.08.2026): kalem kalem
+    // dökülmez, yalnızca ara toplam + genel toplam yazılır. Yalnızca
+    // faturalanacak bir tutar gerçekten varsa çizilir ve blok bölünmez.
     const grandTotal = overtime.total + resources.extraTotal + resources.expenseTotal;
     if (grandTotal > 0) {
-        y = drawBandRow(doc, t('projects.general.pdf.grandTotal'), moneyFmt(grandTotal, currency), y, true);
+        y = ensureSpace(doc, y, BAND_ROW_H + BAND_ROW_STRONG_H + 3);
+        y = drawBandRow(doc, t('projects.general.pdf.subtotal'), moneyFmt(grandTotal, currency), y);
+        y = drawBandRow(doc, t('projects.field.pdf.grandTotal'), moneyFmt(grandTotal, currency), y + 1, true);
         y += 6;
     }
 
     y = drawImages(doc, filteredReports, y, t);
 
-    // İmzayı toplamın kapsadığı EN SON imzalı saha raporundan alırız.
-    const signature = [...filteredReports].reverse().find((r) => r?.customerSignature)?.customerSignature;
+    // İmzaları toplamın kapsadığı EN SON imzalı saha raporundan alırız.
+    const lastSigned = [...filteredReports].reverse();
+    const signature = lastSigned.find((r) => r?.customerSignature)?.customerSignature;
+    const technicianReport = lastSigned.find((r: any) => r?.technicianSignature);
+    const technicianName = technicianReport?.employee
+        ? `${technicianReport.employee.firstName || ''} ${technicianReport.employee.lastName || ''}`.trim()
+        : preparedBy;
     drawApprovalSection(doc, {
         title: t('projects.field.pdf.approvalTitle'),
         confirmText: t('projects.general.pdf.approvalConfirm'),
-        roleLabel: t('projects.field.pdf.customerRole'),
-        customerName: clean(project.customer?.companyName) || EMPTY,
-        dateLabel: t('projects.field.pdf.date'),
-        dateText: dateFmt(reportDate(filteredReports[0]), locale),
-        signatureLabel: t('projects.field.pdf.signature'),
-        signatureData: signature,
+        signers: [
+            {
+                roleLabel: t('projects.field.pdf.technicianRole'),
+                name: clean(technicianName) || EMPTY,
+                dateLabel: t('projects.field.pdf.date'),
+                dateText: technicianReport?.technicianSignedAt
+                    ? dateFmt(technicianReport.technicianSignedAt, locale)
+                    : dateFmt(reportDate(filteredReports[0]), locale),
+                signatureLabel: t('projects.field.pdf.signature'),
+                signatureData: technicianReport?.technicianSignature,
+            },
+            {
+                roleLabel: t('projects.field.pdf.customerRole'),
+                name: clean(project.customer?.companyName) || EMPTY,
+                dateLabel: t('projects.field.pdf.date'),
+                dateText: dateFmt(reportDate(filteredReports[0]), locale),
+                signatureLabel: t('projects.field.pdf.signature'),
+                signatureData: signature,
+            },
+        ],
     }, y);
 
     decoratePages(doc, assets, settings, t);

@@ -28,11 +28,11 @@ export const TenderPriceSummary = ({ summary, canEdit, onOpenDiscounts }: Tender
     const showCombined = summary.discounts.filter((entry) => entry.amount > 0).length > 1;
 
     return (
-        <div className="flex justify-end border-t border-slate-200 bg-slate-50">
+        <div className="flex justify-end border-t border-slate-200 bg-white">
             {/* Sits flush in the table's bottom-right corner — same hairlines, so
                 the totals read as the table's last block rather than a card
                 floating under it. */}
-            <div className="w-full max-w-[330px] space-y-0.5 border-l border-slate-200 bg-white px-3 py-2 text-[12.5px]">
+            <div className="w-full max-w-[330px] space-y-0.5 bg-white px-4 py-3 text-[12.5px]">
                 {hasDiscounts && (
                     <div className="flex items-center justify-between gap-3">
                         <span className="text-slate-500">{t('tenders.subtotal_excl_vat')}</span>
@@ -70,7 +70,7 @@ export const TenderPriceSummary = ({ summary, canEdit, onOpenDiscounts }: Tender
                         <button
                             type="button"
                             onClick={onOpenDiscounts}
-                            className="inline-flex items-center gap-1.5 rounded-[2px] border border-slate-200 px-2 py-1 text-[11.5px] font-semibold text-[#1f2654] transition-colors hover:border-[#1f2654] hover:bg-[#1f2654]/[0.06]"
+                            className="ofi-quote-addbtn"
                         >
                             <Percent01 size={12} />
                             {t('tenders.apply_discount')}

@@ -4,7 +4,7 @@ import { ArrowRight, Bell01 as Bell, X as XIcon } from '@/components/icons/antIc
 
 import { t } from '@/i18n/translate';
 import { crmApi } from '@/lib/api/crm';
-import { notificationApi } from '@/lib/api/notifications';
+import { NOTIFICATIONS_CHANGED_EVENT, notificationApi } from '@/lib/api/notifications';
 import { notificationText, reminderTitle } from '@/lib/notificationText';
 import { useAuthStore } from '@/store/authStore';
 
@@ -34,9 +34,6 @@ const VISIBLE_SECONDS = 15;
 const POLL_MS = 60_000;
 /** Beim ersten Blick zählen Benachrichtigungen der letzten Minuten als "frisch". */
 const FIRST_LOOK_BACK_MS = 5 * 60_000;
-
-/** Wird ausgelöst, sobald neue Benachrichtigungen eingetroffen sind (die Glocke zählt nach). */
-export const NOTIFICATIONS_CHANGED_EVENT = 'ofi:notifications-changed';
 
 interface ToastItem {
     key: string;
@@ -142,9 +139,18 @@ export const ReminderToasts = () => {
             ]);
         };
 
-        void poll();
-        const id = setInterval(() => void poll(), POLL_MS);
-        return () => { cancelled = true; clearInterval(id); };
+        // A cancellable zero-delay start avoids React StrictMode issuing the
+        // same two requests twice during its development-only effect replay.
+        let intervalId: number | undefined;
+        const initialPollId = window.setTimeout(() => {
+            void poll();
+            intervalId = window.setInterval(() => void poll(), POLL_MS);
+        }, 0);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(initialPollId);
+            if (intervalId !== undefined) window.clearInterval(intervalId);
+        };
     }, [isAuthenticated]);
 
     // EIN Zähler für den ganzen Stapel statt einer Uhr pro Fenster.

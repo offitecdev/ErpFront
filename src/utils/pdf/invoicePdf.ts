@@ -15,11 +15,12 @@
  * İsviçre haçı); "Zusätzliche Informationen" satırına fatura numarası yazılır.
  */
 import { tenderApi } from '@/lib/api/tender';
-import { buildTree, flattenTenderTreeForPdf } from '@/pages/tender/detail/tenderDetailUtils';
-import { buildSimpleTenderLines } from '@/pages/tender/detail/utils/tenderLine.utils';
-import { discountDisplayName, seedTotalDiscounts } from '@/pages/tender/detail/utils/tenderDiscounts.utils';
-import { computeTenderPricingSummary } from '@/pages/tender/detail/utils/tenderPricing.utils';
-import { attachPdfPositionImages } from '@/pages/tender/detail/utils/tenderPdfImages.utils';
+import { buildTree, flattenTenderTreeForPdf } from '@/pages/sales/detail/tenderDetailUtils';
+import { buildSimpleTenderLines } from '@/pages/sales/detail/utils/tenderLine.utils';
+import { discountDisplayName, seedTotalDiscounts } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
+import { computeTenderPricingSummary } from '@/pages/sales/detail/utils/tenderPricing.utils';
+import { attachPdfPositionImages } from '@/pages/sales/detail/utils/tenderPdfImages.utils';
+import type { PaymentStage } from '@/lib/paymentSchedule';
 import type { InvoiceDto, InvoiceKind } from '@/types/billing';
 import type { PdfCompanySettings } from '@/store/pdfSettingsStore';
 import {
@@ -40,6 +41,12 @@ export interface InvoiceOrderContext {
     billingAddress?: string | null;
     salespersonName?: string | null;
     commissionNumber?: string | null;
+    /**
+     * Siparişin ödeme planı (taksit yüzdesi + vade). Doluysa faturanın sonuna
+     * "Zahlungsplan" tablosu eklenir — müşteri hangi taksidin ne zaman ve ne
+     * kadar ödeneceğini faturanın kendisinde görür.
+     */
+    paymentStages?: PaymentStage[] | null;
 }
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
@@ -66,6 +73,42 @@ const partialRowTitle = (kind: InvoiceKind, percent: number): string => {
     if (kind === 'SCHLUSS') return `Restbetrag ${fmtPct(percent)}`;
     if (kind === 'ZWISCHEN') return `Zwischenzahlung von ${fmtPct(percent)}`;
     return `Anzahlung von ${fmtPct(percent)}`;
+};
+
+/**
+ * DIREKTRECHNUNG (30.08.2026): die Positionen stehen auf der Rechnung selbst —
+ * es gibt keine Offerte, aus der sie nachgeladen werden könnten. Jede Zeile
+ * wird gedruckt wie eine Offertposition (Menge · Einheit · Einzelpreis ·
+ * Betrag); die Preise sind NETTO, die MWST kommt darunter als eigene Zeile.
+ */
+const buildDirectPositions = (
+    invoice: InvoiceDto,
+    vatRate: number,
+): { positions: TenderPdfData['positions']; totals: TenderPdfTotals } => {
+    const lines = [...(invoice.lineItems || [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const netTotal = round2(lines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0));
+    // Gedruckt wird der GESPEICHERTE Betrag: er ist die Zahl, die der QR-Teil
+    // einzieht. Die Steuer ergibt sich als Differenz, damit Beleg und Zahlteil
+    // nie um einen Rappen auseinanderliegen.
+    const grossTotal = round2(Number(invoice.amount) || round2(netTotal * (1 + vatRate / 100)));
+
+    return {
+        positions: lines.map((line, index) => ({
+            shortDescription: `${index + 1} ${line.description}`,
+            // 'PRODUCT' ist eine der Zeilenarten, die NIE zum Kapitel werden
+            // (`NEVER_CHAPTER_ROW_TYPES`) — eine Position zum Preis 0 behält so
+            // ihre Preisspalten und fällt nicht als Titelband aus der Tabelle.
+            rowType: 'PRODUCT',
+            isTopLevel: true,
+            hierarchyLevel: 1,
+            quantity: Number(line.quantity) || 0,
+            unit: line.unit || 'Stk.',
+            unitPrice: Number(line.unitAmount) || 0,
+            taxRate: vatRate,
+            lineTotal: round2(Number(line.lineTotal) || 0),
+        })),
+        totals: { netTotal, vatTotal: round2(grossTotal - netTotal), grossTotal },
+    };
 };
 
 /** Yüzdelik fatura: tek satırlık pozisyon listesi + net/KDV/brüt özeti. */
@@ -156,6 +199,13 @@ const buildFullPositions = async (
  * PDF'inin Verkäufer satırıyla aynı kural). Proje sekmesinden gelen bağlam
  * adres taşımaz — "doğru adres" HER ZAMAN tekliften okunur (kullanıcı isteği).
  */
+/**
+ * Eine Direktrechnung trägt ihren Empfänger selbst (`recipientName`) — es gibt
+ * weder Auftrag noch Offerte, aus der er käme. Genau daran ist sie zu erkennen.
+ */
+export const isDirectInvoice = (invoice: Pick<InvoiceDto, 'salesOrderId' | 'projectId' | 'recipientName'>): boolean =>
+    !invoice.salesOrderId && !invoice.projectId && Boolean(invoice.recipientName);
+
 const enrichContextFromTender = async (ctx: InvoiceOrderContext): Promise<InvoiceOrderContext> => {
     if (!ctx.tenderId || (ctx.billingAddress && ctx.commissionNumber && ctx.salespersonName)) return ctx;
     try {
@@ -187,15 +237,24 @@ export async function buildInvoicePdfBytes(
     onProgress?: (p: TenderPdfProgress) => void,
     lang: PdfLang = 'de',
 ): Promise<Uint8Array> {
-    const vatRate = Number(settings.vatRate) || 8.1;
+    const direct = isDirectInvoice(invoice);
+    // Der Steuersatz der Direktrechnung ist EINGEFROREN: ein später geänderter
+    // Firmenwert darf eine gestellte Rechnung nicht rückwirkend verschieben.
+    const vatRate = direct && invoice.vatRate != null
+        ? Number(invoice.vatRate)
+        : Number(settings.vatRate) || 8.1;
     const title = invoiceKindTitle(invoice.kind);
-    const ctx = await enrichContextFromTender(rawCtx);
+    // Eine Direktrechnung hat keine Offerte — nichts nachzuladen.
+    const ctx = direct ? rawCtx : await enrichContextFromTender(rawCtx);
 
-    // RECHNUNG bir teklife bağlıysa tüm pozisyonlar; diğer her durumda tek satır.
-    const body = (invoice.kind === 'RECHNUNG' && ctx.tenderId
-        ? await buildFullPositions(ctx.tenderId, vatRate, onProgress)
-        : null)
-        ?? buildPartialPositions(invoice, ctx, vatRate);
+    // Direktrechnung: die eigenen Positionen. Sonst RECHNUNG aus der Offerte
+    // (alle Positionen) bzw. in jedem anderen Fall die eine Prozentzeile.
+    const body = direct
+        ? buildDirectPositions(invoice, vatRate)
+        : ((invoice.kind === 'RECHNUNG' && ctx.tenderId
+            ? await buildFullPositions(ctx.tenderId, vatRate, onProgress)
+            : null)
+            ?? buildPartialPositions(invoice, ctx, vatRate));
 
     // Kartta TAM BEŞ satır (kullanıcı isteği): Auftrags-Nr. YOK, Fälligkeit
     // EN SONDA. Kommission tekliften gelir (faturalama ekranında girilmez).
@@ -211,11 +270,25 @@ export async function buildInvoicePdfBytes(
         tenderNumber: invoice.invoiceNumber,
         version: 1,
         createdAt: invoice.invoiceDate || invoice.createdAt,
-        customerName: ctx.customerName || invoice.customer?.companyName || '',
-        customerAddress: ctx.billingAddress || null,
+        // Direktrechnung: Empfänger und Adresse stehen AUF der Rechnung.
+        customerName: (direct ? invoice.recipientName : null)
+            || ctx.customerName || invoice.customer?.companyName || '',
+        customerAddress: (direct ? invoice.recipientAddress : null) || ctx.billingAddress || null,
+        // Einleitungstext über der Positionstabelle ("Für die ausgeführten
+        // Arbeiten erlauben wir uns zu berechnen:") — er steht auf Seite 1
+        // unter dem Titel, genau wie der Einleitungstext der Offerte.
+        coverLetter: direct ? (invoice.introText || null) : null,
         positions: body.positions,
         grandTotal: round2(Number(invoice.amount) || 0),
         totals: body.totals,
+        // Zahlungsplan des AUFTRAGS — nur auf der Vollrechnung sinnvoll: eine
+        // Teilrechnung IST bereits eine Rate, dort würde der Plan gegen den
+        // Rechnungsbetrag (nicht gegen die Auftragssumme) gerechnet.
+        paymentStages: invoice.kind === 'RECHNUNG' ? (ctx.paymentStages ?? null) : null,
+        // Zahlungsbedingungen gehören auf die RECHNUNG, nicht auf die Offerte:
+        // erst hier gibt es einen fälligen Betrag, auf den sich "zahlbar innert
+        // 30 Tagen" überhaupt beziehen kann.
+        showPaymentTerms: true,
         qrBillEnabled: true,
         lang,
         docTitle: title,

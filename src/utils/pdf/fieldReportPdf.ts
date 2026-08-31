@@ -2,19 +2,21 @@
  * ── MODERN SAHA RAPORU (Montage-Rapport) PDF ─────────────────────────────────
  * Tasarım dili `modernReportKit.ts`ten gelir (tenderPdfModern ile aynı kimlik).
  *  - VERİSİ OLMAYAN BÖLÜM HİÇ ÇİZİLMEZ.
- *  - İmza alanı YALNIZCA müşteri içindir (teknisyen imzası kaldırıldı).
+ *  - İmza alanı İKİ karttır: solda teknisyen, sağda müşteri.
  * Tek para alanı kaynaklar tablosunun "Betrag" sütunudur: kullanılan malzeme
  * daima 0, ek malzeme ve harici gider kendi tutarını taşır (kullanıcı isteği).
+ * Tablonun altında ÜÇ toplam bandı durur: Total Zusatzmaterial, Total externe
+ * Kosten ve Gesamtbetrag (yalnızca tutarı olanlar çizilir).
  */
 import { jsPDF } from 'jspdf';
-import { usePdfSettingsStore } from '../../store/pdfSettingsStore';
+import { getPdfSettings } from '../../store/pdfSettingsStore';
 import type { ProjectDto } from '../../types/project';
 import { getReportTranslator, type FixedTranslator } from '../../i18n/reportLanguage';
 import {
-    CONTENT_W, EMPTY, ML, MR,
+    BAND_ROW_H, BAND_ROW_STRONG_H, CONTENT_W, EMPTY, MR,
     addressLines, clean, dateFmt, dateShort, decoratePages, downloadPdf,
     drawApprovalSection, drawBandRow, drawCover, drawImagesGrid, drawJobList,
-    drawModernTable, drawSectionTitle, durationFmt, ensureSpace,
+    drawModernTable, drawNoteBlock, drawSectionTitle, durationFmt, ensureSpace,
     loadBrandAssets, minutesBetween, registerFonts, timeFmt,
     COLOR_MUTED, FONT, type JobItem, type ModernColumn,
 } from './modernReportKit';
@@ -86,7 +88,10 @@ function drawTimes(doc: jsPDF, report: any, facts: TimeFacts, y: number, t: Fixe
             facts.workedMin > 0 ? durationFmt(facts.workedMin, t) : EMPTY,
         ]);
     }
-    y = drawModernTable(doc, columns, rows, y);
+    // Überzeit bandı tablosundan kopmasın diye son satırla birlikte ölçülür.
+    y = drawModernTable(doc, columns, rows, y, {
+        reserveAfter: facts.overtimeMin > 0 ? BAND_ROW_H + (facts.maxMin > 0 ? 6 : 1) : 0,
+    });
 
     // Überzeit bandı yalnızca gerçekten ek çalışma varken görünür.
     if (facts.overtimeMin > 0) {
@@ -137,17 +142,9 @@ function drawJobs(doc: jsPDF, report: any, y: number, t: FixedTranslator): numbe
     y = drawSectionTitle(doc, t('projects.field.pdf.jobsTitle'), y);
     y = drawJobList(doc, jobs, y, t('projects.field.pdf.technicalNote'));
 
-    // Teknik not: liste sonunda, italik ve soluk — yalnızca doluysa.
-    if (note) {
-        doc.setFont(FONT, 'italic');
-        doc.setFontSize(8.4);
-        doc.setTextColor(...COLOR_MUTED);
-        const noteLines = doc.splitTextToSize(`${t('projects.field.pdf.technicalNote')}: ${note}`, CONTENT_W - 2) as string[];
-        y = ensureSpace(doc, y, noteLines.length * 4 + 4);
-        doc.text(noteLines, ML + 1, y + 3.4);
-        y += noteLines.length * 4 + 3;
-        doc.setFont(FONT, 'normal');
-    }
+    // Teknik not: liste sonunda, artık yumuşak bir not kartında (daha derli
+    // toplu görünüm — kullanıcı isteği).
+    if (note) y = drawNoteBlock(doc, `${t('projects.field.pdf.technicalNote')}: ${note}`, y + 2);
 
     return y + 5;
 }
@@ -162,7 +159,7 @@ const materialQty = (item: any) => {
 
 /** Kaynaklar tablosunun tutar sütunu — para birimi ayarlardan gelir. */
 const moneyFmt = (value: number) => {
-    const currency = usePdfSettingsStore.getState().settings.currency || 'CHF';
+    const currency = getPdfSettings().currency || 'CHF';
     return `${currency} ${new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 };
 
@@ -181,26 +178,29 @@ function drawResources(
     // ("Verwendet" / "Zusatzmaterial" / "Externe Kosten") ilk sütunda yazar —
     // ekran editörüyle birebir aynı düzen.
     y = drawSectionTitle(doc, t('projects.field.pdf.resourcesTitle'), y);
+    // Sütun düzeni GENEL RAPORLA BİREBİR aynıdır (kullanıcı isteği 19.08.2026):
+    // Typ | Bezeichnung | Beschreibung | Datum | Menge | Betrag. Tutar en sağda
+    // durur ki toplam satırının değeriyle aynı hizaya gelsin.
     const columns: ModernColumn[] = [
         { header: t('projects.field.pdf.colType'), w: 32 },
         { header: t('projects.field.pdf.materialName'), w: 46 },
-        { header: t('projects.field.pdf.expenseDescription'), w: CONTENT_W - 32 - 46 - 14 - 24 - 22 },
-        { header: t('projects.field.pdf.colQty'), w: 14, align: 'right' },
-        { header: t('common.amount'), w: 24, align: 'right' },
+        { header: t('projects.field.pdf.expenseDescription'), w: CONTENT_W - 32 - 46 - 22 - 16 - 28 },
         { header: t('projects.field.pdf.colDate'), w: 22, align: 'right' },
+        { header: t('projects.field.pdf.colQty'), w: 16, align: 'right' },
+        { header: t('common.amount'), w: 28, align: 'right' },
     ];
     // Kullanılan malzeme projeye BEDEL YAZMAZ — tutarı boş değil, açıkça 0
     // basılır (kullanıcı isteği); ek malzeme ve harici gider kendi tutarını yazar.
     const usedRow = (item: any) =>
-        [t('projects.field.pdf.usedMaterials'), String(materialName(item, t)), clean(item?.description) || EMPTY, materialQty(item), moneyFmt(0), EMPTY];
+        [t('projects.field.pdf.usedMaterials'), String(materialName(item, t)), clean(item?.description) || EMPTY, EMPTY, materialQty(item), moneyFmt(0)];
     const extraRow = (item: any) =>
         [
             t('projects.field.pdf.extraMaterials'),
             String(materialName(item, t)),
             clean(item?.description) || EMPTY,
+            EMPTY,
             materialQty(item),
             moneyFmt((Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0)),
-            EMPTY,
         ];
     const rows = [
         ...usedMaterials.map(usedRow),
@@ -210,14 +210,30 @@ function drawResources(
             clean(expense?.expenseType) || EMPTY,
             // Harici giderin açıklaması kaldırıldı (kullanıcı isteği).
             EMPTY,
+            dateFmt(expense?.expenseDate, locale),
             EMPTY,
             moneyFmt(Number(expense?.amount) || 0),
-            dateFmt(expense?.expenseDate, locale),
         ]),
     ];
+    // Toplamlar (kullanıcı isteği 19.08.2026): kullanılan malzeme projeye bedel
+    // yazmadığı (tutarı 0) için toplama girmez — yalnızca ek malzeme ve harici
+    // gider faturalanır, genel toplam bu ikisinin toplamıdır.
+    const extraTotal = extraMaterials.reduce(
+        (sum: number, item: any) => sum + (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0),
+        0,
+    );
+    const expenseTotal = expenses.reduce((sum: number, expense: any) => sum + (Number(expense?.amount) || 0), 0);
+    const grandTotal = extraTotal + expenseTotal;
+
     // Tür sütunu birleşik: "Verwendet" bir kez yazılır, malzemeler yanında
-    // tek tek listelenir.
-    y = drawModernTable(doc, columns, rows, y, { mergeFirstColumn: true });
+    // tek tek listelenir. Ardından gelecek toplam bantları için yer ayrılır ki
+    // toplamlar tablodan kopup boş sayfada kalmasın.
+    const bandCount = (extraTotal > 0 ? 1 : 0) + (expenseTotal > 0 ? 1 : 0);
+    const reserveAfter = grandTotal > 0 ? bandCount * (BAND_ROW_H + 1) + BAND_ROW_STRONG_H + 1 : 0;
+    y = drawModernTable(doc, columns, rows, y, { mergeFirstColumn: true, reserveAfter });
+    if (extraTotal > 0) y = drawBandRow(doc, t('projects.field.pdf.extraMaterialTotal'), moneyFmt(extraTotal), y + 1);
+    if (expenseTotal > 0) y = drawBandRow(doc, t('projects.field.pdf.expenseTotal'), moneyFmt(expenseTotal), y + 1);
+    if (grandTotal > 0) y = drawBandRow(doc, t('projects.field.pdf.grandTotal'), moneyFmt(grandTotal), y + 1, true);
     return y + 6;
 }
 
@@ -237,7 +253,7 @@ function drawImages(doc: jsPDF, report: any, y: number, t: FixedTranslator): num
 
 // ── Saha raporu üretimi ──────────────────────────────────────────────────────
 export const exportFieldReportPdf = async (project: ProjectDto, report: any, options: FieldReportOptions = {}) => {
-    const settings = usePdfSettingsStore.getState().settings;
+    const settings = getPdfSettings();
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const preparedBy = authorName(project, report, options.preparedBy);
 
@@ -282,7 +298,11 @@ export const exportFieldReportPdf = async (project: ProjectDto, report: any, opt
         settings,
         recipientName: clean(project.customer?.companyName) || clean(project.customerId),
         recipientLines: addressLines(project.customer?.address),
-        title: `${t('projects.field.pdf.title')} ${reportNo}`,
+        // Belge başlığı yalnızca RAPOR ADIDIR; numara kapak kartındaki
+        // "Rapport-Nr." satırında durur — üç rapor türünde de aynı okunuş
+        // (kullanıcı isteği 19.08.2026).
+        title: t('projects.field.pdf.title'),
+        numberedSections: true,
     });
     y = drawTimes(doc, report, { apptStart, apptEnd, plannedMin, workedMin, maxMin, overtimeMin }, y, t, locale);
     y = drawJobs(doc, report, y, t);
@@ -291,12 +311,24 @@ export const exportFieldReportPdf = async (project: ProjectDto, report: any, opt
     drawApprovalSection(doc, {
         title: t('projects.field.pdf.approvalTitle'),
         confirmText: t('projects.field.pdf.approvalConfirm'),
-        roleLabel: t('projects.field.pdf.customerRole'),
-        customerName: clean(project.customer?.companyName) || EMPTY,
-        dateLabel: t('projects.field.pdf.date'),
-        dateText: dateFmt(reportWorkDate(report), locale),
-        signatureLabel: t('projects.field.pdf.signature'),
-        signatureData: report?.customerSignature,
+        signers: [
+            {
+                roleLabel: t('projects.field.pdf.technicianRole'),
+                name: preparedBy || EMPTY,
+                dateLabel: t('projects.field.pdf.date'),
+                dateText: report?.technicianSignedAt ? dateFmt(report.technicianSignedAt, locale) : dateFmt(reportWorkDate(report), locale),
+                signatureLabel: t('projects.field.pdf.signature'),
+                signatureData: report?.technicianSignature,
+            },
+            {
+                roleLabel: t('projects.field.pdf.customerRole'),
+                name: clean(project.customer?.companyName) || EMPTY,
+                dateLabel: t('projects.field.pdf.date'),
+                dateText: dateFmt(report?.signedAt || reportWorkDate(report), locale),
+                signatureLabel: t('projects.field.pdf.signature'),
+                signatureData: report?.customerSignature,
+            },
+        ],
     }, y);
 
     decoratePages(doc, assets, settings, t);
@@ -307,7 +339,7 @@ export const exportFieldReportPdf = async (project: ProjectDto, report: any, opt
         return new Blob([new Uint8Array(finalBytes)], { type: 'application/pdf' });
     }
     const safeName = clean(project.projectName).replace(/[\\/:*?"<>|]/g, '-').slice(0, 80) || 'proje';
-    const dateLabel = dateShort(reportWorkDate(report)).replace(/[^0-9-]/g, '');
+    const dateLabel = dateShort(reportWorkDate(report)).replace(/\./g, '-');
     downloadPdf(finalBytes, `${safeName}-saha-raporu-${dateLabel}.pdf`);
     return null;
 };

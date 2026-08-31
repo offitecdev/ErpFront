@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle, ChevronLeft, ChevronRight, Coins01, Edit01, File05, Plus, RefreshCcw01, Save01, ShoppingCart01, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
+import { CheckCircle, ChevronLeft, ChevronRight, Coins01, Edit01, File05, Plus, RefreshCcw01, Save01, ShoppingCart01, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { LoadingDots } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
 import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
 import type {
     ArticleListItem,
     ItemType,
@@ -206,7 +206,7 @@ export const OrderCreatePage = () => {
     const editId = searchParams.get('id');
     const permissions = useAuthStore((state) => state.permissions);
     const user = useAuthStore((state) => state.user);
-    const pdfSettings = usePdfSettingsStore((state) => state.settings);
+    const pdfSettings = usePdfSettings();
     const canTransfer = permissions.includes('inventory.transfer');
     const canCreateArticles = permissions.includes('inventory.articles.create');
 
@@ -1215,19 +1215,7 @@ export const OrderCreatePage = () => {
         return (
             <div className="flex w-full flex-col gap-4">
                 <InventoryListHeader
-                    title={(
-                        <span className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                aria-label={t('common.back')}
-                                onClick={() => navigate('/inventory/orders')}
-                                className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                            >
-                                <ArrowLeft size={16} />
-                            </button>
-                            {t('inv.orders.createTitle')}
-                        </span>
-                    )}
+                    title={t('inv.orders.createTitle')}
                 />
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 py-16">
                     <span className="text-[13px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
@@ -1249,14 +1237,6 @@ export const OrderCreatePage = () => {
             <InventoryListHeader
                 title={(
                     <span className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            aria-label={t('common.back')}
-                            onClick={() => navigate('/inventory/orders')}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
                         {editId
                             ? `${t('inv.orders.editTitle')}${editReference ? ` · ${editReference}` : ''}`
                             : t('inv.orders.createTitle')}

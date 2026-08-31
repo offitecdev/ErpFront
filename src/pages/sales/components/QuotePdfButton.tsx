@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Eye } from '@/components/icons/antIconCompat';
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
 import { t } from '@/i18n/translate';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { usePdfSettings } from '@/store/pdfSettingsStore';
 
 /**
  * "Angebot ansehen" auf der Auftragsseite: öffnet das Angebots-PDF der
@@ -17,13 +17,21 @@ import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
  * heraus, bis wirklich jemand das Angebot öffnet. Einmal gebaut, bleibt das
  * Dokument im Zustand — erneutes Öffnen ist sofort da.
  */
-export const QuotePdfButton = ({ tenderId, tenderNumber, label }: {
+export const QuotePdfButton = ({ tenderId, tenderNumber, label, variant = 'button' }: {
     tenderId: string;
     tenderNumber?: string | null;
     /** Gesetzt: Knopf mit Text; leer: nur das Auge-Symbol. */
     label?: string;
+    /**
+     * 'button' = umrandeter Knopf (Kopfzeilen, Angabenzeilen).
+     * 'link'   = Textzeile im Fliesstext. Der Hinweis am Fuss der
+     *            Auftragskarte fragt in EINEM Satz nach dem Angebots-PDF und
+     *            muss darum wie ein Satzteil aussehen, nicht wie ein Knopf —
+     *            geöffnet wird beide Male dasselbe Dokument.
+     */
+    variant?: 'button' | 'link';
 }) => {
-    const { settings } = usePdfSettingsStore();
+    const settings = usePdfSettings();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     // Laufende Stufe (Bilder → Positionen → Abschluss), im Fuss des Blattes.
@@ -60,19 +68,34 @@ export const QuotePdfButton = ({ tenderId, tenderNumber, label }: {
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => { void openPreview(); }}
-                disabled={busy}
-                title={t('common.preview')}
-                aria-label={t('common.preview')}
-                className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#272f67] hover:text-[#272f67] disabled:cursor-progress disabled:opacity-60 dark:border-white/20 dark:text-white/70 dark:hover:border-white/40 dark:hover:text-white ${
-                    label ? 'px-2 py-1' : 'size-7'
-                }`}
-            >
-                <Eye size={13} />
-                {label}
-            </button>
+            {variant === 'link' ? (
+                // Die Beschriftung IST der Satz — darum kein aria-label, das
+                // ihn überschreiben würde.
+                <button
+                    type="button"
+                    onClick={() => { void openPreview(); }}
+                    disabled={busy}
+                    title={t('common.preview')}
+                    className="ofi-quote-pdf-link inline-flex items-center gap-1.5"
+                >
+                    <Eye size={14} />
+                    {label}
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => { void openPreview(); }}
+                    disabled={busy}
+                    title={t('common.preview')}
+                    aria-label={t('common.preview')}
+                    className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#272f67] hover:text-[#272f67] disabled:cursor-progress disabled:opacity-60 dark:border-white/20 dark:text-white/70 dark:hover:border-white/40 dark:hover:text-white ${
+                        label ? 'px-2 py-1' : 'size-7'
+                    }`}
+                >
+                    <Eye size={13} />
+                    {label}
+                </button>
+            )}
 
             <PdfPreviewSheet
                 open={open}

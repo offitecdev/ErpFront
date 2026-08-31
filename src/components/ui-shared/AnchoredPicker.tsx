@@ -31,6 +31,7 @@ export const AnchoredPicker = ({
     width = 360,
     maxHeight = 420,
     footer,
+    panelClassName = '',
     children,
 }: {
     /** Seçicinin tutunduğu hücre; null ise seçici kapalıdır. */
@@ -39,6 +40,8 @@ export const AnchoredPicker = ({
     width?: number;
     maxHeight?: number;
     footer?: ReactNode;
+    /** Zusätzliche Klasse am Panel — für Oberflächen mit eigenem Kleid. */
+    panelClassName?: string;
     children: ReactNode;
 }) => {
     const [style, setStyle] = useState<CSSProperties>({ position: 'fixed', top: -9999, left: -9999 });
@@ -99,10 +102,15 @@ export const AnchoredPicker = ({
             ref={setPanelEl}
             role="dialog"
             style={style}
-            className="ofi-quick-pop z-[999] flex flex-col overflow-hidden rounded-md border border-slate-300 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.18)] dark:border-white/15 dark:bg-[#151616]"
+            /* `.ofi-pop.is-list` = die Trefferliste der gemeinsamen
+               Fensteroberfläche (index.css, "FENSTER-OBERFLÄCHE"): 10px, also
+               eine Stufe weniger rund als ein Fenster — sie hängt an einem Feld
+               und ist keine eigene Fläche. `rounded-md` kam vorher als 2px an,
+               die Liste war das einzige scharfkantige Stück der Kundensuche. */
+            className={`ofi-quick-pop ofi-pop is-list z-[1100] flex flex-col overflow-hidden ${panelClassName}`}
         >
             <div className="flex min-h-0 flex-col" style={{ maxHeight }}>{children}</div>
-            {footer && <div className="border-t border-slate-200 dark:border-white/10">{footer}</div>}
+            {footer && <div className="ofi-pop__rule border-t">{footer}</div>}
         </div>,
         document.body,
     );

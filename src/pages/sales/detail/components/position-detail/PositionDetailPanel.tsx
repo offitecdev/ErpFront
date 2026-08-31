@@ -14,7 +14,7 @@ import { Button } from '../../../../../components/ui-shared/Button';
 import { Card } from '../../../../../components/ui-shared/Card';
 import { Field, Input } from '../../../../../components/ui-shared/Field';
 import { tenderApi } from '../../../../../lib/api/tender';
-import { usePdfSettingsStore } from '../../../../../store/pdfSettingsStore';
+import { usePdfSettings } from '../../../../../store/pdfSettingsStore';
 import { useTenderStore } from '../../../../../store/tenderStore';
 import type { CostInput, PositionDto } from '../../../../../types/tender';
 import type { ArticleStockSummary } from '../../../../../types/inventory';
@@ -49,7 +49,7 @@ export const PositionDetailPanel: React.FC<{
     onLocalPositionChange?: (positionId: string, patch: PositionPricingPatch) => void;
     onLocalMappingChange?: (positionId: string, mappingId: string, patch: MappingPricingPatch) => void;
 }> = ({ position, tenderId, isDraft, canCalc, stockArticles, stockArticlesLoading, stockArticlesLoaded, activeTab, setActiveTab, onSaveCalc, onMapArticle, onRemoveArticleMapping, onSelectArticleMapping, onLocalPositionChange, onLocalMappingChange }) => {
-    const { settings } = usePdfSettingsStore();
+    const settings = usePdfSettings();
     const defaultTaxRate = settings.vatRate ?? 8.1;
     const { updatePosition: storeUpdatePosition } = useTenderStore();
 

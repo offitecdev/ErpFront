@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { ArrowLeft, ArrowRight, File05 as FilePdf, FileDownload02 as FileDown } from '@/components/icons/antIconCompat';
-import { StatusChip } from '@/components/ui-shared/StatusBadge';
+import { ArrowLeft, ArrowRight, Edit01 as PenLine, File05 as FilePdf, FileDownload02 as FileDown } from '@/components/icons/antIconCompat';
+import { PopupCaption } from '@/components/ui-shared/PopupKit';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectMaterial, ProjectSalesOrder } from '@/types/project';
@@ -12,7 +12,7 @@ import { AppointmentSignaturesView } from './AppointmentSignaturesView';
 import { DeliveryChecklistView } from './DeliveryChecklistView';
 import { FieldReportEditorView, type FieldReportSaveHandle } from './FieldReportEditorView';
 import { PdfView } from './PdfView';
-import { ReportsSheet } from './ReportsSheet';
+import { ReportPopup } from './ReportPopup';
 import { appointmentStatusKind, statusLabel } from '../booking/schedule/scheduleShared';
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 import { orderPayloadId } from '../../../utils/projectOrderScope';
@@ -38,12 +38,16 @@ const animClass: Record<SlideDir, string> = {
 type PdfDoc = { title: string; build: () => Promise<Blob | null> };
 
 /**
- * The appointment popup of the Reports section: a large square sheet that
- * slides up from the bottom (identical animation to the planning popup) and
- * NEVER resizes — field report, delivery checklist, signatures and the PDF
- * stage slide in sideways inside it, driven by the back/next bar at the
- * bottom. Every document row carries a PDF glyph that opens the live document
- * in place (dimmed while the document does not exist yet).
+ * The appointment popup of the Rapporte hub — since 18.08.2026 the calendar's
+ * FLOATING CARD (`ReportPopup`): it opens large in the middle of the screen,
+ * is dragged by its header strip, stretched by its edges and blown up to the
+ * full viewport with the maximise toggle, all without a backdrop, so the two
+ * appointment lanes stay readable behind it.
+ *
+ * Inside, the views still slide sideways — overview → field report → delivery
+ * checklist → signatures → PDF stage — driven by the back/next bar. The
+ * overview reads top-down: the appointment's FACTS first, its DOCUMENTS below,
+ * each with its state and a PDF glyph (dimmed while it does not exist yet).
  */
 export const AppointmentReportSheet = ({
     open,
@@ -159,24 +163,21 @@ export const AppointmentReportSheet = ({
         if (view !== 'pdf') go('pdf', 'right');
     };
 
-    // Deep-link from the hub's row PDF glyph straight onto the document.
+    // Deep-link from the hub's row PDF glyph / delivery tile straight onto the
+    // document.
     useEffect(() => {
         if (!open) return;
-        // A newly opened sheet starts with an empty history, so `back` is inert
-        // until something has actually been navigated away from.
-        setPast([]);
+        const landing: SheetView = initialView === 'pdf' && report ? 'pdf'
+            : initialView === 'delivery' ? 'delivery'
+            : 'overview';
+        if (landing === 'pdf') setPdfDoc({ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf });
+        // A deep link lands INSIDE the popup, so its history is seeded with the
+        // overview — otherwise "back" would be inert and the appointment itself
+        // unreachable from the document it opened on.
+        setPast(landing === 'overview' ? [] : ['overview']);
         setFuture([]);
-        if (initialView === 'pdf' && report) {
-            setPdfDoc({ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf });
-            setView('pdf');
-            setAnim('rise');
-        } else if (initialView === 'delivery') {
-            setView('delivery');
-            setAnim('rise');
-        } else {
-            setView('overview');
-            setAnim('rise');
-        }
+        setView(landing);
+        setAnim('rise');
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
@@ -229,15 +230,32 @@ export const AppointmentReportSheet = ({
         }
     };
 
+    /* Eine Zeile "Beschriftung → Wert" in der Sprache des Kalender-Details. */
+    const DetailRow = ({ label, value }: { label: string; value: string }) => (
+        <div className="flex items-baseline gap-2 py-[3px]">
+            <span className="ofi-cal-detail__label">{label}</span>
+            <span className="ofi-cal-detail__value">{value}</span>
+        </div>
+    );
+
     /**
-     * Alt rapor kutusu: İNCE kenarlıklı kutu (kullanıcı isteği) — başlık +
-     * durum solda, önizleme ve indirme sağda. Kutuya tıklamak ilgili editörü açar.
+     * Belge satırı — simge · ad + durum · düğmeler.
+     *
+     * Durum rozeti METNİN YANINDA durur, satırın sağ ucunda DEĞİL: sağa
+     * itilmiş bir rozet satırın ortasında boşluk bırakıyor ve satırdan satıra
+     * kayıyor gibi görünüyordu (kullanıcı, iki kez: "sağa doğru kayma var",
+     * "iki satır da sağa doğru uzamış"). Ayrıca durum artık BİR kez yazılır —
+     * eskiden aynı bilgi hem alt satırda hem rozette vardı. Sağda yalnızca
+     * düğmeler kalır ve yerleri sabittir: düğmesi olmayan satır da o sütunu
+     * boş bırakır. Satıra tıklamak ilgili editörü açar.
      */
-    const DocumentBox = ({ title, status, available, doc, target }: {
+    const DocumentRow = ({ icon, title, state, tone = '', available, doc, target }: {
+        icon: React.ReactNode;
         title: string;
-        status: React.ReactNode;
+        state: string;
+        tone?: '' | 'is-done' | 'is-open';
         available: boolean;
-        doc: PdfDoc;
+        doc?: PdfDoc;
         target?: SheetView;
     }) => (
         <div
@@ -250,144 +268,124 @@ export const AppointmentReportSheet = ({
                     go(target, 'right');
                 }
             } : undefined}
-            className={`flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-4 py-3.5 sm:px-5 dark:border-white/15 ${target ? 'cursor-pointer hover:bg-slate-50/70 dark:hover:bg-white/5' : ''}`}
+            className={`ofi-rep-docrow ${target ? 'is-clickable' : ''}`}
         >
-            <div className="flex min-w-0 items-center gap-2.5">
-                <span className="text-[12.5px] font-semibold text-slate-800">{title}</span>
-                {status}
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                    type="button"
-                    title={available ? t('projects.reportsHub.preview') : t('projects.reportUnavailable')}
-                    aria-label={t('projects.reportsHub.preview')}
-                    disabled={!available}
-                    onClick={(event) => { event.stopPropagation(); openPdf(doc); }}
-                    className={`inline-flex size-7 items-center justify-center rounded-[2px] border transition-colors ${
-                        available ? 'ofi-rs-pdf' : 'ofi-rs-pdf-dim cursor-default'
-                    }`}
-                >
-                    <FilePdf size={14} />
-                </button>
-                <button
-                    type="button"
-                    title={t('projects.delivery.download')}
-                    aria-label={t('projects.delivery.download')}
-                    disabled={!available || downloading === doc.title}
-                    onClick={(event) => { event.stopPropagation(); void downloadDoc(doc); }}
-                    className={`inline-flex size-7 items-center justify-center rounded-[2px] border transition-colors ${
-                        available ? 'ofi-rs-pdf' : 'ofi-rs-pdf-dim cursor-default'
-                    } ${downloading === doc.title ? 'opacity-50' : ''}`}
-                >
-                    <FileDown size={14} />
-                </button>
-            </div>
+            <span className="ofi-tp-icon">{icon}</span>
+            <span className="ofi-rep-docrow__main">
+                <span className="ofi-rep-docrow__title">{title}</span>
+                <span className={`ofi-rep-docrow__state ${tone}`}>{state}</span>
+            </span>
+            <span className="ofi-rep-docrow__actions">
+                {doc && (
+                    <>
+                        <button
+                            type="button"
+                            title={available ? t('projects.reportsHub.preview') : t('projects.reportUnavailable')}
+                            aria-label={t('projects.reportsHub.preview')}
+                            disabled={!available}
+                            onClick={(event) => { event.stopPropagation(); openPdf(doc); }}
+                            className="ofi-rep-docbtn"
+                        >
+                            <FilePdf size={16} />
+                        </button>
+                        <button
+                            type="button"
+                            title={t('projects.delivery.download')}
+                            aria-label={t('projects.delivery.download')}
+                            disabled={!available || downloading === doc.title}
+                            onClick={(event) => { event.stopPropagation(); void downloadDoc(doc); }}
+                            className="ofi-rep-docbtn"
+                        >
+                            <FileDown size={16} />
+                        </button>
+                    </>
+                )}
+            </span>
         </div>
     );
 
     return (
-        <ReportsSheet
+        <ReportPopup
             open={open}
             title={`${start.format('DD.MM.YYYY')} · ${start.format('HH:mm')}–${end.format('HH:mm')}`}
-            subtitle={viewTitles[view]}
+            subtitle={`${viewTitles[view]} · ${statusLabel(kind)}`}
+            /* Der Ausleser bleibt schmal, der Editor bekommt die volle Breite —
+               die Karte folgt der Ansicht (Benutzerwunsch: "gross, aber
+               flexibel"). */
+            size={view === 'overview' || view === 'signatures' ? 'compact' : 'wide'}
+            /* Der Abnahme-Rapport geht OBEN auf: seine Liste wächst mit jeder
+               Checkliste, und eine mittig platzierte Karte rutschte dabei
+               Block für Block nach oben (Benutzerwunsch 19.08.2026). Der Wert
+               hängt am `initialView`, nicht an der laufenden Ansicht — sonst
+               spränge die Karte beim Blättern und verlöre Zug und Vollbild. */
+            openAt={initialView === 'delivery' ? 'top' : 'center'}
             onBack={canBack ? goBack : undefined}
             onClose={handleClose}
             headerActions={<div ref={setActionsHost} className="flex items-center gap-1.5" />}
             footer={(
-                <>
-                    {/* Yalnızca gezinme kaldı: Gesamtrapport/Abnahme düğmeleri
-                        popup'tan çıkıp Rapporte sekmesinin araç çubuğuna taşındı,
-                        "Auftragsrapporte" tamamen kalktı (kullanıcı isteği). */}
-                    <button
-                        type="button"
-                        disabled={!canBack}
-                        onClick={goBack}
-                        className="ofi-rs-nav inline-flex items-center gap-1.5 rounded-[3px] px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-30"
-                    >
-                        <ArrowLeft size={13} />
+                /* Nur die Navigation: Gesamtrapport/Abnahme sitzen als Kacheln
+                   im Rapporte-Tab, nicht mehr im Popup (Benutzerwunsch). */
+                <div className="flex items-center justify-between gap-2">
+                    <button type="button" disabled={!canBack} onClick={goBack} className="ofi-cal-btn">
+                        <ArrowLeft size={14} />
                         {t('common.back')}
                     </button>
-
-                    <button
-                        type="button"
-                        disabled={!canNext}
-                        onClick={goNext}
-                        className="ofi-rs-nav inline-flex items-center gap-1.5 rounded-[3px] px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-30"
-                    >
+                    <button type="button" disabled={!canNext} onClick={goNext} className="ofi-cal-btn">
                         {t('projects.reportsHub.next')}
-                        <ArrowRight size={13} />
+                        <ArrowRight size={14} />
                     </button>
-                </>
+                </div>
             )}
         >
             <div key={`${view}-${anim}-${view === 'pdf' ? pdfDoc?.title || '' : ''}`} className={`flex min-h-0 flex-1 flex-col ${animClass[anim]}`}>
                 {view === 'overview' && (
-                    <div className="space-y-7 px-6 py-7 sm:px-8 sm:py-9 lg:px-10">
-                        {/* Auftrag-Details als EINE Tabelle (Benutzerwunsch) — nur bei
-                            laufenden Terminen; bei abgeschlossenen genügt der Titel
-                            samt Status-Chip darunter. */}
-                        {!isCompleted ? (
-                            <div className="overflow-hidden rounded-[3px] border border-slate-200 dark:border-white/15">
-                                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
-                                    <thead>
-                                        <tr>
-                                            <th className="text-left">{t('projects.reportsHub.order')}</th>
-                                            <th className="text-left">{t('projects.musteri')}</th>
-                                            <th className="text-left">{t('common.date')}</th>
-                                            <th className="text-left">{t('projects.schedule.time')}</th>
-                                            <th className="text-left">{t('projects.teknisyen')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td className="font-semibold text-slate-800 dark:text-white">{order?.orderNumber || '—'}</td>
-                                            <td className="text-slate-700 dark:text-white/80">{project.customer?.companyName || '—'}</td>
-                                            <td className="tabular-nums text-slate-700 dark:text-white/80">{start.format('DD.MM.YYYY')}</td>
-                                            <td className="tabular-nums text-slate-700 dark:text-white/80">{`${start.format('HH:mm')} – ${end.format('HH:mm')}`}</td>
-                                            <td className="text-slate-700 dark:text-white/80">{appointmentTechnicianNames(appointment) || '—'}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                    /* Zwei Spalten wie im Kalender-Detail: LINKS die Fakten des
+                       Termins (Beschriftung → Wert, keine Tabelle mehr), RECHTS
+                       seine Dokumente. Auf schmalen Karten fallen sie
+                       untereinander. */
+                    <div className="ofi-rep-overview">
+                        <section>
+                            <div className="flex items-center justify-between gap-3">
+                                <PopupCaption>{t('projects.reportsHub.appointmentTitle')}</PopupCaption>
+                                <span className={`ofi-tp-pill ${isCompleted ? 'is-done' : kind === 'cancelled' ? 'is-danger' : 'is-open'}`}>
+                                    {statusLabel(kind)}
+                                </span>
                             </div>
-                        ) : (
-                            <div className="flex items-center gap-2.5">
-                                <span className="text-[13px] font-semibold text-slate-800 dark:text-white">{order?.orderNumber || project.projectName}</span>
-                                <StatusChip variant="active">{statusLabel(kind)}</StatusChip>
-                            </div>
-                        )}
+                            <DetailRow label={t('common.date')} value={start.format('DD.MM.YYYY')} />
+                            <DetailRow label={t('projects.schedule.time')} value={`${start.format('HH:mm')} – ${end.format('HH:mm')}`} />
+                            <DetailRow label={t('projects.reportsHub.order')} value={order?.orderNumber || '—'} />
+                            <DetailRow label={t('projects.musteri')} value={project.customer?.companyName || '—'} />
+                            <DetailRow label={t('projects.teknisyen')} value={appointmentTechnicianNames(appointment) || '—'} />
+                        </section>
 
-                        {/* Montage-Rapport: nur Vorschau + PDF (Benutzerwunsch); die
-                            Zeile öffnet den Editor. */}
-                        <div className="space-y-2.5">
-                            <DocumentBox
-                                title={t('projects.reportsHub.fieldSection')}
-                                status={report
-                                    ? <StatusChip variant={report.isSigned ? 'active' : 'info'}>{report.isSigned ? t('projects.reportsHub.signed') : t('projects.reportAvailable')}</StatusChip>
-                                    : <StatusChip variant="neutral">{t('projects.reportUnavailable')}</StatusChip>}
-                                available={Boolean(report)}
-                                doc={{ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf }}
-                                target="field"
-                            />
-
-                            {/* Unterschriften-Zeile — Gesamtrapport & Abnahme-Rapport
-                                sind aus dem Popup in die Werkzeugleiste des
-                                Rapporte-Tabs gewandert (Benutzerwunsch), links
-                                neben "Unterschriften". */}
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => go('signatures', 'right')}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter' || event.key === ' ') {
-                                        event.preventDefault();
-                                        go('signatures', 'right');
-                                    }
-                                }}
-                                className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3.5 hover:bg-slate-50/70 sm:px-5 dark:border-white/15 dark:hover:bg-white/5"
-                            >
-                                <span className="text-[12.5px] font-semibold text-slate-800">{t('projects.reportsHub.signaturesSection')}</span>
+                        <section>
+                            <PopupCaption>{t('projects.reportsHub.documents')}</PopupCaption>
+                            <div className="ofi-rep-doclist">
+                                <DocumentRow
+                                    icon={<FilePdf size={15} />}
+                                    title={t('projects.reportsHub.fieldSection')}
+                                    state={report
+                                        ? (report.isSigned ? t('projects.reportsHub.signed') : t('projects.reportsHub.reportOpen'))
+                                        : t('projects.reportsHub.notCreated')}
+                                    tone={report ? (report.isSigned ? 'is-done' : 'is-open') : ''}
+                                    available={Boolean(report)}
+                                    doc={{ title: t('projects.reportsHub.fieldSection'), build: buildFieldPdf }}
+                                    target="field"
+                                />
+                                <DocumentRow
+                                    icon={<PenLine size={15} />}
+                                    title={t('projects.reportsHub.signaturesSection')}
+                                    state={report?.isSigned
+                                        ? (report.signedAt
+                                            ? `${t('projects.reportsHub.signed')} · ${dayjs(report.signedAt).format('DD.MM.YYYY')}`
+                                            : t('projects.reportsHub.signed'))
+                                        : t('projects.reportsHub.noSignatures')}
+                                    tone={report?.isSigned ? 'is-done' : ''}
+                                    available={false}
+                                    target="signatures"
+                                />
                             </div>
-                        </div>
+                        </section>
                     </div>
                 )}
 
@@ -400,6 +398,7 @@ export const AppointmentReportSheet = ({
                             report={report}
                             materials={materials}
                             showLogs
+                            canSign
                             saveHandleRef={editorHandle}
                             onSaved={() => { fieldChangedSinceSync.current = true; }}
                             onBack={() => go('overview', 'left')}
@@ -431,8 +430,14 @@ export const AppointmentReportSheet = ({
                     </div>
                 )}
 
-                {view === 'pdf' && pdfDoc && <PdfView build={pdfDoc.build} />}
+                {view === 'pdf' && pdfDoc && (
+                    /* Die Dokumentbühne braucht eine eigene Höhe: die Karte
+                       folgt sonst ihrem Inhalt und das <iframe> fiele auf 0. */
+                    <div className="flex min-h-[68vh] flex-1 flex-col">
+                        <PdfView build={pdfDoc.build} />
+                    </div>
+                )}
             </div>
-        </ReportsSheet>
+        </ReportPopup>
     );
 };

@@ -58,15 +58,19 @@ export const ArticlePickerModal = ({
             <section
                 role="dialog"
                 aria-modal="true"
-                className="ofi-rise-in relative flex max-h-[86vh] w-full max-w-[880px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl dark:border-white/15 dark:bg-[#151616]"
+                /* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
+                   "FENSTER-OBERFLÄCHE"): dieselbe Kante, Fläche und Haarlinie
+                   wie das Kundenfenster des Kalenders. `rounded-lg` kam vorher
+                   als 2px an. */
+                className="ofi-rise-in ofi-pop relative flex max-h-[86vh] w-full max-w-[880px] flex-col overflow-hidden"
             >
-                <header className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-white/10">
-                    <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-white">{title ?? t('inv.productPicker.allTitle')}</h3>
+                <header className="ofi-pop__rule flex items-center justify-between gap-2 border-b px-4 py-3">
+                    <h3 className="ofi-pop__title">{title ?? t('inv.productPicker.allTitle')}</h3>
                     <button
                         type="button"
                         aria-label={t('common.close')}
                         onClick={close}
-                        className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
+                        className="ofi-float-card__iconbtn shrink-0"
                     >
                         <X size={15} />
                     </button>
@@ -88,7 +92,7 @@ export const ArticlePickerModal = ({
                             <tr>
                                 <th className="relative text-left">
                                     {t('inv.columns.serialCode')}
-                                    <ColResizeHandle {...grid.resizeProps('code', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('code')} />
                                 </th>
                                 <th className="text-left">{t('inv.columns.productName')}</th>
                                 <th className="relative text-left">

@@ -202,14 +202,25 @@ export const CustomerComboField = ({ selected, onSelect, autoFocus }: {
    customers below — the people window's two tabs, folded into one list), each
    pick lands as a chip; "view all" opens the large multi-select window. Flavors:
    - cc: rows must resolve to an e-mail; a typed address can be added directly
-   - participants: any staff or customer row, an e-mail is not required. */
-export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
+   - participants: any staff or customer row, an e-mail is not required
+   - everyone: BOTH at once — staff, customers AND free addresses in ONE field.
+     That is the meeting's single recipient line (19.08.2026, Vorgabe Samet:
+     "ein einziges Eingabefeld, wie auf der Mailseite"): who takes part and who
+     is only copied in is the same question there, so it is one field. The
+     caller sorts the picks apart afterwards — rows with an id become
+     participants of the calendar entry, typed addresses become its CC. */
+export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc', staffOnly = false }: {
     value: PickedPerson[];
     onChange: (next: PickedPerson[]) => void;
     onOpenAll: () => void;
-    mode?: 'cc' | 'participants';
+    mode?: 'cc' | 'participants' | 'everyone';
+    /* Staff only: no customer rows, no free addresses (the CC of an invitation). */
+    staffOnly?: boolean;
 }) => {
+    /* Only the CC insists on an address — a participant may well be a customer
+       whose mailbox we do not know; he belongs on the entry all the same. */
     const requireEmail = mode === 'cc';
+    const allowTypedEmail = mode === 'cc' || mode === 'everyone';
     const [text, setText] = useState('');
     const [open, setOpen] = useState(false);
     const [employees, setEmployees] = useState<EmployeeLite[] | null>(null);
@@ -217,7 +228,9 @@ export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
     const [loading, setLoading] = useState(false);
     const debounced = useDebouncedValue(text, 120);
 
-    // Staff list once per first open (light payload, whole company tree).
+    // Staff list once per first open (light payload, the selected company —
+    // sister companies of the group are not offered here, see the directory
+    // endpoint's personnel scope).
     useEffect(() => {
         if (!open || employees !== null) return;
         fetchStaffDirectory()
@@ -226,7 +239,7 @@ export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
     }, [open, employees]);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open || staffOnly) return;
         let cancelled = false;
         setLoading(true);
         fetchCustomers(debounced.trim(), 1, 7)
@@ -234,7 +247,7 @@ export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
             .catch(() => { if (!cancelled) setCustomers([]); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [open, debounced, requireEmail]);
+    }, [open, debounced, requireEmail, staffOnly]);
 
     const needle = debounced.trim().toLowerCase();
     const chosen = new Set(value.map((person) => person.key));
@@ -245,7 +258,7 @@ export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
             || (row.email || '').toLowerCase().includes(needle))
         .map((row) => ({ key: personKey('EMPLOYEE', row.id), type: 'EMPLOYEE' as const, id: row.id, name: personName(row), email: row.email }))
         .filter((person) => !chosen.has(person.key));
-    const customerPool: PickedPerson[] = customers
+    const customerPool: PickedPerson[] = (staffOnly ? [] : customers)
         .map((row) => ({ key: personKey('CUSTOMER', row.id), type: 'CUSTOMER' as const, id: row.id, name: row.companyName, email: row.mainEmail }))
         .filter((person) => !chosen.has(person.key));
     // The 7 rows are split between the two groups — either side's unused quota
@@ -277,13 +290,13 @@ export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
                 const person = pool.find((row) => row.key === option.id);
                 if (person) add(person);
             }}
-            placeholder={t('calendar.picker.searchPerson')}
+            placeholder={mode === 'everyone' ? t('calendar.picker.searchAnyone') : t('calendar.picker.searchPerson')}
             emptyText={t('calendar.picker.noPeople')}
             /* Both fields hold a list, so one pick must not end the session:
                the list stays open and the picked row drops out of it. */
             keepOpenOnSelect
             actions={[
-                ...(requireEmail && typed.includes('@') ? [{
+                ...(allowTypedEmail && !staffOnly && typed.includes('@') ? [{
                     key: 'email',
                     icon: <Plus size={12} />,
                     label: `${t('calendar.picker.addEmail')}: ${typed}`,
@@ -300,11 +313,12 @@ export const PeopleComboField = ({ value, onChange, onOpenAll, mode = 'cc' }: {
     );
 };
 
+/* CC = staff only (19.08.2026): the customer is the To of the invitation. */
 export const CcComboField = (props: {
     value: PickedPerson[];
     onChange: (next: PickedPerson[]) => void;
     onOpenAll: () => void;
-}) => <PeopleComboField {...props} mode="cc" />;
+}) => <PeopleComboField {...props} mode="cc" staffOnly />;
 
 /* Same combo behavior over rows that are already loaded (a customer's projects,
    a project's orders): type to filter, at most 7 rows, "show all (n)" footer. */
@@ -369,6 +383,54 @@ export const StaticComboField = ({ selectedId, selectedLabel, options, onPick, o
                 label: viewAllLabel ?? t('calendar.picker.viewAllCount', { count: options.length }),
                 onSelect: onViewAll,
             }] : []}
+        />
+    );
+};
+
+/* Technicians — the customer-field pattern for a MULTI pick: type a name or a
+   role, choose, and the row lands as a chip while the list stays open for the
+   next one. Rows already booked in the window are shown as "busy" and cannot
+   be picked (the server would refuse the conflict anyway). */
+export type TechnicianOption = { id: string; name: string; role?: string | null; busy: boolean };
+
+export const TechnicianComboField = ({ options, value, onChange, disabled }: {
+    options: TechnicianOption[];
+    value: string[];
+    onChange: (next: string[]) => void;
+    disabled?: boolean;
+}) => {
+    const [text, setText] = useState('');
+    const [open, setOpen] = useState(false);
+    const needle = text.trim().toLowerCase();
+    const pool = options
+        .filter((row) => !value.includes(row.id))
+        .filter((row) => !needle || row.name.toLowerCase().includes(needle) || (row.role || '').toLowerCase().includes(needle))
+        .sort((a, b) => Number(a.busy) - Number(b.busy))
+        .slice(0, 7);
+
+    return (
+        <ComboCell
+            open={open && !disabled}
+            onOpenChange={setOpen}
+            value={text}
+            onChange={setText}
+            options={pool.map((row) => ({
+                id: row.id,
+                label: row.name,
+                meta: row.busy ? t('calendar.wizard.busy') : (row.role || t('calendar.wizard.free')),
+                group: row.busy ? t('calendar.wizard.busy') : t('calendar.wizard.free'),
+            }))}
+            loading={false}
+            onSelect={(option) => {
+                const row = pool.find((item) => item.id === option.id);
+                if (!row || row.busy) return;
+                onChange([...value, row.id]);
+                setText('');
+            }}
+            placeholder={t('calendar.create.pickTechnicians')}
+            emptyText={t('common.noData')}
+            invalid={value.length === 0}
+            keepOpenOnSelect
         />
     );
 };

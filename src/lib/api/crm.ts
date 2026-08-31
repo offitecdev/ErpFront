@@ -113,11 +113,23 @@ export interface CrmTaskRecord {
     id: string;
     kind: CrmTaskKind;
     title: string;
+    /** Kalender-Etikett (25.08.2026) — die Farbe der Karte im Kalender. */
+    labelId?: string | null;
     customerId?: string | null;
     contactId?: string | null;
     /** Erste Verantwortliche (Altspalte); die vollständige Liste steht in `assignees`. */
     assigneeEmployeeId?: string | null;
+    /**
+     * ANFANG der Aufgabe (11.09.2026). `dueDate` ist ihr ENDE — eine Aufgabe
+     * darf sich über mehrere Tage ziehen. Fehlt `startAt`, ist sie eintägig
+     * und beginnt mit ihrem Ende.
+     */
+    startAt?: string | null;
+    /** Ganztägig: dann zeigt die Oberfläche keine Uhrzeiten. */
+    allDay?: boolean;
     dueDate?: string | null;
+    /** Verknüpfte Offerte — genauso freiwillig wie der Kunde. */
+    tenderId?: string | null;
     status: CrmTaskStatus;
     completedAt?: string | null;
     createdByEmployeeId?: string;
@@ -138,7 +150,39 @@ export interface CrmTaskRow extends CrmTaskRecord {
     assignees: CrmPersonLite[];
     /** Die ZUWEISENDE Person — ihr Name steht auf der Karte. */
     createdBy: CrmPersonLite;
+    tender?: CrmTaskTenderLite | null;
     noteCount?: number;
+    /** Anhänge und Anleitung als ZAHLEN — die Liste lädt ihren Inhalt nicht. */
+    documentCount?: number;
+    stepCount?: number;
+    stepDoneCount?: number;
+}
+
+/** Die verknüpfte Offerte, so knapp wie die Karte sie braucht. */
+export interface CrmTaskTenderLite {
+    id: string;
+    tenderNumber: string;
+}
+
+/** Ein Schritt der Anleitung (freiwillig, 11.09.2026). */
+export interface CrmTaskStep {
+    id: string;
+    position: number;
+    text: string;
+    done: boolean;
+}
+
+/**
+ * Ein Anhang der Aufgabe — Bild ODER PDF. Die Liste trägt Name, Art und
+ * Grösse; der INHALT kommt erst beim Öffnen (`getTaskDocument`).
+ */
+export interface CrmTaskDocument {
+    id: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    createdAt: string;
+    uploadedBy?: CrmPersonLite | null;
 }
 
 /** Notiz an einer Aufgabe — Text und Bilder (Daten-URLs). */
@@ -156,15 +200,24 @@ export interface CrmTaskDetail {
     kind: CrmTaskKind;
     title: string;
     status: CrmTaskStatus;
+    startAt?: string | null;
+    allDay?: boolean;
     dueDate?: string | null;
     completedAt?: string | null;
     createdAt: string;
     createdByEmployeeId: string;
     customer?: { id: string; companyName: string } | null;
     contact?: CrmPersonLite | null;
+    tenderId?: string | null;
+    tender?: CrmTaskTenderLite | null;
     createdBy: CrmPersonLite;
     assignees: CrmPersonLite[];
     notes: CrmTaskNote[];
+    /* Anleitung und Anhänge kommen MIT der Karte (11.09.2026) — sie werden im
+       selben Fenster gezeigt, und drei Netzwege für ein Popup, das man im
+       Tagesbetrieb ständig auf- und zuklappt, wären zwei zu viel. */
+    steps: CrmTaskStep[];
+    documents: CrmTaskDocument[];
 }
 
 /** Eine fällige Erinnerung, wie sie das Einblendfenster braucht. */
@@ -187,8 +240,15 @@ export interface TaskWriteBody {
     /** Alt (eine Person) — neue Aufrufer schicken `assigneeEmployeeIds`. */
     assigneeEmployeeId?: string | null;
     assigneeEmployeeIds?: string[];
+    startAt?: string | null;
+    allDay?: boolean;
     dueDate?: string | null;
+    tenderId?: string | null;
+    /** Die Anleitung reist MIT der Anlage; die Anhänge kommen als Dateien nach. */
+    steps?: Array<{ text: string; done?: boolean }>;
     kind?: CrmTaskKind;
+    /** Kalender-Etikett; fehlt es beim Anlegen, wird «Aufgabe» gesetzt. */
+    labelId?: string | null;
 }
 
 const toQuery = (params: Record<string, string | number | undefined>) => {
@@ -264,6 +324,12 @@ export const crmApi = {
         kind?: CrmTaskKind | '';
         customerId?: string;
         assigneeId?: string;
+        /* MEHRERE Personen bzw. Kunden als Komma-Liste (11.09.2026). Leer
+           heisst alle — ein Filter, dessen Grundzustand «alle» ist, schickt
+           gar nichts. Die Einzahl-Felder darüber bleiben für Aufrufer, die
+           genau einen meinen (Kundenakte, Personalakte). */
+        assigneeIds?: string;
+        customerIds?: string;
         /** Wessen Aufgaben — jede der drei Sichten ist auth-only. */
         scope?: CrmTaskScope | '';
         /** Terminfenster [from, to) als ISO-Zeitpunkte (die Woche der Ansicht).
@@ -279,6 +345,37 @@ export const crmApi = {
     addTaskNote: (id: string, body: { text: string; images?: string[] }) =>
         apiClient.post<CrmTaskNote>(`/crm/tasks/${id}/notes`, body).then((r) => r.data),
     deleteTaskNote: (id: string, noteId: string) => apiClient.delete(`/crm/tasks/${id}/notes/${noteId}`).then(() => undefined),
+
+    /** Die ganze Anleitung auf einmal — die Liste ist kurz und wird als Block bearbeitet. */
+    saveTaskSteps: (id: string, steps: Array<{ text: string; done?: boolean }>) =>
+        apiClient.put<CrmTaskStep[]>(`/crm/tasks/${id}/steps`, { steps }).then((r) => r.data),
+
+    /** EIN Häkchen — der Griff des Alltags bekommt seinen eigenen Weg. */
+    setTaskStepDone: (id: string, stepId: string, done: boolean) =>
+        apiClient.patch<CrmTaskStep>(`/crm/tasks/${id}/steps/${stepId}`, { done }).then((r) => r.data),
+
+    /**
+     * Anhänge (Bild UND PDF) — alle in EINER Sendung und ROH als multipart:
+     * Base64 in einem JSON-Körper wäre ein Drittel grösser und müsste zweimal
+     * umkodiert werden. Zurück kommt die vollständige Liste der Aufgabe.
+     */
+    addTaskDocuments: (id: string, files: File[]) => {
+        const form = new FormData();
+        files.forEach((file) => form.append('files', file, file.name));
+        // Grosszügiger Zeitrahmen: zehn Bilder aus einer Handykamera sind
+        // schnell 30 MB, und die Standardgrenze des Klienten ist auf kurze
+        // JSON-Antworten gemünzt.
+        return apiClient
+            .post<CrmTaskDocument[]>(`/crm/tasks/${id}/documents`, form, { timeout: 120_000 })
+            .then((r) => r.data);
+    },
+
+    /** Der INHALT eines Anhangs (Daten-URI) — erst beim Öffnen. */
+    getTaskDocument: (documentId: string) =>
+        apiClient.get<CrmTaskDocument & { data: string }>(`/crm/tasks/documents/${documentId}`).then((r) => r.data),
+
+    deleteTaskDocument: (documentId: string) =>
+        apiClient.delete(`/crm/tasks/documents/${documentId}`).then(() => undefined),
 
     createTask: (body: TaskWriteBody) => apiClient.post<CrmTaskRecord>('/crm/tasks', body).then((r) => r.data),
 

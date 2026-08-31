@@ -1,10 +1,9 @@
 import { useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BarChart03 as BarChart3, Coins01 as Coins, Percent01 as Percent, PieChart03 as PieChart, TrendUp01 as TrendingUp } from '@/components/icons/antIconCompat';
+import { useParams } from 'react-router-dom';
+import { BarChart03 as BarChart3, Coins01 as Coins, Percent01 as Percent, PieChart03 as PieChart, TrendUp01 as TrendingUp } from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card } from '../../components/ui-shared/Card';
-import { Button } from '../../components/ui-shared/Button';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { useTenderStore } from '../../store/tenderStore';
@@ -29,7 +28,6 @@ const getStatusLabel = (): Record<string, string> => ({
 export const TenderReport = () => {
     useLanguageRefresh();
     const { id } = useParams();
-    const navigate = useNavigate();
     const { summary, loadingSummary, fetchSummary } = useTenderStore();
 
     useEffect(() => {
@@ -85,11 +83,6 @@ export const TenderReport = () => {
                     </span>
                 }
                 description={t('tenders.line_bazli_cost_margin_ve_karlilik_analizi')}
-                actions={
-                    <>
-                        <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate(`/sales/quotes/${id}`)}>{t('tenders.tekrar_edit')}</Button>
-                    </>
-                }
             />
 
             {/* KPI */}

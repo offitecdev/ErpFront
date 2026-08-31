@@ -203,7 +203,7 @@ export const CustomerContactsTable = ({
                     <tr>
                         <th className="relative text-center">
                             {i18nT('crm.primaryShort')}
-                            <ColResizeHandle {...grid.resizeProps('primary', 'right')} />
+                            <ColResizeHandle {...grid.resizeProps('primary')} />
                         </th>
                         <th className="text-left">{i18nT('crm.customers.responsibleFirstName')}</th>
                         <th className="text-left">{i18nT('crm.customers.responsibleLastName')}</th>

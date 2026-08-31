@@ -18,8 +18,12 @@ import { useAuthStore } from '../../store/authStore';
 import { useModuleAccess } from '../../lib/useEnabledModules';
 import { SkeletonBar } from '../ui-shared/Loader';
 
+/* `bg-[#fff]` statt `bg-white`: index.css macht aus jedem `button.bg-white`
+   einen neutralen Button mit erzwungener `-webkit-text-fill-color` (#111827),
+   die sich auf alle Kinder vererbt — auf der Navy-Hover-Fläche bliebe die
+   Schrift dunkel. Gleiche Regel wie in DashboardStats. */
 const SURFACE =
-    'rounded-2xl border border-[#E3E7F0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#151616]';
+    'rounded-2xl border border-[#E3E7F0] bg-[#fff] shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#151616]';
 
 type UpcomingKey = 'installations' | 'meetings' | 'deliveries';
 
@@ -183,10 +187,18 @@ export const UpcomingSection: React.FC = () => {
                                 onClick={() => (isOpen ? closePopup(key) : openPopup(key))}
                                 aria-expanded={isOpen}
                                 className={cx(
-                                    'group flex w-full items-center gap-3 rounded-2xl border bg-white p-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 dark:bg-[#151616]',
+                                    /* `bg-[#fff]` statt `bg-white`: index.css erzwingt auf jedem
+                                       `button.bg-white` `-webkit-text-fill-color` #111827 — die
+                                       weisse Hover-Schrift bliebe sonst dunkel (siehe SURFACE). */
+                                    'group flex w-full items-center gap-3 rounded-2xl border bg-[#fff] p-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 dark:bg-[#151616]',
                                     isOpen
                                         ? 'border-[#6977c7] dark:border-[#e8873a]'
-                                        : 'border-[#E3E7F0] hover:border-[#6977c7] hover:shadow-[0_4px_12px_rgba(39,47,103,0.10)] dark:border-white/10 dark:hover:border-[#e8873a]',
+                                        /* Hover der Startseite: Fläche dunkles
+                                           Marineblau, Schrift weiss (Nutzerwunsch
+                                           15.08.2026). Der GEÖFFNETE Zustand
+                                           behält seinen eigenen Akzent — er ist
+                                           eine Auswahl, kein Überfahren. */
+                                        : 'border-[#E3E7F0] hover:border-[#1f2654] hover:bg-[#1f2654] hover:shadow-[0_4px_12px_rgba(39,47,103,0.10)] dark:border-white/10 dark:hover:border-[#1f2654] dark:hover:bg-[#1f2654]',
                                 )}
                             >
                                 <span
@@ -194,7 +206,7 @@ export const UpcomingSection: React.FC = () => {
                                         'flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
                                         isOpen
                                             ? 'bg-[#6977c7] text-white dark:bg-[#e8873a] dark:text-[#16130f]'
-                                            : cx(meta.badge, 'group-hover:bg-[#6977c7] group-hover:text-white dark:group-hover:bg-[#e8873a] dark:group-hover:text-[#16130f]'),
+                                            : cx(meta.badge, 'group-hover:bg-white/15 group-hover:text-white dark:group-hover:bg-white/15 dark:group-hover:text-white'),
                                     )}
                                 >
                                     <Icon size={17} />
@@ -205,18 +217,18 @@ export const UpcomingSection: React.FC = () => {
                                             'block truncate text-[13.5px] font-semibold transition-colors',
                                             isOpen
                                                 ? 'text-[#6977c7] dark:text-[#e8873a]'
-                                                : 'text-[#1A1A1A] group-hover:text-[#6977c7] dark:text-white dark:group-hover:text-[#e8873a]',
+                                                : 'text-[#1A1A1A] group-hover:text-white dark:text-white dark:group-hover:text-white',
                                         )}
                                     >
                                         {labels[key]}
                                     </span>
-                                    <span className="mt-0.5 block text-[11.5px] text-[#98A0AE] dark:text-[#8f95a1]">
+                                    <span className="mt-0.5 block text-[11.5px] text-[#98A0AE] transition-colors group-hover:text-white/80 dark:text-[#8f95a1] dark:group-hover:text-white/80">
                                         {t('dash.upcoming.week', { defaultValue: 'Diese Woche' })}
                                     </span>
                                 </span>
                                 <ChevronDown
                                     size={16}
-                                    className={cx('shrink-0 text-slate-400 transition-transform duration-150', isOpen && 'rotate-180')}
+                                    className={cx('shrink-0 text-slate-400 transition-transform duration-150 group-hover:!text-white', isOpen && 'rotate-180')}
                                 />
                             </button>
 
@@ -253,12 +265,12 @@ export const UpcomingSection: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => navigate(item.navigateTo)}
-                                                        className="group flex w-full items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                                                        className="group flex w-full items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[#1f2654] dark:hover:bg-[#1f2654]"
                                                     >
-                                                        <span className="min-w-0 truncate text-[13px] font-semibold text-[#1A1A1A] underline-offset-4 group-hover:underline dark:text-white">
+                                                        <span className="min-w-0 truncate text-[13px] font-semibold text-[#1A1A1A] underline-offset-4 transition-colors group-hover:text-white group-hover:underline dark:text-white">
                                                             {item.client}
                                                         </span>
-                                                        <span className="shrink-0 text-right text-[11.5px] tabular-nums text-[#6B7280] dark:text-[#aab0bb]">
+                                                        <span className="shrink-0 text-right text-[11.5px] tabular-nums text-[#6B7280] transition-colors group-hover:text-white/80 dark:text-[#aab0bb] dark:group-hover:text-white/80">
                                                             {item.date.format('dddd')}
                                                             {' · '}
                                                             {item.hasTime ? item.date.format('HH:mm') : item.date.format('DD.MM.')}

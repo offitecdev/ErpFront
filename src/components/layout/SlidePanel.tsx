@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 interface SlidePanelProps {
     open: boolean;
@@ -27,6 +28,7 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
     children,
     width = 520,
 }) => {
+    const { t } = useTranslation();
     const panelRef = useRef<HTMLElement>(null);
     const titleId = useId();
 
@@ -85,9 +87,22 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
 
     const panelWidth = typeof width === 'number' ? `${width}px` : width;
 
+    // Fläche, Kanten und Ecken stehen in `index.css` (`.ofi-slide-*`) auf den
+    // `--ofi-cal-*`-Tokens: der Dunkelmodus bleibt damit ein Variablentausch,
+    // und der Radius der linken Ecken überlebt die Radius-Regeln der Anwendung
+    // (die jede `rounded-*`-Klasse platt drücken).
+    //
+    // `ofi-compact-modal` ist KEIN Schmuck: eine Regel in `index.css` zwingt
+    // JEDEM `section[role="dialog"][aria-modal="true"]` in einem Portal die
+    // Breite `min(100% - 40px, 1280px)` auf — mit `!important`, also stärker
+    // als der eingebaute Stil hier. Ohne diese Klasse war das Fenster immer
+    // 1280px breit, egal welche Breite der Aufrufer wünschte (das ist der
+    // Grund, warum es beim Verschmälern nie schmaler wurde). Die Klasse ist
+    // der vorgesehene Ausstieg; die Breite reicht zusätzlich als Variable an
+    // die Lage `utilities` weiter, wo sie jede `!important`-Regel schlägt.
     return createPortal(
         <div
-            className="fixed inset-0 z-[100] bg-slate-950/30 dark:bg-black/60"
+            className="ofi-slide-scrim"
             onMouseDown={(event) => {
                 if (event.target === event.currentTarget) onClose();
             }}
@@ -98,28 +113,28 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
                 aria-modal="true"
                 aria-labelledby={title ? titleId : undefined}
                 tabIndex={-1}
-                style={{ width: panelWidth, maxWidth: 'calc(100vw - 24px)' }}
-                className="absolute inset-y-0 right-0 flex flex-col bg-white shadow-2xl outline-none dark:bg-[#151616]"
+                style={{ '--ofi-slide-width': panelWidth, width: panelWidth } as React.CSSProperties}
+                className="ofi-slide-panel ofi-compact-modal"
             >
-                <header className="flex shrink-0 items-start gap-4 border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                <header className="ofi-slide-panel__head">
                     <div className="min-w-0 flex-1">
                         {title && (
-                            <div id={titleId} className="text-lg font-semibold text-primary">
+                            <div id={titleId} className="ofi-slide-panel__title">
                                 {title}
                             </div>
                         )}
-                        {subtitle && <p className="mt-1 text-sm font-normal text-tertiary">{subtitle}</p>}
+                        {subtitle && <p className="ofi-slide-panel__sub">{subtitle}</p>}
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        aria-label="Kapat"
-                        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/10 dark:hover:text-white"
+                        aria-label={t('common.close')}
+                        className="ofi-slide-panel__close rounded-full"
                     >
                         ×
                     </button>
                 </header>
-                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+                <div className="ofi-slide-panel__body">{children}</div>
             </section>
         </div>,
         document.body,

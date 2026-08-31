@@ -3,7 +3,6 @@ import type React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
-    ArrowLeft,
     CalendarCheck01 as CalendarClock,
     Package,
     Save01 as Save,
@@ -173,7 +172,6 @@ export const ShipmentCreate = () => {
                 description={t('logistics.sevkiyat_kartini_genel_bilgi_yuk_tarih_ve_finans')}
                 actions={
                     <>
-                        <Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/logistics/shipments')}>{t('nav.shipments')}</Button>
                         <Button type="submit" form="shipment-create-form" variant="primary" loading={submitting} icon={<Save size={13} />}>{t('common.save')}</Button>
                     </>
                 }

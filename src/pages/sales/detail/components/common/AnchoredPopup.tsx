@@ -95,7 +95,9 @@ export const AnchoredPopup = ({
         <div
             ref={setPanelEl}
             style={style}
-            className={`z-[999] overflow-hidden rounded-[4px] border border-slate-300 bg-white shadow-[0_10px_32px_rgba(15,23,42,0.18)] ${className}`}
+            // `.ofi-tp-menu` — the quote popups' menu surface (index.css "TENDER
+            // POPUPS"): rounded card, soft shadow, token colours (dark mode swap).
+            className={`ofi-tp-menu z-[999] overflow-hidden ${className}`}
         >
             {children}
         </div>,

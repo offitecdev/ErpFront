@@ -124,7 +124,7 @@ export const PriorityAgenda: React.FC<PriorityAgendaProps> = ({
                 overdue: days !== null && days < 0,
                 tagKey: key,
                 tagDefault: defaultLabel,
-                onOpen: () => navigate(`/crm/tenders/${tender.id}`),
+                onOpen: () => navigate(`/sales/quotes/${tender.id}`),
             });
         }
 

@@ -115,11 +115,11 @@ export const OrdersPage = () => {
                             <tr>
                                 <th className="relative text-left">
                                     {t('inv.orders.columns.reference')}
-                                    <ColResizeHandle {...grid.resizeProps('reference', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('reference')} />
                                 </th>
                                 <th className="relative text-left">
                                     {t('inv.orders.columns.quoteNumber')}
-                                    <ColResizeHandle {...grid.resizeProps('quote', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('quote')} />
                                 </th>
                                 <th className="text-left">{t('inv.orders.columns.project')}</th>
                                 <th className="relative text-left">

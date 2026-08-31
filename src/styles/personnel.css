@@ -1,0 +1,958 @@
+/**
+ * ── PERSONALMODUL: DIE NEUEN FLÄCHEN (26.08.2026) ────────────────────────────
+ *
+ * Antragsseite (`.ofi-req-*`), Arbeitszeiterfassung (`.ofi-tr-*`),
+ * Urlaubskonto (`.ofi-ly-*`), Feiertage (`.ofi-hol-*`), Urlaubsregel
+ * (`.ofi-pol-*`) und das Anträge-Feld im Kopf (`.ofi-apps*`).
+ *
+ * ALLES MALT AUS DEN KALENDER-TOKENS (`--ofi-cal-*`, index.css „CALENDAR
+ * MODULE SHELL"). Das ist dieselbe Lage, aus der Moduleinstellungen,
+ * Projektdetail und die App-Popups gebaut sind — der Dunkelmodus ist damit
+ * derselbe Variablentausch und keine zweite Kopie.
+ *
+ * DER GRÖSSERE ECKENRADIUS (Vorgabe: «eher wie bei Google — grösserer
+ * Eckenradius, sauber und viel ansprechender») steht hier als EINE Variable.
+ * Achtung: index.css flacht jede Tailwind-`rounded-*`-Klasse per !important auf
+ * 2px/7px ab (siehe MEMORY «Radius utilities are flattened»); deshalb tragen
+ * diese Flächen benannte Klassen und keine Hilfsklassen — und die Regeln
+ * stehen mit `#root`-Vorsatz UND `body > :not(#root)`-Zwilling, damit sie auch
+ * in einem Portal greifen.
+ */
+
+:root {
+    /* Der Radius dieser Lage. Ein Wert, damit Feld, Kachel und Karte nicht
+       jede für sich driften. */
+    --ofi-hr-radius: 16px;
+    --ofi-hr-radius-sm: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Gemeinsame Bausteine: Filterfeld, Pillenreihe
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-req-filter,
+body > :not(#root) .ofi-req-filter {
+    display: flex;
+    min-width: 150px;
+    flex: 1 1 150px;
+    flex-direction: column;
+    gap: 4px;
+}
+#root .ofi-req-filter--wide,
+body > :not(#root) .ofi-req-filter--wide { flex: 2 1 240px; }
+#root .ofi-req-filter > span,
+body > :not(#root) .ofi-req-filter > span {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+
+/* Die Pillenreihe: Antragsart bzw. Zeitraum-Schnellwahl. */
+#root .ofi-req-typerow,
+body > :not(#root) .ofi-req-typerow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+#root .ofi-req-typebtn,
+body > :not(#root) .ofi-req-typebtn {
+    min-height: 34px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-req-typebtn:hover,
+body > :not(#root) .ofi-req-typebtn:hover {
+    border-color: var(--ofi-cal-accent);
+    color: var(--ofi-cal-text);
+}
+#root .ofi-req-typebtn.is-active,
+body > :not(#root) .ofi-req-typebtn.is-active {
+    border-color: transparent;
+    background: var(--ofi-cal-accent);
+    color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Antragsseite
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-req-filters,
+body > :not(#root) .ofi-req-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius);
+    background: var(--ofi-cal-surface);
+    padding: 16px;
+}
+#root .ofi-req-filterline,
+body > :not(#root) .ofi-req-filterline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+/* Der geschrumpfte Zeitraumfilter (Vorgabe 26.08.2026): eine Zeile, weniger
+   Luft — die Karte soll nach Werkzeugleiste aussehen, nicht nach Formular. */
+#root .ofi-req-filters.is-slim,
+body > :not(#root) .ofi-req-filters.is-slim { padding: 12px 16px; }
+#root .ofi-req-filters.is-slim .ofi-req-filter,
+body > :not(#root) .ofi-req-filters.is-slim .ofi-req-filter {
+    flex: 0 1 190px;
+}
+#root .ofi-req-count,
+body > :not(#root) .ofi-req-count {
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+
+/* Das Fussband des Antragsformulars: Arbeitstage links, der Weg rechts. */
+#root .ofi-req-foot,
+body > :not(#root) .ofi-req-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    border-top: 1px solid var(--ofi-cal-line);
+    padding-top: 12px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-req-foot__days,
+body > :not(#root) .ofi-req-foot__days {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Arbeitszeiterfassung
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-tr-search,
+body > :not(#root) .ofi-tr-search {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius);
+    background: var(--ofi-cal-surface);
+    padding: 16px;
+}
+#root .ofi-tr-presets,
+body > :not(#root) .ofi-tr-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+#root .ofi-tr-preset,
+body > :not(#root) .ofi-tr-preset {
+    min-height: 32px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-tr-preset:hover,
+body > :not(#root) .ofi-tr-preset:hover { border-color: var(--ofi-cal-accent); color: var(--ofi-cal-text); }
+#root .ofi-tr-preset.is-active,
+body > :not(#root) .ofi-tr-preset.is-active {
+    border-color: transparent;
+    background: var(--ofi-cal-accent);
+    color: #fff;
+}
+
+/* Die Wochentagsknöpfe — klein und quadratisch: sie sind Abkürzungen, keine
+   gleichrangige Wahl neben den Zeiträumen darüber. */
+#root .ofi-tr-weekdays,
+body > :not(#root) .ofi-tr-weekdays {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+#root .ofi-tr-weekdays__label,
+body > :not(#root) .ofi-tr-weekdays__label {
+    margin-right: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-tr-weekday,
+body > :not(#root) .ofi-tr-weekday {
+    min-width: 38px;
+    min-height: 30px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius-sm);
+    background: var(--ofi-cal-surface);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-tr-weekday:hover,
+body > :not(#root) .ofi-tr-weekday:hover {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-hover);
+}
+#root .ofi-tr-fields,
+body > :not(#root) .ofi-tr-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+/* Vor der ersten Suche: ein ruhiger Platzhalter statt einer leeren Tabelle. */
+#root .ofi-tr-idle,
+body > :not(#root) .ofi-tr-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border: 1px dashed var(--ofi-cal-line);
+    border-radius: var(--ofi-hr-radius);
+    padding: 56px 24px;
+    text-align: center;
+}
+#root .ofi-tr-idle__title,
+body > :not(#root) .ofi-tr-idle__title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-tr-idle__text,
+body > :not(#root) .ofi-tr-idle__text {
+    max-width: 44ch;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ofi-cal-muted);
+}
+
+/* Das Ausgabeband GANZ OBEN über der Liste (Vorgabe). */
+#root .ofi-tr-exportbar,
+body > :not(#root) .ofi-tr-exportbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius);
+    background: var(--ofi-cal-hover);
+    padding: 12px 16px;
+}
+#root .ofi-tr-exportbar__summary,
+body > :not(#root) .ofi-tr-exportbar__summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 18px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-tr-exportbar__summary strong,
+body > :not(#root) .ofi-tr-exportbar__summary strong {
+    font-size: 13.5px;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-tr-exportbar__actions,
+body > :not(#root) .ofi-tr-exportbar__actions { display: flex; gap: 8px; }
+
+/* Die eine Zahl, wegen der der Reiter «Arbeitszeiten» geöffnet wird. */
+#root .ofi-tr-total,
+body > :not(#root) .ofi-tr-total {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius);
+    background: var(--ofi-cal-surface);
+    padding: 18px 20px;
+}
+#root .ofi-tr-total__main,
+body > :not(#root) .ofi-tr-total__main { display: flex; flex-direction: column; gap: 2px; }
+#root .ofi-tr-total__value,
+body > :not(#root) .ofi-tr-total__value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-tr-total__label,
+body > :not(#root) .ofi-tr-total__label { font-size: 12.5px; color: var(--ofi-cal-muted); }
+#root .ofi-tr-total__side,
+body > :not(#root) .ofi-tr-total__side {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 26px;
+}
+#root .ofi-tr-total__side dt,
+body > :not(#root) .ofi-tr-total__side dt { font-size: 11.5px; color: var(--ofi-cal-muted); }
+#root .ofi-tr-total__side dd,
+body > :not(#root) .ofi-tr-total__side dd {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Urlaubskonto
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-ly-stats,
+body > :not(#root) .ofi-ly-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 16px;
+}
+#root .ofi-ly-stat,
+body > :not(#root) .ofi-ly-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius-sm);
+    padding: 12px 14px;
+}
+#root .ofi-ly-stat.is-strong,
+body > :not(#root) .ofi-ly-stat.is-strong {
+    border-color: transparent;
+    background: var(--ofi-cal-accent);
+}
+#root .ofi-ly-stat.is-strong .ofi-ly-stat__value,
+#root .ofi-ly-stat.is-strong .ofi-ly-stat__label,
+#root .ofi-ly-stat.is-strong .ofi-ly-stat__hint,
+body > :not(#root) .ofi-ly-stat.is-strong .ofi-ly-stat__value,
+body > :not(#root) .ofi-ly-stat.is-strong .ofi-ly-stat__label,
+body > :not(#root) .ofi-ly-stat.is-strong .ofi-ly-stat__hint { color: #fff; }
+#root .ofi-ly-stat.is-strong .ofi-ly-stat__hint,
+body > :not(#root) .ofi-ly-stat.is-strong .ofi-ly-stat__hint { opacity: 0.85; }
+#root .ofi-ly-stat__value,
+body > :not(#root) .ofi-ly-stat__value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-ly-stat__label,
+body > :not(#root) .ofi-ly-stat__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-ly-stat__hint,
+body > :not(#root) .ofi-ly-stat__hint { font-size: 11px; color: var(--ofi-cal-muted); }
+#root .ofi-ly-rule,
+body > :not(#root) .ofi-ly-rule {
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 12px 16px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--ofi-cal-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Feiertage (Einstellungen → Module → Personal)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-hol-head,
+body > :not(#root) .ofi-hol-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+#root .ofi-hol-year,
+body > :not(#root) .ofi-hol-year {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-hol-grid,
+body > :not(#root) .ofi-hol-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+#root .ofi-hol-col,
+body > :not(#root) .ofi-hol-col {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius);
+    overflow: hidden;
+}
+#root .ofi-hol-colhead,
+body > :not(#root) .ofi-hol-colhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    background: var(--ofi-cal-hover);
+    padding: 10px 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-hol-addall,
+body > :not(#root) .ofi-hol-addall {
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    padding: 4px 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #fff;
+}
+#root .ofi-hol-list,
+body > :not(#root) .ofi-hol-list {
+    max-height: 420px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+#root .ofi-hol-row,
+body > :not(#root) .ofi-hol-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    padding: 8px 14px;
+}
+#root .ofi-hol-row:last-child,
+body > :not(#root) .ofi-hol-row:last-child { border-bottom: 0; }
+#root .ofi-hol-row.is-taken,
+body > :not(#root) .ofi-hol-row.is-taken { opacity: 0.45; }
+#root .ofi-hol-date,
+body > :not(#root) .ofi-hol-date {
+    width: 84px;
+    flex: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-hol-name,
+body > :not(#root) .ofi-hol-name {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-hol-tag,
+body > :not(#root) .ofi-hol-tag {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-hol-btn,
+body > :not(#root) .ofi-hol-btn {
+    display: inline-flex;
+    height: 30px;
+    width: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-hol-btn:hover,
+body > :not(#root) .ofi-hol-btn:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-hol-btn.is-danger:hover,
+body > :not(#root) .ofi-hol-btn.is-danger:hover { color: #d93025; }
+#root .ofi-hol-takenmark,
+body > :not(#root) .ofi-hol-takenmark { font-size: 11px; color: var(--ofi-cal-muted); }
+#root .ofi-hol-empty,
+body > :not(#root) .ofi-hol-empty {
+    padding: 28px 14px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-hol-own,
+body > :not(#root) .ofi-hol-own {
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 12px 14px;
+}
+#root .ofi-hol-ownhead,
+body > :not(#root) .ofi-hol-ownhead {
+    display: block;
+    padding-bottom: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-hol-ownrow,
+body > :not(#root) .ofi-hol-ownrow { display: flex; flex-wrap: wrap; gap: 8px; }
+#root .ofi-hol-ownrow .ofi-cal-input,
+body > :not(#root) .ofi-hol-ownrow .ofi-cal-input { flex: 1 1 130px; min-width: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Urlaubsanspruch
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-pol-grid,
+body > :not(#root) .ofi-pol-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+#root .ofi-pol-field,
+body > :not(#root) .ofi-pol-field { display: flex; flex-direction: column; gap: 4px; }
+#root .ofi-pol-label,
+body > :not(#root) .ofi-pol-label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-pol-hint,
+body > :not(#root) .ofi-pol-hint {
+    display: block;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-pol-switch,
+body > :not(#root) .ofi-pol-switch {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius-sm);
+    padding: 12px 14px;
+}
+#root .ofi-pol-preview,
+body > :not(#root) .ofi-pol-preview {
+    margin-top: 18px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius);
+    background: var(--ofi-cal-hover);
+    padding: 14px 16px;
+}
+#root .ofi-pol-previewhead,
+body > :not(#root) .ofi-pol-previewhead {
+    display: block;
+    padding-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-pol-previewrow,
+body > :not(#root) .ofi-pol-previewrow {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+}
+#root .ofi-pol-previewcell,
+body > :not(#root) .ofi-pol-previewcell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: var(--ofi-hr-radius-sm);
+    background: var(--ofi-cal-surface);
+    padding: 10px 12px;
+}
+#root .ofi-pol-previewvalue,
+body > :not(#root) .ofi-pol-previewvalue {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-pol-previewlabel,
+body > :not(#root) .ofi-pol-previewlabel { font-size: 11.5px; color: var(--ofi-cal-muted); }
+#root .ofi-pol-formula,
+body > :not(#root) .ofi-pol-formula {
+    padding-top: 10px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-pol-actions,
+body > :not(#root) .ofi-pol-actions { margin-top: 18px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Das Anträge-Feld im Kopf (Apps-Zeichen)
+   ═══════════════════════════════════════════════════════════════════════════
+   «Eher wie bei Google: grösserer Eckenradius, sauber und viel ansprechender.»
+   Deshalb 20px Radius, viel Weiss, eine einzige weiche Schattenkante — kein
+   Rahmen, keine zweite Farbe.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-apps,
+body > :not(#root) .ofi-apps {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    z-index: 60;
+    width: 340px;
+    max-width: calc(100vw - 24px);
+    border-radius: 20px;
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 12px 32px rgba(15, 23, 42, 0.16);
+    overflow: hidden;
+}
+#root .ofi-apps__head,
+body > :not(#root) .ofi-apps__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 16px 18px 10px;
+}
+#root .ofi-apps__title,
+body > :not(#root) .ofi-apps__title {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-apps__new,
+body > :not(#root) .ofi-apps__new {
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
+/* VIER Kacheln in ZWEI Reihen (11.09.2026, Vorgabe Samet: «vier belebte,
+   lebende Bereiche: E-Mail, Aufgaben, Anträge, Erinnerungen»). Bei drei
+   Spalten sässe die vierte allein in der zweiten Reihe; zwei mal zwei ist
+   das Quadrat, das die vier von selbst bilden. */
+#root .ofi-apps__tiles,
+body > :not(#root) .ofi-apps__tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 4px 12px 12px;
+}
+#root .ofi-apps__tile,
+body > :not(#root) .ofi-apps__tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    border-radius: 14px;
+    padding: 12px 6px;
+    text-align: center;
+    transition: background-color 120ms ease;
+}
+#root .ofi-apps__tile:hover,
+body > :not(#root) .ofi-apps__tile:hover { background: var(--ofi-cal-hover); }
+
+/* ── «Belebt»: der gestaffelte Auftritt ────────────────────────────────────
+   Die Kacheln steigen nacheinander auf, statt als Block zu erscheinen — das
+   Feld geht jetzt beim Darüberfahren auf, und ein Block, der bei jeder
+   Zeigerbewegung aufspringt, wirkt wie ein Fehler. `--i` setzt die Komponente
+   je Kachel (RequestsAppsMenu).
+
+   Wer Bewegung abbestellt hat, bekommt keine: die Kacheln stehen dann sofort
+   und vollständig da. Eine Animation ist hier Schmuck, kein Träger. */
+@keyframes ofi-apps-rise {
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+}
+#root .ofi-apps__tile,
+body > :not(#root) .ofi-apps__tile {
+    animation: ofi-apps-rise 220ms cubic-bezier(0.2, 0, 0, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 45ms);
+}
+/* Die Zahl an einer Kachel ist die LEBENDE Angabe — sie schlägt einmal an,
+   sobald sie erscheint, und ruht danach. Ein dauerndes Pulsen im Kopf wäre
+   nach zehn Minuten unerträglich. */
+@keyframes ofi-apps-beat {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+#root .ofi-apps__tilecount.is-live,
+body > :not(#root) .ofi-apps__tilecount.is-live {
+    animation: ofi-apps-beat 320ms cubic-bezier(0.2, 0, 0, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 45ms + 120ms);
+}
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-apps__tile,
+    body > :not(#root) .ofi-apps__tile,
+    #root .ofi-apps__tilecount.is-live,
+    body > :not(#root) .ofi-apps__tilecount.is-live { animation: none; }
+}
+#root .ofi-apps__tileicon,
+body > :not(#root) .ofi-apps__tileicon {
+    display: inline-flex;
+    height: 34px;
+    width: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    color: var(--ofi-cal-accent);
+}
+#root .ofi-apps__tilelabel,
+body > :not(#root) .ofi-apps__tilelabel {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-apps__tilehint,
+body > :not(#root) .ofi-apps__tilehint {
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-apps__tilecount,
+body > :not(#root) .ofi-apps__tilecount {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    display: inline-flex;
+    min-width: 18px;
+    justify-content: center;
+    border-radius: 999px;
+    background: #d93025;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+}
+#root .ofi-apps__list,
+body > :not(#root) .ofi-apps__list {
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 10px 8px 12px;
+}
+#root .ofi-apps__listhead,
+body > :not(#root) .ofi-apps__listhead {
+    display: block;
+    padding: 0 10px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-apps__row,
+body > :not(#root) .ofi-apps__row {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 1px;
+    border-radius: 12px;
+    padding: 8px 10px;
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+#root .ofi-apps__row:hover,
+body > :not(#root) .ofi-apps__row:hover { background: var(--ofi-cal-hover); }
+#root .ofi-apps__rowname,
+body > :not(#root) .ofi-apps__rowname {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-apps__rowmeta,
+body > :not(#root) .ofi-apps__rowmeta { font-size: 11px; color: var(--ofi-cal-muted); }
+#root .ofi-apps__empty,
+body > :not(#root) .ofi-apps__empty {
+    display: block;
+    padding: 10px 10px 6px;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Telefon und Tablet ───────────────────────────────────────────────────
+   Auf schmalen Geräten wird aus jeder Reihe eine Spalte; das Anträge-Feld
+   spannt sich fast über die Breite, damit die Kacheln nicht auf 60px
+   schrumpfen. */
+@media (max-width: 640px) {
+    #root .ofi-apps,
+    body > :not(#root) .ofi-apps {
+        width: calc(100vw - 20px);
+        right: -8px;
+    }
+    #root .ofi-tr-total__value,
+    body > :not(#root) .ofi-tr-total__value { font-size: 24px; }
+    #root .ofi-req-filter,
+    #root .ofi-req-filter--wide,
+    body > :not(#root) .ofi-req-filter,
+    body > :not(#root) .ofi-req-filter--wide { flex: 1 1 100%; }
+    /* Die schlanke Filterleiste setzt oben eine eigene (spezifischere)
+       Breite — hier muss sie noch einmal auf die volle Zeile. */
+    #root .ofi-req-filters.is-slim .ofi-req-filter,
+    body > :not(#root) .ofi-req-filters.is-slim .ofi-req-filter { flex: 1 1 100%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Personalakte kompakt (`.ofi-pf-*`, 27.08.2026)
+
+   Der Profil-Reiter der Personenseite: kleine, ruhige Felder auf dem
+   Google-Feldkleid (`.ofi-cal-input`), die Ablage-Kachel für Vertrag und
+   Unterlagen und die Firmen-Chips der Zugangs-Gruppe.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#root .ofi-pf-input,
+body > :not(#root) .ofi-pf-input {
+    height: 32px;
+    min-height: 32px;
+    font-size: 12.5px;
+}
+
+#root textarea.ofi-pf-input,
+body > :not(#root) textarea.ofi-pf-input { height: auto; }
+
+/* Die Ablage-Kachel: gestrichelt, als Ganzes klickbar, OBEN in der Karte. */
+#root .ofi-pf-upload,
+body > :not(#root) .ofi-pf-upload {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border: 1.5px dashed var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius-sm);
+    background: transparent;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+#root .ofi-pf-upload:hover,
+body > :not(#root) .ofi-pf-upload:hover {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-tint);
+}
+
+#root .ofi-pf-upload:disabled,
+body > :not(#root) .ofi-pf-upload:disabled { opacity: 0.55; cursor: wait; }
+
+#root .ofi-pf-upload__icon,
+body > :not(#root) .ofi-pf-upload__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-accent);
+}
+
+/* Firmen-Chips: an/aus per Klick — die Kästchenliste war eine Spalte, die
+   nichts sagte. */
+#root .ofi-pf-chip,
+body > :not(#root) .ofi-pf-chip {
+    padding: 5px 12px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+#root .ofi-pf-chip.is-active,
+body > :not(#root) .ofi-pf-chip.is-active {
+    background: #272f67;
+    border-color: #272f67;
+    color: #ffffff;
+}
+
+.dark #root .ofi-pf-chip.is-active,
+.dark body > :not(#root) .ofi-pf-chip.is-active {
+    background: #e6cf9e;
+    border-color: #e6cf9e;
+    color: #140f05;
+}
+
+/* ── Die Karten des eigenen Profils (`.ofi-me-card`, 27.08.2026) ─────────────
+   Aufgaben, Erinnerungen, Termine und Besprechungen als klickbare Kästen —
+   Karte statt Tabellenzeile, Detailfenster auf Klick. */
+#root .ofi-me-card,
+body > :not(#root) .ofi-me-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 12px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: var(--ofi-hr-radius-sm);
+    background: var(--ofi-cal-surface);
+    text-align: left;
+    transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+#root .ofi-me-card:hover,
+body > :not(#root) .ofi-me-card:hover {
+    border-color: var(--ofi-cal-accent);
+    box-shadow: var(--ofi-cal-shadow-soft);
+    transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-me-card,
+    body > :not(#root) .ofi-me-card { transition: none; }
+    #root .ofi-me-card:hover,
+    body > :not(#root) .ofi-me-card:hover { transform: none; }
+}
+
+/* ── Die Anträge im Apps-Feld (10.09.2026) ─────────────────────────────────
+   «Dieser Bereich enthält keine allgemeinen Anträge, sondern die bestimmten —
+    ein Klick auf ‹Urlaub› öffnet die Urlaubs-Antragsseite direkt.»
+   Darum stehen hier VIER Kapseln nebeneinander (Ferien, Homeoffice,
+   Krankheit, Sonstiges) statt eines Sammeleintrags. */
+#root .ofi-apps__reqs,
+body > :not(#root) .ofi-apps__reqs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 10px 4px;
+}
+#root .ofi-apps__req,
+body > :not(#root) .ofi-apps__req {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-apps__req:hover,
+body > :not(#root) .ofi-apps__req:hover {
+    border-color: transparent;
+    background: var(--ofi-cal-tab-active-bg);
+    color: var(--ofi-cal-tab-active-text);
+}
+#root .ofi-apps__req svg,
+body > :not(#root) .ofi-apps__req svg { color: var(--ofi-cal-muted); }

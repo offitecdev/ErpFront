@@ -1,38 +1,41 @@
 import { memo, useMemo } from 'react';
 import dayjs from 'dayjs';
 
-import { CalendarCheck01 as CalendarClock, Clock } from '@/components/icons/antIconCompat';
+import { Clock } from '@/components/icons/antIconCompat';
+import { PopupCaption, PopupEmpty } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import type { AppointmentDto, ProjectDto } from '@/types/project';
 
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 
-/** Keeps the card compact; anything beyond is reported as a "+N" count. */
+/** Keeps the list compact; anything beyond is reported as a "+N" count. */
 const UPCOMING_LIMIT = 6;
 
 const Row = ({ appointment, showDate }: { appointment: AppointmentDto; showDate?: boolean }) => {
     const start = dayjs(appointment.startTime);
     return (
-        <li className="flex items-start gap-2.5 py-1.5">
-            <span className="mt-0.5 shrink-0 text-slate-400"><Clock size={12} /></span>
-            <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="font-mono text-[12px] font-semibold text-slate-900">
-                        {showDate ? start.format('DD.MM.') : ''} {start.format('HH:mm')}–{dayjs(appointment.endTime).format('HH:mm')}
+        <li className="ofi-tp-row">
+            <span className="ofi-tp-icon"><Clock size={13} /></span>
+            <span className="ofi-tp-row__main">
+                <span className="ofi-tp-row__title">
+                    <span className="ofi-tp-num is-strong">
+                        {showDate ? `${start.format('DD.MM.')} ` : ''}{start.format('HH:mm')}–{dayjs(appointment.endTime).format('HH:mm')}
                     </span>
-                    <span className="truncate text-[11.5px] text-slate-500">{appointmentTechnicianNames(appointment)}</span>
-                </div>
-                {appointment.notes && <div className="truncate text-[11px] text-slate-400">{appointment.notes}</div>}
-            </div>
+                    {' '}
+                    <span style={{ color: 'var(--ofi-cal-muted)', fontWeight: 400, fontSize: 11.5 }}>
+                        {appointmentTechnicianNames(appointment)}
+                    </span>
+                </span>
+                {appointment.notes && <span className="ofi-tp-row__meta">{appointment.notes}</span>}
+            </span>
         </li>
     );
 };
 
 /**
- * The project's appointments as one agenda: today on top, everything still
- * ahead below, separated by a single rule inside the SAME card (deliberately
- * not two cards — they are one train of thought, "what is happening now" then
- * "what is coming").
+ * The project's appointments as one agenda inside the details popup: today on
+ * top, everything still ahead below, under their own captions (they are one
+ * train of thought — "what is happening now", then "what is coming").
  *
  * Cancelled appointments are excluded; past ones only ever appear under Today.
  */
@@ -53,48 +56,28 @@ export const ProjectAgendaCard = memo(({ project }: { project: ProjectDto }) => 
     }, [project.appointments]);
 
     return (
-        <section className="rounded-xl border border-slate-200">
-            <header className="flex items-center gap-2 border-b border-slate-100 px-3.5 py-2.5">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#272f67]/10 text-[#272f67]">
-                    <CalendarClock size={13} />
-                </span>
-                <span className="text-[12.5px] font-semibold text-slate-800">{t('projects.details.agenda')}</span>
-            </header>
+        <div>
+            <PopupCaption className="!pt-0">{t('projects.bugun')}</PopupCaption>
+            {today.length === 0
+                ? <PopupEmpty className="is-inline">{t('projects.details.noToday')}</PopupEmpty>
+                : <ul className="ofi-tp-list">{today.map((appointment) => <Row key={appointment.id} appointment={appointment} />)}</ul>}
 
-            <div className="px-3.5 py-2.5">
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{t('projects.bugun')}</div>
-                {today.length === 0 ? (
-                    <p className="py-1.5 text-[12px] text-slate-400">{t('projects.details.noToday')}</p>
-                ) : (
-                    <ul className="divide-y divide-slate-50">
-                        {today.map((appointment) => <Row key={appointment.id} appointment={appointment} />)}
+            <PopupCaption>{t('projects.details.upcoming')}</PopupCaption>
+            {upcoming.length === 0 ? (
+                <PopupEmpty className="is-inline">{t('projects.details.noUpcoming')}</PopupEmpty>
+            ) : (
+                <>
+                    <ul className="ofi-tp-list">
+                        {upcoming.slice(0, UPCOMING_LIMIT).map((appointment) => (
+                            <Row key={appointment.id} appointment={appointment} showDate />
+                        ))}
                     </ul>
-                )}
-            </div>
-
-            {/* The divider that keeps this one card instead of two. */}
-            <div className="mx-3.5 border-t border-slate-200" />
-
-            <div className="px-3.5 py-2.5">
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{t('projects.details.upcoming')}</div>
-                {upcoming.length === 0 ? (
-                    <p className="py-1.5 text-[12px] text-slate-400">{t('projects.details.noUpcoming')}</p>
-                ) : (
-                    <>
-                        <ul className="divide-y divide-slate-50">
-                            {upcoming.slice(0, UPCOMING_LIMIT).map((appointment) => (
-                                <Row key={appointment.id} appointment={appointment} showDate />
-                            ))}
-                        </ul>
-                        {/* Say what was cut rather than let the list look complete. */}
-                        {upcoming.length > UPCOMING_LIMIT && (
-                            <div className="pt-1 text-[11px] text-slate-400">
-                                +{upcoming.length - UPCOMING_LIMIT}
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </section>
+                    {/* Say what was cut rather than let the list look complete. */}
+                    {upcoming.length > UPCOMING_LIMIT && (
+                        <div className="ofi-tp-num" style={{ paddingTop: 6 }}>+{upcoming.length - UPCOMING_LIMIT}</div>
+                    )}
+                </>
+            )}
+        </div>
     );
 });

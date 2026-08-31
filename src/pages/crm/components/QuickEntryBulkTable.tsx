@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Save01 as Save, Trash01 as Trash } from '@/components/icons/antIconCompat';
+import { Link02, Plus, Save01 as Save, Trash01 as Trash } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
 import { crmApi } from '@/lib/api/crm';
@@ -10,6 +10,7 @@ import { QuoteDatePicker } from '@/pages/sales/detail/components/common/QuoteDat
 import { CustomerComboCell } from './CustomerComboCell';
 import { StaffMultiCombo } from './StaffMultiCombo';
 import { ContactCell } from './ContactCell';
+import { TaskTenderCombo } from '../tasks/TaskTenderCombo';
 import { dateInputToIso, dateTimeToIso, toDateInputValue } from '../utils/crmFormat.utils';
 import type { CrmCustomerOption, QuickEntryAction, QuickEntryDraftRow } from '../types/crm.types';
 
@@ -26,6 +27,22 @@ import type { CrmCustomerOption, QuickEntryAction, QuickEntryDraftRow } from '..
  * die der Server ablehnt, BLEIBEN stehen und tragen ihre Meldung; die
  * erfolgreichen verschwinden. Die Zuordnung läuft über den `index` innerhalb
  * der gefüllten Zeilen — genau wie beim Lager-Massenimport.
+ *
+ * ══ 11.09.2026 (Vorgabe Samet) ═══════════════════════════════════════════
+ *
+ * «Man soll nicht jedes Mal ‹Kunde› tippen müssen; dasselbe gilt für die
+ * Schnellerfassung — es soll freiwillig sein, auf einen Kunden und eine
+ * Offerte zu verweisen.»
+ *
+ * BEI AUFGABEN UND ERINNERUNGEN SIND DIE VERKNÜPFUNGSSPALTEN DARUM
+ * ZUGEKLAPPT. Kunde, Ansprechpartner und Offerte standen vorher in jeder
+ * Zeile und wollten ausgefüllt werden, obwohl die meisten Aufgaben an gar
+ * keinem Kunden hängen — drei leere Zellen, an denen man bei jeder Zeile
+ * vorbeitippt. Der Knopf «Verknüpfungen» im Kopf holt sie hervor, wenn man
+ * sie braucht.
+ *
+ * BEI TELEFON UND NOTIZ BLEIBEN SIE STEHEN: dort IST der Kunde der Inhalt —
+ * ein Anruf ohne Gegenüber ist keine Notiz wert.
  */
 
 let rowSeed = 0;
@@ -34,6 +51,7 @@ const emptyRow = (): QuickEntryDraftRow => ({
     customerId: null,
     customerName: '',
     contactId: '',
+    tender: null,
     note: '',
     title: '',
     // Verantwortliche werden bewusst NICHT vorbelegt.
@@ -51,7 +69,7 @@ const emptyRow = (): QuickEntryDraftRow => ({
  */
 const rowHasContent = (row: QuickEntryDraftRow, isCommunication: boolean) => (isCommunication
     ? Boolean(row.customerId || row.customerName.trim() || row.note.trim())
-    : Boolean(row.title.trim() || row.customerId || row.customerName.trim() || row.assignees.length));
+    : Boolean(row.title.trim() || row.customerId || row.customerName.trim() || row.assignees.length || row.tender));
 
 export const QuickEntryBulkTable = ({
     action,
@@ -66,6 +84,10 @@ export const QuickEntryBulkTable = ({
     const [rows, setRows] = useState<QuickEntryDraftRow[]>(() => [emptyRow()]);
     const [focusRowKey, setFocusRowKey] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    /* Kunde, Ansprechpartner und Offerte: bei Telefon und Notiz IMMER da (sie
+       sind dort der Inhalt), bei Aufgaben und Erinnerungen erst auf Wunsch. */
+    const [showLinks, setShowLinks] = useState(false);
+    const linksOn = isCommunication || showLinks;
 
     /**
      * Eingabe übernehmen, Fehlermeldung der Zeile löschen und — falls die
@@ -121,6 +143,7 @@ export const QuickEntryBulkTable = ({
                     title: row.title.trim(),
                     customerId: row.customerId || null,
                     contactId: row.customerId ? row.contactId || null : null,
+                    tenderId: row.tender?.id || null,
                     assigneeEmployeeIds: row.assignees.map((person) => person.id),
                     // Erinnerungen läuten zur Minute, Aufgaben sind tagesgenau.
                     dueDate: (isReminder ? dateTimeToIso(row.date, row.time) : dateInputToIso(row.date)) || null,
@@ -159,7 +182,22 @@ export const QuickEntryBulkTable = ({
     const dateLabel = isReminder ? t('crm.quick.reminderDate') : t('crm.quick.dueDate');
 
     return (
-        <SectionCard title={t('crm.quick.bulkTitle')}>
+        <SectionCard
+            title={t('crm.quick.bulkTitle')}
+            action={isCommunication ? undefined : (
+                <button
+                    type="button"
+                    onClick={() => setShowLinks((value) => !value)}
+                    aria-pressed={showLinks}
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold transition-colors ${showLinks
+                        ? 'border-[#272f67]/25 bg-[#272f67]/[0.08] text-[#272f67] dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e]'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/12 dark:bg-transparent dark:text-white/70'}`}
+                >
+                    <Link02 size={13} />
+                    {t('crm.quick.toggleLinks')}
+                </button>
+            )}
+        >
             <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                 {/* Die Textspalte (Notiz bzw. Betreff) hat KEINE Breite: sie
                     nimmt den restlichen Platz auf. */}
@@ -174,8 +212,9 @@ export const QuickEntryBulkTable = ({
                     ) : (
                         <>
                             <col />
-                            <col style={{ width: 210 }} />
-                            <col style={{ width: 170 }} />
+                            {linksOn && <col style={{ width: 200 }} />}
+                            {linksOn && <col style={{ width: 160 }} />}
+                            {linksOn && <col style={{ width: 150 }} />}
                             <col style={{ width: 180 }} />
                             <col style={{ width: 150 }} />
                             {/* Uhrzeit GROSS (Vorgabe 15.08.2026): breite Spalte, hohes
@@ -198,8 +237,9 @@ export const QuickEntryBulkTable = ({
                         ) : (
                             <>
                                 <th className="text-left">{subjectLabel}</th>
-                                <th className="text-left">{t('crm.quick.customer')}</th>
-                                <th className="text-left">{t('crm.quick.contact')}</th>
+                                {linksOn && <th className="text-left">{t('crm.quick.customer')}</th>}
+                                {linksOn && <th className="text-left">{t('crm.quick.contact')}</th>}
+                                {linksOn && <th className="text-left">{t('crm.tasks.colQuote')}</th>}
                                 <th className="text-left">{t('crm.quick.assignee')}</th>
                                 <th className="text-left">{dateLabel}</th>
                                 {isReminder && <th className="text-left">{t('crm.quick.time')}</th>}
@@ -261,25 +301,40 @@ export const QuickEntryBulkTable = ({
                                             <span className="mt-0.5 block text-[10.5px] font-semibold text-red-500">{row.error}</span>
                                         )}
                                     </td>
-                                    <td>
-                                        <CustomerComboCell
-                                            value={row.customerName}
-                                            // Der Kunde ist hier freiwillig: eine leere Zelle
-                                            // darf nicht als "falsch" markiert werden.
-                                            linked={Boolean(row.customerId) || !row.customerName.trim()}
-                                            onChange={(next) => onCustomerTyped(row.key, next)}
-                                            onPick={(customer) => onCustomerPicked(row.key, customer)}
-                                        />
-                                    </td>
-                                    <td>
-                                        {/* Die Kundenwahl schliesst den Ansprechpartner ein —
-                                            auch bei Aufgaben und Erinnerungen. */}
-                                        <ContactCell
-                                            customerId={row.customerId}
-                                            value={row.contactId}
-                                            onChange={(next) => patchRow(row.key, { contactId: next })}
-                                        />
-                                    </td>
+                                    {linksOn && (
+                                        <td>
+                                            <CustomerComboCell
+                                                value={row.customerName}
+                                                // Der Kunde ist hier freiwillig: eine leere Zelle
+                                                // darf nicht als "falsch" markiert werden.
+                                                linked={Boolean(row.customerId) || !row.customerName.trim()}
+                                                onChange={(next) => onCustomerTyped(row.key, next)}
+                                                onPick={(customer) => onCustomerPicked(row.key, customer)}
+                                            />
+                                        </td>
+                                    )}
+                                    {linksOn && (
+                                        <td>
+                                            {/* Die Kundenwahl schliesst den Ansprechpartner ein —
+                                                auch bei Aufgaben und Erinnerungen. */}
+                                            <ContactCell
+                                                customerId={row.customerId}
+                                                value={row.contactId}
+                                                onChange={(next) => patchRow(row.key, { contactId: next })}
+                                            />
+                                        </td>
+                                    )}
+                                    {linksOn && (
+                                        <td>
+                                            {/* Ist ein Kunde gewählt, zeigt das Feld nur SEINE
+                                                Offerten — das ist der häufige Fall. */}
+                                            <TaskTenderCombo
+                                                value={row.tender}
+                                                onChange={(next) => patchRow(row.key, { tender: next })}
+                                                customerId={row.customerId}
+                                            />
+                                        </td>
+                                    )}
                                     <td>
                                         <StaffMultiCombo
                                             value={row.assignees}

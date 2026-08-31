@@ -24,16 +24,18 @@ export interface SplitableRoute {
 /** Label table for the secondary-pane header (leaf menu pages). */
 export const SPLITABLE_ROUTES: SplitableRoute[] = [
     { path: '/', label: 'nav.home' },
-    { path: '/attendance', label: 'nav.attendance' },
     { path: '/calendar', label: 'nav.calendar' },
-    { path: '/employees', label: 'nav.employeeList' },
-    { path: '/attendance-records', label: 'nav.attendanceRecords' },
-    { path: '/attendance-settings', label: 'nav.attendanceQR' },
+    // Personalmodul (Neubau 16.08.2026). Die Stempeluhr fehlt hier bewusst:
+    // sie belegt einen ganzen Tabletbildschirm und die Kamera — in einer halben
+    // Spalte wäre sie unbedienbar.
+    { path: '/personnel', label: 'nav.personnelList' },
+    { path: '/personnel/time-records', label: 'nav.personnelTimeRecords' },
+    { path: '/personnel/requests', label: 'nav.personnelRequests' },
     { path: '/roles', label: 'nav.roleManagement' },
     { path: '/crm/overview', label: 'nav.crmOverview' },
     { path: '/crm/customers', label: 'nav.customerList' },
-    { path: '/crm/tenders', label: 'nav.tenderManagement' },
-    { path: '/crm/my-orders', label: 'nav.myOrders' },
+    { path: '/sales/quotes', label: 'nav.tenderManagement' },
+    { path: '/sales/orders', label: 'nav.myOrders' },
     { path: '/projects', label: 'nav.projectManagement' },
     { path: '/inventory/articles', label: 'nav.articles' },
     { path: '/inventory/stock', label: 'nav.stock' },

@@ -113,7 +113,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     if (!open) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-[110] flex items-end justify-center px-3">
+        <div className="fixed inset-0 z-[650] flex items-end justify-center px-3">
             <div
                 className="ofi-sheet-backdrop absolute inset-0 animate-in fade-in duration-200"
                 aria-hidden
@@ -126,18 +126,25 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 aria-labelledby={titleId}
                 tabIndex={-1}
                 style={{ width: `min(100%, ${size}px)`, height: `min(${size}px, 92vh)` }}
-                className="ofi-sheet ofi-sheet-up relative flex flex-col overflow-hidden rounded-t-2xl outline-none"
+                /* `.ofi-pop.is-sheet` = die gemeinsame Fensteroberfläche
+                   (index.css, "FENSTER-OBERFLÄCHE") mit den zwei OBEREN Ecken:
+                   `rounded-t-2xl` kam als 4px an, das Fenster stand also
+                   scharfkantig neben dem runden Kalenderfenster. */
+                className="ofi-sheet ofi-sheet-up ofi-pop is-sheet relative flex flex-col overflow-hidden outline-none"
             >
-                <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-6 py-4 dark:border-white/10">
+                <header className="ofi-pop__rule flex shrink-0 items-start justify-between gap-4 border-b px-6 py-4">
                     <div className="min-w-0">
-                        <h2 id={titleId} className="truncate text-[15px] font-bold text-slate-900 dark:text-white">{title}</h2>
-                        {description && <p className="mt-0.5 text-[12px] text-slate-500 dark:text-white/60">{description}</p>}
+                        {/* Grundschrift statt `.ofi-serif`: die Fenster der
+                            Anwendung schreiben ihre Titel jetzt alle so wie das
+                            Kalenderfenster — klein, halbfett, eine Schrift. */}
+                        <h2 id={titleId} className="ofi-pop__title">{title}</h2>
+                        {description && <p className="ofi-pop__subtitle">{description}</p>}
                     </div>
                     <button
                         type="button"
                         aria-label={t('common.close')}
                         onClick={onClose}
-                        className="ofi-rs-nav flex size-8 shrink-0 items-center justify-center rounded-md transition-colors"
+                        className="ofi-float-card__iconbtn shrink-0"
                     >
                         <X size={16} />
                     </button>
@@ -146,7 +153,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
                 <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">{children}</div>
 
                 {footer && (
-                    <footer className="shrink-0 border-t border-slate-200 px-6 py-3 dark:border-white/10">{footer}</footer>
+                    <footer className="ofi-pop__rule shrink-0 border-t px-6 py-3">{footer}</footer>
                 )}
             </section>
         </div>,

@@ -69,7 +69,6 @@ export const PersonAccessTab = ({
     onChanged: () => void;
 }) => {
     const permissions = useAuthStore((state) => state.permissions);
-    const tenants = useAuthStore((state) => state.tenants);
     const ownPageAccess = useAuthStore((state) => state.pageAccess);
     const canManage = permissions.includes('roles.manage');
 
@@ -124,13 +123,40 @@ export const PersonAccessTab = ({
         return null;
     }, [access, canManage, isSelf, ownPageAccess, roleId]);
 
+    /* Die Firmen kommen aus der Zugangsantwort, NICHT aus dem Firmenumschalter:
+       der zeigt seit dem 31.08.2026 nur noch die zugeteilten Firmen, und damit
+       liesse sich nie eine weitere zuteilen. Ohne gespeicherte Zuteilung gilt
+       genau die Firma, unter der die Person angelegt wurde.
+
+       Die Liste fuehrt seit dem 31.08.2026 JEDE aktive Firma - Untergesellschaft
+       oder eigene Gruppe, das spielt hier keine Rolle mehr. Vorgabe: eine
+       Auswahl muss getroffen werden, sie muss angegeben werden. */
+    const companies = access?.companies ?? [];
+    const homeTenantId = access?.homeTenantId ?? '';
+    const defaultTenantIds = homeTenantId ? [homeTenantId] : [];
+
+    /* WAS DIESE PERSON AM ENDE AUSWAEHLEN KANN - die Verwaltung soll es lesen
+       koennen, ohne es sich aus Haken und Rolle zusammenzureimen (Vorgabe
+       31.08.2026: die Verwaltung muss wissen, wer was auswaehlen kann und was
+       in der Liste steht). Zwei Quellen fliessen zusammen:
+         - die Haken unten (ohne Haken: die Heimatfirma),
+         - die Rolle, wenn sie den Firmenwechsel traegt - die oeffnet zusaetzlich
+           die ganze eigene Gruppe, ohne dass hier etwas angehakt waere. */
+    const selectedRole = access?.roles.find((role) => role.id === roleId) ?? null;
+    const roleOpensGroup = Boolean(selectedRole?.canSwitchTenant);
+    const effectiveTenantIds = allowedTenantIds?.length ? allowedTenantIds : defaultTenantIds;
+    const effectiveNames = companies
+        .filter((tenant) => effectiveTenantIds.includes(tenant.id))
+        .map((tenant) => tenant.tenantName);
+
     const toggleTenant = (tenantId: string) => {
         setAllowedTenantIds((current) => {
-            const selected = new Set(current ?? tenants.map((tenant) => tenant.id));
+            const selected = new Set(current ?? defaultTenantIds);
             if (selected.has(tenantId)) selected.delete(tenantId);
             else selected.add(tenantId);
-            // Alle angehakt = keine Einschränkung (null) — Haus-Semantik.
-            return selected.size === tenants.length ? null : [...selected];
+            // Immer eine ausdrückliche Liste: «alle angehakt» ist nicht mehr
+            // dasselbe wie «keine Zuteilung» (das hiesse jetzt: nur die eigene).
+            return [...selected];
         });
     };
 
@@ -191,7 +217,7 @@ export const PersonAccessTab = ({
         }
     };
 
-    const allowedSet = new Set(allowedTenantIds ?? tenants.map((tenant) => tenant.id));
+    const allowedSet = new Set(allowedTenantIds ?? defaultTenantIds);
 
     if (loading) {
         return <div className="py-10"><InlineLoading label={t('common.loading')} /></div>;
@@ -270,7 +296,7 @@ export const PersonAccessTab = ({
                                         {t('personnel.person.companiesHint')}
                                     </span>
                                     <div className="flex flex-col gap-1.5 rounded-lg border border-slate-200 p-2.5 dark:border-white/15">
-                                        {tenants.map((tenant) => (
+                                        {companies.map((tenant) => (
                                             <label key={tenant.id} className="flex cursor-pointer items-center gap-2 text-[12.5px] text-slate-700 dark:text-white/80">
                                                 <input
                                                     type="checkbox"
@@ -279,9 +305,31 @@ export const PersonAccessTab = ({
                                                     className="accent-[#272f67]"
                                                 />
                                                 <span className="truncate">{tenant.tenantName}</span>
+                                                {/* Die Heimatfirma ist die, unter der die Person
+                                                    angelegt wurde - ohne jeden Haken gilt genau
+                                                    sie, deshalb steht sie hier angeschrieben. */}
+                                                {tenant.id === homeTenantId && (
+                                                    <Chip className="bg-slate-100 text-slate-600 ring-slate-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/15">
+                                                        {t('personnel.person.companiesHome')}
+                                                    </Chip>
+                                                )}
                                             </label>
                                         ))}
                                     </div>
+                                    {/* Der Klartext darunter: was diese Person nach dem
+                                        Speichern im Kopf auswaehlen kann. */}
+                                    <span className="mt-1.5 block text-[11.5px] text-slate-600 dark:text-white/60">
+                                        {t('personnel.person.companiesSelectable', {
+                                            list: effectiveNames.join(', ') || '-',
+                                        })}
+                                    </span>
+                                    {roleOpensGroup && (
+                                        <span className="mt-1 block text-[11.5px] text-emerald-700 dark:text-emerald-300">
+                                            {t('personnel.person.companiesRoleOpensGroup', {
+                                                role: selectedRole?.roleName ?? '',
+                                            })}
+                                        </span>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end pt-1">

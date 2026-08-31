@@ -10,6 +10,22 @@ interface NavGuardState {
     attempt: NavAttempt | null;
     /** Register (or clear, with null) the current guard. */
     setGuard: (attempt: NavAttempt | null) => void;
+    /**
+     * ── DER VERLAUF IST VERSTELLT ───────────────────────────────────────────
+     *
+     * Wahr, sobald eine Seite einen eigenen Eintrag in den Verlauf gelegt hat,
+     * um den Zurück-Griff des Browsers abzufangen (die Angebotsmaske tut das,
+     * sobald sie ungespeicherte Änderungen hat — siehe
+     * `useUnsavedChangesGuard`).
+     *
+     * Wer den Rückweg geht, darf dann KEINEN Verlaufsschritt mehr nehmen:
+     * `navigate(-1)` landete auf diesem Zwischen-Eintrag, also wieder auf
+     * derselben Seite. Genau das war der Fehler «der Zurück-Pfeil geht nicht
+     * zur Angebotsliste, er bleibt im Angebot» (Vorgabe Samet, 12.09.2026).
+     * Ist die Marke gesetzt, wird die Zieladresse angesteuert.
+     */
+    historyPinned: boolean;
+    setHistoryPinned: (pinned: boolean) => void;
 }
 
 /**
@@ -21,6 +37,8 @@ interface NavGuardState {
 export const useNavGuardStore = create<NavGuardState>((set) => ({
     attempt: null,
     setGuard: (attempt) => set({ attempt }),
+    historyPinned: false,
+    setHistoryPinned: (historyPinned) => set({ historyPinned }),
 }));
 
 /**

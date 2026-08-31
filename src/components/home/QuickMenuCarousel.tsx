@@ -96,7 +96,7 @@ export const QuickMenuCarousel: React.FC<{ tiles: QuickMenuTile[] }> = ({ tiles 
                                 key={tile.key}
                                 type="button"
                                 onClick={() => navigate(tile.key)}
-                                className="group flex h-[136px] w-[218px] shrink-0 snap-start flex-col justify-between rounded-xl border border-[#EAEAEC] bg-white p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors duration-150 hover:border-[#1f2654] hover:bg-[#1f2654] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#272f67]/40 dark:border-white/10 dark:bg-[#151616] dark:hover:border-[#1f2654] dark:hover:bg-[#1f2654]"
+                                className="group flex h-[136px] w-[218px] shrink-0 snap-start flex-col justify-between rounded-xl border border-[#EAEAEC] bg-[#fff] p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors duration-150 hover:border-[#1f2654] hover:bg-[#1f2654] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#272f67]/40 dark:border-white/10 dark:bg-[#151616] dark:hover:border-[#1f2654] dark:hover:bg-[#1f2654]"
                             >
                                 <span className="flex size-10 items-center justify-center rounded-lg bg-[#F3F4F6] text-[#3F4350] transition-colors duration-150 group-hover:bg-white/15 group-hover:text-white dark:bg-[#e8873a]/12 dark:text-[#e8873a] dark:group-hover:bg-white/15 dark:group-hover:text-white">
                                     <Icon size={20} />

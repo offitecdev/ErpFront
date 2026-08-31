@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft as ArrowLeftOutlined, CheckCircle, PieChart03, User01 as UserRound, XClose } from '../../components/icons/antIconCompat';
+import { CheckCircle, PieChart03, User01 as UserRound, XClose } from '../../components/icons/antIconCompat';
 import dayjs from 'dayjs';
 import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
@@ -10,7 +10,7 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { SlidingTopTabs } from '../../components/ui-shared/SlidingTopTabs';
 import { OrderBillingSection, type BillingLineInput } from '../../components/billing/OrderBillingSection';
 import { myOrdersApi } from '../../lib/api/billing';
-import { sharePercent } from '../../lib/orderBillingTotals';
+import { openAmount, sharePercent } from '../../lib/orderBillingTotals';
 import { deliveryReportApi, type DeliveryReportDto } from '../../lib/api/project';
 import { OverviewPieCharts } from '../project/features/components/detail/tabs/overview/OverviewPieCharts';
 import type { MyOrderDetailDto } from '../../types/billing';
@@ -282,12 +282,15 @@ export const MyOrderDetail = () => {
     // siparişlerin üstüne koyduğu para (proje genel bakışındaki ayrımın aynısı).
     const mainTotal = Number(order.billingSummary?.baseAmount ?? order.totalAmount) || 0;
     const mainBilled = Number(order.billingSummary?.billedAmount) || 0;
-    const orderFigures = { billed: mainBilled, unbilled: Math.max(0, mainTotal - mainBilled) };
+    const orderFigures = { billed: mainBilled, unbilled: Math.max(0, openAmount(order.billingSummary?.billedPercent, mainTotal, mainBilled)) };
     const addonFigures = addons.reduce(
         (acc, addon) => {
             const total = Number(addon.billingSummary?.baseAmount ?? addon.totalAmount) || 0;
             const billed = Number(addon.billingSummary?.billedAmount) || 0;
-            return { billed: acc.billed + billed, unbilled: acc.unbilled + Math.max(0, total - billed) };
+            return {
+                billed: acc.billed + billed,
+                unbilled: acc.unbilled + Math.max(0, openAmount(addon.billingSummary?.billedPercent, total, billed)),
+            };
         },
         { billed: 0, unbilled: 0 },
     );
@@ -306,14 +309,6 @@ export const MyOrderDetail = () => {
                         <span className="inline-flex items-center gap-1 text-[13px] text-slate-600 dark:text-white/70"><UserRound size={12} /> {order.customer.companyName}</span>
                     )}
                 </div>
-                <button
-                    type="button"
-                    onClick={() => navigate('/sales/orders')}
-                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
-                >
-                    <ArrowLeftOutlined size={14} />
-                    {t('crm.ordersList')}
-                </button>
             </div>
 
             <TabBar tab={activeTab} onSelect={setTab} showAddons={!delivery} addonCount={addons.length} />
@@ -348,7 +343,10 @@ export const MyOrderDetail = () => {
                             onClick={() => setChartsOpen(true)}
                             title={t('projects.detail.overview.chartsTitle')}
                             aria-label={t('projects.detail.overview.chartsTitle')}
-                            className="inline-flex size-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#272f67] shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-colors hover:border-[#272f67]/40 hover:bg-[#eef4ff] dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                            /* Google-clean (19.08.2026): rundes Symbolfeld ohne
+                               Rahmen und ohne Schatten — die Fläche erscheint
+                               erst beim Überfahren. */
+                            className="ofi-inv-glyph is-accent"
                         >
                             <PieChart03 size={20} />
                         </button>

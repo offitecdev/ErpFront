@@ -15,7 +15,17 @@
             "action": "İşlem",
             "pageTitle": "Raporları görüntüle veya oluştur",
             "pageHint": "Genel rapor ve teslim raporu için bir sipariş seçin."
-        }
+        },
+        "documents": {
+            "appointmentPdfs": "Randevu PDF'leri",
+            "openOrCreate": "Randevu belgesini açın veya şimdi oluşturun.",
+            "reports": "Raporlar",
+            "title": "Belgeler"
+        },
+        "home": {
+            "notificationsHint": "Montaj ve raporlarınızdaki güncellemeler"
+        },
+        "myDocuments": "Belgelerim"
     },
     "supply": {
         "title": "Tedarik Talepleri",
@@ -161,8 +171,6 @@
         "profile": "Profilim",
         "settingsMenu": "Ayarlar",
         "logout": "Oturumu Kapat",
-        "sidebarPin": "Menüyü sabitle",
-        "sidebarCollapse": "Menüyü daralt",
         "quickCreate": "Hızlı oluştur",
         "online": "Online",
         "serviceReports": "Servis Raporları",
@@ -188,7 +196,9 @@
             "add": "Sekme ekle",
             "menuTitle": "Yeni sekme aç",
             "close": "Sekmeyi kapat"
-        }
+        },
+        "backTo": "{{page}} sayfasına dön",
+        "sidebarOpen": "Menüyü aç"
     },
     "common": {
         "appTitle": "Offitec Yönetim Paneli",
@@ -491,7 +501,7 @@
             "role": "Sistem rolü",
             "roleSelect": "Rol seçin",
             "companies": "Erişebileceği şirketler",
-            "companiesHint": "Personelin çalışabileceği ve şirket seçicide görebileceği şirketleri seçin. Hiçbiri seçilmezse şirket ağacındaki tüm şirketlere erişir.",
+            "companiesHint": "Personelin çalıştığı ve şirket seçicide gördüğü şirketleri seçin. Hiçbiri seçilmezse yalnızca kayıtlı olduğu şirket geçerlidir.",
             "modulePackageMovedHint": "Erişilebilen sayfalar personel bazında değil, rol bazında belirlenir: Rol Yönetimi'nde ilgili rolün modül paketini düzenleyin.",
             "errorRequired": "Ad, soyad, e-posta ve geçici parola zorunludur.",
             "successUpdate": "Personel güncellendi.",
@@ -991,7 +1001,8 @@
             "successImageSave": "Görsel kaydedildi.",
             "errorPdfOnly": "Sadece PDF dosyası yükleyebilirsiniz.",
             "errorPdfSize": "PDF 5 MB sınırını aşıyor.",
-            "successPdfSave": "Antetli kayıt PDF kaydedildi."
+            "successPdfSave": "Antetli kayıt PDF kaydedildi.",
+            "companyNameHint": "Sağ üstteki firma seçiminden gelir: PDF’te her zaman etkin firmanın adı basılır."
         },
         "mail": {
             "breadcrumb": "Ayarlar › Mail",
@@ -1236,8 +1247,6 @@
         "line_loglari": "Satır günlükleri",
         "line_price": "Satır fiyatı",
         "line_select": "Satır seçin",
-        "move_up": "Yukarı taşı",
-        "move_down": "Aşağı taşı",
         "line_sil": "Satırı sil",
         "line_silindi": "Satır silindi.",
         "linked_products": "Bağlı ürünler",
@@ -1293,6 +1302,8 @@
         "order_create": "Sipariş oluştur",
         "order_create_with_options": "Seçeneklerle sipariş oluştur…",
         "order_created": "Sipariş oluşturuldu",
+        "order_already_created": "Bu teklif için sipariş zaten oluşturulmuş.",
+        "project_created_from_tender": "Sipariş/proje oluşturuldu. Teklif mailindeki saat planları projeye kilitli randevu olarak aktarıldı.",
         "order_olusturulamadi": "Sipariş oluşturulamadı",
         "order_project_or_direct_question": "Projeye mi eklenecek, yoksa doğrudan mı faturalanacak?",
         "order_choice_required": "Burada bir seçim yapmanız gerekiyor.",
@@ -1302,6 +1313,10 @@
         "output_formati": "Çıktı formatı",
         "pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor": "PDF çıktısında düz metin ve madde işaretleri korunur",
         "pdf_export": "PDF dışa aktar",
+        "pdf_export_de": "PDF exportieren",
+        "pdf_export_en": "PDF Export",
+        "pdf_export_tr": "PDF dışa aktar",
+        "pdf_language_question": "Teklif hangi dilde oluşturulsun?",
         "pdf_gorsel_add": "PDF görseli ekle",
         "pdf_ile_tender_maili_gonder": "PDF ile teklif e-postası gönder",
         "pdf_indirildi": "PDF indirildi",
@@ -1495,7 +1510,11 @@
         "mail_not_sent": "Gönderilmedi",
         "delivery_order_create": "Sipariş için fatura oluştur",
         "project_code_auto_hint": "Proje kodu otomatik verilir (örn. PR-2026-10001) ve aynı zamanda proje adıdır.",
-        "delivery_date_required": "Teslimat siparişi için teslim tarihi zorunludur."
+        "delivery_date_required": "Teslimat siparişi için teslim tarihi zorunludur.",
+        "move_line_hint": "Satırı taşı: istediğiniz yere sürükleyin veya hedef konuma tıklayın (Esc iptal eder)",
+        "copy_offer": "Teklifi kopyala",
+        "tender_kopyalandi": "Teklif {{number}} olarak kopyalandı.",
+        "tender_kopyalanamadi": "Teklif kopyalanamadı."
     },
     "auto": {
         "0_ise_hareket_yok": "0 ise hareket yok",

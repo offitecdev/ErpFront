@@ -1,5 +1,6 @@
 import {
     LuZap as Activity,
+    LuZap as Zap,
     LuCircleAlert as AlertCircle,
     LuTriangleAlert as AlertTriangle,
     LuArrowDown as ArrowDown,
@@ -8,6 +9,7 @@ import {
     LuArrowUp as ArrowUp,
     LuChartBar as BarChart03,
     LuBell as Bell01,
+    LuBellRing as BellRinging,
     LuBookOpen as BookOpen01,
     LuBox as Box,
     LuBriefcase as Briefcase01,
@@ -59,6 +61,8 @@ import {
     LuLayers as LayersTwo01,
     LuLifeBuoy as LifeBuoy01,
     LuList as List,
+    LuListChecks as ListChecks,
+    LuLink2 as Link02,
     LuLogOut as LogOut01,
     LuMail as Mail01,
     LuMapPin as MarkerPin01,
@@ -68,6 +72,7 @@ import {
     LuPackage as Package,
     LuPackagePlus as PackagePlus,
     LuPackageX as PackageX,
+    LuPaperclip as Paperclip,
     LuPercent as Percent01,
     LuPhone as Phone,
     LuChartPie as PieChart03,
@@ -92,6 +97,7 @@ import {
     LuTrendingUp as TrendUp01,
     LuTruck as Truck01,
     LuCloudUpload as UploadCloud02,
+    LuLock as Lock01,
     LuUser as User01,
     LuUsers as Users01,
     LuUserX as UserX01,
@@ -102,11 +108,15 @@ import {
     LuChartLine as LineChart,
     LuShoppingBag as ShoppingBag,
     LuHouse as Home01,
-    LuCircleAlert as Alert
+    LuCircleAlert as Alert,
+    // Personalmodul (16.08.2026): QR-Ausweis drucken, Urlaub.
+    LuPrinter as Printer,
+    LuUmbrella as Umbrella
 } from './lucideLocal';
 
 export {
     Activity,
+    Zap,
     AlertCircle,
     AlertTriangle,
     ArrowDown,
@@ -115,6 +125,7 @@ export {
     ArrowUp,
     BarChart03,
     Bell01,
+    BellRinging,
     BookOpen01,
     Box,
     Briefcase01,
@@ -166,6 +177,8 @@ export {
     LayersTwo01,
     LifeBuoy01,
     List,
+    ListChecks,
+    Link02,
     LogOut01,
     Mail01,
     MarkerPin01,
@@ -175,6 +188,7 @@ export {
     Package,
     PackagePlus,
     PackageX,
+    Paperclip,
     Percent01,
     Phone,
     PieChart03,
@@ -199,6 +213,7 @@ export {
     TrendUp01,
     Truck01,
     UploadCloud02,
+    Lock01,
     User01,
     Users01,
     UserX01,
@@ -209,5 +224,7 @@ export {
     LineChart,
     ShoppingBag,
     Home01,
-    Alert
+    Alert,
+    Printer,
+    Umbrella
 };

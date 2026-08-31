@@ -187,6 +187,18 @@ export const useProjectDetailData = (id: string | undefined, view: ProjectDetail
         [fetchCurrent],
     );
 
+    /**
+     * Nur ENTWERTEN, nicht nachladen. Für Änderungen, die der sichtbare Bereich
+     * bereits selbst kennt — der Terminbereich ist der Kalender und lädt seine
+     * Termine selbst. Die ganze Projektabfrage dafür noch einmal zu stellen,
+     * hiesse die Seite hinter dem Fenster neu aufzubauen (Vorgabe 19.08.2026).
+     * Zahlen und Abzeichen der anderen Bereiche holen sich beim Wechsel dorthin
+     * ohnehin frische Daten, weil der Zwischenspeicher hier geleert wird.
+     */
+    const invalidate = useCallback(() => {
+        projectCacheRef.current.clear();
+    }, []);
+
     const visibleProject = project?.id === id ? project : null;
 
     return {
@@ -197,5 +209,6 @@ export const useProjectDetailData = (id: string | undefined, view: ProjectDetail
         sectionLoading,
         loadError,
         load,
+        invalidate,
     };
 };

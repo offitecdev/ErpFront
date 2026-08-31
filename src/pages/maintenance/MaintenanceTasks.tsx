@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import DatePicker from 'antd/es/date-picker';
 import AntSelect from 'antd/es/select';
-import { AlertTriangle, ArrowLeft, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
+import { AlertTriangle, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -344,6 +344,7 @@ const MaintenanceWorkspace = () => {
                         key={tab.key}
                         data-tab-key={tab.key}
                         type="button"
+                        aria-current={view === tab.key ? 'page' : undefined}
                         onClick={() => changeView(tab.key)}
                         className={`ofi-quote-tab relative -mb-px inline-flex items-center rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${view === tab.key
                             ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
@@ -572,7 +573,6 @@ const getDetailTabs = (): Array<{ key: DetailTab; label: string }> => [
 ];
 
 const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
-    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const initialTab = (searchParams.get('tab') as DetailTab) || 'appointment';
     const [activeTab, setActiveTab] = useState<DetailTab>(getDetailTabs().some((tab) => tab.key === initialTab) ? initialTab : 'appointment');
@@ -768,7 +768,6 @@ const MaintenanceTaskDetail = ({ taskId }: { taskId: string }) => {
                 breadcrumb="Bakım / Randevu"
                 title={task ? `${task.contract?.contractCode || ''} ${task.contract?.customer?.companyName || task.contract?.title ||t('nav.maintenance')}` :t('auto.bakim_randevusu')}
                 description={t('auto.randevu_opsiyonlari_mail_musteri_secimi_ve_manue')}
-                actions={<Button variant="secondary" icon={<ArrowLeft size={13} />} onClick={() => navigate('/maintenance/tasks')}>{t('auto.listeye_don')}</Button>}
             />
 
             {loading || !task ? (

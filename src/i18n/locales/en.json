@@ -15,7 +15,17 @@
             "action": "Action",
             "pageTitle": "View or create reports",
             "pageHint": "Select an order for its general and delivery reports."
-        }
+        },
+        "documents": {
+            "appointmentPdfs": "Appointment PDFs",
+            "openOrCreate": "Open the appointment document or create it now.",
+            "reports": "Reports",
+            "title": "Documents"
+        },
+        "home": {
+            "notificationsHint": "Updates about your installations and reports"
+        },
+        "myDocuments": "My Documents"
     },
     "supply": {
         "title": "Supply Requests",
@@ -161,8 +171,6 @@
         "profile": "My Profile",
         "settingsMenu": "Settings",
         "logout": "Sign Out",
-        "sidebarPin": "Pin sidebar",
-        "sidebarCollapse": "Collapse sidebar",
         "quickCreate": "Quick create",
         "online": "Online",
         "serviceReports": "Service Reports",
@@ -188,7 +196,9 @@
             "add": "Add tab",
             "menuTitle": "Open new tab",
             "close": "Close tab"
-        }
+        },
+        "backTo": "Back to {{page}}",
+        "sidebarOpen": "Open menu"
     },
     "common": {
         "appTitle": "Offitec Management Panel",
@@ -491,7 +501,7 @@
             "role": "System role",
             "roleSelect": "Select role",
             "companies": "Companies they can access",
-            "companiesHint": "Pick the companies this staff member may work in and switch between. If none are selected, every company of the tree stays accessible.",
+            "companiesHint": "Pick the companies this person works in and sees in the company switcher. With none selected only the company they were created in applies.",
             "modulePackageMovedHint": "Accessible pages are set per role, not per person: edit the module package of the role in Role Management.",
             "errorRequired": "First name, last name, email and temporary password are required.",
             "successUpdate": "Employee updated.",
@@ -991,7 +1001,8 @@
             "successImageSave": "Image saved.",
             "errorPdfOnly": "Only PDF files can be uploaded.",
             "errorPdfSize": "PDF exceeds 5 MB limit.",
-            "successPdfSave": "Letterhead PDF saved."
+            "successPdfSave": "Letterhead PDF saved.",
+            "companyNameHint": "Taken from the company selector at the top right: the active tenant’s name is always the one printed."
         },
         "mail": {
             "breadcrumb": "Settings › Mail",
@@ -1236,8 +1247,6 @@
         "line_loglari": "Line Loglari",
         "line_price": "Line Price",
         "line_select": "Line Select",
-        "move_up": "Move up",
-        "move_down": "Move down",
         "line_sil": "Line Sil",
         "line_silindi": "Row deleted.",
         "linked_products": "Linked Products",
@@ -1293,6 +1302,8 @@
         "order_create": "Create Order",
         "order_create_with_options": "Create order with options…",
         "order_created": "Order created",
+        "order_already_created": "An order has already been created for this quote.",
+        "project_created_from_tender": "Order/project created. The time slots from the quote email were transferred to the project as locked appointments.",
         "order_olusturulamadi": "Order could not be created",
         "order_project_or_direct_question": "Will it be added to the project or billed directly?",
         "order_choice_required": "You have to make a choice here.",
@@ -1302,6 +1313,10 @@
         "output_formati": "Output Formati",
         "pdf_ciktisinda_duz_metin_ve_madde_isaretleri_kor": "PDF Ciktisinda Duz Metin Ve Madde Isaretleri Kor",
         "pdf_export": "PDF Export",
+        "pdf_export_de": "PDF exportieren",
+        "pdf_export_en": "PDF Export",
+        "pdf_export_tr": "PDF dışa aktar",
+        "pdf_language_question": "Which language should the offer be generated in?",
         "pdf_gorsel_add": "PDF Gorsel Add",
         "pdf_ile_tender_maili_gonder": "Send offer email with PDF",
         "pdf_indirildi": "PDF Indirildi",
@@ -1495,7 +1510,11 @@
         "mail_not_sent": "Not sent",
         "delivery_order_create": "Create invoice for order",
         "project_code_auto_hint": "The project code is assigned automatically (e.g. PR-2026-10001) and is also the project name.",
-        "delivery_date_required": "A delivery order requires a delivery date."
+        "delivery_date_required": "A delivery order requires a delivery date.",
+        "move_line_hint": "Move line: drag it to the right place or click the target position (Esc cancels)",
+        "copy_offer": "Copy offer",
+        "tender_kopyalandi": "Offer copied as {{number}}.",
+        "tender_kopyalanamadi": "Offer could not be copied."
     },
     "auto": {
         "0_ise_hareket_yok": "No movement if 0",

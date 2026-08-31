@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { Settings01 as Settings, Trash01 } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
-import { Modal } from '@/components/ui-shared/Modal';
-import { inputClass } from '@/components/ui-shared/Field';
+import { AlertTriangle, Settings01 as Settings, Trash01 } from '@/components/icons/antIconCompat';
+import {
+    PopupActions,
+    PopupButton,
+    PopupDialog,
+    PopupField,
+    PopupNote,
+} from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 
 /** Onay için birebir yazılması gereken sözcük — her dilde AYNI (kod gibi). */
@@ -14,6 +18,10 @@ const CONFIRM_WORD = 'DELETE';
  * burada durur. Şimdilik tek madde: projeyi silme. Silme, yanlışlıkla
  * tıklamayla tetiklenemesin diye "DELETE" yazılarak onaylanır
  * (kullanıcı isteği).
+ *
+ * Menü ve onay penceresi, uygulamanın açılır pencere takımını (PopupKit,
+ * 18.08.2026) kullanır: aynı yüzey, aynı yazı tipi, karanlık modda aynı
+ * değişkenler.
  */
 export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen = false }: {
     deleting: boolean;
@@ -45,18 +53,16 @@ export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen =
                 aria-label={t('nav.settings')}
                 title={t('nav.settings')}
                 onClick={() => setOpen((value) => !value)}
-                className={`flex size-7 items-center justify-center rounded-md transition-colors ${
-                    open ? 'bg-slate-100 text-[#272f67]' : 'text-slate-400 hover:bg-slate-100 hover:text-[#272f67]'
-                }`}
+                /* Dieselbe runde Form wie das Info-Symbol daneben (Kopf,
+                   19.08.2026) — sonst springt der Knopf, sobald das Menü
+                   nachgeladen wird und diese Fassung die Attrappe ablöst. */
+                className={`ofi-prj-glyph ${open ? 'is-active' : ''}`}
             >
                 <Settings size={16} />
             </button>
 
             {open && (
-                <div
-                    role="menu"
-                    className="absolute left-0 top-8 z-50 w-52 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg"
-                >
+                <div role="menu" className="ofi-tp-menu absolute left-0 top-8 z-50 w-56">
                     <button
                         type="button"
                         role="menuitem"
@@ -65,52 +71,52 @@ export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen =
                             setTyped('');
                             setConfirmOpen(true);
                         }}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                        className="ofi-tp-menu__item is-danger"
                     >
-                        <Trash01 size={13} /> {t('projects.deleteProject')}
+                        <Trash01 size={14} /> {t('projects.deleteProject')}
                     </button>
                 </div>
             )}
 
-            {confirmOpen && (
-                <Modal
-                    open
-                    onClose={() => { if (!deleting) setConfirmOpen(false); }}
-                    title={t('projects.deleteProject')}
-                    width="sm"
-                    footer={
-                        <>
-                            <Button variant="secondary" disabled={deleting} onClick={() => setConfirmOpen(false)}>
-                                {t('common.cancel')}
-                            </Button>
-                            <Button
-                                variant="danger"
-                                loading={deleting}
-                                disabled={!armed}
-                                onClick={() => void onDeleteProject()}
-                            >
-                                {t('common.delete')}
-                            </Button>
-                        </>
-                    }
-                >
-                    <div className="space-y-3">
-                        <p className="text-sm leading-relaxed text-secondary">
-                            {t('projects.deleteProjectConfirmText')}
-                        </p>
-                        <p className="text-[12.5px] font-semibold text-red-600">
-                            {t('projects.deleteProjectTypeDelete')}
-                        </p>
-                        <input
-                            value={typed}
-                            onChange={(event) => setTyped(event.target.value)}
-                            placeholder={CONFIRM_WORD}
-                            autoFocus
-                            className={`${inputClass} h-10 w-full px-3 font-mono text-[14px] font-semibold tracking-widest`}
-                        />
-                    </div>
-                </Modal>
-            )}
+            <PopupDialog
+                open={confirmOpen}
+                title={t('projects.deleteProject')}
+                subtitle={t('projects.deleteProjectConfirmText')}
+                icon={<AlertTriangle size={20} />}
+                tone="danger"
+                width={460}
+                onClose={() => { if (!deleting) setConfirmOpen(false); }}
+                closeOnBackdrop={!deleting}
+                closeOnEscape={!deleting}
+                footer={(
+                    <PopupActions>
+                        <PopupButton disabled={deleting} onClick={() => setConfirmOpen(false)}>
+                            {t('common.cancel')}
+                        </PopupButton>
+                        <PopupButton
+                            variant="danger"
+                            loading={deleting}
+                            disabled={!armed}
+                            onClick={() => void onDeleteProject()}
+                        >
+                            {t('common.delete')}
+                        </PopupButton>
+                    </PopupActions>
+                )}
+            >
+                <PopupNote tone="danger">{t('projects.deleteProjectTypeDelete')}</PopupNote>
+                <PopupField className="pt-3" label={CONFIRM_WORD} required>
+                    <input
+                        value={typed}
+                        onChange={(event) => setTyped(event.target.value)}
+                        placeholder={CONFIRM_WORD}
+                        autoFocus
+                        spellCheck={false}
+                        autoCapitalize="characters"
+                        className="ofi-cal-input ofi-tp-keyword w-full"
+                    />
+                </PopupField>
+            </PopupDialog>
         </div>
     );
 };

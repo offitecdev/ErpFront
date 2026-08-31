@@ -250,11 +250,11 @@ export const CustomerAddressesTable = ({
                     <tr>
                         <th className="relative text-left">
                             {i18nT('crm.addressKind')}
-                            <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                            <ColResizeHandle {...grid.resizeProps('kind')} />
                         </th>
                         <th className="relative text-left">
                             {i18nT('crm.locationName')}
-                            <ColResizeHandle {...grid.resizeProps('name', 'right')} />
+                            <ColResizeHandle {...grid.resizeProps('name')} />
                         </th>
                         <th className="text-left">{i18nT('address.street')}</th>
                         <th className="relative text-left">

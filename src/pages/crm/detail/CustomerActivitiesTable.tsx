@@ -189,11 +189,11 @@ export const CustomerActivitiesTable = ({
                     <tr>
                         <th className="relative text-left">
                             {i18nT('common.date')}
-                            <ColResizeHandle {...grid.resizeProps('date', 'right')} />
+                            <ColResizeHandle {...grid.resizeProps('date')} />
                         </th>
                         <th className="relative text-left">
                             {i18nT('crm.activityType')}
-                            <ColResizeHandle {...grid.resizeProps('kind', 'right')} />
+                            <ColResizeHandle {...grid.resizeProps('kind')} />
                         </th>
                         <th className="text-left">{i18nT('crm.activityDescription')}</th>
                         <th className="relative text-left">

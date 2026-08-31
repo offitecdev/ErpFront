@@ -13,7 +13,7 @@
  *        Stadt: Muttenz
  *    Snapshot 2 satırlıdır ("sokak" / "PLZ Şehir"); son satır PLZ + şehir
  *    olarak ayrıştırılıp etiketli iki satıra açılır.
- *  - Gönderici TEK SATIRDIR ("OffiTec Heating & Cooling, Cores Tower -
+ *  - Gönderici TEK SATIRDIR ("Offitec GmbH, Ceres Tower -
  *    Hohenrainstrasse 24, 4133 Pratteln") ve kapak KARTI teklif belgesindeki dar
  *    tablodur (78 mm): … / Projekt / EMPFÄNGER / Lieferant. Alıcı adı kartta
  *    durur, adres bloğunda değil; DURUM SATIRI YOKTUR (kullanıcı isteği).
@@ -96,7 +96,7 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
         colQty: 'Menge',
         plzLabel: 'PLZ',
         cityLabel: 'Stadt',
-        vatIdLabel: 'MwSt-Nr.',
+        vatIdLabel: 'MWST-Nr.',
         pageWord: 'Seite',
         pageOf: 'von',
         serialShort: 'Serien-Nr.',
@@ -184,7 +184,6 @@ const FS_POS = 8.2;
 const FS_HEADER = 8.4;
 const LH_TITLE = 4.7;
 const LH_BODY = 4.4;
-const UNIT_GAP = 4.2;
 
 const COLOR_TEXT = [30, 32, 40] as const;
 const COLOR_MUTED = [120, 126, 140] as const;
@@ -311,7 +310,9 @@ const fmtDateShort = (iso?: string | null) => {
     const yy = String(d.getFullYear()).slice(-2);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    return `${yy}-${mm}-${dd}`;
+    // GG.AA.YY — "21.08.26" (kullanıcı isteği 2026-08-21: yy-mm-dd sıralaması
+    // karşı tarafça anlaşılmıyordu; müşteri teklif PDF'i de GG.AA.YYYY kullanır).
+    return `${dd}.${mm}.${yy}`;
 };
 
 /**
@@ -573,7 +574,7 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     const addrX = 112;
     const addrW = MR - addrX;
     // GÖNDERİCİ TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — arada üç
-    // satıra bölünmüştü, geri alındı): "OffiTec Heating & Cooling, Cores Tower -
+    // satıra bölünmüştü, geri alındı): "Offitec GmbH, Ceres Tower -
     // Hohenrainstrasse 24, 4133 Pratteln". Sipariş şablonuyla aynı.
     const sender = companySenderLine(s);
     doc.setFont(FONT, 'normal');
@@ -736,7 +737,8 @@ function buildRowLines(doc: jsPDF, item: OrderItem, L: PriceRequestPdfStrings, l
 function measureRow(doc: jsPDF, item: OrderItem, L: PriceRequestPdfStrings, layout: TableLayout): number {
     const { title, meta } = buildRowLines(doc, item, L, layout);
     const contentH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
-    const numericsH = FIRST_BASELINE - 2 + (item.unit ? UNIT_GAP : 0);
+    // BİRİM SATIRI YOKTUR (kullanıcı isteği 2026-08-21: "adet vs. yazmasın").
+    const numericsH = FIRST_BASELINE - 2;
     return Math.max(ROW_MIN_H, Math.max(contentH, numericsH) + ROW_PAD * 2);
 }
 
@@ -795,12 +797,8 @@ function drawRow(
 
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
+    // Miktarın altına BİRİM YAZILMAZ (kullanıcı isteği 2026-08-21).
     drawFittedRight(doc, fmtQty(item.quantity || 0), layout.qtyR, layout.wQty, baseY, 'bold');
-    if (item.unit) {
-        doc.setTextColor(...COLOR_LABEL);
-        drawFittedRight(doc, item.unit, layout.qtyR, layout.wQty, baseY + UNIT_GAP, 'normal', FS_BASE - 0.4);
-        doc.setTextColor(...COLOR_TEXT);
-    }
     doc.setFont(FONT, 'normal');
 
     doc.setDrawColor(...COLOR_HAIRLINE);

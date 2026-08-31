@@ -1,27 +1,26 @@
-import { t } from '@/i18n/translate';
 import type { ProjectStatus } from '@/types/project';
 
 import { getStatusLabel, STATUS_VARIANT } from '../../../../utils/projectFormatters';
+import { deliveryStateLabel, technicalStateLabel } from './overviewShared';
 import type { DeliveryState, TechnicalState } from './overviewShared';
 
 export type ChipTone = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger';
 
-// Hand-rolled chips — no antd on this screen. The colours are the same ones the
-// rest of the app uses for these states, so a green chip here means exactly what
-// a green chip means on the project list.
+// Hand-rolled chips — no antd on this screen. Google-clean since 19.08.2026:
+// a soft tint with the matching dark ink instead of a solid colour block, so a
+// row of chips no longer shouts over the figures beside it. The meaning of each
+// colour is unchanged — green still means done, red still means closed.
 const TONE_CLASS: Record<ChipTone, string> = {
-    active: 'bg-[#059669] text-white',
-    approved: 'bg-[#272f67] text-white',
-    passive: 'bg-[#64748b] text-white',
-    info: 'bg-[#3b82f6] text-white',
-    warning: 'bg-[#f59e0b] text-white',
-    danger: 'bg-[#dc2626] text-white',
+    active: 'is-green',
+    approved: 'is-blue',
+    passive: 'is-grey',
+    info: 'is-blue',
+    warning: 'is-amber',
+    danger: 'is-red',
 };
 
 export const Chip = ({ tone, children }: { tone: ChipTone; children: React.ReactNode }) => (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${TONE_CLASS[tone]}`}>
-        {children}
-    </span>
+    <span className={`ofi-prj-state ${TONE_CLASS[tone]}`}>{children}</span>
 );
 
 export const ProjectStatusChip = ({ status }: { status: ProjectStatus }) => (
@@ -30,20 +29,12 @@ export const ProjectStatusChip = ({ status }: { status: ProjectStatus }) => (
 
 export const DeliveryChip = ({ state }: { state: DeliveryState }) => (
     <Chip tone={state === 'delivered' ? 'active' : state === 'unsigned' ? 'warning' : 'passive'}>
-        {state === 'delivered'
-            ? t('projects.detail.overview.delivered')
-            : state === 'unsigned'
-                ? t('projects.delivery.statusUnsigned')
-                : t('projects.detail.overview.notDelivered')}
+        {deliveryStateLabel(state)}
     </Chip>
 );
 
 export const TechnicalChip = ({ state }: { state: TechnicalState }) => (
     <Chip tone={state === 'completed' ? 'active' : state === 'ongoing' ? 'warning' : 'passive'}>
-        {state === 'completed'
-            ? t('projects.flow.stateCompleted')
-            : state === 'ongoing'
-                ? t('projects.flow.stateOngoing')
-                : t('projects.detail.incomplete')}
+        {technicalStateLabel(state)}
     </Chip>
 );

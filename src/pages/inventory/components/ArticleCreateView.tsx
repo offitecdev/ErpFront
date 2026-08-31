@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
+import { Plus, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
@@ -209,17 +209,10 @@ export const ArticleCreateView = ({
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
+                /* Kein Zurück-Knopf im Kopf: der Rückweg in die Produktliste
+                   sitzt im Blitz ganz vorn in der Kopfleiste, der auf einer
+                   Unterseite zum Pfeil wird (QuickBackButton). */
                 title={t(`${copyPrefix}.title`)}
-                action={(
-                    <button
-                        type="button"
-                        onClick={() => navigate(backPath)}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
-                    >
-                        <ArrowLeft size={14} />
-                        {t(`${copyPrefix}.backToList`)}
-                    </button>
-                )}
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -246,7 +239,7 @@ export const ArticleCreateView = ({
                         <tr>
                             <th className="relative text-left">
                                 {codeLabel}
-                                <ColResizeHandle {...grid.resizeProps('code', 'right')} />
+                                <ColResizeHandle {...grid.resizeProps('code')} />
                             </th>
                             <th className="text-left">{nameLabel}</th>
                             <th className="relative text-right">

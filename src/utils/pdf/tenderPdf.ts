@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
 import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
-import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/tender/detail/utils/markdown.utils';
+import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/sales/detail/utils/markdown.utils';
 import { drawRichText, parseRichTextParagraphs } from './richTextPdf';
 
 // Arial yerine metrik olarak özdeş, Türkçe karakter destekli Arimo gömülür.
@@ -137,7 +137,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
         kommission: 'Komisyon:',
         offerDate: 'Teklif Tarihi:',
         validUntil: 'Teklif Bitiş Tarihi:',
-        seller: 'Satıcı:',
+        seller: 'Salesperson:',
         offerTitle: 'Teklif',
         greeting: 'Sayın Yetkili,',
         intro: 'Talebiniz için teşekkür ederiz. Aşağıda teklifimizi memnuniyetle sunarız. Pozisyonların ayrıntılı dökümünü ilerleyen sayfalarda bulabilirsiniz.',
@@ -167,7 +167,7 @@ const I18N: Record<PdfLang, PdfStrings> = {
         kommission: 'Kommission:',
         offerDate: 'Angebotsdatum:',
         validUntil: 'Gültig bis:',
-        seller: 'Verkäufer:',
+        seller: 'Salesperson:',
         offerTitle: 'Angebot',
         greeting: 'Sehr geehrte Damen und Herren',
         intro: 'Vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen nachfolgend unser Angebot. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten.',

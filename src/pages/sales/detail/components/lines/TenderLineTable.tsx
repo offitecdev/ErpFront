@@ -1,13 +1,13 @@
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
     ArrowDown,
     ArrowUp,
     ChevronDown,
-    ChevronUp,
     File05 as FileText,
     Package,
+    Plus,
     Tag01,
     Trash01,
 } from '@/components/icons/antIconCompat';
@@ -23,6 +23,7 @@ import {
     useTenderLineColumnWidths,
     type ResizableLineColumn,
 } from '../../hooks/useTenderLineColumnWidths';
+import { isRealDropSlot, useTenderLineLongPressMove } from '../../hooks/useTenderLineLongPressMove';
 import type {
     ManualProductForm,
     NumberField,
@@ -111,10 +112,10 @@ const TenderLineProfitPopover = ({
         <div
             ref={setPanelEl}
             style={style}
-            className="z-[999] overflow-hidden rounded-[2px] border border-slate-300 bg-white shadow-[0_10px_32px_rgba(15,23,42,0.18)]"
+            className="ofi-tp-menu z-[999] overflow-hidden"
             onClick={(event) => event.stopPropagation()}
         >
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3.5 py-2">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3.5 py-2 dark:border-white/10">
                 <span className="text-[11.5px] font-semibold text-slate-600">{t('tenders.profit_loss')}</span>
                 <span className={`inline-flex items-center gap-1 text-[12px] font-bold tabular-nums ${isProfit ? 'text-emerald-700' : 'text-rose-600'}`}>
                     {isProfit ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
@@ -168,7 +169,12 @@ type TenderLineTableProps = {
     registerCell: (key: string, handle: { focus: () => void } | null) => void;
     onArrowNav: (col: string, rowIndex: number, dir: 1 | -1) => boolean;
     onAddRow: (rowType: 'TITLE' | 'DESCRIPTION' | 'PRODUCT', article?: ProductSource, options?: Partial<ManualProductForm>, afterRowId?: string) => void;
-    onMoveRow: (rowId: string, direction: 'up' | 'down') => void;
+    /**
+     * Long-press reordering: put `rowId` before the row currently at index
+     * `slot` (`slot === rows.length` = at the end). Slots are over the order
+     * as displayed, before the row is taken out.
+     */
+    onMoveRowTo: (rowId: string, slot: number) => void;
     /** Trash button next to the position number — removes just that line. */
     onDeleteRow: (rowId: string) => void;
     /**
@@ -241,7 +247,7 @@ export const TenderLineTable = ({
     registerCell,
     onArrowNav,
     onAddRow,
-    onMoveRow,
+    onMoveRowTo,
     onDeleteRow,
     onAddProductRow,
     autoFocusRowId,
@@ -253,7 +259,12 @@ export const TenderLineTable = ({
     // Drag-resizable numeric columns, remembered per browser.
     const { widths, setColRef, startResize, resetColumn } = useTenderLineColumnWidths();
     // At most ONE row shows its full description at a time; it expands downwards
-    // inside the cell and collapses again on any click outside that cell.
+    // inside the cell and collapses ONLY via its own arrow (or when another
+    // row's editor is focused). Clicks elsewhere leave it open — an
+    // outside-click collapse used to unmount the editor mid-edit and could
+    // drop text that had not blur-committed yet, and the old "click anywhere
+    // in the name cell to open" shortcut had the same effect through the back
+    // door: opening row B closed row A's editor under the user's text.
     const [expandedId, setExpandedId] = useState<string | null>(null);
     // Profit/loss pop-up opened from the icon next to a row total.
     const [profitPopover, setProfitPopover] = useState<{ rowId: string; anchorEl: HTMLElement } | null>(null);
@@ -310,29 +321,39 @@ export const TenderLineTable = ({
         return onArrowNav(col, rowIndex, dir);
     }, [effectiveRenderedRowCount, onArrowNav, rows.length]);
 
-    useEffect(() => {
-        if (!expandedId) return;
-        // `click` (not mousedown) so the editor's on-blur commit runs BEFORE the
-        // collapse unmounts it; capture phase so rows that stopPropagation on
-        // their own clicks still close the open description.
-        const onDocClick = (event: MouseEvent) => {
-            const target = event.target as Element | null;
-            if (!target?.closest?.(`[data-desc-cell="${expandedId}"]`)) setExpandedId(null);
-        };
-        document.addEventListener('click', onDocClick, true);
-        return () => document.removeEventListener('click', onDocClick, true);
-    }, [expandedId]);
-
     const canReorder = isDraft && canManage;
     const popoverProfit = profitPopover ? profitByRowId.get(profitPopover.rowId) : undefined;
+
+    // Reordering = long-press a row to pick it up, then drag or click the slot
+    // it should land in. No arrows: the pos column stays quiet, and a line can
+    // go anywhere in one gesture instead of one step at a time.
+    const tableRef = useRef<HTMLTableElement | null>(null);
+    const rowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+    const { moveState, onRowPointerDown, cancelMove } = useTenderLineLongPressMove({
+        enabled: canReorder,
+        rowIds,
+        tableRef,
+        onMoveRowTo,
+        onPickUp: (rowId) => {
+            // Every row must be in the DOM to be a drop target, and the picked
+            // row becomes the current one so its trash button etc. follow it.
+            setRenderedRowCount(rows.length);
+            onSelectRow(rowId);
+        },
+    });
+    const dropSlot = moveState && isRealDropSlot(rowIds, moveState.rowId, moveState.slot) ? moveState.slot : null;
 
     return (
         <>
         <table
+            ref={tableRef}
             data-tender-detail-table
+            data-no-col-resize
             // Opts out of the app-wide table chrome (72px rows, 14px text,
             // 32px-square cell buttons) — this table styles itself in index.css.
             data-unstyled-table
+            data-reorderable={canReorder ? 'true' : undefined}
+            data-move-active={moveState ? 'true' : undefined}
             style={{ minWidth: TENDER_LINE_TABLE_MIN_WIDTH }}
             className="w-full"
         >
@@ -425,10 +446,14 @@ export const TenderLineTable = ({
                                 onSelectRow(row.id);
                                 setExpandedId(isExpanded ? null : row.id);
                             }}
-                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-[2px] transition-colors ${
-                                visibleLongDescription
-                                    ? 'text-[#1f2654] hover:bg-[#1f2654]/10'
-                                    : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'
+                            // Open state wears a circle so the one control that
+                            // collapses the description is visibly "on".
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
+                                isExpanded
+                                    ? 'bg-[#1f2654]/10 text-[#1f2654]'
+                                    : visibleLongDescription
+                                        ? 'text-[#1f2654] hover:bg-[#1f2654]/10'
+                                        : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'
                             }`}
                         >
                             <ChevronDown
@@ -439,7 +464,18 @@ export const TenderLineTable = ({
                     ) : null;
 
                     const expandedDescription = canExpand && isExpanded ? (
-                        <div className="mt-1 min-w-0">
+                        // Focusing the editor pins the row open. An empty
+                        // DESCRIPTION row starts force-opened without owning
+                        // `expandedId`; the first committed text ends the forced
+                        // state, and without the pin that unmounted the editor
+                        // right under the caret — the row collapsed and showed
+                        // nothing, which read as "my text was deleted".
+                        <div
+                            className="mt-1 min-w-0"
+                            onFocusCapture={() => {
+                                if (expandedId !== row.id) setExpandedId(row.id);
+                            }}
+                        >
                             {isDraft ? (
                                 <Suspense fallback={<div className="min-h-[60px] rounded bg-slate-50" />}>
                                     <LazyInlineDescriptionEditor
@@ -458,48 +494,35 @@ export const TenderLineTable = ({
                         </div>
                     ) : null;
 
+                    const isMoving = moveState?.rowId === row.id;
+
                     return (
                         <tr
                             key={stableRowKeys.get(row.id) ?? row.id}
+                            data-row-id={row.id}
                             onClick={() => onSelectRow(row.id)}
+                            onPointerDown={canReorder ? (event) => onRowPointerDown(event, row.id) : undefined}
                             // Every row is white — a title line is told apart by its
                             // type, not by a background of its own. Selection is an
                             // accent bar on the leading edge (index.css), so the row
                             // colour never changes underneath the figures.
                             data-row-selected={isSelected ? 'true' : undefined}
+                            // Long-press move (index.css): the picked row is lifted,
+                            // every other row greys out, and the drop line sits on
+                            // the top edge of the slot's row (bottom edge for "after
+                            // the last row").
+                            data-row-moving={isMoving ? 'true' : undefined}
+                            data-row-dimmed={moveState && !isMoving ? 'true' : undefined}
+                            data-drop-before={dropSlot === rowIndex ? 'true' : undefined}
+                            data-drop-after={dropSlot === rows.length && rowIndex === rows.length - 1 ? 'true' : undefined}
                             className="group"
                         >
                             {/* Position column: the row number is the resting state;
                                 the checkbox takes its place on hover (and stays put
-                                once anything is selected), with the reorder arrows
-                                tucked to its left. Keeps the column quiet without
-                                giving up bulk selection or ordering. */}
+                                once anything is selected). Ordering has no control
+                                here — long-press the row and drop it where it goes. */}
                             <td className="align-top">
                                 <div className="flex items-center gap-1">
-                                    {canReorder && (
-                                        <div className="flex shrink-0 flex-col opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                                            <button
-                                                type="button"
-                                                aria-label={t('tenders.move_up')}
-                                                title={t('tenders.move_up')}
-                                                disabled={rowIndex === 0}
-                                                onClick={(event) => { event.stopPropagation(); onMoveRow(row.id, 'up'); }}
-                                                className="flex h-3 w-4 items-center justify-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                                            >
-                                                <ChevronUp size={11} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-label={t('tenders.move_down')}
-                                                title={t('tenders.move_down')}
-                                                disabled={rowIndex === rows.length - 1}
-                                                onClick={(event) => { event.stopPropagation(); onMoveRow(row.id, 'down'); }}
-                                                className="flex h-3 w-4 items-center justify-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                                            >
-                                                <ChevronDown size={11} />
-                                            </button>
-                                        </div>
-                                    )}
                                     <span className="relative flex h-5 w-6 shrink-0 items-center justify-start">
                                         <span
                                             aria-hidden
@@ -522,11 +545,11 @@ export const TenderLineTable = ({
                                     </span>
                                 </div>
                             </td>
-                            <td
-                                data-desc-cell={row.id}
-                                onClick={() => { if (canExpand && expandedId !== row.id) setExpandedId(row.id); }}
-                                className="align-top"
-                            >
+                            {/* The description opens and closes through its arrow
+                                alone — a click on the cell's empty space must
+                                never toggle it (it silently closed another row's
+                                open editor). */}
+                            <td className="align-top">
                                 {/* No position number here — it lives in the Pos.
                                     column, to the side of the row. */}
                                 <div className="flex min-w-0 items-center gap-1.5">
@@ -689,7 +712,7 @@ export const TenderLineTable = ({
                     lands HERE — selecting in the dropdown or the large pop-up
                     fills this slot and a fresh blank line appears below it. */}
                 {isDraft && canManage && (
-                    <tr data-tender-line-placeholder>
+                    <tr data-tender-line-placeholder data-row-dimmed={moveState ? 'true' : undefined}>
                         <td />
                         <td colSpan={8}>
                             <button
@@ -706,47 +729,44 @@ export const TenderLineTable = ({
                     </tr>
                 )}
                 {isDraft && canManage && (
-                    <tr data-tender-line-actions>
+                    <tr data-tender-line-actions data-row-dimmed={moveState ? 'true' : undefined}>
                         <td colSpan={9} className="!border-b-0">
                             {/* One row of add-actions: the product button leads, with
                                 the title / description pair grouped beside it. */}
-                            <div className="flex flex-wrap items-center gap-2 py-0.5">
+                            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto py-0.5">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setRenderedRowCount(rows.length + 1);
                                         onAddProductRow(lastRowId);
                                     }}
-                                    className="inline-flex items-center gap-1.5 rounded-[2px] bg-emerald-600 px-2.5 py-1 text-[12.5px] font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                                    className="ofi-quote-addbtn is-primary"
                                 >
-                                    <Package size={13} />
+                                    <Package size={14} />
                                     {t('tenders.product_add')}
                                 </button>
-                                <span className="h-4 w-px bg-slate-200" aria-hidden />
-                                <div className="inline-flex items-center overflow-hidden rounded-[2px] border border-slate-200">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setRenderedRowCount(rows.length + 1);
-                                            onAddRow('TITLE', undefined, undefined, lastRowId);
-                                        }}
-                                        className="px-2.5 py-1 text-[11.5px] font-medium text-slate-700 transition-colors hover:bg-[#1f2654] hover:text-white"
-                                    >
-                                        {t('tenders.baslik')}
-                                    </button>
-                                    <span className="h-5 w-px bg-slate-200" aria-hidden />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setRenderedRowCount(rows.length + 1);
-                                            onAddRow('DESCRIPTION', undefined, undefined, lastRowId);
-                                        }}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 transition-colors hover:bg-[#1f2654] hover:text-white"
-                                    >
-                                        <FileText size={11} />
-                                        {t('tenders.description_add')}
-                                    </button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setRenderedRowCount(rows.length + 1);
+                                        onAddRow('TITLE', undefined, undefined, lastRowId);
+                                    }}
+                                    className="ofi-quote-addbtn"
+                                >
+                                    <Plus size={13} />
+                                    {t('tenders.baslik')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setRenderedRowCount(rows.length + 1);
+                                        onAddRow('DESCRIPTION', undefined, undefined, lastRowId);
+                                    }}
+                                    className="ofi-quote-addbtn"
+                                >
+                                    <FileText size={13} />
+                                    {t('tenders.description_add')}
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -760,6 +780,16 @@ export const TenderLineTable = ({
                 fmtMoney={fmtMoney}
                 onClose={() => setProfitPopover(null)}
             />
+        )}
+        {/* While a row is picked up: what to do next, and a way out for
+            pointers without an Escape key. Portaled so the table's overflow
+            wrapper cannot clip it. */}
+        {moveState && createPortal(
+            <div data-line-move-hint className="ofi-quote-move-hint" role="status">
+                <span>{t('tenders.move_line_hint')}</span>
+                <button type="button" onClick={cancelMove}>{t('common.cancel')}</button>
+            </div>,
+            document.body,
         )}
         </>
     );

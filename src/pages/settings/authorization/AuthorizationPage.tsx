@@ -81,6 +81,20 @@ export const AuthorizationPage = () => {
                                                 {t('settings.roles.fixed')}
                                             </Chip>
                                         )}
+                                        {role.isPurser && (
+                                            <Chip className="bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/30">
+                                                {t('settings.roles.purser')}
+                                            </Chip>
+                                        )}
+                                        {/* Wer den ganzen Konzernbaum im Kopf
+                                            wählen darf, soll hier ohne Klick
+                                            in die Rolle sichtbar sein — es ist
+                                            eine Zugriffsgrenze. */}
+                                        {role.canSwitchTenant && (
+                                            <Chip className="bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30">
+                                                {t('settings.roles.tenantSwitchChip')}
+                                            </Chip>
+                                        )}
                                     </span>
                                 </td>
                                 <td className="text-[12.5px] text-slate-600 dark:text-white/70">

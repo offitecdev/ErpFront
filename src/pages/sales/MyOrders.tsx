@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { CornerDownRight, Plus } from '../../components/icons/antIconCompat';
+import { CornerDownRight, Plus, Receipt } from '../../components/icons/antIconCompat';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
@@ -61,9 +61,11 @@ export const MyOrders = () => {
     const [customerFilter, setCustomerFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<'' | OrderBillingState>('');
     // Sürüklenebilir sütunlar; sipariş no sütununun genişliği yoktur, kalanı o emer.
+    // Genişlikler 20.08.2026'da ferahlatıldı (başlıklar birbirine giriyordu):
+    // anahtar bu yüzden v2 — v1'i saklayan tarayıcılar da yeni ölçüyü alsın.
     const grid = useColumnWidths({
-        storageKey: 'offitec:order-list:col-widths:v1',
-        defaults: { customer: 224, project: 168, status: 160, total: 144, billed: 144, remaining: 144 },
+        storageKey: 'offitec:order-list:col-widths:v2',
+        defaults: { customer: 220, project: 190, status: 176, total: 150, billed: 150, remaining: 160 },
         minPx: 72,
     });
     const [sortBy, setSortBy] = useState<OrderSortKey>('createdAt');
@@ -133,23 +135,51 @@ export const MyOrders = () => {
 
     const hasActiveFilters = Boolean(search || orderNoFilter || customerFilter || statusFilter);
 
+    // Telefon kartında her hücrenin başına kendi sütun adı yazılır
+    // (`data-label`); metin başlıkla AYNI çeviri anahtarından gelir.
+    const colLabel = {
+        customer: t('nav.quickActionsGroup.customers'),
+        project: t('nav.projects'),
+        status: t('common.status'),
+        total: t('common.total'),
+        billed: t('billing.billed'),
+        remaining: t('billing.remaining'),
+    };
+
     return (
         <div className="flex w-full flex-col gap-4">
-            <InventoryListHeader title={t('nav.myOrders')} />
+            {/* Von den Aufträgen zu ihren Rechnungen — mit vorgewähltem
+                LIEFERAUFTRAG (Vorgabe Samet): wer hier steht, meint die
+                Aufträge ohne Projekt. */}
+            <InventoryListHeader
+                title={t('nav.myOrders')}
+                action={
+                    <button
+                        type="button"
+                        onClick={() => navigate('/sales/invoices?type=DELIVERY')}
+                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                    >
+                        <Receipt size={14} />
+                        {t('nav.salesInvoices')}
+                    </button>
+                }
+            />
 
-            {/* Üst çubuk — ürün listesiyle aynı: genel arama + durum seçici. */}
+            {/* Üst çubuk — ürün listesiyle aynı: genel arama + durum seçici.
+                Telefonda ikisi de tam genişlik: 390px'te yan yana sıkışmak
+                yerine alt alta, dokunulacak kadar geniş dururlar. */}
             <div className="flex flex-wrap items-center gap-2">
                 <SearchBox
                     value={search}
                     onChange={setSearch}
                     placeholder={t('crm.order_customer_search')}
-                    className="w-64"
+                    className="w-full sm:w-64"
                 />
                 <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as '' | OrderBillingState)}
                     aria-label={t('common.status')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none sm:w-auto dark:border-white/20 dark:bg-transparent dark:text-white"
                 >
                     <option value="">{t('common.all')}</option>
                     <option value="notBilled">{t('crm.faturalanmadi')}</option>
@@ -159,7 +189,9 @@ export const MyOrders = () => {
             </div>
 
             <SectionCard title={`${t('nav.myOrders')} (${total})`}>
-                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                {/* `data-list-table`: ferah satır ölçüsü + telefonda kart
+                    görünümü (bkz. index.css "ÜBERSICHTSLISTEN"). */}
+                <table data-inv-table data-list-table data-grid-lines data-unstyled-table className="w-full">
                     <colgroup>
                         {/* Sipariş no: genişliği yok, kalan yeri emer. */}
                         <col />
@@ -214,6 +246,11 @@ export const MyOrders = () => {
                         )}
                         {!loading && paged.map(({ order, totals }) => {
                             const addons = order.addonSalesOrders || [];
+                            // Ek sipariş satırları ana siparişin projesini soluk tekrarlar;
+                            // teslimat siparişinde proje yoktur, o zaman boş kalır.
+                            const parentProjectLabel = isDeliveryRow(order)
+                                ? ''
+                                : (order.project?.projectNumber || order.project?.projectName || '');
                             return (
                                 <Fragment key={order.id}>
                                 <tr className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5" onClick={() => navigate(`/sales/orders/${order.id}`)}>
@@ -226,32 +263,35 @@ export const MyOrders = () => {
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="text-[11px] text-slate-400 dark:text-white/50">{new Date(order.createdAt).toLocaleDateString('de-CH')}</div>
+                                        <div className="ofi-list-sub text-[11px] text-slate-400 dark:text-white/50">{new Date(order.createdAt).toLocaleDateString('de-CH')}</div>
                                     </td>
-                                    <td className="text-slate-600 dark:text-white/80"><span className="block truncate">{order.customer?.companyName || t('crm.customer_not_found')}</span></td>
+                                    <td data-label={colLabel.customer} className="text-slate-600 dark:text-white/80"><span className="block truncate">{order.customer?.companyName || t('crm.customer_not_found')}</span></td>
                                     {/* Teklif onaylanırken seçilen yol her satırda görünür:
                                         proje siparişi proje numarasının altında etiketlenir,
                                         projesi olmayan sipariş teslimat siparişidir. */}
-                                    <td>
+                                    <td data-label={colLabel.project}>
                                         {isDeliveryRow(order) ? (
                                             <StatusChip variant="neutral">{t('crm.deliveryOrder')}</StatusChip>
                                         ) : (
-                                            <>
+                                            // İki satır TEK kutuda: telefon kartında hücre
+                                            // "etiket ↔ değer" diye yan yana dizilir, sarmalayıcı
+                                            // olmasa iki satır etiketin yanına ayrı ayrı düşerdi.
+                                            <div className="min-w-0">
                                                 <span className="block truncate font-mono text-[12px] text-slate-600 dark:text-white/70">
                                                     {order.project?.projectNumber || order.project?.projectName || '-'}
                                                 </span>
-                                                <span className="mt-0.5 block truncate text-[10px] font-semibold uppercase tracking-wide text-[#272f67] dark:text-white/50">
+                                                <span className="ofi-list-sub block truncate text-[10px] font-semibold uppercase tracking-wide text-[#272f67] dark:text-white/50">
                                                     {t('crm.projectOrder')}
                                                 </span>
-                                            </>
+                                            </div>
                                         )}
                                     </td>
-                                    <td>
+                                    <td data-label={colLabel.status}>
                                         <StatusChip variant={billingChipVariant(totals.percent)}>{billingChipLabel(totals.percent)}</StatusChip>
                                     </td>
-                                    <td className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{fmtMoney(totals.total)}</td>
-                                    <td className="text-right font-mono text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">{fmtMoney(totals.billed)}</td>
-                                    <td className="text-right font-mono text-[13px] font-semibold text-amber-600 dark:text-amber-400">{fmtMoney(totals.remaining)}</td>
+                                    <td data-label={colLabel.total} className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{fmtMoney(totals.total)}</td>
+                                    <td data-label={colLabel.billed} className="text-right font-mono text-[13px] font-semibold text-emerald-600 dark:text-emerald-400">{fmtMoney(totals.billed)}</td>
+                                    <td data-label={colLabel.remaining} className="text-right font-mono text-[13px] font-semibold text-amber-600 dark:text-amber-400">{fmtMoney(totals.remaining)}</td>
                                 </tr>
                                 {/* Ek siparişler ana siparişin hemen altında kendi
                                     satırlarıyla listelenir; tıklamak ana siparişin
@@ -264,6 +304,9 @@ export const MyOrders = () => {
                                     return (
                                         <tr
                                             key={addon.id}
+                                            // Telefon kartında ana siparişin altına girintili,
+                                            // bernsteinfarbene kenarlı bir kart olarak düşer.
+                                            data-subrow
                                             className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                                             onClick={() => navigate(`/sales/orders/${order.id}?tab=addons&addon=${addon.id}`)}
                                         >
@@ -275,22 +318,28 @@ export const MyOrders = () => {
                                                         {t('projects.addonOrder')}
                                                     </span>
                                                 </div>
-                                                <div className="pl-10 text-[11px] text-slate-400 dark:text-white/50">
+                                                <div className="ofi-list-sub pl-10 text-[11px] text-slate-400 dark:text-white/50">
                                                     {date ? new Date(date).toLocaleDateString('de-CH') : '-'}
                                                 </div>
                                             </td>
                                             {/* Müşteri/proje ana siparişinkiyle aynı — satırın bir
                                                 alt kayıt olduğu okunsun diye soluk tekrarlanır. */}
-                                            <td className="text-slate-400 dark:text-white/40"><span className="block truncate">{order.customer?.companyName || ''}</span></td>
-                                            <td className="font-mono text-[12px] text-slate-400 dark:text-white/40">
-                                                <span className="block truncate">{isDeliveryRow(order) ? '' : (order.project?.projectNumber || order.project?.projectName || '')}</span>
+                                            <td data-label={colLabel.customer} className="text-slate-400 dark:text-white/40">
+                                                {order.customer?.companyName ? <span className="block truncate">{order.customer.companyName}</span> : null}
                                             </td>
-                                            <td>
+                                            {/* Değer yoksa hücre GERÇEKTEN boş kalır (boş bir
+                                                span bile değil): telefon kartında `td:empty`
+                                                onu tamamen atar, "Projekte" etiketi boşa
+                                                yazılmaz. */}
+                                            <td data-label={colLabel.project} className="font-mono text-[12px] text-slate-400 dark:text-white/40">
+                                                {parentProjectLabel ? <span className="block truncate">{parentProjectLabel}</span> : null}
+                                            </td>
+                                            <td data-label={colLabel.status}>
                                                 <StatusChip variant={billingChipVariant(percent)}>{billingChipLabel(percent)}</StatusChip>
                                             </td>
-                                            <td className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">{fmtMoney(lineTotal(line))}</td>
-                                            <td className="text-right font-mono text-[13px] text-emerald-600/90 dark:text-emerald-400/90">{fmtMoney(lineBilled(line))}</td>
-                                            <td className="text-right font-mono text-[13px] text-amber-600/90 dark:text-amber-400/90">{fmtMoney(lineRemaining(line))}</td>
+                                            <td data-label={colLabel.total} className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">{fmtMoney(lineTotal(line))}</td>
+                                            <td data-label={colLabel.billed} className="text-right font-mono text-[13px] text-emerald-600/90 dark:text-emerald-400/90">{fmtMoney(lineBilled(line))}</td>
+                                            <td data-label={colLabel.remaining} className="text-right font-mono text-[13px] text-amber-600/90 dark:text-amber-400/90">{fmtMoney(lineRemaining(line))}</td>
                                         </tr>
                                     );
                                 })}

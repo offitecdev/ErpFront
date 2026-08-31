@@ -4,9 +4,10 @@ import { toast } from 'sonner';
 
 import { t } from '@/i18n/translate';
 import { tenderApi } from '@/lib/api/tender';
-import { usePdfSettingsStore } from '@/store/pdfSettingsStore';
+import { useAuthStore } from '@/store/authStore';
+import { getPdfSettings } from '@/store/pdfSettingsStore';
 
-import { projectApi, type SalesOrderMode } from '../../../../lib/api/project';
+import { projectApi, type SalesOrderDto, type SalesOrderMode } from '../../../../lib/api/project';
 import type { ProjectDto } from '../../../../types/project';
 import type { TenderListItem } from '../../../../types/tender';
 import { bytesToBase64 } from '../tenderDetailUtils';
@@ -49,17 +50,38 @@ const hasRequiredAddresses = (tender: TenderListItem): boolean => {
 
 /**
  * Auftragsbestätigung an den Kunden — läuft unmittelbar nach dem Erstellen des
- * Auftrags. Die Offerte wird dafür noch einmal als PDF gerendert (derselbe
- * Generator wie Vorschau und Export) und als Anhang mitgeschickt; Empfänger und
- * CC bestimmt der Server aus der Offerte.
+ * Auftrags. Empfänger und CC bestimmt der Server aus der Offerte.
+ *
+ * ANGEHÄNGT WIRD DIE AUFTRAGSBESTÄTIGUNG, nicht mehr die blanke Offerte
+ * (Benutzerwunsch 29.08.2026: «der Auftrag ist bestätigt, sobald er aus der
+ * Offerte eröffnet wird — eine eigene Bestätigung muss niemand anlegen, sie
+ * hängt ohnehin am Auftrag»). Es ist dasselbe Dokument, das der Knopf an der
+ * Auftragskarte erzeugt: dieselbe Offerte, ausgestellt auf die AB-Nummer.
+ *
+ * Es wird hier bewusst NICHTS am Auftrag gesichert. `confirmationNote` und
+ * `confirmationValidUntil` bleiben NULL — «nie bearbeitet» —, und ihre Vorgaben
+ * (Einleitungstext der Offerte, Auftragsdatum + 1 Monat) sind genau das, was
+ * hier gedruckt wird. Das Fenster an der Auftragskarte öffnet darum später mit
+ * demselben Stand, den der Kunde bekommen hat.
  *
  * Ein Fehler hier darf den erstellten Auftrag NICHT zurücknehmen: er wird als
  * Warnung gemeldet, der Ablauf geht weiter — die Mail lässt sich danach von
  * Hand aus dem Offert-Mailfenster nachreichen.
  */
-const sendOrderConfirmation = async (tenderId: string): Promise<void> => {
-    const { buildQuotePdf } = await import('@/utils/pdf/quotePdf');
-    const doc = await buildQuotePdf(tenderId, usePdfSettingsStore.getState().settings);
+const sendOrderConfirmation = async (tenderId: string, salesOrder: SalesOrderDto): Promise<void> => {
+    const { buildOrderConfirmationPdf } = await import('@/utils/pdf/quotePdf');
+    // Verkäufer ist, wer den AUFTRAG erteilt hat. Normalerweise ist das die
+    // angemeldete Person; bestand der Auftrag aber schon (der Server gibt ihn
+    // dann nur zurück), war es womöglich jemand anders — darum schlägt der
+    // Ersteller des Auftrags den angemeldeten Benutzer.
+    const creator = salesOrder.createdBy || useAuthStore.getState().user;
+    const doc = await buildOrderConfirmationPdf(tenderId, getPdfSettings(), {
+        orderNumber: salesOrder.orderNumber,
+        orderDate: salesOrder.orderDate ?? salesOrder.createdAt,
+        validUntil: null,
+        salespersonName: `${creator?.firstName || ''} ${creator?.lastName || ''}`.trim(),
+        introText: null,
+    });
     const result = await tenderApi.sendOrderMail(tenderId, {
         attachments: [{
             filename: doc.fileName,
@@ -166,14 +188,18 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
                 overtimeHourlyRate,
             });
             if (res.project?.id) setCreatedProjectId(res.project.id);
-            toast.success(res.message ||t('tenders.order_created'));
+            // Der Server antwortet mit einem fest verdrahteten türkischen Satz.
+            // Die Meldung kommt deshalb aus i18n und NICHT aus `res.message`,
+            // sonst steht sie auch in einer deutschen oder englischen Sitzung
+            // auf Türkisch. `reused` unterscheidet den bereits vorhandenen Auftrag.
+            toast.success(res.reused ? t('tenders.order_already_created') : t('tenders.order_created'));
 
             // Der Kunde erfährt SOFORT vom Auftrag — ohne Rückfrage und noch
             // bevor die Seite zum Projekt/Auftrag wechselt, damit ein Mailfehler
             // hier sichtbar wird und nicht in einem Seitenwechsel untergeht.
-            if (tender.customerEmail) {
+            if (tender.customerEmail && res.salesOrder) {
                 try {
-                    await sendOrderConfirmation(tender.id);
+                    await sendOrderConfirmation(tender.id, res.salesOrder);
                 } catch (mailError: any) {
                     toast.error(mailError?.response?.data?.error || t('tenders.order_mail_failed'));
                 }
@@ -220,7 +246,9 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         try {
             const res = await projectApi.createFromTender(tender.id, undefined, overtimeHourlyRate);
             setCreatedProjectId(res.project.id);
-            toast.success(res.message ||t('tenders.order_created'));
+            // Wie oben: die Servermeldung ist einsprachig, also übersetzen wir
+            // selbst. Hier entsteht Auftrag UND Projekt, daher ein eigener Schlüssel.
+            toast.success(t('tenders.project_created_from_tender'));
             await fetchDetail(tender.id, true);
             // Ask the user whether to open the project or stay, instead of
             // navigating away automatically.

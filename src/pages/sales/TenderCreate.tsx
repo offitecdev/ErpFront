@@ -3,10 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
-import { ArrowLeft } from '@/components/icons/antIconCompat';
 
 import { PageHeader } from '../../components/layout/PageHeader';
-import { Button } from '../../components/ui-shared/Button';
 import { useTenderStore } from '../../store/tenderStore';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../lib/axios';
@@ -86,9 +84,6 @@ export const TenderCreate = () => {
             <PageHeader
                 breadcrumb={t('tenders.crm_teklif_yeni')}
                 title={t('tenders.new_tender')}
-                actions={
-                    <Button variant="ghost" icon={<ArrowLeft size={13} />} onClick={() => navigate('/sales/quotes')}>{t('tenders.list_back')}</Button>
-                }
             />
             <div className="flex min-h-[360px] items-center justify-center rounded-md border border-slate-200 bg-white">
                 <div className="w-full max-w-sm rounded-md border border-slate-200 bg-white px-6 py-5 text-center">

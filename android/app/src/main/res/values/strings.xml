@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Offitec ERP</string>
+    <string name="title_activity_main">Offitec ERP</string>
+    <string name="package_name">com.offitec.erp</string>
+    <string name="custom_url_scheme">com.offitec.erp</string>
+</resources>

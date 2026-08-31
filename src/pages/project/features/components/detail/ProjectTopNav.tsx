@@ -10,7 +10,6 @@ import {
     Coins01 as Wallet,
     Receipt as ReceiptText,
 } from '@/components/icons/antIconCompat';
-
 import { t } from '@/i18n/translate';
 import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
 import type {
@@ -134,7 +133,7 @@ export const ProjectTopNav = ({
             // Same tab strip as the tender detail workspace (TenderWorkspaceTabs):
             // underline on the page edge, active tab = filled panel + brand
             // underline + weight. `ofi-quote-tab*` are the dark.css accent hooks.
-            className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 md:overflow-visible dark:border-white/15"
+            className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-[#dadce0] px-1 pt-1 md:overflow-visible dark:border-white/15"
         >
             <SlidingTopTabs activeKey={activeView.section} className="flex min-w-max items-stretch gap-1">
             {groups.map((group) => {
@@ -162,8 +161,8 @@ export const ProjectTopNav = ({
                             onFocus={() => hasSubs && openMenu(group.section)}
                             className={`ofi-quote-tab inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                 active
-                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                                    ? 'ofi-quote-tab-active border-[#dadce0] bg-[#eef2fb] font-bold text-[#1f2654]'
+                                    : 'border-transparent font-medium text-[#70757a] hover:border-[#dadce0] hover:bg-[#f1f3f4] hover:text-[#1f2654] dark:text-white/70'
                             }`}
                         >
                             <span>{group.label()}</span>

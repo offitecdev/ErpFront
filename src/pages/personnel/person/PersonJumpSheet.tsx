@@ -4,7 +4,9 @@ import { ArrowRight } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
 import { BottomSheet } from '@/components/ui-shared/BottomSheet';
+import { isPathAllowedForTechnician } from '@/lib/access';
 import { isPathAllowed } from '@/lib/pageAccess';
+import { useMontageIsWorkspace } from '@/lib/useMontageWorkspace';
 import { useAuthStore } from '@/store/authStore';
 import { EMPTY_CELL } from '../utils/format';
 
@@ -52,11 +54,16 @@ export const PersonJumpSheet = ({
 }) => {
     const navigate = useNavigate();
     const pageAccess = useAuthStore((state) => state.pageAccess);
+    const isTechnicianWorkspace = useMontageIsWorkspace();
 
     /* Nur Wege anbieten, die diese Person auch gehen darf: MainLayout wirft
        eine gesperrte Adresse auf die Startseite zurück, und ein Knopf, der dort
-       endet, ist schlimmer als ein fehlender. */
-    const allowed = targets.filter((target) => isPathAllowed(pageAccess, target.to));
+       endet, ist schlimmer als ein fehlender. Beim Monteur ist die Schranke
+       enger als die Stufenkarte — für ihn gibt es nur den Montagebildschirm,
+       den Kalender und das eigene Profil. */
+    const allowed = targets.filter((target) => (isTechnicianWorkspace
+        ? isPathAllowedForTechnician(target.to, pageAccess)
+        : isPathAllowed(pageAccess, target.to)));
 
     const jump = (to: string) => {
         onClose();

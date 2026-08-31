@@ -121,9 +121,11 @@ export const BillingTab = memo(({
 
     if (!summariesLoaded) {
         return (
-            <div className="flex h-56 flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 text-slate-500 dark:border-white/10 dark:bg-white/5">
-                <RefreshCcw01 size={18} className="animate-spin" />
-                <span className="text-[12px] font-medium">{t('projects.detail.billingLoading')}</span>
+            /* Ladefläche in der Form der Karte, die gleich kommt — Haarlinie,
+               weisse Fläche, kein graues Feld (Google-clean, 19.08.2026). */
+            <div className="ofi-inv-card flex h-56 items-center justify-center gap-2">
+                <RefreshCcw01 size={18} className="animate-spin ofi-inv-muted" />
+                <span className="text-[12px] ofi-inv-muted">{t('projects.detail.billingLoading')}</span>
             </div>
         );
     }

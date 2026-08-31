@@ -1,3 +1,5 @@
+import type { TaskTenderPick } from '../tasks/TaskTenderCombo';
+
 import type {
     CommunicationChannel,
     CrmCommunicationRow,
@@ -76,6 +78,8 @@ export interface QuickEntryDraftRow {
     customerId: string | null;
     customerName: string;
     contactId: string;
+    /** Verknüpfte Offerte — freiwillig, wie der Kunde (11.09.2026). */
+    tender: TaskTenderPick | null;
     note: string;
     title: string;
     /** Verantwortliche — mehrere Personen (18.08.2026). */

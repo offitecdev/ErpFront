@@ -2,7 +2,7 @@
  * ── KUNDENDETAIL: gemeinsame Klassen und Optionen ───────────────────────────
  *
  * Die Kundenübersicht übernimmt die Zeilen-Optik der Angebotsdetailseite
- * (`pages/tender/detail/utils/quoteField.constants.ts`): Label links in einer
+ * (`pages/sales/detail/utils/quoteField.constants.ts`): Label links in einer
  * festen Spalte, Wert rechts, eine Zeile pro Feld — keine Kartenraster.
  * Die Klassen sind hier gespiegelt statt importiert, damit das CRM-Modul nicht
  * am Angebotsmodul hängt; die Werte müssen mit jenen im Gleichschritt bleiben.

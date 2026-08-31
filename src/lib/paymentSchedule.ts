@@ -1,14 +1,19 @@
 // Payment schedule (Ödeme planı) helpers — frontend mirror of the backend's
 // application/utils/paymentSchedule.ts. A schedule is an array of instalments,
-// each carrying a percentage of the gross total and the day it falls due
-// (e.g. 30% on 2026-09-01, 70% on 2026-11-15), persisted as a JSON string on
-// Tender.paymentStages / SalesOrder.paymentStages. Stages carry no identity:
-// billing progress is derived from the summed billedPercent against the
-// cumulative stage percents, so off-schedule invoices self-heal.
+// each carrying a percentage of the gross total and — ON THE ORDER — the day it
+// falls due (e.g. 30% on 2026-09-01, 70% on 2026-11-15), persisted as a JSON
+// string on Tender.paymentStages / SalesOrder.paymentStages. Stages carry no
+// identity: billing progress is derived from the summed billedPercent against
+// the cumulative stage percents, so off-schedule invoices self-heal.
+//
+// DUE DATES BELONG TO THE ORDER, NOT THE OFFER (Vorgabe 15.08.2026): an offer
+// only fixes the percentages — 30/20/10/40 — and the customer's actual due days
+// are agreed once the order exists. So the offer side validates without dates
+// and writes them out as null (`stripStageDates`), while the order side keeps
+// demanding a date per instalment.
 //
 // Legacy rows hold a bare percent array (`[30,20,10,40]`) from before dates
-// existed. They still parse — the dates come back null — but a schedule only
-// counts as valid once every stage has one, so the next save fills the gap.
+// existed. They still parse — the dates come back null.
 
 const EPSILON = 0.005;
 export const MAX_PAYMENT_STAGES = 12;
@@ -67,12 +72,22 @@ export const paymentStagesSum = (stages: PaymentStage[]): number =>
 export const paymentStagesMissingDate = (stages: PaymentStage[]): boolean =>
     stages.some((stage) => !isValidStageDate(stage.date));
 
-/** Valid = 1..12 stages, each in (0, 100] WITH a due date, summing to 100 (±0.01). */
-export const paymentStagesValid = (stages: PaymentStage[]): boolean =>
+/** Drops the due dates — the offer stores percentages only. */
+export const stripStageDates = (stages: PaymentStage[]): PaymentStage[] =>
+    stages.map((stage) => ({ ...stage, date: null }));
+
+/**
+ * Valid = 1..12 stages, each in (0, 100], summing to 100 (±0.01) — and, unless
+ * `requireDates` is turned off (the offer side), every instalment dated.
+ */
+export const paymentStagesValid = (
+    stages: PaymentStage[],
+    { requireDates = true }: { requireDates?: boolean } = {},
+): boolean =>
     stages.length > 0
     && stages.length <= MAX_PAYMENT_STAGES
     && stages.every((stage) => Number.isFinite(stage.percent) && round2(stage.percent) > 0 && round2(stage.percent) <= 100)
-    && !paymentStagesMissingDate(stages)
+    && (!requireDates || !paymentStagesMissingDate(stages))
     && Math.abs(paymentStagesSum(stages) - 100) <= 0.01;
 
 export const cumulativeStages = (stages: PaymentStage[]): number[] => {

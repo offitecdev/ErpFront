@@ -1,5 +1,81 @@
 import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import type { AppointmentDto, MailSettingDto, MontageOrdersPageDto, MontageReportOrderDetailDto, MontageReportOrdersPageDto, MontageReportResourcesDto, ProjectAddonRequestDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
+
+/* ── Mehrtägige Einsätze (24.08.2026) ───────────────────────────────────────
+   Ein Einsatz über mehrere Tage ist EINE ZEILE JE TAG, zusammengehalten von
+   einer Serie. Der Tag trägt die Arbeit (Rapport, Überstunden), die Serie die
+   Klammer (eine Mail, ein Satz Unterlagen, ein Begleitwort). */
+
+/** Ein geplanter Tag. Mit `appointmentId`: ein bestehender Tag, der bleibt. */
+export interface AppointmentDayInput {
+    appointmentId?: string;
+    startTime: string;
+    endTime: string;
+}
+
+export interface AppointmentSeriesDay {
+    id: string;
+    dayIndex: number;
+    startTime: string;
+    endTime: string;
+    status: string;
+}
+
+/** Eine Unterlage — ohne Inhalt; der kommt erst beim Öffnen. */
+export interface AppointmentDocumentDto {
+    id: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    createdAt: string;
+    uploadedBy?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface AppointmentSeriesDto {
+    /** null = ein Termin von vor dem 24.08.2026; er bekommt seine Serie beim ersten Schreiben. */
+    seriesId: string | null;
+    coverNote: string | null;
+    days: AppointmentSeriesDay[];
+    documents: AppointmentDocumentDto[];
+}
+
+/** Eine Checkliste als PDF, im Browser gezeichnet und mitgeschickt. */
+export interface InviteAttachmentInput {
+    filename: string;
+    contentType: 'application/pdf';
+    contentBase64: string;
+}
+
+export interface InviteSendInput {
+    to: string;
+    cc?: string[];
+    subject?: string | null;
+    message?: string | null;
+    /**
+     * Die AUTOMATISCHE Teammail: eine zweite, nicht verfasste Nachricht an das
+     * Montageteam, die CC-Liste und die Person, die den Termin angelegt hat.
+     * Ohne Angabe laeuft sie mit (der Server nimmt alles ausser `false` als an).
+     * Nur bei Terminen — Besprechungen kennen kein Team.
+     */
+    teamMail?: boolean;
+    /** Checklisten des Projekts/Auftrags; haengen NUR an der Teammail. */
+    attachments?: InviteAttachmentInput[];
+}
+
+/** Eine der beiden Nachrichten: verschickt, oder mit Grund nicht verschickt. */
+export type InviteMailOutcome =
+    | { sent: true; recipients: string[] }
+    | { sent: false; reason: 'NO_SMTP' | 'NO_SENDER' | 'NO_RECIPIENT' };
+
+export interface InviteSendResult {
+    sentAt: string;
+    /** Die von Hand verfasste Mail an den Kunden; null = keine Adresse. */
+    customer?: InviteMailOutcome | null;
+    /** Die automatische Teammail; null = abgeschaltet oder niemand zu melden. */
+    team?: InviteMailOutcome | null;
+    recipients: string[];
+    teamRecipients?: string[];
+}
 import type { PersonLite } from '../../types/maintenance';
 
 export type SalesOrderMode = 'PROJECT_NEW' | 'PROJECT_EXISTING' | 'PROJECT_ADDON' | 'INVOICE';
@@ -32,6 +108,8 @@ export interface SalesOrderDto {
     createdByEmployeeId: string;
     createdAt: string;
     updatedAt: string;
+    /** Geschäftsdatum des Auftrags; leer = `createdAt`. */
+    orderDate?: string | null;
     customer?: { id: string; companyName: string; mainEmail?: string | null; mainPhone?: string | null } | null;
     tender?: { id: string; tenderNumber: string; status: string; projectId?: string | null } | null;
     // Projesi OLMAYAN sipariş = teslimat siparişi (teklifin proje açmayan yolu);
@@ -67,6 +145,9 @@ export interface ServiceReportDto {
     operationsDone?: string;
     technicalNotes?: string | null;
     customerSignature?: string | null;
+    /** Unterschrift des Technikers — zweite Signatur neben der des Kunden. */
+    technicianSignature?: string | null;
+    technicianSignedAt?: string | null;
     appointment?: { id: string; startTime: string; endTime: string } | null;
     employee?: { id: string; firstName: string; lastName: string; email: string } | null;
     images?: { id: string }[];
@@ -78,6 +159,8 @@ export type CompleteInstallationInput = {
     startedAt?: string;
     endedAt?: string;
     signatureBase64?: string;
+    /** Unterschrift des Technikers — reist mit dem Abschluss mit. */
+    technicianSignature?: string | null;
     expenses?: { id?: string; expenseType: string; amount: number; description?: string }[];
     materials?: { id?: string; materialId: string; quantity: number; description?: string }[];
     usedMaterials?: { id?: string; materialId: string; quantity: number; description?: string }[];
@@ -179,7 +262,7 @@ export const projectApi = {
         // Teklifin `internalDeliveryDate` alanina yazilir.
         deliveryDate?: string;
         overtimeHourlyRate?: number;
-    }): Promise<{ message: string; salesOrder: SalesOrderDto; project?: ProjectDto | null }> => {
+    }): Promise<{ message: string; salesOrder: SalesOrderDto; project?: ProjectDto | null; reused?: boolean }> => {
         const res = await apiClient.post('/sales-orders/from-tender', input);
         return res.data;
     },
@@ -266,6 +349,10 @@ export const projectApi = {
         expenses?: Array<{ id?: string; expenseType: string; amount: number }>;
         extraMaterials?: Array<{ id?: string; materialId: string; quantity: number; description?: string }>;
         usedMaterials?: Array<{ id?: string; materialId: string; quantity: number }>;
+        /** Mitgeschickt = setzen/löschen, weggelassen = unverändert. */
+        technicianSignature?: string | null;
+        /** Direkte Kundenunterschrift aus dem gemeinsamen Rapport-Editor. */
+        customerSignature?: string | null;
     }) => {
         const res = await apiClient.put(`/projects/appointments/${appointmentId}/field-report`, input);
         return res.data;
@@ -277,8 +364,9 @@ export const projectApi = {
         return res.data;
     },
 
-    signReport: async (reportId: string, signatureBase64: string) => {
-        const res = await apiClient.patch(`/projects/reports/${reportId}/sign`, { signatureBase64 });
+    /** `role: 'TECHNICIAN'` legt die Technikersignatur ab; ohne Rolle unterschreibt der Kunde. */
+    signReport: async (reportId: string, signatureBase64: string, role: 'CUSTOMER' | 'TECHNICIAN' = 'CUSTOMER') => {
+        const res = await apiClient.patch(`/projects/reports/${reportId}/sign`, { signatureBase64, role });
         return res.data;
     },
 
@@ -396,18 +484,117 @@ export const projectApi = {
         return res.data;
     },
 
-    createAppointment: async (id: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string; ccEmails?: string[] }) => {
+    /**
+     * Ein Einsatz — EIN Tag oder MEHRERE (24.08.2026). Mit `days` entsteht je
+     * Tag ein Termin, alle unter derselben Serie; ohne bleibt es beim einzelnen
+     * Termin aus `startTime`/`endTime`. Die Antwort ist der erste Tag, ergänzt
+     * um `seriesId` und die ganze Tagesliste.
+     */
+    createAppointment: async (id: string, input: {
+        salesOrderId?: string | null;
+        assignedTechId?: string | null;
+        technicianIds?: string[];
+        startTime?: string;
+        endTime?: string;
+        days?: AppointmentDayInput[];
+        notes?: string;
+        coverNote?: string;
+        ccEmails?: string[];
+        /** Kalender-Etikett; fehlt es, wird «Geplanter Termin» gesetzt. */
+        labelId?: string | null;
+    }) => {
         const res = await apiClient.post(`/projects/${id}/appointments`, input);
+        return res.data as (AppointmentDto & { seriesId?: string | null; days?: AppointmentDto[] });
+    },
+
+    /* ── Mehrtägige Einsätze und Terminunterlagen ─────────────────────── */
+
+    /** Der ganze Einsatz eines Termins: Tage, Begleitwort, Unterlagen. */
+    getAppointmentSeries: async (appointmentId: string, opts: { technician?: boolean } = {}): Promise<AppointmentSeriesDto> => {
+        const path = opts.technician
+            ? `/projects/technician/installations/${appointmentId}/series`
+            : `/projects/appointments/${appointmentId}/series`;
+        const res = await apiClient.get(path);
         return res.data;
     },
 
-    updateAppointment: async (appointmentId: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string; ccEmails?: string[] }) => {
+    /**
+     * Der Einsatzplan, wie er sein SOLL. Tage mit `appointmentId` werden
+     * fortgeschrieben, Tage ohne kommen dazu, fehlende fallen weg — anhängen
+     * und ändern gehen denselben Weg.
+     */
+    saveAppointmentDays: async (appointmentId: string, input: { days: AppointmentDayInput[]; technicianIds?: string[] }) => {
+        const res = await apiClient.put(`/projects/appointments/${appointmentId}/series/days`, input);
+        return res.data as { seriesId: string; days: AppointmentSeriesDay[]; added: number; removed: number };
+    },
+
+    /** Das Begleitwort an die Monteurin — es geht nie an den Kunden. */
+    saveAppointmentCoverNote: async (appointmentId: string, coverNote: string) => {
+        const res = await apiClient.patch(`/projects/appointments/${appointmentId}/series`, { coverNote });
+        return res.data as { seriesId: string; coverNote: string | null };
+    },
+
+    /**
+     * DIE DATEI REIST ROH (24.08.2026, Vorgabe Samet: «so schnell wie beim
+     * Angebot»): ein multipart-Formular mit der `File` selbst — kein FileReader,
+     * kein Base64 (ein Drittel grösser und zweimal umkodiert), kein Umweg über
+     * einen JSON-Körper. Genau derselbe Weg wie der Angebotsanhang.
+     */
+    addAppointmentDocument: async (appointmentId: string, file: File) => {
+        const form = new FormData();
+        form.append('file', file, file.name);
+        const res = await apiClient.post(`/projects/appointments/${appointmentId}/documents`, form, {
+            timeout: MAIL_REQUEST_TIMEOUT_MS,
+        });
+        return res.data as { seriesId: string; document: AppointmentDocumentDto };
+    },
+
+    /** Gemeinsam ausgewaehlte Unterlagen reisen als EIN Multipart-Paket. */
+    addAppointmentDocuments: async (appointmentId: string, files: File[]) => {
+        const form = new FormData();
+        files.forEach((file) => form.append('files', file, file.name));
+        const res = await apiClient.post(`/projects/appointments/${appointmentId}/documents/batch`, form, {
+            timeout: MAIL_REQUEST_TIMEOUT_MS,
+        });
+        return res.data as { seriesId: string; documents: AppointmentDocumentDto[] };
+    },
+
+    /** Der Inhalt einer Unterlage kommt erst beim Oeffnen ueber die Leitung. */
+    getAppointmentDocument: async (documentId: string, opts: { technician?: boolean } = {}): Promise<AppointmentDocumentDto & { data: string }> => {
+        const path = opts.technician
+            ? `/projects/technician/appointment-documents/${documentId}`
+            : `/projects/appointment-documents/${documentId}`;
+        const res = await apiClient.get(path, { timeout: MAIL_REQUEST_TIMEOUT_MS });
+        return res.data;
+    },
+
+    deleteAppointmentDocument: async (documentId: string): Promise<void> => {
+        await apiClient.delete(`/projects/appointment-documents/${documentId}`);
+    },
+
+    updateAppointment: async (appointmentId: string, input: { salesOrderId?: string | null; assignedTechId?: string | null; technicianIds?: string[]; startTime: string; endTime: string; notes?: string; ccEmails?: string[]; labelId?: string | null }) => {
         const res = await apiClient.patch(`/projects/appointments/${appointmentId}`, input);
         return res.data;
     },
 
-    deleteAppointment: async (appointmentId: string): Promise<void> => {
-        await apiClient.delete(`/projects/appointments/${appointmentId}`);
+    /** `scope: 'series'` löscht den ganzen mehrtägigen Einsatz, sonst nur den Tag. */
+    deleteAppointment: async (appointmentId: string, scope: 'day' | 'series' = 'day'): Promise<void> => {
+        await apiClient.delete(`/projects/appointments/${appointmentId}`, {
+            ...(scope === 'series' ? { params: { scope: 'series' } } : {}),
+        });
+    },
+
+    // "Termin senden": the calendar invitation (card mail + .ics) leaves ONLY
+    // through this call — saving an appointment never mails anyone. It produces
+    // TWO messages: the written one to the customer (to/cc/subject/message) and,
+    // unless `teamMail: false`, the automatic one to the technicians, the CC list
+    // and the appointment's creator, carrying the checklist PDFs.
+    // Same long timeout as every other mail call: attachments travel with it.
+    sendAppointmentInvite: async (appointmentId: string, input: InviteSendInput): Promise<InviteSendResult> => {
+        const res = await apiClient.post(`/projects/appointments/${appointmentId}/send-invite`, input, {
+            timeout: MAIL_REQUEST_TIMEOUT_MS,
+        });
+        return res.data;
     },
 
     requestVariation: async (id: string, input: { salesOrderId?: string | null; appointmentId?: string | null; materialId: string; quantity: number; description?: string }) => {
@@ -493,17 +680,37 @@ export const mailApi = {
         return res.data;
     },
 
-    // smtpPassword/imapPassword: undefined/atlanmış = kayıtlı şifreye dokunma, null = sil.
+    // smtpPassword/imapPassword/caldavPassword: undefined/atlanmış = kayıtlı
+    // şifreye dokunma, null = sil.
     saveSettings: async (
-        input: Partial<MailSettingDto> & { smtpPassword?: string | null; imapPassword?: string | null },
+        input: Partial<MailSettingDto> & {
+            smtpPassword?: string | null;
+            imapPassword?: string | null;
+            caldavPassword?: string | null;
+        },
     ): Promise<MailSettingDto> => {
         const res = await apiClient.put('/mail/settings', input);
         return res.data;
     },
 
+    /* KALENDER DES KONTOS (CalDAV). `testCaldav` sucht die Kalender des
+       eingerichteten Postfachs und meldet, was es gefunden hat — die
+       Einrichtung soll man prüfen können, ohne auf den nächsten Durchgang zu
+       warten. Die Suche kostet mehrere Anfragen an den Server, darum eine
+       eigene, längere Frist. */
+    testCaldav: async (): Promise<{ ok: boolean; calendars: Array<{ href: string; displayName: string }>; error?: string }> => {
+        const res = await apiClient.post('/mail/caldav/test', {}, { timeout: MAIL_REQUEST_TIMEOUT_MS });
+        return res.data;
+    },
+
+    syncCaldav: async (): Promise<{ calendars: number; created: number; updated: number; removed: number; error?: string }> => {
+        const res = await apiClient.post('/mail/caldav/sync', {}, { timeout: MAIL_REQUEST_TIMEOUT_MS });
+        return res.data;
+    },
+
     // Zaman aşımı: yanıtsız kalan bir gönderim ekranı sonsuz "gönderiliyor"da
     // bırakmasın (axios'un varsayılan zaman aşımı yoktur).
-    send: async (input: { fromEmail?: string; fromName?: string; to: string; cc?: string[]; subject: string; text?: string; html?: string; attachments?: Array<{ filename: string; contentType: string; contentBase64: string }> }) => {
+    send: async (input: { fromEmail?: string; fromName?: string; to: string; cc?: string[]; subject: string; text?: string; html?: string; attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>; customerId?: string | null }) => {
         const res = await apiClient.post('/mail/send', input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
     },
@@ -585,6 +792,9 @@ export interface DeliveryReportDto {
     /** Report-own photo attachments (base64 data URLs) — detail fetch only. */
     images?: Array<{ imageData: string; caption?: string }> | null;
     customerSignature?: string | null;
+    /** Unterschrift des ausführenden Technikers — detail fetch only. */
+    technicianSignature?: string | null;
+    technicianSignedAt?: string | null;
     isSigned: boolean;
     signedAt: string | null;
     sentAt: string | null;
@@ -606,6 +816,8 @@ export type DeliveryReportInput = {
     notes?: string | null;
     images?: Array<{ imageData: string; caption?: string }>;
     signatureBase64?: string | null;
+    /** Technikersignatur beim Anlegen (Tablet-Ansicht). */
+    technicianSignatureBase64?: string | null;
 };
 
 export const deliveryReportApi = {
@@ -625,11 +837,19 @@ export const deliveryReportApi = {
         const res = await apiClient.post('/delivery-reports', input);
         return res.data;
     },
-    sign: async (id: string, signatureBase64: string): Promise<DeliveryReportDto> => {
-        const res = await apiClient.patch(`/delivery-reports/${id}/sign`, { signatureBase64 });
+    sign: async (id: string, signatureBase64: string, role: 'CUSTOMER' | 'TECHNICIAN' = 'CUSTOMER'): Promise<DeliveryReportDto> => {
+        const res = await apiClient.patch(`/delivery-reports/${id}/sign`, { signatureBase64, role });
         return res.data;
     },
-    update: async (id: string, input: { responses?: DeliveryReportInput['responses']; notes?: string | null; checklistName?: string | null; images?: Array<{ imageData: string; caption?: string }> }): Promise<DeliveryReportDto> => {
+    update: async (id: string, input: {
+        responses?: DeliveryReportInput['responses'];
+        notes?: string | null;
+        checklistName?: string | null;
+        images?: Array<{ imageData: string; caption?: string }>;
+        /** Mitgeschickt = gesetzt/gelöscht; weggelassen = unverändert. */
+        technicianSignature?: string | null;
+        customerSignature?: string | null;
+    }): Promise<DeliveryReportDto> => {
         const res = await apiClient.patch(`/delivery-reports/${id}`, input);
         return res.data;
     },

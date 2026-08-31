@@ -13,11 +13,12 @@ import {
 
 import { getShared } from '../../../lib/axios';
 import { Button } from '../../../components/ui-shared/Button';
+import { PersonAvatar } from '../../../components/ui-shared/PersonAvatar';
 import { StatusChip } from '../../../components/ui-shared/StatusBadge';
 import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../../hooks/useColumnWidths';
 import { formatMoney, toCurrencyCode } from '../../../utils/currency';
-import { tenderStatusLabel, tenderStatusVariant } from '../../tender/detail/utils/tenderStatus.utils';
+import { tenderStatusLabel, tenderStatusVariant } from '../../sales/detail/utils/tenderStatus.utils';
 
 import { t as i18nT } from '@/i18n/translate';
 
@@ -54,6 +55,9 @@ interface OfferRow {
     currency?: string | null;
     createdAt: string;
     offerMailSentAt?: string | null;
+    // "Abgelaufen" wird daraus abgeleitet (tenderStatus.utils).
+    validUntil?: string | null;
+    offerAcceptedAt?: string | null;
     positionCount?: number;
     grandTotal?: number;
 }
@@ -68,14 +72,6 @@ const fmtMoney = (value?: number | null, currency?: string | null) =>
 
 const creatorName = (row: OfferRow) =>
     row.createdByName || row.createdByEmail || row.createdByEmployeeId || '—';
-
-const initialsFromName = (value?: string | null) => {
-    const cleaned = value?.trim();
-    if (!cleaned || cleaned === '—') return '?';
-    const parts = cleaned.split(/\s+/).filter(Boolean);
-    const source = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : [cleaned];
-    return source.map((part) => part.charAt(0)).join('').slice(0, 2).toUpperCase();
-};
 
 export const CustomerOffersTable = ({
     customerId,
@@ -231,7 +227,7 @@ export const CustomerOffersTable = ({
                         variant="primary"
                         size="sm"
                         icon={<Plus size={11} />}
-                        onClick={() => navigate(`/crm/tenders/new?customerId=${customerId}`)}
+                        onClick={() => navigate(`/sales/quotes/new?customerId=${customerId}`)}
                     >
                         {i18nT('nav.quickActionsGroup.newTender')}
                     </Button>
@@ -303,7 +299,7 @@ export const CustomerOffersTable = ({
                             <tr
                                 key={row.id}
                                 className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
-                                onClick={() => navigate(`/crm/tenders/${row.id}`)}
+                                onClick={() => navigate(`/sales/quotes/${row.id}`)}
                             >
                                 <td>
                                     <div className="flex min-w-0 items-center gap-2.5">
@@ -325,9 +321,16 @@ export const CustomerOffersTable = ({
                                 </td>
                                 <td>
                                     <div className="flex min-w-0 items-center gap-2">
-                                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/70">
-                                            {initialsFromName(creatorName(row))}
-                                        </span>
+                                        {/* Profilbild des Erstellers; ohne
+                                            hinterlegtes Bild bleibt es beim
+                                            Kreis mit den Initialen. */}
+                                        <PersonAvatar
+                                            id={row.createdByEmployeeId}
+                                            name={creatorName(row)}
+                                            size={24}
+                                            ring={false}
+                                            tone="subtle"
+                                        />
                                         <span className="truncate text-[12.5px] text-slate-700 dark:text-white/80">
                                             {creatorName(row)}
                                         </span>
@@ -359,7 +362,7 @@ export const CustomerOffersTable = ({
                                 <td className="text-right" onClick={(event) => event.stopPropagation()}>
                                     <button
                                         type="button"
-                                        onClick={() => navigate(`/crm/tenders/${row.id}`)}
+                                        onClick={() => navigate(`/sales/quotes/${row.id}`)}
                                         className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[12px] text-blue-700 transition-colors hover:bg-blue-50 active:bg-blue-100 dark:text-sky-300 dark:hover:bg-sky-500/15"
                                     >
                                         <Eye size={12} />{i18nT('common.detail')}<ChevronRight size={11} />

@@ -98,9 +98,14 @@ export const DangerConfirmDialog = ({
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
-                className="relative flex w-full max-w-[420px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/15 dark:bg-[#151616]"
+                /* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
+                   "FENSTER-OBERFLÄCHE"). `.ofi-compact-modal` muss dazu: die
+                   app-weite Regel zieht JEDES Portal-`section[role=dialog]`
+                   auf 1280px, dieses Fenster mit seinen zwei Feldern stand
+                   also quer über den Schirm statt in seinen 420px. */
+                className="ofi-rise-in ofi-pop ofi-compact-modal relative flex w-full max-w-[420px] flex-col overflow-hidden"
             >
-                <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-3.5 dark:border-white/10">
+                <header className="ofi-pop__rule flex items-start justify-between gap-3 border-b px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300">
                             <AlertTriangle size={16} />
@@ -112,9 +117,9 @@ export const DangerConfirmDialog = ({
                         aria-label={t('common.close')}
                         disabled={busy}
                         onClick={onCancel}
-                        className="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+                        className="ofi-float-card__iconbtn shrink-0 disabled:opacity-40"
                     >
-                        <X size={14} />
+                        <X size={16} />
                     </button>
                 </header>
 
@@ -172,14 +177,14 @@ export const DangerConfirmDialog = ({
                             type="button"
                             disabled={busy}
                             onClick={onCancel}
-                            className="rounded-md border border-slate-300 px-3.5 py-1.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 disabled:opacity-40 dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                            className="ofi-cal-btn"
                         >
                             {t('common.cancel')}
                         </button>
                         <button
                             type="submit"
                             disabled={!armed}
-                            className="flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="ofi-cal-btn is-danger"
                         >
                             {busy && <Spinner size="sm" />}
                             {confirmLabel || t('common.delete')}

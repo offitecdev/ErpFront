@@ -124,14 +124,18 @@ export const PersonnelSheet = ({
                 aria-labelledby={titleId}
                 tabIndex={-1}
                 style={{ width: `min(100%, ${width}px)`, height: `min(${height}px, 92vh)` }}
-                className="ofi-sheet ofi-sheet-up relative flex flex-col overflow-hidden rounded-t-2xl outline-none"
+                /* `.ofi-pop.is-sheet` — siehe index.css, "FENSTER-OBERFLÄCHE". */
+                className="ofi-sheet ofi-sheet-up ofi-pop is-sheet relative flex flex-col overflow-hidden outline-none"
             >
-                <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 py-3.5 dark:border-white/10">
+                <header className="ofi-pop__rule flex shrink-0 items-start justify-between gap-3 border-b px-5 py-3.5">
                     <div className="min-w-0">
-                        <h2 id={titleId} className="ofi-serif truncate text-[16px] font-bold text-slate-900 dark:text-white">
+                        {/* Grundschrift statt `.ofi-serif`: ein Fenstertitel
+                            der Anwendung ist klein und halbfett, wie im
+                            Kalender. */}
+                        <h2 id={titleId} className="ofi-pop__title">
                             {title}
                         </h2>
-                        {subtitle && <div className="mt-0.5 truncate text-[12px] text-slate-500 dark:text-white/60">{subtitle}</div>}
+                        {subtitle && <div className="ofi-pop__subtitle">{subtitle}</div>}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         {headerActions}
@@ -139,7 +143,7 @@ export const PersonnelSheet = ({
                             type="button"
                             aria-label={t('common.close')}
                             onClick={onClose}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
+                            className="ofi-float-card__iconbtn shrink-0"
                         >
                             <X size={16} />
                         </button>
@@ -151,7 +155,7 @@ export const PersonnelSheet = ({
                 </div>
 
                 {footer && (
-                    <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-5 py-3 dark:border-white/10">
+                    <footer className="ofi-pop__rule flex shrink-0 items-center justify-between gap-2 border-t px-5 py-3">
                         {footer}
                     </footer>
                 )}

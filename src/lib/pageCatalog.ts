@@ -43,12 +43,24 @@ export const PAGE_MODULES: CatalogModule[] = [
         pages: [
             { key: 'personnel.list', path: '/personnel', labelKey: 'nav.personnelList', maxLevel: 3 },
             { key: 'personnel.terminal', path: '/personnel/terminal', labelKey: 'nav.personnelTerminal', maxLevel: 1 },
-            { key: 'personnel.shiftPlan', path: '/personnel/shift-plan', labelKey: 'nav.personnelShiftPlan', maxLevel: 2 },
-            { key: 'personnel.reports', path: '/personnel/reports', labelKey: 'nav.personnelDetailedReport', maxLevel: 2 },
-            { key: 'personnel.accounting', path: '/personnel/accounting', labelKey: 'nav.personnelAccounting', maxLevel: 1 },
-            { key: 'personnel.leaves', path: '/personnel/leaves', labelKey: 'nav.personnelLeaves', maxLevel: 3 },
-            { key: 'personnel.approvals', path: '/personnel/approvals', labelKey: 'nav.personnelApprovals', maxLevel: 2 },
-            { key: 'personnel.incoming', path: '/personnel/incoming', labelKey: 'nav.personnelIncoming', maxLevel: 2 },
+            /* Arbeitszeiterfassung und Anträge (26.08.2026). Sie haben die
+               früheren Schlüssel personnel.reports/accounting bzw.
+               personnel.leaves/approvals/incoming abgelöst. Bestehende Rollen
+               tragen in ihrer gespeicherten Karte noch die alten Schlüssel —
+               `RETIRED_PAGE_KEYS` (lib/pageAccess.ts und, wortgleich,
+               shared/pageCatalog.ts im Backend) vererbt deren Stufe an die
+               Nachfolgeseite, bis die Rolle das nächste Mal gespeichert wird.
+               Ohne diese Umschrift stünden beide Seiten für JEDE bestehende
+               Rolle auf Stufe 0. */
+            { key: 'personnel.timeRecords', path: '/personnel/time-records', labelKey: 'nav.personnelTimeRecords', maxLevel: 2 },
+            /* Die Antragsseite in DREI wählbaren Zeilen (27.08.2026): Meine /
+               Eingehende / Alle Anträge sind in der Rollentabelle einzeln
+               schaltbar. Die beiden Unteradressen werden nie aufgerufen — die
+               Seite bleibt EINE Adresse mit Reitern; die Reiter lesen die
+               Stufen dieser Schlüssel. */
+            { key: 'personnel.requests', path: '/personnel/requests', labelKey: 'nav.personnelRequestsMine', maxLevel: 1 },
+            { key: 'personnel.requestsIncoming', path: '/personnel/requests/incoming', labelKey: 'nav.personnelRequestsIncoming', maxLevel: 2 },
+            { key: 'personnel.requestsAll', path: '/personnel/requests/all', labelKey: 'nav.personnelRequestsAll', maxLevel: 1 },
         ],
     },
     {
@@ -57,7 +69,9 @@ export const PAGE_MODULES: CatalogModule[] = [
         pages: [
             { key: 'crm.customers', path: '/crm/customers', labelKey: 'nav.customerList', maxLevel: 2 },
             { key: 'crm.contacts', path: '/crm/contacts', labelKey: 'nav.crmContacts', maxLevel: 2 },
+            { key: 'crm.enquiries', path: '/crm/enquiries', labelKey: 'nav.crmEnquiries', maxLevel: 2 },
             { key: 'crm.communication', path: '/crm/communication', labelKey: 'nav.crmCommunication', maxLevel: 2 },
+            { key: 'crm.activities', path: '/crm/activities', labelKey: 'nav.crmActivities', maxLevel: 1 },
             { key: 'crm.mail', path: '/crm/mail', labelKey: 'nav.crmMail', maxLevel: 2 },
             { key: 'crm.tasks', path: '/crm/tasks', labelKey: 'nav.crmTasks', maxLevel: 2 },
             { key: 'crm.reminders', path: '/crm/reminders', labelKey: 'nav.crmReminders', maxLevel: 2 },
@@ -71,6 +85,12 @@ export const PAGE_MODULES: CatalogModule[] = [
         pages: [
             { key: 'sales.quotes', path: '/sales/quotes', labelKey: 'nav.tenderManagement', maxLevel: 2 },
             { key: 'sales.orders', path: '/sales/orders', labelKey: 'nav.myOrders', maxLevel: 2 },
+            // OSP (04.09.2026): Offertanfragen der Offitec Selection Platform.
+            { key: 'sales.osp', path: '/sales/osp', labelKey: 'nav.salesOsp', maxLevel: 2 },
+            // Rechnungsliste (30.08.2026) — Löschen ist hier eine eigene Stufe:
+            // eine stornierte Rechnung endgültig zu entfernen ist mehr, als eine
+            // neue auszustellen.
+            { key: 'sales.invoices', path: '/sales/invoices', labelKey: 'nav.salesInvoices', maxLevel: 3 },
         ],
     },
     {

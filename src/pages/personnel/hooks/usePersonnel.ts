@@ -6,22 +6,17 @@
  * Alle Ladevorgänge sind gegen ein Abbruch-Flag geschützt: das Modul lebt auf
  * Tablets, wo ein Seitenwechsel während eines Netzwerkweges normal ist.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import { personnelApi } from '@/lib/api/personnel';
 import { DEFAULT_SHIFT_PLAN } from '../utils/personnel';
-import { firstDayOfMonth, lastDayOfMonth } from '../utils/format';
 import type {
-    AccountingDetail,
     ClockActivity,
-    AccountingReport,
-    DetailedReport,
     LeaveCounts,
     LeaveKind,
     LeaveRequestRow,
     PersonRef,
     PersonnelMe,
-    ReportQuery,
     ShiftPlan,
     StaffRow,
     WeekOverview,
@@ -177,144 +172,13 @@ export const useShiftPlan = () => {
     return { plan, setPlan, loading, saving, error, save };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Berichte
-// ─────────────────────────────────────────────────────────────────────────────
-
-export interface ReportFilterState extends ReportQuery {
-    publicHolidays: number;
-}
-
-/** Startwerte der Berichtsfilter: der laufende Monat, keine Feiertage. */
-export const defaultReportFilters = (): ReportFilterState => ({
-    startDate: firstDayOfMonth(),
-    endDate: lastDayOfMonth(),
-    firstName: '',
-    lastName: '',
-    publicHolidays: 0,
-});
-
-/**
- * Berichte laden NICHT bei jedem Tastendruck: der Zeitraum und die Namensfelder
- * gehören zusammen, und ein halb getippter Nachname soll keinen Serverweg
- * kosten. Der Filterzustand ist deshalb ein Entwurf; `apply()` übergibt ihn.
- */
-const useAppliedFilters = () => {
-    const [draft, setDraft] = useState<ReportFilterState>(defaultReportFilters);
-    const [applied, setApplied] = useState<ReportFilterState>(draft);
-
-    const patch = useCallback((next: Partial<ReportFilterState>) => {
-        setDraft((current) => ({ ...current, ...next }));
-    }, []);
-    // IMMER eine neue Objektidentität: `setApplied(draft)` mit demselben Objekt
-    // liesse React abbrechen, und ein Druck auf „Filtern" ohne Feldänderung
-    // (oder ein Auffrischen von aussen) täte gar nichts.
-    const apply = useCallback(() => setApplied({ ...draft }), [draft]);
-    const reset = useCallback(() => {
-        setDraft(defaultReportFilters());
-        setApplied(defaultReportFilters());
-    }, []);
-
-    return { draft, applied, patch, apply, reset, setApplied };
-};
-
-export const useDetailedReport = () => {
-    const filters = useAppliedFilters();
-    const [report, setReport] = useState<DetailedReport>({ days: [], flags: [], plan: { ...DEFAULT_SHIFT_PLAN } });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [tick, setTick] = useState(0);
-    const reload = useCallback(() => setTick((value) => value + 1), []);
-    const { applied } = filters;
-
-    useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        setError(null);
-        personnelApi
-            .detailedReport(applied)
-            .then((value) => { if (!cancelled) setReport(value); })
-            .catch((err) => { if (!cancelled) setError(readError(err, 'load')); })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
-    }, [applied, tick]);
-
-    /** Abwesenheiten je Person — das Ausrufezeichen neben dem Namen. */
-    const flagsByEmployee = useMemo(() => {
-        const map = new Map<string, DetailedReport['flags']>();
-        for (const flag of report.flags) {
-            const bucket = map.get(flag.employeeId) ?? [];
-            bucket.push(flag);
-            map.set(flag.employeeId, bucket);
-        }
-        return map;
-    }, [report.flags]);
-
-    /* Die drei Summen der Fusszeile — getrennt gehalten wie die Spalten, damit
-       niemand sie im Kopf gegeneinander verrechnen muss. */
-    const totals = useMemo(() => report.days.reduce(
-        (sum, day) => ({
-            gross: sum.gross + day.grossSeconds,
-            actual: sum.actual + day.actualWorkSeconds,
-            breaks: sum.breaks + day.breakSeconds,
-        }),
-        { gross: 0, actual: 0, breaks: 0 },
-    ), [report.days]);
-
-    return { ...filters, report, flagsByEmployee, totals, loading, error, reload };
-};
-
-export const useAccountingReport = () => {
-    const filters = useAppliedFilters();
-    const [report, setReport] = useState<AccountingReport | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const { applied } = filters;
-
-    useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        setError(null);
-        personnelApi
-            .accountingReport(applied)
-            .then((value) => { if (!cancelled) setReport(value); })
-            .catch((err) => { if (!cancelled) setError(readError(err, 'load')); })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
-    }, [applied]);
-
-    /** „Feiertage zurücksetzen" — nur die Feiertagszahl, nicht der Zeitraum. */
-    const resetHolidays = useCallback(() => {
-        filters.patch({ publicHolidays: 0 });
-        filters.setApplied((current) => ({ ...current, publicHolidays: 0 }));
-    }, [filters]);
-
-    return { ...filters, report, loading, error, resetHolidays };
-};
-
-export const useAccountingDetail = (employeeId: string | null, query: ReportFilterState) => {
-    const [detail, setDetail] = useState<AccountingDetail | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!employeeId) {
-            setDetail(null);
-            return;
-        }
-        let cancelled = false;
-        setLoading(true);
-        setError(null);
-        personnelApi
-            .accountingDetail(employeeId, query)
-            .then((value) => { if (!cancelled) setDetail(value); })
-            .catch((err) => { if (!cancelled) setError(readError(err, 'load')); })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
-    }, [employeeId, query]);
-
-    return { detail, loading, error };
-};
+/* ── BERICHTE ────────────────────────────────────────────────────────────────
+   Der Detail- und der Buchhaltungsrapport sind am 26.08.2026 in der
+   Arbeitszeiterfassung aufgegangen; ihre Haken (`useDetailedReport`,
+   `useAccountingReport`, `useAccountingDetail`) sind mit den Seiten
+   weggefallen. Die neue Seite hält ihren Zustand selbst — sie lädt ERST nach
+   einer Suche, und ein Haken, der beim Aufsetzen lädt, wäre genau das
+   Gegenteil davon. */
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Anträge
@@ -343,7 +207,7 @@ export const useLeaveRequests = (scope: 'mine' | 'approver' | 'accounting' | 'al
 };
 
 export const useLeaveCounts = () => {
-    const [counts, setCounts] = useState<LeaveCounts>({ approver: 0, accounting: 0 });
+    const [counts, setCounts] = useState<LeaveCounts>({ approver: 0, accounting: 0, mine: 0, incoming: 0 });
     const [tick, setTick] = useState(0);
     const reload = useCallback(() => setTick((value) => value + 1), []);
 

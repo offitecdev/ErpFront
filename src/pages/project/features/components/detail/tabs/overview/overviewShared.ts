@@ -1,3 +1,4 @@
+import { t } from '@/i18n/translate';
 import type { DeliveryReportDto } from '@/lib/api/project';
 import type { ProjectSalesOrder } from '@/types/project';
 
@@ -32,3 +33,23 @@ export const orderDeliveryState = (rows: DeliveryReportDto[]): DeliveryState =>
 // means the work is under way.
 export const orderTechnicalState = (rows: DeliveryReportDto[]): TechnicalState =>
     rows.some((row) => row.isSigned) ? 'completed' : rows.length > 0 ? 'ongoing' : 'pending';
+
+/* Der WORTLAUT eines Zustands, getrennt vom Plättchen, das ihn zeigt: die
+   anklickbare Zeile muss ihn in ihre Vorlesehilfe nehmen (siehe `linkRow`), und
+   zwei Stellen, die denselben Zustand verschieden benennen, wären ein Fehler,
+   der erst beim Vorlesen auffällt. */
+export const deliveryStateLabel = (state: DeliveryState) => (
+    state === 'delivered'
+        ? t('projects.detail.overview.delivered')
+        : state === 'unsigned'
+            ? t('projects.delivery.statusUnsigned')
+            : t('projects.detail.overview.notDelivered')
+);
+
+export const technicalStateLabel = (state: TechnicalState) => (
+    state === 'completed'
+        ? t('projects.flow.stateCompleted')
+        : state === 'ongoing'
+            ? t('projects.flow.stateOngoing')
+            : t('projects.detail.incomplete')
+);

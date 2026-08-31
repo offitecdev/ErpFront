@@ -26,6 +26,7 @@ export const BookingSection = ({
     settings,
     userEmail,
     onSaved,
+    onAppointmentChanged,
     leaf,
 }: {
     project: ProjectDto;
@@ -35,6 +36,9 @@ export const BookingSection = ({
     settings: MailSettingDto | null;
     userEmail: string;
     onSaved: () => Promise<void>;
+    /** Nur der Terminbereich: er lädt seine Liste selbst nach, die Seite muss
+        das Projekt nicht neu holen. */
+    onAppointmentChanged: () => void;
     // When set, render only this single leaf without the internal sub-tabs.
     // Used by the workflow navigation, which owns section switching itself.
     leaf?: BookingMode;
@@ -44,7 +48,7 @@ export const BookingSection = ({
     return (
         <div>
             {!leaf && <SubTabs tabs={getBookingSubTabs()} activeTab={mode} onSelectTab={setMode} />}
-            {activeMode === 'schedule' && <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
+            {activeMode === 'schedule' && <AppointmentList project={project} order={order} isPrimary={isPrimary} materials={materials} settings={settings} userEmail={userEmail} onChanged={onAppointmentChanged} />}
             {activeMode === 'mail' && <MailTab project={project} order={order} settings={settings} userEmail={userEmail} />}
             {activeMode === 'signature' && <SignatureRequestTab project={project} order={order} isPrimary={isPrimary} settings={settings} userEmail={userEmail} onSaved={onSaved} />}
         </div>

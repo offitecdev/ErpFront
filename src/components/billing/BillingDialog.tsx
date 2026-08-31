@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Radio from 'antd/es/radio';
 import { toast } from 'sonner';
-import { Button } from '../ui-shared/Button';
-import { Field, Input } from '../ui-shared/Field';
-import { ReportsSheet } from '../../pages/project/features/components/detail/reports/ReportsSheet';
+import { Check } from '../icons/antIconCompat';
+import { PopupButton, PopupDialog, PopupEmpty, PopupField, PopupNote } from '../ui-shared/PopupKit';
 import { billingApi } from '../../lib/api/billing';
 import { formatStageDate, stageStatus } from '../../lib/paymentSchedule';
 import type { BillingSummaryDto, InvoiceBillingType } from '../../types/billing';
@@ -20,6 +18,11 @@ interface BillingDialogProps {
     target: BillingTarget | null;
     onClose: () => void;
     onSuccess?: () => void;
+    /**
+     * Raise the dialog above the popup it was opened from (the project
+     * completion dialog sits at 150). Default keeps the kit's own stacking.
+     */
+    zIndex?: number;
 }
 
 const fmtMoney = (v?: number | null) =>
@@ -29,7 +32,15 @@ const fmtMoney = (v?: number | null) =>
 
 const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onClose, onSuccess }) => {
+/**
+ * Rechnen-Fenster des Abschluss-Ablaufs. Google-clean seit 19.08.2026: es ist
+ * das mittige Auswahlfenster der Anwendung (`PopupDialog`) statt des alten
+ * Bodenblattes, der Wahlstreifen „Voll / Teil" ist ein eigener Segmentstreifen
+ * statt einer AntD-Radiogruppe (im neuen Kleid hat die Bibliothek nichts zu
+ * suchen), und das Prozentfeld wird — wie jedes Feld des Moduls — von ganz
+ * RECHTS her geschrieben.
+ */
+export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onClose, onSuccess, zIndex }) => {
     const { t } = useTranslation();
     const [summary, setSummary] = useState<BillingSummaryDto | null>(null);
     const [loading, setLoading] = useState(false);
@@ -87,44 +98,49 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
     };
 
     return (
-        <ReportsSheet
+        <PopupDialog
             open={open}
             title={t('billing.title')}
             subtitle={target?.label}
+            width={560}
+            z={zIndex}
             onClose={onClose}
+            closeOnBackdrop={!submitting}
+            bodyClassName="ofi-inv-scope"
             footer={
-                <>
-                    <Button variant="secondary" onClick={onClose} isDisabled={submitting}>{t('common.cancel')}</Button>
-                    <Button
-                        variant="primary"
-                        onClick={submit}
-                        isLoading={submitting}
-                        isDisabled={loading || fullyBilled || partialInvalid || previewAmount <= 0}
-                    >
-                        {t('billing.createInvoice')}
-                    </Button>
-                </>
+                <div className="ofi-tp-actions">
+                    <div className="ofi-tp-actions__start" />
+                    <div className="ofi-tp-actions__end">
+                        <PopupButton onClick={onClose} disabled={submitting}>{t('common.cancel')}</PopupButton>
+                        <PopupButton
+                            variant="primary"
+                            onClick={() => void submit()}
+                            loading={submitting}
+                            disabled={loading || fullyBilled || partialInvalid || previewAmount <= 0}
+                        >
+                            {t('billing.createInvoice')}
+                        </PopupButton>
+                    </div>
+                </div>
             }
         >
-            <div className="mx-auto w-full max-w-5xl px-5 py-6 md:px-8">
             {loading ? (
-                    <div className="py-8 text-center text-sm text-tertiary">{t('common.loading')}</div>
-                ) : (
-                    <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-xs">
-                        <div>
-                            <div className="text-tertiary">{t('billing.totalAmount')}</div>
-                            <div className="mt-0.5 font-semibold text-primary">{fmtMoney(baseAmount)}</div>
+                <PopupEmpty>{t('common.loading')}</PopupEmpty>
+            ) : (
+                <div className="flex flex-col gap-4 pt-1">
+                    {/* Die drei Zahlen des Auftrags: Haarlinie, keine Fläche. */}
+                    <div className="ofi-inv-tiles" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+                        <div className="ofi-inv-tile">
+                            <div className="ofi-inv-tile__label">{t('billing.totalAmount')}</div>
+                            <div className="ofi-inv-tile__value">{fmtMoney(baseAmount)}</div>
                         </div>
-                        <div>
-                            <div className="text-tertiary">{t('billing.billed')}</div>
-                            <div className="mt-0.5 font-semibold text-primary">{fmtMoney(summary?.billedAmount ?? 0)}</div>
-                            <div className="text-[11px] text-tertiary">%{summary?.billedPercent ?? 0}</div>
+                        <div className="ofi-inv-tile">
+                            <div className="ofi-inv-tile__label">{t('billing.billed')} · {summary?.billedPercent ?? 0}%</div>
+                            <div className="ofi-inv-tile__value">{fmtMoney(summary?.billedAmount ?? 0)}</div>
                         </div>
-                        <div>
-                            <div className="text-tertiary">{t('billing.remainingBalance')}</div>
-                            <div className="mt-0.5 font-semibold text-emerald-600">{fmtMoney(summary?.remainingAmount ?? baseAmount)}</div>
-                            <div className="text-[11px] text-emerald-600">%{remainingPercent}</div>
+                        <div className="ofi-inv-tile is-paid">
+                            <div className="ofi-inv-tile__label">{t('billing.remainingBalance')} · {remainingPercent}%</div>
+                            <div className="ofi-inv-tile__value">{fmtMoney(summary?.remainingAmount ?? baseAmount)}</div>
                         </div>
                     </div>
 
@@ -133,7 +149,7 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                         the partial mode. Free percent entry stays available —
                         the schedule guides, it does not lock. */}
                     {target?.type === 'order' && summary?.paymentStages?.length ? (
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="ofi-inv-stages">
                             {summary.paymentStages.map((stage, index) => {
                                 const status = stageStatus(summary.paymentStages!, summary.billedPercent)[index];
                                 const isNext = status === 'next' && !!summary.nextStage;
@@ -150,18 +166,11 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                                             setMode('PARTIAL');
                                             setPercent(summary.nextStage.suggestedPercent);
                                         }}
-                                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold tabular-nums transition-colors ${
-                                            status === 'done'
-                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
-                                                : isNext
-                                                    ? 'cursor-pointer border-[#272f67] bg-[#272f67] text-white hover:bg-[#1f2654]'
-                                                    : 'border-slate-200 bg-slate-50 text-slate-400'
-                                        }`}
+                                        className={`ofi-inv-stage ${status === 'done' ? 'is-done' : isNext ? 'is-next' : ''}`}
                                     >
-                                        {status === 'done' ? '✓ ' : ''}{t('billing.stageOf', { n: index + 1, total: summary.paymentStages!.length })} · {stage.percent}%
-                                        {stage.date && (
-                                            <span className="font-normal opacity-70">{formatStageDate(stage.date)}</span>
-                                        )}
+                                        {status === 'done' && <Check size={11} strokeWidth={3} />}
+                                        {t('billing.stageOf', { n: index + 1, total: summary.paymentStages!.length })} · {stage.percent}%
+                                        {stage.date && <span className="ofi-inv-stage__when">{formatStageDate(stage.date)}</span>}
                                     </button>
                                 );
                             })}
@@ -169,49 +178,59 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                     ) : null}
 
                     {fullyBilled ? (
-                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                            {t('billing.fullyBilled')}
-                        </div>
+                        <PopupNote tone="warning">{t('billing.fullyBilled')}</PopupNote>
                     ) : (
                         <>
-                            <Radio.Group
-                                value={mode}
-                                onChange={(e) => setMode(e.target.value)}
-                                className="flex flex-col gap-2"
-                            >
-                                <Radio value="FULL">
+                            {/* Voll oder Teil — zwei Möglichkeiten, eine Zeile. */}
+                            <div className="ofi-inv-seg">
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('FULL')}
+                                    className={`ofi-inv-seg__btn ${mode === 'FULL' ? 'is-on' : ''}`}
+                                >
                                     {t('billing.fullMode', { percent: remainingPercent })}
-                                </Radio>
-                                <Radio value="PARTIAL">{t('billing.partialMode')}</Radio>
-                            </Radio.Group>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('PARTIAL')}
+                                    className={`ofi-inv-seg__btn ${mode === 'PARTIAL' ? 'is-on' : ''}`}
+                                >
+                                    {t('billing.partialMode')}
+                                </button>
+                            </div>
 
                             {mode === 'PARTIAL' && (
-                                <Field label={t('billing.percentLabel')} hint={t('billing.maxPercent', { percent: remainingPercent })}>
-                                    <Input
-                                        type="number"
-                                        min={1}
-                                        max={remainingPercent}
-                                        value={String(percent)}
-                                        onChange={(e) => setPercent(Number(e.target.value))}
-                                    />
-                                </Field>
+                                <PopupField label={t('billing.percentLabel')} hint={t('billing.maxPercent', { percent: remainingPercent })}>
+                                    {/* Von ganz rechts geschrieben — wie jedes Feld
+                                        des Rechnungsmoduls. */}
+                                    <span className="ofi-inv-unit block max-w-[160px]">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={remainingPercent}
+                                            value={String(percent)}
+                                            onChange={(e) => setPercent(Number(e.target.value))}
+                                            className="ofi-inv-input"
+                                        />
+                                        <span className="ofi-inv-unit__mark">%</span>
+                                    </span>
+                                </PopupField>
                             )}
 
-                            <div className="rounded-lg border border-[#272f67]/20 bg-[#272f67]/5 px-3 py-2.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-secondary">{t('billing.amountToBill', { percent: effectivePercent })}</span>
-                                    <span className="text-base font-semibold text-[#272f67]">{fmtMoney(previewAmount)}</span>
+                            <div className="ofi-inv-sum">
+                                <div className="ofi-inv-sum__row">
+                                    <span className="ofi-inv-sum__label">{t('billing.amountToBill', { percent: effectivePercent })}</span>
+                                    <span className="ofi-inv-sum__value">{fmtMoney(previewAmount)}</span>
                                 </div>
-                                <div className="mt-1.5 flex items-center justify-between border-t border-[#272f67]/10 pt-1.5 text-[12px]">
-                                    <span className="text-tertiary">{t('billing.afterInvoice', { percent: afterBilledPercent })}</span>
-                                    <span className="font-semibold text-amber-600">{t('billing.remainingBalance')}: {fmtMoney(afterRemainingAmount)}</span>
+                                <div className="ofi-inv-sum__row">
+                                    <span className="ofi-inv-sum__label">{t('billing.afterInvoice', { percent: afterBilledPercent })}</span>
+                                    <span className="ofi-inv-sum__value">{t('billing.remainingBalance')}: {fmtMoney(afterRemainingAmount)}</span>
                                 </div>
                             </div>
                         </>
                     )}
-                    </div>
-                )}
-            </div>
-        </ReportsSheet>
+                </div>
+            )}
+        </PopupDialog>
     );
 };

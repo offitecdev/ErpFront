@@ -437,7 +437,7 @@ export const CustomerOrdersTable = ({
                     </colgroup>
                     <thead>
                         <tr>
-                            <SortableTh label={i18nT('crm.orderNumber')} sortKey="orderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('orderNumber', 'right')} />
+                            <SortableTh label={i18nT('crm.orderNumber')} sortKey="orderNumber" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" {...grid.resizeProps('orderNumber')} />
                             <SortableTh label={i18nT('nav.projects')} sortKey="project" activeKey={sortBy} direction={sortDirection} onSort={toggleSort} className="text-left" />
                             <th className="relative text-right">
                                 {i18nT('crm.orderCount')}
@@ -506,7 +506,7 @@ export const CustomerOrdersTable = ({
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => navigate(`/crm/my-orders/${parent.id}`)}
+                                                onClick={() => navigate(`/sales/orders/${parent.id}`)}
                                                 className="truncate text-left hover:underline"
                                             >
                                                 {parent.orderNumber}

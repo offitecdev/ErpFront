@@ -12,7 +12,7 @@ import {
 } from '@/lib/paymentSchedule';
 // The quote's own calendar rather than `<input type="date">`: the native control
 // cannot be themed and renders in the OS language (see QuoteDatePicker).
-import { QuoteDatePicker } from '@/pages/tender/detail/components/common/QuoteDatePicker';
+import { QuoteDatePicker } from '@/pages/sales/detail/components/common/QuoteDatePicker';
 
 type PaymentScheduleEditorProps = {
     stages: PaymentStage[];
@@ -25,6 +25,12 @@ type PaymentScheduleEditorProps = {
     billedPercent?: number | null;
     /** Suppresses the empty-state hint paragraph (order page: no extra text). */
     hideEmptyHint?: boolean;
+    /**
+     * Fälligkeiten gehören zum AUFTRAG, nicht zur Offerte (Vorgabe 15.08.2026).
+     * Die Offerte setzt `false`: keine Datumsspalte, und der Plan gilt allein
+     * über die Prozente als gültig.
+     */
+    showDates?: boolean;
 };
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -36,10 +42,11 @@ const parsePercentInput = (raw: string): number => {
 };
 
 // Row list editing a payment schedule (30/20/10/40, 50/50, …). Every instalment
-// carries its percentage AND the day it falls due; both are required before the
-// plan counts as valid. Purely presentational + local math: the parent owns the
-// stage array and decides when/where it is persisted. Amounts are a live preview
-// against the current gross total, never stored.
+// carries its percentage and — where `showDates` is on (the order) — the day it
+// falls due; both are then required before the plan counts as valid. Purely
+// presentational + local math: the parent owns the stage array and decides
+// when/where it is persisted. Amounts are a live preview against the current
+// gross total, never stored.
 export const PaymentScheduleEditor = ({
     stages,
     onChange,
@@ -48,10 +55,11 @@ export const PaymentScheduleEditor = ({
     formatMoney,
     billedPercent,
     hideEmptyHint = false,
+    showDates = true,
 }: PaymentScheduleEditorProps) => {
     const sum = paymentStagesSum(stages);
-    const valid = paymentStagesValid(stages);
-    const missingDate = paymentStagesMissingDate(stages);
+    const valid = paymentStagesValid(stages, { requireDates: showDates });
+    const missingDate = showDates && paymentStagesMissingDate(stages);
     const statuses = billedPercent != null && stages.length > 0 ? stageStatus(stages, billedPercent) : null;
 
     const patchStage = (index: number, patch: Partial<PaymentStage>) => {
@@ -136,9 +144,11 @@ export const PaymentScheduleEditor = ({
                                         <span className="text-[12px] text-slate-500 dark:text-white/60">%</span>
                                     </span>
                                 )}
-                                {/* Fälligkeit der Rate — Pflichtfeld: ohne Datum
-                                    bleibt der Plan ungültig und wird nicht gespeichert. */}
-                                {readOnly ? (
+                                {/* Fälligkeit der Rate — nur am Auftrag, dort
+                                    Pflichtfeld: ohne Datum bleibt der Plan
+                                    ungültig und wird nicht gespeichert. Die
+                                    Offerte legt nur die Prozente fest. */}
+                                {!showDates ? null : readOnly ? (
                                     <span className="w-[104px] shrink-0 text-[12px] tabular-nums text-slate-600 dark:text-white/70">
                                         {formatStageDate(stage.date) || '—'}
                                     </span>

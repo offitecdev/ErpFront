@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { ClockRewind, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
 import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from '@/components/ui-shared/TableKit';
+import { SignaturePad } from '@/components/ui-shared/SignaturePad';
+import { PopupDialog, PopupEmpty } from '@/components/ui-shared/PopupKit';
+import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
@@ -24,21 +27,23 @@ import { operationItems as reportOperationItems } from '../../../installations/u
 // table (`data-inv-table` inside a `SectionCard`).
 const cellInput = CELL_INPUT_CLASS;
 
-const RowPlusButton = ({ onClick, label }: { onClick: () => void; label: string }) => (
+const AddOperationButton = ({ onClick, label }: { onClick: () => void; label: string }) => (
     <button
         type="button"
         onClick={onClick}
         title={label}
         aria-label={label}
-        className="ofi-rs-iconbtn inline-flex size-6 items-center justify-center rounded-[2px] border transition-colors"
+        className="inline-flex size-9 items-center justify-center rounded-full text-[#1f2654] transition-colors hover:bg-[#eef2fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2654]/30 dark:text-amber-300 dark:hover:bg-white/10"
     >
-        <Plus size={13} />
+        <Plus size={20} />
     </button>
 );
 
 /**
  * Satır silme — ayrı bir "Seçenekler" sütunu YOKTUR (kullanıcı isteği), çarpı
- * son hücrenin sağ ucunda küçük ve sessiz durur.
+ * satırın METİN hücresinin (Bezeichnung) sağ ucunda küçük ve sessiz durur.
+ * Tutar hücresine KOYULMAZ: orada sayıyı sola itip Betrag sütununun sağ
+ * kenarında boşluk bırakıyordu (kullanıcı isteği 20.08.2026).
  */
 const RowRemoveButton = ({ onClick, label, disabled }: { onClick: () => void; label: string; disabled?: boolean }) => (
     <button
@@ -91,6 +96,10 @@ export type FieldReportPayload = {
     expenses?: Array<{ id?: string; expenseType: string; amount: number }>;
     extraMaterials?: Array<{ id?: string; materialId: string; quantity: number }>;
     usedMaterials?: Array<{ id?: string; materialId: string; quantity: number }>;
+    /** Nur mitgeschickt, wenn sich die Technikerunterschrift geändert hat. */
+    technicianSignature?: string | null;
+    /** Direkte Kundenunterschrift aus demselben Rapport-Editor. */
+    customerSignature?: string | null;
 };
 
 /** Kaydet/kapat akışını üst bileşene açan tutamaç (popup kapanırken otokayıt). */
@@ -126,6 +135,7 @@ export const FieldReportEditorView = ({
     images,
     setImages,
     disabled = false,
+    canSign = false,
     showLogs = false,
     onSaved,
     onPreviewPdf,
@@ -144,6 +154,13 @@ export const FieldReportEditorView = ({
     images?: string[];
     setImages?: (images: string[]) => void;
     disabled?: boolean;
+    /**
+     * Nur die TECHNIKERFLÄCHE (/montage) darf die Technikerunterschrift
+     * abnehmen. Der Projektleiter unterschreibt NIE — weder für den Techniker
+     * noch für den Kunden (Vorgabe 19.08.2026): der Techniker signiert auf
+     * seinem eigenen Gerät, der Kunde dort oder über die Signaturanfrage.
+     */
+    canSign?: boolean;
     /** Projektleiter-Ansicht: Protokoll-Knopf (wer hat wann gespeichert). */
     showLogs?: boolean;
     onSaved: () => Promise<void> | void;
@@ -177,6 +194,12 @@ export const FieldReportEditorView = ({
         return items.length ? items : [''];
     });
     const [technicalNotes, setTechnicalNotes] = useState(report?.technicalNotes || '');
+    /* Zweite Unterschrift des Rapports: der Techniker selbst. Sie reist mit dem
+       normalen Speichern (siehe `collect`), nicht über einen eigenen Knopf. */
+    const [technicianSignature, setTechnicianSignature] = useState<string | null>(report?.technicianSignature || null);
+    const savedTechnicianSignature = useRef<string | null>(report?.technicianSignature || null);
+    const [customerSignature, setCustomerSignature] = useState<string | null>(report?.customerSignature || null);
+    const savedCustomerSignature = useRef<string | null>(report?.customerSignature || null);
     // Base64 fotoğrafları her kayıtta tekrar POST etmek hem gövdeyi büyütüyor hem
     // de sunucuda gereksiz delete/create yaptırıyordu. Küçük bir parmak iziyle
     // yalnızca gerçekten değişen görsel setini gönder.
@@ -245,16 +268,6 @@ export const FieldReportEditorView = ({
     const rowKeyRef = useRef(0);
     const nextRowKey = () => { rowKeyRef.current += 1; return `n${rowKeyRef.current}`; };
 
-    // Son satır HER ZAMAN boş bir giriş satırıdır (düğme yok, doğrudan yazılır).
-    useEffect(() => {
-        if (disabled) return;
-        setRows((current) => {
-            const last = current[current.length - 1];
-            if (last && !rowHasContent(last) && !last.id) return current;
-            return [...current, { key: nextRowKey(), kind: 'expense', text: '', quantity: 1, amount: 0, unitPrice: 0 }];
-        });
-    }, [rows, disabled]);
-
     /** Kaynaklar tablosunun sütunları sürüklenerek genişletilir/daraltılır. */
     const resourceGrid = useColumnWidths({
         storageKey: 'offitec:field-report-resources:col-widths:v1',
@@ -301,13 +314,28 @@ export const FieldReportEditorView = ({
     const overtimeMin = Math.max(0, Math.ceil(workedMin - plannedMin * (1 + tolerance / 100)));
     const overtimeCost = (overtimeMin / 60) * (Number(project?.overtimeHourlyRate) || 0);
 
-    const insertOperation = (index: number) =>
-        setOperations((current) => [...current.slice(0, index + 1), '', ...current.slice(index + 1)]);
+    const operationRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+    const addOperation = () => {
+        const nextIndex = operations.length;
+        setOperations((current) => [...current, '']);
+        window.requestAnimationFrame(() => operationRefs.current[nextIndex]?.focus());
+    };
 
     const patchRow = (key: string, patch: Partial<ResourceRow>) =>
         setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
 
     const dropRow = (key: string) => setRows((current) => current.filter((row) => row.key !== key));
+    const [focusedResourceKey, setFocusedResourceKey] = useState<string | null>(null);
+    const addResourceRow = () => {
+        const existingBlank = rows.find((row) => !row.id && !rowHasContent(row));
+        if (existingBlank) {
+            setFocusedResourceKey(existingBlank.key);
+            return;
+        }
+        const key = nextRowKey();
+        setRows((current) => [...current, { key, kind: 'expense', text: '', quantity: 1, amount: 0, unitPrice: 0 }]);
+        setFocusedResourceKey(key);
+    };
 
     // ── Değişiklik takibi: Kaydet simgesi yalnızca gerçek bir değişiklikte
     // aktifleşir; popup değişiklikle kapatılırsa otokayıt devreye girer. ──
@@ -317,6 +345,8 @@ export const FieldReportEditorView = ({
         operations: operations.map((item) => item.trim()),
         technicalNotes: technicalNotes.trim(),
         images: imageFingerprint(images),
+        signature: technicianSignature ? `${technicianSignature.length}:${technicianSignature.slice(-48)}` : '',
+        customerSignature: customerSignature ? `${customerSignature.length}:${customerSignature.slice(-48)}` : '',
         rows: rowsArg.filter(rowHasContent).map((row) => [row.id || '', row.kind, row.text.trim(), row.materialId || '', row.quantity, row.amount]),
     });
     const [baseline, setBaseline] = useState<string | null>(null);
@@ -350,6 +380,8 @@ export const FieldReportEditorView = ({
             operationsDoneItems: cleanOperations,
             technicalNotes: technicalNotes.trim(),
             ...(imageFingerprint(images) !== savedImagesFingerprint.current ? { images: images || [] } : {}),
+            ...(technicianSignature !== savedTechnicianSignature.current ? { technicianSignature } : {}),
+            ...(customerSignature !== savedCustomerSignature.current ? { customerSignature } : {}),
             ...(resourceFingerprint(rows, 'expense') !== savedResourceFingerprints.current.expense ? { expenses: expenseRows } : {}),
             ...(resourceFingerprint(rows, 'extra') !== savedResourceFingerprints.current.extra ? { extraMaterials: extraRows } : {}),
             ...(resourceFingerprint(rows, 'used') !== savedResourceFingerprints.current.used ? { usedMaterials: usedRows } : {}),
@@ -366,6 +398,8 @@ export const FieldReportEditorView = ({
             const res = await projectApi.saveFieldReport(appointment.id, payload);
             if (res.report) setSavedReport(res.report);
             savedImagesFingerprint.current = imageFingerprint(images);
+            savedTechnicianSignature.current = technicianSignature;
+            savedCustomerSignature.current = customerSignature;
             // Sunucu durumu benimsenir: yeni satırlar artık id taşır, bir sonraki
             // kayıt kopya oluşturmak yerine günceller.
             const nextRows = buildRows(res.expenses || [], res.extraMaterials || [], res.report?.usedMaterials || []);
@@ -465,7 +499,11 @@ export const FieldReportEditorView = ({
     };
 
     return (
-        <div className="space-y-4">
+        /* `ofi-fr-editor`: bütün ızgaralar TEK yüzey gibi okunur — yazılabilen
+           hücre ile hesaplanan hücre aynı yüksekliği ve aynı hizayı taşır
+           (kullanıcı: "tablonun bir kısmı boş bir kısmı dolu"). Kutu yalnızca
+           odakta/üzerine gelindiğinde belirir; bkz. index.css `.ofi-fr-*`. */
+        <div className="ofi-fr-editor space-y-4">
             {/* Auftrag-Details als EINE Tabelle (Benutzerwunsch) — nur bei
                 laufenden Terminen; abgeschlossene zeigen sie nicht mehr. */}
             {!completed && (
@@ -527,48 +565,44 @@ export const FieldReportEditorView = ({
                 </table>
             </SectionTable>
 
-            {/* Work performed: one row per item, each row ending with "+". */}
-            <SectionTable title={t('projects.yapilan_isler')} collapsible>
-                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
-                    <thead>
-                        <tr>
-                            <th className="w-10 text-left">#</th>
-                            <th className="text-left">{t('projects.yapilan_is')}</th>
-                            <th className="w-20 text-right" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {operations.map((item, index) => (
-                            <tr key={index}>
-                                <td className="tabular-nums text-slate-400 dark:text-white/50">{index + 1}</td>
-                                <td>
-                                    <input
-                                        className={cellInput}
-                                        value={item}
-                                        disabled={disabled}
-                                        placeholder={t('projects.yapilan_is')}
-                                        onChange={(e) => setOperations(operations.map((row, i) => (i === index ? e.target.value : row)))}
-                                    />
-                                </td>
-                                <td>
-                                    <div className="flex items-center justify-end gap-1">
-                                        <button
-                                            type="button"
-                                            title={t('common.delete')}
-                                            aria-label={t('common.delete')}
-                                            disabled={disabled || operations.length === 1}
-                                            onClick={() => setOperations(operations.filter((_, i) => i !== index))}
-                                            className="inline-flex size-6 items-center justify-center rounded-[2px] text-slate-300 transition-colors hover:text-rose-600 disabled:opacity-30"
-                                        >
-                                            <Trash2 size={13} />
-                                        </button>
-                                        {!disabled && <RowPlusButton label={t('projects.madde')} onClick={() => insertOperation(index)} />}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            {/* Genau EIN Plus am Listenende. Eine neue, grössere Eingabe erscheint
+                sofort; Tabellen-Haarlinien unter leeren Zeilen gibt es nicht. */}
+            <SectionTable
+                title={t('projects.yapilan_isler')}
+            >
+                <div className="space-y-2.5 bg-white px-4 py-4 dark:bg-transparent">
+                    {operations.map((item, index) => (
+                        <div key={index} className="flex items-start gap-3">
+                            <span className="mt-3.5 w-5 shrink-0 text-right text-[12px] font-semibold tabular-nums text-slate-400 dark:text-white/45">{index + 1}.</span>
+                            <textarea
+                                ref={(node) => { operationRefs.current[index] = node; }}
+                                rows={2}
+                                className="min-h-[52px] flex-1 resize-y rounded-lg border border-slate-200 bg-slate-50/45 px-3.5 py-3 text-[14px] leading-5 text-slate-800 outline-none transition focus:border-[#1f2654]/45 focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10 dark:border-white/15 dark:bg-white/[0.04] dark:text-white dark:focus:border-amber-400/50 dark:focus:bg-white/[0.06]"
+                                value={item}
+                                disabled={disabled}
+                                aria-label={t('projects.yapilan_is')}
+                                onChange={(e) => setOperations(operations.map((row, i) => (i === index ? e.target.value : row)))}
+                            />
+                            {!disabled && (
+                                <button
+                                    type="button"
+                                    title={t('common.delete')}
+                                    aria-label={t('common.delete')}
+                                    disabled={operations.length === 1}
+                                    onClick={() => setOperations(operations.filter((_, i) => i !== index))}
+                                    className="mt-2.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-25 dark:hover:bg-rose-500/10"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                    {!disabled && (
+                        <div className="flex justify-end pt-1">
+                            <AddOperationButton label={t('projects.madde')} onClick={addOperation} />
+                        </div>
+                    )}
+                </div>
             </SectionTable>
 
             {/* Technical notes stay a free-text block below the work grid. */}
@@ -582,6 +616,37 @@ export const FieldReportEditorView = ({
                 />
             </SectionTable>
 
+            {/* Unterschriften: der Techniker unterschreibt AUF SEINEM EIGENEN
+                GERÄT (/montage), die Kundensignatur kommt von dort oder über
+                die Signaturanfrage. Der Projektleiter sieht beide nur — er
+                unterschreibt für niemanden (Vorgabe 19.08.2026). Beide
+                erscheinen so auch auf dem PDF. */}
+            <SectionTable title={t('signatures.section')} collapsible>
+                <div className="space-y-3 px-4 py-3">
+                    {!canSign && <div className="ofi-tp-note">{t('signatures.readOnlyNote')}</div>}
+                    <div className="ofi-sign-grid">
+                        <SignaturePad
+                            label={t('projects.field.pdf.technicianRole')}
+                            value={technicianSignature}
+                            onChange={setTechnicianSignature}
+                            caption={effectiveReport?.technicianSignedAt
+                                ? dayjs(effectiveReport.technicianSignedAt).format('DD.MM.YYYY HH:mm')
+                                : t('projects.delivery.technicianSignatureHint')}
+                            readOnly={disabled || !canSign}
+                        />
+                        <SignaturePad
+                            label={t('projects.field.pdf.customerRole')}
+                            value={customerSignature}
+                            onChange={setCustomerSignature}
+                            caption={effectiveReport?.signedAt
+                                ? dayjs(effectiveReport.signedAt).format('DD.MM.YYYY HH:mm')
+                                : t('signatures.notSignedYet')}
+                            readOnly={disabled || !canSign}
+                        />
+                    </div>
+                </div>
+            </SectionTable>
+
             {/* Rapor fotoğrafları — yalnızca fotoğraf durumu yönetilen yüzeyde
                 (montaj) görünür; kayıtla birlikte gider. */}
             {images !== undefined && setImages && (
@@ -591,15 +656,12 @@ export const FieldReportEditorView = ({
                     </div>
                 </SectionTable>
             )}
+
             </>)}
 
             {tab === 'expenses' && (<>
-            {/* TEK, DÜZ tablo (kullanıcı isteği): "Verwendete Materialien" /
-                "Externe Kosten" / "Zusatzmaterialien" DÜĞMELERİ KALDIRILDI.
-                Son satır her zaman boş bir giriş satırıdır: yazılan metin
-                malzeme kataloğuna uyarsa Zusatzmaterial, uymuyorsa Externe
-                Kosten olur. Kayıtlı satırlar da listede ve düzenlenebilir —
-                kaydetme sunucudaki durumu bu listeyle değiştirir. */}
+            {/* Tek, düz kaynak tablosu. Boş giriş satırı sürekli görünmez:
+                sağ alttaki tek + anında yeni satırı açar ve odaklar. */}
             <SectionTable title={t('projects.reportsHub.resources')} collapsible>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <colgroup>
@@ -609,11 +671,11 @@ export const FieldReportEditorView = ({
                         <tr>
                             <th className="relative text-left">
                                 {t('common.type')}
-                                <ColResizeHandle {...resourceGrid.resizeProps('type', 'right')} />
+                                <ColResizeHandle {...resourceGrid.resizeProps('type')} />
                             </th>
                             <th className="relative text-left">
                                 {t('projects.reportsHub.colItem')}
-                                <ColResizeHandle {...resourceGrid.resizeProps('item', 'right')} />
+                                <ColResizeHandle {...resourceGrid.resizeProps('item')} />
                             </th>
                             <th className="relative text-right">
                                 {t('projects.adet')}
@@ -640,29 +702,44 @@ export const FieldReportEditorView = ({
                                     : 0;
                             return (
                                 <tr key={row.key}>
-                                    <td className="text-[12px] text-slate-500 dark:text-white/60">{typeLabel(row)}</td>
+                                    <td><span className="ofi-fr-cell is-muted text-[12px]">{typeLabel(row)}</span></td>
                                     <td>
-                                        {row.kind === 'expense' && !disabled ? (
-                                            <MaterialSuggestCell
-                                                value={row.text}
-                                                materials={materials}
-                                                placeholder={isEntry ? t('projects.reportsHub.entryPlaceholder') : t('auto.harici_giderler')}
-                                                onText={(text) => patchRow(row.key, { text })}
-                                                onPick={(material) => patchRow(row.key, {
-                                                    kind: 'extra',
-                                                    materialId: material.id,
-                                                    text: material.name,
-                                                    quantity: row.quantity > 0 ? row.quantity : 1,
-                                                    unitPrice: Number(material.unitCost) || 0,
-                                                })}
-                                            />
-                                        ) : (
-                                            <span className={`truncate ${row.kind === 'expense' ? 'text-slate-700 dark:text-white/80' : 'font-medium text-slate-800 dark:text-white'}`}>{row.text}</span>
-                                        )}
+                                        {/* Silme çarpısı BEZEICHNUNG hücresinin sağ ucunda durur (teklif
+                                            satırlarındaki gibi). Tutarın yanında dururken sayıyı sola itiyor,
+                                            sütunun sağ kenarında bir boşluk bırakıyordu (kullanıcı isteği
+                                            20.08.2026): artık her satırın tutarı aynı kenarda biter. */}
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="min-w-0 flex-1">
+                                                {row.kind !== 'used' && !disabled ? (
+                                                    <MaterialSuggestCell
+                                                        value={row.text}
+                                                        materials={materials}
+                                                        placeholder={isEntry ? t('projects.reportsHub.entryPlaceholder') : t('auto.harici_giderler')}
+                                                        autoFocus={focusedResourceKey === row.key}
+                                                        onFocused={() => setFocusedResourceKey(null)}
+                                                        onText={(text) => patchRow(row.key, row.kind === 'extra'
+                                                            ? { text, kind: 'expense', materialId: undefined, unitPrice: 0, quantity: 1 }
+                                                            : { text })}
+                                                        onPick={(material) => patchRow(row.key, {
+                                                            kind: 'extra',
+                                                            materialId: material.id,
+                                                            text: material.name,
+                                                            quantity: row.quantity > 0 ? row.quantity : 1,
+                                                            unitPrice: Number(material.unitCost) || 0,
+                                                        })}
+                                                    />
+                                                ) : (
+                                                    <span className={`ofi-fr-cell truncate ${row.kind === 'expense' ? '' : 'font-medium'}`}>{row.text}</span>
+                                                )}
+                                            </div>
+                                            {!disabled && (
+                                                <RowRemoveButton label={t('common.delete')} onClick={() => dropRow(row.key)} />
+                                            )}
+                                        </div>
                                     </td>
                                     <td>
                                         {row.kind === 'expense'
-                                            ? <div className="text-right text-slate-400 dark:text-white/40">—</div>
+                                            ? <span className="ofi-fr-cell is-right is-faint">—</span>
                                             : (
                                                 <input
                                                     type="number"
@@ -676,29 +753,29 @@ export const FieldReportEditorView = ({
                                             )}
                                     </td>
                                     <td>
-                                        <div className="flex items-center gap-1.5">
-                                            {row.kind === 'expense' && !disabled ? (
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    step="0.01"
-                                                    className={`${cellInput} text-right font-mono`}
-                                                    value={row.amount}
-                                                    onChange={(e) => patchRow(row.key, { amount: Number(e.target.value) })}
-                                                />
-                                            ) : (
-                                                <div className="flex-1 text-right font-mono text-[13px] text-slate-700 dark:text-white/80">{money(rowAmount)}</div>
-                                            )}
-                                            {!disabled && !isEntry && (
-                                                <RowRemoveButton label={t('common.delete')} onClick={() => dropRow(row.key)} />
-                                            )}
-                                        </div>
+                                        {row.kind === 'expense' && !disabled ? (
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                className={`${cellInput} text-right font-mono`}
+                                                value={row.amount}
+                                                onChange={(e) => patchRow(row.key, { amount: Number(e.target.value) })}
+                                            />
+                                        ) : (
+                                            <span className="ofi-fr-cell is-right is-num font-mono">{money(rowAmount)}</span>
+                                        )}
                                     </td>
                                 </tr>
                             );
                         })}
                     </tbody>
                 </table>
+                {!disabled && (
+                    <div className="flex justify-end bg-white px-4 py-3 dark:bg-transparent">
+                        <AddOperationButton label={t('projects.reportsHub.entryPlaceholder')} onClick={addResourceRow} />
+                    </div>
+                )}
             </SectionTable>
             </>)}
 
@@ -712,56 +789,35 @@ export const FieldReportEditorView = ({
 
             </div>
 
-            {/* Protokoll: wer hat den Rapport wann gespeichert (dedizierter Knopf). */}
-            {logsOpen && createPortal(
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-                    <button
-                        type="button"
-                        aria-label={t('common.close')}
-                        onClick={() => setLogsOpen(false)}
-                        className="absolute inset-0 cursor-default border-0 bg-black/30 p-0"
-                    />
-                    <div className="relative flex max-h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-white/15 dark:bg-[#17191c]">
-                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
-                            <span className="text-[13.5px] font-bold text-slate-900 dark:text-white">{t('projects.reportsHub.logs')}</span>
-                            <button
-                                type="button"
-                                aria-label={t('common.close')}
-                                onClick={() => setLogsOpen(false)}
-                                className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-                            {logs === null && <div className="py-6 text-center text-[12.5px] text-slate-400">{t('common.loading')}</div>}
-                            {logs !== null && logs.length === 0 && (
-                                <div className="py-6 text-center text-[12.5px] text-slate-400">{t('projects.reportsHub.logsEmpty')}</div>
-                            )}
-                            {logs !== null && logs.length > 0 && (
-                                <ul className="divide-y divide-slate-100 dark:divide-white/10">
-                                    {logs.map((log: any) => (
-                                        <li key={log.id} className="flex items-baseline justify-between gap-3 py-2">
-                                            <div className="min-w-0">
-                                                <div className="truncate text-[13px] font-semibold text-slate-800 dark:text-white">
-                                                    {log.employee ? `${log.employee.firstName} ${log.employee.lastName}` : '—'}
-                                                </div>
-                                                <div className="text-[11.5px] text-slate-500 dark:text-white/55">
-                                                    {t(LOG_ACTION_KEYS[log.action] || 'projects.reportsHub.logSaved')}
-                                                </div>
-                                            </div>
-                                            <span className="shrink-0 font-mono text-[12px] tabular-nums text-slate-500 dark:text-white/60">
-                                                {dayjs(log.createdAt).format('DD.MM.YYYY HH:mm')}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
+            {/* Protokoll — a small read-only dialog of the app popup kit; it
+                opens ABOVE the reports sheet, hence the raised z. */}
+            <PopupDialog
+                open={logsOpen}
+                onClose={() => setLogsOpen(false)}
+                title={t('projects.reportsHub.logs')}
+                width={440}
+                z={750}
+            >
+                {logs === null && <PopupEmpty>{t('common.loading')}</PopupEmpty>}
+                {logs !== null && logs.length === 0 && <PopupEmpty>{t('projects.reportsHub.logsEmpty')}</PopupEmpty>}
+                {logs !== null && logs.length > 0 && (
+                    <div className="ofi-tp-list ofi-tp-list--scroll">
+                        {logs.map((log: any) => (
+                            <div key={log.id} className="ofi-tp-row">
+                                <span className="ofi-tp-row__main">
+                                    <span className="ofi-tp-row__title">
+                                        {log.employee ? `${log.employee.firstName} ${log.employee.lastName}` : '—'}
+                                    </span>
+                                    <span className="ofi-tp-row__meta">
+                                        {t(LOG_ACTION_KEYS[log.action] || 'projects.reportsHub.logSaved')}
+                                    </span>
+                                </span>
+                                <span className="ofi-tp-num">{dayjs(log.createdAt).format('DD.MM.YYYY HH:mm')}</span>
+                            </div>
+                        ))}
                     </div>
-                </div>,
-                document.body,
-            )}
+                )}
+            </PopupDialog>
         </div>
     );
 };
@@ -775,43 +831,57 @@ const MaterialSuggestCell = ({
     value,
     materials,
     placeholder,
+    autoFocus,
+    onFocused,
     onText,
     onPick,
 }: {
     value: string;
     materials: ProjectMaterial[];
     placeholder: string;
+    autoFocus?: boolean;
+    onFocused?: () => void;
     onText: (text: string) => void;
     onPick: (material: ProjectMaterial) => void;
 }) => {
-    const [focused, setFocused] = useState(false);
+    const [anchorEl, setAnchorEl] = useState<HTMLInputElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    useEffect(() => {
+        if (autoFocus) inputRef.current?.focus();
+    }, [autoFocus]);
     const query = value.trim().toLowerCase();
     const matches = query
         ? materials
             .filter((m) => m.name.toLowerCase().includes(query) || (m.serialId || '').toLowerCase().includes(query))
             .slice(0, 8)
         : [];
-    const open = focused && matches.length > 0;
+    const open = Boolean(anchorEl && matches.length > 0);
     return (
-        <div className="relative">
+        <div>
             <input
-                className={`${CELL_INPUT_CLASS} w-full`}
+                ref={inputRef}
+                autoFocus={autoFocus}
+                className="min-h-11 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-[13.5px] text-slate-800 outline-none transition-colors placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-[#1f2654]/35 focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10 dark:text-white dark:placeholder:text-white/25 dark:hover:border-white/15 dark:hover:bg-white/5 dark:focus:border-amber-400/40 dark:focus:bg-white/5"
                 value={value}
                 placeholder={placeholder}
                 aria-label={placeholder}
                 onChange={(e) => onText(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
+                onFocus={(event) => { setAnchorEl(event.currentTarget); onFocused?.(); }}
             />
-            {open && (
-                <ul className="absolute left-0 right-0 top-full z-30 mt-0.5 max-h-56 overflow-y-auto rounded-[3px] border border-slate-200 bg-white py-1 shadow-lg dark:border-white/15 dark:bg-[#1d2024]">
+            <AnchoredPicker
+                anchorEl={open ? anchorEl : null}
+                onClose={() => setAnchorEl(null)}
+                width={380}
+                maxHeight={320}
+                panelClassName="shadow-[0_12px_36px_rgba(15,23,42,0.18)]"
+            >
+                <ul className="space-y-1 overflow-y-auto p-2">
                     {matches.map((material) => (
                         <li key={material.id}>
                             <button
                                 type="button"
-                                // onMouseDown, blur'dan ÖNCE çalışır — öneri kaybolmadan seçilir.
-                                onMouseDown={(event) => { event.preventDefault(); onPick(material); }}
-                                className="flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[12.5px] transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                                onClick={() => { onPick(material); setAnchorEl(null); }}
+                                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors hover:bg-[#eef2fb] focus:bg-[#eef2fb] focus:outline-none dark:hover:bg-white/10 dark:focus:bg-white/10"
                             >
                                 <span className="truncate font-medium text-slate-800 dark:text-white">{material.name}</span>
                                 <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-slate-400">
@@ -822,7 +892,7 @@ const MaterialSuggestCell = ({
                         </li>
                     ))}
                 </ul>
-            )}
+            </AnchoredPicker>
         </div>
     );
 };

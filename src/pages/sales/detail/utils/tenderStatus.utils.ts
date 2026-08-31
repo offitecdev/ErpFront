@@ -21,13 +21,40 @@ export const formatTenderFormatLabel = (format?: TenderFormat | string | null) =
  * schlanken Listenzeile (`fields=list`), die kein `status` mitschickt. Deshalb
  * funktionieren die Helfer in der Angebotsliste UND im Kundenreiter.
  */
-type TenderStateSource = { projectId?: string | null; sourceStatus?: string | null };
+type TenderStateSource = {
+    projectId?: string | null;
+    sourceStatus?: string | null;
+    validUntil?: string | Date | null;
+    offerAcceptedAt?: string | Date | null;
+};
 
 export const isOrderTender = (tender: TenderStateSource) =>
     Boolean(tender.projectId) || isSourceSalesOrder(tender.sourceStatus);
 
-export const tenderStatusLabel = (tender: TenderStateSource) =>
-    isOrderTender(tender) ? t('crm.tenders.statusOrdered') : t('crm.tenders.statusDraft');
+/**
+ * "Abgelaufen" (Vorgabe 15.08.2026): ein Entwurf, dessen "gültig bis" vor
+ * heute liegt (der letzte Gültigkeitstag zählt noch) und der weder angenommen
+ * noch bestellt wurde. Der Hintergrunddienst räumt dazu die Erinnerungen weg;
+ * die Liste und die Detailansicht zeigen den Zustand als Status.
+ */
+export const isExpiredTender = (tender: TenderStateSource): boolean => {
+    if (isOrderTender(tender) || tender.offerAcceptedAt || !tender.validUntil) return false;
+    const validUntil = new Date(tender.validUntil);
+    if (Number.isNaN(validUntil.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    validUntil.setHours(0, 0, 0, 0);
+    return validUntil < today;
+};
 
-export const tenderStatusVariant = (tender: TenderStateSource): 'passive' | 'order' =>
-    isOrderTender(tender) ? 'order' : 'passive';
+export const tenderStatusLabel = (tender: TenderStateSource) => {
+    if (isOrderTender(tender)) return t('crm.tenders.statusOrdered');
+    if (isExpiredTender(tender)) return t('crm.tenders.statusExpired');
+    return t('crm.tenders.statusDraft');
+};
+
+export const tenderStatusVariant = (tender: TenderStateSource): 'passive' | 'order' | 'danger' => {
+    if (isOrderTender(tender)) return 'order';
+    if (isExpiredTender(tender)) return 'danger';
+    return 'passive';
+};

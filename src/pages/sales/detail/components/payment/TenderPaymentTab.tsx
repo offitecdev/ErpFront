@@ -6,6 +6,7 @@ import {
     parsePaymentStages,
     paymentStagesValid,
     serializePaymentStages,
+    stripStageDates,
     type PaymentStage,
 } from '@/lib/paymentSchedule';
 import type { TenderListItem } from '@/types/tender';
@@ -20,26 +21,30 @@ type TenderPaymentTabProps = {
     onMetaChange: (patch: { paymentStages: string | null }) => void;
 };
 
-// Quote-side payment schedule editor. Stage edits live in local state and are
-// committed to the staging pipeline ONLY when the schedule is valid (sum=100 and
-// every instalment dated) or cleared — an in-progress 30/20, or a stage still
-// missing its due date, shows the amber warning without being staged, so Save
-// can never fail on schedule validation.
+// Quote-side payment schedule editor. The offer fixes the PERCENTAGES ONLY —
+// Fälligkeiten hängen am Auftrag (Vorgabe 15.08.2026), also zeigt die Offerte
+// keine Datumsspalte und schreibt die Daten als null weg; ältere Offerten
+// verlieren ihre Daten beim nächsten Speichern.
+//
+// Stage edits live in local state and are committed to the staging pipeline
+// ONLY when the schedule is valid (sum=100) or cleared — an in-progress 30/20
+// shows the amber warning without being staged, so Save can never fail on
+// schedule validation.
 export const TenderPaymentTab = ({ tender, canEdit, grossTotal, onMetaChange }: TenderPaymentTabProps) => {
     const fmtMoney = useMoneyFormat();
-    const [stages, setStages] = useState<PaymentStage[]>(() => parsePaymentStages(tender.paymentStages) ?? []);
+    const [stages, setStages] = useState<PaymentStage[]>(() => stripStageDates(parsePaymentStages(tender.paymentStages) ?? []));
 
     // Re-sync when another tender loads or a Save/refetch updates the stored plan.
     useEffect(() => {
-        setStages(parsePaymentStages(tender.paymentStages) ?? []);
+        setStages(stripStageDates(parsePaymentStages(tender.paymentStages) ?? []));
     }, [tender.id, tender.paymentStages]);
 
     const handleChange = (next: PaymentStage[]) => {
         setStages(next);
         if (next.length === 0) {
             onMetaChange({ paymentStages: null });
-        } else if (paymentStagesValid(next)) {
-            onMetaChange({ paymentStages: serializePaymentStages(next) });
+        } else if (paymentStagesValid(next, { requireDates: false })) {
+            onMetaChange({ paymentStages: serializePaymentStages(stripStageDates(next)) });
         }
     };
 
@@ -54,6 +59,7 @@ export const TenderPaymentTab = ({ tender, canEdit, grossTotal, onMetaChange }: 
                 readOnly={!canEdit}
                 baseTotal={grossTotal}
                 formatMoney={fmtMoney}
+                showDates={false}
             />
         </div>
     );

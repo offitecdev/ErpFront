@@ -26,6 +26,16 @@ export interface RoleTemplate {
     roleName: string;
     /** Die feste Administratorrolle: alle Seiten, nicht änderbar, nicht löschbar. */
     isSystemAdmin: boolean;
+    /** Die feste Purser-Rolle (27.08.2026): sie führt die zweite Stufe des
+        Antragswegs. Stufen bleiben änderbar, Name und Bestand nicht. */
+    isPurser?: boolean;
+    /** FIRMENWECHSEL (31.08.2026): darf diese Rolle im Kopf jede Firma des
+        eigenen Konzernbaums wählen — auch ohne Zuteilung unter Person →
+        Zugang? Für Verwaltung und Projektleitung, die über alle Häuser hinweg
+        arbeiten. Die Administratorrolle trägt es immer; der Server schickt
+        deshalb dort das abgeleitete `true`. Es ist KEINE Seitenstufe: es
+        entscheidet die Reichweite des Umschalters, nicht was jemand öffnet. */
+    canSwitchTenant?: boolean;
     userCount: number;
     pageLevels: Record<string, PageLevel>;
 }
@@ -48,7 +58,18 @@ export interface RoleOption {
     id: string;
     roleName: string;
     isSystemAdmin: boolean;
+    /** Oeffnet diese Rolle von sich aus die ganze eigene Firmengruppe? Der
+        Server liefert hier das ABGELEITETE Ja (Administratorrolle inbegriffen),
+        damit die Zugangsflaeche sagen kann, was zusaetzlich zu den Haken gilt. */
+    canSwitchTenant?: boolean;
     pageLevels: Record<string, PageLevel>;
+}
+
+/** Eine Firma des Baums, wie sie in der Zuteilung angeboten wird. */
+export interface AccessCompany {
+    id: string;
+    tenantName: string;
+    parentTenantId: string | null;
 }
 
 export interface PersonAccess {
@@ -57,8 +78,15 @@ export interface PersonAccess {
     lastName: string;
     email: string;
     isActive: boolean;
-    /** null = alle Firmen des Baums (keine Einschränkung). */
+    /** Die Firma, unter der die Person angelegt wurde. */
+    homeTenantId: string;
+    /** null = keine Zuteilung gespeichert → NUR `homeTenantId` (31.08.2026).
+        Früher hiess null «alle Firmen des Baums»; genau das liess Personal
+        einer Untergesellschaft die Schwesterfirmen sehen. */
     allowedTenantIds: string[] | null;
+    /** Der GANZE Firmenbaum — die Auswahl hier vergibt erst den Zugang, darf
+        also nicht am Firmenumschalter hängen (der zeigt nur Zugeteiltes). */
+    companies: AccessCompany[];
     roleId: string | null;
     roles: RoleOption[];
 }
@@ -87,14 +115,18 @@ export const roleTemplateApi = {
         return res.data.modules;
     },
 
-    create: async (body: { roleName: string; pageLevels: Record<string, PageLevel> }): Promise<RoleTemplate> => {
+    create: async (body: {
+        roleName: string;
+        pageLevels: Record<string, PageLevel>;
+        canSwitchTenant?: boolean;
+    }): Promise<RoleTemplate> => {
         const res = await apiClient.post<RoleTemplate>('/role-templates', body);
         return res.data;
     },
 
     update: async (
         id: string,
-        body: { roleName?: string; pageLevels?: Record<string, PageLevel> },
+        body: { roleName?: string; pageLevels?: Record<string, PageLevel>; canSwitchTenant?: boolean },
     ): Promise<void> => {
         await apiClient.put(`/role-templates/${id}`, body);
     },

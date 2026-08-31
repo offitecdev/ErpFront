@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type React from 'react';
 import dayjs from 'dayjs';
 
+import { OrderConfirmationButton } from '@/components/orders/OrderConfirmationButton';
 import { t } from '@/i18n/translate';
 import type { MyOrderDetailDto } from '@/types/billing';
 
@@ -67,7 +68,26 @@ export const OrderOverviewTab = memo(({ order, stages, onOpenStage }: {
                     </div>
                 </Card>
 
-                <Card title={t('projects.order')}>
+                {/* Die Auftragsbestätigung steht NEBEN der Auftragskarte — wie
+                    auf der Projektübersicht, damit der Beleg in beiden Modulen
+                    an derselben Stelle liegt. */}
+                <Card
+                    title={t('projects.order')}
+                    actions={(
+                        <OrderConfirmationButton
+                            order={{
+                                id: order.id,
+                                orderNumber: order.orderNumber,
+                                tenderId: tender?.id ?? null,
+                                orderDate: order.orderDate ?? null,
+                                createdAt: order.createdAt,
+                                confirmationNote: order.confirmationNote ?? null,
+                                confirmationValidUntil: order.confirmationValidUntil ?? null,
+                                createdBy: order.createdBy ?? null,
+                            }}
+                        />
+                    )}
+                >
                     <div className="divide-y divide-slate-100 text-sm">
                         <FactRow label={t('crm.order_no')}>{order.orderNumber}</FactRow>
                         <FactRow label={t('common.type')}>

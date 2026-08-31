@@ -208,7 +208,7 @@ export const TenderProductSearchDropdown = ({
         <div
             ref={setPanelEl}
             style={style}
-            className="relative z-[999] overflow-hidden rounded-[2px] border border-slate-300 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.14)]"
+            className="ofi-tp-menu relative z-[999] overflow-hidden"
         >
             {/* The spinner only replaces the list on the FIRST load. A refresh
                 keeps the current items on screen and clickable — blanking or
@@ -243,8 +243,8 @@ export const TenderProductSearchDropdown = ({
                                     event.preventDefault();
                                     onSelectArticle(article);
                                 }}
-                                className={`ofi-option-row group flex cursor-pointer items-center gap-1.5 px-2 py-1.5 transition-colors hover:bg-[#1f2654] ${
-                                    index === activeIdx ? 'bg-amber-100 ring-1 ring-inset ring-amber-400' : ''
+                                className={`ofi-option-row group flex cursor-pointer items-center gap-1.5 px-2 py-1.5 transition-colors ${
+                                    index === activeIdx ? 'is-active' : ''
                                 }`}
                             >
                                 <span className="min-w-0 flex-1 truncate text-left text-[13px] text-slate-900 transition-colors group-hover:!text-white">
@@ -302,7 +302,7 @@ export const TenderProductSearchDropdown = ({
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onOpenAllProducts(search.trim())}
-                    className="flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[12px] font-medium text-[#1f2654] transition-colors hover:bg-[#1f2654] hover:!text-white"
+                    className="ofi-option-action flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[12px] font-medium text-[#1f2654] transition-colors"
                 >
                     <Package size={12} />
                     {t('tenders.all_products')} …

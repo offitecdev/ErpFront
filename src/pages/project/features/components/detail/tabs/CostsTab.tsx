@@ -55,12 +55,14 @@ export const CostsTab = memo(({
     onGoFieldReports: () => void;
 }) => {
     const tolerance = Number(project.overtimeTolerancePercent ?? 15);
-    // Kalem sütunu da SÜRÜKLENEBİLİR (kullanıcı isteği): kendi genişliği vardır,
-    // sağ kenarından tutulup sola/sağa çekilir. Genişlikler localStorage'da
-    // saklandığı için sürüm anahtarı yükseltildi.
+    // Kalem sütununun BİLEREK genişliği yoktur: kartın kalan yerini emen sütun
+    // odur (lib/columnLayout, kural 2). Dört sütunun dördü de React'ten genişlik
+    // alsaydı toplam sabit kalır, tablo geniş ekranda kartın sağında boşluk
+    // bırakarak yarıda biterdi. Sürükleme kaybolmaz — genişliği olmayan sütuna
+    // tutamacı uygulama geneli katman (lib/autoColumnResize) takar.
     const grid = useColumnWidths({
         storageKey: 'offitec:project-costs:col-widths:v2',
-        defaults: { order: 190, item: 420, date: 110, amount: 150 },
+        defaults: { order: 190, date: 110, amount: 150 },
         minPx: 72,
     });
     const orders = useMemo(() => getProjectDisplayOrders(project), [project]);
@@ -180,17 +182,19 @@ export const CostsTab = memo(({
                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/15 dark:bg-transparent">
                     <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                         <colgroup>
-                            <ResizableCols keys={['order', 'item', 'date', 'amount'] as const} grid={grid} />
+                            <ResizableCols keys={['order'] as const} grid={grid} />
+                            {/* Kalem sütunu: genişliği yok, kalan yeri emer. */}
+                            <col />
+                            <ResizableCols keys={['date', 'amount'] as const} grid={grid} />
                         </colgroup>
                         <thead>
                             <tr>
                                 <th className="relative text-left">
                                     {t('projects.detail.colOrder')}
-                                    <ColResizeHandle {...grid.resizeProps('order', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('order')} />
                                 </th>
                                 <th className="relative text-left">
                                     {t('projects.detail.colItem')}
-                                    <ColResizeHandle {...grid.resizeProps('item', 'right')} />
                                 </th>
                                 <th className="relative text-left">
                                     {t('common.date')}

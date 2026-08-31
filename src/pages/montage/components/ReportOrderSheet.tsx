@@ -75,7 +75,7 @@ export const ReportOrderSheet = ({
             title={order.orderNumber}
             subtitle={`${order.customerName} · ${order.projectName}`}
             onClose={onClose}
-            zIndex={85}
+            zIndex={600}
         >
             <div className="flex min-h-full flex-col px-6 py-7 sm:px-8 sm:py-9 lg:px-10">
                 {loading ? (

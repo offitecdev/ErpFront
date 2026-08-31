@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { ArrowLeft, CheckCircle } from '@/components/icons/antIconCompat';
+import { CheckCircle } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { Spinner } from '@/components/ui-shared/Loader';
+// Die Einheit wird GEWAEHLT (Stueck, Meter, kg, Liter, Set, Packung ...) --
+// die Liste pflegt der Mandant unter Einstellungen -> Module -> Lager.
+import { UnitSelect } from '@/components/ui-shared/UnitSelect';
 // Detay ekranıyla AYNI biçimli metin editörü — açıklama HTML olarak saklanır
 // ve aynı PDF/görüntüleme hattından geçer.
-import { RichTextMarkdownEditor } from '@/pages/tender/detail/components/RichTextMarkdownEditor';
+import { RichTextMarkdownEditor } from '@/pages/sales/detail/components/RichTextMarkdownEditor';
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
@@ -54,12 +57,10 @@ interface SingleDraft {
  */
 export const ArticleSingleCreateView = ({
     copyPrefix,
-    backPath,
     detailRoot,
 }: {
     /** 'inv.newProduct' — metin yaprağı. */
     copyPrefix: string;
-    backPath: string;
     /** Kayıt sonrası açılacak detay kökü ('/inventory/articles'). */
     detailRoot: string;
 }) => {
@@ -143,20 +144,7 @@ export const ArticleSingleCreateView = ({
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
-                title={(
-                    <span className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            aria-label={t('common.back')}
-                            title={t('common.back')}
-                            onClick={() => navigate(backPath)}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
-                        {t(`${copyPrefix}.title`)}
-                    </span>
-                )}
+                title={t(`${copyPrefix}.title`)}
                 action={(
                     <button
                         type="button"
@@ -186,7 +174,11 @@ export const ArticleSingleCreateView = ({
                                 <input aria-label={nameLabel} {...field('name', 'max-w-md', nameLabel)} />
                             </Row>
                             <Row label={t('inv.columns.unit')}>
-                                <input aria-label={t('inv.columns.unit')} {...field('unit', 'max-w-[8rem]', t('inv.columns.unit'))} />
+                                <UnitSelect
+                                    value={draft.unit}
+                                    onChange={(next) => edit({ unit: next })}
+                                    className="max-w-[12rem]"
+                                />
                             </Row>
                             <Row label={t('inv.columns.salePrice')}>
                                 <input inputMode="decimal" aria-label={t('inv.columns.salePrice')} {...field('salePrice', 'font-mono max-w-[10rem]', '0.00')} />

@@ -15,16 +15,28 @@ type PlainButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'typ
     type?: 'button' | 'submit' | 'reset';
 };
 
+// Buttons of the fresh look (17.08.2026): filled navy for the primary action,
+// a hairline outline for secondary, plain text for ghost — with a modest 6px
+// corner (user request: "significantly reduce the radius of Save / Export /
+// Confirm"); `.ofi-quote-btn` in index.css pins that corner against the
+// app-wide button radius rule.
 const BUTTON_VARIANT_CLASS: Record<NonNullable<PlainButtonProps['variant']>, string> = {
-    primary: 'border border-transparent bg-[#1f2654] text-white hover:bg-[#2a3470]',
-    secondary: 'border border-slate-300 bg-white text-slate-700 hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]',
-    ghost: 'border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-    danger: 'border border-transparent bg-rose-600 text-white hover:bg-rose-700',
+    primary: 'ofi-quote-btn is-primary border border-transparent bg-[#1f2654] text-white hover:bg-[#2a3470]',
+    secondary: 'ofi-quote-btn is-secondary border border-[#dadce0] bg-white text-[#1f2654] hover:bg-[#1f2654]/[0.05]',
+    ghost: 'ofi-quote-btn is-ghost border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+    danger: 'ofi-quote-btn is-danger border border-transparent bg-[#c5221f] text-white hover:bg-[#a50e0e]',
 };
 
+/* PILLEN, und `rounded-full` ist hier PFLICHT statt `rounded-[999px]`:
+   index.css zwingt in `@layer utilities` JEDE Klasse, die `rounded-[`
+   enthaelt, per !important auf 2px (MEMORY «Radius utilities are
+   flattened») — der alte `rounded-[6px]` kam nie an, die Knoepfe standen
+   in Wahrheit auf 2px. `rounded-full` ist ausgenommen, und es nimmt sie
+   zugleich aus dem App-Grundradius (`button:not([class~="rounded-full"])`)
+   heraus. */
 const BUTTON_SIZE_CLASS: Record<NonNullable<PlainButtonProps['size']>, string> = {
-    sm: 'h-7 gap-1.5 rounded-[2px] px-2.5 text-[12px]',
-    md: 'h-8 gap-2 rounded-[2px] px-3 text-[12.5px]',
+    sm: 'h-8 gap-1.5 rounded-full px-3 text-[12.5px]',
+    md: 'h-9 gap-2 rounded-full px-3.5 text-[13px]',
 };
 
 export const PlainButton = ({
@@ -81,12 +93,12 @@ export const PlainCard = ({
 }: PlainCardProps) => (
     <section
         data-ui-card
-        className={clsx('overflow-hidden rounded-[2px] border border-slate-300 bg-white', className)}
+        className={clsx('ofi-quote-card overflow-hidden rounded-lg border border-[#e6e8eb] bg-white', className)}
     >
         {(title || actions) && (
-            <div data-ui-card-header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3.5 py-2">
+            <div data-ui-card-header className="ofi-quote-card__head flex items-center justify-between gap-3 border-b border-[#eef0f2] bg-white px-4 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
-                    {icon && <span className="flex size-5 shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-[#272f67]">{icon}</span>}
+                    {icon && <span className="ofi-quote-card__icon flex size-6 shrink-0 items-center justify-center rounded-full text-[#1f2654]">{icon}</span>}
                     <div className="min-w-0">
                         {title && <h3 className="truncate text-[13.5px] font-semibold text-primary">{title}</h3>}
                         {description && <p className="mt-0.5 truncate text-[12px] text-tertiary">{description}</p>}

@@ -61,9 +61,13 @@ export const Projects = () => {
     // Durum seçici üst çubukta — müşteri/teklif listeleriyle aynı desen.
     const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
     // Sürüklenebilir sütunlar; proje adı sütununun genişliği yoktur, kalanı o emer.
+    // Genişlikler 20.08.2026'da ferahlatıldı: "Rapport"/"Technik" başlıkları
+    // kendi hücrelerine sığmayıp komşularının üstüne biniyordu (başlık şeridi
+    // `white-space: nowrap`). Anahtar bu yüzden v2 — v1'i saklamış tarayıcılar
+    // da yeni ölçüyü alsın.
     const grid = useColumnWidths({
-        storageKey: 'offitec:project-list:col-widths:v1',
-        defaults: { customer: 160, tender: 112, budget: 112, report: 64, appointment: 112, status: 128, technical: 80, billing: 96 },
+        storageKey: 'offitec:project-list:col-widths:v2',
+        defaults: { customer: 190, tender: 128, budget: 128, report: 84, appointment: 136, status: 144, technical: 100, billing: 100 },
         minPx: 64,
     });
     const [sortBy, setSortBy] = useState<ProjectSortKey>('createdAt');
@@ -154,13 +158,28 @@ export const Projects = () => {
 
     const hasActiveFilters = Boolean(search || nameFilter || customerFilter || tenderFilter || statusFilter);
 
+    // Telefon kartında her hücrenin başına kendi sütun adı yazılır
+    // (`data-label`); metin başlıkla AYNI çeviri anahtarından gelir.
+    const colLabel = {
+        customer: t('nav.quickActionsGroup.customers'),
+        tender: t('auto.teklif'),
+        budget: t('auto.butce'),
+        report: t('auto.rapor'),
+        appointment: t('auto.randevu'),
+        status: t('common.status'),
+        technical: t('projects.listColTechnical'),
+        billing: t('projects.listColBilling'),
+    };
+
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader title={t('nav.projects')} />
 
-            {/* Üst çubuk — müşteri listesiyle aynı: genel arama + durum seçici. */}
+            {/* Üst çubuk — müşteri listesiyle aynı: genel arama + durum seçici.
+                Telefonda ikisi de tam genişlik: 390px'te yan yana sıkışmak
+                yerine alt alta, dokunulacak kadar geniş dururlar. */}
             <div className="flex flex-wrap items-center gap-2">
-                <div className="w-64">
+                <div className="w-full sm:w-64">
                     <SearchBox
                         value={search}
                         onChange={setSearch}
@@ -171,7 +190,7 @@ export const Projects = () => {
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value as ProjectStatus | '')}
                     aria-label={t('common.status')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none sm:w-auto dark:border-white/20 dark:bg-transparent dark:text-white"
                 >
                     <option value="">{t('auto.tum_durumlar')}</option>
                     {FILTERABLE_STATUSES.map((key) => (
@@ -181,7 +200,9 @@ export const Projects = () => {
             </div>
 
             <SectionCard title={`${t('nav.projects')} (${total})`}>
-                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                {/* `data-list-table`: ferah satır ölçüsü + telefonda kart
+                    görünümü (bkz. index.css "ÜBERSICHTSLISTEN"). */}
+                <table data-inv-table data-list-table data-grid-lines data-unstyled-table className="w-full">
                     <colgroup>
                         {/* Proje adı: genişliği yok, kalan yeri emer. */}
                         <col />
@@ -274,7 +295,7 @@ export const Projects = () => {
                                                     burada TEKRARLANMAZ, altta yalnızca tarih durur
                                                     (kullanıcı isteği). Eski, koddan farklı adlanmış
                                                     projelerde kod bilgi kaybolmasın diye kalır. */}
-                                                <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-slate-400">
+                                                <div className="ofi-list-sub flex items-center gap-1.5 text-[11.5px] text-slate-400">
                                                     {project.projectNumber && project.projectNumber !== project.projectName && (
                                                         <span className="font-mono font-semibold text-slate-500 dark:text-white/60">{project.projectNumber}</span>
                                                     )}
@@ -283,22 +304,27 @@ export const Projects = () => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="text-[13px] text-slate-700 dark:text-white/80">
-                                        <span className="block truncate">{project.customer?.companyName || project.customerId}</span>
-                                        {/* Satır "PR / müşteri / kişi / tarih" diye okunur:
-                                            sorumlu kişi müşterinin altında gösterilir. */}
-                                        {project.manager && (
-                                            <span className="mt-0.5 block truncate text-[11.5px] text-slate-400 dark:text-white/50">
-                                                {project.manager.firstName} {project.manager.lastName}
-                                            </span>
-                                        )}
+                                    {/* İki satır TEK kutuda: telefon kartında hücre
+                                        "etiket ↔ değer" diye yan yana dizilir, sarmalayıcı
+                                        olmasa iki satır etiketin yanına ayrı ayrı düşerdi. */}
+                                    <td data-label={colLabel.customer} className="text-[13px] text-slate-700 dark:text-white/80">
+                                        <div className="min-w-0">
+                                            <span className="block truncate">{project.customer?.companyName || project.customerId}</span>
+                                            {/* Satır "PR / müşteri / kişi / tarih" diye okunur:
+                                                sorumlu kişi müşterinin altında gösterilir. */}
+                                            {project.manager && (
+                                                <span className="ofi-list-sub block truncate text-[11.5px] text-slate-400 dark:text-white/50">
+                                                    {project.manager.firstName} {project.manager.lastName}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
-                                    <td className="font-mono text-[12px] text-slate-500 dark:text-white/60">
+                                    <td data-label={colLabel.tender} className="font-mono text-[12px] text-slate-500 dark:text-white/60">
                                         <span className="block truncate">{project.tender?.tenderNumber ? project.tender.tenderNumber : (project.tenderId || '—')}</span>
                                     </td>
-                                    <td className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{money(project.plannedBudget)}</td>
-                                    <td className="text-right font-mono text-[13px] text-slate-600 dark:text-white/70">{project._count?.reports || 0}</td>
-                                    <td>
+                                    <td data-label={colLabel.budget} className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">{money(project.plannedBudget)}</td>
+                                    <td data-label={colLabel.report} className="text-right font-mono text-[13px] text-slate-600 dark:text-white/70">{project._count?.reports || 0}</td>
+                                    <td data-label={colLabel.appointment}>
                                         {booked ? (
                                             <span className={`inline-flex items-center gap-1.5 ${dayjs(booked.startTime).isAfter(dayjs()) ? 'text-[#272f67] dark:text-sky-300' : 'text-slate-500 dark:text-white/60'}`}>
                                                 <CalendarClock size={12} className="shrink-0" />
@@ -309,9 +335,9 @@ export const Projects = () => {
                                             </span>
                                         ) : <span className="text-slate-300 dark:text-white/30">—</span>}
                                     </td>
-                                    <td><ProjectStatusBadge status={project.status} /></td>
-                                    <td><PercentCell percent={flowMap[project.id]?.technicalPercent} /></td>
-                                    <td><PercentCell percent={flowMap[project.id]?.billingPercent} /></td>
+                                    <td data-label={colLabel.status}><ProjectStatusBadge status={project.status} /></td>
+                                    <td data-label={colLabel.technical}><PercentCell percent={flowMap[project.id]?.technicalPercent} /></td>
+                                    <td data-label={colLabel.billing}><PercentCell percent={flowMap[project.id]?.billingPercent} /></td>
                                 </tr>
                             );
                         })}

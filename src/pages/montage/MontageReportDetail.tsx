@@ -400,7 +400,11 @@ export const MontageReportDetail = () => {
             {pdfOpen && createPortal(
                 <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6">
                     <button type="button" aria-label={t('common.close')} onClick={() => setPdfOpen(false)} className="absolute inset-0 bg-slate-950/55" />
-                    <section role="dialog" aria-modal="true" className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3px] bg-white shadow-2xl">
+                    {/* `.ofi-pop` = die gemeinsame Fensteroberfläche (index.css,
+                        "FENSTER-OBERFLÄCHE"). Der navy Kopfstreifen bleibt: er ist
+                        die Handschrift des Montage-Panels. Nur die Kante folgt
+                        jetzt der Anwendung — `rounded-[3px]` war scharf. */}
+                    <section role="dialog" aria-modal="true" className="ofi-pop relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden">
                         <header className="flex items-center justify-between bg-[#1f2654] px-4 py-3 text-white dark:bg-amber-500">
                             <div>
                                 <div className="text-[14px] font-semibold">{t('montage.pdfPreview')}</div>

@@ -312,11 +312,11 @@ export const ExcelImportSheet = ({
                             <tr>
                                 <th className="relative text-left">
                                     {t('inv.excel.targetColumn')}
-                                    <ColResizeHandle {...grid.resizeProps('target', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('target')} />
                                 </th>
                                 <th className="relative text-left">
                                     {t('inv.excel.excelColumn')}
-                                    <ColResizeHandle {...grid.resizeProps('source', 'right')} />
+                                    <ColResizeHandle {...grid.resizeProps('source')} />
                                 </th>
                                 <th className="text-left">{t('inv.excel.suggestionsAndSamples')}</th>
                             </tr>

@@ -1,17 +1,33 @@
-import { StrictMode, startTransition } from 'react'
+import { StrictMode, startTransition, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/fonts.css'
 import './index.css'
+// Feinschliff aus der Anmeldemaske (Serifentitel, Feldkanten, Bewegung) —
+// MUSS nach index.css stehen, sonst verliert er gegen dessen Formularblock.
+import './styles/refine.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
 import { initInstallPrompt } from './lib/pwa/installPrompt'
 import { registerServiceWorker } from './lib/pwa/registerServiceWorker'
+import { installAutoColumnResize } from './lib/autoColumnResize'
+import { installTableChrome } from './lib/tableChrome'
+import { dismissBootSplash } from './lib/bootSplash'
 import App from './App.tsx'
 
 // PWA: capture `beforeinstallprompt` before any component mounts (the browser
 // fires it once, very early), then install the service worker after load.
 initInstallPrompt()
 registerServiceWorker()
+
+// Every table gets drag-resizable columns, with no per-table wiring — the
+// tables that declare their own columns in React keep theirs (see
+// hooks/useColumnWidths), this picks up all the rest.
+installAutoColumnResize()
+
+// index.css finds table wrappers/cards via data attributes this module keeps
+// up to date — the `:has()` selectors it replaces made every style recalc walk
+// the whole document (700ms+ tasks on a throttled mobile boot).
+installTableChrome()
 
 // Start translations and the app together. Protected routes paint their
 // loading shell while the profile and locale chunks resolve, so waiting here
@@ -20,7 +36,7 @@ void initI18n().catch(() => undefined)
 
 // The build makes the app stylesheet non-render-blocking (see the async-css
 // plugin in vite.config): it ships as media="print" plus a preload, and the
-// boot skeleton in index.html carries the first paint. Mounting React before
+// boot splash in index.html carries the first paint. Mounting React before
 // the stylesheet finished would flash the whole app unstyled, so the mount
 // waits for the preload — with a timeout so a broken/hanging CSS request can
 // never brick the app. In dev (and Electron dev) the links don't exist and
@@ -50,7 +66,16 @@ const whenAppCssReady = (): Promise<void> => {
   })
 }
 
-// Two animation frames guarantee the browser composites the boot skeleton
+// The boot splash (index.html) is a fixed overlay above #root. It leaves
+// only after the app shell has actually committed — an effect runs after
+// commit, whereas the transition-lane render below returns before React has
+// painted anything — and after its intro has had its minimum time on screen.
+function BootSplashGate() {
+  useEffect(() => { dismissBootSplash() }, [])
+  return null
+}
+
+// Two animation frames guarantee the browser composites the boot splash
 // before React's mount work starts. Without this the first paint races the
 // mount: on runs React wins, the very first frame the user (and Lighthouse's
 // FCP) sees is the fully-booted app several seconds in.
@@ -68,6 +93,7 @@ void whenAppCssReady().then(afterFirstPaint).then(() => {
     root.render(
       <StrictMode>
         <App />
+        <BootSplashGate />
       </StrictMode>,
     )
   })

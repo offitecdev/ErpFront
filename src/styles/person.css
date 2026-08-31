@@ -47,29 +47,54 @@
 /* Oben gespiegelt: die Kämme zeigen nach unten, die Fläche sitzt an der
    Oberkante — dasselbe Bild wie das Kopfband der Anmeldeseite.
 
-   Deutlich HÖHER als die untere Welle (Vorgabe 17.08.2026: „oben auch eine
-   Welle"): auf 46 px las sich das Band als farbiger Streifen, erst ab rund
-   100 px sieht man das Auf und Ab. Die Maske löst die Welle nach unten hin
-   auf, statt sie an einer waagrechten Kante abzuschneiden — wie auf der
-   Anmeldeseite. Doppelt notiert (`-webkit-` zuerst) wegen Safari. */
+   SEIT DEM 27.08.2026 DEUTLICH FLACHER (Vorgabe: «die Vorlage verkleinern,
+   nur der obere Teil bleibt sichtbar — der Inhalt rückt nach oben»): das
+   Kopfband ist der einzige Wellenrest, die Fusswelle ist weg. Die Maske löst
+   die Welle nach unten hin auf, statt sie an einer waagrechten Kante
+   abzuschneiden. Doppelt notiert (`-webkit-` zuerst) wegen Safari. */
 .ofi-person-hero__wave--top {
     transform: scaleY(-1);
-    height: clamp(78px, 9.5vw, 118px);
+    height: clamp(52px, 6.5vw, 78px);
     -webkit-mask-image: linear-gradient(to top, #000 0%, #000 46%, transparent 100%);
     mask-image: linear-gradient(to top, #000 0%, #000 46%, transparent 100%);
 }
 
-/* Die Bildfläche zwischen den Wellen. Der negative Rand zieht sie in die
-   Wellenbänder hinein, damit kein leerer Streifen entsteht — oben stärker,
-   weil das Kopfband deutlich höher ist als die Fusswelle. */
+/* Die Bildfläche unter dem Kopfband. Der negative Rand zieht sie hinein,
+   damit kein leerer Streifen entsteht; nach unten schliesst sie knapp ab. */
 .ofi-person-hero__body {
     position: relative;
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: clamp(12px, 2.5vw, 22px);
-    margin: clamp(-40px, -5vw, -26px) 0 clamp(-22px, -3vw, -14px);
-    padding: 0 clamp(16px, 3vw, 32px);
+    gap: clamp(10px, 2vw, 18px);
+    margin: clamp(-30px, -3.5vw, -20px) 0 0;
+    padding: 0 clamp(14px, 2.5vw, 26px) clamp(8px, 1.2vw, 12px);
+}
+
+/* Der eine Handgriff der Seite (Profil: «Urlaub beantragen») — rechts neben
+   dem Namen; auf dem Telefon rückt er als volle Zeile unter ihn. */
+.ofi-person-hero__action {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+@media (max-width: 640px) {
+    .ofi-person-hero__body {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+
+    .ofi-person-hero__action {
+        display: flex;
+        width: 100%;
+    }
+
+    .ofi-person-hero__action > * {
+        flex: 1;
+        justify-content: center;
+    }
 }
 
 .ofi-person-hero__avatar {
@@ -77,13 +102,13 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: clamp(64px, 9vw, 92px);
-    height: clamp(64px, 9vw, 92px);
+    width: clamp(52px, 6.5vw, 68px);
+    height: clamp(52px, 6.5vw, 68px);
     border-radius: 999px;
     overflow: hidden;
     background: #272f67;
     color: #ffffff;
-    font-size: clamp(20px, 3vw, 28px);
+    font-size: clamp(17px, 2.2vw, 22px);
     font-weight: 700;
     letter-spacing: 0.5px;
     box-shadow: 0 10px 26px rgb(15 28 69 / 0.22);
@@ -152,8 +177,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 23px;
+    height: 23px;
     border-radius: 999px;
     background: #ffffff;
     color: #272f67;
@@ -203,7 +228,7 @@
 .ofi-person-tab {
     position: relative;
     flex-shrink: 0;
-    padding: 11px 16px;
+    padding: 9px 14px;
     font-size: 12.5px;
     font-weight: 600;
     color: rgb(100 116 139);

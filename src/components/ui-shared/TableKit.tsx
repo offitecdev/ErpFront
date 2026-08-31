@@ -23,16 +23,19 @@ export const CELL_INPUT_CLASS =
  * kalsın diye başlıkta durmayı sürdürür.
  */
 export const SectionCard = ({ title, action, children, collapsible = false, defaultOpen = true }: {
-    title: ReactNode;
+    /** Ohne Titel: kopfloser Rahmen — die Überschrift trägt die Ebene darüber. */
+    title?: ReactNode;
     action?: ReactNode;
     children: ReactNode;
     collapsible?: boolean;
     defaultOpen?: boolean;
 }) => {
     const [open, setOpen] = useState(defaultOpen);
-    const expanded = !collapsible || open;
+    const headless = title === undefined;
+    const expanded = headless || !collapsible || open;
     return (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-white/15 dark:bg-transparent dark:shadow-none">
+            {!headless && (
             <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
                 {collapsible ? (
                     <button
@@ -53,6 +56,7 @@ export const SectionCard = ({ title, action, children, collapsible = false, defa
                 )}
                 {action}
             </header>
+            )}
             {expanded && <div data-table-scroll>{children}</div>}
         </section>
     );
@@ -240,10 +244,10 @@ export const ActionTh = ({
 );
 
 /**
- * Genişletilebilir sütunların `<col>` etiketleri. Esnek (genişliği olmayan)
- * sütunlar için tabloda ayrıca düz bir `<col />` yazılır ve bu bileşen ONDAN
- * SONRA gelir: tutamaçlar sütunların SOL kenarında olduğu için genişletilebilir
- * sütunların hepsi esnek sütunun SAĞINDA olmalıdır.
+ * Genişletilebilir sütunların `<col>` etiketleri. Genişliği yazılmayan sütunlar
+ * için tabloda ayrıca düz bir `<col />` bulunur; onları uygulama geneli katman
+ * (`lib/autoColumnResize`) ölçüp dondurur ve kendi tutamacını takar — sütun
+ * sırası artık serbesttir (bkz. `lib/columnLayout`).
  */
 export const ResizableCols = <K extends string>({
     keys,
@@ -260,33 +264,33 @@ export const ResizableCols = <K extends string>({
 );
 
 /**
- * Sütun genişletme tutamacı: başlığın SOL kenarında oturur — sürüklenince
- * hareket eden kenar orada olduğu için imleçle birlikte gider. Çift tıklama
- * sütunu varsayılan genişliğine döndürür. Bulunduğu `<th>` `relative` olmalıdır
- * ve tablo `table-layout: fixed` + `<colgroup>` kullanmalıdır (bkz.
- * `useColumnWidths`). Sütunlar arasındaki görünür çizgi ile aynı kenardır:
- * kullanıcı gördüğü çizgiyi tutar.
+ * Sütun genişletme tutamacı iki sütunun arasındaki sınırda oturur. Sağa çekince
+ * soldaki sütun genişler ve sağdaki aynı miktarda daralır; tablo toplamı sabit
+ * kaldığı için kartın sağında boşluk oluşmaz (kural: `lib/columnLayout`). Çift
+ * tıklama sınırı varsayılan orana döndürür. Bulunduğu `<th>`
+ * `relative` olmalıdır ve tablo `table-layout: fixed` + `<colgroup>`
+ * kullanmalıdır (bkz. `useColumnWidths`).
+ *
+ * Görünüm `.ofi-col-grip` sınıfından gelir (index.css): kalın gri bir tutamaç.
+ * AYNI sınıfı, elle bağlanmamış tablolara tutamaç ekleyen uygulama geneli
+ * katman da kullanır (`lib/autoColumnResize`) — iki yol da birebir aynı görünür.
  */
 export const ColResizeHandle = ({
     onResizeStart,
     onResizeReset,
-    side = 'left',
 }: {
     onResizeStart: (event: React.PointerEvent) => void;
     onResizeReset?: () => void;
-    /** Esnek sütunun SOLUNDA kalan sabit sütunlar sağ kenarlarından tutulur. */
-    side?: 'left' | 'right';
 }) => (
     <span
         role="separator"
         aria-orientation="vertical"
+        data-col-resizer="react"
         title={t('tenders.column_resize')}
         onPointerDown={onResizeStart}
         onDoubleClick={onResizeReset}
         onClick={(event) => event.stopPropagation()}
-        className={`absolute inset-y-0 z-10 w-[7px] cursor-col-resize touch-none select-none before:absolute before:inset-y-0 before:left-1/2 before:w-[3px] before:-translate-x-1/2 before:rounded-full before:bg-transparent before:transition-colors hover:before:bg-[#1f2654]/30 active:before:bg-[#1f2654]/50 dark:hover:before:bg-white/30 dark:active:before:bg-white/45 ${
-            side === 'left' ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'
-        }`}
+        className="ofi-col-grip ofi-col-grip--right"
     />
 );
 
@@ -300,7 +304,6 @@ export const SortableTh = <K extends string>({
     className = '',
     onResizeStart,
     onResizeReset,
-    side,
 }: {
     label: ReactNode;
     sortKey: K;
@@ -308,10 +311,9 @@ export const SortableTh = <K extends string>({
     direction: 'asc' | 'desc';
     onSort: (key: K) => void;
     className?: string;
-    /** Verilirse başlığın kenarı sütunu genişletme tutamacı olur. */
+    /** Verilirse başlığın SAĞ kenarı sütunu genişletme tutamacı olur. */
     onResizeStart?: (event: React.PointerEvent) => void;
     onResizeReset?: () => void;
-    side?: 'left' | 'right';
 }) => (
     <th className={`relative ${className}`}>
         <button
@@ -322,6 +324,6 @@ export const SortableTh = <K extends string>({
             {label}
             {activeKey === sortKey && (direction === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
         </button>
-        {onResizeStart && <ColResizeHandle onResizeStart={onResizeStart} onResizeReset={onResizeReset} side={side} />}
+        {onResizeStart && <ColResizeHandle onResizeStart={onResizeStart} onResizeReset={onResizeReset} />}
     </th>
 );

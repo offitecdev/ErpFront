@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+    Copy01 as Copy,
     Settings01 as Settings,
     Trash01 as Trash2,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 type TenderSettingsMenuProps = {
+    /** Copies the quote into a new one (own number, version 1, draft). */
+    onCopyOffer: () => void;
     /** Opens the destructive "delete offer" confirmation popup. */
     onDeleteOffer: () => void;
 };
@@ -13,10 +16,12 @@ type TenderSettingsMenuProps = {
 /**
  * Settings gear on the quote top bar. Clicking it opens a small dropdown menu
  * anchored to the button — same interaction as the header profile menu (avatar →
- * "My Profile / Settings / Log Out"). For now the menu holds a single option,
- * "Delete offer"; more offer-level actions can be added as sibling rows.
+ * "My Profile / Settings / Log Out"). The menu holds the offer-level actions
+ * "Angebot kopieren" and "Angebot loeschen"; more can be added as sibling rows.
+ * Kopieren steht UEBER dem Papierkorb (Benutzerwunsch 31.08.2026) — die
+ * harmlose Aktion zuerst, die zerstoerende zuletzt.
  */
-export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDeleteOffer }) => {
+export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onCopyOffer, onDeleteOffer }) => {
     const [open, setOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -40,10 +45,10 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
                 aria-label={t('tenders.tender_settings')}
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-[3px] border border-transparent transition-colors ${
+                className={`ofi-quote-iconbtn inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent transition-colors ${
                     open
-                        ? 'bg-[#272f67]/15 text-[#1f2654]'
-                        : 'text-slate-500 hover:bg-[#272f67]/15 hover:text-[#1f2654]'
+                        ? 'bg-slate-100 text-[#1f2654]'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-[#1f2654]'
                 }`}
             >
                 <Settings size={16} />
@@ -52,13 +57,9 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
             {open && (
                 <div
                     role="menu"
-                    className="absolute left-0 top-11 z-50 w-56 rounded-[2px] bg-primary p-1.5 shadow-lg ring-1 ring-secondary_alt animate-in fade-in slide-in-from-top-2"
+                    className="ofi-tp-menu absolute left-0 top-11 z-50 w-56 py-1 animate-in fade-in slide-in-from-top-2"
                 >
-                    <div className="border-b border-secondary px-3 py-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-tertiary">
-                            {t('tenders.tender_settings')}
-                        </p>
-                    </div>
+                    <div className="ofi-tp-menu__title">{t('tenders.tender_settings')}</div>
                     {/* Sipariş türü sorusu ARTIK BURADA DEĞİL: Onayla / Auftrag
                         erstellen düğmesi iki seçenekli popup'ı kendisi açar
                         (kullanıcı isteği). */}
@@ -67,11 +68,22 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({ onDelete
                         role="menuitem"
                         onClick={() => {
                             setOpen(false);
+                            onCopyOffer();
+                        }}
+                        className="ofi-tp-menu__item"
+                    >
+                        <Copy size={14} /> {t('tenders.copy_offer')}
+                    </button>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                            setOpen(false);
                             onDeleteOffer();
                         }}
-                        className="mt-1 flex w-full items-center gap-2 rounded-[2px] px-3 py-2 text-sm font-medium text-error-primary transition-colors hover:bg-error-primary"
+                        className="ofi-tp-menu__item is-danger"
                     >
-                        <Trash2 size={13} /> {t('tenders.delete_offer')}
+                        <Trash2 size={14} /> {t('tenders.delete_offer')}
                     </button>
                 </div>
             )}

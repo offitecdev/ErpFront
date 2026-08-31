@@ -43,70 +43,53 @@ export const OrderNotifications = memo(({ items }: { items: OrderNotification[] 
                 title={items.length > 0 ? t('projects.detail.overview.showNotifications') : t('projects.detail.overview.noNotifications')}
                 aria-label={`${t('projects.detail.notifications')} (${items.length})`}
                 /* Aynı ekrandaki diğer ikonlarla AYNI renk (kullanıcı isteği):
-                   amber/altın vurgu kaldırıldı, nötr slate kullanılır. */
-                className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
-                    items.length > 0
-                        ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-[#272f67] dark:border-white/15 dark:bg-transparent dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white'
-                        : 'cursor-default border-slate-200 bg-white text-slate-400 dark:border-white/15 dark:bg-transparent dark:text-white/40'
-                }`}
+                   amber/altın vurgu kaldırıldı, nötr gri kullanılır. Sayı
+                   sıfırdan büyükse yalnızca koyulaşır — vurgu rengi yok. */
+                className="ofi-prj-bell"
             >
                 <Bell01 size={14} />
                 <span>{t('projects.detail.notifications')}</span>
-                <span className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
-                    items.length > 0
-                        ? 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white/80'
-                        : 'bg-slate-100 text-slate-400 dark:bg-white/10 dark:text-white/50'
-                }`}>
-                    {items.length}
-                </span>
+                <span className={`ofi-prj-bell__count ${items.length > 0 ? 'is-hot' : ''}`}>{items.length}</span>
             </button>
 
             {open && items.length > 0 && createPortal(
                 <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex justify-center p-4">
-                    <div className="ofi-rise-in pointer-events-auto w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(16,24,40,0.18)] dark:border-white/15 dark:bg-[#1d2024]">
-                        <header className="flex items-center justify-between gap-2 border-b border-slate-200 px-3.5 py-2 dark:border-white/10">
-                            <span className="flex items-center gap-2 text-[12px] font-semibold text-slate-700 dark:text-white">
-                                <Bell01 size={13} />
+                    <div className="ofi-rise-in ofi-prj-notes">
+                        <header className="ofi-prj-notes__head">
+                            <span className="flex items-center gap-2">
+                                <Bell01 size={14} />
                                 {t('projects.detail.notifications')}
-                                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#8a5f08] px-1 text-[10px] font-bold text-white dark:bg-[#e6cf9e] dark:text-black">
-                                    {items.length}
-                                </span>
+                                <span className="ofi-prj-bell__count is-hot">{items.length}</span>
                             </span>
                             <button
                                 type="button"
                                 aria-label={t('projects.detail.dismiss')}
                                 onClick={() => setOpen(false)}
-                                className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+                                className="ofi-prj-glyph"
                             >
-                                <X size={14} />
+                                <X size={15} />
                             </button>
                         </header>
 
                         {/* One line per notification, stacked — the whole list in one window. */}
-                        <ul className="divide-y divide-slate-100 dark:divide-white/10">
+                        <ul className="ofi-prj-notes__list">
                             {items.map((item) => (
                                 <li key={item.key}>
                                     <button
                                         type="button"
                                         onClick={() => { setOpen(false); item.onOpen(); }}
-                                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                                        className="ofi-prj-notes__row"
                                     >
-                                        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${
-                                            item.critical
-                                                ? 'bg-rose-500/12 text-rose-600 dark:text-rose-300'
-                                                : 'bg-[#8a5f08]/10 text-[#8a5f08] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]'
-                                        }`}>
+                                        <span className={`ofi-prj-notes__mark ${item.critical ? 'is-critical' : ''}`}>
                                             {item.icon}
                                         </span>
                                         <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-[12.5px] font-semibold text-slate-900 dark:text-white">
-                                                {item.title}
-                                            </span>
-                                            <span className="block truncate text-[11px] text-slate-500 dark:text-white/60">
+                                            <span className="ofi-prj-cut ofi-prj-strong text-[12.5px]">{item.title}</span>
+                                            <span className="ofi-prj-sub ofi-prj-cut">
                                                 {item.tag}{item.subtitle ? ` · ${item.subtitle}` : ''}
                                             </span>
                                         </span>
-                                        <ChevronRight size={15} className="shrink-0 text-slate-400 dark:text-white/30" />
+                                        <ChevronRight size={15} className="ofi-prj-arrow" />
                                     </button>
                                 </li>
                             ))}

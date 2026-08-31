@@ -18,7 +18,7 @@ export const BottomSheet = ({
     footer,
     width = 900,
     height = 720,
-    zIndex = 80,
+    zIndex = 650,
     children,
 }: {
     open: boolean;
@@ -41,10 +41,12 @@ export const BottomSheet = ({
             <section
                 role="dialog"
                 aria-modal="true"
-                className="ofi-sheet ofi-sheet-up relative flex w-full flex-col overflow-hidden rounded-t-2xl"
+                /* `.ofi-pop.is-sheet` — siehe index.css, "FENSTER-OBERFLÄCHE":
+                   die zwei oberen Ecken in der Fensterkante der Anwendung. */
+                className="ofi-sheet ofi-sheet-up ofi-pop is-sheet relative flex w-full flex-col overflow-hidden"
                 style={{ maxWidth: width, height: `min(${height}px, 92vh)` }}
             >
-                <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-white/10">
+                <header className="ofi-pop__rule flex items-center justify-between gap-3 border-b px-4 py-3">
                     <div className="flex min-w-0 items-center gap-2">
                         {onBack && (
                             <button
@@ -52,14 +54,14 @@ export const BottomSheet = ({
                                 aria-label={t('common.back')}
                                 title={t('common.back')}
                                 onClick={onBack}
-                                className="ofi-rs-nav flex size-8 shrink-0 items-center justify-center rounded-md transition-colors"
+                                className="ofi-float-card__iconbtn shrink-0"
                             >
                                 <ArrowLeft size={15} />
                             </button>
                         )}
                         <div className="min-w-0">
-                            <h2 className="truncate text-[14px] font-bold text-slate-900 dark:text-white">{title}</h2>
-                            {subtitle && <div className="mt-0.5 truncate text-[11.5px] text-slate-500 dark:text-white/60">{subtitle}</div>}
+                            <h2 className="ofi-pop__title">{title}</h2>
+                            {subtitle && <div className="ofi-pop__subtitle">{subtitle}</div>}
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -68,7 +70,7 @@ export const BottomSheet = ({
                             type="button"
                             aria-label={t('common.close')}
                             onClick={onClose}
-                            className="ofi-rs-nav flex size-8 items-center justify-center rounded-md transition-colors"
+                            className="ofi-float-card__iconbtn shrink-0"
                         >
                             <X size={16} />
                         </button>
@@ -80,7 +82,7 @@ export const BottomSheet = ({
                 </div>
 
                 {footer && (
-                    <footer className="flex items-center justify-between gap-2 border-t border-slate-200 px-4 py-2.5 dark:border-white/10">
+                    <footer className="ofi-pop__rule flex items-center justify-between gap-2 border-t px-4 py-2.5">
                         {footer}
                     </footer>
                 )}

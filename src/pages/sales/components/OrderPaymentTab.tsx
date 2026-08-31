@@ -12,7 +12,6 @@ import {
 import { myOrdersApi } from '@/lib/api/billing';
 import type { MyOrderDetailDto } from '@/types/billing';
 
-import { Card } from '../../../components/ui-shared/Card';
 import { Button } from '../../../components/ui-shared/Button';
 
 const fmtMoney = (value: number) =>
@@ -56,25 +55,32 @@ export const OrderPaymentTab = ({ order, onChanged }: OrderPaymentTabProps) => {
 
     // Başlık ve açıklama metni YOK (kullanıcı isteği): sekmede yalnızca taksit
     // satırları, "Rate hinzufügen" düğmesi ve Kaydet durur.
+    //
+    // Derselbe Plan steht auch im Zahlungsplan-Fenster; er traegt hier darum
+    // dasselbe Kleid (`.ofi-inv-card` + `.ofi-inv-plan`, Google-clean
+    // 19.08.2026) — sonst saehe ein und dieselbe Tabelle an zwei Orten
+    // verschieden aus.
     return (
-        <Card>
-            <div className="max-w-xl space-y-3">
-                <PaymentScheduleEditor
-                    stages={stages}
-                    onChange={setStages}
-                    baseTotal={order.totalAmount}
-                    formatMoney={fmtMoney}
-                    /* Onay işareti ÖDENEN payı izler (plan popup'ıyla aynı kural):
-                       kesilmiş ama ödenmemiş fatura taksiti kapatmaz. */
-                    billedPercent={order.billingSummary?.paidPercent ?? 0}
-                    hideEmptyHint
-                />
+        <div className="ofi-inv-card ofi-inv-scope">
+            <div className="ofi-inv-pop__pad max-w-xl space-y-3">
+                <div className="ofi-inv-plan">
+                    <PaymentScheduleEditor
+                        stages={stages}
+                        onChange={setStages}
+                        baseTotal={order.totalAmount}
+                        formatMoney={fmtMoney}
+                        /* Onay işareti ÖDENEN payı izler (plan popup'ıyla aynı kural):
+                           kesilmiş ama ödenmemiş fatura taksiti kapatmaz. */
+                        billedPercent={order.billingSummary?.paidPercent ?? 0}
+                        hideEmptyHint
+                    />
+                </div>
                 <div className="flex justify-end">
                     <Button variant="primary" size="md" loading={saving} disabled={!canSave} onClick={save}>
                         {t('common.save')}
                     </Button>
                 </div>
             </div>
-        </Card>
+        </div>
     );
 };

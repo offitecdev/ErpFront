@@ -33,7 +33,9 @@ export const BillingButton: React.FC<BillingButtonProps> = ({
 
     if (typeof remainingPercent === 'number' && remainingPercent <= 0) {
         return (
-            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+            /* Google-clean (19.08.2026): weiche Pille statt Kasten, dieselbe
+               Marke wie der Zahlungseingang in der Rechnungsliste. */
+            <span className="ofi-inv-state is-paid">
                 <Check size={12} strokeWidth={3} />
                 {t('billing.fullyBilledChip')}
             </span>

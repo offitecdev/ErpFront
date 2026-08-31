@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { Plus } from '@/components/icons/antIconCompat';
+import { Edit01, Plus } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import type { CustomerLocationDto } from '@/lib/api/customer';
 
@@ -21,6 +22,47 @@ const tinyMetaSpinner = (
 // those to the card's own surface with !important, which turned this block into
 // an unreadable dark slab in dark mode.
 const readBackClass = 'ofi-addr-box rounded-[2px] px-2.5 py-1.5 text-[12px] leading-[1.45]';
+
+type TenderAddressFreeTextProps = {
+    value: string;
+    /** Getrimmter Text — leer wird als `null` gemeldet (Slot folgt wieder der Hauptadresse). */
+    onCommit: (value: string | null) => void;
+    ariaLabel: string;
+    placeholder?: string;
+};
+
+// FREI ERFASSTE KUNDSCHAFT (kein CRM-Kunde): Es gibt keine gespeicherten
+// Adressen, aus denen ein Picker wählen könnte — die Anschrift wird DIREKT als
+// Text an der Offerte eingetippt (Benutzerwunsch). Mehrzeilig, weil das PDF die
+// Adresse zeilenweise druckt. Übernommen wird beim Verlassen des Feldes; wie
+// jede andere Kopfänderung ist das nur GESTAGED und wird erst mit "Speichern"
+// persistiert.
+export const TenderAddressFreeText = ({ value, onCommit, ariaLabel, placeholder }: TenderAddressFreeTextProps) => {
+    const [draft, setDraft] = useState(value);
+    // Von aussen geänderte Werte (Detail-Fetch, Verwerfen, eigener Commit)
+    // direkt beim Rendern übernehmen — das "adjust state when props change"-
+    // Muster, ohne Effekt und ohne Kaskadenrender.
+    const [lastValue, setLastValue] = useState(value);
+    if (value !== lastValue) {
+        setLastValue(value);
+        setDraft(value);
+    }
+    return (
+        <textarea
+            rows={2}
+            value={draft}
+            aria-label={ariaLabel}
+            placeholder={placeholder}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={() => {
+                const trimmed = draft.trim();
+                if (trimmed === value.trim()) return;
+                onCommit(trimmed || null);
+            }}
+            className="ofi-quote-control w-full min-w-0 resize-none rounded-[6px] border border-transparent px-3 py-1.5 text-left text-[13px] font-medium leading-[1.45] outline-none transition-[border-color,background-color] duration-150 placeholder:font-normal"
+        />
+    );
+};
 
 type TenderAddressPickerProps = {
     storedValue: string;
@@ -116,28 +158,77 @@ type TenderMainAddressRowProps = {
     value: string;
     hasCustomer: boolean;
     onAdd: () => void;
+    /** Adresse VON HAND — gilt nur für diese Offerte (Kundenstamm unberührt). */
+    onEdit: () => void;
+    /** Weicht die Anschrift vom Kundenstamm ab? Dann sagt es die Zeile. */
+    isOwn?: boolean;
     renderLines: (value: string) => ReactNode;
+    /** Frei erfasste Kundschaft: die Hauptadresse wird DIREKT hier getippt. */
+    editable?: boolean;
+    onCommit?: (value: string | null) => void;
+    editPlaceholder?: string;
 };
 
 // The Hauptadresse: the customer's own address, and the source every other
-// address slot defaults to. It is not picked here — it belongs to the customer
-// record — so the row only reads it back. The "+" appears only while the
-// customer has no address at all, since without one no slot can be filled.
-export const TenderMainAddressRow = ({ value, hasCustomer, onAdd, renderLines }: TenderMainAddressRowProps) => (
+// address slot defaults to. Sie wird hier NICHT aus den gespeicherten Adressen
+// gepickt — sie gehört zur Kundschaft —, ist seit 05.09.2026 aber von Hand
+// überschreibbar: der Stift öffnet die Kundenangaben DIESER Offerte, damit auch
+// eine Anschrift erfasst werden kann, die es im CRM (noch) nicht gibt. Das "+"
+// legt sie stattdessen beim Kunden an und erscheint nur, solange er gar keine
+// Adresse hat.
+//
+// FREI ERFASSTE KUNDSCHAFT (`editable`): ohne CRM-Kunden ist die Zeile kein
+// Schaukasten, sondern das Eingabefeld selbst — die Adresse wird direkt hier
+// getippt; der Stift daneben öffnet weiterhin die vollen Kundenangaben.
+export const TenderMainAddressRow = ({
+    value,
+    hasCustomer,
+    onAdd,
+    onEdit,
+    isOwn = false,
+    renderLines,
+    editable = false,
+    onCommit,
+    editPlaceholder,
+}: TenderMainAddressRowProps) => (
     <div className="flex items-start gap-1.5">
-        <div className={`min-w-0 flex-1 ${readBackClass}`}>
-            {value
-                ? renderLines(value)
-                : <span className="text-slate-400">{t('tenders.address_info_not_found')}</span>}
-        </div>
-        {!value && (
+        {editable && onCommit ? (
+            <div className="min-w-0 flex-1">
+                <TenderAddressFreeText
+                    value={value}
+                    onCommit={onCommit}
+                    ariaLabel={t('address.sectionTitle')}
+                    placeholder={editPlaceholder}
+                />
+            </div>
+        ) : (
+            <div className={`min-w-0 flex-1 ${readBackClass}`}>
+                {value
+                    ? renderLines(value)
+                    : <span className="text-slate-400">{t('tenders.address_info_not_found')}</span>}
+                {isOwn && (
+                    <span className="mt-0.5 block text-[11px] text-slate-400">
+                        {t('tenders.manualCustomer.ownDataNote')}
+                    </span>
+                )}
+            </div>
+        )}
+        <button
+            type="button"
+            onClick={onEdit}
+            title={t('tenders.manualCustomer.title')}
+            aria-label={t('tenders.manualCustomer.title')}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+        >
+            <Edit01 size={13} />
+        </button>
+        {!value && hasCustomer && (
             <button
                 type="button"
                 onClick={onAdd}
-                disabled={!hasCustomer}
                 title={t('crm.addAddressTitle')}
                 aria-label={t('crm.addAddressTitle')}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654] disabled:opacity-40"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
             >
                 <Plus size={13} />
             </button>
