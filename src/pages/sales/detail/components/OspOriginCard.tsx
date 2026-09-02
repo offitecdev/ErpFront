@@ -5,21 +5,25 @@ import { AlertTriangle, RefreshCcw01 } from '@/components/icons/antIconCompat';
 import { OspMark, OspPdfIcon } from '@/components/icons/OspMark';
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
 import { t } from '@/i18n/translate';
-import { ospApi, type OspDocumentDto } from '@/lib/api/osp';
+import { ospApi, type OspDocumentDto, type OspUnitDto } from '@/lib/api/osp';
+import { changeSummary } from '@/pages/sales/osp/ospChanges';
 
 /**
  * ── HERKUNFT AUS DER OSP (19.09.2026) ────────────────────────────────────────
  *
  * Eine Offerte, die aus einer Anfrage der Offitec Selection Platform entstanden
- * ist, trägt sie hier sichtbar: Zeichen, Belegreferenz, Stand — und das
- * DATENBLATT, aus dem offeriert wird, als Kachel "OSP PDF".
+ * ist, trägt sie hier sichtbar: Zeichen, Projektnummer, Stand — und die
+ * DATENBLÄTTER, aus denen offeriert wird, je Einheit eine Kachel "OSP PDF".
  *
- * Der Grund für die Karte ist aber die WARNUNG. Die anfragende Person darf
- * ihre Einheit drüben weiterrechnen, nachdem sie die Anfrage gestellt hat; tut
- * sie das und fragt erneut an, kommt dieselbe Anfrage neu gerechnet zurück
- * (§1a). Das Datenblatt, aus dem hier offeriert wurde, gilt dann NICHT MEHR —
- * und niemand merkt es, wenn es nicht an der Offerte selbst steht. Genau
- * deshalb steht es hier und nicht bloss in der OSP-Liste.
+ * Der Grund für die Karte ist aber die WARNUNG. Die anfragende Person darf ihr
+ * Projekt drüben weiterbearbeiten, nachdem sie es angefragt hat, und es gibt
+ * ZWEI Wege, auf denen unser Datenblatt dadurch ungültig wird:
+ *
+ *  • Sie fragt ERNEUT an (§1a) — dann kommt dieselbe Anfrage geändert zurück,
+ *    und `changes` sagt, was sich bewegt hat.
+ *  • Sie rechnet bloss weiter (§1c) — niemand fragt etwas, aber die OSP rendert
+ *    das Datenblatt neu und LÖSCHT die alte Datei. Auch das steht hier, denn
+ *    sonst offeriert jemand aus einem Blatt, das es drüben nicht mehr gibt.
  *
  * Die Warnung verschwindet, wenn jemand sie zur Kenntnis nimmt; `revisedAt`
  * bleibt als Verlauf stehen. Kommt die nächste Überarbeitung, lebt sie auf.
@@ -43,13 +47,24 @@ const hasOpenRevision = (doc: OspDocumentDto): boolean => {
     return new Date(doc.revisedAt).getTime() > new Date(doc.revisionSeenAt).getTime();
 };
 
+/** Hat der Aktivitätsstrom (§1c) seither ein Datenblatt neu rendern lassen? */
+const hasOpenFeedRevision = (doc: OspDocumentDto): boolean => {
+    if (!doc.feedRevisedAt) return false;
+    if (!doc.revisionSeenAt) return true;
+    return new Date(doc.feedRevisedAt).getTime() > new Date(doc.revisionSeenAt).getTime();
+};
+
+const unitTitle = (unit: OspUnitDto): string => (
+    unit.unitModel || unit.unitName || t('osp.unitFallback', { id: unit.ospDocumentId })
+);
+
 export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
     const [doc, setDoc] = useState<OspDocumentDto | null>(null);
     const [busy, setBusy] = useState(false);
 
-    /* Das Datenblatt in der gemeinsamen PDF-Vorschau — dasselbe Fenster wie
-       bei Offerte und Rapport. */
-    const [sheetOpen, setSheetOpen] = useState(false);
+    /* Das Datenblatt EINER Einheit in der gemeinsamen PDF-Vorschau — dasselbe
+       Fenster wie bei Offerte und Rapport. */
+    const [sheetUnit, setSheetUnit] = useState<OspUnitDto | null>(null);
     const [sheetBlob, setSheetBlob] = useState<Blob | null>(null);
     const [sheetLoading, setSheetLoading] = useState(false);
 
@@ -63,38 +78,41 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
         return () => { cancelled = true; };
     }, [tenderId]);
 
-    const openDatasheet = useCallback(async () => {
-        if (!doc) return;
-        setSheetOpen(true);
-        if (sheetBlob) return;
+    const openDatasheet = useCallback(async (unit: OspUnitDto) => {
+        setSheetUnit(unit);
+        setSheetBlob(null);
         setSheetLoading(true);
         try {
-            let row = doc;
-            // Liegt das PDF noch nicht bei uns, einmal nachholen — das ist der
-            // Normalfall für Zeilen, die vor dem Datenblatt-Feld entstanden.
+            let row = unit;
+            // Liegt das PDF noch nicht bei uns, einmal nachholen — der
+            // Normalfall, wenn die OSP es zwischenzeitlich neu gerendert hat.
             if (!row.datasheetFile) {
-                row = await ospApi.refetchDatasheet(doc.id);
-                setDoc(row);
+                row = await ospApi.refetchDatasheet(unit.id);
+                setDoc((current) => (current
+                    ? { ...current, units: (current.units || []).map((entry) => (entry.id === row.id ? row : entry)) }
+                    : current));
+                setSheetUnit(row);
                 if (!row.datasheetFile) {
                     toast.error(row.datasheetError || t('osp.datasheetFailed'));
-                    setSheetOpen(false);
+                    setSheetUnit(null);
                     return;
                 }
             }
             setSheetBlob(await ospApi.datasheet(row.id));
         } catch (error: any) {
             toast.error(error?.response?.data?.error || t('osp.datasheetFailed'));
-            setSheetOpen(false);
+            setSheetUnit(null);
         } finally {
             setSheetLoading(false);
         }
-    }, [doc, sheetBlob]);
+    }, []);
 
     const acknowledgeRevision = async () => {
         if (!doc) return;
         setBusy(true);
         try {
-            setDoc(await ospApi.markRevisionSeen(doc.id));
+            const updated = await ospApi.markRevisionSeen(doc.id);
+            setDoc({ ...updated, units: updated.units ?? doc.units });
         } catch (error: any) {
             toast.error(error?.response?.data?.error || t('osp.saveError'));
         } finally {
@@ -104,19 +122,22 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
 
     if (!doc) return null;
 
+    const units = doc.units ?? [];
     const revisionOpen = hasOpenRevision(doc);
+    const feedRevisionOpen = !revisionOpen && hasOpenFeedRevision(doc);
     const withdrawn = doc.status === 'WITHDRAWN';
+    const projectChanges = changeSummary(doc.changes);
 
     return (
         <section
             data-ui-card
             className="ofi-quote-card relative z-10 mb-2 overflow-hidden rounded-lg border border-[#e6e8eb] bg-white"
         >
-            {/* EINE Zeile (Vorgabe 19.09.2026): Zeichen, Herkunft, Referenz,
-                Stand, Zuständige, Einheit, Firma — und rechts das Datenblatt.
-                Kein Umbruch: wird es eng, rollt die Zeile in der Karte, statt
-                sich zu stapeln. Die Warnungen darunter erscheinen NUR, wenn es
-                etwas zu warnen gibt. */}
+            {/* EINE Zeile (Vorgabe 19.09.2026): Zeichen, Herkunft, Projektnummer,
+                Stand, Zuständige, Einheiten, Firma — und rechts die
+                Datenblätter. Kein Umbruch: wird es eng, rollt die Zeile in der
+                Karte, statt sich zu stapeln. Die Warnungen darunter erscheinen
+                NUR, wenn es etwas zu warnen gibt. */}
             <div className="ofi-osp-origin flex items-center gap-x-3 overflow-x-auto px-4 py-2 [scrollbar-width:thin]">
                 <OspMark size={24} variant="tile" className="shrink-0" />
                 <span className="shrink-0 text-[13px] font-semibold tracking-[0.01em] text-[#1f2654]">
@@ -132,10 +153,10 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
                         {doc.salespersonName}
                     </span>
                 )}
-                {doc.model && (
+                {units.length > 0 && (
                     <span className="shrink-0 whitespace-nowrap text-[12px] text-slate-600">
-                        <span className="text-slate-400">{t('osp.colUnit')}: </span>
-                        {doc.model}
+                        <span className="text-slate-400">{t('osp.colUnits')}: </span>
+                        {units.map(unitTitle).join(', ')}
                     </span>
                 )}
                 {doc.company && (
@@ -144,39 +165,68 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
                         {doc.company}
                     </span>
                 )}
-                {/* Das Datenblatt der Einheit — die Datei, aus der offeriert
-                    wird. "OSP PDF", weil sie von drüben stammt und nicht aus
-                    unserem Anhang. */}
-                {(doc.datasheetUrl || doc.datasheetFile) && (
-                    <button
-                        type="button"
-                        className="ofi-osp-sheetbtn ml-auto shrink-0"
-                        title={t('osp.datasheetOpen')}
-                        onClick={() => void openDatasheet()}
-                    >
-                        <OspPdfIcon size={26} />
-                        {t('osp.datasheetTile')}
-                    </button>
+                {/* Die Datenblätter der Einheiten — die Dateien, aus denen
+                    offeriert wird. "OSP PDF", weil sie von drüben stammen und
+                    nicht aus unserem Anhang. Eine Kachel je Einheit: ein
+                    Projekt kann mehrere haben. */}
+                {units.length > 0 && (
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                        {units.filter((unit) => unit.pdfUrl || unit.datasheetFile).map((unit) => (
+                            <button
+                                key={unit.id}
+                                type="button"
+                                className="ofi-osp-sheetbtn shrink-0"
+                                title={`${t('osp.datasheetOpen')} — ${unitTitle(unit)}`}
+                                onClick={() => void openDatasheet(unit)}
+                            >
+                                <OspPdfIcon size={26} />
+                                {units.length > 1 ? unitTitle(unit) : t('osp.datasheetTile')}
+                            </button>
+                        ))}
+                    </span>
                 )}
             </div>
 
-            {/* Neu gerechnet (§1a): die Einheit drüben hat sich geändert, das
-                Datenblatt hier ist überholt. */}
+            {/* Geändert und erneut angefragt (§1a): das Datenblatt hier ist
+                überholt — und `changes` sagt, woran es liegt. */}
             {revisionOpen && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-amber-100 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-800">
                     <AlertTriangle size={15} className="shrink-0" />
                     <span className="min-w-0 flex-1">
                         {t('osp.origin.revisedWarning', { date: fmtDateTime(doc.revisedAt) })}
+                        {projectChanges && (
+                            <span className="ml-1 font-semibold">{projectChanges}</span>
+                        )}
                     </span>
                     <button
                         type="button"
                         className="ofi-osp-toolbtn"
-                        disabled={busy}
-                        onClick={() => void openDatasheet()}
+                        disabled={busy || !units.length}
+                        onClick={() => { const unit = units[0]; if (unit) void openDatasheet(unit); }}
                     >
                         <RefreshCcw01 size={13} />
                         {t('osp.origin.reviewDatasheet')}
                     </button>
+                    <button
+                        type="button"
+                        className="ofi-osp-toolbtn"
+                        disabled={busy}
+                        onClick={() => void acknowledgeRevision()}
+                    >
+                        {t('osp.origin.acknowledge')}
+                    </button>
+                </div>
+            )}
+
+            {/* Nur weitergerechnet (§1c): niemand hat neu angefragt, aber die
+                OSP hat das Datenblatt neu gerendert und die alte Datei
+                gelöscht. Kein Auftrag — eine Warnung. */}
+            {feedRevisionOpen && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-amber-100 bg-amber-50/70 px-4 py-2.5 text-[12.5px] text-amber-800">
+                    <AlertTriangle size={15} className="shrink-0" />
+                    <span className="min-w-0 flex-1">
+                        {t('osp.origin.feedRevisedWarning', { date: fmtDateTime(doc.feedRevisedAt) })}
+                    </span>
                     <button
                         type="button"
                         className="ofi-osp-toolbtn"
@@ -202,21 +252,21 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
 
 
             <PdfPreviewSheet
-                open={sheetOpen}
+                open={Boolean(sheetUnit)}
                 title={t('osp.datasheetTile')}
-                subtitle={[doc.reference, doc.model].filter(Boolean).join(' · ')}
+                subtitle={sheetUnit ? [doc.reference, unitTitle(sheetUnit)].filter(Boolean).join(' · ') : ''}
                 blob={sheetBlob}
                 loading={sheetLoading}
                 loadingLabel={t('osp.datasheetLoading')}
                 emptyText={t('osp.datasheetNone')}
                 downloadLabel={t('osp.datasheet')}
-                onClose={() => setSheetOpen(false)}
+                onClose={() => { setSheetUnit(null); setSheetBlob(null); }}
                 onDownload={() => {
-                    if (!sheetBlob) return;
+                    if (!sheetBlob || !sheetUnit) return;
                     const url = URL.createObjectURL(sheetBlob);
                     const anchor = document.createElement('a');
                     anchor.href = url;
-                    anchor.download = `Datenblatt-${doc.reference}.pdf`;
+                    anchor.download = `Datenblatt-${doc.reference}-${sheetUnit.ospDocumentId}.pdf`;
                     anchor.click();
                     URL.revokeObjectURL(url);
                 }}

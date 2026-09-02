@@ -27,6 +27,8 @@ export interface AppointmentDocumentDto {
     fileName: string;
     contentType: string;
     sizeBytes: number;
+    /** Permanent Cloudflare R2 URL stored in the database. */
+    url: string;
     createdAt: string;
     uploadedBy?: { id: string; firstName: string; lastName: string } | null;
 }
@@ -502,9 +504,15 @@ export const projectApi = {
         ccEmails?: string[];
         /** Kalender-Etikett; fehlt es, wird «Geplanter Termin» gesetzt. */
         labelId?: string | null;
+        /**
+         * Die Termine, die dem neuen Platz machen sollen. Sie stammen aus dem
+         * `replaceable` einer vorigen Absage (409) — der Server räumt sie in
+         * DERSELBEN Transaktion weg, in der er den neuen Einsatz anlegt.
+         */
+        replaceAppointmentIds?: string[];
     }) => {
         const res = await apiClient.post(`/projects/${id}/appointments`, input);
-        return res.data as (AppointmentDto & { seriesId?: string | null; days?: AppointmentDto[] });
+        return res.data as (AppointmentDto & { seriesId?: string | null; days?: AppointmentDto[]; replaced?: number });
     },
 
     /* ── Mehrtägige Einsätze und Terminunterlagen ─────────────────────── */
@@ -560,7 +568,7 @@ export const projectApi = {
     },
 
     /** Der Inhalt einer Unterlage kommt erst beim Oeffnen ueber die Leitung. */
-    getAppointmentDocument: async (documentId: string, opts: { technician?: boolean } = {}): Promise<AppointmentDocumentDto & { data: string }> => {
+    getAppointmentDocument: async (documentId: string, opts: { technician?: boolean } = {}): Promise<AppointmentDocumentDto> => {
         const path = opts.technician
             ? `/projects/technician/appointment-documents/${documentId}`
             : `/projects/appointment-documents/${documentId}`;
@@ -806,6 +814,8 @@ export interface DeliveryReportDto {
     orderNumber?: string | null;
 }
 
+export type ProjectListDeliveryReportDto = Pick<DeliveryReportDto, 'projectId' | 'salesOrderId' | 'isSigned'>;
+
 export type DeliveryReportInput = {
     projectId?: string | null;
     salesOrderId?: string | null;
@@ -823,6 +833,10 @@ export type DeliveryReportInput = {
 export const deliveryReportApi = {
     list: async (params?: { appointmentId?: string; projectId?: string; salesOrderId?: string }): Promise<DeliveryReportDto[]> => {
         const res = await getShared<DeliveryReportDto[]>('/delivery-reports', { params });
+        return res.data;
+    },
+    listProjectFlow: async (): Promise<ProjectListDeliveryReportDto[]> => {
+        const res = await getShared<ProjectListDeliveryReportDto[]>('/delivery-reports', { params: { view: 'project-list' } });
         return res.data;
     },
     getOne: async (id: string): Promise<DeliveryReportDto> => {

@@ -89,6 +89,8 @@ export interface TenderListItem {
     ospReference?: string | null;
     ospRevisedAt?: string | null;
     ospRevisionSeenAt?: string | null;
+    /** §1c: drüben neu gerendert, ohne dass jemand neu angefragt hätte. */
+    ospFeedRevisedAt?: string | null;
     offerAcceptedAt?: string | null;
     offerMailRecipient?: string | null;
     offerAcceptanceToken?: string | null;

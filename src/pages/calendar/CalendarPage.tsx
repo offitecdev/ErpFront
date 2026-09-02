@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
@@ -47,6 +47,7 @@ import { LabelSettingsCard } from './components/LabelSettingsCard';
 import { useCalendarLabels } from './useCalendarLabels';
 import { extendDays, type DaySpan } from './components/DayPlanRows';
 import {
+    anchorFromPoint,
     anchorFromRect,
     appointmentCalStatus,
     dayKey,
@@ -232,8 +233,24 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
     /* Aufgaben: "mir zugewiesen" oder "von mir zugewiesen" — ein "Alle" gibt es
        nicht mehr (Vorgabe 19.08.2026). */
     const [taskScope, setTaskScope] = useState<TaskScope>('me');
-    const [anchor, setAnchor] = useState(() => dayjs());
-    const [selectedDay, setSelectedDay] = useState(() => dayjs());
+    /* AUS DEN AKTIVITAETEN HERAUS (01.09.2026, Vorgabe Samet): `/calendar?
+       meeting=…&at=…` schlaegt GENAU DIESE Besprechung auf. `at` ist der volle
+       Zeitstempel des Termins — er entscheidet, welches Blatt der Kalender
+       ueberhaupt laedt (geholt wird immer nur der sichtbare Zeitraum), und
+       wird darum schon als ANFANGSZUSTAND gelesen und nicht erst in einem
+       Effekt: sonst laedt die Seite zweimal, einmal fuer heute und einmal fuer
+       den Termin. Dieselbe Bauart wie im Postfach (`/crm/mail?id=…`). */
+    const deepLinkParams = useSearchParams()[0];
+    const deepLinkMeetingId = deepLinkParams.get('meeting');
+    const deepLinkDay = useMemo(() => {
+        const raw = deepLinkParams.get('at');
+        const day = raw ? dayjs(raw) : null;
+        return day?.isValid() ? day : null;
+        // Nur der Anfangswert zaehlt — die Adresse aendert sich danach nicht mehr.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const [anchor, setAnchor] = useState(() => deepLinkDay ?? dayjs());
+    const [selectedDay, setSelectedDay] = useState(() => deepLinkDay ?? dayjs());
     /* DIE ETIKETTEN (25.08.2026). Sie ersetzen die alten Filterschalter der
        Leiste: gefiltert wird nach dem Etikett am Eintrag, nicht mehr nach
        Herkunft (Termine/Besprechungen/Wartung/Aufgaben) und schon gar nicht
@@ -813,6 +830,22 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
         setPickedTask(null);
         setDetail({ event, anchor: popupAnchor });
     }, []);
+
+    /* Die Karte zum Sprung aus den Aktivitaeten. Sie kann erst aufgehen, wenn
+       die Besprechungen des Blattes da sind — darum haengt der Effekt an der
+       Liste und nicht am Aufbau der Seite. `deepLink` ist ein Merker: er wird
+       beim ersten Treffer geleert, damit ein spaeteres Nachladen die Karte
+       nicht wieder aufschlaegt, nachdem man sie zugemacht hat. Die Karte hat
+       hier keinen Griff im Raster, an dem sie sitzen koennte — sie oeffnet in
+       der Bildmitte. */
+    const deepLinkMeeting = useRef(embed ? null : deepLinkMeetingId);
+    useEffect(() => {
+        if (!deepLinkMeeting.current) return;
+        const wanted = allEvents.find((event) => event.category === 'meetings' && event.refId === deepLinkMeeting.current);
+        if (!wanted) return;
+        deepLinkMeeting.current = null;
+        openEvent(wanted, anchorFromPoint(window.innerWidth / 2, window.innerHeight / 2));
+    }, [allEvents, openEvent]);
 
     const removeEvent = useCallback(async (event: CalEvent, scope: 'day' | 'series' = 'day') => {
         setDetail(null);

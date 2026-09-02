@@ -11,9 +11,15 @@ import { readArticleImageFile } from '../utils/image';
 /**
  * Ürün detayının SAĞ SÜTUNU — ürünün TEK görseli.
  *
- * Kaydedilmiş görsel ayrı ve önbelleklenebilir bir binary uçtan gelir. Böylece
- * 2 MB'a kadar çıkabilen base64 metni ürün detay JSON'unu ve ilk render'ı
- * bloke etmez.
+ * GÖRSEL ARTIK BİR ADRESTİR (01.09.2026). Dosya R2'de durur ve eimere bağlı
+ * kendi alan adımızdan çıkar (`https://assets.demo.offitec.ch/article-image/…`)
+ * — takvimdeki randevu belgeleriyle birebir aynı yol. Detay yanıtı bu adresi
+ * getirdiğinde `<img src>` doğrudan onu kullanır: ne ikinci bir istek, ne blob,
+ * ne base64 şişmesi; adres değişmediği için tarayıcı da önbelleğe alır.
+ *
+ * Adres yoksa (henüz taşınmamış eski kayıt) eski yol yürür: görsel ayrı ve
+ * önbelleklenebilir bir binary uçtan blob olarak gelir. İki yol yan yana
+ * çalışır, kesme tarihi yoktur.
  *
  * Yükleme ANINDA KAYDETMEZ: seçilen dosya yalnızca önizlemeye alınır ve
  * `onPick` ile üst bileşene bildirilir. Yazma işlemi ekranın ortak "Kaydet"
@@ -25,6 +31,7 @@ import { readArticleImageFile } from '../utils/image';
 export const ArticleImagePanel = ({
     canUpdate,
     articleId,
+    imageUrl,
     imageVersion,
     pending,
     onPick,
@@ -32,6 +39,8 @@ export const ArticleImagePanel = ({
     canUpdate: boolean;
     /** null = oluşturma kipi: kayıtlı görsel yok, uçtan da istenmez. */
     articleId: string | null;
+    /** Depodaki dosyanın kalıcı adresi; yoksa binary uca düşülür. */
+    imageUrl?: string | null;
     imageVersion: string;
     /** Bekleyen seçim: string = yeni görsel, null = kaldırıldı, undefined = değişmedi. */
     pending: string | null | undefined;
@@ -48,6 +57,12 @@ export const ArticleImagePanel = ({
         let objectUrl: string | null = null;
         setSaved(null);
         if (!articleId) {
+            setLoadingSaved(false);
+            return;
+        }
+        // Adres varsa iş bitti: <img> onu kendisi indirir.
+        if (imageUrl) {
+            setSaved(imageUrl);
             setLoadingSaved(false);
             return;
         }
@@ -68,7 +83,7 @@ export const ArticleImagePanel = ({
             cancelled = true;
             if (objectUrl) URL.revokeObjectURL(objectUrl);
         };
-    }, [articleId, imageVersion]);
+    }, [articleId, imageUrl, imageVersion]);
 
     // Ekranda gösterilen: bekleyen seçim varsa o, yoksa kaydedilmiş görsel.
     const shown = pending === undefined ? saved : pending;

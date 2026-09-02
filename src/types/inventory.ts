@@ -142,6 +142,15 @@ export interface ArticleDetail {
     description?: string | null;
     salePrice: number;
     itemType: ItemType;
+    /**
+     * GÖRSELİN KALICI ADRESİ (assets.demo.offitec.ch) — takvimdeki randevu
+     * belgeleriyle aynı yol. Dosya R2'de durur; bu alan doğrudan <img src>
+     * içine girer, ikinci bir istek gerekmez ve tarayıcı önbelleğe alır.
+     *
+     * Henüz taşınmamış eski bir kayıtta `null` gelir; o zaman görsel aşağıdaki
+     * `imageVersion` ile binary uçtan çekilir.
+     */
+    imageUrl?: string | null;
     /** Görsel binary URL'sinin cache-busting sürümü; base64 bu yanıta girmez. */
     imageVersion: string;
     totalQuantity: number;

@@ -338,6 +338,8 @@ export const crmApi = {
         to?: string;
         page?: number;
         pageSize?: number;
+        /** Badge-only view: returns no task rows, only the matching total. */
+        view?: 'count';
     }) => getShared<PagedResult<CrmTaskRow>>(`/crm/tasks${toQuery(params)}`).then((r) => r.data),
 
     getTask: (id: string) => apiClient.get<CrmTaskDetail>(`/crm/tasks/${id}`).then((r) => r.data),
@@ -389,6 +391,7 @@ export const crmApi = {
 
     /** Fällige Erinnerungen der angemeldeten Person (Wecker der Oberfläche). */
     listDueReminders: () => apiClient.get<DueReminder[]>('/crm/reminders/due').then((r) => r.data),
+    countDueReminders: () => apiClient.get<{ count: number }>('/crm/reminders/due', { params: { view: 'count' } }).then((r) => r.data.count),
 
     /** Gezeigte Erinnerungen stempeln, damit sie nicht erneut aufpoppen. */
     ackReminders: (ids: string[]) =>

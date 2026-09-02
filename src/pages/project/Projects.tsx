@@ -51,7 +51,7 @@ export const Projects = () => {
     const [loading, setLoading] = useState(true);
     const [flowMap, setFlowMap] = useState<Record<string, ProjectFlow>>({});
     const [addonMap, setAddonMap] = useState<Record<string, number>>({});
-    const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.list>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.list>>; invoices: Awaited<ReturnType<typeof billingApi.listInvoices>> } | null>(null);
+    const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.listProjectFlow>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.listProjectFlow>>; invoices: Awaited<ReturnType<typeof billingApi.listProjectFlowInvoices>> } | null>(null);
 
     const [search, setSearch] = useState('');
     // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı).
@@ -82,7 +82,7 @@ export const Projects = () => {
                 projectApi.list(),
                 flowSourcesRef.current
                     ? Promise.resolve(flowSourcesRef.current)
-                    : Promise.all([myOrdersApi.list(), deliveryReportApi.list(), billingApi.listInvoices()]).then(
+                    : Promise.all([myOrdersApi.listProjectFlow(), deliveryReportApi.listProjectFlow(), billingApi.listProjectFlowInvoices()]).then(
                           ([orders, deliveryReports, invoices]) => ({ orders, deliveryReports, invoices }),
                       ),
             ]);
@@ -100,7 +100,7 @@ export const Projects = () => {
                 });
                 addons[project.id] = sources.orders
                     .filter((o) => o.projectId === project.id)
-                    .reduce((n, o) => n + (o.addonSalesOrders?.length || 0), 0);
+                    .reduce((n, o) => n + (o.addonCount || 0), 0);
             }
             setProjects(list);
             setFlowMap(map);

@@ -477,13 +477,14 @@ html.dark #root .ofi-apps-glyph .ofi-apps-br { fill: #f79009; }
 html.dark #root .ofi-apps-glyph .ofi-apps-dia { fill: #ffb02e; }
 
 /* Ohne Flaeche braucht der Knopf trotzdem eine Antwort auf den Zeiger: das
-   Zeichen wird eine Spur heller und heber sich leicht. */
+   Zeichen wird eine Spur heller. Angehoben wurde es bis zum 01.09.2026
+   zusaetzlich um einen Pixel — seit der Vorgabe «beim Ueberfahren nur eine
+   Farbanimation» bleibt es stehen. */
 #root .ofi-topbar .ofi-apps-btn .ofi-apps-glyph {
-    transition: filter 140ms ease, transform 140ms ease;
+    transition: filter 140ms ease;
 }
 #root .ofi-topbar .ofi-apps-btn:hover .ofi-apps-glyph {
     filter: brightness(1.12);
-    transform: translateY(-1px);
 }
 
 
@@ -551,14 +552,12 @@ html.dark #root .ofi-apps-glyph .ofi-apps-dia { fill: #ffb02e; }
     transform: none;
 }
 
-/* Die kleine Geste des Vorbilds: beim Zeigen rutscht der Pfeil
-   ein Stück in seine Richtung, beim Drücken noch etwas weiter. */
-#root .ofi-quickback.is-back:hover .ofi-quickback__arrow,
-#root .ofi-quickback.is-back:focus-visible .ofi-quickback__arrow {
-    transform: translateX(-2px);
-}
+/* Beim Zeigen rutschte der Pfeil ein Stück in seine Richtung. Das ist am
+   01.09.2026 gefallen — Zeigen färbt, es schiebt nicht. Beim DRÜCKEN darf
+   er weiter nachgeben: das ist der Druckpunkt, den jeder Knopf der
+   Anwendung hat, hier nur auf den Pfeil selbst gelegt. */
 #root .ofi-quickback.is-back:active .ofi-quickback__arrow {
-    transform: translateX(-3px) scale(0.92);
+    transform: scale(0.92);
 }
 
 /* Zweitfenster des Doppelbildschirms: dieselbe Schale, aber eine

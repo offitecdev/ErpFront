@@ -9,6 +9,7 @@ import { t } from '@/i18n/translate';
 import { crmApi } from '@/lib/api/crm';
 import { mailMessagesApi } from '@/lib/api/mail';
 import { personnelApi } from '@/lib/api/personnel';
+import { onIdle } from '@/lib/utils/onIdle';
 import { useAuthStore } from '@/store/authStore';
 import type { LeaveCounts } from '@/pages/personnel/types/personnel';
 import { REQUEST_TYPES } from '@/pages/personnel/utils/personnel';
@@ -135,19 +136,26 @@ export const RequestsAppsMenu = () => {
        eine Zahl im Kopf zu ziehen, wäre bei jedem Takt ein Kilobyte je offener
        Aufgabe. Der Zeitraum bleibt offen — «offen» kennt keinen Stichtag. */
     const loadCounts = useCallback(() => {
-        personnelApi.leaveCounts().then(setLeaves).catch(() => setLeaves(EMPTY_LEAVES));
+        personnelApi.leaveIncomingCount()
+            .then((incoming) => setLeaves({ ...EMPTY_LEAVES, incoming }))
+            .catch(() => setLeaves(EMPTY_LEAVES));
         if (!canCrm) return;
-        mailMessagesApi.stats().then((stats) => setUnreadMail(stats.unreadInbox)).catch(() => setUnreadMail(0));
-        crmApi.listTasks({ kind: 'TASK', scope: 'me', status: 'OPEN', page: 1, pageSize: 1 })
+        mailMessagesApi.unreadCount().then(setUnreadMail).catch(() => setUnreadMail(0));
+        crmApi.listTasks({ kind: 'TASK', scope: 'me', status: 'OPEN', page: 1, pageSize: 1, view: 'count' })
             .then((page) => setOpenTasks(page.total))
             .catch(() => setOpenTasks(0));
-        crmApi.listDueReminders().then((rows) => setDueReminders(rows.length)).catch(() => setDueReminders(0));
+        crmApi.countDueReminders().then(setDueReminders).catch(() => setDueReminders(0));
     }, [canCrm]);
 
     useEffect(() => {
-        loadCounts();
+        // Header badges are secondary. Let the current route start its critical
+        // requests first instead of competing for the browser/DB connection pool.
+        const cancelIdle = onIdle(loadCounts, 4000);
         const timer = window.setInterval(loadCounts, POLL_MS);
-        return () => window.clearInterval(timer);
+        return () => {
+            cancelIdle();
+            window.clearInterval(timer);
+        };
     }, [loadCounts]);
 
     // Beim Öffnen einmal nachziehen — die Zahlen sollen stimmen, wenn man

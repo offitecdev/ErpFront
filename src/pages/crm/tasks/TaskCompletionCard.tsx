@@ -16,6 +16,7 @@ import { formatCrmDateTime, personName } from '../utils/crmFormat.utils';
 import { taskOrigin } from './taskBoardModel';
 import { TaskFilesPane } from './TaskFilesPane';
 import { TaskStepsEditor, type TaskStepChange, type TaskStepDraft } from './TaskStepsEditor';
+import { TaskTenderCombo, type TaskTenderPick } from './TaskTenderCombo';
 import { isoToSpan, spanToIso, type TaskSpanFields } from './taskSchedule';
 
 /**
@@ -122,6 +123,30 @@ const CompletionBody = ({ task, anchor, open, onClose, onSetDone, onSaveSpan, on
        geschickt — ein Kalenderklick je Tastendruck wäre eine Anfrage zu viel. */
     const [span, setSpan] = useState(() => isoToSpan(task));
 
+    /* ══ DIE OFFERTE AUCH HIER (13.09.2026, Vorgabe Samet) ═══════════════════
+     *
+     * «Sie muss sich im Aufgabenmodus hinzufügen lassen.» Bisher liess sich
+     * eine Offerte NUR beim Anlegen anhängen: wer eine bestehende Aufgabe
+     * öffnete, sah die Nummer bestenfalls als Text und hatte keinen Weg, eine
+     * nachzutragen oder die falsche zu ersetzen — die Aufgabe musste gelöscht
+     * und neu erfasst werden. Jetzt steht dasselbe Feld wie im
+     * Anlegen-Fenster in den Angaben.
+     *
+     * Die Liste ist hier NICHT auf den Kunden der Aufgabe eingeschränkt: die
+     * Karte kennt kein Kundenfeld, eine Einschränkung liesse sich also nicht
+     * aufheben und die gesuchte Offerte wäre unerreichbar. */
+    const [quote, setQuote] = useState<TaskTenderPick | null>(
+        () => (task.tender ? { id: task.tender.id, tenderNumber: task.tender.tenderNumber } : null),
+    );
+    /** Von Hand verändert? Dann darf das Nachladen sie nicht überschreiben. */
+    const quoteDirty = useRef(false);
+    /* Derselbe Stand ALS MERKER: der Schreibweg unten liest ihn, ohne auf die
+       nächste Zeichnung zu warten — sonst hätte er beim Rücksprung nach einem
+       Fehlschlag den Stand VOR der vorletzten Wahl in der Hand. */
+    const quoteRef = useRef<TaskTenderPick | null>(
+        task.tender ? { id: task.tender.id, tenderNumber: task.tender.tenderNumber } : null,
+    );
+
     const taskId = task.id;
 
     /* Notizen, Anleitung und Anhänge hängen nicht an der Listenzeile — sie
@@ -147,6 +172,11 @@ const CompletionBody = ({ task, anchor, open, onClose, onSetDone, onSaveSpan, on
                 }
                 setDocuments(loaded.documents ?? []);
                 setSpan(isoToSpan(loaded));
+                if (!quoteDirty.current) {
+                    const fresh = loaded.tender ? { id: loaded.tender.id, tenderNumber: loaded.tender.tenderNumber } : null;
+                    quoteRef.current = fresh;
+                    setQuote(fresh);
+                }
             } catch {
                 if (!cancelled) setDetail(null);
             } finally {
@@ -302,6 +332,30 @@ const CompletionBody = ({ task, anchor, open, onClose, onSetDone, onSaveSpan, on
         onSaveSpan(task, { ...spanToIso(next), allDay: next.allDay });
     }, [task, onSaveSpan]);
 
+    /**
+     * OFFERTE ANGEHÄNGT ODER GELÖST — sie geht sofort raus (es gibt keinen
+     * «Speichern»-Knopf an dieser Karte), und die Listenzeile dahinter zieht
+     * mit: die Nummer steht dort neben dem Kunden. Scheitert die Sendung,
+     * springt das Feld auf den vorherigen Stand zurück und es gibt EINE
+     * Meldung — dieselbe Hand wie beim Umterminieren.
+     */
+    const writeQuote = useCallback(async (next: TaskTenderPick | null) => {
+        quoteDirty.current = true;
+        const previous = quoteRef.current;
+        const lite = next ? { id: next.id, tenderNumber: next.tenderNumber } : null;
+        quoteRef.current = next;
+        setQuote(next);
+        try {
+            await crmApi.updateTask(taskId, { tenderId: next?.id ?? null });
+            setDetail((current) => (current ? { ...current, tenderId: lite?.id ?? null, tender: lite } : current));
+            onPatched?.(taskId, { tenderId: lite?.id ?? null, tender: lite });
+        } catch {
+            quoteRef.current = previous;
+            setQuote(previous);
+            toast.error(t('crm.tasks.updateError'));
+        }
+    }, [taskId, onPatched]);
+
     const done = task.status === 'DONE';
     const origin = taskOrigin(task, user?.id);
     const assignees = detail?.assignees ?? task.assignees;
@@ -309,7 +363,7 @@ const CompletionBody = ({ task, anchor, open, onClose, onSetDone, onSaveSpan, on
     const canWrite = participant || canManage;
     // Solange die Notizen laden, zählt der Wert der Listenzeile.
     const noteCount = detail?.notes.length ?? Number(task.noteCount ?? 0);
-    const linkedQuote = detail?.tender ?? task.tender ?? null;
+    const linkedQuote = quote;
 
     /* Ein zweiter Klick auf dasselbe Zeichen führt zurück auf die Angaben. */
     const goTo = (next: Sheet) => setSheet((current) => (current === next ? 'info' : next));
@@ -477,14 +531,21 @@ const CompletionBody = ({ task, anchor, open, onClose, onSetDone, onSaveSpan, on
                                 </dd>
                             </div>
                         )}
-                        {linkedQuote && (
-                            <div>
+                        {(canManage || linkedQuote) && (
+                            <div className={canManage ? 'is-tall' : undefined}>
                                 <dt>{t('crm.tasks.colQuote')}</dt>
                                 <dd>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <File05 size={13} />
-                                        {linkedQuote.tenderNumber}
-                                    </span>
+                                    {canManage ? (
+                                        <TaskTenderCombo
+                                            value={quote}
+                                            onChange={(next) => void writeQuote(next)}
+                                        />
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <File05 size={13} />
+                                            {linkedQuote?.tenderNumber}
+                                        </span>
+                                    )}
                                 </dd>
                             </div>
                         )}

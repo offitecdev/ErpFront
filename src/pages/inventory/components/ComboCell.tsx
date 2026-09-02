@@ -1,5 +1,6 @@
 import { Fragment, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Check } from '@/components/icons/antIconCompat';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { CELL_INPUT_CLASS } from './primitives';
 
@@ -48,6 +49,7 @@ export const ComboCell = ({
     panelClassName = '',
     keepOpenOnSelect = false,
     listWidth = 260,
+    selectedId = null,
 }: {
     /** Açık/kapalı durum çağıranda durur: veri çekmeyi de o kapatır. */
     open: boolean;
@@ -73,6 +75,16 @@ export const ComboCell = ({
     /** Açılır listenin genişliği. Tablo hücresinde dar (260) doğrudur; form
         alanında liste alanın kendisi kadar geniş olmalıdır. */
     listWidth?: number;
+    /**
+     * DIE BEREITS GEBUNDENE ZEILE (13.09.2026, Vorgabe Samet: «man muss sehen,
+     * dass das Hinzugefügte gewählt ist»). Steht hier eine Kennung, trägt genau
+     * diese Zeile in der Liste einen Haken — wer das Feld wieder aufklappt,
+     * sieht auf einen Blick, WELCHE der sieben Zeilen die gewählte ist. Ohne
+     * das sah eine gewählte Offerte genauso aus wie sechs ungewählte, und der
+     * getippte Text im Feld war der einzige Hinweis — der aber sieht aus wie
+     * blosses Getipptes.
+     */
+    selectedId?: string | null;
 }) => {
     // Vurgulanan satır index yerine ID ile tutulur: liste her yazışta yeniden
     // kurulduğu için index kayardı; kayıt listeden düşerse vurgu kendiliğinden söner.
@@ -217,6 +229,9 @@ export const ComboCell = ({
                                 <span className="shrink-0 font-mono text-[11px] text-slate-400 group-hover:!text-white/70">
                                     {option.meta}
                                 </span>
+                            )}
+                            {selectedId === option.id && (
+                                <Check size={13} className="ofi-combo-row__check shrink-0 group-hover:!text-white" />
                             )}
                         </button>
                         </Fragment>

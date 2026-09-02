@@ -1,0 +1,1205 @@
+/* =========================================================
+   Offitec — EIN KNOPF FÜR DIE GANZE ANWENDUNG (01.09.2026)
+
+   Vorgabe Samet, erste Fassung: «Der Knopf soll eine
+   Farbbewegung haben und beim Drücken spürbar antworten —
+   das gilt für ALLE Knöpfe. Alle Knöpfe müssen gleich
+   gross sein und nicht klein.»
+
+   Nachtrag Samet, gleicher Tag: «Beim Klicken soll jeder
+   Knopf leicht schrumpfen. Beim Überfahren NUR eine
+   Farbanimation — nichts, was von der Seite hereinfährt.»
+   Damit ist die Welle, die von links nach rechts über den
+   Knopf lief, ersatzlos gestrichen: die Farbe wechselt jetzt
+   auf der GANZEN Fläche zugleich, und die einzige Bewegung,
+   die ein Knopf noch macht, ist der Druckpunkt.
+
+   Gemessen war der Bestand dreifach uneinheitlich:
+     · Höhe    28px (`py-1.5`) neben 38px (`py-2.5`) neben den
+               36px der Fensterknöpfe (`.ofi-cal-btn`)
+     · Schrift 12px neben 12,5px neben 14px
+     · Bewegung nur die Markenknöpfe hatten überhaupt eine —
+               und die lief von UNTEN nach oben.
+
+   Diese Datei setzt dagegen EINEN Knopf: eine Höhe, ein
+   Innenmass, eine Schriftgrösse, EIN Farbwechsel, EIN
+   Druckpunkt.
+
+   Ladereihenfolge (main.tsx):
+     fonts.css → index.css → refine.css → DIESE DATEI
+   Sie steht zuletzt und ausserhalb jeder `@layer`. Beides
+   zusammen ist der Grund, warum sie ohne `!important` gegen
+   Tailwinds `px-3 py-1.5 text-[12px]` gewinnt (ungeschichtete
+   Regeln schlagen geschichtete). `!important` steht nur dort,
+   wo index.css selbst welches trägt.
+
+   ── AUFBAU ─────────────────────────────────────────────────
+   Es gibt genau ZWEI Selektorgruppen, und beide tragen
+   dieselben drei Teile:
+
+     TRÄGER   `#root …` und `body > :not(#root) …` — Fenster
+              hängen in einem Portal ausserhalb von #root und
+              brauchen deshalb immer ihren Zwilling
+              (siehe Notiz „Portal popups need a CSS twin").
+     LISTE    was ein Handlungsknopf ist.
+     SPERRE   was trotz `<button>` KEINER ist.
+
+   Die SPERRE steht bewusst als `:not(:is(…))` am Knopf selbst
+   und NICHT als zweite Regel, die hinterher wieder zurück-
+   setzt. Ein Rücksetzer müsste `revert-layer` benutzen, und
+   das würde nicht nur die Werte DIESER Datei verwerfen,
+   sondern jede ungeschichtete Erklärung davor — ein
+   `.ofi-cal-btn` in einer Tabellenzelle verlöre damit auch
+   sein `display: inline-flex` aus index.css. Was gar nicht
+   erst zutrifft, kann auch nichts kaputtmachen.
+
+   ── AUSSTIEGE, wenn ein Knopf sein eigenes Mass braucht ────
+     · `.ofi-btn-plain` — der ausdrückliche Ausstieg hier
+     · `.ofi-nosize`    — der bestehende Ausstieg der
+                          Kopfleiste, gilt jetzt auch hier
+   ========================================================= */
+
+:root {
+    /* EIN Mass — und zwar KEIN neues: 40px/16px/14px ist der Bedienstandard,
+       den index.css seit je für AntD-Knöpfe und Eingabefelder setzt
+       (`--ofi-control-height`, `--ofi-control-font-size`, Abschnitt „Form and
+       action-control standard"). Diese Datei trägt ihn nur auf die rund 850
+       rohen `<button>`-Fundstellen weiter, die ihn bisher nicht kannten.
+       Knopf und Suchfeld einer Werkzeugleiste stehen damit auf derselben
+       Linie. Die drei Werte stehen als Zahlen und nicht als `var(…)` auf die
+       Steuervariablen: `--ofi-control-height` wird in der Kopfleiste auf 44px
+       umgebogen, und ein Knopf soll nicht mitwachsen, nur weil er zufällig in
+       einem Bereich sitzt, der seine Felder höher stellt. Der Bezug steht
+       dafür AUF BEIDEN SEITEN im Kommentar — wer eines ändert, ändert beides. */
+    --ofi-btn-height: 40px;
+    --ofi-btn-padding-x: 16px;
+    /* Bewusst knapp: senkrecht mittig sitzt die Beschriftung über
+       `align-items: center`, die Polsterung ist nur die Reserve für
+       zweizeilige Beschriftungen. Knapp gehalten, damit Rahmen + Polsterung +
+       Zeilenhöhe zusammen unter dem gemeinsamen Mass bleiben — sonst hat
+       `min-height` nichts mehr zu klemmen und der Knopf wächst über 40px
+       hinaus (mit einer 4px-Kante gemessen: 41px statt 40px). */
+    --ofi-btn-padding-y: 2px;
+    --ofi-btn-font-size: 14px;
+
+    /* Die Kante bleibt 1px. Die 4px aus der Vorgabe vom 01.09.2026 waren der
+       RADIUS, nicht die Rahmenbreite — siehe `--ofi-btn-radius`. Die Breite
+       steht trotzdem weiter als Variable, denn die Farbfläche muss sie
+       kennen: nur wer weiss, wie breit der Rahmen ist, kann ihn auch decken
+       (siehe `--ofi-btn-tint-inset`). Eine dickere Kante ist damit eine
+       Ein-Zeilen-Änderung — `--ofi-btn-padding-y` unten hat dafür schon die
+       nötige Luft. */
+    --ofi-btn-border-width: 1px;
+
+    /* Die Ecke. 4px (Vorgabe 01.09.2026: «der Radius soll 4px sein»). Vorher
+       standen die Knöpfe je nach Herkunft auf 10px (AntD), 7px (die
+       plattgedrückten `rounded-*`) oder als Pille auf 999px.
+
+       Der Radius MUSS am Kasten hängen und nicht an der Farbfläche: die
+       Fläche erbt ihn (`border-radius: inherit`) und trägt keinen eigenen.
+       Sonst müsste jede Ausnahme (die Pillen der Offertenseite etwa) ihren
+       Radius an ZWEI Stellen setzen — und die Fläche bekäme beim Vergessen
+       eckige Ecken auf einem runden Knopf. */
+    --ofi-btn-radius: 4px;
+
+    /* Der Farbwechsel — Zeit und Kurve sind ABGESCHRIEBEN, nicht erfunden.
+
+       Vorgabe Samet 01.09.2026: «die Knopf-Bewegung soll sein wie beim
+       Verkaufs-PDF im Projekt». Das ist `.ofi-ordconf-btn` (index.css,
+       Abschnitt Auftragsbestätigung): der Knopf färbt sich beim Überfahren
+       über die ganze Fläche um, in `140ms ease`, ohne dass irgendetwas
+       durchläuft. Genau diese Zeit und diese Kurve stehen jetzt hier und
+       gelten damit für JEDEN Knopf. Wer eines ändert, ändert beides — der
+       Hinweis steht auf beiden Seiten.
+
+       Die 620/300ms der alten Welle sind ausdrücklich NICHT geblieben: eine
+       Farbe, die quer über den Knopf läuft, muss man laufen sehen — eine
+       Farbe, die auf der ganzen Fläche zugleich umschlägt, wirkt bei
+       derselben Dauer nur noch träge und hängt dem Zeiger hinterher. */
+    --ofi-btn-tint-in: 140ms;
+    --ofi-btn-tint-out: 140ms;
+    /* `ease` — dieselbe Kurve wie beim Vorbild. Die vorher absichtlich
+       gleichmässige Kurve (0.35, 0, 0.25, 1) hatte nur so lange einen Sinn,
+       wie die Farbe eine Strecke zurücklegte; bei einem Wechsel am Ort
+       zögert sie nur. */
+    --ofi-btn-tint-ease: ease;
+    --ofi-btn-tint-ease-out: ease;
+
+    /* Die Farbe, die beim Überfahren aufblendet — für neutrale Knöpfe ein
+       Hauch Marineblau. Markenknöpfe und Fensterknöpfe lenken die Variable
+       um (Abschnitt 3), die Mechanik bleibt dieselbe. */
+    --ofi-btn-tint-fill: rgba(39, 47, 103, 0.13);
+
+    /* Druckpunkt — seit dem Nachtrag vom 01.09.2026 die EINZIGE Bewegung,
+       die ein Knopf macht. 0.965 ist spürbar, ohne dass die Beschriftung
+       springt. */
+    --ofi-btn-press-scale: 0.965;
+    --ofi-btn-press-ms: 90ms;
+}
+
+.dark {
+    --ofi-btn-tint-fill: rgba(255, 255, 255, 0.14);
+}
+
+
+/* ═════════ 1 + 2. EINE GRÖSSE, EIN FARBWECHSEL ══════════════
+   GRÖSSE — `min-height` statt `height`: ein Knopf, der aus einem anderen
+   Grund höher ist (Kachel, zweizeilige Beschriftung), bleibt höher; er
+   wird nur nie mehr kleiner als das gemeinsame Mass.
+
+   `display: inline-flex` + `align-items: center` müssen mit, sonst hängt
+   die Beschriftung eines nicht-flex Knopfes oben im gewachsenen Kasten.
+   `justify-content` wird bewusst NICHT gesetzt: Knöpfe mit
+   `justify-between` (Beschriftung links, Pfeil rechts) fielen sonst
+   zusammen. Als Kind eines Flex-Behälters ist der Unterschied ohnehin
+   keiner — Flex-Kinder werden blockifiziert.
+
+   FARBE — `position: relative` + `isolation: isolate` spannen den eigenen
+   Stapel auf, in dem die Farbe als `::before` mit `z-index: -1` liegt:
+   ÜBER dem Grund und dem Rahmen, UNTER der Beschriftung. Genau die
+   Reihenfolge, die ein Farbwechsel braucht.
+
+   Kein `overflow: hidden`: das kappte Abzeichen, die absichtlich über den
+   Rand ragen (Glocke, Anfragen-Punkt). Die Rundung trägt die Farbfläche
+   stattdessen selbst, über `border-radius: inherit`.
+   ══════════════════════════════════════════════════════════ */
+#root :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-topbar *,
+    .ofi-login *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)),
+body > :not(#root) :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)) {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--ofi-btn-height);
+    padding-inline: var(--ofi-btn-padding-x);
+    padding-block: var(--ofi-btn-padding-y);
+    font-size: var(--ofi-btn-font-size);
+    position: relative;
+    isolation: isolate;
+
+    /* Ruhewert für die Farbfläche: bündig mit dem Innenkasten. Knöpfe MIT
+       Rahmen biegen ihn gleich unten auf die Rahmenbreite um, damit die
+       Fläche auch die Kante und damit die RUNDEN ECKEN deckt. Er steht als
+       eigene Variable und nicht direkt als `--ofi-btn-border-width`, weil ein
+       Knopf ohne Rahmen sonst eine Fläche bekäme, die 4px über ihn
+       hinausragt. */
+    --ofi-btn-tint-inset: 0px;
+}
+
+
+/* Die 4px-Kante — und mit ihr der Versatz, den die Farbfläche braucht.
+
+   Die Regel trifft ABSICHTLICH nicht jeden Handlungsknopf, sondern nur den
+   mit Rahmen. Tailwinds Preflight setzt auf allem `border: 0 solid` und
+   laesst die Farbe auf `currentColor`; wer nur die Breite hochdreht, malt
+   jedem rahmenlosen Knopf einen 4px-Ring in seiner Schriftfarbe. Was heute
+   keinen Rahmen hat, bekommt hier also auch keinen.
+
+   `!important`, weil index.css die Kante an drei Stellen selbst mit
+   `!important` auf 1px setzt (`.ant-btn`/`.ofi-cta`, die Markenknoepfe und
+   der Bedienstandard). Diese Regel steht spaeter UND hoeher — sie gewinnt. */
+#root :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    [class~="border"],
+    [class~="bg-[#272f67]"],
+    [class~="bg-[#1f2654]"],
+    [class~="bg-[#07145c]"],
+    [class~="bg-[#0b1a6e]"],
+    [class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-topbar *,
+    .ofi-login *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)),
+body > :not(#root) :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    [class~="border"],
+    [class~="bg-[#272f67]"],
+    [class~="bg-[#1f2654]"],
+    [class~="bg-[#07145c]"],
+    [class~="bg-[#0b1a6e]"],
+    [class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)) {
+    border-style: solid;
+    border-width: var(--ofi-btn-border-width) !important;
+    /* Jetzt weiss die Farbfläche, wie weit sie nach aussen greifen muss:
+       genau um die Rahmenbreite. Damit deckt sie den Rahmenkasten statt nur
+       den Innenkasten — und weil sie dessen Rundung erbt, liegen ihre Ecken
+       exakt auf den Ecken des Knopfes. Vorher blieb rundherum ein
+       ungestrichener Ring stehen, an den runden Ecken am deutlichsten
+       (Vorgabe 01.09.2026: «sie soll auch die Ecken decken»). */
+    --ofi-btn-tint-inset: calc(-1 * var(--ofi-btn-border-width));
+}
+
+/* Die Farbfläche in Ruhe: da, aber unsichtbar.
+
+     Ruhe   → `opacity: 0`
+     Hover  → `opacity: 1`
+
+   Kein `transform`, kein Ursprung, keine Richtung. Die Fläche deckt den
+   Knopf von Anfang an vollständig und wird nur auf- und abgeblendet —
+   genau die Vorgabe «nur eine Farbanimation, nichts, was von der Seite
+   hereinfährt».
+
+   Warum überhaupt eine Fläche und nicht `background-color` am Knopf selbst:
+   der Grund eines Knopfes kommt je nach Herkunft aus index.css, aus Tailwind
+   oder aus AntD, oft mit `!important` und in einem Dutzend Blautönen. EINE
+   Fläche darüber färbt sie alle gleich, ohne dass jede Herkunft ihre eigene
+   Hover-Farbe mitbringen muss. `opacity` läuft dabei wie `transform` im
+   Compositor: kein Layout, kein Neuzeichnen der Beschriftung. */
+#root :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-topbar *,
+    .ofi-login *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)):not(:disabled):not([disabled])::before,
+body > :not(#root) :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)):not(:disabled):not([disabled])::before {
+    /* `!important`, weil index.css die Fläche der Markenknöpfe INNERHALB
+       eines Fensters mit `content: none !important` abschaltet (Abschnitt
+       „Kein oranger Schwall IN einem Fenster"). Der WECHSEL gilt jetzt
+       überall — nur die FARBE bleibt dort eine andere, siehe Abschnitt 3. */
+    content: "" !important;
+    position: absolute;
+    inset: var(--ofi-btn-tint-inset, 0px);
+    /* `inset` allein setzt eine fremde Breite/Höhe nicht zurück — beides
+       steht hier ausdrücklich, damit die Fläche immer genau den Knopf deckt.
+       Der Versatz ist bei Knöpfen mit Rahmen negativ: die Fläche greift dann
+       um die Rahmenbreite nach aussen und liegt exakt auf dem Rahmenkasten,
+       dessen Rundung sie über `border-radius: inherit` erbt. */
+    width: auto;
+    height: auto;
+    z-index: -1;
+    background: var(--ofi-btn-tint-fill);
+    /* Die Rundung des Knopfes erben, statt ihn zu beschneiden. */
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity var(--ofi-btn-tint-out) var(--ofi-btn-tint-ease-out);
+    pointer-events: none;
+}
+
+/* Die Farbfläche sichtbar. `:focus-visible` ist mit dabei, damit ein Knopf,
+   den man mit der Tastatur ansteuert, dieselbe Antwort gibt wie einer
+   unter dem Zeiger. */
+#root :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-topbar *,
+    .ofi-login *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)):not(:disabled):not([disabled]):is(:hover, :focus-visible, :active)::before,
+body > :not(#root) :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)):not(:disabled):not([disabled]):is(:hover, :focus-visible, :active)::before {
+    /* Die Sperren stehen hier nicht zur Auswahl, sondern für das GEWICHT:
+       ein gesperrter Knopf hat ohnehin kein `::before`. Ohne sie hätte die
+       Ruheregel oben vier Klassen mehr und hielte die Fläche auf
+       `opacity: 0` fest — der Knopf sähe dann beim Überfahren einfach gar
+       nichts tun. (Genau so gemessen am 01.09.2026, bevor die Sperren hier
+       standen.) */
+    opacity: 1;
+    transition: opacity var(--ofi-btn-tint-in) var(--ofi-btn-tint-ease);
+}
+
+
+/* ═════════ 3. WELCHE FARBE AUFBLENDET ════════════════════
+   Eine Mechanik, drei Farben. Umgelenkt wird nur die Variable — die
+   `::before`-Regel oben bleibt dieselbe.
+   ══════════════════════════════════════════════════════════ */
+
+/* Markenknöpfe: das Orange des Hauses (im Dunkelmodus das gebrannte
+   Orange aus dark.css — die Variable ist dieselbe). */
+#root :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    a[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    a[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    a[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    a[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    a[class~="bg-brand-solid"]
+),
+body > :not(#root) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    a[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    a[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    a[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    a[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    a[class~="bg-brand-solid"]
+) {
+    --ofi-btn-tint-fill: var(--ofi-button-hover-fill);
+}
+
+/* Den fertigen Farbwechsel festhalten. Die aufgeblendete Fläche macht die
+   Animation; sobald sie voll steht, deckt dieser verzögerte Innenschatten
+   den marineblauen Grund vollständig, damit die Kantenglättung in den
+   runden Ecken keine dunklen Härchen stehen lässt. Der Schatten SPRINGT
+   (`0s`) — zu sehen ist davon nichts, weil die Verzögerung genau die Dauer
+   des Farbwechsels ist und die Fläche darüber in diesem Moment dieselbe
+   Farbe trägt. Ihn statt dessen zu überblenden ginge NICHT: von `none` aus
+   interpoliert der Browser die Streuung, der Schatten wüchse als Kreis aus
+   der Mitte — wieder eine Bewegung, wo keine sein soll. */
+#root :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    a[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    a[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    a[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    a[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover,
+body > :not(#root) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    a[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    a[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    a[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    a[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    a[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover {
+    border-color: var(--ofi-button-hover-fill) !important;
+    background: var(--ofi-button-navy) !important;
+    box-shadow: inset 0 0 0 999px var(--ofi-button-hover-fill) !important;
+    /* Diese Liste trägt `!important` und ERSETZT damit auch die Überblendung
+       des Druckpunktes aus Abschnitt 4 — `transition` ist eine Kurzschreib-
+       weise, sie lässt sich nicht ergänzen. Ohne die Zeile `transform` hier
+       sprang ein Markenknopf beim Klicken hart auf 0.965, statt in 90ms
+       nachzugeben (gemessen am 01.09.2026). Rahmen und Schrift laufen in
+       derselben Zeit wie die Fläche: dem Vorbild entnommen. */
+    transition:
+        border-color var(--ofi-btn-tint-in) ease,
+        color var(--ofi-btn-tint-in) ease,
+        transform var(--ofi-btn-press-ms) ease,
+        box-shadow 0s linear var(--ofi-btn-tint-in) !important;
+}
+
+/* Fensterknöpfe: KEIN Orange in einem Fenster — das steht seit dem
+   24.08.2026 fest, und daran ändert sich nichts. Was sich ändert, ist die
+   Art des Wechsels: statt eines harten Sprungs blendet ein heller Schleier
+   über dem ganzen Knopf auf. Er ist auf dem Marineblau deutlich zu sehen,
+   ohne eine zweite Farbe einzuführen. Im Dunkelmodus, wo der Akzent hell
+   ist, entsprechend andersherum. */
+#root :is(
+    .ofi-pop,
+    .ofi-float-card,
+    .ofi-tp-dialog,
+    .ofi-calendar-dialog,
+    .ofi-mailconfirm-card,
+    .ofi-slide-panel,
+    .ofi-quick-pop,
+    .ant-modal-content,
+    .ant-drawer-content
+) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    .ofi-cal-btn.is-primary
+),
+body > :not(#root) :is(
+    .ofi-pop,
+    .ofi-float-card,
+    .ofi-tp-dialog,
+    .ofi-calendar-dialog,
+    .ofi-mailconfirm-card,
+    .ofi-slide-panel,
+    .ofi-quick-pop,
+    .ant-modal-content,
+    .ant-drawer-content
+) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    .ofi-cal-btn.is-primary
+) {
+    --ofi-btn-tint-fill: rgba(255, 255, 255, 0.22);
+}
+
+.dark #root :is(
+    .ofi-pop,
+    .ofi-float-card,
+    .ofi-tp-dialog,
+    .ofi-calendar-dialog,
+    .ofi-mailconfirm-card,
+    .ofi-slide-panel,
+    .ofi-quick-pop,
+    .ant-modal-content,
+    .ant-drawer-content
+) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    .ofi-cal-btn.is-primary
+),
+.dark body > :not(#root) :is(
+    .ofi-pop,
+    .ofi-float-card,
+    .ofi-tp-dialog,
+    .ofi-calendar-dialog,
+    .ofi-mailconfirm-card,
+    .ofi-slide-panel,
+    .ofi-quick-pop,
+    .ant-modal-content,
+    .ant-drawer-content
+) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"],
+    .ofi-cal-btn.is-primary
+) {
+    --ofi-btn-tint-fill: rgba(0, 0, 0, 0.22);
+}
+
+/* Der Grund bleibt stehen; die Farbe kommt allein von der Fläche darüber.
+   Sonst schlüge der Knopf zweimal um — einmal im Grund, einmal im Schleier
+   — und der Schleier läge auf einer Farbe, für die er nicht gemischt ist.
+   index.css setzt hier `background !important`, also braucht die Gegenregel
+   dasselbe Gewicht; sie gewinnt über die Spezifität (`#root` schlägt die
+   klassenlose `:where()`-Liste dort). */
+#root :is(
+    .ofi-pop,
+    .ofi-float-card,
+    .ofi-tp-dialog,
+    .ofi-calendar-dialog,
+    .ofi-mailconfirm-card,
+    .ofi-slide-panel,
+    .ofi-quick-pop,
+    .ant-modal-content,
+    .ant-drawer-content
+) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover,
+body > :not(#root) :is(
+    .ofi-pop,
+    .ofi-float-card,
+    .ofi-tp-dialog,
+    .ofi-calendar-dialog,
+    .ofi-mailconfirm-card,
+    .ofi-slide-panel,
+    .ofi-quick-pop,
+    .ant-modal-content,
+    .ant-drawer-content
+) :is(
+    .ant-btn-primary,
+    .ofi-btn-brand,
+    button[class~="bg-[#272f67]"],
+    button[class~="bg-[#1f2654]"],
+    button[class~="bg-[#07145c]"],
+    button[class~="bg-[#0b1a6e]"],
+    button[class~="bg-brand-solid"]
+):not(:disabled):not([disabled]):hover {
+    background: var(--ofi-button-navy) !important;
+    box-shadow: none !important;
+    /* Auch die KANTE darf im Fenster nicht orange werden. Die Markenregel in
+       Abschnitt 3 setzt sie auf `--ofi-button-hover-fill`; ohne diese Zeile
+       zog sich beim Überfahren ein oranger Rahmen um den Knopf, während die
+       Fläche brav marineblau blieb — gemessen am 01.09.2026. */
+    border-color: var(--ofi-cal-accent-hover) !important;
+}
+
+
+/* ═════════ 4. DRUCKPUNKT ═════════════════════════════════
+   Die spürbare Antwort beim Klicken — der Knopf gibt kurz nach und steht
+   sofort wieder. Sie gilt für JEDES `<button>`, auch für die oben
+   gesperrten: ein Reiter oder ein Schalter darf ruhig antworten, er darf
+   nur nicht wachsen. Seit dem Nachtrag vom 01.09.2026 ist das die einzige
+   Bewegung im Knopf — alles andere ist Farbe.
+
+   Zwei Teile:
+     · hier das Sichtbare — der Knopf gibt kurz nach
+     · in `lib/buttonFeedback.ts` das Fühlbare — ein 10ms-Impuls des
+       Vibrationsmotors, wenn mit dem FINGER gedrückt wird (Tablet der
+       Monteure, Telefon). Mit der Maus passiert dort nichts.
+
+   Der Weg ZURÜCK läuft bewusst ohne Übergang, und das ist keine
+   Auslassung: eine Regel `button { transition: transform … }` würde die
+   Übergänge ersetzen, die dieselben Knöpfe für Farbe und Rahmen schon
+   tragen (`transition` ist eine Kurzschreibweise, sie lässt sich nicht
+   ergänzen). Ein Knopf, der beim Loslassen sofort wieder steht, ist genau
+   das, was ein echter Knopf tut. */
+#root :is(button, a[href], [role="button"], summary):not(:disabled):not([disabled]):not([aria-disabled="true"]):active,
+body > :not(#root) :is(button, a[href], [role="button"], summary):not(:disabled):not([disabled]):not([aria-disabled="true"]):active {
+    transform: scale(var(--ofi-btn-press-scale));
+    transition: transform var(--ofi-btn-press-ms) ease;
+}
+
+/* Was den Zeiger führt, darf sich unter ihm nicht wegbewegen: die
+   Spaltengriffe der Tabellen und alles, was gerade gezogen wird. */
+#root .ofi-col-grip:active,
+#root [draggable="true"]:active,
+#root [data-dragging]:active,
+body > :not(#root) [draggable="true"]:active,
+body > :not(#root) [data-dragging]:active {
+    transform: none;
+}
+
+
+/* ═════════ 5. WENIGER BEWEGUNG ═══════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --ofi-btn-tint-in: 0.01ms;
+        --ofi-btn-tint-out: 0.01ms;
+        --ofi-btn-press-scale: 1;
+    }
+}
+
+
+/* ═════════ 6. TELEFON ════════════════════════════════════
+   Auf schmalen Geräten schöbe das grosszügige Innenmass eine Werkzeugleiste
+   aus drei Knöpfen über den Rand. Die HÖHE bleibt — dort ist sie am
+   wichtigsten, ein Finger ist breiter als ein Zeiger —, nur das seitliche
+   Mass geht zurück. */
+@media (max-width: 640px) {
+    :root {
+        --ofi-btn-padding-x: 12px;
+    }
+}
+
+
+/* ═════════ 7. EINE ECKE ══════════════════════════════════
+   Vorgabe 01.09.2026: «der Radius soll 4px sein». Vorher hing er davon ab,
+   woher der Knopf kam: 10px bei AntD (`--ofi-button-radius`), 7px bei allem
+   mit einer `rounded-*`-Klasse (die Kantensprache drückt sie platt), 0px bei
+   den Markenknöpfen und 999px bei den Pillen in den Fenstern und auf der
+   Offertenseite.
+
+   WARUM DIESE REGEL IN EINER LAGE STEHT — und das ist die einzige Stelle
+   dieser Datei, die eine braucht: alle Radiusregeln der Anwendung tragen
+   `!important`. Bei WICHTIGEN Erklärungen dreht die Kaskade die Reihenfolge
+   der Lagen um: eine wichtige Erklärung IN einer Lage schlägt eine wichtige
+   Erklärung ohne Lage. Ungeschichtet käme man hier also nie durch, egal wie
+   hoch die Spezifität. In der Lage entscheidet dann wieder das Übliche —
+   diese Datei wird nach index.css geladen, ihre Regeln stehen also später
+   und gewinnen. (Dieselbe Falle steht in index.css schon zweimal
+   beschrieben, bei der Fensterpille und beim Ratenplan-Editor.)
+
+   Ausgenommen ist wie überall, was gar kein Handlungsknopf ist — Kreise
+   (`rounded-full`), Reiter, Schalter, Menü- und Tabellenzeilen behalten ihre
+   Form. ACHTUNG: die Fensterknöpfe und die Offertenknöpfe waren bisher
+   PILLEN; sie stehen jetzt ebenfalls auf 4px, weil «alle Knöpfe gleich»
+   die neuere Vorgabe ist. Sollen sie ihre Pille zurück, gehört sie hier als
+   eine Zeile hin, nicht wieder in drei Dateien verteilt. */
+@layer utilities {
+    #root :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-topbar *,
+    .ofi-login *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)),
+    body > :not(#root) :is(
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    .ofi-cal-btn,
+    .ofi-crm-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-mtg-btn,
+    .ofi-prj-btn,
+    .ofi-quote-btn,
+    button[class*="px-"],
+    a[class~="bg-[#272f67]"],
+    a[class~="bg-[#1f2654]"],
+    a[class~="bg-[#07145c]"],
+    a[class~="bg-[#0b1a6e]"],
+    a[class~="bg-brand-solid"]
+):not(:is(
+    .ofi-btn-plain,
+    .ofi-nosize,
+    .ofi-switch,
+    .ofi-sigbtn,
+    .ofi-col-grip,
+    .ofi-quote-tab,
+    .ofi-header-icon-button,
+    .ofi-hdr-ctl,
+    .ofi-option-row,
+    .ant-switch,
+    .ant-btn-link,
+    .ant-btn-circle,
+    .ant-btn-icon-only,
+    [class~="rounded-full"],
+    [class*="absolute"],
+    [class*="fixed"],
+    [class*="sticky"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    [role="switch"]
+)):not(:is(
+    td *,
+    th *,
+    [role="menu"] *,
+    [role="listbox"] *,
+    [role="tablist"] *,
+    [data-sliding-tabs] *,
+    .ofi-cal-modegroup *,
+    .ofi-cal-viewgroup *,
+    .ofi-cal-createmenu *,
+    .ofi-cal-addmenu *,
+    .ofi-tp-segment *,
+    .ofi-tp-kind *,
+    .ofi-mail-windowpick *,
+    .ofi-taskcard-pop__tabs *,
+    .ofi-invp-segwrap *,
+    .ofi-pop.is-list *
+)) {
+        border-radius: var(--ofi-btn-radius) !important;
+    }
+}

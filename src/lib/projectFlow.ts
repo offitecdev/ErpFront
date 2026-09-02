@@ -1,6 +1,6 @@
 import type { ProjectDto } from '../types/project';
-import type { MyOrderDto, InvoiceDto } from '../types/billing';
-import type { DeliveryReportDto, ServiceReportDto, SignatureRequestDto } from './api/project';
+import type { ProjectListInvoiceDto, ProjectListOrderDto } from '../types/billing';
+import type { ProjectListDeliveryReportDto, ServiceReportDto, SignatureRequestDto } from './api/project';
 
 /**
  * Shared per-project progress computation (process pop-up, detail badges,
@@ -40,10 +40,10 @@ export interface ProjectFlow {
 
 export interface FlowSources {
     projects: ProjectDto[];
-    orders: MyOrderDto[];
-    deliveryReports: DeliveryReportDto[];
+    orders: ProjectListOrderDto[];
+    deliveryReports: ProjectListDeliveryReportDto[];
     fieldReports: ServiceReportDto[];
-    invoices: InvoiceDto[];
+    invoices: ProjectListInvoiceDto[];
     generalSignatures: SignatureRequestDto[];
 }
 
@@ -52,7 +52,7 @@ const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(val
 const stageFromPercent = (percent: number): StageState =>
     percent >= 100 ? 'completed' : percent > 0 ? 'ongoing' : 'pending';
 
-const billedPercentForOrder = (orderId: string, invoices: InvoiceDto[]): number => {
+const billedPercentForOrder = (orderId: string, invoices: ProjectListInvoiceDto[]): number => {
     const total = invoices
         .filter((inv) => inv.salesOrderId === orderId && inv.status !== 'CANCELLED')
         .reduce((sum, inv) => sum + (Number(inv.billedPercent) || 0), 0);
@@ -60,7 +60,7 @@ const billedPercentForOrder = (orderId: string, invoices: InvoiceDto[]): number 
 };
 
 const computeOrderFlow = (
-    order: MyOrderDto,
+    order: ProjectListOrderDto,
     sources: Pick<FlowSources, 'deliveryReports' | 'fieldReports' | 'invoices'>,
     /** A signed project-level handover report (salesOrderId null) delivers every order. */
     projectDelivered: boolean,
@@ -95,8 +95,8 @@ const computeOrderFlow = (
 const computeProjectBillingPercent = (
     project: ProjectDto,
     orders: OrderFlow[],
-    rawOrders: MyOrderDto[],
-    invoices: InvoiceDto[],
+    rawOrders: ProjectListOrderDto[],
+    invoices: ProjectListInvoiceDto[],
 ): number => {
     // Project-scoped invoices (no salesOrderId) cover the whole project.
     const projectLevel = invoices

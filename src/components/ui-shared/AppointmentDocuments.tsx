@@ -354,6 +354,19 @@ export type AppointmentDocsHandle = {
     save: () => Promise<boolean>;
     /** Sofort sichern — ohne die Bedenkzeit des Selbstsicherns abzuwarten. */
     saveNow: () => void;
+    /**
+     * Ob das Zumachen der Spalte nachholen darf, was noch nicht draussen ist.
+     *
+     * Beim Begleitwort JA (Vorgabe 25.08.2026): es sichert sich von selbst, und
+     * beim X kann die Bedenkzeit noch laufen — die letzten Anschläge dürfen
+     * nicht mit dem Fenster verschwinden.
+     *
+     * Beim EINSATZPLAN NEIN (01.09.2026): dort gibt es kein Selbstsichern mehr,
+     * der Knopf im Fuss ist der einzige Weg. Ein Plan, den niemand gespeichert
+     * hat, darf auch beim Zumachen nicht hinausgehen — sonst wäre das X ein
+     * zweiter, unsichtbarer Speichern-Knopf. Fehlt die Angabe, gilt JA.
+     */
+    saveOnClose?: boolean;
 };
 
 /** Was der Knopf im Fuss der Karte anzeigt, solange die Spalte offen ist. */
@@ -382,11 +395,17 @@ export const AUTOSAVE_NOTICE = 2200;
  * EIN Knopf für beide Spalten: er fragt den Griff der Spalte, die gerade offen
  * ist, und ist nur da, solange eine offen ist.
  *
- * Gesichert wird weiterhin von SELBST, kurz nach dem letzten Anschlag; dieser
- * Knopf wartet nicht darauf, sondern schickt sofort. Er ist damit kein zweiter
- * Weg, den man kennen müsste, sondern die Abkürzung für den, der es eilig hat
- * — und die Auskunft für den, der es genau wissen will: seine Aufschrift sagt,
- * woran man ist («Speichern» – «Wird gespeichert …» – «Gespeichert»).
+ * WAS ER BEDEUTET, HÄNGT AN DER SPALTE (01.09.2026):
+ *   · Unterlagen — das Blatt sichert sich weiterhin von selbst, kurz nach dem
+ *     letzten Anschlag; der Knopf wartet nur nicht darauf. Er ist die Abkürzung
+ *     für den, der es eilig hat.
+ *   · Einsatzplan — dort ist er der EINZIGE Weg (Vorgabe Samet: «Änderungen
+ *     werden nicht automatisch gespeichert»). Ein gelöschter oder angehängter
+ *     Tag steht so lange nur in der Liste, bis jemand hier drückt.
+ *
+ * Grau, solange es nichts zu sichern gibt, und aktiv ab der ersten Änderung —
+ * daran sieht man, dass etwas offen ist. Seine Aufschrift sagt, woran man ist
+ * («Speichern» – «Wird gespeichert …» – «Gespeichert»).
  */
 export const PaneSaveButton = ({ state, dirty, onSave }: {
     state: PaneSaveState;
@@ -610,7 +629,7 @@ export const AppointmentDocumentsPanel = ({
             fileName: document.fileName,
             contentType: document.contentType,
             sizeBytes: document.sizeBytes,
-            url: content[document.id],
+            url: content[document.id] || document.url,
         })),
         ...pending,
         ...staged.views.map((view) => ({ ...view, pending: true })),
@@ -737,7 +756,7 @@ export const AppointmentDocumentsPanel = ({
     const loadContent = async (item: DocumentView) => {
         try {
             const payload = await projectApi.getAppointmentDocument(item.id, { technician });
-            setContent((current) => ({ ...current, [item.id]: payload.data }));
+            setContent((current) => ({ ...current, [item.id]: payload.url }));
         } catch (error: any) {
             toast.error(error?.response?.data?.error || t('calendar.docs.openFailed'));
         }

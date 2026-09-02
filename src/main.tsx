@@ -5,12 +5,17 @@ import './index.css'
 // Feinschliff aus der Anmeldemaske (Serifentitel, Feldkanten, Bewegung) —
 // MUSS nach index.css stehen, sonst verliert er gegen dessen Formularblock.
 import './styles/refine.css'
+// EIN Knopf fuer die ganze Anwendung (Hoehe, Innenmass, Welle von links nach
+// rechts, Druckpunkt) — MUSS nach refine.css stehen, damit die gemeinsame
+// Groesse gegen die Einzelmasse aus index.css und Tailwind gewinnt.
+import './styles/buttons.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
 import { initInstallPrompt } from './lib/pwa/installPrompt'
 import { registerServiceWorker } from './lib/pwa/registerServiceWorker'
 import { installAutoColumnResize } from './lib/autoColumnResize'
 import { installTableChrome } from './lib/tableChrome'
+import { installButtonFeedback } from './lib/buttonFeedback'
 import { dismissBootSplash } from './lib/bootSplash'
 import App from './App.tsx'
 
@@ -28,6 +33,10 @@ installAutoColumnResize()
 // up to date — the `:has()` selectors it replaces made every style recalc walk
 // the whole document (700ms+ tasks on a throttled mobile boot).
 installTableChrome()
+
+// Der Druckpunkt ist sichtbar (styles/buttons.css); auf Tablet und Telefon
+// kommt hier der kurze Impuls des Vibrationsmotors dazu.
+installButtonFeedback()
 
 // Start translations and the app together. Protected routes paint their
 // loading shell while the profile and locale chunks resolve, so waiting here

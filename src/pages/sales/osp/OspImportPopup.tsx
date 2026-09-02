@@ -18,6 +18,11 @@ import { useAuthStore } from '@/store/authStore';
  * Erfassung je zurückkommen soll; die Beschreibungs-Schablone lebt in
  * ospDescription.ts und wird von beiden Wegen geteilt.
  *
+ * ⚠ Und seit der VIERTEN Vertragsfassung (20.09.2026) ist eine Anfrage ein
+ * PROJEKT mit mehreren Einheiten (`OspDocumentDto.units`). Dieses Fenster kennt
+ * noch die eine Einheit von früher; wer es wiederbelebt, muss es auf EINE
+ * POSITION JE EINHEIT umstellen — genau das tut `OspPage.createOffer` heute.
+ *
  * Aus einem OSP-Beleg wird direkt eine Offerte:
  *
  *  • KUNDE — entweder ein bestehender CRM-Kunde ODER von Hand (vorausgefüllt

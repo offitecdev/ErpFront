@@ -34,7 +34,13 @@ export type QuickCreateItem = {
    legt sich beim Zeigen darüber, es schiebt die Seite nie zur Seite. */
 export const SIDEBAR_RAIL_WIDTH = 84;
 export const SIDEBAR_PANEL_WIDTH = 232;
-const HEADER_HEIGHT = 64; // matches the fixed header (h-16)
+/* Wo das Untermenü oben ansetzt. NICHT als Zahl: die Kopfleiste ist `h-16`
+   = 4rem, und `html` steht auf 14px — das sind 56px, nicht 64. Die feste 64
+   liess einen 8px breiten Streifen Seitengrund zwischen Kopf und Klappfeld
+   stehen («keine Lücke, die beiden gehören zusammen», Samet 02.09.2026).
+   MainLayout setzt `--app-header-height` auf genau dieselben 4rem, also
+   folgt das Feld der Kopfleiste jetzt von selbst. */
+const HEADER_OFFSET = 'var(--app-header-height, 4rem)';
 
 /* Hover intent: the submenu panel opens/switches only after the pointer rests
    on a module for a moment, and survives short gaps on the way into the panel —
@@ -454,14 +460,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 <div
                     ref={panelRef}
                     id="oi-sidebar-panel"
-                    style={{ left: SIDEBAR_RAIL_WIDTH, top: HEADER_HEIGHT, width: SIDEBAR_PANEL_WIDTH }}
+                    style={{ left: SIDEBAR_RAIL_WIDTH, top: HEADER_OFFSET, width: SIDEBAR_PANEL_WIDTH }}
                     {...hoverProps}
                     /* Immer schwebend: Schatten + Einblenden, weil die Seite
                        darunter stehen bleibt. */
                     className="ofi-shell-white fixed bottom-0 z-[45] hidden flex-col border-l border-black/5 shadow-[28px_0_56px_-28px_rgba(16,24,40,0.25)] animate-in fade-in slide-in-from-left-2 duration-150 dark:border-white/8 dark:shadow-[28px_0_56px_-28px_rgba(0,0,0,0.8)] lg:flex"
                 >
-                    {/* The panel butts straight against the header (top = 64px), so
-                        the title starts tight — extra top padding read as a gap. */}
+                    {/* The panel butts straight against the header (top =
+                        --app-header-height), so the title starts tight — extra
+                        top padding read as a gap. */}
                     <div className="flex items-center justify-between pb-1 pl-5 pr-3 pt-2">
                         <h2 className="ofi-serif truncate text-[15px] font-bold tracking-tight text-black dark:text-white">
                             {t(panelData.section.label)}
