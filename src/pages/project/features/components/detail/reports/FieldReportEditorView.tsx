@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { ClockRewind, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
+import { Check, ClockRewind, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
-import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from '@/components/ui-shared/TableKit';
+import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols } from '@/components/ui-shared/TableKit';
 import { SignaturePad } from '@/components/ui-shared/SignaturePad';
 import { PopupDialog, PopupEmpty } from '@/components/ui-shared/PopupKit';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
@@ -27,15 +27,31 @@ import { operationItems as reportOperationItems } from '../../../installations/u
 // table (`data-inv-table` inside a `SectionCard`).
 const cellInput = CELL_INPUT_CLASS;
 
-const AddOperationButton = ({ onClick, label }: { onClick: () => void; label: string }) => (
-    <button
-        type="button"
-        onClick={onClick}
-        title={label}
-        aria-label={label}
-        className="inline-flex size-9 items-center justify-center rounded-full text-[#1f2654] transition-colors hover:bg-[#eef2fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1f2654]/30 dark:text-amber-300 dark:hover:bg-white/10"
-    >
-        <Plus size={20} />
+/**
+ * ══ iOS-Kleid des Rapport-Editors (Vorgabe Samet, 02.09.2026) ═══════════════
+ * «Ausgeführte Arbeiten», «Technische Notizen», «Kosten» und «Unterschriften»
+ * tragen die Sprache der iOS-Einstellungen: ein grauer Grund, darauf weisse,
+ * runde Gruppen; über jeder Gruppe eine kleine graue Überschrift; INNERHALB
+ * der Gruppe trennt eine ab 16px eingerückte Haarlinie die Zeilen, und die
+ * letzte Zeile ist die Hinzufügen-Zeile mit dem Ring-Plus.
+ *
+ * Die Klassen liegen in index.css unter `.ofi-ios-*` — sie sind bewusst auf
+ * `.ofi-fr-editor` beschränkt, damit dieses Kleid nicht in den Rest der
+ * Anwendung ausblutet.
+ */
+const IosGroup = ({ title, footer, children }: { title?: ReactNode; footer?: ReactNode; children: ReactNode }) => (
+    <section className="ofi-ios-group">
+        {title !== undefined && <h3 className="ofi-ios-group__title">{title}</h3>}
+        <div className="ofi-ios-card">{children}</div>
+        {footer !== undefined && <p className="ofi-ios-group__footer">{footer}</p>}
+    </section>
+);
+
+/** Letzte Zeile einer Gruppe: Ring mit Plus, daneben das Wort — wie in iOS. */
+const IosAddRow = ({ onClick, label }: { onClick: () => void; label: string }) => (
+    <button type="button" onClick={onClick} className="ofi-ios-add">
+        <span aria-hidden className="ofi-ios-add__ring"><Plus size={13} /></span>
+        <span className="truncate">{label}</span>
     </button>
 );
 
@@ -58,9 +74,48 @@ const RowRemoveButton = ({ onClick, label, disabled }: { onClick: () => void; la
     </button>
 );
 
-const SectionTable = SectionCard;
+/**
+ * Ein Register — eine ruhige Pille, kein Unterstrich. Die alte Klammer unter
+ * dem aktiven Register (`border-b-2`) war das, was der Benutzer «wie eine
+ * Klammer» nannte; sie ist ersatzlos gestrichen. `role="tab"` ist dabei nicht
+ * Kosmetik: buttons.css nimmt Register ausdrücklich von der 40px-Regel für
+ * Handlungsknöpfe aus.
+ */
+const EditorTabButton = ({ label, active, onSelect }: { label: string; active: boolean; onSelect: () => void }) => (
+    <button
+        type="button"
+        role="tab"
+        aria-selected={active}
+        onClick={onSelect}
+        className={`ofi-fr-tab${active ? ' is-active' : ''}`}
+    >
+        {label}
+    </button>
+);
 
-type EditorTab = 'work' | 'expenses';
+/**
+ * EINE Leiste oben, fünf Register (Vorgabe Samet, 02.09.2026): «Ausgeführte
+ * Arbeiten» und «Technische Notizen» sind keine aufklappbaren Unterabschnitte
+ * mehr, sondern eigene Register.
+ *
+ * Nachtrag gleichen Tags: die beiden standen LINKS, Kosten/Fotos/Unterschriften
+ * durch eine Lücke nach RECHTS gedrückt — «nicht links und rechts, sondern
+ * nebeneinander». Die Lücke (`.ofi-fr-tabs__gap`) ist darum ersatzlos weg und
+ * die Leiste ist ein iOS-Segmentwähler: eine graue Schiene, gleich breite
+ * Abschnitte, das aktive als weisse Pille; siehe `.ofi-fr-tab` in index.css.
+ */
+type EditorTab = 'work' | 'notes' | 'expenses' | 'photos' | 'signatures';
+
+/** Was die umgebende Fläche (Montage-Bildschirm) über den Editor wissen muss. */
+export type FieldReportEditorState = {
+    dirty: boolean;
+    saving: boolean;
+    pdfBusy: boolean;
+    /** Ein Rapport existiert — erst dann lässt sich ein PDF bauen. */
+    hasReport: boolean;
+    technicianSigned: boolean;
+    customerSigned: boolean;
+};
 
 /**
  * TEK, DÜZ kaynak listesi (kullanıcı isteği): kayıtlı ve yeni satırlar aynı
@@ -109,6 +164,14 @@ export type FieldReportSaveHandle = {
     save: () => Promise<boolean>;
     /** Formun anlık yükü (doğrulama hatasında null + toast) — montaj bitirme bunu gönderir. */
     collect: () => FieldReportPayload | null;
+    /** Tagesrapport als PDF — der Knopf dazu darf ausserhalb des Editors stehen. */
+    createPdf: () => Promise<void>;
+    /**
+     * «Signatur einholen» (Vorgabe Samet, 02.09.2026): der Knopf öffnet KEIN
+     * Fenster mehr, sondern schlägt das Register «Unterschriften» auf — erst
+     * das Technikerfeld, darunter das Kundenfeld. Ein Klick, eine Fläche.
+     */
+    openSignatures: () => void;
 };
 
 const LOG_ACTION_KEYS: Record<string, string> = {
@@ -137,8 +200,11 @@ export const FieldReportEditorView = ({
     disabled = false,
     canSign = false,
     showLogs = false,
+    showOrderSummary = true,
+    hideActions = false,
     onSaved,
     onPreviewPdf,
+    onStateChange,
     actionsHost,
     saveHandleRef,
 }: {
@@ -163,11 +229,22 @@ export const FieldReportEditorView = ({
     canSign?: boolean;
     /** Projektleiter-Ansicht: Protokoll-Knopf (wer hat wann gespeichert). */
     showLogs?: boolean;
+    /**
+     * Die Tabelle «Auftrag · Kunde · Datum · Uhrzeit · Techniker» über dem
+     * Editor. Auf dem Montage-Bildschirm ist sie ABGESCHALTET (Vorgabe Samet,
+     * 02.09.2026): dort stehen dieselben Angaben schon in der Kopfzeile und in
+     * der Zeitleiste — zweimal dasselbe ist kein Detail, sondern Ballast.
+     */
+    showOrderSummary?: boolean;
+    /** Speichern/PDF zeichnet die umgebende Fläche selbst (Montage-Zeitleiste). */
+    hideActions?: boolean;
     onSaved: () => Promise<void> | void;
     /** Kayıt artık editörden çıkmaz — geri dönüş yalnızca başlık okuyla olur. */
     onBack?: () => void;
     /** When set, the PDF button opens the in-sheet preview instead of downloading. */
     onPreviewPdf?: () => void;
+    /** Meldet dirty/saving/Signaturstand nach oben, damit fremde Knöpfe mitgehen. */
+    onStateChange?: (state: FieldReportEditorState) => void;
     /**
      * Popup başlığındaki sabit aksiyon alanı: Kaydet/PDF buraya portallanır ve
      * içerik kaydırılsa da görünür kalır. Host yoksa düğmeler altta çizilir.
@@ -300,6 +377,8 @@ export const FieldReportEditorView = ({
     };
 
     const materialById = (id?: string) => materials.find((m) => m.id === id);
+    /** Was schon im Stapel liegt, trägt in der Trefferliste einen Haken. */
+    const pickedMaterialIds = new Set(rows.map((row) => row.materialId).filter(Boolean) as string[]);
 
     // The planned duration is capped the same way, so an appointment that runs
     // over midnight is compared against the part of it this report can cover.
@@ -326,6 +405,48 @@ export const FieldReportEditorView = ({
 
     const dropRow = (key: string) => setRows((current) => current.filter((row) => row.key !== key));
     const [focusedResourceKey, setFocusedResourceKey] = useState<string | null>(null);
+
+    /**
+     * EIN Feld, MEHRERE Artikel (Vorgabe Samet, 02.09.2026): «im Fenster, in
+     * dem wir Produkte hinzufügen, sollen wir mehrere hinzufügen können — im
+     * selben Eingabefeld, und wenn wir mehr als einen wählen, sollen sie sich
+     * nach UNTEN stapeln; ein Klick daneben schliesst.»
+     *
+     * Der Griff dazu: ein Treffer füllt die angefasste EINGABEZEILE, direkt
+     * darunter entsteht sofort die nächste leere Zeile und der Fokus wandert
+     * mit. Die Trefferliste hängt am Feld, also rutscht sie eine Zeile nach
+     * unten und bleibt offen — für den Benutzer sieht es aus, als sammle
+     * dasselbe Feld einen Stapel ein. Geschlossen wird mit einem Klick daneben
+     * oder Esc (AnchoredPicker).
+     *
+     * Eine SCHON gefüllte Zeile (gespeichert oder bereits mit Artikel) wird nur
+     * ersetzt: dort korrigiert man, man sammelt nicht — eine leere Folgezeile
+     * wäre dort nur Ballast.
+     */
+    const pickMaterial = (key: string, material: ProjectMaterial) => {
+        const target = rows.find((row) => row.key === key);
+        const patch = {
+            kind: 'extra' as const,
+            materialId: material.id,
+            text: material.name,
+            quantity: Number(target?.quantity) > 0 ? Number(target?.quantity) : 1,
+            unitPrice: Number(material.unitCost) || 0,
+        };
+        if (!target || target.id || target.materialId) { patchRow(key, patch); return; }
+        const nextKey = nextRowKey();
+        setRows((current) => {
+            const index = current.findIndex((row) => row.key === key);
+            if (index < 0) return current;
+            return [
+                ...current.slice(0, index),
+                { ...current[index], ...patch },
+                { key: nextKey, kind: 'expense', text: '', quantity: 1, amount: 0, unitPrice: 0 },
+                ...current.slice(index + 1),
+            ];
+        });
+        setFocusedResourceKey(nextKey);
+    };
+
     const addResourceRow = () => {
         const existingBlank = rows.find((row) => !row.id && !rowHasContent(row));
         if (existingBlank) {
@@ -423,13 +544,21 @@ export const FieldReportEditorView = ({
         }
     };
 
-    // Üst bileşen (popup) kapanırken buradan okur: değişiklik varsa kaydeder.
-    if (saveHandleRef) saveHandleRef.current = { dirty, saving, save, collect };
+    /**
+     * «Signatur einholen» schlägt das Register auf und rollt es ins Bild — der
+     * Techniker steht beim Kunden und soll nach EINEM Klick unterschreiben
+     * können, nicht erst suchen.
+     */
+    const signaturesRef = useRef<HTMLDivElement | null>(null);
+    const openSignatures = () => {
+        setTab('signatures');
+        window.requestAnimationFrame(() => signaturesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    };
 
     const createPdf = async () => {
-        if (!effectiveReport) return toast.error(t('projects.raporu_once_kaydedin'));
+        if (!effectiveReport) { toast.error(t('projects.raporu_once_kaydedin')); return; }
         // Üst bileşen taze raporu henüz görmediyse önizleme yerine indirme çalışır.
-        if (onPreviewPdf && report) return onPreviewPdf();
+        if (onPreviewPdf && report) { onPreviewPdf(); return; }
         setPdfBusy(true);
         try {
             const { exportFieldReportPdf } = await import('@/utils/pdf/fieldReportPdf');
@@ -441,20 +570,21 @@ export const FieldReportEditorView = ({
         }
     };
 
-    const TabButton = ({ id, label }: { id: EditorTab; label: string }) => (
-        <button
-            type="button"
-            onClick={() => setTab(id)}
-            aria-pressed={tab === id}
-            className={`-mb-px border-b-2 px-4 py-2 text-[13px] font-semibold transition-colors ${
-                tab === id
-                    ? 'border-[#272f67] text-[#272f67] dark:border-[#e6cf9e] dark:text-[#e6cf9e]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-white/55 dark:hover:text-white'
-            }`}
-        >
-            {label}
-        </button>
-    );
+    // Üst bileşen (popup) kapanırken buradan okur: değişiklik varsa kaydeder.
+    if (saveHandleRef) saveHandleRef.current = { dirty, saving, save, collect, createPdf, openSignatures };
+
+    /* Der Montage-Bildschirm zeichnet Speichern und Unterschrift selbst — er
+       muss darum wissen, wann es etwas zu speichern gibt und ob schon jemand
+       unterschrieben hat. Der Rückruf liegt in einem Ref, damit ein frisch
+       gebundener Callback des Elternteils die Schleife nicht neu anstösst. */
+    const technicianSigned = Boolean(technicianSignature);
+    const customerSigned = Boolean(customerSignature);
+    const hasReport = Boolean(effectiveReport);
+    const stateCallback = useRef(onStateChange);
+    useEffect(() => { stateCallback.current = onStateChange; }, [onStateChange]);
+    useEffect(() => {
+        stateCallback.current?.({ dirty, saving, pdfBusy, hasReport, technicianSigned, customerSigned });
+    }, [dirty, saving, pdfBusy, hasReport, technicianSigned, customerSigned]);
 
     /**
      * Aksiyonlar: PDF önizleme + BÜYÜK, YALIN Kaydet simgesi (kullanıcı isteği) —
@@ -492,6 +622,9 @@ export const FieldReportEditorView = ({
     );
 
     const completed = appointment.status === 'COMPLETED' || appointment.status === 'CANCELLED';
+    /* Fotos gibt es nur dort, wo der Bildzustand auch verwaltet wird (Montage);
+       im Projektleiter-Fenster fehlt das Register darum ganz statt leer zu sein. */
+    const showPhotos = images !== undefined && Boolean(setImages);
     const typeLabel = (row: ResourceRow) => {
         if (row.kind === 'used') return t('projects.kullanilan');
         if (row.materialId) return t('projects.ek_malzeme');
@@ -504,10 +637,18 @@ export const FieldReportEditorView = ({
            (kullanıcı: "tablonun bir kısmı boş bir kısmı dolu"). Kutu yalnızca
            odakta/üzerine gelindiğinde belirir; bkz. index.css `.ofi-fr-*`. */
         <div className="ofi-fr-editor space-y-4">
+            <div className="min-w-0 space-y-4">
+            {/* Der graue Grund der iOS-Einstellungen: er trägt den Segmentwähler
+                und darunter die weissen Gruppen. */}
+            <div className="ofi-fr-panel">
             {/* Auftrag-Details als EINE Tabelle (Benutzerwunsch) — nur bei
                 laufenden Terminen; abgeschlossene zeigen sie nicht mehr. */}
-            {!completed && (
-                <div className="overflow-hidden rounded-[3px] border border-slate-200 dark:border-white/15">
+            {showOrderSummary && !completed && (
+                <IosGroup title={t('projects.reportsHub.appointmentInfo')}>
+                    {/* Die Tabelle steht in einem eigenen Behälter: lib/tableChrome
+                        macht IHN zum Schiebefeld, die Gruppe darf ihre runden Ecken
+                        behalten (`overflow: hidden`) ohne die Tabelle zu kappen. */}
+                    <div className="ofi-ios-tablewrap">
                     <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                         <thead>
                             <tr>
@@ -528,141 +669,156 @@ export const FieldReportEditorView = ({
                             </tr>
                         </tbody>
                     </table>
-                </div>
+                    </div>
+                </IosGroup>
             )}
 
-            <div className="min-w-0 space-y-4">
-            {/* Two passes through the report: what was done, then what it cost. */}
-            <div className="flex items-center gap-1 border-b border-slate-200 dark:border-white/15">
-                <TabButton id="work" label={t('projects.reportsHub.tabWork')} />
-                <TabButton id="expenses" label={t('projects.reportsHub.tabExpenses')} />
+            {/* Alle Register NEBENEINANDER auf einer Schiene — kein linker und
+                kein rechter Block mehr (Vorgabe 02.09.2026). */}
+            <div className="ofi-fr-tabs" role="tablist">
+                <EditorTabButton label={t('projects.reportsHub.tabWork')} active={tab === 'work'} onSelect={() => setTab('work')} />
+                <EditorTabButton label={t('projects.teknik_notlar')} active={tab === 'notes'} onSelect={() => setTab('notes')} />
+                <EditorTabButton label={t('projects.reportsHub.tabExpenses')} active={tab === 'expenses'} onSelect={() => setTab('expenses')} />
+                {showPhotos && <EditorTabButton label={t('montage.handover.imagesTab')} active={tab === 'photos'} onSelect={() => setTab('photos')} />}
+                <EditorTabButton label={t('signatures.section')} active={tab === 'signatures'} onSelect={() => setTab('signatures')} />
             </div>
 
             {tab === 'work' && (<>
-            {/* Appointment times + overtime preview, as one thin-lined grid. */}
-            <SectionTable title={t('projects.randevu_saatleri')} collapsible>
-                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
-                    <thead>
-                        <tr>
-                            <th className="text-left">{t('common.date')}</th>
-                            <th className="text-left">{t('common.start')}</th>
-                            <th className="text-left">{t('common.end')}</th>
-                            <th className="text-left">{t('projects.calisilan_saat')}</th>
-                            <th className="text-left">{t('projects.ek_calisma')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td className="font-semibold tabular-nums text-slate-800 dark:text-white">{apptDate.format('DD.MM.YYYY')}</td>
-                            {/* Both times belong to the appointment's own day, so
-                                neither may run past 23:59 into the next one. */}
-                            <td><input type="time" min="00:00" max="23:59" disabled={disabled} className={cellInput} value={start} onChange={(e) => setStart(e.target.value)} /></td>
-                            <td><input type="time" min="00:00" max="23:59" disabled={disabled} className={cellInput} value={end} onChange={(e) => setEnd(e.target.value)} /></td>
-                            <td className="tabular-nums text-slate-700 dark:text-white/80">{durationFmt(workedMin)} <span className="text-[11px] text-slate-400">({t('auto.plan')}: {durationFmt(plannedMin)})</span></td>
-                            <td className="tabular-nums text-slate-700 dark:text-white/80">{durationFmt(overtimeMin)} · {money(overtimeCost)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </SectionTable>
-
-            {/* Genau EIN Plus am Listenende. Eine neue, grössere Eingabe erscheint
-                sofort; Tabellen-Haarlinien unter leeren Zeilen gibt es nicht. */}
-            <SectionTable
-                title={t('projects.yapilan_isler')}
-            >
-                <div className="space-y-2.5 bg-white px-4 py-4 dark:bg-transparent">
-                    {operations.map((item, index) => (
-                        <div key={index} className="flex items-start gap-3">
-                            <span className="mt-3.5 w-5 shrink-0 text-right text-[12px] font-semibold tabular-nums text-slate-400 dark:text-white/45">{index + 1}.</span>
-                            <textarea
-                                ref={(node) => { operationRefs.current[index] = node; }}
-                                rows={2}
-                                className="min-h-[52px] flex-1 resize-y rounded-lg border border-slate-200 bg-slate-50/45 px-3.5 py-3 text-[14px] leading-5 text-slate-800 outline-none transition focus:border-[#1f2654]/45 focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10 dark:border-white/15 dark:bg-white/[0.04] dark:text-white dark:focus:border-amber-400/50 dark:focus:bg-white/[0.06]"
-                                value={item}
-                                disabled={disabled}
-                                aria-label={t('projects.yapilan_is')}
-                                onChange={(e) => setOperations(operations.map((row, i) => (i === index ? e.target.value : row)))}
-                            />
-                            {!disabled && (
-                                <button
-                                    type="button"
-                                    title={t('common.delete')}
-                                    aria-label={t('common.delete')}
-                                    disabled={operations.length === 1}
-                                    onClick={() => setOperations(operations.filter((_, i) => i !== index))}
-                                    className="mt-2.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-25 dark:hover:bg-rose-500/10"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                    {!disabled && (
-                        <div className="flex justify-end pt-1">
-                            <AddOperationButton label={t('projects.madde')} onClick={addOperation} />
-                        </div>
-                    )}
+            {/* Zeiten und Überstunden als iOS-Liste: Beschriftung links, Wert
+                (oder das Zeitfeld) rechts am Rand — keine fünfspaltige Tabelle
+                mehr, in der nur zwei Spalten überhaupt tippbar waren. */}
+            <IosGroup title={t('projects.randevu_saatleri')}>
+                <div className="ofi-ios-row">
+                    <span className="ofi-ios-row__label">{t('common.date')}</span>
+                    <span className="ofi-ios-row__value is-strong">{apptDate.format('DD.MM.YYYY')}</span>
                 </div>
-            </SectionTable>
+                {/* Both times belong to the appointment's own day, so neither may
+                    run past 23:59 into the next one. */}
+                <div className="ofi-ios-row">
+                    <span className="ofi-ios-row__label">{t('common.start')}</span>
+                    <input type="time" min="00:00" max="23:59" disabled={disabled} className="ofi-ios-time" value={start} onChange={(e) => setStart(e.target.value)} />
+                </div>
+                <div className="ofi-ios-row">
+                    <span className="ofi-ios-row__label">{t('common.end')}</span>
+                    <input type="time" min="00:00" max="23:59" disabled={disabled} className="ofi-ios-time" value={end} onChange={(e) => setEnd(e.target.value)} />
+                </div>
+                <div className="ofi-ios-row">
+                    <span className="ofi-ios-row__label">{t('projects.calisilan_saat')}</span>
+                    <span className="ofi-ios-row__value">
+                        {durationFmt(workedMin)}
+                        <span className="ofi-ios-row__sub">({t('auto.plan')}: {durationFmt(plannedMin)})</span>
+                    </span>
+                </div>
+                <div className="ofi-ios-row">
+                    <span className="ofi-ios-row__label">{t('projects.ek_calisma')}</span>
+                    <span className="ofi-ios-row__value">{durationFmt(overtimeMin)} · {money(overtimeCost)}</span>
+                </div>
+            </IosGroup>
 
-            {/* Technical notes stay a free-text block below the work grid. */}
-            <SectionTable title={t('projects.teknik_notlar')} collapsible>
-                <textarea
-                    rows={2}
-                    disabled={disabled}
-                    className="w-full resize-y bg-white px-4 py-3 text-[13.5px] text-slate-800 outline-none placeholder:text-slate-300 dark:bg-transparent dark:text-white"
-                    value={technicalNotes}
-                    onChange={(e) => setTechnicalNotes(e.target.value)}
-                />
-            </SectionTable>
+            {/* Eine Gruppe, eine Zeile je Arbeit, unten die Hinzufügen-Zeile. */}
+            <IosGroup title={t('projects.yapilan_isler')}>
+                {operations.map((item, index) => (
+                    <div key={index} className="ofi-ios-row is-field">
+                        <span className="ofi-ios-num">{index + 1}</span>
+                        <textarea
+                            ref={(node) => { operationRefs.current[index] = node; }}
+                            rows={2}
+                            className="ofi-ios-textarea"
+                            value={item}
+                            disabled={disabled}
+                            /* Ein randloses Feld in einer weissen Karte sieht ohne
+                               Platzhalter aus wie eine leere Zeile — der Monteur
+                               muss sehen, wo er schreibt. */
+                            placeholder={t('projects.yapilan_is')}
+                            aria-label={t('projects.yapilan_is')}
+                            onChange={(e) => setOperations(operations.map((row, i) => (i === index ? e.target.value : row)))}
+                        />
+                        {!disabled && (
+                            <button
+                                type="button"
+                                title={t('common.delete')}
+                                aria-label={t('common.delete')}
+                                disabled={operations.length === 1}
+                                onClick={() => setOperations(operations.filter((_, i) => i !== index))}
+                                className="ofi-ios-minus"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
+                    </div>
+                ))}
+                {!disabled && <IosAddRow label={t('projects.madde')} onClick={addOperation} />}
+            </IosGroup>
+
+            </>)}
+
+            {/* Technische Notizen — eigenes Register, ein einziges grosses Feld. */}
+            {tab === 'notes' && (
+                <IosGroup title={t('projects.teknik_notlar')}>
+                    <textarea
+                        rows={10}
+                        disabled={disabled}
+                        placeholder={t('projects.teknik_notlar')}
+                        aria-label={t('projects.teknik_notlar')}
+                        className="ofi-ios-textarea is-block"
+                        value={technicalNotes}
+                        onChange={(e) => setTechnicalNotes(e.target.value)}
+                    />
+                </IosGroup>
+            )}
+
+            {/* Rapor fotoğrafları — yalnızca fotoğraf durumu yönetilen yüzeyde
+                (montaj) görünür; kayıtla birlikte gider. */}
+            {tab === 'photos' && showPhotos && (
+                <IosGroup title={t('montage.handover.imagesTab')}>
+                    <div className="px-4 py-4">
+                        <MontageImageUpload value={images!} onChange={setImages!} disabled={disabled} />
+                    </div>
+                </IosGroup>
+            )}
 
             {/* Unterschriften: der Techniker unterschreibt AUF SEINEM EIGENEN
                 GERÄT (/montage), die Kundensignatur kommt von dort oder über
                 die Signaturanfrage. Der Projektleiter sieht beide nur — er
                 unterschreibt für niemanden (Vorgabe 19.08.2026). Beide
-                erscheinen so auch auf dem PDF. */}
-            <SectionTable title={t('signatures.section')} collapsible>
-                <div className="space-y-3 px-4 py-3">
+                erscheinen so auch auf dem PDF.
+
+                Gestapelt und nicht nebeneinander (Vorgabe 02.09.2026): ERST das
+                Technikerfeld, DARUNTER das Kundenfeld — in dieser Reihenfolge
+                wird auch unterschrieben, und über jedem Feld steht fett, wem es
+                gehört. Auf einem Tablet ist das ausserdem die einzige Anordnung,
+                die beiden Feldern die volle Breite lässt. */}
+            {tab === 'signatures' && (
+                <div ref={signaturesRef} className="ofi-fr-signs">
                     {!canSign && <div className="ofi-tp-note">{t('signatures.readOnlyNote')}</div>}
-                    <div className="ofi-sign-grid">
-                        <SignaturePad
-                            label={t('projects.field.pdf.technicianRole')}
-                            value={technicianSignature}
-                            onChange={setTechnicianSignature}
-                            caption={effectiveReport?.technicianSignedAt
-                                ? dayjs(effectiveReport.technicianSignedAt).format('DD.MM.YYYY HH:mm')
-                                : t('projects.delivery.technicianSignatureHint')}
-                            readOnly={disabled || !canSign}
-                        />
-                        <SignaturePad
-                            label={t('projects.field.pdf.customerRole')}
-                            value={customerSignature}
-                            onChange={setCustomerSignature}
-                            caption={effectiveReport?.signedAt
-                                ? dayjs(effectiveReport.signedAt).format('DD.MM.YYYY HH:mm')
-                                : t('signatures.notSignedYet')}
-                            readOnly={disabled || !canSign}
-                        />
-                    </div>
+                    <SignaturePad
+                        label={t('signatures.technicianArea')}
+                        value={technicianSignature}
+                        onChange={setTechnicianSignature}
+                        caption={effectiveReport?.technicianSignedAt
+                            ? dayjs(effectiveReport.technicianSignedAt).format('DD.MM.YYYY HH:mm')
+                            : t('projects.delivery.technicianSignatureHint')}
+                        readOnly={disabled || !canSign}
+                        height={190}
+                    />
+                    <SignaturePad
+                        label={t('signatures.customerArea')}
+                        value={customerSignature}
+                        onChange={setCustomerSignature}
+                        caption={effectiveReport?.signedAt
+                            ? dayjs(effectiveReport.signedAt).format('DD.MM.YYYY HH:mm')
+                            : t('signatures.notSignedYet')}
+                        readOnly={disabled || !canSign}
+                        height={190}
+                    />
                 </div>
-            </SectionTable>
-
-            {/* Rapor fotoğrafları — yalnızca fotoğraf durumu yönetilen yüzeyde
-                (montaj) görünür; kayıtla birlikte gider. */}
-            {images !== undefined && setImages && (
-                <SectionTable title={t('montage.work.photos')} collapsible>
-                    <div className="px-4 py-3">
-                        <MontageImageUpload value={images} onChange={setImages} disabled={disabled} />
-                    </div>
-                </SectionTable>
             )}
-
-            </>)}
 
             {tab === 'expenses' && (<>
             {/* Tek, düz kaynak tablosu. Boş giriş satırı sürekli görünmez:
-                sağ alttaki tek + anında yeni satırı açar ve odaklar. */}
-            <SectionTable title={t('projects.reportsHub.resources')} collapsible>
+                alttaki «Hinzufügen»-Zeile anında yeni satırı açar ve odaklar. */}
+            <IosGroup title={t('projects.reportsHub.resources')} footer={disabled ? undefined : t('projects.reportsHub.multiPickHint')}>
+                <div className="ofi-ios-tablewrap">
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <colgroup>
                         <ResizableCols keys={['type', 'item', 'qty', 'amount'] as const} grid={resourceGrid} />
@@ -717,16 +873,11 @@ export const FieldReportEditorView = ({
                                                         placeholder={isEntry ? t('projects.reportsHub.entryPlaceholder') : t('auto.harici_giderler')}
                                                         autoFocus={focusedResourceKey === row.key}
                                                         onFocused={() => setFocusedResourceKey(null)}
+                                                        pickedIds={pickedMaterialIds}
                                                         onText={(text) => patchRow(row.key, row.kind === 'extra'
                                                             ? { text, kind: 'expense', materialId: undefined, unitPrice: 0, quantity: 1 }
                                                             : { text })}
-                                                        onPick={(material) => patchRow(row.key, {
-                                                            kind: 'extra',
-                                                            materialId: material.id,
-                                                            text: material.name,
-                                                            quantity: row.quantity > 0 ? row.quantity : 1,
-                                                            unitPrice: Number(material.unitCost) || 0,
-                                                        })}
+                                                        onPick={(material) => pickMaterial(row.key, material)}
                                                     />
                                                 ) : (
                                                     <span className={`ofi-fr-cell truncate ${row.kind === 'expense' ? '' : 'font-medium'}`}>{row.text}</span>
@@ -771,17 +922,17 @@ export const FieldReportEditorView = ({
                         })}
                     </tbody>
                 </table>
-                {!disabled && (
-                    <div className="flex justify-end bg-white px-4 py-3 dark:bg-transparent">
-                        <AddOperationButton label={t('projects.reportsHub.entryPlaceholder')} onClick={addResourceRow} />
-                    </div>
-                )}
-            </SectionTable>
+                </div>
+                {!disabled && <IosAddRow label={t('projects.reportsHub.addResource')} onClick={addResourceRow} />}
+            </IosGroup>
             </>)}
 
+            </div>
+
             {/* Kaydet/PDF popup başlığına portallanır (sabit, kaydırmada görünür);
-                host yoksa eski yerinde, altta kalır. */}
-            {actionsHost ? createPortal(actionButtons, actionsHost) : (
+                host yoksa eski yerinde, altta kalır. `hideActions` = die Fläche
+                darüber zeichnet Speichern und PDF selbst (Montage-Zeitleiste). */}
+            {hideActions ? null : actionsHost ? createPortal(actionButtons, actionsHost) : (
                 <div className="flex items-center justify-end gap-2 border-t border-dashed border-slate-300 pt-3">
                     {actionButtons}
                 </div>
@@ -822,16 +973,28 @@ export const FieldReportEditorView = ({
     );
 };
 
+/** Wie viele Treffer die Liste höchstens zeigt — sie scrollt innerhalb davon. */
+const SUGGEST_LIMIT = 40;
+
 /**
  * Doğrudan giriş hücresi: yazarken malzeme kataloğundan öneriler açılır.
  * Bir öneri seçilirse satır Zusatzmaterial olur; seçilmezse yazılan metin
  * Externe Kosten olarak kalır — ayrı düğme/popup yoktur (kullanıcı isteği).
+ *
+ * MEHRERE ARTIKEL AUS EINEM FELD (Vorgabe Samet, 02.09.2026): das leere Feld
+ * öffnet den Katalog von sich aus, nicht erst nach dem ersten Buchstaben —
+ * sonst wäre «mehrere wählen» ein Ratespiel. Ein Treffer legt sich als Zeile
+ * ab, die Eingabe rutscht eine Zeile TIEFER und schlägt dort dieselbe Liste
+ * wieder auf: für den Benutzer sammelt ein Feld einen Stapel ein, der nach
+ * unten wächst. Bereits gewählte Artikel tragen einen Haken. Geschlossen wird
+ * mit einem Klick daneben oder Esc — das erledigt AnchoredPicker.
  */
 const MaterialSuggestCell = ({
     value,
     materials,
     placeholder,
     autoFocus,
+    pickedIds,
     onFocused,
     onText,
     onPick,
@@ -840,6 +1003,8 @@ const MaterialSuggestCell = ({
     materials: ProjectMaterial[];
     placeholder: string;
     autoFocus?: boolean;
+    /** Schon im Rapport stehende Artikel — sie bekommen den Haken. */
+    pickedIds?: Set<string>;
     onFocused?: () => void;
     onText: (text: string) => void;
     onPick: (material: ProjectMaterial) => void;
@@ -850,18 +1015,17 @@ const MaterialSuggestCell = ({
         if (autoFocus) inputRef.current?.focus();
     }, [autoFocus]);
     const query = value.trim().toLowerCase();
-    const matches = query
-        ? materials
-            .filter((m) => m.name.toLowerCase().includes(query) || (m.serialId || '').toLowerCase().includes(query))
-            .slice(0, 8)
-        : [];
+    const matches = (query
+        ? materials.filter((m) => m.name.toLowerCase().includes(query) || (m.serialId || '').toLowerCase().includes(query))
+        : materials.filter((m) => m.isActive !== false)
+    ).slice(0, SUGGEST_LIMIT);
     const open = Boolean(anchorEl && matches.length > 0);
     return (
         <div>
             <input
                 ref={inputRef}
                 autoFocus={autoFocus}
-                className="min-h-11 w-full rounded-lg border border-transparent bg-transparent px-3 py-2 text-[13.5px] text-slate-800 outline-none transition-colors placeholder:text-slate-300 hover:border-slate-200 hover:bg-white focus:border-[#1f2654]/35 focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10 dark:text-white dark:placeholder:text-white/25 dark:hover:border-white/15 dark:hover:bg-white/5 dark:focus:border-amber-400/40 dark:focus:bg-white/5"
+                className="ofi-ios-cellinput"
                 value={value}
                 placeholder={placeholder}
                 aria-label={placeholder}
@@ -876,21 +1040,33 @@ const MaterialSuggestCell = ({
                 panelClassName="shadow-[0_12px_36px_rgba(15,23,42,0.18)]"
             >
                 <ul className="space-y-1 overflow-y-auto p-2">
-                    {matches.map((material) => (
-                        <li key={material.id}>
-                            <button
-                                type="button"
-                                onClick={() => { onPick(material); setAnchorEl(null); }}
-                                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors hover:bg-[#eef2fb] focus:bg-[#eef2fb] focus:outline-none dark:hover:bg-white/10 dark:focus:bg-white/10"
-                            >
-                                <span className="truncate font-medium text-slate-800 dark:text-white">{material.name}</span>
-                                <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-slate-400">
-                                    <span>{numberFmt(material.stockQuantity)}</span>
-                                    <span>{money(Number(material.unitCost) || 0)}</span>
-                                </span>
-                            </button>
-                        </li>
-                    ))}
+                    {matches.map((material) => {
+                        const picked = Boolean(pickedIds?.has(material.id));
+                        return (
+                            <li key={material.id}>
+                                <button
+                                    type="button"
+                                    /* Diese Liste schliesst immer — offen bleibt sie nur
+                                       scheinbar: die Eingabe wandert eine Zeile tiefer und
+                                       DEREN Feld schlägt beim Fokus dieselbe Liste wieder
+                                       auf. Zwei Listen gleichzeitig gäbe es sonst. */
+                                    onClick={() => { onPick(material); setAnchorEl(null); }}
+                                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors hover:bg-[#eef2fb] focus:bg-[#eef2fb] focus:outline-none dark:hover:bg-white/10 dark:focus:bg-white/10"
+                                >
+                                    <span className="flex min-w-0 items-center gap-2">
+                                        <span aria-hidden className={`ofi-ios-tick${picked ? ' is-on' : ''}`}>
+                                            {picked && <Check size={12} />}
+                                        </span>
+                                        <span className="truncate font-medium text-slate-800 dark:text-white">{material.name}</span>
+                                    </span>
+                                    <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-slate-400">
+                                        <span>{numberFmt(material.stockQuantity)}</span>
+                                        <span>{money(Number(material.unitCost) || 0)}</span>
+                                    </span>
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
             </AnchoredPicker>
         </div>

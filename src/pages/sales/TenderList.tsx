@@ -41,14 +41,23 @@ const tenderCreatorName = (tender: TenderListItem) =>
 /* Offerten aus der OSP tragen deren Zeichen neben der Offertnummer (Vorgabe
    19.09.2026) — man sieht in der Liste sofort, welche von drüben kommen.
 
-   Wurde die Einheit drüben inzwischen NEU GERECHNET (§1a), warnt daneben ein
-   Dreieck: das Datenblatt, aus dem offeriert wurde, gilt nicht mehr. Es
-   verschwindet, sobald jemand die Überarbeitung an der Offerte selbst zur
+   Ist das Datenblatt, aus dem offeriert wurde, drüben überholt, warnt daneben
+   ein Dreieck. Das geschieht auf ZWEI Wegen, und beide zählen:
+
+    • die anfragende Person hat GEÄNDERT und ERNEUT angefragt (§1a);
+    • sie hat bloss weitergerechnet (§1c) — dann hat niemand etwas angefragt,
+      aber die OSP hat das Blatt neu gerendert und das alte gelöscht.
+
+   Das Dreieck verschwindet, sobald jemand es an der Offerte selbst zur
    Kenntnis genommen hat. */
 const hasOpenOspRevision = (tender: TenderListItem): boolean => {
-    if (!tender.ospRevisedAt) return false;
+    const revised = [tender.ospRevisedAt, tender.ospFeedRevisedAt]
+        .filter(Boolean)
+        .map((value) => dayjs(value as string))
+        .sort((a, b) => b.valueOf() - a.valueOf())[0];
+    if (!revised) return false;
     if (!tender.ospRevisionSeenAt) return true;
-    return dayjs(tender.ospRevisedAt).isAfter(dayjs(tender.ospRevisionSeenAt));
+    return revised.isAfter(dayjs(tender.ospRevisionSeenAt));
 };
 
 // Sürüklenebilir sütun genişlikleri (quote-lines tablosundaki ile aynı mekanik).

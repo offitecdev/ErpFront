@@ -225,6 +225,9 @@ export const mailMessagesApi = {
     list: async (params: MailListQuery): Promise<{ data: MailMessageRow[]; total: number; page: number; pageSize: number }> =>
         (await apiClient.get(`/mail/messages${query(params as Record<string, unknown>)}`)).data,
     stats: async (): Promise<MailStatsDto> => (await apiClient.get('/mail/messages/stats')).data,
+    unreadCount: async (): Promise<number> => (
+        await apiClient.get<{ unreadInbox: number }>('/mail/messages/stats', { params: { view: 'unread-count' } })
+    ).data.unreadInbox,
     get: async (id: string): Promise<MailMessageDetail> => (await apiClient.get(`/mail/messages/${id}`)).data,
     attachments: async (id: string): Promise<{ attachments: MailAttachmentMeta[]; source: string }> =>
         (await apiClient.get(`/mail/messages/${id}/attachments`)).data,
@@ -242,8 +245,11 @@ export const mailMessagesApi = {
     remove: async (id: string): Promise<void> => { await apiClient.delete(`/mail/messages/${id}`); },
     restore: async (id: string): Promise<MailMessageDetail> =>
         (await apiClient.post(`/mail/messages/${id}/restore`)).data,
-    /** Nachrichten einer Kategorie zuordnen (categoryId null = herausnehmen). */
-    assign: async (ids: string[], categoryId: string | null): Promise<{ assigned: number }> =>
+    /** Nachrichten einer Kategorie zuordnen (categoryId null = herausnehmen).
+        `enquiries` = wie viele Anfragen dabei entstanden sind: die Kategorie
+        «Anfragen» ist mehr als ein Ordner, sie legt aus eingehender Post einen
+        Vorgang an (Server: mailbox.routes.ts → enquiryFromMail.ts). */
+    assign: async (ids: string[], categoryId: string | null): Promise<{ assigned: number; enquiries: number }> =>
         (await apiClient.post('/mail/messages/assign', { ids, categoryId })).data,
     send: async (input: MailSendInput): Promise<MailSendResult> =>
         (await apiClient.post('/mail/messages/send', input, { timeout: MAIL_REQUEST_TIMEOUT_MS })).data,

@@ -210,6 +210,11 @@ export const personnelApi = {
         return res.data;
     },
 
+    leaveIncomingCount: async (): Promise<number> => {
+        const res = await apiClient.get<{ incoming: number }>('/personnel/leaves/counts', { params: { view: 'incoming' } });
+        return res.data.incoming;
+    },
+
     createLeave: async (input: {
         /** Urlaub · Homeoffice · Krankheit · Sonstiges — die Wahl der Oberfläche. */
         requestType?: RequestTypeKey;

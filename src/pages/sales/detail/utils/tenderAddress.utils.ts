@@ -58,8 +58,7 @@ export const EMPTY_TENDER_CUSTOMER_FORM: TenderCustomerCreateForm = {
  * müşteriye adres diye gitmemelidir.
  *
  * Hiçbir bileşen girilmemişse sonuç BOŞ metindir. Yuva boş kalır, böylece
- * `useTenderOrderDecision` / `hasRequiredAddresses` sipariş oluşturmayı
- * zaten engeller ve eksik adres sessizce doldurulmuş gibi görünmez.
+ * eksik adres sessizce doldurulmuş gibi görünmez.
  */
 export const formatLocationAddress = (loc: CustomerLocationDto): string =>
     formatAddressLines(addressParts(loc)).join('\n');

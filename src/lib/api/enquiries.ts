@@ -176,7 +176,7 @@ export const publicEnquiryApi = {
 
 /* ── Aktivitäten: die Zeitleiste des Hauses (/crm/activities) ─────────────── */
 
-export type ActivityKind = 'ENQUIRY' | 'QUOTE' | 'ORDER' | 'TASK' | 'MAIL' | 'CONTACT';
+export type ActivityKind = 'ENQUIRY' | 'QUOTE' | 'ORDER' | 'TASK' | 'MAIL' | 'MEETING' | 'CONTACT';
 
 export interface ActivityRow {
     key: string;

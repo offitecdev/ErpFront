@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { LuCheck, LuChevronLeft, LuChevronRight, LuInbox, LuRefreshCw, LuSend, LuTrash2 } from 'react-icons/lu';
 
@@ -70,13 +71,23 @@ export const MailPage = () => {
     const [rows, setRows] = useState<MailMessageRow[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    /* AUS DEN AKTIVITAETEN HERAUS (Vorgabe Samet): `/crm/mail?id=…` schlaegt
+       GENAU DIESE Nachricht auf, statt nur das Postfach zu oeffnen. Gelesen
+       wird die Kennung als Anfangszustand — die Seite wird beim Sprung ohnehin
+       neu aufgebaut, und ein Effekt, der hinterher `setState` ruft, kostet nur
+       einen zweiten Durchgang (dieselbe Bauart wie auf der Anfragenseite). Die
+       Kennung bleibt in der Adresse: der Link laesst sich damit weitergeben. */
+    const deepLinkId = useSearchParams()[0].get('id');
+    const [selectedId, setSelectedId] = useState<string | null>(deepLinkId);
     const [detail, setDetail] = useState<MailMessageDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     /** Nur der Papierkorb fragt nach — dort ist Löschen endgültig. */
     const [pendingDelete, setPendingDelete] = useState<MailMessageRow | MailMessageDetail | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [syncing, setSyncing] = useState(false);
+    /* Die Kennung aus `?id=`, bis ihre Nachricht geladen ist — danach null.
+       Sie entscheidet EINMAL, in welchen Ordner die Liste umschaltet. */
+    const deepLink = useRef<string | null>(deepLinkId);
     /* Ein Nachschlag-Zeitgeber für den Fall, dass der Abruf länger läuft, als
        der Server auf ihn wartet (siehe `capture`). */
     const followUp = useRef<number | null>(null);
@@ -218,6 +229,13 @@ export const MailPage = () => {
             .then((data) => {
                 if (cancelled) return;
                 setDetail(data);
+                /* Der Sprung von aussen zeigt die Nachricht auch LINKS: ohne
+                   das Umschalten stuende rechts eine gesendete oder geloeschte
+                   Mail, waehrend die Liste weiter den Posteingang zeigt. */
+                if (deepLink.current === data.id) {
+                    deepLink.current = null;
+                    setView({ kind: 'folder', folder: data.deleted ? 'bin' : data.direction === 'OUT' ? 'sent' : 'inbox' });
+                }
                 // Gelesen-Punkt in der Liste sofort ausblenden.
                 setRows((current) => current.map((row) => (row.id === data.id && !row.isRead ? { ...row, isRead: true } : row)));
                 if (stats && !rows.find((r) => r.id === data.id)?.isRead) void refreshStats();
@@ -300,26 +318,37 @@ export const MailPage = () => {
     /* Zuordnen und HERAUSNEHMEN (categoryId null) über die Nachricht selbst —
        nicht über die Listenzeile: aus dem Lesebereich heraus kann die geöffnete
        Nachricht längst aus der geladenen Seite gefallen sein. */
-    const assignMail = async (mailId: string, previous: string | null, category: MailCategoryDto | null): Promise<boolean> => {
+    const assignMail = async (mailId: string, previous: string | null, category: MailCategoryDto | null): Promise<{ enquiries: number } | null> => {
         const nextId = category?.id ?? null;
-        if (previous === nextId) return false;
+        if (previous === nextId) return null;
         try {
-            await mailMessagesApi.assign([mailId], nextId);
+            const result = await mailMessagesApi.assign([mailId], nextId);
             bumpCounts(previous, nextId);
             const lite = category ? { id: category.id, name: categoryLabel(category), color: category.color } : null;
             setRows((current) => current.map((entry) => (entry.id === mailId ? { ...entry, category: lite } : entry)));
             setDetail((current) => (current && current.id === mailId ? { ...current, category: lite } : current));
             // In der Kategorie-Ansicht fällt eine herausgenommene Zeile aus der Liste.
             if (view.kind === 'category' && nextId !== view.id) dropRowFromList(mailId);
-            return true;
+            return { enquiries: result?.enquiries ?? 0 };
         } catch (error: unknown) {
             toast.error(mailApiError(error).message || t('mail.categories.assignFailed'));
-            return false;
+            return null;
         }
     };
 
     const assignRow = (row: MailMessageRow, category: MailCategoryDto | null) =>
         assignMail(row.id, row.category?.id ?? null, category);
+
+    /* «ANFRAGEN» IST MEHR ALS EIN ORDNER: was dort hineinfaellt, wird zur
+       ANFRAGE (Server: enquiryFromMail.ts). Genau das muss man sehen — sonst
+       sieht das Ablegen aus wie das Ablegen in jedes andere Fach, und niemand
+       weiss, dass unter /crm/enquiries gerade ein Vorgang entstanden ist.
+       Gesendete Post wird keine Anfrage; dann meldet der Satz nur das Ablegen. */
+    const announceFiled = (category: MailCategoryDto, enquiries: number) => {
+        toast.success(enquiries > 0
+            ? t('mail.categories.filedRequest')
+            : t('mail.categories.filed', { name: categoryLabel(category) }));
+    };
 
     /** Aus dem Lesebereich: die geöffnete Nachricht aus ihrer Kategorie nehmen. */
     const unassignOpenMail = async () => {
@@ -330,17 +359,23 @@ export const MailPage = () => {
         }
     };
 
-    /** Sammelmodus: Klick = zuordnen, zweiter Klick = herausnehmen. */
-    const toggleAssign = (row: MailMessageRow) => {
+    /** Sammelmodus: Klick = zuordnen, zweiter Klick = herausnehmen. Gemeldet
+        wird hier NUR die entstandene Anfrage — eine Meldung je Klick waere in
+        einem Modus, der auf viele Klicks hintereinander angelegt ist, Laerm. */
+    const toggleAssign = async (row: MailMessageRow) => {
         if (!assignCategory) return;
-        void assignRow(row, row.category?.id === assignCategory.id ? null : assignCategory);
+        const target = row.category?.id === assignCategory.id ? null : assignCategory;
+        const result = await assignRow(row, target);
+        if (result?.enquiries) announceFiled(assignCategory, result.enquiries);
     };
 
-    const dropMailOnCategory = (categoryId: string, mailId: string) => {
+    /** Eine Nachricht auf eine Kategorie der Leiste fallen lassen. */
+    const dropMailOnCategory = async (categoryId: string, mailId: string) => {
         const row = rows.find((entry) => entry.id === mailId);
         const category = categories.find((entry) => entry.id === categoryId);
         if (!row || !category) return;
-        void assignRow(row, category);
+        const result = await assignRow(row, category);
+        if (result) announceFiled(category, result.enquiries);
     };
 
     const reorderCategories = (ids: string[]) => {
@@ -427,7 +462,7 @@ export const MailPage = () => {
                         assignCategoryId={assignCategory?.id ?? null}
                         onSelect={selectCategory}
                         onReorder={reorderCategories}
-                        onDropMail={dropMailOnCategory}
+                        onDropMail={(categoryId, mailId) => { void dropMailOnCategory(categoryId, mailId); }}
                         onStartAssign={(category) => { setSelectedId(null); setAssignCategory(category); }}
                         onCreated={(category) => { setCategories((current) => [...current, category]); }}
                         onDeleted={(id) => {
@@ -465,7 +500,7 @@ export const MailPage = () => {
                             configured={Boolean(status?.imapConfigured)}
                             assignCategory={assignCategory}
                             onSelect={setSelectedId}
-                            onToggleAssign={toggleAssign}
+                            onToggleAssign={(row) => { void toggleAssign(row); }}
                         />
                     </div>
                     <MailReader

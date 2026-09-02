@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
-    Check, ChevronLeft, ChevronRight, File05, Mail01, Phone,
+    Calendar, Check, ChevronLeft, ChevronRight, File05, Mail01, Phone,
     Receipt, RefreshCcw01, SearchLg, ShoppingCart01,
 } from '@/components/icons/antIconCompat';
 import { InlineLoading } from '@/components/ui-shared/Loader';
@@ -24,6 +24,11 @@ import { dayHeading, dayKey, shortWhen } from '../enquiries/enquiryShared';
  * einem KUNDEN besprochen wurde. Hier steht, was GESCHEHEN ist — auch das,
  * was noch keinen Kunden hat (eine Anfrage aus dem Formular zum Beispiel).
  *
+ * POST NUR MIT ETIKETT «KUNDE» (Vorgabe Samet): der Reiter «E-Mail» zeigt
+ * nicht das ganze Firmenpostfach, sondern die Nachrichten, die dort einer
+ * Kundenkategorie zugeordnet sind — der Rest ist Post, aber kein Vorgang.
+ * Entschieden wird das im Server (crmActivity.routes.ts).
+ *
  * DIE ZAHL AM MENÜEINTRAG ist `today`: was seit Mitternacht dazugekommen ist.
  * Nicht «alles jemals» — eine Zahl, die nur wächst, sagt nichts.
  *
@@ -35,7 +40,7 @@ import { dayHeading, dayKey, shortWhen } from '../enquiries/enquiryShared';
 const PAGE_SIZE = 40;
 
 /** Die Reiter — die Reihenfolge ist die des Arbeitsflusses, nicht das Alphabet. */
-const KINDS: ActivityKind[] = ['ENQUIRY', 'QUOTE', 'ORDER', 'TASK', 'MAIL', 'CONTACT'];
+const KINDS: ActivityKind[] = ['ENQUIRY', 'QUOTE', 'ORDER', 'TASK', 'MAIL', 'MEETING', 'CONTACT'];
 
 const KindMark = ({ kind }: { kind: ActivityKind }) => {
     if (kind === 'ENQUIRY') return <File05 size={15} />;
@@ -43,6 +48,7 @@ const KindMark = ({ kind }: { kind: ActivityKind }) => {
     if (kind === 'ORDER') return <ShoppingCart01 size={15} />;
     if (kind === 'TASK') return <Check size={15} />;
     if (kind === 'MAIL') return <Mail01 size={15} />;
+    if (kind === 'MEETING') return <Calendar size={15} />;
     return <Phone size={15} />;
 };
 
@@ -53,8 +59,16 @@ const KIND_DOT: Record<ActivityKind, string> = {
     ORDER: '#0b8043',
     TASK: '#0f766e',
     MAIL: '#3f51b5',
+    MEETING: '#c5221f',
     CONTACT: '#e8710a',
 };
+
+/* WELCHEN WEG DIE POST GING (01.09.2026): «E-Mail» allein sagt nicht, ob sie
+   HEREINKAM oder hinausging — und genau das ist bei Kundenpost die Auskunft,
+   auf die es ankommt. Die Richtung steht im Feld `statusText` (IN | OUT). */
+const kindLabel = (row: ActivityRow): string => (row.kind === 'MAIL'
+    ? t(row.statusText === 'OUT' ? 'crm.activity.mailOut' : 'crm.activity.mailIn')
+    : t(`crm.activity.kind.${row.kind}`));
 
 export const ActivitiesPage = () => {
     const navigate = useNavigate();
@@ -98,14 +112,32 @@ export const ActivitiesPage = () => {
     useEffect(() => { void load(); }, [load]);
     useEffect(() => { loadStats(); }, [loadStats]);
 
-    /* Wohin ein Klick springt. Nicht jede Quelle hat ein Ziel — Post öffnet das
-       Postfach, ein Kontakt hat keine eigene Seite und bleibt still. */
+    /* Wohin ein Klick springt. Nicht jede Quelle hat ein Ziel — ein Kontakt hat
+       keine eigene Seite und fuehrt deshalb zum Kunden.
+
+       POST OEFFNET DIE NACHRICHT SELBST (Vorgabe Samet): `?id=` traegt die
+       Kennung ins Postfach, das die Mail daraufhin im Lesebereich aufschlaegt
+       und in den passenden Ordner umschaltet. Bis dahin landete jeder Klick
+       auf derselben leeren Liste — man musste die Nachricht dort noch einmal
+       von Hand suchen.
+
+       DIE BESPRECHUNG OEFFNET IHRE KARTE IM KALENDER: der Termin liegt oft
+       Wochen zurueck, darum reist das DATUM mit — der Kalender springt auf den
+       Tag und schlaegt die Karte auf. Ohne das Datum stuende man im heutigen
+       Blatt und muesste zurueckblaettern. */
     const jump = (row: ActivityRow) => {
         if (row.kind === 'ENQUIRY') return navigate(`/crm/enquiries?id=${row.id}`);
         if (row.kind === 'QUOTE') return navigate(`/sales/quotes/${row.id}`);
         if (row.kind === 'ORDER') return navigate(`/sales/orders/${row.id}`);
         if (row.kind === 'TASK') return navigate(`/crm/tasks/${row.id}`);
-        if (row.kind === 'MAIL') return navigate('/crm/mail');
+        if (row.kind === 'MAIL') return navigate(`/crm/mail?id=${encodeURIComponent(row.id)}`);
+        if (row.kind === 'MEETING') {
+            /* Der Zeitpunkt reist als voller Zeitstempel und nicht als
+               Datumsstueck: der Kalender rechnet ihn in die ORTSZEIT um, ein
+               abgeschnittenes «2026-08-17» waere fuer einen Termin am fruehen
+               Morgen der falsche Tag. */
+            return navigate(`/calendar?meeting=${encodeURIComponent(row.id)}&at=${encodeURIComponent(row.occurredAt)}`);
+        }
         if (row.customer) return navigate(`/crm/customers/${row.customer.id}`);
         return undefined;
     };
@@ -194,7 +226,7 @@ export const ActivitiesPage = () => {
                                         <span className="ofi-crm-row__title">{row.title || t('crm.activity.untitled')}</span>
                                         <span className="ofi-crm-row__sub">
                                             <span className="ofi-crm-state" style={{ ['--dot' as string]: KIND_DOT[row.kind] }}>
-                                                {t(`crm.activity.kind.${row.kind}`)}
+                                                {kindLabel(row)}
                                             </span>
                                             {row.customer?.companyName && (
                                                 <>

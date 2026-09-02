@@ -10,7 +10,7 @@ import { QuoteDatePicker } from '@/pages/sales/detail/components/common/QuoteDat
 import { CustomerComboCell } from './CustomerComboCell';
 import { StaffMultiCombo } from './StaffMultiCombo';
 import { ContactCell } from './ContactCell';
-import { TaskTenderCombo } from '../tasks/TaskTenderCombo';
+import { TaskTenderCombo, type TaskTenderPick } from '../tasks/TaskTenderCombo';
 import { dateInputToIso, dateTimeToIso, toDateInputValue } from '../utils/crmFormat.utils';
 import type { CrmCustomerOption, QuickEntryAction, QuickEntryDraftRow } from '../types/crm.types';
 
@@ -121,6 +121,16 @@ export const QuickEntryBulkTable = ({
 
     const onCustomerPicked = (key: string, customer: CrmCustomerOption) =>
         patchRow(key, { customerId: customer.id, customerName: customer.companyName, contactId: '' });
+
+    /* Eine gewählte Offerte bringt ihren Kunden MIT (13.09.2026): steht in der
+       Zeile noch keiner, trägt die Wahl ihn ein — dieselbe Hand wie im Fenster
+       «Neue Aufgabe», damit niemand denselben Namen zweimal sucht. */
+    const onTenderPicked = (key: string, row: QuickEntryDraftRow, next: TaskTenderPick | null) => {
+        const adopt = next?.customerId && next.customerName && !row.customerId
+            ? { customerId: next.customerId, customerName: next.customerName, contactId: '' }
+            : {};
+        patchRow(key, { tender: next, ...adopt });
+    };
 
     const filledRows = useMemo(
         () => rows.filter((row) => rowHasContent(row, isCommunication)),
@@ -330,7 +340,7 @@ export const QuickEntryBulkTable = ({
                                                 Offerten — das ist der häufige Fall. */}
                                             <TaskTenderCombo
                                                 value={row.tender}
-                                                onChange={(next) => patchRow(row.key, { tender: next })}
+                                                onChange={(next) => onTenderPicked(row.key, row, next)}
                                                 customerId={row.customerId}
                                             />
                                         </td>

@@ -23,31 +23,6 @@ type UseTenderOrderDecisionParams = {
     saveAll: () => Promise<boolean>;
 };
 
-// An order needs somewhere to work and somewhere to invoice. Both slots normally
-// carry the customer's Hauptadresse, so this only bites when the customer has no
-// address at all: the check stays deliberately lenient — either the Projekt- or
-// the Lieferadresse satisfies the first half — so quotes written under the older
-// single-slot model can still be turned into orders. Shows a toast naming
-// whichever is missing and returns false so the caller can bail out.
-const hasRequiredAddresses = (tender: TenderListItem): boolean => {
-    const installation = String((tender as any).installationAddress ?? '').trim();
-    const delivery = String((tender as any).deliveryAddress ?? '').trim();
-    const active = installation || delivery;
-    // Legacy quotes could mirror billing off the project address instead of
-    // storing it; honour that flag when the billing slot itself is empty.
-    const sameAsInstallation = !!(tender as any).billingSameAsInstallation;
-    const billing = String((tender as any).billingAddress ?? '').trim() || (sameAsInstallation ? active : '');
-    if (!active) {
-        toast.error(t('tenders.installation_address_required'));
-        return false;
-    }
-    if (!billing) {
-        toast.error(t('tenders.billing_address_required'));
-        return false;
-    }
-    return true;
-};
-
 /**
  * Auftragsbestätigung an den Kunden — läuft unmittelbar nach dem Erstellen des
  * Auftrags. Empfänger und CC bestimmt der Server aus der Offerte.
@@ -157,9 +132,6 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
 
     const handleSubmitOrderDecision = async () => {
         if (!tender) return;
-        // Both the installation (deliveryAddress) and billing addresses must be set
-        // before an order can be created.
-        if (!hasRequiredAddresses(tender)) return;
         // No card chosen yet — force the user to pick an order type first.
         if (!orderMode) {
             toast.error(t('tenders.order_turunu_select'));
@@ -224,8 +196,8 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
 
     // Confirm / "Auftrag erstellen" artık SORAR (kullanıcı isteği): iki
     // seçenekli popup açılır — proje siparişi ya da teslimat siparişi. Bu karar
-    // ayarlar menüsünde SAKLANAMAZ; ana akışın kendisidir. Adres kontrolü ve
-    // asıl oluşturma popup'ın onayında yapılır (handleSubmitOrderDecision).
+    // ayarlar menüsünde SAKLANAMAZ; ana akışın kendisidir. Asıl oluşturma
+    // popup'ın onayında yapılır (handleSubmitOrderDecision).
     const handleApprove = async () => {
         if (!tender) return;
         // Approve doubles as Save: staged line/meta edits are flushed first
@@ -241,7 +213,6 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         if (!tender) return;
         // Creating the project also acts as save for any staged edits.
         if (!(await flushPendingEdits())) return;
-        if (!hasRequiredAddresses(tender)) return;
         setProjectCreateLoading(true);
         try {
             const res = await projectApi.createFromTender(tender.id, undefined, overtimeHourlyRate);

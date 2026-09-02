@@ -191,7 +191,8 @@ const MENU_SECTIONS: MenuSection[] = [
              • Erinnerungen (/crm/reminders) und Schnellerfassung
                (/crm/quick-entry) sind Handgriffe, keine Bereiche: sie werden
                aus Kommunikation und Aufgaben heraus bedient.
-             • Checklisten (/crm/forms) hängen an Auftrag und Montage.
+             • Checklisten (/crm/forms) hängen an Auftrag und Montage —
+               ihr Menüeintrag steht darum in der Gruppe Projekte.
 
            Wer eine dieser Adressen als Lesezeichen hat, kommt weiterhin an —
            und die Rollentabelle führt sie unverändert (siehe pageCatalog.ts). */
@@ -231,6 +232,14 @@ const MENU_SECTIONS: MenuSection[] = [
         icon: FundProjectionScreenOutlined,
         items: [
             { key: '/projects', label: 'nav.projectManagement', permission: 'projects.view' },
+            /* Checklisten (/crm/forms): die Listen, die Monteur und
+               Projektleiter ausfüllen — mit dem CRM-Menü auf vier Einträge
+               verlor der Bereich seinen Eintrag, obwohl die Seiten weiter
+               antworten. Er steht hier, weil die Checklisten an Auftrag,
+               Projekt und Montage hängen; die Adresse bleibt /crm/forms
+               (Lesezeichen, Rollentabelle und der Schlüssel `crm.forms`
+               bleiben damit unverändert gültig). */
+            { key: '/crm/forms', label: 'nav.crmForms', permission: 'projects.view' },
             // Rechnungen der PROJEKTAUFTRÄGE (Vorgabe Samet: „nicht alle —
             // Projektauftrag vorgewählt"). Es ist dieselbe Liste wie unter
             // Verkauf, nur mit gesetztem Typ; die Seitenleiste unterscheidet

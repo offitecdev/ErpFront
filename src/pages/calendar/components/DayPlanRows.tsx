@@ -1,7 +1,5 @@
 import dayjs from 'dayjs';
 
-import { useEffect, useState } from 'react';
-
 import { Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
@@ -137,21 +135,19 @@ export const sameTimesForAll = (days: DaySpan[]): DaySpan[] => {
 };
 
 /**
- * EIN TAG WIRD IN ZWEI SCHRITTEN GESTRICHEN (25.08.2026).
+ * EIN KLICK NIMMT DEN TAG AUS DER LISTE (01.09.2026).
  *
- * Solange es einen Speichern-Knopf gab, war er die Rückfrage: einen Tag
- * herausnehmen und nicht speichern hiess, es war nie passiert. Seit das Blatt
- * sich selbst sichert (Vorgabe Samet: «kein Speichern-Knopf — es soll von
- * selbst sichern»), würde EIN Klick auf den Papierkorb den Tag eine Sekunde
- * später wirklich löschen — mitsamt Rapport, Spesen und Material.
+ * Vom 25.08.2026 bis heute fragte der Papierkorb selbst nach — erster Klick
+ * rot, zweiter Klick weg. Das war nötig, solange das Blatt sich selbst sicherte:
+ * ohne Rückfrage hätte EIN Klick den Tag eine Sekunde später wirklich gelöscht,
+ * mitsamt Rapport, Spesen und Material.
  *
- * Also fragt der Papierkorb selbst: der erste Klick macht ihn rot, der zweite
- * streicht den Tag. Ein Klick daneben, und er ist wieder still. Die übrigen
- * Änderungen (Datum, Zeiten, ein Tag mehr) brauchen das nicht — sie nehmen
- * nichts weg.
+ * Seit der Einsatzplan wieder einen Speichern-Knopf hat (Vorgabe Samet:
+ * «Änderungen werden nicht automatisch gespeichert — sobald gelöscht oder
+ * hinzugefügt wird, wird der graue Knopf aktiv»), IST dieser Knopf die
+ * Rückfrage: einen Tag herausnehmen und nicht speichern heisst, es ist nie
+ * passiert. Zwei Rückfragen für dieselbe Geste wären eine zu viel.
  */
-const ARM_TIMEOUT = 4000;
-
 export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }: {
     days: DaySpan[];
     onChange: (next: DaySpan[]) => void;
@@ -161,14 +157,6 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }
 }) => {
     const multiDay = days.length > 1;
     const locked = new Set(lockedIds);
-    /** Welcher Papierkorb gerade gefragt hat. */
-    const [armed, setArmed] = useState<number | null>(null);
-
-    useEffect(() => {
-        if (armed === null) return;
-        const timer = window.setTimeout(() => setArmed(null), ARM_TIMEOUT);
-        return () => window.clearTimeout(timer);
-    }, [armed]);
 
     return (
         <>
@@ -216,15 +204,10 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }
                         {multiDay && !disabled && !locked.has(day.appointmentId || '') ? (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    if (armed !== index) { setArmed(index); return; }
-                                    setArmed(null);
-                                    onChange(days.filter((_, position) => position !== index));
-                                }}
-                                onBlur={() => setArmed((current) => (current === index ? null : current))}
-                                className={`ofi-cal-dayrow__drop ${armed === index ? 'is-armed' : ''}`}
+                                onClick={() => onChange(days.filter((_, position) => position !== index))}
+                                className="ofi-cal-dayrow__drop"
                                 aria-label={t('calendar.days.remove')}
-                                title={armed === index ? t('calendar.days.removeConfirm') : t('calendar.days.remove')}
+                                title={t('calendar.days.remove')}
                             >
                                 <Trash01 size={13} />
                             </button>

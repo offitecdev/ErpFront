@@ -660,7 +660,9 @@
 
 .dark .ofi-login__bell { color: #e6cf9e; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45); }
 
-.ofi-login__bell:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(15, 28, 69, 0.18); }
+/* Beim Überfahren nur der Schatten — gehoben wurde die Glocke bis zum
+   01.09.2026; seither bewegt sich ein Knopf nur noch beim Drücken. */
+.ofi-login__bell:hover { box-shadow: 0 10px 26px rgba(15, 28, 69, 0.18); }
 .ofi-login__notif.is-open .ofi-login__bell { background: var(--lg-btn-bg); color: var(--lg-btn-fg); }
 
 .ofi-login__bell-dot {

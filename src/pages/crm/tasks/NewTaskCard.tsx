@@ -122,6 +122,36 @@ export const NewTaskCard = ({ open, onClose, onSaved }: {
 
     const close = () => { reset(); onClose(); };
 
+    /* ══ KUNDE UND OFFERTE ZIEHEN EINANDER NACH (13.09.2026, Vorgabe Samet) ══
+     *
+     * «Man wählt die Offertennummer und sie verschwindet.» So war es: hier
+     * stand die Regel «wechselt der Kunde, fällt die Offerte weg», und sie
+     * traf JEDEN Kundenwechsel — auch den von NICHTS auf einen Kunden. Wer
+     * also zuerst die Offerte griff (man kennt ja die Nummer) und danach den
+     * Kunden eintrug, sah die eben gewählte Nummer im selben Moment lautlos
+     * verschwinden; dasselbe beim blossen Tippen im Kundenfeld, denn Tippen
+     * löst die Kundenbindung und meldet einen «Wechsel» auf null.
+     *
+     * Jetzt gilt die eine Frage, um die es wirklich geht: GEHÖRT DIE OFFERTE
+     * DIESEM KUNDEN? Nur wenn der neu gewählte Kunde ein ANDERER ist als der
+     * Kunde der Offerte, wird sie gelöst — der Rest bleibt stehen.
+     */
+    const pickCustomer = (nextCustomer: CrmCustomerOption | null) => {
+        setCustomer(nextCustomer);
+        const quoteOwner = tender?.customerId ?? null;
+        if (tender && nextCustomer && quoteOwner && quoteOwner !== nextCustomer.id) setTender(null);
+    };
+
+    /* Umgekehrt: eine Offerte bringt ihren Kunden MIT. Ist noch keiner
+       eingetragen, trägt die Wahl ihn ein — die Aufgabe hängt damit an
+       beidem, ohne dass jemand denselben Namen ein zweites Mal sucht. */
+    const pickTender = (next: TaskTenderPick | null) => {
+        setTender(next);
+        if (next?.customerId && next.customerName && !customer) {
+            setCustomer({ id: next.customerId, companyName: next.customerName });
+        }
+    };
+
     /* Ein zweiter Klick auf dasselbe Zeichen führt zurück aufs Grundblatt —
        sonst müsste man den Weg zurück suchen, und es gibt keinen anderen. */
     const goTo = (next: Sheet) => setSheet((current) => (current === next ? 'plan' : next));
@@ -355,20 +385,14 @@ export const NewTaskCard = ({ open, onClose, onSaved }: {
                                 contact={null}
                                 withContact={false}
                                 z={130}
-                                onChange={(nextCustomer) => {
-                                    setCustomer(nextCustomer);
-                                    // Wechselt der Kunde, passt die Offerte des alten
-                                    // nicht mehr — sie fällt weg statt still falsch
-                                    // zu bleiben.
-                                    if (tender && nextCustomer?.id !== customer?.id) setTender(null);
-                                }}
+                                onChange={pickCustomer}
                             />
                         </label>
                         <label className="ofi-newtask__row is-tall">
                             <span>{t('crm.tasks.colQuote')}</span>
                             <TaskTenderCombo
                                 value={tender}
-                                onChange={setTender}
+                                onChange={pickTender}
                                 customerId={customer?.id ?? null}
                                 z={130}
                             />

@@ -251,16 +251,22 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
     const showDays = isAppointment && (canEditDays || multiDay);
 
     /**
-     * ZUMACHEN (25.08.2026 vereinfacht). Es gibt keinen Speichern-Knopf mehr —
-     * das Blatt sichert sich selbst, kurz nach dem letzten Anschlag. Beim
-     * Zumachen kann diese Wartezeit aber noch laufen; dann wird hier nachgeholt,
-     * was sie noch nicht weggeschickt hat. Scheitert das, bleibt die Spalte
-     * offen: der Fehler steht darin, und niemand macht ein Fenster zu, in dem
-     * gerade etwas verloren ginge.
+     * ZUMACHEN — und dabei hängt es an der Spalte, was das heisst.
+     *
+     * UNTERLAGEN (25.08.2026): das Blatt sichert sich selbst, kurz nach dem
+     * letzten Anschlag. Beim Zumachen kann diese Wartezeit noch laufen; dann
+     * wird hier nachgeholt, was sie noch nicht weggeschickt hat. Scheitert das,
+     * bleibt die Spalte offen: der Fehler steht darin, und niemand macht ein
+     * Fenster zu, in dem gerade etwas verloren ginge.
+     *
+     * EINSATZPLAN (01.09.2026): dort gibt es kein Selbstsichern mehr — der
+     * Knopf im Fuss ist der einzige Weg (Vorgabe Samet). Also holt das X hier
+     * NICHTS nach; täte es das, wäre es ein zweiter, unsichtbarer
+     * Speichern-Knopf. Die Spalte meldet das mit `saveOnClose: false`.
      */
     const closePane = async () => {
         const handle = paneHandle.current;
-        if (handle?.dirty && !(await handle.save())) return;
+        if (handle?.dirty && handle.saveOnClose !== false && !(await handle.save())) return;
         paneHandle.current = null;
         setPane(null);
         setPaneSave({ dirty: false, state: 'idle' });
@@ -427,8 +433,10 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                             eine Spalte offen ist, und gilt dann für BEIDE: bei
                             den Tagen wie bei den Unterlagen ist es derselbe
                             Knopf, der den Griff der offenen Spalte fragt.
-                            Gesichert wird weiter von selbst — er wartet die
-                            Bedenkzeit nur nicht ab. */}
+                            Bei den Unterlagen ist er die Abkürzung (dort wird
+                            weiter von selbst gesichert), beim EINSATZPLAN der
+                            einzige Weg: grau, bis ein Tag gelöscht oder
+                            angehängt wurde, dann anklickbar (01.09.2026). */}
                         {pane && canEditDays && (
                             <PaneSaveButton
                                 state={paneSave.state}

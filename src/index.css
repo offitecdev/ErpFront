@@ -21,9 +21,12 @@
   --ofi-bottom-sheet-radius: var(--ofi-modal-radius);
   --ofi-button-navy: #272f67;
   --ofi-button-hover-fill: #f59e0b;
-  /* Wie lange die orange Welle durch den Knopf nach oben laeuft. Die
-     verzoegerte Inset-Fuellung auf :hover haengt am selben Wert. */
-  --ofi-button-fill-rise: 1300ms;
+  /* Die Zeiten des Knopf-Farbwechsels stehen seit dem 01.09.2026 in
+     `styles/buttons.css` (`--ofi-btn-tint-in` / `--ofi-btn-tint-out`) —
+     zusammen mit dem Farbwechsel selbst, der dort fuer JEDEN Knopf gilt und
+     die ganze Flaeche zugleich umfaerbt. Er loest die Welle ab, die von links
+     nach rechts durchlief; Vorbild ist der Verkaufs-PDF-Knopf
+     `.ofi-ordconf-btn` weiter unten. */
   --ofi-control-height: 40px;
   --ofi-control-font-size: 14px;
   --ofi-control-border: #aeb8c8;
@@ -1298,8 +1301,9 @@ a[class~="rounded-full"][class~="bg-[#272f67]"],
   button[title*="schließ" i],
   .workspace-tab [role="button"]
 ):hover svg {
+  /* Nur die Strichstaerke, kein Wachsen mehr: seit dem 01.09.2026 bewegt sich
+     an einem Knopf beim Ueberfahren nichts (`styles/buttons.css`). */
   stroke-width: 3 !important;
-  transform: scale(1.08);
 }
 
 button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):hover,
@@ -2470,6 +2474,67 @@ html.dark {
     -webkit-text-fill-color: var(--ofi-pop-row-bg) !important;
   }
 }
+
+/* ── DER HAKEN AN DER GEWÄHLTEN ZEILE (ComboCell `selectedId`) ───────────
+   Ein Tippfeld, das etwas GEBUNDEN hat, muss seine Zeile wiederfinden lassen:
+   klappt die Liste erneut auf, trägt die gewählte Zeile diesen Haken. Er
+   nimmt den Akzent der Oberfläche (hell marineblau, dunkel Weizen) und wird
+   auf der überfahrenen Zeile von der Regel oben ohnehin weiß. */
+.ofi-combo-row__check { color: #07145c; }
+html.dark .ofi-combo-row__check { color: var(--ofi-d-wheat-solid, #d48f16); }
+
+/* ── DIE GEBUNDENE OFFERTE UNTER DEM FELD (TaskTenderCombo) ──────────────
+   «Man muss sehen, dass das Hinzugefügte gewählt ist» (Vorgabe 13.09.2026).
+   Blosser Text in einem Eingabefeld sieht aus wie Getipptes — also bekommt
+   die WIRKLICH gebundene Offerte ein eigenes kleines Feld darunter: Haken,
+   Nummer, Kunde, und rechts das Kreuz, das die Bindung wieder löst. Steht es
+   da, hängt die Offerte an der Aufgabe; steht es nicht da, hängt sie nicht
+   dran — unabhängig davon, was im Feld darüber geschrieben steht. */
+.ofi-boundpick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  border: 1px solid color-mix(in srgb, #07145c 22%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, #07145c 6%, transparent);
+  padding: 3px 4px 3px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #07145c;
+}
+.ofi-boundpick__num { font-variant-numeric: tabular-nums; }
+.ofi-boundpick__who {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  opacity: 0.7;
+}
+.ofi-boundpick__drop {
+  margin-left: auto;
+  display: inline-flex;
+  height: 20px;
+  width: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: inherit;
+  opacity: 0.6;
+}
+.ofi-boundpick__drop:hover { background: color-mix(in srgb, #07145c 12%, transparent); opacity: 1; }
+html.dark .ofi-boundpick {
+  border-color: color-mix(in srgb, var(--ofi-d-wheat-solid, #d48f16) 32%, transparent);
+  background: color-mix(in srgb, var(--ofi-d-wheat-solid, #d48f16) 10%, transparent);
+  color: var(--ofi-d-wheat-solid, #d48f16);
+}
+html.dark .ofi-boundpick__drop:hover {
+  background: color-mix(in srgb, var(--ofi-d-wheat-solid, #d48f16) 20%, transparent);
+}
+
 /* Detail panel entering from the right; the list re-entering left-to-right. */
 @keyframes ofi-slide-right {
   from { transform: translateX(56px); opacity: 0; }
@@ -4387,14 +4452,6 @@ body > :not(#root) .ofi-cal-dayrow__drop {
 }
 #root .ofi-cal-dayrow__drop:hover,
 body > :not(#root) .ofi-cal-dayrow__drop:hover { background: #fce8e6; color: #c5221f; }
-/* Gefragt: der erste Klick färbt den Papierkorb, der zweite streicht den Tag
-   (25.08.2026 — seit das Blatt von selbst sichert, ist ein Klick endgültig). */
-#root .ofi-cal-dayrow__drop.is-armed,
-body > :not(#root) .ofi-cal-dayrow__drop.is-armed {
-    background: var(--ofi-cal-danger);
-    color: #fff;
-}
-
 /* DER SCHNELLSPEICHER STEHT NICHT MEHR IN DER SPALTE (25.08.2026, Vorgabe
    Samet: «in den Kalender damit — rechts neben dem Pfeil»). Seine Regeln
    stehen jetzt beim Fuss der Auskunftskarte, bei `.ofi-cal-btn.is-wide`. */
@@ -5983,23 +6040,15 @@ a.ofi-btn-brand:not([class~="rounded-full"]),
   border-radius: var(--ofi-button-radius) !important;
 }
 
-/* Brand buttons: Offitec navy at rest; an OSYM-inspired orange swell rises
-   from the bottom edge on hover until it covers the full button.
+/* Markenknoepfe: Offitec-Marineblau in Ruhe, weisse Schrift.
 
-   The rise is slow and undulating rather than a straight glide. Two things
-   make the wave, both carried by the transition alone so nothing keeps
-   running while the button sits idle:
+   `position: relative` + `isolation: isolate` sind der Traeger der Welle:
+   sie spannen den eigenen Stapel auf, in dem das `::before` aus
+   `styles/buttons.css` mit `z-index: -1` UEBER dem Grund und UNTER der
+   Beschriftung liegt. Ohne sie liefe die Farbe ueber den Text.
 
-   * `top` uses a linear() easing whose stops step FORWARD and then a little
-     BACK again. Each dip lets the crest sink before it surges on, which is
-     what reads as water sloshing up the button.
-   * `transform` sways the blob sideways on a second, out-of-phase linear()
-     curve, so the crest rolls left and right while it climbs instead of
-     lifting as one rigid dome.
-
-   Both keep an ordinary cubic-bezier declaration ahead of them: a browser
-   without linear() drops the second declaration as invalid and still gets
-   the slow rise, only without the undulation. */
+   `overflow: hidden` bleibt als zweite Sicherung fuer die runden Ecken —
+   die Welle traegt die Rundung inzwischen selbst (`border-radius: inherit`). */
 :where(
   .ant-btn-primary,
   .ofi-btn-brand,
@@ -6016,122 +6065,30 @@ a.ofi-btn-brand:not([class~="rounded-full"]),
 ):not(:disabled):not([disabled]) {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  /* KEIN `overflow: hidden` mehr (01.09.2026). Es beschnitt jedes Kind am
+     INNENkasten — und genau dorthin greift die Welle aus buttons.css seit
+     der 4px-Kante bewusst hinaus, um den Rahmen und damit die runden Ecken
+     mitzudecken. Gebraucht wird es auch nicht: die Welle traegt die Rundung
+     selbst (`border-radius: inherit`). Nebenbei haengen die Abzeichen auf
+     Glocke und Anfragen wieder frei statt abgeschnitten. */
   border-color: var(--ofi-button-navy) !important;
   background: var(--ofi-button-navy) !important;
   color: #fff !important;
   box-shadow: none !important;
-  transition: border-color 220ms ease, color 220ms ease, box-shadow 0s linear 0s !important;
+  transition: border-color 160ms ease, color 160ms ease,
+    box-shadow 0s linear 0s !important;
 }
 
-:where(
-  .ant-btn-primary,
-  .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
-  button[class~="bg-brand-solid"],
-  a[class~="bg-brand-solid"]
-):not(:disabled):not([disabled])::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: 110%;
-  left: 50%;
-  width: 240%;
-  height: 320%;
-  /* A lopsided dome — the crest reads as a swell rather than a drawn compass
-     circle. Opposing radii stay within 100% so nothing gets scaled down. */
-  border-radius: 46% 54% 50% 50% / 58% 60% 40% 38%;
-  background: var(--ofi-button-hover-fill);
-  transform: translateX(-52%);
-  transition: top var(--ofi-button-fill-rise) cubic-bezier(0.32, 0.6, 0.26, 1),
-    transform var(--ofi-button-fill-rise) cubic-bezier(0.45, 0.1, 0.35, 1);
-  transition:
-    top var(--ofi-button-fill-rise)
-      linear(0 0%, 0.13 10%, 0.1 16%, 0.36 30%, 0.32 37%, 0.6 52%, 0.56 59%,
-        0.82 74%, 0.79 81%, 0.95 91%, 0.93 95%, 1 100%),
-    transform var(--ofi-button-fill-rise)
-      linear(0 0%, 0.3 12%, 0.14 25%, 0.62 39%, 0.44 51%, 0.86 65%, 0.7 78%,
-        1.04 90%, 1 100%);
-  pointer-events: none;
-}
-
-:where(
-  .ant-btn-primary,
-  .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
-  button[class~="bg-brand-solid"],
-  a[class~="bg-brand-solid"]
-):not(:disabled):not([disabled]):hover {
-  border-color: var(--ofi-button-hover-fill) !important;
-  background: var(--ofi-button-navy) !important;
-  color: #fff !important;
-  /* The expanding circle supplies the animation. Once it has arrived, this
-     delayed inset fill replaces the navy base completely so sub-pixel edge
-     antialiasing cannot leave dark hairlines in the rounded corners. */
-  box-shadow: inset 0 0 0 999px var(--ofi-button-hover-fill) !important;
-  transition: border-color 220ms ease, color 220ms ease,
-    box-shadow 0s linear var(--ofi-button-fill-rise) !important;
-}
-
-:where(
-  .ant-btn-primary,
-  .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
-  button[class~="bg-brand-solid"],
-  a[class~="bg-brand-solid"]
-):not(:disabled):not([disabled]):hover::before,
-:where(
-  .ant-btn-primary,
-  .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
-  button[class~="bg-brand-solid"],
-  a[class~="bg-brand-solid"]
-):not(:disabled):not([disabled]):active::before,
-:where(
-  .ant-btn-primary,
-  .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
-  button[class~="bg-brand-solid"],
-  a[class~="bg-brand-solid"]
-):not(:disabled):not([disabled]):focus-visible::before {
-  top: -110%;
-  transform: translateX(-48%);
-}
+/* Die BEWEGUNG dieser Knoepfe steht seit dem 01.09.2026 nicht mehr hier,
+   sondern in `styles/buttons.css` — dort laeuft sie fuer JEDEN Knopf der
+   Anwendung gleich, von links nach rechts, und nur die FARBE der Welle
+   wird pro Zusammenhang umgelenkt (Marke = Orange, Fenster = heller
+   Schleier). Entfernt wurden: die aufsteigende Kuppel als `::before`, ihr
+   Hover-Ziel, die verzoegerte Innenfuellung und die Ausnahme fuer
+   `prefers-reduced-motion`. Sie mussten weg, weil zwei Mechaniken auf
+   DEMSELBEN `::before` einander die Geometrie ueberschreiben — die Kuppel
+   war 220% breit und 300% hoch, ein `inset: 0` allein setzt das nicht
+   zurueck. Hier stehen nur noch Grund, Rahmen und Schriftfarbe. */
 
 :where(
   .ant-btn-primary,
@@ -6153,27 +6110,6 @@ a.ofi-btn-brand:not([class~="rounded-full"]),
   -webkit-text-fill-color: #fff !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --ofi-button-fill-rise: 0.01ms;
-  }
-  :where(
-    .ant-btn-primary,
-    .ofi-btn-brand,
-    button[class~="bg-[#272f67]"],
-    a[class~="bg-[#272f67]"],
-    button[class~="bg-[#1f2654]"],
-    a[class~="bg-[#1f2654]"],
-    button[class~="bg-[#07145c]"],
-    a[class~="bg-[#07145c]"],
-    button[class~="bg-[#0b1a6e]"],
-    a[class~="bg-[#0b1a6e]"],
-    button[class~="bg-brand-solid"],
-    a[class~="bg-brand-solid"]
-  )::before {
-    transition-duration: 0.01ms;
-  }
-}
 
 
 /* Neutral buttons keep readable contrast without taking the brand colour. */
@@ -6281,12 +6217,25 @@ body > div:not(#root) section[role="dialog"][aria-modal="true"]:not(.ofi-viewpor
 
 /* Form and action-control standard: 40px height, 14px copy and a clearly
    visible one-pixel edge. Compact row actions and navigation tabs keep their
-   purpose-built dimensions. */
+   purpose-built dimensions.
+
+   IM GLEICHSCHRITT mit `styles/buttons.css`: dort tragen `--ofi-btn-height`
+   (40px) und `--ofi-btn-font-size` (14px) dasselbe Mass auf JEDEN anderen
+   Knopf der Anwendung. Wer eines der beiden Masse ändert, muss das andere
+   mitziehen — sonst stehen AntD-Knöpfe und rohe `<button>` wieder
+   unterschiedlich hoch, und genau das war der Anlass (01.09.2026). Das
+   seitliche Mass liest bereits dieselbe Variable, damit die Telefonstufe
+   (12px statt 16px) auch hier greift. */
 #root :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(.ant-btn-link):not(.ant-btn-text),
 body > div:not(#root) :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(.ant-btn-link):not(.ant-btn-text) {
   height: var(--ofi-control-height) !important;
   min-height: var(--ofi-control-height) !important;
-  padding-inline: 16px !important;
+  padding-inline: var(--ofi-btn-padding-x, 16px) !important;
+  /* Die Rahmenbreite jedes HANDLUNGSknopfes kommt inzwischen aus
+     `--ofi-btn-border-width` (styles/buttons.css) und steht dort ebenfalls auf
+     1px — diese Zeile und jene müssen zusammenbleiben. Hier gilt sie ausserdem
+     dort weiter, wo buttons.css bewusst nicht hinlangt: Kopfleiste,
+     Anmeldeseite, Menü- und Tabellenzeilen. */
   border-width: 1px !important;
   font-size: var(--ofi-control-font-size) !important;
   line-height: 1.2 !important;
@@ -7810,6 +7759,14 @@ body > :not(#root) .ofi-taskcard-pop__done:disabled { opacity: 0.55; cursor: not
     gap: var(--ofi-newtask-gap, 12px);
     min-height: 30px;
 }
+/* Eine Zeile mit einem FELD statt eines Wortes (die Offerte, 13.09.2026):
+   das Feld ist höher als seine Beschriftung und wächst um das gebundene
+   Kästchen noch einmal — die Beschriftung hält sich darum oben, auf Höhe
+   der ersten Zeile, statt in der Mitte zu schweben. Dieselbe Rechnung wie
+   `.ofi-newtask__row.is-tall` im Anlegefenster. */
+.ofi-taskcard-pop__rows > div.is-tall { align-items: start; }
+.ofi-taskcard-pop__rows > div.is-tall > dt { padding-top: 9px; }
+
 .ofi-taskcard-pop__rows dt {
     font-size: 10.5px;
     font-weight: 700;
@@ -8038,21 +7995,27 @@ html:not(.dark) #root .ofi-quote-page table[data-tender-detail-table] td { color
    damals — «den Radius von Speichern / Export / Bestätigen deutlich
    verkleinern» — ist damit überholt; hier steht die neuere Vorgabe.
    Höhe und Polsterung stehen MIT in dieser Regel, damit die Reihe nicht
-   wieder auseinanderläuft, sobald irgendwo ein `h-10` danebengesetzt wird. */
+   wieder auseinanderläuft, sobald irgendwo ein `h-10` danebengesetzt wird.
+
+   DAS «KLEINER» IST SEIT DEM 01.09.2026 ÜBERHOLT: «alle Knöpfe müssen gleich
+   gross sein und nicht klein». Die Pille bleibt (das war der Kern der
+   damaligen Vorgabe), das MASS kommt jetzt aus `styles/buttons.css` — sonst
+   stünde ausgerechnet die Offertenseite als einzige auf 32px, weil ihre
+   Werte hier `!important` tragen und die gemeinsame Regel schlagen. */
 #root .ofi-quote-page .ofi-quote-btn,
 #root .ofi-quote-topbar .ofi-quote-btn {
-    height: 32px !important;
-    min-height: 32px !important;
-    padding-left: 14px !important;
-    padding-right: 14px !important;
+    height: var(--ofi-btn-height) !important;
+    min-height: var(--ofi-btn-height) !important;
+    padding-left: var(--ofi-btn-padding-x) !important;
+    padding-right: var(--ofi-btn-padding-x) !important;
     border-radius: 999px !important;
-    font-size: 12.5px !important;
+    font-size: var(--ofi-btn-font-size) !important;
 }
 /* Die runden Symbolknöpfe der Leiste (Zurück, Zahnrad) tragen dasselbe Mass,
    sonst steht die Zeile wieder gestuft. */
 #root .ofi-quote-topbar .ofi-quote-iconbtn {
-    height: 32px !important;
-    width: 32px !important;
+    height: var(--ofi-btn-height) !important;
+    width: var(--ofi-btn-height) !important;
 }
 #root .ofi-quote-page .ofi-quote-btn.is-secondary,
 #root .ofi-quote-topbar .ofi-quote-btn.is-secondary {
@@ -8590,6 +8553,11 @@ body > :not(#root) .ofi-mail-outlookbtn:hover { background: #106ebe; text-decora
     text-align: left;
     color: var(--ofi-cal-text);
     transition: background-color 100ms ease;
+    /* Die Zeile ist ein `div` mit `role="button"`, damit sie sich ziehen
+       laesst (siehe MailList.tsx) — Zeiger und Auswahlsperre kamen vorher vom
+       `<button>` und stehen deshalb jetzt hier. */
+    cursor: pointer;
+    user-select: none;
 }
 #root .ofi-mail-row:hover { background: var(--ofi-cal-hover); }
 #root .ofi-mail-row.is-active { background: var(--ofi-cal-tab-active-bg); }
@@ -10085,10 +10053,9 @@ body > :not(#root) .ofi-prj-card__link {
 }
 #root .ofi-prj-card__link:hover,
 body > :not(#root) .ofi-prj-card__link:hover { background: var(--ofi-cal-accent-tint); }
-#root .ofi-prj-card__link svg,
-body > :not(#root) .ofi-prj-card__link svg { transition: transform 140ms ease; }
-#root .ofi-prj-card__link:hover svg,
-body > :not(#root) .ofi-prj-card__link:hover svg { transform: translateX(2px); }
+/* Der Pfeil rutschte beim Überfahren zwei Pixel nach rechts. Weg damit:
+   Vorgabe 01.09.2026 — beim Überfahren ändert sich NUR die Farbe, und die
+   Zeile darunter tut das mit ihrem Grund bereits. */
 .ofi-prj-card__scroll { min-width: 0; overflow-x: auto; }
 
 /* Tabellen IN einer Übersichtskarte: keine senkrechten Gitterlinien, KEIN
@@ -10288,17 +10255,25 @@ a.ofi-prj-contact__text:hover { color: var(--ofi-cal-accent); text-decoration: u
     font-weight: 600;
     white-space: nowrap;
     color: #272f67;
+    /* DIESE 140ms sind das Vorbild der ganzen Anwendung. Vorgabe Samet
+       01.09.2026: «die Bewegung der Knöpfe soll sein wie beim Verkaufs-PDF im
+       Projekt» — gemeint ist dieser Knopf. `styles/buttons.css` trägt seither
+       dieselbe Zeit und dieselbe Kurve als `--ofi-btn-tint-in/-out/-ease` auf
+       JEDEN Knopf. Wer hier dreht, dreht dort mit; der Hinweis steht auf
+       beiden Seiten. */
     transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
-                box-shadow 140ms ease, transform 140ms ease;
+                box-shadow 140ms ease;
 }
 #root .ofi-ordconf-btn:hover:not(:disabled) {
     border-color: #272f67;
     background: linear-gradient(135deg, #1f2654, #3f4a92);
     color: #fff;
     box-shadow: 0 2px 10px rgba(39, 47, 103, 0.32);
-    transform: translateY(-1px);
 }
-#root .ofi-ordconf-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+/* Das Zurücksetzen des Hebens beim Klick braucht es nicht mehr, seit beim
+   Überfahren nichts mehr angehoben wird; das Schrumpfen liefert
+   `styles/buttons.css` für jeden Knopf der Anwendung. */
+#root .ofi-ordconf-btn:active:not(:disabled) { box-shadow: none; }
 #root .ofi-ordconf-btn:disabled {
     border-color: var(--ofi-cal-border);
     background: transparent;
@@ -12906,7 +12881,12 @@ body > :not(#root) :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-b
 .ofi-invp-page {
     /* Ein Ort für Radius und Bedienhöhe des ganzen Moduls. */
     --ofi-invp-radius: 12px;
-    --ofi-invp-control-h: 36px;
+    /* 40px statt der frueheren 36px (01.09.2026): die Knoepfe der ganzen
+       Anwendung stehen jetzt auf `--ofi-btn-height` (styles/buttons.css).
+       Bliebe die Werkzeugleiste des Moduls bei 36px, staende ihr Suchfeld
+       4px niedriger als der Knopf daneben — genau der Versatz, den die
+       Vorgabe "alle gleich gross" beseitigen soll. */
+    --ofi-invp-control-h: 40px;
     display: flex;
     min-width: 0;
     flex-direction: column;
@@ -13566,8 +13546,10 @@ body > :not(#root) input.ofi-invp-input[type="number"]::-webkit-inner-spin-butto
 .dark .ofi-invp-step__num { background-image: none; box-shadow: none; }
 
 /* ── Knöpfe: ein Ding, kein Rechteck ────────────────────────────────────
-   Ruhe → angehoben beim Überfahren → gedrückt beim Klick. Die Verschiebung
-   ist EIN Pixel; mehr wirkt wie ein Wackeln. */
+   Ruhe → beim Überfahren nur ein grösserer Schatten, der Knopf bleibt
+   stehen → beim Klick sinkt er ein. Das Heben um einen Pixel ist am
+   01.09.2026 gefallen («beim Überfahren nur eine Farbanimation»); das
+   Schrumpfen beim Klick kommt für jeden Knopf aus `styles/buttons.css`. */
 .ofi-invp-foot > button,
 .ofi-invp-page .ofi-btn-brand,
 .ofi-invp-page > .ofi-rise button {
@@ -13578,13 +13560,11 @@ body > :not(#root) input.ofi-invp-input[type="number"]::-webkit-inner-spin-butto
 .ofi-invp-page .ofi-btn-brand:hover:not(:disabled),
 .ofi-invp-page > .ofi-rise button:hover:not(:disabled) {
     box-shadow: var(--ofi-invp-e2);
-    transform: translateY(-1px);
 }
 .ofi-invp-foot > button:active:not(:disabled),
 .ofi-invp-page .ofi-btn-brand:active:not(:disabled),
 .ofi-invp-page > .ofi-rise button:active:not(:disabled) {
     box-shadow: inset 0 1px 3px rgba(32, 33, 36, 0.28);
-    transform: translateY(0);
 }
 .ofi-invp-foot > button:disabled { box-shadow: none; }
 
@@ -13593,9 +13573,9 @@ body > :not(#root) input.ofi-invp-input[type="number"]::-webkit-inner-spin-butto
 #root .ofi-invp-glyph,
 body > :not(#root) .ofi-invp-glyph { transition: background-color 120ms ease, color 120ms ease, box-shadow 140ms ease, transform 140ms ease; }
 #root .ofi-invp-glyph:hover:not(:disabled),
-body > :not(#root) .ofi-invp-glyph:hover:not(:disabled) { box-shadow: var(--ofi-invp-e1); transform: translateY(-1px); }
+body > :not(#root) .ofi-invp-glyph:hover:not(:disabled) { box-shadow: var(--ofi-invp-e1); }
 #root .ofi-invp-glyph:active:not(:disabled),
-body > :not(#root) .ofi-invp-glyph:active:not(:disabled) { box-shadow: inset 0 1px 3px rgba(32, 33, 36, 0.22); transform: translateY(0); }
+body > :not(#root) .ofi-invp-glyph:active:not(:disabled) { box-shadow: inset 0 1px 3px rgba(32, 33, 36, 0.22); }
 
 /* ── Felder sind Mulden ─────────────────────────────────────────────────
    Ein Feld liegt TIEFER als die Platte, auf der es sitzt. Beim Fokus kommt es
@@ -14165,7 +14145,6 @@ body > :not(#root) .ofi-osp-import-btn {
 body > :not(#root) .ofi-osp-import-btn:hover:not(:disabled) {
     background: #1f2654;
     box-shadow: 0 6px 14px rgba(39, 47, 103, 0.2);
-    transform: translateY(-1px);
 }
 #root .ofi-osp-import-btn:disabled,
 body > :not(#root) .ofi-osp-import-btn:disabled { opacity: 0.55; }
@@ -14217,6 +14196,65 @@ body > :not(#root) .ofi-osp-import-btn.is-open:hover { background: var(--ofi-cal
 .dark .ofi-osp-creating { background: rgba(0, 0, 0, 0.5); }
 .dark .ofi-osp-creating__spinner { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.9); }
 
+/* ── ZWEI REITER: ANFRAGEN | AKTIVITÄT (§1c, 20.09.2026) ─────────────────────
+   Links steht, was jemand bestellt hat, rechts, was jemand bloss rechnet. Der
+   Unterschied ist kein Anzeigedetail — der Aktivitätsstrom ist ausdrücklich
+   KEINE Anfrage —, also sind es zwei Reiter und nicht ein Filter. */
+.ofi-osp-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-bottom: 1px solid var(--ofi-cal-border);
+    padding-bottom: 0;
+}
+#root .ofi-osp-tab,
+body > :not(#root) .ofi-osp-tab {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-osp-tab:hover,
+body > :not(#root) .ofi-osp-tab:hover { color: #272f67; background: transparent; }
+#root .ofi-osp-tab.is-on,
+body > :not(#root) .ofi-osp-tab.is-on {
+    border-bottom-color: #272f67;
+    color: #272f67;
+}
+.dark .ofi-osp-tab:hover,
+.dark .ofi-osp-tab.is-on { color: #fff; }
+.dark .ofi-osp-tab.is-on { border-bottom-color: rgba(255, 255, 255, 0.7); }
+
+/* Der Vorgang im Aktivitätsstrom: NEU (berechnet, ins Projekt gelegt) oder
+   ÄNDERUNG an einem Beleg, den wir schon kennen. */
+.ofi-osp-chip.is-new { background: #e7f6ef; color: #0f766e; }
+.ofi-osp-chip.is-update { background: #fdeee2; color: #c2410c; }
+.dark .ofi-osp-chip.is-new { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+.dark .ofi-osp-chip.is-update { background: rgba(249, 115, 22, 0.18); color: #fdba74; }
+
+/* ── DIE ANGEFRAGTEN EINHEITEN ───────────────────────────────────────────────
+   Eine Anfrage ist ein PROJEKT und hält mehrere Einheiten (§1). Sie stehen
+   untereinander, jede mit ihrem eigenen Datenblatt — genau die Aufteilung, die
+   die Offerte danach bekommt: eine Position je Einheit. */
+.ofi-osp-unitcell { vertical-align: top !important; }
+.ofi-osp-units { display: flex; flex-direction: column; gap: 4px; }
+.ofi-osp-unit {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+.ofi-osp-unit__text { display: flex; min-width: 0; flex-direction: column; }
+.ofi-osp-unit__text .ofi-osp-model { padding-top: 0; }
+/* Eine Einheit ohne Datenblatt rutscht nicht nach links: der Platz der Kachel
+   bleibt stehen, damit die Namen untereinander fluchten. */
+.ofi-osp-unit__nosheet { display: inline-block; width: 40px; flex: none; }
+
 /* Das Datenblatt: NUR das Zeichen (Vorgabe 19.09.2026 — "die Spalte darf
    schmaler sein"). Vorher stand hier der Dateiname, den die OSP vergibt: eine
    Kennnummer, die niemandem etwas sagt und der Spalte die halbe Tabelle
@@ -14245,7 +14283,7 @@ body > :not(#root) .ofi-osp-sheetbtn {
     transition: background-color 130ms ease, transform 130ms ease;
 }
 #root .ofi-osp-sheetbtn:hover,
-body > :not(#root) .ofi-osp-sheetbtn:hover { transform: translateY(-1px); background: var(--ofi-cal-hover); }
+body > :not(#root) .ofi-osp-sheetbtn:hover { background: var(--ofi-cal-hover); }
 #root .ofi-osp-sheetbtn svg,
 body > :not(#root) .ofi-osp-sheetbtn svg { flex: none; }
 .dark .ofi-osp-sheetbtn { color: rgba(255, 255, 255, 0.86); }
@@ -15409,7 +15447,6 @@ body > :not(#root) .ofi-upd__appbtn {
 }
 #root .ofi-upd__appbtn:hover,
 body > :not(#root) .ofi-upd__appbtn:hover {
-    transform: translateY(-2px);
     border-color: var(--ofi-cal-border);
     box-shadow: 0 10px 22px rgba(32, 33, 36, 0.12);
 }
@@ -15463,7 +15500,6 @@ body > :not(#root) .ofi-upd__cardbtn {
 }
 #root .ofi-upd__cardbtn:hover,
 body > :not(#root) .ofi-upd__cardbtn:hover {
-    transform: translateY(-2px);
     border-color: var(--ofi-cal-border);
     box-shadow: 0 10px 22px rgba(32, 33, 36, 0.12);
 }
@@ -15894,3 +15930,604 @@ body > :not(#root) .ofi-upd__primary:hover { background: var(--ofi-cal-accent-ho
     }
     .ofi-upd-spot { transition: none; }
 }
+
+
+/* ═══════════ MONTAGE-ARBEITSBILDSCHIRM (Vorgabe Samet, 02.09.2026) ═══════════
+   «Sauberer, im Google-/Apple-Stil, bedienbarer — und alles mit EINEM Klick.»
+
+   Der Bildschirm malt ausschliesslich aus den `--ofi-cal-*`-Marken wie das
+   Projekt- und das Kalendermodul: damit stimmt der Dunkelmodus ohne eine
+   zweite Regelmenge (siehe styles/dark.css, Abschnitt «Calendar module»).
+
+   Die Knöpfe setzen HIER weder Höhe noch Radius. Beides kommt aus
+   styles/buttons.css — 40px und 4px, für JEDEN Knopf der Anwendung —, wohin
+   `.ofi-mtg-btn` dafür eingetragen ist. Wer hier eine eigene Höhe setzt, hebt
+   nur die gemeinsame Linie aus Feld und Knopf wieder auf. */
+.ofi-mtg-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ── Kopfzeile: Termin, daneben die Unterlagen, daneben der Status ──────── */
+.ofi-mtg-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.ofi-mtg-head__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.ofi-mtg-head__title {
+    margin: 0;
+    padding-right: 4px;
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--ofi-cal-text);
+}
+.ofi-mtg-head__sub {
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+/* Der Status steht NEBEN den Unterlagen, nicht am anderen Bildschirmrand —
+   er gehört zum Termin und nicht zur Werkzeugleiste. */
+.ofi-mtg-head__status { margin-left: 2px; }
+
+/* ── Ein Knopf für diesen Bildschirm ────────────────────────────────────── */
+#root .ofi-mtg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+#root .ofi-mtg-btn:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+/* «is-on» = dieser Knopf hat schon etwas bewirkt (Unterschrift erfasst, Fenster
+   offen). Eine weiche Akzentfläche, keine zweite Farbe. */
+#root .ofi-mtg-btn.is-on {
+    border-color: transparent;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+#root .ofi-mtg-btn.is-on:hover:not(:disabled) { background: var(--ofi-cal-accent-tint); }
+#root .ofi-mtg-btn.is-primary {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+#root .ofi-mtg-btn.is-primary:hover:not(:disabled) {
+    border-color: var(--ofi-cal-accent-hover);
+    background: var(--ofi-cal-accent-hover);
+}
+/* Der Schleier, den buttons.css beim Überfahren aufblendet, ist für HELLE
+   Flächen gemischt. Auf dem gefüllten Akzent kehrt er sich um — sonst legte
+   sich Marineblau auf Marineblau und der Knopf sähe tot aus. */
+#root .ofi-mtg-btn.is-primary { --ofi-btn-tint-fill: rgba(255, 255, 255, 0.2); }
+.dark #root .ofi-mtg-btn.is-primary { --ofi-btn-tint-fill: rgba(0, 0, 0, 0.2); }
+#root .ofi-mtg-btn:disabled { cursor: not-allowed; opacity: 0.42; }
+/* Ein Symbolknopf bleibt quadratisch: die gemeinsame Polsterung wird über die
+   Steuervariable von buttons.css auf null gesetzt, nicht überschrieben. */
+#root .ofi-mtg-btn.is-icon {
+    --ofi-btn-padding-x: 0px;
+    width: 40px;
+    gap: 0;
+}
+.ofi-mtg-spin {
+    display: inline-block;
+    height: 15px;
+    width: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 999px;
+    animation: ofi-mtg-spin 700ms linear infinite;
+}
+.dark .ofi-mtg-spin { border-color: rgba(0, 0, 0, 0.3); border-top-color: rgba(0, 0, 0, 0.75); }
+@keyframes ofi-mtg-spin { to { transform: rotate(360deg); } }
+
+/* ── Zeitleiste: Zeit links, Speichern MITTIG, Abschluss rechts ─────────── */
+.ofi-mtg-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+    padding: 10px 14px;
+}
+.ofi-mtg-bar__time {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    line-height: 1.2;
+}
+.ofi-mtg-bar__hours {
+    font-size: 17px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+}
+.ofi-mtg-bar__date {
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mtg-bar__center {
+    display: flex;
+    justify-content: center;
+}
+.ofi-mtg-bar__end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.ofi-mtg-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.12);
+    padding: 7px 14px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #047857;
+}
+.dark .ofi-mtg-done { color: #6ee7b7; background: rgba(16, 185, 129, 0.16); }
+
+/* Auf dem Tablet quer reicht die Breite für drei Spalten nicht mehr: die
+   Leiste bricht in drei Zeilen um und die Mitte bleibt die Mitte. */
+@media (max-width: 1100px) {
+    .ofi-mtg-bar { grid-template-columns: minmax(0, 1fr); }
+    /* Gestapelt gibt es keine Mitte mehr — ein Knopf, der allein in der Mitte
+       einer eigenen Zeile schwebt, sieht verloren aus. Alle drei Zeilen stehen
+       darum an derselben linken Kante. */
+    .ofi-mtg-bar__center,
+    .ofi-mtg-bar__end { justify-content: flex-start; }
+}
+
+/* Der Editor bringt seit dem iOS-Kleid (02.09.2026) seinen eigenen grauen Grund
+   mit (`.ofi-fr-panel`). Eine weisse Karte darum herum wäre eine zweite Fläche
+   um dieselbe Sache — der Platzhalter bleibt nur noch als Anker stehen. */
+.ofi-mtg-editor {
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+
+/* ── Register des Rapport-Editors: Pille statt Klammer ──────────────────────
+   Vorgabe Samet: «unter dem aktiven Register steht so eine Klammer — ich will
+   sie nicht; sauberer, wie bei Apple oder Google». Der 2px-Unterstrich ist
+   darum weg. Aktiv ist eine gefüllte, ruhige Pille; beim Überfahren nur die
+   neutrale Hoverfläche. Dieselbe Sprache wie `.ofi-cal-tab` im Kalender. */
+.ofi-fr-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding-bottom: 2px;
+}
+/* Die Lücke, die «Ausgeführte Arbeiten»/«Technische Notizen» nach links und den
+   Rest nach rechts schob, ist am 02.09.2026 ersatzlos gestrichen — alle
+   Register stehen nebeneinander. Das Kleid der Leiste (iOS-Segmentwähler) steht
+   ganz unten in dieser Datei unter `.ofi-fr-editor .ofi-fr-tabs`. */
+#root .ofi-fr-tab {
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: 999px !important;
+    background: transparent;
+    padding: 0 16px;
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-fr-tab:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-fr-tab.is-active {
+    background: var(--ofi-cal-tab-active-bg);
+    color: var(--ofi-cal-tab-active-text);
+    font-weight: 600;
+}
+
+/* ── Unterschriften: gestapelt, mit fetter Überschrift ──────────────────────
+   ERST das Techniker-, DARUNTER das Kundenfeld (Vorgabe 02.09.2026) — in
+   dieser Reihenfolge wird auch unterschrieben. Die Beschriftung des Feldes
+   ist hier die Überschrift und darum fett und in Textfarbe, nicht die
+   gedämpfte Kapitälchenzeile der übrigen Signaturkarten. */
+.ofi-fr-signs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.ofi-fr-signs .ofi-sign-card__label {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-cal-text);
+}
+
+/* ═══════════ RAPPORT-EDITOR IM iOS-KLEID (Vorgabe Samet, 02.09.2026) ═══════
+   «Ausgeführte Arbeiten, Technische Notizen, Kosten und Unterschriften — im
+   Stil von Apple iOS.»
+
+   Gemeint ist die «Inset Grouped»-Liste der iOS-Einstellungen, und die besteht
+   aus genau vier Dingen:
+
+     1. ein GRAUER Grund (`--ofi-ios-group`), auf dem alles liegt,
+     2. WEISSE, runde Gruppen darauf (`.ofi-ios-card`),
+     3. über jeder Gruppe eine kleine graue Überschrift, unter ihr eine
+        ebenso kleine Fussnote — beide AUSSERHALB der Karte,
+     4. innerhalb der Karte eine ab 16px EINGERÜCKTE Haarlinie zwischen den
+        Zeilen; die Linie berührt den linken Rand nie.
+
+   Die Zeilenhöhe ist 44px — das Fingermass von iOS, und auf dem Tablet des
+   Monteurs ist das kein Zierat, sondern der Grund, warum man trifft.
+
+   Alles hier hängt an `.ofi-fr-editor`: das Kleid gilt für den Rapport und
+   sonst nirgends. Die Farben kommen aus zwei Sätzen von Variablen, hell und
+   dunkel, damit jede Regel nur EINMAL geschrieben werden muss. */
+.ofi-fr-editor {
+    --ofi-ios-group: #f2f2f7;   /* systemGroupedBackground */
+    --ofi-ios-card: #ffffff;    /* secondarySystemGroupedBackground */
+    --ofi-ios-sep: rgba(60, 60, 67, 0.19);
+    --ofi-ios-label: #6c6c70;
+    --ofi-ios-field: #f2f2f7;   /* Felder INNERHALB einer weissen Karte */
+    --ofi-ios-radius: 12px;
+    --ofi-ios-row: 44px;
+}
+html.dark .ofi-fr-editor {
+    /* Der Grund sinkt unter die Karte, statt wie in Hell darüber zu liegen —
+       sonst verschwimmen Gruppe und Grund zu einer Platte. */
+    --ofi-ios-group: var(--ofi-d-bg);
+    --ofi-ios-card: var(--ofi-d-surface);
+    --ofi-ios-sep: rgba(255, 246, 232, 0.09);
+    --ofi-ios-label: rgba(255, 255, 255, 0.45);
+    --ofi-ios-field: rgba(255, 255, 255, 0.06);
+}
+
+/* Der graue Grund. Er trägt die Registerschiene und darunter die Gruppen. */
+.ofi-fr-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    border-radius: 16px;
+    background: var(--ofi-ios-group);
+    padding: 14px 12px 18px;
+}
+
+.ofi-ios-group__title {
+    padding: 0 16px 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-ios-label);
+}
+.ofi-ios-card {
+    overflow: hidden;
+    border-radius: var(--ofi-ios-radius);
+    background: var(--ofi-ios-card);
+}
+.ofi-ios-group__footer {
+    padding: 7px 16px 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ofi-ios-label);
+}
+
+/* Die Haarlinie ist ein Pseudo-Element und KEIN `border-top`: sie muss links
+   eingerückt beginnen (16px) und rechts am Kartenrand enden — genau so trennt
+   iOS seine Zeilen. Auf eine Tabelle folgt sie nicht: die Tabelle zieht ihre
+   Abschlusslinie weiter unten selbst. */
+.ofi-ios-card > * { position: relative; }
+.ofi-ios-card > * + *::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 0;
+    height: 1px;
+    background: var(--ofi-ios-sep);
+}
+/* Eine Tabelle steht in `.ofi-ios-tablewrap`; sie zieht ihre Abschlusslinie
+   selbst (siehe unten), also bekommt die Zeile DANACH keine zweite. */
+.ofi-ios-tablewrap + *::before { content: none; }
+
+.ofi-ios-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--ofi-ios-row);
+    padding: 7px 16px;
+    font-size: 14.5px;
+    color: var(--ofi-cal-text);
+}
+/* Eine Zeile, die ein FELD trägt, richtet oben aus — ein mehrzeiliger Text
+   soll nach unten wachsen und die Nummer nicht mitziehen. */
+.ofi-ios-row.is-field { align-items: flex-start; padding: 8px 10px 8px 16px; }
+.ofi-ios-row__label { flex: 0 0 auto; min-width: 0; }
+.ofi-ios-row__value {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    text-align: right;
+    color: var(--ofi-ios-label);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ios-row__value.is-strong { font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-ios-row__sub { font-size: 11.5px; color: var(--ofi-cal-faint); }
+.ofi-ios-num {
+    flex: 0 0 auto;
+    width: 20px;
+    padding-top: 9px;
+    text-align: right;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-ios-label);
+}
+
+/* Ein Zeitfeld in der Zeile ist in iOS eine graue Pille am rechten Rand. */
+#root .ofi-fr-editor .ofi-ios-time,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time {
+    margin-left: auto;
+    height: 32px;
+    min-height: 32px;
+    width: auto;
+    border: 0;
+    border-radius: 8px;
+    background: var(--ofi-ios-field);
+    padding: 0 10px;
+    font-size: 14.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    outline: none;
+}
+#root .ofi-fr-editor .ofi-ios-time:disabled,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time:disabled { opacity: 0.55; }
+
+/* Schreibfelder: randlos in der Karte, der Rahmen erscheint erst beim
+   Anfassen — dieselbe Sprache wie die Tabellenzellen des Editors. */
+#root .ofi-fr-editor .ofi-ios-textarea,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea {
+    flex: 1 1 auto;
+    min-height: 46px;
+    resize: vertical;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    padding: 10px 12px;
+    font-size: 14.5px;
+    line-height: 1.45;
+    color: var(--ofi-cal-text);
+    outline: none;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-ios-textarea::placeholder,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea::placeholder { color: var(--ofi-cal-faint); }
+#root .ofi-fr-editor .ofi-ios-textarea:hover:not(:disabled),
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea:hover:not(:disabled) { background: var(--ofi-ios-field); }
+#root .ofi-fr-editor .ofi-ios-textarea:focus,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea:focus {
+    border-color: var(--ofi-cal-border);
+    background: var(--ofi-ios-field);
+}
+/* Das Notizfeld füllt seine Gruppe ganz aus. */
+#root .ofi-fr-editor .ofi-ios-textarea.is-block,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea.is-block {
+    display: block;
+    width: 100%;
+    min-height: 240px;
+    border-radius: var(--ofi-ios-radius);
+    padding: 14px 16px;
+    line-height: 1.6;
+}
+
+/* Das Eingabefeld IN der Kostentabelle — gleiche Höhe wie eine iOS-Zeile. */
+#root .ofi-fr-editor .ofi-ios-cellinput,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput {
+    width: 100%;
+    height: 38px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 13.5px;
+    color: var(--ofi-cal-text);
+    outline: none;
+    box-shadow: none;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-ios-cellinput:hover,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput:hover { background: var(--ofi-ios-field); }
+#root .ofi-fr-editor .ofi-ios-cellinput:focus,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput:focus {
+    border-color: var(--ofi-cal-border);
+    background: var(--ofi-ios-field);
+}
+
+/* Die Hinzufügen-Zeile: ein Ring mit Plus, daneben das Wort — in iOS steht
+   sie IMMER als letzte Zeile der Gruppe und nicht als Knopf daneben. */
+#root .ofi-ios-add,
+body > :not(#root) .ofi-ios-add {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--ofi-ios-row);
+    border: 0;
+    background: transparent;
+    padding: 8px 16px;
+    text-align: left;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-accent);
+    transition: background-color 140ms ease;
+}
+#root .ofi-ios-add:hover,
+body > :not(#root) .ofi-ios-add:hover { background: var(--ofi-cal-hover); }
+.ofi-ios-add__ring {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 21px;
+    height: 21px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+/* Löschen ist still: grau, bis man daraufzeigt. */
+#root .ofi-ios-minus,
+body > :not(#root) .ofi-ios-minus {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-ios-minus:hover:not(:disabled),
+body > :not(#root) .ofi-ios-minus:hover:not(:disabled) { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+#root .ofi-ios-minus:disabled,
+body > :not(#root) .ofi-ios-minus:disabled { opacity: 0.25; }
+
+/* Der Haken vor einem schon gewählten Artikel in der Trefferliste. */
+.ofi-ios-tick {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    color: var(--ofi-cal-accent);
+}
+.ofi-ios-tick.is-on { background: var(--ofi-cal-accent-soft); }
+
+/* ── Die Kostentabelle in der Gruppe ────────────────────────────────────────
+   Sie BLEIBT eine Tabelle (die Spalten sind ziehbar und die Beträge müssen an
+   einer Kante enden), trägt aber das Kleid der Liste: eine graue Kopfzeile
+   ohne Fläche und dieselben eingerückten Haarlinien.
+
+   Die UNTERSTE Linie ist eine ausdrückliche Vorgabe (Samet, 02.09.2026: «in
+   der Kostentabelle auf dem Montage-Bildschirm fehlt die untere Linie»). Sie
+   fehlte, weil die Grundregel jeder App-Tabelle die letzte Zeile absichtlich
+   offen lässt (`tbody tr:last-child td { border-bottom-color: transparent }`,
+   ganz oben in dieser Datei) — dort schliesst sonst der Kartenrand ab. In der
+   Gruppe steht darunter aber noch die Hinzufügen-Zeile, und ohne Linie klebte
+   die letzte Kostenzeile an ihr. */
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] thead th {
+    background: transparent;
+    border-bottom: 1px solid var(--ofi-ios-sep);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ofi-ios-label);
+}
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] tbody tr:last-child td {
+    border-bottom: 1px solid var(--ofi-ios-sep);
+}
+/* Die senkrechten Rasterlinien der ziehbaren Spalten bleiben, nehmen aber den
+   ruhigeren Ton der Liste an. */
+.ofi-fr-editor .ofi-ios-card table[data-grid-lines] { --quote-grid-line: var(--ofi-ios-sep); }
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] td,
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] th { padding-left: 12px; padding-right: 12px; }
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] td:first-child,
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] th:first-child { padding-left: 16px; }
+
+/* ── Register als iOS-Segmentwähler ─────────────────────────────────────────
+   Eine graue Schiene, gleich breite Abschnitte, das aktive als weisse Pille.
+   Damit stehen «Ausgeführte Arbeiten» und «Technische Notizen» NEBEN den
+   übrigen und nicht mehr links gegen rechts (Vorgabe 02.09.2026). */
+.ofi-fr-editor .ofi-fr-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    border-radius: 10px;
+    background: rgba(118, 118, 128, 0.12);
+    padding: 2px;
+}
+html.dark .ofi-fr-editor .ofi-fr-tabs { background: rgba(255, 255, 255, 0.07); }
+#root .ofi-fr-editor .ofi-fr-tab,
+body > :not(#root) .ofi-fr-editor .ofi-fr-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 32px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 8px !important;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-fr-tab:hover,
+body > :not(#root) .ofi-fr-editor .ofi-fr-tab:hover { background: rgba(118, 118, 128, 0.1); }
+#root .ofi-fr-editor .ofi-fr-tab.is-active,
+body > :not(#root) .ofi-fr-editor .ofi-fr-tab.is-active {
+    background: var(--ofi-ios-card);
+    color: var(--ofi-cal-text);
+    font-weight: 600;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+/* Im Dunkeln liegt die Kartenfarbe zu nah an der Schiene: der gewählte
+   Abschnitt steigt darum eine Stufe höher, sonst sieht man nicht, wo man ist. */
+html.dark #root .ofi-fr-editor .ofi-fr-tab.is-active,
+html.dark body > :not(#root) .ofi-fr-editor .ofi-fr-tab.is-active {
+    background: var(--ofi-d-surface-3);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+/* Auf dem Telefon passen fünf gleich breite Abschnitte nicht mehr, ohne dass
+   die Wörter zu Stummeln werden: die Schiene wird dort schiebbar. */
+@media (max-width: 640px) {
+    .ofi-fr-editor .ofi-fr-tabs { overflow-x: auto; scrollbar-width: none; }
+    .ofi-fr-editor .ofi-fr-tabs::-webkit-scrollbar { display: none; }
+    #root .ofi-fr-editor .ofi-fr-tab,
+    body > :not(#root) .ofi-fr-editor .ofi-fr-tab { flex: 0 0 auto; }
+    .ofi-fr-panel { padding: 12px 8px 14px; }
+    .ofi-ios-group__title, .ofi-ios-group__footer { padding-left: 12px; padding-right: 12px; }
+}
+
+/* ── Unterschriften im selben Kleid ─────────────────────────────────────────
+   Die Signaturkarte verliert ihren Rahmen und wird eine Gruppe wie die
+   anderen; die Schreibfläche bleibt weiss, weil die Tinte darauf liegt. */
+.ofi-fr-editor .ofi-sign-card {
+    border: 0;
+    border-radius: var(--ofi-ios-radius);
+    background: var(--ofi-ios-card);
+}
+.ofi-fr-editor .ofi-sign-card__head { min-height: var(--ofi-ios-row); padding: 6px 10px 6px 16px; }
+.ofi-fr-editor .ofi-sign-card__pad {
+    border-top: 1px solid var(--ofi-ios-sep);
+    border-bottom: 0;
+}
+.ofi-fr-editor .ofi-sign-card__caption { padding: 9px 16px 12px; font-size: 12px; color: var(--ofi-ios-label); }
+.ofi-fr-editor .ofi-fr-signs { gap: 14px; }
+.ofi-fr-editor .ofi-fr-signs .ofi-sign-card__label { font-size: 14.5px; font-weight: 600; }

@@ -24,6 +24,7 @@
  * schnell einige hundert Kilobyte und würden dessen Platz sprengen.
  */
 import { apiClient } from './axios';
+import { onIdle } from './utils/onIdle';
 
 /** `undefined` = noch nicht gefragt, `null` = gefragt, hat kein Bild. */
 const cache = new Map<string, string | null>();
@@ -83,10 +84,10 @@ export const requestPersonPhoto = (id: string | null | undefined): void => {
     queued.add(id);
     if (flushScheduled) return;
     flushScheduled = true;
-    // Mikrotask statt Zeitgeber: alle Zeilen EINES Bildaufbaus melden sich im
-    // selben Durchgang an, verschickt wird direkt danach — ohne sichtbare
-    // Verzögerung und trotzdem als eine einzige Anfrage.
-    queueMicrotask(() => { void flush(); });
+    // Profile pictures are secondary to the route's business data. Batch them
+    // once the browser is idle so they do not occupy a connection while a list
+    // such as Projects is still loading.
+    onIdle(() => { void flush(); }, 2500);
 };
 
 /** Was bekannt ist: die Daten-URL, `null` (kein Bild) oder `undefined`. */

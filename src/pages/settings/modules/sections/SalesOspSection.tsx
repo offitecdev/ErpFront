@@ -12,9 +12,14 @@ import { useAuthStore } from '@/store/authStore';
  *  • MANDANTEN — welche Firmen des eigenen Firmenbaums die OSP-Seite
  *    (/sales/osp) sehen und bearbeiten (die Wurzel sieht sie immer).
  *  • EINGANG  — der gemeinsame Schlüssel, mit dem die OSP bei uns anklopft,
- *    und die DREI Adressen, die ihr dafür zu nennen sind: neue Anfrage (§1),
- *    überarbeitete Anfrage (§1a) und Rückzug (§1b). Drei statt einer, damit
- *    drüben auf die Adresse geroutet werden kann statt auf den Inhalt.
+ *    und die VIER Adressen, die ihr dafür zu nennen sind: neue Anfrage (§1),
+ *    geänderte Anfrage (§1a), Rückzug (§1b) und der Aktivitätsstrom (§1c).
+ *    Vier statt einer, damit drüben auf die Adresse geroutet werden kann statt
+ *    auf den Inhalt. Die ersten drei sind Anfragen einer Person; die vierte ist
+ *    ausdrücklich KEINE — sie meldet nur, was gerechnet wird.
+ *
+ *    Was hier nicht eingetragen ist, schickt die OSP gar nicht erst: eine leere
+ *    Adresse schaltet den Aufruf drüben ab.
  *  • AUSGANG  — Basisadresse + Schlüssel für unsere Statusmeldungen an die
  *    OSP (under review / offer has been sent).
  *
@@ -66,6 +71,7 @@ export const SalesOspSection = () => {
             ['webhookUrl', settings.webhookPath],
             ['revisionWebhookUrl', settings.revisionWebhookPath],
             ['withdrawalWebhookUrl', settings.withdrawalWebhookPath],
+            ['projectWebhookUrl', settings.projectWebhookPath],
             ['changeWebhookUrl', settings.changeWebhookPath],
         ] as const)
             .filter(([, path]) => Boolean(path))

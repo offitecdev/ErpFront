@@ -9,6 +9,8 @@ import type {
     InvoiceStatus,
     MyOrderDetailDto,
     MyOrderDto,
+    ProjectListInvoiceDto,
+    ProjectListOrderDto,
 } from '../../types/billing';
 
 export const billingApi = {
@@ -29,6 +31,11 @@ export const billingApi = {
         // Rechnungstyp — vom Server aus dem Beleg abgeleitet, nicht gespeichert.
         if (filter.category) params.set('category', filter.category);
         const res = await apiClient.get(`/billing/invoices${params.toString() ? '?' + params : ''}`);
+        return res.data;
+    },
+
+    listProjectFlowInvoices: async (): Promise<ProjectListInvoiceDto[]> => {
+        const res = await getShared<ProjectListInvoiceDto[]>('/billing/invoices?view=project-list');
         return res.data;
     },
 
@@ -64,6 +71,11 @@ export const myOrdersApi = {
         const params = new URLSearchParams();
         if (search) params.set('search', search);
         const res = await getShared<MyOrderDto[]>(`/sales-orders/my-orders${params.toString() ? '?' + params : ''}`);
+        return res.data;
+    },
+
+    listProjectFlow: async (): Promise<ProjectListOrderDto[]> => {
+        const res = await getShared<ProjectListOrderDto[]>('/sales-orders/my-orders?view=project-list');
         return res.data;
     },
 

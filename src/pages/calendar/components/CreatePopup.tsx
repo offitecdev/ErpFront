@@ -9,6 +9,7 @@ import { maintenanceApi } from '@/lib/api/maintenance';
 import { meetingApi } from '@/lib/api/meetings';
 import { projectApi, type ProjectPickerDto } from '@/lib/api/project';
 import { StaffMultiCombo } from '@/pages/crm/components/StaffMultiCombo';
+import { TaskTenderCombo, type TaskTenderPick } from '@/pages/crm/tasks/TaskTenderCombo';
 import {
     AppointmentNoteComposer,
     DocumentStage,
@@ -157,6 +158,12 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
     const [ccOpen, setCcOpen] = useState(false);
     // Verantwortliche einer Aufgabe — mehrere Personen (18.08.2026).
     const [assignees, setAssignees] = useState<Array<{ id: string; firstName: string; lastName: string }>>([]);
+    /* DIE OFFERTE AN DER AUFGABE (13.09.2026, Vorgabe Samet: «im Aufgabenmodus
+       muss sie sich hinzufügen lassen»). Der Aufgabenmodus dieses Fensters
+       legt über denselben Weg an wie «Neue Aufgabe» im CRM, kannte aber als
+       einziger die Offerte nicht — wer eine Aufgabe hier erfasste, konnte sie
+       nachträglich nirgends anhängen. Freiwillig wie der Kunde daneben. */
+    const [tender, setTender] = useState<TaskTenderPick | null>(null);
     /* «Termin an Kunden senden» nach dem Speichern (19.08.2026): standardmässig
        AN, damit der Weg zum Versand offen steht — gesendet wird trotzdem erst
        mit dem Senden-Knopf im Fenster. Ohne den Haken bleibt der Termin still. */
@@ -164,6 +171,25 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    /* DER TAG IST SCHON BESETZT (01.09.2026, Vorgabe Samet: «wenn der Tag schon
+       belegt ist, soll der alte Eintrag gelöscht werden — mit einem Knopf, der
+       löscht und speichert»).
+
+       Bis dahin war die Absage eine Sackgasse: sie nannte das Datum, und wer
+       den alten Termin loswerden wollte, musste das Fenster schliessen, ihn im
+       Raster suchen, löschen und alles noch einmal eintippen. Jetzt schickt der
+       Server die Zeilen mit, die im Weg stehen — und der Fuss stellt einen
+       zweiten, roten Knopf daneben. EIN Klick: der alte Termin geht, der neue
+       steht. Beides in derselben Transaktion, also nie das eine ohne das andere.
+
+       Bewusst KEIN stilles Überschreiben: gelöscht wird ein Termin nur, wenn
+       jemand ausdrücklich darauf drückt.
+
+       Mit den Kennungen liegt der PLAN dabei, für den die Absage kam. Ändert
+       sich Kunde, Auftrag oder ein Datum, passt sie nicht mehr — der rote Knopf
+       verschwindet von selbst, statt einen Termin zu löschen, der längst nicht
+       mehr im Weg steht. */
+    const [blockedBy, setBlockedBy] = useState<{ plan: string; ids: string[] } | null>(null);
 
     /* NOTIZEN MIT ANHÄNGEN (24.08.2026, Vorgabe Samet). Die Notiz eines Termins
        ist der Zettel für die MONTEURIN — und dazu gehören Bilder und PDF
@@ -226,6 +252,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
         setParticipants([]);
         setCc([]);
         setAssignees([]);
+        setTender(null);
         setSendMailAfter(true);
         setProjectComboToken(0);
         setOrderComboToken(0);
@@ -277,6 +304,10 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
        der Server lehnt ihn sonst beim Speichern ab, und zwar erst dann. Gefragt
        wird deshalb über die ganze Spanne, verglichen wird Tag für Tag. */
     const daysKey = days.map((day) => `${day.start.valueOf()}-${day.end.valueOf()}`).join('|');
+
+    /* Wofür eine Absage galt: derselbe Kunde, derselbe Auftrag, dieselben Tage. */
+    const replacePlanKey = `${customer?.id || ''}|${projectId || ''}|${salesOrderId || ''}|${daysKey}`;
+
     useEffect(() => {
         if (!open || kind !== 'appointment' || stepKey !== 'team') return;
         let cancelled = false;
@@ -334,6 +365,8 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
 
     const steps = stepsFor(kind);
     const isLast = step >= steps.length - 1;
+    /* Nur solange der Plan derselbe ist, für den die Absage kam. */
+    const replaceIds = blockedBy && blockedBy.plan === replacePlanKey ? blockedBy.ids : [];
     const ccEmails = cc.map((person) => person.email).filter((email): email is string => Boolean(email));
     /* Das eine Teilnehmerfeld der Besprechung, wieder auseinandergelegt: wer
        einen Datensatz hat (Mitarbeitende, Kunden), wird Teilnehmer:in des
@@ -419,15 +452,18 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
         setView('mail');
     };
 
-    const submit = async () => {
+    /** `replaceAppointmentIds` = der rote Knopf: erst räumen, dann speichern. */
+    const submit = async (replaceAppointmentIds: string[] = []) => {
         setSaving(true);
         setError(null);
+        setBlockedBy(null);
         try {
             let target: InviteTarget | null = null;
             if (kind === 'appointment') {
                 if (!projectId) return;
                 const created = await projectApi.createAppointment(projectId, {
                     salesOrderId,
+                    ...(replaceAppointmentIds.length ? { replaceAppointmentIds } : {}),
                     technicianIds: selectedTechIds,
                     // Der erste Tag steht weiterhin einzeln da (Aufrufer, die
                     // nur einen Termin kennen), die ganze Reihe daneben.
@@ -477,6 +513,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                     kind: 'TASK',
                     title: title.trim(),
                     customerId: customer?.id ?? null,
+                    tenderId: tender?.id ?? null,
                     assigneeEmployeeIds: assignees.map((person) => person.id),
                     dueDate: start.startOf('day').toISOString(),
                 });
@@ -494,6 +531,13 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
             }
         } catch (err: any) {
             setError(err?.response?.data?.error || err?.message || t('calendar.wizard.saveFailed'));
+            /* Steht ein bestehender Termin im Weg, nennt ihn die Absage — dann
+               darf der Fuss «löschen und speichern» anbieten. Ein bereits
+               abgeschlossener Tag ist NICHT dabei (der Server lässt ihn weg),
+               also bleibt die Absage dort eine Absage. */
+            const replaceable = err?.response?.data?.replaceable as Array<{ id?: string }> | undefined;
+            const ids = Array.isArray(replaceable) ? replaceable.map((row) => String(row?.id || '')).filter(Boolean) : [];
+            if (ids.length) setBlockedBy({ plan: replacePlanKey, ids });
         } finally {
             setSaving(false);
         }
@@ -721,6 +765,20 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                     <Field label={t('calendar.create.assignee')} hint={assignees.length ? t('calendar.picker.selectedCount', { count: assignees.length }) : undefined}>
                         <StaffMultiCombo value={assignees} onChange={setAssignees} compact />
                     </Field>
+                    {/* Ist ein Kunde gewählt, zeigt das Feld nur SEINE Offerten;
+                        eine gewählte Offerte trägt umgekehrt ihren Kunden ein. */}
+                    <Field label={t('crm.tasks.colQuote')} hint={t('common.optional')}>
+                        <TaskTenderCombo
+                            value={tender}
+                            onChange={(next) => {
+                                setTender(next);
+                                if (next?.customerId && next.customerName && !customer) {
+                                    setCustomer({ id: next.customerId, companyName: next.customerName });
+                                }
+                            }}
+                            customerId={customer?.id ?? null}
+                        />
+                    </Field>
                 </>
             );
         }
@@ -824,7 +882,11 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                         )}
                         {error && <span className="min-w-0 truncate text-[11.5px] font-semibold text-red-600 dark:text-red-400" title={error}>{error}</span>}
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    {/* `flex-wrap`, seit der rote Knopf dazukommen kann: drei
+                        Knöpfe in einem 500px-Fenster brauchen sonst die Breite,
+                        die sie nicht haben — dann nimmt der dritte die zweite
+                        Zeile, statt aus der Karte zu ragen. */}
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                         {step > 0 ? (
                             <button type="button" onClick={() => { setStep((current) => current - 1); setError(null); }} className="ofi-cal-btn">
                                 <ChevronLeft size={14} />
@@ -833,8 +895,24 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                         ) : (
                             <button type="button" onClick={onClose} className="ofi-cal-btn">{t('common.cancel')}</button>
                         )}
+                        {/* DER ZWEITE KNOPF (01.09.2026): er steht nur da, wenn
+                            ein bestehender Termin im Weg ist, und er sagt, was
+                            er tut — erst löschen, dann speichern. Rot, weil er
+                            etwas wegnimmt; links vom Speichern, damit der
+                            gewohnte Knopf an seinem Platz bleibt. */}
+                        {isLast && replaceIds.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => void submit(replaceIds)}
+                                disabled={saving || !stepValid}
+                                className="ofi-cal-btn is-danger"
+                                title={t('calendar.create.replaceHint')}
+                            >
+                                {saving ? t('common.saving') : t('calendar.create.replaceAndSave')}
+                            </button>
+                        )}
                         {isLast ? (
-                            <button type="button" onClick={submit} disabled={saving || !stepValid} className="ofi-cal-btn is-primary">
+                            <button type="button" onClick={() => void submit()} disabled={saving || !stepValid} className="ofi-cal-btn is-primary">
                                 {saving ? t('common.saving') : t('common.save')}
                             </button>
                         ) : (

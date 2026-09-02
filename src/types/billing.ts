@@ -163,6 +163,13 @@ export interface MyOrderDto {
     billingSummary?: OrderBillingFiguresDto | null;
 }
 
+/** Minimal sources consumed by the project-list progress calculation. */
+export type ProjectListOrderDto = Pick<MyOrderDto, 'id' | 'orderNumber' | 'totalAmount' | 'projectId'> & {
+    addonCount?: number;
+};
+
+export type ProjectListInvoiceDto = Pick<InvoiceDto, 'projectId' | 'salesOrderId' | 'billedPercent' | 'status'>;
+
 /** An additional order on the detail page — the full row plus its own summary. */
 export interface MyOrderAddonDto extends MyOrderListAddonDto {
     orderType: string;

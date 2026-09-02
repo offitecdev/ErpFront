@@ -313,12 +313,14 @@ export const ArticleDetailView = ({ copyPrefix }: {
                         </SectionCard>
                     </div>
 
-                    {/* Görsel ayrı ve önbelleklenebilir binary uçtan gelir.
-                        Seçim burada yalnızca BEKLETİLİR, yazma ortak Kaydet ile olur. */}
+                    {/* Görsel depodaki kalıcı adresinden gelir (eski kayıtlarda
+                        binary uçtan). Seçim burada yalnızca BEKLETİLİR, yazma
+                        ortak Kaydet ile olur. */}
                     {detail && (
                         <ArticleImagePanel
                             canUpdate={canUpdate}
                             articleId={detail.id}
+                            imageUrl={detail.imageUrl}
                             imageVersion={detail.imageVersion}
                             pending={pendingImage}
                             onPick={setPendingImage}

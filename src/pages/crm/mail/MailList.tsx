@@ -11,7 +11,16 @@ import { avatarColor, counterpartOf, initialOf, partyLabel, shortDate, type Mail
    den Zeilen, Auswahl als Tönung.
 
    ZIEHEN (08.09.2026): jede Zeile lässt sich auf eine Kategorie in der Leiste
-   fallen (Datentyp `application/x-ofi-mail`).
+   fallen (Datentyp `application/x-ofi-mail`) — bei «Anfragen» entsteht dabei
+   eine Anfrage (MailPage → Server).
+
+   WARUM DIE ZEILE KEIN `<button>` IST: ein Formularsteuerelement beginnt trotz
+   `draggable` in mehreren Browsern (Firefox seit je, WebKit je nach Fassung)
+   gar kein Ziehen — der Zug endete dann stumm, und «hineinziehen» war schlicht
+   nicht möglich. Ein `div` mit `role="button"` zieht überall; Tastatur
+   (Enter/Leertaste) und Vorlesen bleiben durch Rolle und `tabIndex` erhalten.
+   Neben dem eigenen Datentyp wandert die Kennung zusätzlich als `text/plain`
+   mit: manche Browser starten einen Zug erst, wenn ein Standardtyp anliegt.
 
    SAMMELMODUS: solange eine Kategorie «sammelt», schaltet der Klick auf eine
    Zeile die Zuordnung um statt zu öffnen — zugeordnete Zeilen tragen den Rand
@@ -36,17 +45,26 @@ const Row = ({
     const label = partyLabel(party) || t('mail.page.unknownSender');
     const unread = !row.isRead && row.direction === 'IN';
     const inAssignCategory = Boolean(assignCategory && row.category?.id === assignCategory.id);
+    const open = () => (assignCategory ? onToggleAssign(row) : onSelect(row.id));
     return (
-        <button
-            type="button"
+        <div
+            role="button"
+            tabIndex={0}
+            aria-pressed={assignCategory ? inAssignCategory : undefined}
             className={`ofi-mail-row ${active ? 'is-active' : ''} ${unread ? 'is-unread' : ''} ${assignCategory ? 'is-picking' : ''} ${inAssignCategory ? 'is-assigned' : ''}`}
             style={inAssignCategory && assignCategory ? { ['--ofi-cat-color' as string]: assignCategory.color } : undefined}
             draggable={!assignCategory}
             onDragStart={(event) => {
                 event.dataTransfer.setData(MAIL_DRAG_TYPE, row.id);
+                event.dataTransfer.setData('text/plain', row.subject || label);
                 event.dataTransfer.effectAllowed = 'move';
             }}
-            onClick={() => (assignCategory ? onToggleAssign(row) : onSelect(row.id))}
+            onClick={open}
+            onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                open();
+            }}
         >
             <span className="ofi-mail-row__avatar" style={{ background: avatarColor(party.address || label) }}>
                 {inAssignCategory ? <LuCheck size={14} /> : row.direction === 'OUT' ? <LuArrowUpRight size={14} /> : initialOf(label)}
@@ -92,7 +110,7 @@ const Row = ({
                     {row.origin === 'ERP' && <span className="ofi-mail-tag is-erp">ERP</span>}
                 </span>
             </span>
-        </button>
+        </div>
     );
 };
 
