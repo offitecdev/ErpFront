@@ -80,7 +80,7 @@ export const ConfirmDialog = ({
     return createPortal(
         <div className="fixed inset-0 flex items-center justify-center px-3" style={{ zIndex }}>
             <div
-                className="absolute inset-0 bg-slate-950/35 dark:bg-black/60"
+                className="ofi-win-scrim absolute inset-0"
                 onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}
                 aria-hidden
             />
@@ -95,21 +95,18 @@ export const ConfirmDialog = ({
                 className="ofi-rise-in ofi-pop relative flex w-full max-w-[440px] flex-col overflow-hidden"
             >
                 <header className="flex items-start gap-3 px-4 pb-2 pt-4">
-                    <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                        tone === 'danger'
-                            ? 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300'
-                            : 'bg-[#272f67]/10 text-[#272f67] dark:bg-white/10 dark:text-white'
-                    }`}
-                    >
+                    {/* Symbolkasten des Fensterbausatzes (styles/appleModal.css):
+                        kleiner Rahmen, das Zeichen trägt die Farbe. */}
+                    <span className={`ofi-tp-iconbadge ${tone === 'danger' ? 'is-danger' : 'is-neutral'}`}>
                         <AlertTriangle size={17} />
                     </span>
                     <div className="min-w-0 flex-1 pt-0.5">
                         {/* Ohne `.ofi-serif`: der Kalender schreibt seine
                             Fenstertitel in der Grundschrift, und eine zweite
                             Schrift in einem 440px-Fenster war der Bruch. */}
-                        <h2 className="text-[14px] font-bold leading-snug text-slate-900 dark:text-white">{title}</h2>
+                        <h2 className="ofi-pop__title whitespace-normal">{title}</h2>
                         {message && (
-                            <p className="mt-1 text-[12.5px] leading-relaxed text-slate-500 dark:text-white/60">{message}</p>
+                            <p className="ofi-pop__subtitle mt-1 whitespace-normal leading-relaxed">{message}</p>
                         )}
                     </div>
                     <button

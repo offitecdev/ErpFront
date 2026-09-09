@@ -22,8 +22,6 @@ export interface StaffRow {
     email: string;
     createdAt: string;
     isActive: boolean;
-    /** Der QR-Text des Ausdrucks; null, solange keiner ausgegeben wurde. */
-    qrToken: string | null;
     staffRole: StaffRole;
     workLocation: WorkLocation;
     /** Die Rolle aus den Einstellungen — sie steht in der Liste anstelle der
@@ -272,7 +270,6 @@ export interface PersonnelMe {
     staffRole: StaffRole;
     workLocation: WorkLocation;
     staffNumber: number | null;
-    qrToken: string | null;
 }
 
 export interface ReportQuery {
@@ -299,7 +296,6 @@ export interface PersonHeader {
     workLocation: WorkLocation;
     hireDate: string | null;
     createdAt: string;
-    qrToken: string | null;
     profilePictureUrl: string | null;
     /** Die zugewiesene Rollenvorlage (Einstellungen → Berechtigungen). */
     roleId: string | null;

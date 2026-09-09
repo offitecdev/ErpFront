@@ -113,7 +113,7 @@ export const FormTemplatesPage = () => {
             <ChecklistTabs active="templates" />
 
             <CrmFilterBar>
-                <SearchBox value={search} onChange={setSearch} placeholder={t('forms.templates.search')} className="w-64" />
+                <SearchBox value={search} onChange={setSearch} placeholder={t('forms.templates.search')} />
                 <ToggleGroup
                     value={activeFilter}
                     onChange={setActiveFilter}

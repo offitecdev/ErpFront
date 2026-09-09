@@ -28,11 +28,18 @@ export const TenderPriceSummary = ({ summary, canEdit, onOpenDiscounts }: Tender
     const showCombined = summary.discounts.filter((entry) => entry.amount > 0).length > 1;
 
     return (
-        <div className="flex justify-end border-t border-slate-200 bg-white">
-            {/* Sits flush in the table's bottom-right corner — same hairlines, so
-                the totals read as the table's last block rather than a card
-                floating under it. */}
-            <div className="w-full max-w-[330px] space-y-0.5 bg-white px-4 py-3 text-[12.5px]">
+        <div className="ofi-quote-price-footer">
+            {(canEdit || hasDiscounts) && <div className="ofi-quote-discounts">
+                <span className="ofi-quote-summary-caption">{t('tenders.discounts')}</span>
+                {canEdit && (
+                    <button type="button" onClick={onOpenDiscounts} className="ofi-quote-addbtn ofi-quote-discount-action">
+                        <Percent01 size={14} />
+                        {t('tenders.apply_discount')}
+                    </button>
+                )}
+                {hasDiscounts && <span className="ofi-quote-discount-total">−{fmtMoney(summary.totalDiscountAmount)}</span>}
+            </div>}
+            <div className="ofi-quote-totals">
                 {hasDiscounts && (
                     <div className="flex items-center justify-between gap-3">
                         <span className="text-slate-500">{t('tenders.subtotal_excl_vat')}</span>
@@ -65,18 +72,6 @@ export const TenderPriceSummary = ({ summary, canEdit, onOpenDiscounts }: Tender
                         </span>
                     </div>
                 )}
-                {canEdit && (
-                    <div className="pt-0.5 pb-1">
-                        <button
-                            type="button"
-                            onClick={onOpenDiscounts}
-                            className="ofi-quote-addbtn"
-                        >
-                            <Percent01 size={12} />
-                            {t('tenders.apply_discount')}
-                        </button>
-                    </div>
-                )}
                 {/* Figures are right-aligned and tabular so the amounts stack
                     into one readable column of digits. */}
                 <div className="flex items-center justify-between gap-3">
@@ -87,9 +82,9 @@ export const TenderPriceSummary = ({ summary, canEdit, onOpenDiscounts }: Tender
                     <span className="text-slate-500">{t('tenders.vat_amount')}</span>
                     <span className="font-medium tabular-nums text-slate-800">{fmtMoney(summary.vatTotal)}</span>
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-2 pb-0.5">
-                    <span className="text-[13px] font-bold text-slate-700">{t('tenders.total_incl_vat')}</span>
-                    <span className="text-[17px] font-extrabold tabular-nums text-slate-900">{fmtMoney(summary.grossTotal)}</span>
+                <div className="ofi-quote-grand-total">
+                    <span className="ofi-quote-grand-total-label">{t('tenders.total_incl_vat')}</span>
+                    <span className="ofi-quote-grand-total-value">{fmtMoney(summary.grossTotal)}</span>
                 </div>
             </div>
         </div>

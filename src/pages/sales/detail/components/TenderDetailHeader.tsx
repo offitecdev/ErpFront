@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
     Briefcase01 as BriefcaseBusiness,
-    File05 as FileText,
     FileCheck02 as FileCheck2,
     FileDownload02 as FileDown,
     GitBranch01 as GitBranch,
@@ -15,6 +14,7 @@ import { StatusChip } from '../../../../components/ui-shared/StatusBadge';
 import type { TenderListItem } from '../../../../types/tender';
 import { PlainButton as Button } from './common/PlainUi';
 import { TenderSettingsMenu } from './TenderSettingsMenu';
+import '@/styles/tenderHeader.css';
 
 type StatusChipVariant = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger' | 'neutral' | 'order';
 
@@ -45,6 +45,10 @@ type TenderDetailHeaderProps = {
     onCopyOffer: () => void;
     /** Opens the "delete offer" confirmation, from the settings gear menu. */
     onDeleteOffer: () => void;
+    /** Storno der Offerte setzen oder aufheben (Zahnradmenü, 06.09.2026). */
+    onCancelOffer: () => void;
+    /** Die Offerte ist storniert — sie bleibt als Beleg stehen. */
+    cancelled?: boolean;
     canSave: boolean;
     saving: boolean;
     isDirty: boolean;
@@ -79,7 +83,7 @@ type TenderDetailHeaderProps = {
  * wrap to two rows at narrow pane widths, hence the ResizeObserver instead of
  * a hard-coded height.
  *
- * `#f6f8fb` matches the page, which is what masks the content passing beneath.
+ * The translucent surface is scoped to the quote page's appearance tokens.
  */
 export const TenderDetailHeader = ({
     tender,
@@ -100,6 +104,8 @@ export const TenderDetailHeader = ({
     onApprove,
     onCopyOffer,
     onDeleteOffer,
+    onCancelOffer,
+    cancelled = false,
     canSave,
     saving,
     isDirty,
@@ -107,15 +113,10 @@ export const TenderDetailHeader = ({
     creatorName,
 }: TenderDetailHeaderProps) => {
     const barRef = useRef<HTMLDivElement>(null);
-    // One-line bar: 32px controls + 16px vertical padding. Using the real
-    // common-case height on the first paint avoids a spacer correction (and
-    // therefore CLS) before ResizeObserver reports wrapped narrow layouts.
-    // Below ~640px the toolbar always wraps to two rows, so a narrow viewport
-    // starts from the wrapped height for the same reason. (Seit dem
-    // 28.08.2026 ohne Haarlinie und mit 32px-Knöpfen — beides steckt hier
-    // drin, sonst springt der Platzhalter beim ersten Bild.)
+    // Seed the spacer close to the desktop/two-row toolbar height. The
+    // observer also handles wrapping in split panes and translated labels.
     const [barHeight, setBarHeight] = useState(() =>
-        typeof window !== 'undefined' && window.innerWidth < 640 ? 80 : 48);
+        typeof window !== 'undefined' && window.innerWidth < 1100 ? 112 : 66);
 
     useEffect(() => {
         const bar = barRef.current;
@@ -125,9 +126,9 @@ export const TenderDetailHeader = ({
         // the calculated border-box size, so no geometry read is needed.
         const observer = new ResizeObserver(([entry]) => {
             const measured = entry.borderBoxSize[0]?.blockSize;
-            // Legacy ResizeObserver only exposes the content box. The bar has
-            // 8px vertical padding and no border.
-            const height = measured || entry.contentRect.height + 16;
+            // Legacy ResizeObserver only exposes the content box. Match the
+            // toolbar's 14px vertical padding and single bottom hairline.
+            const height = measured || entry.contentRect.height + 29;
             setBarHeight((current) => current === height ? current : height);
         });
         observer.observe(bar);
@@ -138,25 +139,26 @@ export const TenderDetailHeader = ({
         <>
         <div
             ref={barRef}
-            className="ofi-quote-topbar fixed left-[var(--app-shell-inset,0px)] right-0 top-[var(--app-header-height,0px)] z-40 bg-[#f6f8fb] px-[var(--page-gutter,1rem)] py-2 transition-[left] duration-300 ease-in-out"
+            className="ofi-quote-topbar fixed left-[var(--app-shell-inset,0px)] right-0 top-[var(--app-header-height,0px)] z-40 px-[var(--page-gutter,1rem)] transition-[left] duration-300 ease-in-out"
         >
-        <div className="flex flex-nowrap items-center gap-x-3 gap-y-2">
+        <div className="ofi-quote-topbar__inner">
             {/* Hier stand der Zurück-Pfeil vor der Angebotsnummer. Der
                 Rückweg in die Angebotsliste sitzt jetzt im Blitz ganz vorn in
                 der Kopfleiste (QuickBackButton) — samt der Nachfrage nach
                 ungespeicherten Änderungen, die er dort ebenso durchläuft. */}
             {/* Quote identity — number, version, status. */}
-            <span className="flex min-w-0 items-center gap-2.5">
-                <FileText size={16} className="shrink-0 text-slate-400" />
-                <span className="truncate text-[17px] font-semibold tracking-tight text-slate-900">
+            <div className="ofi-quote-topbar__identity">
+                <h1 className="ofi-quote-topbar__title" title={tender.tenderNumber}>
                     {tender.tenderNumber}
+                </h1>
+                <span className="ofi-quote-topbar__version">v{tender.version}</span>
+                <span className="ofi-quote-topbar__status" data-status={tenderStatusVariant}>
+                    <StatusChip variant={tenderStatusVariant}>{tenderStatusLabel}</StatusChip>
                 </span>
-                <span className="shrink-0 text-[12px] tabular-nums text-slate-400">v{tender.version}</span>
-                <StatusChip variant={tenderStatusVariant}>{tenderStatusLabel}</StatusChip>
-            </span>
+            </div>
 
             {/* Log storage / save / settings, on the same line as the quote. */}
-            <span className="flex shrink-0 items-center gap-1 border-l border-slate-200 pl-3">
+            <div className="ofi-quote-topbar__editing">
                 {canSave && (
                     <button
                         type="button"
@@ -164,13 +166,8 @@ export const TenderDetailHeader = ({
                         disabled={!isDirty || saving}
                         title={t('common.save')}
                         aria-label={t('common.save')}
-                        className={`ofi-quote-btn flex items-center gap-1.5 rounded-full font-semibold transition-colors ${
-                            saving
-                                ? 'cursor-wait bg-[#1f2654] text-white'
-                                : isDirty
-                                    ? 'bg-[#1f2654] text-white hover:bg-[#2a3470]'
-                                    : 'cursor-not-allowed bg-slate-200 text-slate-400'
-                        }`}
+                        aria-busy={saving}
+                        className={`ofi-quote-btn ofi-quote-topbar__save flex items-center gap-1.5 rounded-full font-medium transition-colors ${saving ? 'is-saving cursor-wait' : isDirty ? 'is-dirty' : ''}`}
                     >
                         {saving ? (
                             <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -182,11 +179,19 @@ export const TenderDetailHeader = ({
                 )}
                 {/* Sipariş türü sorusu artık ANA düğmenin popup'ında sorulur —
                     ayarlar menüsünde saklanmaz (kullanıcı isteği). */}
-                <TenderSettingsMenu onCopyOffer={onCopyOffer} onDeleteOffer={onDeleteOffer} />
-            </span>
+                <TenderSettingsMenu
+                    onCopyOffer={onCopyOffer}
+                    onDeleteOffer={onDeleteOffer}
+                    onCancelOffer={onCancelOffer}
+                    cancelled={cancelled}
+                    /* Auftrag oder Projekt an der Offerte = kein Loeschen mehr,
+                       nur noch Storno (Vorgabe Samet 06.09.2026). */
+                    linked={Boolean(salesOrderId || projectId)}
+                />
+            </div>
 
             {/* Primary actions, right-aligned on the same line. */}
-            <span className="ml-auto flex flex-nowrap items-center justify-end gap-2">
+            <div className="ofi-quote-topbar__actions">
                 {/* "Neue Version" steht auf JEDER Offerte im Verkauf
                     (Benutzerwunsch 31.08.2026). Vorher war der Knopf an
                     Entwuerfen und an Auftraegen ohne Projekt versteckt, sodass
@@ -226,13 +231,13 @@ export const TenderDetailHeader = ({
                     </Button>
                 )}
                 <span
-                    className="flex shrink-0 items-center gap-1.5 border-l border-slate-200 pl-2.5 text-[12px] text-slate-600"
+                    className="ofi-quote-topbar__creator"
                     title={creatorName}
                 >
-                    <User size={14} className="text-slate-400" />
-                    <span className="max-w-[150px] truncate font-medium text-slate-700">{creatorName}</span>
+                    <User size={14} aria-hidden="true" />
+                    <span>{creatorName}</span>
                 </span>
-            </span>
+            </div>
         </div>
         </div>
         <div aria-hidden style={{ height: `calc(${barHeight}px - var(--page-pad-y, 1.25rem) + 0.75rem)` }} />

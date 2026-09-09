@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Trash01 } from '@/components/icons/antIconCompat';
+import { Camera01, Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { DangerConfirmDialog } from '@/components/ui-shared/DangerConfirmDialog';
 import { t } from '@/i18n/translate';
 import { articleApi } from '@/lib/api/inventory';
+// Telefon / Tablet / Schreibtisch — dieselben Schwellen wie im Kalender.
+import { useCalViewport } from '@/pages/calendar/calendarShared';
 import { useAuthStore } from '@/store/authStore';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from './primitives';
+import { QuickAddSheet } from '../quick-add/QuickAddSheet';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from './primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { PRODUCTS_PAGE_SIZE, useArticlesList } from '../hooks/useArticlesList';
 import { useLanguageTick } from '../hooks/useLanguageTick';
@@ -55,6 +58,18 @@ export const ArticleListView = ({
     const isSystemAdmin = useAuthStore((state) => state.isSystemAdmin);
     const canCreate = permissions.includes('inventory.articles.create');
     const canDelete = permissions.includes('inventory.articles.delete');
+    const canTransfer = permissions.includes('inventory.transfer');
+    // Schnellerfassung (02.09.2026): Foto → Text → Produkt, Codes vom System.
+    // Auf dem Telefon ist sie der EINZIGE Knopf im Kopf; die zwei Formularwege
+    // bleiben dem grösseren Schirm. Wer nur Bestand buchen darf, sieht sie
+    // auch — dort bucht sie Eingänge auf vorhandene Produkte.
+    const canQuickAdd = canCreate || canTransfer;
+    const viewport = useCalViewport();
+    const [quickAddOpen, setQuickAddOpen] = useState(false);
+    const closeQuickAdd = (added: number) => {
+        setQuickAddOpen(false);
+        if (added > 0) list.reload({ silent: true });
+    };
 
     /** İşaretli satırlar (sayfalar arası korunur) — toplu silmenin seçimi. */
     const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -149,36 +164,55 @@ export const ArticleListView = ({
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
                 title={t(`${copyPrefix}.title`)}
-                action={canCreate && (
-                    // Tekli ekleme üstte, toplu ekleme hemen ALTINDA (kullanıcı
-                    // isteği 2026-08-07): iki ayrı sayfaya giden iki düğme.
-                    <div className="flex flex-col items-stretch gap-1.5">
-                        <button
-                            type="button"
-                            onClick={() => navigate(createPath)}
-                            className="ofi-btn-brand flex items-center justify-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
-                        >
-                            <Plus size={14} />
-                            {t(`${copyPrefix}.addButton`)}
+                action={viewport.phone
+                    ? (canQuickAdd && (
+                        // Telefon: NUR die Schnellerfassung (Vorgabe 02.09.2026) —
+                        // die Formularseiten sind für den Daumen kein Weg.
+                        <button type="button" className="ofi-qa-launch is-phone" onClick={() => setQuickAddOpen(true)}>
+                            <Camera01 size={18} />
+                            {t('inv.quickAdd.button')}
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => navigate(bulkCreatePath)}
-                            className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
-                        >
-                            <Plus size={13} />
-                            {t(`${copyPrefix}.bulkAddButton`)}
-                        </button>
-                    </div>
-                )}
+                    ))
+                    : (canQuickAdd || canCreate) && (
+                        <div className="flex items-start gap-2">
+                            {canQuickAdd && (
+                                <button type="button" className="ofi-qa-launch" onClick={() => setQuickAddOpen(true)}>
+                                    <Camera01 size={16} />
+                                    {t('inv.quickAdd.button')}
+                                </button>
+                            )}
+                            {canCreate && (
+                                // Tekli ekleme üstte, toplu ekleme hemen ALTINDA (kullanıcı
+                                // isteği 2026-08-07): iki ayrı sayfaya giden iki düğme.
+                                <div className="flex flex-col items-stretch gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(createPath)}
+                                        className="ofi-btn-brand flex items-center justify-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
+                                    >
+                                        <Plus size={14} />
+                                        {t(`${copyPrefix}.addButton`)}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(bulkCreatePath)}
+                                        className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                                    >
+                                        <Plus size={13} />
+                                        {t(`${copyPrefix}.bulkAddButton`)}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
             />
+            <QuickAddSheet open={quickAddOpen} onClose={closeQuickAdd} />
 
-            <div className="flex flex-wrap items-center gap-2">
+            <FilterBar>
                 <SearchBox
                     value={list.search}
                     onChange={list.setSearch}
                     placeholder={t(`${copyPrefix}.searchPlaceholder`)}
-                    className="w-64"
                 />
 
                 {/* Seçim şeridi: yalnızca bir şey seçiliyken görünür, arama
@@ -207,7 +241,7 @@ export const ArticleListView = ({
                         )}
                     </div>
                 )}
-            </div>
+            </FilterBar>
 
             <SectionCard title={t(`${copyPrefix}.sectionTitle`, { count: list.total })}>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">

@@ -1,8 +1,11 @@
 import { memo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { lazyToast as toast } from '@/lib/lazyToast';
 
-import { Plus } from '@/components/icons/antIconCompat';
+import { PackagePlus, Plus } from '@/components/icons/antIconCompat';
+import { addonCreatePath } from '@/components/orders/addonEditorRoute';
+import { AddonOrderPdfButton } from '@/components/orders/AddonOrderPdfButton';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
 import type { BillingSummaryDto } from '@/types/billing';
@@ -56,12 +59,12 @@ export const AddonOrdersBox = memo(({
     onSelectOrder: (orderId: string) => void;
     onNavigate: (view: ProjectDetailView) => void;
 }) => {
+    const navigate = useNavigate();
     const [creating, setCreating] = useState(false);
     // Only a real parent order can carry an add-on; the synthetic "project-main-*"
     // placeholder has no row in the database to hang one off.
-    const canCreateHere = canCreate
-        && Boolean(parentOrder && !parentOrder.id.startsWith('project-main-'))
-        && pendingTotal > 0;
+    const hasRealParent = Boolean(parentOrder && !parentOrder.id.startsWith('project-main-'));
+    const canCreateHere = canCreate && hasRealParent && pendingTotal > 0;
 
     const createNow = async () => {
         if (!parentOrder) return;
@@ -94,12 +97,14 @@ export const AddonOrdersBox = memo(({
                         <th className="w-32 text-right">{t('projects.detail.colAmount')}</th>
                         <th className="w-32 text-right">{t('billing.billed')}</th>
                         <th className="w-32 text-right">{t('billing.remaining')}</th>
+                        {/* Jeder Nachtrag hat seinen EIGENEN Beleg (NT-PDF). */}
+                        <th className="w-12 text-right">PDF</th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.length === 0 ? (
                         <tr>
-                            <td colSpan={4}>
+                            <td colSpan={5}>
                                 <div className="ofi-prj-empty">{t('projects.detail.overview.noAddons')}</div>
                             </td>
                         </tr>
@@ -120,10 +125,35 @@ export const AddonOrdersBox = memo(({
                             <td className="ofi-prj-num">{money(cost)}</td>
                             <td className="ofi-prj-num is-billed">{money(billed)}</td>
                             <td className="ofi-prj-num">{money(remaining)}</td>
+                            <td className="text-right">
+                                <AddonOrderPdfButton addon={order} variant="icon" />
+                            </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {/* Der freie Nachtrag: Produkte oder Material direkt erfassen,
+                unabhängig von den Rapporten — eigener NT-Code. Er entsteht auf
+                einer eigenen SEITE, die hierher zurückführt. */}
+            {canCreate && hasRealParent && parentOrder && (
+                <div className="mt-2.5 flex justify-end">
+                    <button
+                        type="button"
+                        className="ofi-prj-btn"
+                        /* Die Erfassung steht IM Zusatzauftrags-Bereich (dort
+                           hängt die Maske, Vorgabe 05.09.2026) — also führt der
+                           Weg dorthin, und «Zurück» bleibt dort. */
+                        onClick={() => navigate(addonCreatePath(
+                            { id: parentOrder.id, orderNumber: parentOrder.orderNumber, projectId: project.id },
+                            `/projects/${project.id}?section=addons`,
+                        ))}
+                    >
+                        <PackagePlus size={14} />
+                        {t('crm.addon.newTitle')}
+                    </button>
+                </div>
+            )}
 
             {/* Extra work waiting for an add-on order that does not exist yet. */}
             {pendingTotal > 0 && (

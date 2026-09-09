@@ -15,7 +15,7 @@
 .ofi-login__qr-layer {
     /* Titelschrift der Anmeldeseite: ausdrücklich Times New Roman
        (Nutzerwunsch, 16.08.2026) — programmweit ist `.ofi-serif` seit
-       demselben Tag Open Sans (styles/refine.css). Umgelenkt wird die
+       demselben Tag die Programmschrift Inter Variable (styles/refine.css). Umgelenkt wird die
        VARIABLE, nicht `font-family`: `.ofi-serif *` in refine.css zöge
        jedes Kind sonst wieder auf die Programmschrift zurück.
 
@@ -23,52 +23,82 @@
        das sind seit 17.08.2026 nur noch zwei Stellen: die Rechtezeile
        unten und der Titel des QR-Popups. Erklärtext (Login.tsx) und
        Mitteilungsleiste (LoginNotifications.tsx) tragen die Klasse
-       nicht mehr — sie laufen wie Überschrift und Formular in Open
-       Sans. */
+       nicht mehr — sie laufen wie Überschrift und Formular in Inter
+       Variable. */
     --ofi-serif: "Times New Roman", Times, serif;
 
     --lg-navy: #1a2361;
     --lg-navy-deep: #0b1340;
-    --lg-navy-hover: #141d52;
+    --lg-navy-hover: #232e7d;
     --lg-red: #e63329;
     --lg-error: #d92d20;
     --lg-success: #079455;
 
-    --lg-bg: #f8fafd;
-    --lg-text: #0f1c45;
-    --lg-sub: #5b6b95;
+    /* ── Aegis ────────────────────────────────────────────────
+       Die Farben der Authenticator-App, aus ihrem Zeichen
+       abgegriffen. Sie gelten NUR auf der Fläche des zweiten
+       Faktors (`.ofi-login.is-mfa`) — dort ist Aegis das Thema,
+       und die Welle, der Knopf und das Zeichen sprechen dann
+       dieselbe Sprache. */
+    --lg-aegis-light: #17a0da;
+    --lg-aegis-deep: #005e9e;
+    --lg-aegis: #0879bd;
+    --lg-aegis-hover: #0a8ad6;
+
+    /* ── Mass und Rundung (Apple-Anmutung, 09.09.2026) ────────
+       Vorgabe Samet: «Die Anmeldeseite soll aussehen wie von
+       Apple.» Was das hier heisst, steht in DREI Zahlen und
+       nicht in Effekten: eine Pille für Knöpfe, eine ruhige
+       Rundung für Felder, eine grössere für Karten. Die alten
+       3 px sind weg — sie waren die Kante, die die Seite
+       technisch statt ruhig aussehen liess. */
+    --lg-r-pill: 980px;
+    --lg-r-field: 12px;
+    --lg-r-card: 18px;
+
+    --lg-bg: #fbfbfd;
+    --lg-text: #1d1d1f;
+    --lg-sub: #6e6e73;
     --lg-surface: #ffffff;
-    --lg-border: rgba(15, 28, 69, 0.12);
+    --lg-border: rgba(0, 0, 0, 0.09);
     --lg-field-bg: #ffffff;
-    --lg-field-border: rgba(26, 35, 97, 0.34);
+    --lg-field-border: rgba(0, 0, 0, 0.16);
     --lg-field-border-focus: var(--lg-navy);
-    --lg-field-ring: rgba(26, 35, 97, 0.12);
+    --lg-field-ring: rgba(26, 35, 97, 0.16);
     --lg-btn-bg: var(--lg-navy);
     --lg-btn-bg-hover: var(--lg-navy-hover);
     --lg-btn-fg: #ffffff;
-    --lg-shadow: 0 14px 40px rgba(15, 28, 69, 0.14);
+    /* Weit, weich, kaum sichtbar — eine Karte soll schweben, nicht abheben. */
+    --lg-shadow: 0 18px 60px rgba(0, 0, 0, 0.09);
 
     --lg-wave-a: #1f2a54;
     --lg-wave-b: #d32026;
 }
 
+/* Dunkel wie bei Apple: die SEITE ist schwarz, die Karten darauf sind ein
+   angehobenes Grau. Das frühere warme Anthrazit lag dazwischen und liess
+   Karte und Grund ineinanderlaufen (vgl. die Notiz zur Flächentrennung im
+   Dunkelmodus). Die goldene Hausfarbe bleibt der Akzent. */
 .dark .ofi-login,
 .dark .ofi-login__qr-layer {
-    --lg-bg: #0f1113;
-    --lg-text: #f7f8fa;
-    --lg-sub: #a5adbf;
-    --lg-surface: #17191c;
-    --lg-border: rgba(255, 246, 232, 0.12);
-    --lg-field-bg: #17191c;
-    --lg-field-border: rgba(255, 246, 232, 0.24);
+    --lg-bg: #000000;
+    --lg-text: #f5f5f7;
+    --lg-sub: #86868b;
+    --lg-surface: #1c1c1e;
+    --lg-border: rgba(255, 255, 255, 0.11);
+    --lg-field-bg: #1c1c1e;
+    --lg-field-border: rgba(255, 255, 255, 0.2);
     --lg-field-border-focus: #e6cf9e;
-    --lg-field-ring: rgba(230, 207, 158, 0.16);
+    --lg-field-ring: rgba(230, 207, 158, 0.2);
     --lg-btn-bg: #e6cf9e;
-    --lg-btn-bg-hover: #f0ddb4;
-    --lg-btn-fg: #140f05;
+    --lg-btn-bg-hover: #f2e1bb;
+    --lg-btn-fg: #17130a;
     --lg-error: #ff6b61;
     --lg-success: #4ade80;
-    --lg-shadow: 0 16px 44px rgba(0, 0, 0, 0.5);
+    --lg-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+
+    --lg-aegis: #0e8fd8;
+    --lg-aegis-hover: #29a4e6;
 
     --lg-wave-a: #8ea3dc;
     --lg-wave-b: #e05656;
@@ -79,6 +109,104 @@
    Variable für die Anmeldeseite auf Times New Roman umgelenkt (siehe den
    Token-Block). Beide Träger sind nötig, weil das QR-Popup nach <body>
    portiert wird und die Variable von `.ofi-login` dort nicht mehr erbt. */
+
+/* =========================================================
+   DER KNOPF DER ANMELDESEITE (09.09.2026)
+
+   Vorgabe Samet: «Knöpfe viel besser und moderner — so
+   professionell wie möglich.» Herausgekommen ist die
+   Apple-Pille: keine Kante, keine Verläufe, kein Schlagschatten,
+   keine Bewegung ausser dem Druckpunkt. Was sie modern macht,
+   ist Weglassen — Form, Innenmass und EIN Farbton.
+
+   Sie steht bewusst NICHT in styles/buttons.css: die
+   Anmeldeseite ist dort ausdrücklich ausgenommen
+   (`.ofi-login *` in der Sperrliste), und sie ist die einzige
+   Fläche, die ein Fremder zu sehen bekommt — sie darf ihr
+   eigenes Mass haben.
+
+   `.ofi-btn-apple` gilt für <button> UND <a> (der Play-Store-
+   Verweis ist ein Link, sieht aber aus wie ein Knopf); darum
+   die Trägerangaben doppelt, und der Zwilling für das Popup,
+   das ausserhalb von #root hängt.
+   ========================================================= */
+#root .ofi-btn-apple,
+body > :not(#root) .ofi-btn-apple {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box;
+    min-height: 46px;
+    padding: 0 24px;
+    border: none;
+    border-radius: var(--lg-r-pill);
+    background: var(--lg-btn-bg);
+    color: var(--lg-btn-fg);
+    font-size: 15.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    /* Farbe blendet, Druck schrumpft — mehr Bewegung gibt es nicht. */
+    transition: background 0.2s ease, transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+}
+
+#root .ofi-btn-apple:hover:not(:disabled),
+body > :not(#root) .ofi-btn-apple:hover:not(:disabled) { background: var(--lg-btn-bg-hover); }
+
+#root .ofi-btn-apple:active:not(:disabled),
+body > :not(#root) .ofi-btn-apple:active:not(:disabled) { transform: scale(0.97); }
+
+#root .ofi-btn-apple:disabled,
+body > :not(#root) .ofi-btn-apple:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#root .ofi-btn-apple:focus-visible,
+body > :not(#root) .ofi-btn-apple:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--lg-field-ring);
+}
+
+/* Über die volle Breite — die Hauptaktion einer Fläche. */
+#root .ofi-btn-apple--block,
+body > :not(#root) .ofi-btn-apple--block {
+    width: 100%;
+    min-height: 52px;
+    font-size: 17px;
+}
+
+/* In den Farben der Authenticator-App. */
+#root .ofi-btn-apple--aegis,
+body > :not(#root) .ofi-btn-apple--aegis {
+    background: var(--lg-aegis);
+    color: #ffffff;
+}
+
+#root .ofi-btn-apple--aegis:hover:not(:disabled),
+body > :not(#root) .ofi-btn-apple--aegis:hover:not(:disabled) { background: var(--lg-aegis-hover); }
+
+#root .ofi-btn-apple--aegis:focus-visible,
+body > :not(#root) .ofi-btn-apple--aegis:focus-visible {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--lg-aegis) 28%, transparent);
+}
+
+#root .ofi-btn-apple.is-loading .ofi-btn-apple__label,
+body > :not(#root) .ofi-btn-apple.is-loading .ofi-btn-apple__label { opacity: 0.3; }
+
+.ofi-btn-apple__spinner {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: ofi-login-spin 0.7s linear infinite;
+}
 
 /* ---- Seite ---- */
 .ofi-login {
@@ -100,16 +228,19 @@
 
    Die Maske ist doppelt notiert (`-webkit-` zuerst), weil Safari und ältere
    Chrome-Versionen die ungepräfixte Eigenschaft nicht kennen. */
+/* Kleiner geworden am 09.09.2026 (Vorgabe Samet: «die Welle kleiner») und
+   ganz nach oben gerückt — dieselben Masse wie auf der Aegis-Seite, damit die
+   beiden Schritte wie eine Seite wirken. Vorher: ab 24-42 px, 96-165 px hoch. */
 .ofi-login__wave--top {
     position: absolute;
     /* `inset` MUSS vor `top`/`left` stehen — es ist die Kurzform und würde
        die Einzelwerte sonst wieder auf `auto` zurücksetzen. */
     inset: auto;
-    top: clamp(24px, 3.5vh, 42px);
+    top: 0;
     left: 0;
     z-index: 0;
     width: 100%;
-    height: clamp(96px, 12vw, 165px);
+    height: clamp(58px, 6.5vw, 92px);
     pointer-events: none;
     -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
     mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
@@ -133,6 +264,42 @@
     object-fit: contain;
 }
 
+/* ---- Der Name des Programms (LoginWordmark) ----
+   Steht unter dem Zeichen und über den Feldern, auf BEIDEN Schritten an
+   derselben Stelle. Klein, weit gesperrt, zurückhaltend: er nennt das
+   Programm, ohne dem Zeichen darüber die Aufmerksamkeit zu nehmen.
+
+   In der Kopfzeile stand er zuerst — dort war er eine Bildunterschrift am
+   Rand; in der Mitte ist er der Titel der Seite. */
+.ofi-login__wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    color: var(--lg-sub);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Das Kürzel als kleine Marke daneben — dieselben drei Buchstaben, die die
+   Eröffnung auf ihren Tafeln zeigt. */
+.ofi-login__wordmark-abbr {
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--lg-text) 8%, transparent);
+    color: var(--lg-text);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+}
+
+/* Auf der Aegis-Seite folgt gleich der Titel — dort darf der Abstand darunter
+   kleiner sein, damit Zeichen, Name und Überschrift zusammengehören. */
+.ofi-login__mfa-head .ofi-login__wordmark { margin-top: 14px; margin-bottom: 12px; }
+
 .ofi-login__controls {
     display: flex;
     align-items: center;
@@ -145,10 +312,12 @@
     align-items: center;
     gap: 2px;
     padding: 3px;
-    border: 1px solid var(--lg-border);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--lg-surface) 82%, transparent);
-    backdrop-filter: blur(6px);
+    border: none;
+    border-radius: var(--lg-r-pill);
+    /* Milchglas wie in Apples Leisten: der Grund scheint durch, die Kante
+       entsteht aus dem Farbunterschied und nicht aus einer Linie. */
+    background: color-mix(in srgb, var(--lg-text) 6%, transparent);
+    backdrop-filter: saturate(180%) blur(14px);
 }
 
 .ofi-login__lang-btn {
@@ -159,18 +328,22 @@
     border-radius: 999px;
     background: transparent;
     color: var(--lg-sub);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     cursor: pointer;
-    transition: background 0.16s ease, color 0.16s ease;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .ofi-login__lang-btn:hover { color: var(--lg-text); }
 
+/* Der gewählte Eintrag hebt sich als helle Kachel heraus — nicht als
+   Farbklecks. Apple markiert die Auswahl mit einer Fläche, nicht mit dem
+   Akzent. */
 .ofi-login__lang-btn.is-active {
-    background: var(--lg-btn-bg);
-    color: var(--lg-btn-fg);
+    background: var(--lg-surface);
+    color: var(--lg-text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .ofi-login__lang-btn:focus-visible,
@@ -212,23 +385,30 @@
 }
 
 /* ---- Inhalt ---- */
+/* OBEN ausgerichtet, nicht mittig (09.09.2026, Vorgabe Samet: «an derselben
+   Stelle wie bei Aegis»). Mittig gesetzt hing die Höhe am Inhalt: die kurze
+   Kennwortmaske rutschte in die Bildmitte, die lange Einrichtung nach oben —
+   beim Weiterklicken sprang das Zeichen also. Von oben gemessen steht es auf
+   jedem Schritt gleich. */
 .ofi-login__body {
     position: relative;
     z-index: 1;
     display: flex;
     flex: 1;
-    align-items: center;
-    /* Oben grosszügiger: das Formular sitzt bewusst unterhalb des Wabenbands. */
-    padding: clamp(56px, 11vh, 132px) clamp(20px, 4vw, 48px) 28px;
+    align-items: flex-start;
+    padding: clamp(56px, 11vh, 128px) clamp(20px, 4vw, 48px) 28px;
 }
 
+/* EINE mittige Bahn — seit dem 09.09.2026 auch für die Kennwortmaske. Die
+   Erklärspalte rechts (zwei Absätze und zwei Adressen) ist weg; was bleibt,
+   steht in der Mitte, genau wie einen Schritt weiter auf der Aegis-Seite. */
 .ofi-login__grid {
     display: grid;
     width: 100%;
-    max-width: 1000px;
+    max-width: 620px;
     margin: 0 auto;
-    grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
-    gap: clamp(36px, 7vw, 110px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
     align-items: start;
     animation: ofi-login-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -243,27 +423,55 @@
     to { opacity: 1; }
 }
 
+/* Apple-Schlagzeile: gross, halbfett, ENG gesetzt. Die negative Laufweite
+   ist der halbe Trick — sie lässt eine grosse Zeile ruhig statt breit
+   wirken. */
 .ofi-login__title {
     margin: 0;
-    font-size: 36px;
-    font-weight: 700;
-    line-height: 1.12;
-    letter-spacing: -0.005em;
+    font-size: clamp(32px, 3.4vw, 44px);
+    font-weight: 650;
+    line-height: 1.06;
+    letter-spacing: -0.024em;
     color: var(--lg-text);
 }
 
 .ofi-login__lead {
-    margin: 10px 0 0;
-    font-size: 15px;
-    line-height: 1.55;
+    margin: 12px 0 0;
+    font-size: 16px;
+    line-height: 1.5;
+    letter-spacing: -0.008em;
     color: var(--lg-sub);
+}
+
+/* ---- Das Programmzeichen aus dem Browserreiter ----
+   Marineblaues Rund mit weissem Stern und rotem Punkt — dieselbe Zeichnung
+   wie `public/fav4.svg`, hier über OffitecMark. Es steht in Grösse und
+   Abstand genau dort, wo einen Schritt weiter das Aegis-Zeichen sitzt
+   (`.ofi-login__mfa-mark`). */
+.ofi-login__form-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ofi-login__appmark {
+    display: inline-flex;
+    width: 56px;
+    height: 56px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #1f2654;
+    box-shadow: 0 6px 18px rgba(31, 38, 84, 0.22);
 }
 
 /* ---- Formular ---- */
 .ofi-login__form {
     display: grid;
     gap: 18px;
-    margin-top: 30px;
+    width: 100%;
+    max-width: 380px;
+    margin-top: 26px;
 }
 
 .ofi-login__form.is-shaking {
@@ -283,10 +491,11 @@
 }
 
 .ofi-login__label {
-    font-size: 14.5px;
+    font-size: 13.5px;
     font-weight: 500;
     line-height: 1.3;
-    color: var(--lg-text);
+    letter-spacing: -0.005em;
+    color: var(--lg-sub);
 }
 
 .ofi-login__req {
@@ -302,31 +511,35 @@
 #root .ofi-login__input {
     box-sizing: border-box;
     width: 100%;
-    height: 54px;
+    height: 52px;
     padding: 0 16px;
-    border: 1.5px solid var(--lg-field-border);
-    border-radius: 3px;
+    /* EIN Haar statt anderthalb, und eine ruhige Rundung: ein Feld soll
+       lesbar begrenzt sein, nicht eingerahmt. */
+    border: 1px solid var(--lg-field-border);
+    border-radius: var(--lg-r-field);
     background: var(--lg-field-bg);
     color: var(--lg-text);
-    font-size: 15.5px;
+    font-size: 16px;
+    letter-spacing: -0.01em;
     outline: none;
-    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     -webkit-appearance: none;
     appearance: none;
 }
 
+/* Kein Kursiv mehr: eine schräge Platzhalterzeile ist ein Stilmittel aus
+   Formularen der 2010er und liest sich schlechter. */
 .ofi-login__input::placeholder {
     color: var(--lg-sub);
-    opacity: 0.75;
-    font-style: italic;
+    opacity: 0.62;
 }
-
-#root .ofi-login__input:hover { border-color: color-mix(in srgb, var(--lg-field-border-focus) 70%, var(--lg-field-border)); }
 
 #root .ofi-login__input:focus {
     border-color: var(--lg-field-border-focus) !important;
     box-shadow: 0 0 0 4px var(--lg-field-ring);
 }
+
+#root .ofi-login__input:hover:not(:focus) { border-color: color-mix(in srgb, var(--lg-text) 30%, transparent); }
 
 #root .ofi-login__field.has-error .ofi-login__input,
 #root .ofi-login__field.has-error .ofi-login__input:focus {
@@ -432,12 +645,12 @@
 
 .ofi-login__check {
     display: inline-flex;
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     align-items: center;
     justify-content: center;
     border: 1.5px solid var(--lg-field-border);
-    border-radius: 3px;
+    border-radius: 7px;
     background: var(--lg-field-bg);
     color: var(--lg-btn-fg);
     transition: background 0.14s ease, border-color 0.14s ease;
@@ -471,48 +684,48 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-top: 8px;
+    margin-top: 6px;
 }
 
-.ofi-login__submit {
+/* Derselbe Knopf wie überall auf dieser Seite (siehe `.ofi-btn-apple`), nur
+   breiter: die Hauptaktion. Der Schlagschatten von früher ist weg — er liess
+   den Knopf über der Seite schweben, statt auf ihr zu liegen. */
+#root .ofi-login__submit {
     position: relative;
     display: inline-flex;
-    height: 60px;
-    min-width: 152px;
+    min-height: 52px;
+    min-width: 160px;
+    flex: 1;
     align-items: center;
     justify-content: center;
-    padding: 0 30px;
+    padding: 0 28px;
     border: none;
-    border-radius: 3px;
+    border-radius: var(--lg-r-pill);
     background: var(--lg-btn-bg);
     color: var(--lg-btn-fg);
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.005em;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
     cursor: pointer;
-    box-shadow: 0 8px 20px rgba(26, 35, 97, 0.18);
-    transition: background 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+    transition: background 0.2s ease, transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
 }
 
-.ofi-login__submit:hover:not(:disabled) {
-    background: var(--lg-btn-bg-hover);
-    box-shadow: 0 10px 26px rgba(26, 35, 97, 0.24);
-}
+#root .ofi-login__submit:hover:not(:disabled) { background: var(--lg-btn-bg-hover); }
 
-.ofi-login__submit:active:not(:disabled) { transform: scale(0.985); }
+#root .ofi-login__submit:active:not(:disabled) { transform: scale(0.97); }
 
-.ofi-login__submit:disabled {
+#root .ofi-login__submit:disabled {
     cursor: progress;
-    opacity: 0.85;
+    opacity: 0.5;
 }
 
-.ofi-login__submit.is-loading .ofi-login__submit-label { opacity: 0.35; }
+.ofi-login__submit.is-loading .ofi-login__submit-label { opacity: 0.3; }
 
 .ofi-login__spinner {
     position: absolute;
-    width: 22px;
-    height: 22px;
-    border: 2.5px solid color-mix(in srgb, var(--lg-btn-fg) 30%, transparent);
+    width: 20px;
+    height: 20px;
+    border: 2px solid color-mix(in srgb, var(--lg-btn-fg) 30%, transparent);
     border-top-color: var(--lg-btn-fg);
     border-radius: 50%;
     animation: ofi-login-spin 0.7s linear infinite;
@@ -520,30 +733,25 @@
 
 @keyframes ofi-login-spin { to { transform: rotate(360deg); } }
 
-.dark .ofi-login__submit { box-shadow: 0 8px 22px rgba(230, 207, 158, 0.16); }
-.dark .ofi-login__submit:hover:not(:disabled) { box-shadow: 0 10px 26px rgba(230, 207, 158, 0.22); }
-
+/* Rund und randlos: eine Nebenhandlung neben der Pille, kein zweiter
+   Hauptknopf. */
 .ofi-login__qr-btn {
     display: inline-flex;
-    width: 46px;
-    height: 46px;
+    width: 52px;
+    height: 52px;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    border: 1.5px solid var(--lg-field-border);
-    border-radius: 3px;
-    background: var(--lg-field-bg);
-    color: var(--lg-navy);
+    border: none;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--lg-text) 6%, transparent);
+    color: var(--lg-text);
     cursor: pointer;
-    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    transition: background 0.2s ease, transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.dark .ofi-login__qr-btn { color: #e6cf9e; }
-
-.ofi-login__qr-btn:hover:not(:disabled) {
-    border-color: var(--lg-field-border-focus);
-    background: color-mix(in srgb, var(--lg-field-border-focus) 8%, var(--lg-field-bg));
-}
+.ofi-login__qr-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--lg-text) 11%, transparent); }
+.ofi-login__qr-btn:active:not(:disabled) { transform: scale(0.94); }
 
 .ofi-login__qr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -556,11 +764,11 @@
     opacity: 0.85;
 }
 
-/* ---- Erklärtext rechts (Programmschrift Open Sans) ----
+/* ---- Erklärtext rechts (Programmschrift Inter Variable) ----
    Die Spalte trug bis 17.08.2026 `.ofi-serif` und damit Times New Roman;
    dazu gehörte hier ein Ausgleich von 0,01em Laufweite, weil Times bei
    gleicher Punktzahl schmaler läuft. Beides ist weg: der Text steht jetzt
-   in Open Sans, dessen Grundlaufweite bereits stimmt (vgl. refine.css). */
+   in Inter Variable, dessen Grundlaufweite bereits stimmt (vgl. refine.css). */
 .ofi-login__aside {
     padding-top: 74px;
     color: var(--lg-text);
@@ -1011,6 +1219,474 @@
 .ofi-login__qr-msg.is-success { color: var(--lg-success); font-weight: 600; }
 
 /* ---- Handy / schmale Fenster ---- */
+/* =========================================================
+   ZWEITER FAKTOR — Einmalcode aus der Authenticator-App
+   (LoginMfaStep.tsx / LoginStoreDialog.tsx)
+
+   Fassung vom 09.09.2026 nach Vorgabe Samet: die Fläche war
+   «zu nüchtern». Geändert wurde nicht der Text, sondern der
+   Auftritt —
+
+     · EINE mittige Bahn statt zwei Spalten. Die Kachel mit
+       dem Weg zur App stand rechts und wurde einmal im Leben
+       gebraucht; jetzt kommt der Ladecode als Popup.
+     · Das AEGIS-Zeichen führt die Fläche an, das Hauszeichen
+       tritt hier ab (Login.tsx) — es geht auf dieser Seite um
+       die App, nicht um die Firma.
+     · Die Welle trägt die Farben von Aegis, sitzt am oberen
+       Rand und ist schmaler: ohne Logo ist oben Platz.
+     · Zwei Karten für die Einrichtung, darunter das Codefeld.
+       Vorher war es eine lange Liste.
+   ========================================================= */
+
+/* Die Mitteilungsglocke schweigt während des zweiten Faktors.
+   Sie sitzt unten links am Bildschirmrand und liegt ÜBER dem Inhalt; die
+   Einrichtungsfläche ist aber höher als das Anmeldeformular, sodass ihr
+   Bestätigen-Knopf genau dort landet, wo die herausgleitende Leiste steht —
+   die Neuigkeit deckte den Knopf zu. */
+.ofi-login.is-mfa .ofi-login__notif { display: none; }
+
+/* Die Welle in den Farben der App: hellblau nach tiefblau, oben angesetzt
+   und deutlich schmaler. Umgefärbt wird über die Verlaufsmarken, die
+   LoginWave.tsx ausliest — die Zeichnung selbst bleibt unberührt. */
+.ofi-login.is-mfa {
+    --lg-wave-a: var(--lg-aegis-light);
+    /* Der rechte Anschlag ist dunkler als das Zeichen selbst: die Lagen sind
+       stark durchscheinend, ein reines #005E9E verschwand auf Weiss beinahe. */
+    --lg-wave-b: #00335c;
+}
+
+/* ---- Kopf: Zeichen, Titel, Konto ---- */
+.ofi-login__mfa-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.ofi-login__mfa-mark {
+    margin-bottom: 0;
+    border-radius: 14px;
+    /* Wie ein App-Symbol auf dem Startbildschirm. */
+    box-shadow: 0 6px 20px rgba(0, 94, 158, 0.22);
+}
+
+.ofi-login__mfa-title {
+    margin: 0;
+    font-size: clamp(27px, 3.1vw, 36px);
+    font-weight: 650;
+    line-height: 1.08;
+    letter-spacing: -0.024em;
+    color: var(--lg-text);
+}
+
+.ofi-login__mfa-lead {
+    max-width: 46ch;
+    margin: 11px 0 0;
+    font-size: 15.5px;
+    line-height: 1.5;
+    letter-spacing: -0.008em;
+    color: var(--lg-sub);
+}
+
+.ofi-login__mfa-account {
+    margin-top: 12px;
+    padding: 5px 13px;
+    border-radius: var(--lg-r-pill);
+    background: color-mix(in srgb, var(--lg-text) 6%, transparent);
+    color: var(--lg-text);
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+/* ---- Die zwei Einrichtungskarten ---- */
+.ofi-login__mfa-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 28px;
+}
+
+.ofi-login__mfa-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Die beiden Karten sind gleich hoch (Raster), aber ungleich voll: links
+       ein Knopf, rechts ein QR-Bild. Senkrecht zentriert steht der Knopf in
+       der Mitte seiner Karte statt oben mit einem Loch darunter. */
+    justify-content: center;
+    padding: 22px 18px;
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-r-card);
+    background: var(--lg-surface);
+    text-align: center;
+}
+
+.ofi-login__mfa-card h2 {
+    margin: 10px 0 0;
+    font-size: 15.5px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    color: var(--lg-text);
+}
+
+.ofi-login__mfa-card p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--lg-sub);
+}
+
+/* Die Nummer der Handlung — klein, rund, in der Farbe der App. */
+.ofi-login__mfa-step-no {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--lg-aegis) 14%, transparent);
+    color: var(--lg-aegis);
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.dark .ofi-login__mfa-step-no { color: #6cc4f0; }
+
+.ofi-login__mfa-card .ofi-btn-apple { margin-top: 14px; }
+
+/* Der Einrichtungscode. Weisser Grund und dunkler Vordergrund sind Absicht
+   und keine vergessene Farbe: ein umgefärbter QR-Code ist für viele
+   Telefonkameras nicht mehr lesbar. Er bleibt darum auch im Dunkelmodus
+   weiss — daher der eigene helle Rahmen. */
+.ofi-login__mfa-qr {
+    display: flex;
+    margin-top: 14px;
+    padding: 9px;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* «Direkt in Aegis öffnen» — nur auf schmalen Bildschirmen sichtbar (siehe
+   die Begründung im TSX): auf dem Schreibtisch gibt es keine App, die eine
+   `otpauth`-Adresse annimmt. */
+.ofi-login__mfa-open-app { display: none; }
+
+/* Der Schlüssel zum Abtippen liegt zugeklappt darunter — er ist der
+   Notausgang für den Fall, dass die Kamera streikt, und muss nicht dauernd
+   achtunddreissig Zeichen Platz belegen. */
+.ofi-login__mfa-manual {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.ofi-login__mfa-manual summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    color: var(--lg-sub);
+    font-size: 12px;
+    font-weight: 500;
+    list-style: none;
+}
+
+/* Ein kleiner Winkel als Aufklapp-Zeichen; er dreht sich beim Öffnen. */
+.ofi-login__mfa-manual summary::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-right: 1.4px solid currentColor;
+    border-bottom: 1.4px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.2s ease;
+}
+
+.ofi-login__mfa-manual[open] summary::before { transform: rotate(45deg); }
+
+.ofi-login__mfa-manual summary::-webkit-details-marker { display: none; }
+.ofi-login__mfa-manual summary:hover { color: var(--lg-text); }
+
+.ofi-login__mfa-secret {
+    display: block;
+    margin-top: 9px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--lg-text) 5%, transparent);
+    color: var(--lg-text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    /* Der Schlüssel ist lang — er darf umbrechen statt die Karte zu sprengen. */
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.ofi-login__mfa-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: var(--lg-r-pill);
+    background: color-mix(in srgb, var(--lg-text) 7%, transparent);
+    color: var(--lg-text);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.ofi-login__mfa-copy:hover { background: color-mix(in srgb, var(--lg-text) 12%, transparent); }
+
+/* ---- Das Codefeld ---- */
+.ofi-login__mfa-form {
+    display: grid;
+    justify-items: center;
+    gap: 14px;
+    margin-top: 26px;
+}
+
+.ofi-login__mfa-form.is-shaking {
+    animation: ofi-login-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.ofi-login__mfa-entry {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.ofi-login__mfa-entry-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--lg-sub);
+}
+
+.ofi-login__mfa-entry-head label { cursor: pointer; }
+
+/* Restsekunden des laufenden Codes. Reine Anzeige — der Server lässt das
+   Fenster davor und danach ebenfalls gelten. */
+.ofi-login__mfa-countdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--lg-sub);
+}
+
+.ofi-login__mfa-ring { transform: rotate(-90deg); }
+
+.ofi-login__mfa-ring-track {
+    fill: none;
+    stroke: color-mix(in srgb, var(--lg-text) 12%, transparent);
+    stroke-width: 2.5;
+}
+
+.ofi-login__mfa-ring-fill {
+    fill: none;
+    stroke: var(--lg-aegis);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s linear;
+}
+
+.ofi-login__mfa-boxes {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 356px;
+}
+
+/* `#root`, weil index.css `#root :where(input…)` mit weissem Grund und einer
+   !important-Fokusfarbe setzt — die Klasse allein verliert (dieselbe Lage
+   wie beim Kennwortfeld weiter oben). */
+#root .ofi-login__mfa-box {
+    box-sizing: border-box;
+    width: 100%;
+    height: 60px;
+    padding: 0;
+    border: 1px solid var(--lg-field-border);
+    border-radius: var(--lg-r-field);
+    background: var(--lg-field-bg);
+    color: var(--lg-text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 25px;
+    font-weight: 500;
+    text-align: center;
+    caret-color: var(--lg-aegis);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#root .ofi-login__mfa-box:focus {
+    border-color: var(--lg-aegis) !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--lg-aegis) 20%, transparent);
+}
+
+/* Zifferndrehrad abschalten — die Kästchen sind Textfelder mit
+   Zifferntastatur, kein Zahlenfeld. */
+#root .ofi-login__mfa-box::-webkit-outer-spin-button,
+#root .ofi-login__mfa-box::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#root .ofi-login__mfa-entry.has-error .ofi-login__mfa-box {
+    border-color: var(--lg-error) !important;
+}
+
+#root .ofi-login__mfa-entry.has-error .ofi-login__mfa-box:focus {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--lg-error) 18%, transparent);
+}
+
+.ofi-login__mfa-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: var(--lg-error);
+    font-size: 13px;
+    font-weight: 500;
+    animation: ofi-login-fade 0.2s ease both;
+}
+
+.ofi-login__mfa-form .ofi-btn-apple--block { max-width: 356px; }
+
+.ofi-login__mfa-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 10px;
+    border: none;
+    background: transparent;
+    color: var(--lg-sub);
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.ofi-login__mfa-back:hover:not(:disabled) { color: var(--lg-text); }
+.ofi-login__mfa-back:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ofi-login__mfa-foot {
+    max-width: 46ch;
+    margin: 26px auto 0;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: center;
+    color: var(--lg-sub);
+    opacity: 0.85;
+}
+
+/* =========================================================
+   «AEGIS HOLEN» — das Popup mit dem Ladecode
+   (LoginStoreDialog.tsx; liegt in <body>, siehe .ofi-login__qr-layer)
+   ========================================================= */
+.ofi-login__store {
+    position: relative;
+    display: flex;
+    width: min(360px, calc(100vw - 32px));
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 26px 24px;
+    border-radius: 22px;
+    background: var(--lg-surface);
+    box-shadow: var(--lg-shadow);
+    text-align: center;
+    animation: ofi-login-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ofi-login__store-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--lg-text) 7%, transparent);
+    color: var(--lg-sub);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.ofi-login__store-close:hover {
+    background: color-mix(in srgb, var(--lg-text) 13%, transparent);
+    color: var(--lg-text);
+}
+
+.ofi-login__store-mark {
+    border-radius: 13px;
+    box-shadow: 0 6px 20px rgba(0, 94, 158, 0.22);
+}
+
+.ofi-login__store-title {
+    margin: 14px 0 0;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--lg-text);
+}
+
+.ofi-login__store-text {
+    margin: 7px 0 0;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--lg-sub);
+}
+
+.ofi-login__store-qr {
+    margin: 18px 0 2px;
+    padding: 10px;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+body > :not(#root) .ofi-login__store a.ofi-login__store-open {
+    width: 100%;
+    margin-top: 16px;
+}
+
+body > :not(#root) .ofi-login__store a.ofi-login__store-alt {
+    margin-top: 11px;
+    color: var(--lg-sub);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+body > :not(#root) .ofi-login__store a.ofi-login__store-alt:hover { color: var(--lg-text); }
+
+.ofi-login__store-note {
+    margin: 16px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--lg-border);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--lg-sub);
+}
+
 @media (max-width: 899px) {
     .ofi-login__grid {
         grid-template-columns: minmax(0, 1fr);
@@ -1018,11 +1694,39 @@
     }
 
     .ofi-login__aside { display: none; }
+
+    /* Der zweite Faktor steht ohnehin schon in EINER Bahn — hier wird sie nur
+       schmaler, und die beiden Einrichtungskarten stapeln sich. */
+    .ofi-login__grid.is-mfa { max-width: 480px; }
+    .ofi-login__mfa-cards { grid-template-columns: minmax(0, 1fr); }
+
+    /* Auf dem Telefon gibt es eine App, die `otpauth:` annehmen kann — und die
+       Kamera kann den Bildschirm, auf dem sie läuft, nicht scannen. Der
+       Verweis ersetzt hier das Scannen. */
+    .ofi-login .ofi-login__mfa-card a.ofi-login__mfa-open-app {
+        display: inline-flex;
+        width: 100%;
+        box-sizing: border-box;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 44px;
+        margin-top: 14px;
+        padding: 0 18px;
+        border-radius: var(--lg-r-pill);
+        background: var(--lg-aegis);
+        color: #ffffff;
+        font-size: 14.5px;
+        font-weight: 600;
+        text-decoration: none;
+    }
 }
 
 @media (max-width: 640px) {
     .ofi-login__bar { padding: 22px 18px 0; }
     .ofi-login__logo { height: 28px; }
+    .ofi-login__wordmark { font-size: 9.5px; letter-spacing: 0.12em; gap: 6px; margin-top: 14px; }
+    .ofi-login__wordmark-abbr { font-size: 9px; padding: 2px 5px; }
     .ofi-login__controls { gap: 8px; }
     .ofi-login__lang-btn { height: 28px; min-width: 36px; padding: 0 9px; font-size: 11.5px; }
     .ofi-login__theme { width: 34px; height: 34px; }
@@ -1044,6 +1748,69 @@
     .ofi-login__notif { left: 12px; bottom: 12px; }
     .ofi-login__teaser { max-width: calc(100vw - 84px); }
     .ofi-login__notif-panel { bottom: 56px; width: calc(100vw - 24px); }
+
+    /* ---- Zweiter Faktor auf dem Telefon ----
+       Die sechs Kästchen müssen zwischen die Ränder passen: schmaler, engerer
+       Abstand, und die Schrift bleibt bei 16 px oder darüber (darunter zoomt
+       iOS beim Hineintippen die ganze Seite). */
+    .ofi-login__mfa-form { margin-top: 22px; }
+    .ofi-login__mfa-boxes { gap: 7px; }
+    #root .ofi-login__mfa-box { height: 54px; font-size: 22px; }
+    .ofi-login__mfa-cards { margin-top: 22px; }
+    .ofi-login__mfa-card { padding: 18px 16px; }
+    .ofi-login__mfa-mark { margin-bottom: 14px; }
+    .ofi-login__mfa-foot { margin-top: 20px; padding-bottom: 8px; }
+}
+
+/* =========================================================
+   ZWEI FREMDE REGELN, DIE HIER NICHT GELTEN SOLLEN
+   (gemessen am 09.09.2026 mit CSS.getMatchedStylesForNode)
+
+   1) FORM DER KNÖPFE
+      index.css setzt für JEDEN <button> der Anwendung
+        `border-radius: var(--ofi-button-radius) !important`  (10 px)
+      — ohne Träger, also auch hier. Damit war die Apple-Pille
+      still wieder ein abgerundetes Rechteck, und der runde
+      QR-Knopf ein Quadrat mit Ecken. Sichtbar war das nur im
+      Bild, nicht in der Datei: die eigene Regel STAND da, sie
+      verlor bloss.
+
+      Die dortige Regel wiegt (0,2,1). Ein `#root` davor wiegt
+      (1,1,0) und schlägt sie, weil Kennungen zuerst zählen —
+      darum steht die Form hier EINMAL für alle Knöpfe der
+      Seite, statt in jeder einzelnen Regel ein `!important`
+      mitzuschleppen. Der Zwilling `body > :not(#root)` gilt
+      dem Popup, das in einem Portal ausserhalb von #root hängt
+      (siehe die Notiz «Portal popups need a CSS twin»).
+
+   2) KURSIVE PLATZHALTER
+      refine.css setzt `#root :where(input, textarea)::placeholder
+      { font-style: italic }` (1,0,1) — programmweit gewollt, auf
+      dieser Seite nicht: ein schräger Platzhalter ist das
+      Formulargefühl der 2010er.
+   ========================================================= */
+#root .ofi-login__lang-btn,
+#root .ofi-login__submit,
+#root .ofi-login__mfa-copy,
+#root .ofi-login__mfa-back,
+#root .ofi-btn-apple,
+body > :not(#root) .ofi-btn-apple {
+    border-radius: var(--lg-r-pill) !important;
+}
+
+#root .ofi-login__qr-btn,
+#root .ofi-login__theme,
+#root .ofi-login__icon-btn,
+#root .ofi-login__bell,
+body > :not(#root) .ofi-login__store-close {
+    border-radius: 50% !important;
+}
+
+#root .ofi-login__check { border-radius: 7px !important; }
+
+#root .ofi-login__input::placeholder {
+    font-style: normal;
+    opacity: 0.62;
 }
 
 /* ---- Bewegung reduzieren ---- */
@@ -1058,6 +1825,9 @@
     .ofi-login__qr-beam,
     .ofi-login__bell-dot { animation: none; }
 
-    .ofi-login__form.is-shaking { animation-duration: 0.3s; }
+    .ofi-login__form.is-shaking,
+    .ofi-login__mfa-form.is-shaking { animation-duration: 0.3s; }
     .ofi-login__notif-panel { transition-duration: 0.01s; }
+    /* Der Ring springt dann von Sekunde zu Sekunde, statt zu gleiten. */
+    .ofi-login__mfa-ring-fill { transition: none; }
 }

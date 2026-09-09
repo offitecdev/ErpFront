@@ -533,8 +533,9 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
             setError(err?.response?.data?.error || err?.message || t('calendar.wizard.saveFailed'));
             /* Steht ein bestehender Termin im Weg, nennt ihn die Absage — dann
                darf der Fuss «löschen und speichern» anbieten. Ein bereits
-               abgeschlossener Tag ist NICHT dabei (der Server lässt ihn weg),
-               also bleibt die Absage dort eine Absage. */
+               ABGESCHLOSSENER Tag steht seit dem 03.09.2026 gar nicht mehr im
+               Weg: neben ihm darf ein weiterer Termin entstehen, ohne dass
+               etwas gelöscht wird. Er kann hier also auch nicht auftauchen. */
             const replaceable = err?.response?.data?.replaceable as Array<{ id?: string }> | undefined;
             const ids = Array.isArray(replaceable) ? replaceable.map((row) => String(row?.id || '')).filter(Boolean) : [];
             if (ids.length) setBlockedBy({ plan: replacePlanKey, ids });

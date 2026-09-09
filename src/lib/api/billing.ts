@@ -9,6 +9,9 @@ import type {
     InvoiceStatus,
     MyOrderDetailDto,
     MyOrderDto,
+    OrderCancelResultDto,
+    OrderLifecycleDto,
+    OrderRevertResultDto,
     ProjectListInvoiceDto,
     ProjectListOrderDto,
 } from '../../types/billing';
@@ -44,15 +47,56 @@ export const billingApi = {
         return res.data;
     },
 
+    /**
+     * Die Nummer, die die nächste Rechnung bekäme — für die Vorschau der
+     * Erfassungsmaske. Sie bewegt den Zähler NICHT: vergeben wird sie erst
+     * beim Erstellen, darum ist sie eine Auskunft und keine Reservierung.
+     */
+    nextInvoiceNumber: async (): Promise<string | null> => {
+        try {
+            const res = await apiClient.get('/billing/invoices/next-number');
+            return res.data?.invoiceNumber ?? null;
+        } catch {
+            return null;
+        }
+    },
+
     /** Direktrechnung — die selbst ausgefüllte Vorlage (weder Auftrag noch Projekt). */
     createDirectInvoice: async (input: CreateDirectInvoiceInput): Promise<{ message: string; invoice: InvoiceDto }> => {
         const res = await apiClient.post('/billing/invoices/direct', input);
         return res.data;
     },
 
-    updateStatus: async (id: string, status: InvoiceStatus): Promise<{ message: string; invoice: InvoiceDto }> => {
-        const res = await apiClient.patch(`/billing/invoices/${id}/status`, { status });
+    /**
+     * Statuswechsel. `paidAt` ist der ZAHLUNGSEINGANG: das Markieren als
+     * bezahlt trägt ein Datum (voreingestellt heute, im Fenster änderbar);
+     * jeder andere Status löscht es serverseitig wieder.
+     */
+    /**
+     * Eine Direktrechnung als GANZES neu schreiben. Nummer und Zahlungsstand
+     * bleiben beim Beleg — der Server lässt weder eine bezahlte noch eine
+     * stornierte Rechnung ändern.
+     */
+    updateDirectInvoice: async (id: string, input: CreateDirectInvoiceInput): Promise<{ message: string; invoice: InvoiceDto }> => {
+        const res = await apiClient.put(`/billing/invoices/${id}/direct`, input);
         return res.data;
+    },
+
+    updateStatus: async (id: string, status: InvoiceStatus, paidAt?: string | null): Promise<{ message: string; invoice: InvoiceDto }> => {
+        const res = await apiClient.patch(`/billing/invoices/${id}/status`, { status, paidAt: paidAt ?? null });
+        return res.data;
+    },
+
+    /**
+     * Produktbilder für das Rechnungs-PDF — auf den Bildrahmen des Belegs
+     * verkleinert. Die Direktrechnung druckt dieselbe Positionstabelle wie das
+     * Angebot und braucht darum dieselben Bilder; sie hat aber keine Offerte,
+     * an der der Weg `/tenders/:id/product-images` hängen könnte.
+     */
+    productImages: async (articleIds: string[]): Promise<Array<{ id: string; imageUrl: string }>> => {
+        if (articleIds.length === 0) return [];
+        const res = await apiClient.post('/billing/product-images', { ids: articleIds });
+        return Array.isArray(res.data) ? res.data : [];
     },
 
     /** Kalıcı silme — sunucu yalnızca iptal edilmiş faturalar için izin verir. */
@@ -81,6 +125,49 @@ export const myOrdersApi = {
 
     getById: async (id: string): Promise<MyOrderDetailDto> => {
         const res = await apiClient.get(`/sales-orders/${id}`);
+        return res.data;
+    },
+
+    /**
+     * EINEN AUFTRAG ZURÜCKNEHMEN — Projektauftrag, Nachtrag oder Lieferauftrag.
+     *
+     * Der Server entscheidet die Folgen: Nachträge fallen mit dem Hauptauftrag,
+     * das Material geht ans Lager zurück, die Offerte wird wieder ein Entwurf
+     * und mit dem LETZTEN Auftrag verschwindet auch das Projekt. Genau das
+     * meldet die Antwort zurück, damit die Seite weiss, wohin sie danach geht.
+     */
+    remove: async (id: string): Promise<{ projectDeleted: boolean; addonIds: string[]; projectId: string | null }> => {
+        const res = await apiClient.delete(`/sales-orders/${id}`);
+        return res.data;
+    },
+
+    /**
+     * ── LÖSCHEN, STORNO, ZURÜCK IN ENTWURF (Vorgabe Samet 06.09.2026) ────────
+     *
+     * Was mit diesem Auftrag geschehen DARF, entscheidet der Server: die
+     * Oberfläche fragt, sobald jemand «Auftrag zurücknehmen» öffnet, und zeigt
+     * dann nur die Wege, die auch durchgehen — samt der Gründe, warum der
+     * andere versperrt ist.
+     */
+    lifecycle: async (id: string): Promise<OrderLifecycleDto> => {
+        const res = await apiClient.get(`/sales-orders/${id}/lifecycle`);
+        return res.data;
+    },
+
+    /** Der Auftrag verschwindet, seine Offerte wird wieder ein Entwurf. */
+    revertToDraft: async (id: string): Promise<OrderRevertResultDto> => {
+        const res = await apiClient.post(`/sales-orders/${id}/revert-to-draft`);
+        return res.data;
+    },
+
+    /** Der Auftrag bleibt stehen und gilt als zurückgenommen. */
+    cancel: async (id: string, reason?: string | null): Promise<OrderCancelResultDto> => {
+        const res = await apiClient.post(`/sales-orders/${id}/cancel`, { reason: reason || null });
+        return res.data;
+    },
+
+    uncancel: async (id: string): Promise<{ salesOrderIds: string[]; projectRestored: boolean }> => {
+        const res = await apiClient.post(`/sales-orders/${id}/uncancel`);
         return res.data;
     },
 

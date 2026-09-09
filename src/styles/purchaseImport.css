@@ -1,0 +1,1866 @@
+/* =========================================================
+   Offitec — BELEG-IMPORT DER LIEFERANTENBESTELLUNG (07.09.2026)
+
+   Vorgabe Samet: «Eine neue Zeit für Excel- und PDF-Importe.
+   Schritt für Schritt, mit Fenstern und Übergängen — und am
+   Ende steht ein PDF. Wird eine Auswahl getroffen, soll die
+   Oberfläche in den RECHENMODUS wechseln: Hintergrund und
+   Aufbau ändern sich, damit man sieht, dass jetzt die
+   Lieferantenrechnung läuft. Sauber, im Stil von iOS oder
+   Google.»
+
+   Aufbau: `.ofi-poi` ist der Assistent (ein Fenster über
+   einem Schleier), `.ofi-poi.is-calc` derselbe Assistent im
+   RECHENMODUS — der Rumpf bekommt einen anderen Grund, wird
+   zweispaltig und trägt oben ein Band, das den Wechsel
+   ausspricht. Der Wechsel selbst ist eine Blende, keine
+   Bewegung: die Karte springt nicht.
+
+   Farben kommen ausschliesslich aus den Kalender-Token
+   (`--ofi-cal-*`); der Dunkelmodus ist damit der reine
+   Variablentausch aus styles/dark.css. Die Knöpfe hier tragen
+   KEINE Tailwind-Innenmasse, damit die gemeinsame Knopfregel
+   in buttons.css sie nicht anfasst.
+
+   Geladen wird die Datei vom Assistenten selbst
+   (`SupplierImportWizard.tsx`), nicht global — sie kostet
+   nichts, solange niemand einen Beleg hochlädt.
+   ========================================================= */
+
+/* ── Der Startknopf in der Bestellzeile ───────────────────────────────────
+   40px, nicht 34: die Knöpfe daneben tragen Tailwinds `px-3` und werden
+   deshalb von `styles/buttons.css` auf `--ofi-btn-height` (40px) gestellt.
+   Dieser hier fällt nicht unter jene Regel (kein `px-*`, nicht in ihrer
+   Liste) und müsste sonst als einziger zu kurz in der Reihe stehen. */
+/* ── EIN ZEICHEN STATT EINES WORTES (09.09.2026) ──────────────────────────
+   Die Rechenart wird selten gewechselt und stand doch als breiter Knopf
+   zwischen Vorlage und Beleg-Import. Jetzt ist sie ein quadratisches Zeichen
+   in der Höhe der Nachbarn; welche Art gilt, sagt der Kurzhinweis, DASS
+   gerechnet wird, sagt die Farbe. Dieselbe Sprache wie der Stift daneben. */
+.ofi-poi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-icon:hover { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); color: var(--ofi-cal-accent); }
+.ofi-poi-icon:active { transform: scale(0.94); }
+.ofi-poi-icon.is-on {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-poi-icon.is-on:hover { background: var(--ofi-cal-accent-hover); color: var(--ofi-cal-on-accent); }
+.ofi-poi-icon svg { flex: none; }
+
+.ofi-poi-launch {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--ofi-cal-accent);
+    border-radius: 8px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-launch:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
+.ofi-poi-launch:active { transform: scale(0.965); }
+.ofi-poi-launch:disabled { opacity: 0.45; cursor: not-allowed; }
+.ofi-poi-launch svg { flex: none; }
+
+/* ── Der Knopf LEBT (Vorgabe Samet: «Bitte den Beleg-Import-Knopf animiert») ──
+   Die Bewegung ist ein LICHT, das langsam über die Fläche zieht, und ein
+   Blitzsymbol, das mit ihm atmet — kein Wackeln, kein Springen. Das Haus hat
+   sich 2026 bewusst gegen bewegte Knöpfe entschieden (styles/buttons.css:
+   «beim Überfahren NUR eine Farbanimation»); dieser eine darf auffallen, weil
+   er der neue Hauptweg ist, aber er tut es, ohne die Reihe zu verrücken:
+   die Fläche bleibt, wo sie ist, es wandert nur der Glanz. */
+.ofi-poi-launch.is-alive { position: relative; overflow: hidden; isolation: isolate; }
+.ofi-poi-launch.is-alive::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+        105deg,
+        transparent 35%,
+        color-mix(in srgb, var(--ofi-cal-on-accent) 26%, transparent) 50%,
+        transparent 65%
+    );
+    transform: translateX(-120%);
+    animation: ofi-poi-sheen 3.6s ease-in-out infinite;
+}
+.ofi-poi-launch.is-alive svg:first-child { animation: ofi-poi-pulse 3.6s ease-in-out infinite; }
+@keyframes ofi-poi-sheen {
+    0%, 55% { transform: translateX(-120%); }
+    85%, 100% { transform: translateX(120%); }
+}
+@keyframes ofi-poi-pulse {
+    0%, 55%, 100% { opacity: 1; }
+    70% { opacity: 0.55; }
+}
+/* Wer Bewegung abgestellt hat, bekommt einen ruhigen Knopf — die Auskunft
+   steckt in der Beschriftung, nicht im Glanz. */
+@media (prefers-reduced-motion: reduce) {
+    .ofi-poi-launch.is-alive::after,
+    .ofi-poi-launch.is-alive svg:first-child { animation: none; }
+    .ofi-poi-launch.is-alive::after { display: none; }
+}
+
+/* ── Das grosse PLUS (Vorgabe Samet: «ganz links, jeder Klick eine Zeile») ── */
+.ofi-poi-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 15px 0 12px;
+    border: 1px solid var(--ofi-cal-accent);
+    border-radius: 10px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: var(--ofi-cal-shadow-soft);
+    transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-add:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
+.ofi-poi-add:active { transform: scale(0.965); }
+.ofi-poi-add svg { flex: none; }
+
+/* ── Das Menü unter einem Knopf ───────────────────────────────────────────
+   Nur zwei bis drei Zeilen; ein eigenes Fenster wäre zu viel Apparat für eine
+   Auswahl, die in zwei Worten steht. */
+.ofi-poi-menuwrap { position: relative; display: inline-flex; }
+.ofi-poi-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 60;
+    min-width: 224px;
+    padding: 6px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow);
+    animation: ofi-poi-menuin 140ms ease both;
+}
+@keyframes ofi-poi-menuin {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+.ofi-poi-menu button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+.ofi-poi-menu button:hover { background: var(--ofi-cal-hover); }
+.ofi-poi-menu button.is-on { color: var(--ofi-cal-accent); font-weight: 600; }
+.ofi-poi-menu button svg { flex: none; color: var(--ofi-cal-muted); }
+.ofi-poi-menu button.is-on svg { color: var(--ofi-cal-accent); }
+.ofi-poi-menu button:disabled { opacity: 0.4; cursor: not-allowed; }
+.ofi-poi-menu button small {
+    display: block;
+    margin-top: 1px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ofi-cal-muted);
+}
+.ofi-poi-menu hr { margin: 5px 4px; border: 0; border-top: 1px solid var(--ofi-cal-border-soft); }
+
+/* ── Die Einstellung als Auskunft (im Import-Fenster) ─────────────────────── */
+.ofi-poi-settings {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-accent-tint);
+}
+.ofi-poi-settings > svg { flex: none; color: var(--ofi-cal-accent); }
+.ofi-poi-settings > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-poi-settings b { font-size: 12.5px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-poi-settings span { font-size: 11.5px; color: var(--ofi-cal-muted); }
+
+/* ── Vorlagenfenster: Liste links, Bearbeitung rechts ────────────────────── */
+.ofi-poi-tplgrid {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+@media (max-width: 860px) {
+    .ofi-poi-tplgrid { grid-template-columns: minmax(0, 1fr); }
+}
+.ofi-poi-tpl.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+.ofi-poi-template-tabs {
+    display: flex;
+    gap: 7px;
+    margin-bottom: 10px;
+    padding-bottom: 3px;
+    overflow-x: auto;
+}
+.ofi-poi-template-tabs button {
+    display: flex;
+    min-width: 150px;
+    max-width: 230px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 8px 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 9px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-poi-template-tabs button:hover,
+.ofi-poi-template-tabs button.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+.ofi-poi-template-tabs span { overflow: hidden; font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-poi-template-tabs small { overflow: hidden; color: var(--ofi-cal-muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Der zweite, ruhige Knopf («Vorlagen», «Stufe hinzufügen») — 36px, damit er
+   im Fenster auf einer Linie mit `.ofi-poi-btn` sitzt. */
+.ofi-poi-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-ghost:hover { background: var(--ofi-cal-hover); border-color: var(--ofi-cal-accent); color: var(--ofi-cal-accent); }
+.ofi-poi-ghost:active { transform: scale(0.965); }
+.ofi-poi-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Fenster ───────────────────────────────────────────────────────────── */
+.ofi-poi-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+        radial-gradient(circle at 16% 14%, color-mix(in srgb, var(--ofi-cal-accent) 24%, transparent), transparent 28%),
+        radial-gradient(circle at 84% 82%, rgba(56, 189, 248, 0.16), transparent 30%),
+        rgba(15, 23, 42, 0.38);
+    /* Der Schleier ist MILCHIG, nicht nur dunkel (07.09.2026): darunter bleibt
+       zu sehen, wo man herkommt — das Fenster liegt darauf, es ersetzt die
+       Seite nicht. */
+    backdrop-filter: blur(6px) saturate(1.2);
+    animation: ofi-poi-fade 240ms ease both;
+}
+
+.ofi-poi {
+    display: flex;
+    flex-direction: column;
+    width: min(1120px, 100%);
+    height: min(760px, 100%);
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 18px;
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow);
+    animation: ofi-poi-rise 440ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ofi-poi-fade { from { opacity: 0; } to { opacity: 1; } }
+/* Es POPPT auf statt einzublenden — die kleine Ueberschwingung am Ende ist der
+   ganze Unterschied zwischen «erschienen» und «gekommen». */
+@keyframes ofi-poi-rise {
+    0% { opacity: 0; transform: translateY(32px) scale(0.9) rotateX(5deg); filter: blur(8px); }
+    68% { opacity: 1; transform: translateY(-3px) scale(1.008); filter: blur(0); }
+    100% { opacity: 1; transform: none; filter: blur(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-poi { animation-duration: 1ms; }
+}
+
+/* ── Kopf mit der Schrittleiste ────────────────────────────────────────── */
+.ofi-poi-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: none;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-poi-title {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+.ofi-poi-title b {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    letter-spacing: -0.01em;
+}
+.ofi-poi-title span {
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-poi-steps {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+.ofi-poi-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 999px;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    cursor: default;
+    transition: background-color 160ms ease;
+}
+.ofi-poi-step.is-clickable { cursor: pointer; }
+.ofi-poi-step.is-clickable:hover { background: var(--ofi-cal-hover); }
+.ofi-poi-step i {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--ofi-cal-border);
+    color: var(--ofi-cal-muted);
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+    transition: background-color 160ms ease, color 160ms ease;
+}
+.ofi-poi-step b {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-faint);
+    transition: color 160ms ease;
+}
+.ofi-poi-step.is-done i { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+.ofi-poi-step.is-done b { color: var(--ofi-cal-muted); }
+.ofi-poi-step.is-active i { background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent); }
+.ofi-poi-step.is-active b { color: var(--ofi-cal-text); }
+.ofi-poi-steps hr {
+    width: 12px;
+    height: 1px;
+    margin: 0;
+    border: 0;
+    background: var(--ofi-cal-border);
+}
+
+/* ── DAS SCHLIESSEN-ZEICHEN ───────────────────────────────────────────────
+   Vorgabe Samet (08.09.2026): «Das X muss ganz rechts stehen und gross sein —
+   wie das X auf dem iPhone.» Also die graue Scheibe aus iOS: sie ist IMMER da,
+   nicht erst beim Überfahren, misst 34px und trägt ein kräftiges Zeichen. Und
+   `margin-left: auto` schiebt sie an die rechte Kante des Kopfes, egal was
+   links davon steht — Titel, Schrittleiste oder beides. */
+.ofi-poi-x {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    margin-left: auto;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    color: var(--ofi-cal-text-2);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-x svg { width: 20px; height: 20px; stroke-width: 2.4; }
+.ofi-poi-x:hover { background: var(--ofi-cal-border); color: var(--ofi-cal-text); }
+.ofi-poi-x:active { transform: scale(0.9); }
+
+/* ── Rumpf ─────────────────────────────────────────────────────────────── */
+.ofi-poi-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 18px;
+    background: var(--ofi-cal-surface);
+    /* Der Wechsel in den Rechenmodus ist eine BLENDE, keine Bewegung. */
+    transition: background-color 260ms ease;
+}
+.ofi-poi-pane { animation: ofi-poi-slide 220ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.ofi-poi-pane.is-back { animation-name: ofi-poi-slide-back; }
+@keyframes ofi-poi-slide {
+    from { opacity: 0; transform: translateX(18px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes ofi-poi-slide-back {
+    from { opacity: 0; transform: translateX(-18px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── DER RECHENMODUS ───────────────────────────────────────────────────────
+   Der sichtbare Beweis, dass jetzt gerechnet wird: der Grund wird zur
+   Werkbank (ein Hauch Akzentfarbe statt Weiss), der Rand des Fensters nimmt
+   die Akzentfarbe auf, und der Rumpf wird ZWEISPALTIG — links die Regler,
+   rechts die Summen, die sich beim Tippen mitbewegen. */
+.ofi-poi.is-calc { border-color: var(--ofi-cal-accent-line, var(--ofi-cal-accent)); }
+.ofi-poi.is-calc .ofi-poi-body { background: color-mix(in srgb, var(--ofi-cal-accent) 7%, var(--ofi-cal-surface)); }
+.ofi-poi.is-calc .ofi-poi-head { background: var(--ofi-cal-accent-soft); }
+
+.ofi-poi-calcbanner {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 14px;
+    padding: 9px 12px;
+    border: 1px solid var(--ofi-cal-accent-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    animation: ofi-poi-banner 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes ofi-poi-banner {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+}
+.ofi-poi-calcbanner svg { flex: none; color: var(--ofi-cal-accent); }
+.ofi-poi-calcbanner b { font-size: 12.5px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-poi-calcbanner span { font-size: 11.5px; color: var(--ofi-cal-muted); }
+
+.ofi-poi-calcgrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 14px;
+    align-items: start;
+}
+
+/* ── Karten ────────────────────────────────────────────────────────────── */
+.ofi-poi-card {
+    padding: 14px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+}
+.ofi-poi-card + .ofi-poi-card { margin-top: 12px; }
+.ofi-poi-card > h4 {
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-poi-card > p {
+    margin: -4px 0 10px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Ablagefeld ────────────────────────────────────────────────────────── */
+.ofi-poi-empty-upload { position: relative; }
+.ofi-poi-empty-upload > .ofi-poi-addwrap {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 3;
+}
+.ofi-poi-empty-upload > .ofi-poi-addwrap .ofi-poi-imagemenu {
+    top: auto;
+    right: 0;
+    bottom: calc(100% + 7px);
+    left: auto;
+}
+.ofi-poi-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 230px;
+    padding: 24px;
+    border: 1.5px dashed var(--ofi-cal-border);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+    transition: border-color 160ms ease, background-color 160ms ease;
+}
+.ofi-poi-drop:hover,
+.ofi-poi-drop.is-over { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+.ofi-poi-drop svg { color: var(--ofi-cal-accent); }
+.ofi-poi-drop b { font-size: 13.5px; font-weight: 600; }
+.ofi-poi-drop span { font-size: 11.5px; color: var(--ofi-cal-muted); }
+
+.ofi-poi-file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-poi-file svg { flex: none; color: var(--ofi-cal-accent); }
+.ofi-poi-file div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-poi-file b {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-poi-file span { font-size: 11px; color: var(--ofi-cal-muted); }
+
+.ofi-poi-filelist {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+}
+.ofi-poi-filecard { position: relative; display: inline-flex; }
+.ofi-poi-filecard > em {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--ofi-cal-surface-2);
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 800;
+}
+.ofi-poi-addwrap { position: relative; display: inline-flex; min-height: 62px; }
+.ofi-poi-imageplus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 62px;
+    min-height: 62px;
+    border: 1.5px dashed var(--ofi-cal-accent);
+    border-radius: 14px;
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-accent);
+    cursor: pointer;
+    transition: transform 150ms cubic-bezier(0.2, 0.8, 0.3, 1.4), background-color 150ms ease;
+}
+.ofi-poi-imageplus:hover { transform: rotate(4deg) scale(1.04); background: var(--ofi-cal-accent-soft); }
+.ofi-poi-imagemenu { top: calc(100% + 7px); left: 0; right: auto; }
+
+/* Persistent camera: capture can be pressed repeatedly; only Done closes it. */
+.ofi-poi-camera-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 940;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background: rgba(2, 6, 23, 0.76);
+    backdrop-filter: blur(14px) saturate(1.25);
+    animation: ofi-poi-fade 220ms ease both;
+}
+.ofi-poi-camera {
+    width: min(720px, 100%);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 24px;
+    background: #070b18;
+    box-shadow: 0 32px 100px rgba(0,0,0,0.5);
+    color: #fff;
+    animation: ofi-poi-camera-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes ofi-poi-camera-in {
+    from { opacity: 0; transform: scale(0.86) rotate(-1.5deg); clip-path: inset(46% 46% round 40px); }
+    to { opacity: 1; transform: none; clip-path: inset(0 round 24px); }
+}
+.ofi-poi-camera > header,
+.ofi-poi-camera > footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 13px 16px; }
+.ofi-poi-camera > header > span { display: inline-flex; align-items: center; gap: 8px; }
+.ofi-poi-camera > header > button {
+    grid-column: 3;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    cursor: pointer;
+}
+.ofi-poi-camera-view { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #020617; }
+.ofi-poi-camera-view video { width: 100%; height: 100%; object-fit: cover; }
+.ofi-poi-camera-frame {
+    position: absolute;
+    inset: 9%;
+    border: 1px solid rgba(255,255,255,0.65);
+    border-radius: 18px;
+    box-shadow: 0 0 0 999px rgba(2,6,23,0.12);
+    pointer-events: none;
+}
+.ofi-poi-camera-frame::before,
+.ofi-poi-camera-frame::after {
+    content: '';
+    position: absolute;
+    width: 42px;
+    height: 42px;
+    border-color: #7dd3fc;
+}
+.ofi-poi-camera-frame::before { top: -2px; left: -2px; border-top: 4px solid; border-left: 4px solid; border-radius: 16px 0 0; }
+.ofi-poi-camera-frame::after { right: -2px; bottom: -2px; border-right: 4px solid; border-bottom: 4px solid; border-radius: 0 0 16px; }
+.ofi-poi-camera-error { position: absolute; inset: auto 16px 16px; padding: 10px 12px; border-radius: 10px; background: rgba(127,29,29,0.9); font-size: 12px; }
+.ofi-poi-camera > footer > span { font-variant-numeric: tabular-nums; color: rgba(255,255,255,0.65); font-size: 12px; }
+.ofi-poi-shutter {
+    display: grid;
+    place-items: center;
+    width: 66px;
+    height: 66px;
+    border: 3px solid #fff;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    transition: transform 100ms ease;
+}
+.ofi-poi-shutter:active { transform: scale(0.9); }
+.ofi-poi-shutter:disabled { opacity: 0.35; cursor: not-allowed; }
+.ofi-poi-shutter > i { width: 52px; height: 52px; border-radius: inherit; background: #fff; }
+.ofi-poi-camera-done { justify-self: end; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: #fff; color: #0f172a; font-weight: 700; cursor: pointer; }
+
+@media (max-width: 640px) {
+    .ofi-poi-filelist { grid-template-columns: 1fr; }
+    .ofi-poi-camera-scrim { padding: 0; align-items: end; }
+    .ofi-poi-camera { width: 100%; border-radius: 24px 24px 0 0; }
+}
+
+/* ── Spalten-Chips (die Vorlage) ───────────────────────────────────────── */
+.ofi-poi-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ofi-poi-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 11px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.ofi-poi-chip:hover { border-color: var(--ofi-cal-accent); color: var(--ofi-cal-accent); }
+.ofi-poi-chip.is-on {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-weight: 600;
+}
+.ofi-poi-chip.is-locked { opacity: 0.75; cursor: default; }
+.ofi-poi-chip.is-locked:hover { border-color: var(--ofi-cal-accent); }
+.ofi-poi-chip em {
+    font-style: normal;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+/* ── Felder ────────────────────────────────────────────────────────────── */
+.ofi-poi-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ofi-poi-field > label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-poi-field input,
+.ofi-poi-field select {
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.ofi-poi-field input:focus,
+.ofi-poi-field select:focus {
+    border-color: var(--ofi-cal-accent);
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint);
+}
+.ofi-poi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+/* ── Umschalter (Preisbasis / Rechenart) ───────────────────────────────── */
+.ofi-poi-seg {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 9px;
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-poi-seg button {
+    height: 28px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.ofi-poi-seg button:hover:not(:disabled) { color: var(--ofi-cal-text); }
+.ofi-poi-seg button.is-on {
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-accent);
+    box-shadow: var(--ofi-cal-shadow-soft);
+}
+/* Eine Berechnungsart, deren Schlüssel in der Vorlage fehlt, ist NICHT wählbar
+   — sie ergäbe überall 0.00, und die Ursache läge unsichtbar in der Vorlage. */
+.ofi-poi-seg button:disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* Ein Umschalter in einem Feld soll seine Breite behalten, nicht die des
+   Feldes annehmen (das Feld ist eine Spalte und streckt seine Kinder). */
+.ofi-poi-field > .ofi-poi-seg { align-self: flex-start; }
+
+.ofi-poi-setting-toggle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 9px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-poi-setting-toggle > svg:first-child { flex: none; color: var(--ofi-cal-accent); }
+.ofi-poi-setting-toggle > svg:last-child { margin-left: auto; transition: transform 140ms ease; }
+.ofi-poi-setting-toggle > svg:last-child.is-open { transform: rotate(180deg); }
+.ofi-poi-setting-toggle > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 1px; }
+.ofi-poi-setting-toggle b { font-size: 12.5px; font-weight: 650; }
+.ofi-poi-setting-toggle small { color: var(--ofi-cal-muted); font-size: 11.5px; }
+.ofi-poi-mode-list { display: grid; gap: 7px; margin-top: 8px; }
+.ofi-poi-vat-setting {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.4fr);
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+}
+.ofi-poi-vat-rates { display: flex; min-height: 36px; align-items: center; gap: 5px; flex-wrap: wrap; }
+.ofi-poi-vat-rates button {
+    height: 28px;
+    padding: 0 9px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+    font-size: 11.5px;
+    font-weight: 650;
+    cursor: pointer;
+}
+.ofi-poi-vat-rates button.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent); }
+.ofi-poi-vat-rates input { width: 64px; height: 30px; padding: 0 7px; text-align: right; font-variant-numeric: tabular-nums; }
+.ofi-poi-vat-rates > span { color: var(--ofi-cal-muted); font-size: 12px; }
+
+/* ── Vorwärts und zurück durch die Vorlagen ───────────────────────────────
+   Vorgabe Samet: «Die Vorlagen erscheinen, und durch Klicken geht es vor und
+   zurück.» Eine Vorlage auf einmal, zwei Pfeile, dazwischen ihr Name — bei
+   drei, vier Vorlagen war eine Liste eine halbe Bildschirmbreite für nichts. */
+.ofi-poi-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-poi-pager > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+}
+.ofi-poi-pager b {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-poi-pager b svg { color: var(--ofi-cal-accent); }
+.ofi-poi-pager span { font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-poi-pager .ofi-poi-iconbtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.ofi-poi-pager .ofi-poi-iconbtn:hover:not(:disabled) { color: var(--ofi-cal-accent); }
+
+/* ── Das X an einem Chip ──────────────────────────────────────────────────
+   Nur der freiwillige Rabatt 2 trägt eines; alle anderen Felder sind fest. */
+.ofi-poi-chipx {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    margin-left: 2px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 22%, transparent);
+    color: inherit;
+    font-size: 9px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+.ofi-poi-chipx:hover { background: color-mix(in srgb, currentColor 42%, transparent); }
+
+/* ── Die drei Möglichkeiten im Rechenfenster ──────────────────────────────── */
+.ofi-poi-modeopt {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    width: 100%;
+    padding: 12px 13px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+.ofi-poi-modeopt + .ofi-poi-modeopt { margin-top: 8px; }
+.ofi-poi-modeopt:hover { border-color: var(--ofi-cal-accent); }
+.ofi-poi-modeopt.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+.ofi-poi-modeopt i {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+}
+.ofi-poi-modeopt.is-on i { background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent); }
+.ofi-poi-modeopt div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-poi-modeopt b { font-size: 13.5px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-poi-modeopt span { font-size: 11.5px; line-height: 1.5; color: var(--ofi-cal-muted); }
+
+/* ── DIE BESTELLSEITE IM RECHENMODUS ──────────────────────────────────────
+   Vorgabe Samet: «Schaltet man den Rechenmodus ein, soll sich der Bildschirm
+   ändern.» Er tut es hier, wo die Zahlen stehen: die Tabelle bekommt den
+   Werkbank-Grund und eine Kante in der Akzentfarbe. Der Wechsel ist eine
+   Blende, keine Bewegung — die Zeilen springen nicht. */
+.ofi-poi-calcpage {
+    border-radius: 12px;
+    padding: 10px;
+    margin: -10px;
+    background: color-mix(in srgb, var(--ofi-cal-accent) 6%, transparent);
+    box-shadow: inset 0 0 0 1px var(--ofi-cal-accent-soft);
+    transition: background-color 260ms ease, box-shadow 260ms ease;
+}
+
+/* ── Die Spalten der Vorlage ──────────────────────────────────────────────
+   Name, Art, weg — mehr braucht eine Spalte nicht, und mehr würde die Liste
+   von acht Zeilen zur Tabelle machen. */
+.ofi-poi-col {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 132px 32px;
+    gap: 8px;
+    align-items: center;
+}
+.ofi-poi-col + .ofi-poi-col { margin-top: 8px; }
+.ofi-poi-col input,
+.ofi-poi-col select {
+    height: 34px;
+    padding: 0 9px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color 140ms ease;
+}
+.ofi-poi-col input:focus,
+.ofi-poi-col select:focus { border-color: var(--ofi-cal-accent); }
+
+/* Der Griff: er sagt, wo man anfasst, und ist der einzige Ort, an dem der
+   Mauszeiger zum Verschieben wird. */
+.ofi-poi-grip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ofi-cal-faint);
+    font-size: 13px;
+    cursor: grab;
+    user-select: none;
+}
+.ofi-poi-col.is-dragging { opacity: 0.45; }
+.ofi-poi-col.is-dragging .ofi-poi-grip { cursor: grabbing; }
+.ofi-poi-colhead {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 132px 32px;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-faint);
+}
+
+/* ── Mengenstaffel ─────────────────────────────────────────────────────── */
+.ofi-poi-tier {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 32px;
+    gap: 8px;
+    align-items: center;
+}
+.ofi-poi-tier + .ofi-poi-tier { margin-top: 8px; }
+.ofi-poi-tier input {
+    height: 34px;
+    padding: 0 9px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 12.5px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+}
+.ofi-poi-tier input:focus { border-color: var(--ofi-cal-accent); }
+.ofi-poi-tierhead {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 32px;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-faint);
+    text-align: right;
+}
+.ofi-poi-iconbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 34px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.ofi-poi-iconbtn:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-danger); }
+
+/* ── Summenkarte (rechte Spalte im Rechenmodus) ────────────────────────── */
+.ofi-poi-sum {
+    position: sticky;
+    top: 0;
+    padding: 15px;
+    border: 1px solid var(--ofi-cal-accent-soft);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow-soft);
+}
+.ofi-poi-sum h4 {
+    margin: 0 0 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-poi-sumrow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text-2);
+}
+.ofi-poi-sumrow b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+}
+.ofi-poi-sumrow.is-muted { color: var(--ofi-cal-muted); }
+.ofi-poi-sumrow.is-total {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    font-size: 14px;
+}
+.ofi-poi-sumrow.is-total b { font-size: 17px; color: var(--ofi-cal-accent); }
+
+/* ── Tabelle der erkannten Positionen ──────────────────────────────────── */
+.ofi-poi-tablewrap {
+    overflow: auto;
+    max-height: 46vh;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+}
+table.ofi-poi-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12.5px;
+}
+table.ofi-poi-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: nowrap;
+}
+table.ofi-poi-table th.is-num,
+table.ofi-poi-table td.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+table.ofi-poi-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    color: var(--ofi-cal-text);
+    vertical-align: top;
+}
+table.ofi-poi-table tr:last-child td { border-bottom: 0; }
+table.ofi-poi-table tbody tr:hover td { background: var(--ofi-cal-hover); }
+table.ofi-poi-table tbody tr.is-off td { opacity: 0.4; }
+/* Eingabe und Merkzeichen stehen NEBENEINANDER, nicht untereinander: ein
+   umbrechendes Staffelzeichen machte die Zeile höher als alle anderen und
+   zerriss die Tabelle. */
+.ofi-poi-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
+}
+table.ofi-poi-table td:not(.is-num) .ofi-poi-cell { justify-content: flex-start; }
+
+table.ofi-poi-table input {
+    width: 100%;
+    min-width: 56px;
+    height: 28px;
+    padding: 0 7px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+/* Bezeichnung und Zusatztext sind Sätze, keine Zahlen — sie brauchen Platz,
+   sonst liest man «Schraube M6 verzin» und muss jede Zeile anklicken. */
+table.ofi-poi-table input.is-wide { min-width: 190px; }
+table.ofi-poi-table input:hover { border-color: var(--ofi-cal-border); }
+table.ofi-poi-table input:focus { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-surface); }
+table.ofi-poi-table input.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Merkzeichen für die greifende Staffel — winzig, aber es beantwortet die
+   Frage «warum steht hier dieser Preis?» ohne Rückfrage. */
+.ofi-poi-tierflag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* ── Fortschritt beim Erkennen ─────────────────────────────────────────── */
+.ofi-poi-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    min-height: 340px;
+    text-align: center;
+}
+.ofi-poi-phases { display: flex; flex-direction: column; gap: 10px; width: min(360px, 100%); }
+.ofi-poi-phase {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+    text-align: left;
+    transition: border-color 200ms ease, color 200ms ease, background-color 200ms ease;
+}
+.ofi-poi-phase.is-active {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-text);
+    font-weight: 600;
+}
+.ofi-poi-phase.is-done { color: var(--ofi-cal-text-2); }
+.ofi-poi-phase i {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--ofi-cal-border);
+    color: var(--ofi-cal-muted);
+    font-style: normal;
+}
+.ofi-poi-phase.is-active i { background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent); }
+.ofi-poi-phase.is-done i { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+.ofi-poi-spin {
+    width: 15px;
+    height: 15px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 999px;
+    animation: ofi-poi-spin 720ms linear infinite;
+}
+@keyframes ofi-poi-spin { to { transform: rotate(360deg); } }
+
+/* ── Nutzung / Kosten ──────────────────────────────────────────────────── */
+.ofi-poi-usage {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.ofi-poi-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ofi-poi-badge b { color: var(--ofi-cal-text); font-variant-numeric: tabular-nums; }
+.ofi-poi-badge.is-accent {
+    border-color: var(--ofi-cal-accent-soft);
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-accent);
+}
+.ofi-poi-badge.is-warn {
+    border-color: color-mix(in srgb, var(--ofi-cal-danger) 30%, transparent);
+    background: color-mix(in srgb, var(--ofi-cal-danger) 8%, transparent);
+    color: var(--ofi-cal-danger);
+}
+
+/* ── Fehlermeldung ─────────────────────────────────────────────────────── */
+.ofi-poi-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 11px 13px;
+    border: 1px solid color-mix(in srgb, var(--ofi-cal-danger) 34%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ofi-cal-danger) 7%, transparent);
+    color: var(--ofi-cal-danger);
+    font-size: 12.5px;
+    line-height: 1.55;
+}
+.ofi-poi-error svg { flex: none; margin-top: 1px; }
+.ofi-poi-error b { display: block; font-weight: 700; }
+.ofi-poi-error span { color: var(--ofi-cal-text-2); }
+
+/* ── PDF-Vorschau (der letzte Schritt) ─────────────────────────────────── */
+.ofi-poi-pdf {
+    width: 100%;
+    height: 52vh;
+    min-height: 320px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface-3);
+}
+
+/* ── Fuss ──────────────────────────────────────────────────────────────── */
+.ofi-poi-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    padding: 12px 16px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-poi-foot .ofi-poi-spacer { margin-left: auto; }
+.ofi-poi-note {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ofi-cal-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-poi-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 15px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 9px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-btn:hover { background: var(--ofi-cal-hover); }
+.ofi-poi-btn:active { transform: scale(0.97); }
+.ofi-poi-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.ofi-poi-btn.is-primary {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-poi-btn.is-primary:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
+
+/* ── Vorlagenliste ─────────────────────────────────────────────────────── */
+.ofi-poi-tpl {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+.ofi-poi-tpl + .ofi-poi-tpl { margin-top: 8px; }
+.ofi-poi-tpl:hover { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+.ofi-poi-tpl div { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ofi-poi-tpl b { font-size: 13px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-poi-tpl span { font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-poi-empty {
+    padding: 28px 12px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Tablet und Telefon ────────────────────────────────────────────────────
+   Unter 1024px hat die Werkbank keinen Platz mehr für zwei Spalten: die
+   Summen rutschen unter die Regler und bleiben oben kleben, damit die Zahl
+   beim Tippen sichtbar bleibt. Unter 640px füllt das Fenster den Schirm —
+   ein Fenster mit Rand auf dem Telefon ist verschenkte Fläche. */
+@media (max-width: 1024px) {
+    .ofi-poi-calcgrid { grid-template-columns: minmax(0, 1fr); }
+    .ofi-poi-sum { position: static; }
+    .ofi-poi-steps .ofi-poi-step b { display: none; }
+    .ofi-poi-steps .ofi-poi-step { padding: 4px; }
+}
+@media (max-width: 640px) {
+    .ofi-poi-scrim { padding: 0; }
+    .ofi-poi { width: 100%; height: 100%; border-radius: 0; border: 0; }
+    .ofi-poi-body { padding: 13px; }
+    .ofi-poi-foot { flex-wrap: wrap; }
+    .ofi-poi-tier,
+    .ofi-poi-tierhead { grid-template-columns: 1fr 1fr 32px; }
+    .ofi-poi-tier input:nth-child(3) { grid-column: 1 / -1; }
+    .ofi-poi-vat-setting { grid-template-columns: 1fr; }
+}
+
+/* =========================================================
+   DIE BELEGSYMBOLE (07.09.2026)
+
+   Vorgabe Samet: «Für PDF, JPG, PNG, XLSX und CSV farbige,
+   drehende Symbole — im Stil von Apple, elegant hellblau —
+   und dazu ein Prozentwert.»
+
+   Der Aufbau kommt aus `import/FileGlyphs.tsx`; hier steht
+   nur, wie er sich bewegt. Zwei Ebenen je Blatt: das äussere
+   `i` trägt die Fächerung (eine WEICHE Änderung beim
+   Überfahren), das innere `span` das Wiegen (eine LAUFENDE
+   Bewegung). Beides in einem Element wäre ein Kampf um
+   dieselbe `transform`-Eigenschaft — die Animation gewänne
+   und der Fächer bliebe stehen.
+   ========================================================= */
+
+/* Das Hellblau ist die einzige feste Farbe hier: es ist der Ton, in dem
+   gelesen wird, und darf im Dunkeln derselbe bleiben — er leuchtet auf
+   beiden Gründen. */
+:root {
+    --ofi-poi-blue: #0a84ff;
+    --ofi-poi-blue-soft: #5ac8fa;
+}
+
+/* ── Der aufgefächerte Stapel ────────────────────────────────────────────── */
+.ofi-poi-deck {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 94px;
+    margin-bottom: 4px;
+    perspective: 620px;
+}
+/* Die Blaetter ueberlappen nur so weit, dass JEDE Endung lesbar bleibt — bei
+   mehr Ueberlappung sieht man fuenf Farben und drei Woerter. */
+.ofi-poi-deck-card {
+    display: block;
+    margin: 0 -5px;
+    transform-origin: 50% 118%;
+    transform: rotate(calc(var(--r) * 8deg)) translateY(calc(var(--r) * var(--r) * 2px));
+    transition: transform 420ms cubic-bezier(0.2, 0.9, 0.3, 1.35);
+    will-change: transform;
+}
+/* ── LEBHAFTER (Vorgabe Samet, 07.09.2026: «die Animationen muessen
+   lebendiger sein») ───────────────────────────────────────────────────────
+   Vorher wogen sich die Blaetter 6px in gut fuenf Sekunden — das sah man erst,
+   wenn man darauf wartete. Jetzt ist es eine WELLE: jedes Blatt steigt 13px,
+   kippt dabei, wird kurz groesser, und weil der Versatz zwischen ihnen groesser
+   ist als frueher, laeuft die Bewegung sichtbar von links nach rechts durch den
+   Stapel. Die Fläche bleibt, wo sie ist — es bewegt sich nur, was darin liegt. */
+.ofi-poi-deck-card > span {
+    display: block;
+    filter: drop-shadow(0 7px 13px rgba(15, 23, 42, 0.2));
+    animation: ofi-poi-bob 2.9s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+    animation-delay: var(--d);
+}
+@keyframes ofi-poi-bob {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+    22% { transform: translateY(-13px) rotate(-6deg) scale(1.06); }
+    48% { transform: translateY(1px) rotate(3deg) scale(0.99); }
+    68% { transform: translateY(-4px) rotate(-1.5deg) scale(1.01); }
+}
+/* Beim Überfahren fächert der Stapel weiter auf und richtet sich auf — die
+   Fläche antwortet, bevor jemand klickt. */
+.ofi-poi-drop:hover .ofi-poi-deck-card,
+.ofi-poi-drop.is-over .ofi-poi-deck-card {
+    margin: 0 3px;
+    transform: rotate(calc(var(--r) * 13deg)) translateY(calc(var(--r) * var(--r) * 1px - 6px)) scale(1.06);
+}
+
+/* ── Das Ablagefeld, freundlicher ────────────────────────────────────────── */
+.ofi-poi-drop { position: relative; overflow: hidden; }
+/* Ein hellblauer Hauch, der von unten aufsteigt, sobald man darüber ist. */
+.ofi-poi-drop::before {
+    content: '';
+    position: absolute;
+    inset: auto -20% -60% -20%;
+    height: 150%;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--ofi-poi-blue) 16%, transparent), transparent);
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 260ms ease, transform 380ms cubic-bezier(0.2, 0.8, 0.3, 1);
+    pointer-events: none;
+}
+.ofi-poi-drop:hover::before,
+.ofi-poi-drop.is-over::before { opacity: 1; transform: none; }
+.ofi-poi-drop.is-over { border-style: solid; }
+.ofi-poi-drop > * { position: relative; }
+
+/* ── Die gewählte Datei ──────────────────────────────────────────────────── */
+.ofi-poi-file .ofi-poi-filecard {
+    flex: none;
+    filter: drop-shadow(0 5px 10px rgba(15, 23, 42, 0.18));
+    animation: ofi-poi-drop-in 380ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+@keyframes ofi-poi-drop-in {
+    from { opacity: 0; transform: translateY(-10px) rotate(-8deg) scale(0.85); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Der Ring beim Lesen ─────────────────────────────────────────────────── */
+.ofi-poi-dial {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 168px;
+    height: 168px;
+    /* Fluchtpunkt fuer das Blatt in der Mitte: ohne ihn waere die Drehung eine
+       Stauchung statt einer Wendung. */
+    perspective: 520px;
+}
+.ofi-poi-dial-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* Der Kreis beginnt oben, nicht rechts. */
+    transform: rotate(-90deg);
+}
+.ofi-poi-dial-track {
+    fill: none;
+    stroke: color-mix(in srgb, var(--ofi-poi-blue) 14%, transparent);
+    stroke-width: 7;
+}
+.ofi-poi-dial-arc {
+    fill: none;
+    stroke: var(--ofi-poi-blue);
+    stroke-width: 7;
+    stroke-linecap: round;
+    /* Der Bogen LÄUFT — er springt nicht von Schritt zu Schritt. */
+    transition: stroke-dashoffset 420ms cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+/* Ein zweiter, weicher Ring darunter: das Leuchten, das den Bogen trägt. */
+.ofi-poi-dial::before {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--ofi-poi-blue-soft) 20%, transparent), transparent 72%);
+    animation: ofi-poi-breathe 1.5s ease-in-out infinite;
+}
+/* Ein WANDERNDES Licht auf der Bahn des Rings: es sagt «es laeuft», auch
+   solange der Bogen selbst zwischen zwei Schritten stillsteht. Ohne das wirkte
+   der Ring bei 42 % wie eingefroren. */
+.ofi-poi-dial-ring::after { content: none; }
+.ofi-poi-dial-spark {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        color-mix(in srgb, var(--ofi-poi-blue-soft) 55%, transparent) 34deg,
+        transparent 70deg,
+        transparent 360deg
+    );
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000 calc(100% - 9px));
+    mask: radial-gradient(closest-side, transparent calc(100% - 9px), #000 calc(100% - 9px));
+    animation: ofi-poi-sweep 1.35s linear infinite;
+    pointer-events: none;
+}
+@keyframes ofi-poi-sweep { to { transform: rotate(360deg); } }
+@keyframes ofi-poi-breathe {
+    0%, 100% { opacity: 0.45; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.06); }
+}
+/* Das Blatt in der Mitte WENDET sich — langsam nach links, langsam nach
+   rechts, mit einem Hauch Neigung dazu. Eine ganze Umdrehung waere reizvoller
+   gewesen und ist verworfen: bei 90 Grad steht ein flaches SVG auf der Kante
+   und verschwindet, bei 180 laeuft die Endung rueckwaerts. So bleibt die
+   Bewegung dreidimensional und die Endung jederzeit lesbar. */
+.ofi-poi-dial-glyph {
+    position: relative;
+    display: block;
+    margin-bottom: 4px;
+    transform-style: preserve-3d;
+    animation: ofi-poi-tumble 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.22));
+}
+@keyframes ofi-poi-tumble {
+    0%, 100% { transform: rotateY(-38deg) rotateZ(-5deg) translateY(0); }
+    50% { transform: rotateY(38deg) rotateZ(5deg) translateY(-5px); }
+}
+/* Die Zahl pulst mit jedem Schritt kurz auf — sie ZAEHLT, sie steht nicht. */
+.ofi-poi-dial-value {
+    position: relative;
+    animation: ofi-poi-count 1.5s ease-in-out infinite;
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--ofi-poi-blue);
+}
+@keyframes ofi-poi-count {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.07); }
+}
+
+/* ── Die Schritte melden sich, wenn sie dran sind ──────────────────────────
+   Der laufende Schritt hebt sich kurz an und bleibt dann leise am Pulsieren:
+   drei stille Kaesten sagten nicht, welcher gerade arbeitet. */
+.ofi-poi-phase.is-active { animation: ofi-poi-phase-in 420ms cubic-bezier(0.22, 1.2, 0.36, 1) both; }
+@keyframes ofi-poi-phase-in {
+    from { transform: translateX(-10px) scale(0.98); opacity: 0.4; }
+    to { transform: none; opacity: 1; }
+}
+.ofi-poi-phase.is-active i { animation: ofi-poi-phase-pulse 1.5s ease-in-out infinite; }
+@keyframes ofi-poi-phase-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ofi-cal-accent) 40%, transparent); }
+    60% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ofi-cal-accent) 0%, transparent); }
+}
+/* Ein erledigter Schritt bekommt seinen Haken mit einem kleinen Sprung. */
+.ofi-poi-phase.is-done i { animation: ofi-poi-phase-done 340ms cubic-bezier(0.22, 1.4, 0.36, 1) both; }
+@keyframes ofi-poi-phase-done {
+    from { transform: scale(0.5); }
+    to { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-poi-deck-card > span,
+    .ofi-poi-dial::before,
+    .ofi-poi-dial-glyph,
+    .ofi-poi-dial-spark,
+    .ofi-poi-dial-value,
+    .ofi-poi-phase.is-active,
+    .ofi-poi-phase.is-active i,
+    .ofi-poi-phase.is-done i,
+    .ofi-poi-file .ofi-poi-filecard { animation: none; }
+    .ofi-poi-dial-spark { display: none; }
+}
+
+/* ── DIE REITERREIHE MIT PFEILEN ──────────────────────────────────────────
+   Vorgabe Samet (07.09.2026): «Wenn die Liste sich füllt, soll es Pfeile vor
+   und zurück geben.» Die Pfeile erscheinen erst, wenn die Reihe wirklich
+   breiter ist als ihr Platz — einer, der nichts zu tun hat, ist nur Betrieb.
+   Die Reihe selbst scrollt dann, statt umzubrechen: eine Vorlage bleibt eine
+   Zeile hoch, egal wie viele es sind. */
+.ofi-poi-tabrail {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.ofi-poi-tabrail .ofi-poi-template-tabs {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+}
+.ofi-poi-tabrail .ofi-poi-template-tabs::-webkit-scrollbar { display: none; }
+.ofi-poi-tabnav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 9px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-poi-tabnav:hover { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); color: var(--ofi-cal-accent); }
+.ofi-poi-tabnav:active { transform: scale(0.92); }
+
+/* =========================================================
+   PROFESSIONAL DOCUMENT ANALYZER (08.09.2026)
+
+   A restrained analysis animation: the scan line moves over the document,
+   detected fields answer in sequence, and the real progress stays separate.
+   ========================================================= */
+
+.ofi-poi-progress {
+    gap: 14px;
+    width: 100%;
+    min-height: 430px;
+    padding: 18px;
+    border: 1px solid color-mix(in srgb, var(--ofi-poi-blue) 14%, var(--ofi-cal-border-soft));
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--ofi-poi-blue-soft) 11%, transparent), transparent 43%),
+        linear-gradient(180deg, color-mix(in srgb, var(--ofi-poi-blue) 3%, var(--ofi-cal-surface)), var(--ofi-cal-surface));
+    overflow: hidden;
+}
+
+.ofi-poi-analyzer {
+    width: min(580px, 100%);
+}
+.ofi-poi-analyzer-scene {
+    position: relative;
+    height: 258px;
+    overflow: hidden;
+    border-radius: 16px;
+    isolation: isolate;
+}
+.ofi-poi-analyzer-scene::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--ofi-poi-blue) 6%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--ofi-poi-blue) 6%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px;
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%);
+    mask-image: radial-gradient(ellipse at center, #000 0%, transparent 72%);
+}
+.ofi-poi-analyzer-halo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: -1;
+    width: 305px;
+    height: 305px;
+    border: 1px solid color-mix(in srgb, var(--ofi-poi-blue) 13%, transparent);
+    border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--ofi-poi-blue) 9%, transparent), transparent 69%);
+    transform: translate(-50%, -50%);
+}
+.ofi-poi-analyzer-halo::before,
+.ofi-poi-analyzer-halo::after {
+    content: '';
+    position: absolute;
+    border: 1px dashed color-mix(in srgb, var(--ofi-poi-blue) 16%, transparent);
+    border-radius: inherit;
+    animation: ofi-poi-analyzer-orbit 18s linear infinite;
+}
+.ofi-poi-analyzer-halo::before { inset: 24px; }
+.ofi-poi-analyzer-halo::after { inset: 55px; animation-direction: reverse; animation-duration: 12s; }
+
+.ofi-poi-analyzer-document {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 420px;
+    max-width: 94%;
+    height: 260px;
+    transform: translateX(-50%);
+    overflow: visible;
+}
+.ofi-poi-analyzer-paper {
+    animation: ofi-poi-analyzer-paper 3.8s ease-in-out infinite;
+    transform-origin: center;
+}
+.ofi-poi-analyzer-scan {
+    animation: ofi-poi-analyzer-scan 2.65s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+.ofi-poi-analyzer-field {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ofi-poi-analyzer-detect 2.65s ease-in-out infinite;
+}
+.ofi-poi-analyzer-field.is-two { animation-delay: 0.34s; }
+.ofi-poi-analyzer-field.is-three { animation-delay: 0.68s; }
+
+.ofi-poi-analyzer-signal {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 35px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid color-mix(in srgb, var(--ofi-poi-blue) 22%, var(--ofi-cal-border-soft));
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 91%, transparent);
+    box-shadow: 0 8px 22px rgba(27, 85, 139, 0.12);
+    color: var(--ofi-poi-blue);
+    font-size: 11px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    animation: ofi-poi-analyzer-signal 2.65s ease-in-out infinite;
+}
+.ofi-poi-analyzer-signal.is-code { top: 70px; left: 13%; }
+.ofi-poi-analyzer-signal.is-value { top: 125px; right: 12%; animation-delay: 0.38s; }
+.ofi-poi-analyzer-signal.is-check { right: 18%; bottom: 39px; color: #18a66b; animation-delay: 0.76s; }
+
+.ofi-poi-analyzer-meter {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--ofi-poi-blue) 14%, var(--ofi-cal-border-soft));
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 92%, transparent);
+    box-shadow: 0 8px 24px rgba(21, 76, 132, 0.07);
+}
+.ofi-poi-analyzer-file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    filter: drop-shadow(0 4px 6px rgba(15, 23, 42, 0.15));
+}
+.ofi-poi-analyzer-track {
+    position: relative;
+    display: block;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ofi-poi-blue) 10%, var(--ofi-cal-surface-3));
+    box-shadow: inset 0 1px 2px rgba(22, 53, 91, 0.08);
+}
+.ofi-poi-analyzer-track > span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    min-width: 8px;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #5ac8fa, var(--ofi-poi-blue), #6266d8);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--ofi-poi-blue) 32%, transparent);
+    transition: width 420ms cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+.ofi-poi-analyzer-track > span::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.58) 48%, transparent 74%);
+    transform: translateX(-110%);
+    animation: ofi-poi-analyzer-shine 1.8s ease-in-out infinite;
+}
+.ofi-poi-analyzer-meter > b {
+    color: var(--ofi-poi-blue);
+    font-size: 15px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.ofi-poi-progress .ofi-poi-phases {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: min(580px, 100%);
+}
+.ofi-poi-progress .ofi-poi-phase {
+    min-width: 0;
+    padding: 9px 10px;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 90%, transparent);
+}
+.ofi-poi-progress .ofi-poi-phase.is-active {
+    border-color: color-mix(in srgb, var(--ofi-poi-blue) 48%, transparent);
+    background: color-mix(in srgb, var(--ofi-poi-blue) 7%, var(--ofi-cal-surface));
+    box-shadow: 0 6px 18px rgba(21, 100, 173, 0.07);
+}
+
+@keyframes ofi-poi-analyzer-paper {
+    0%, 100% { transform: translateY(0) rotate(-0.35deg); }
+    50% { transform: translateY(-5px) rotate(0.35deg); }
+}
+@keyframes ofi-poi-analyzer-scan {
+    0% { transform: translateY(-28px); opacity: 0; }
+    10% { opacity: 1; }
+    86% { opacity: 1; }
+    100% { transform: translateY(112px); opacity: 0; }
+}
+@keyframes ofi-poi-analyzer-detect {
+    0%, 18%, 100% { filter: none; transform: scale(1); }
+    28%, 44% { filter: drop-shadow(0 0 5px rgba(10, 132, 255, 0.28)); transform: scale(1.018); }
+    58% { filter: none; transform: scale(1); }
+}
+@keyframes ofi-poi-analyzer-signal {
+    0%, 17%, 72%, 100% { opacity: 0; transform: translateY(7px) scale(0.94); }
+    29%, 58% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ofi-poi-analyzer-orbit { to { transform: rotate(360deg); } }
+@keyframes ofi-poi-analyzer-shine {
+    0%, 18% { transform: translateX(-110%); }
+    82%, 100% { transform: translateX(110%); }
+}
+
+@media (max-width: 640px) {
+    .ofi-poi-progress { min-height: 410px; padding: 10px; border-radius: 15px; }
+    .ofi-poi-analyzer-scene { height: 235px; }
+    .ofi-poi-analyzer-document { top: -8px; width: 380px; }
+    .ofi-poi-analyzer-signal.is-code { left: 5%; }
+    .ofi-poi-analyzer-signal.is-value { right: 4%; }
+    .ofi-poi-progress .ofi-poi-phases { grid-template-columns: 1fr; gap: 6px; }
+    .ofi-poi-progress .ofi-poi-phase { padding: 7px 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-poi-analyzer-paper,
+    .ofi-poi-analyzer-scan,
+    .ofi-poi-analyzer-field,
+    .ofi-poi-analyzer-signal,
+    .ofi-poi-analyzer-halo::before,
+    .ofi-poi-analyzer-halo::after,
+    .ofi-poi-analyzer-track > span::after { animation: none; }
+    .ofi-poi-analyzer-scan { opacity: 0.65; transform: translateY(52px); }
+    .ofi-poi-analyzer-signal { display: none; }
+}

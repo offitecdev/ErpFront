@@ -1,28 +1,43 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { DocumentWorkspace } from '@/components/sales-document/DocumentWorkspace';
+import { documentLineAmount, documentLineStarted, documentLineValid, documentNumber, emptyDocumentLine, type DocumentLine } from '@/components/sales-document/documentLines';
+import { paymentStagesValid, serializePaymentStages, type PaymentStage } from '@/lib/paymentSchedule';
+import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesPopup } from '@/pages/sales/detail/popups/UnsavedChangesPopup';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { Eye, Plus, Receipt, Trash01 } from '@/components/icons/antIconCompat';
-import { CELL_INPUT_CLASS, SectionCard } from '@/components/ui-shared/TableKit';
+import { Eye, RefreshCcw01, Receipt } from '@/components/icons/antIconCompat';
+import { SectionCard } from '@/components/ui-shared/TableKit';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { t } from '@/i18n/translate';
 import { billingApi } from '@/lib/api/billing';
+import { parsePaymentStages } from '@/lib/paymentSchedule';
+import {
+    applyDiscounts,
+    MAX_LINE_DISCOUNTS,
+    parseDiscountList,
+    serializeDiscountList,
+    type TenderDiscountEntry,
+} from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
-import type { DirectInvoiceLineInput, InvoiceDto } from '@/types/billing';
+import type { DirectInvoiceLineInput, InvoiceDto, InvoiceSectionFlags } from '@/types/billing';
 import { formatAddressLines } from '@/utils/address';
+import { companySenderLine } from '@/utils/pdf/addressBlock';
 
 import { InvoicePdfPopup } from './components/InvoicePdfPopup';
 import {
     InvoiceField,
     InvoicePageHeader,
+    InvoiceProgress,
     InvoiceStepFoot,
-    InvoiceSteps,
     type WizardStep,
 } from './components/InvoiceFormBits';
-import { ArticleLineCell, CustomerPickCell, type CustomerPick } from './components/InvoiceLinePicker';
+import { CustomerPickCell, type CustomerPick } from './components/InvoiceLinePicker';
 import {
+    ALL_SECTIONS,
     apiError,
-    articlePrice,
+    invoiceDiscounts,
     FIELD_INPUT_CLASS,
     FIELD_TEXTAREA_CLASS,
     fmtMoney,
@@ -38,57 +53,54 @@ import {
  * setzen. Man muss sich das PDF als leere Vorlage vorstellen, die wir selbst
  * ausfüllen." Und: Schritt für Schritt statt einer langen Seite —
  *
- *   1 Empfänger   Bestandskunde suchen oder frei erfassen; die Adresse steht in
- *                 ihren Bestandteilen und wird zu ganzen Zeilen gefaltet.
- *   2 Positionen  Katalogprodukt wählen ODER die Zeile selbst tippen, Menge und
- *                 Preis setzen. Hier entsteht der Betrag.
+ *   1 Empfänger   Absenderzeile (aus den Mandanteneinstellungen vorbelegt, aber
+ *                 änderbar) und der Empfänger: Bestandskunde oder frei erfasst.
+ *   2 Beleg       DIE DREI ABSCHNITTE — Positionen · Rabatt · Schlusstext.
+ *                 Jeder einzelne darf entfernt werden und ist dann auch nicht
+ *                 mehr im PDF (Vorgabe Samet, 05.09.2026).
  *   3 Rechnung    Datum, Fälligkeit, Verkäufer, Einleitungstext — Vorschau und
  *                 erstellen.
  *
- * Sie hängt an keinem Auftrag und an keinem Projekt: Empfänger, Steuersatz und
- * Einleitungstext stehen auf der Rechnung SELBST (es gibt keine Offerte, aus der
- * sie nachgeladen werden könnten), und die Positionen SIND der Betrag. Ihre
- * Rechnungsart ist deshalb immer die GESAMTRECHNUNG — das steht im dritten
- * Schritt als Marke, damit es nicht erraten werden muss.
+ * Sie hängt an keinem Auftrag und an keinem Projekt: Empfänger, Steuersatz,
+ * Einleitungstext, Rabatte und Schlusstext stehen auf der Rechnung SELBST (es
+ * gibt keine Offerte, aus der sie nachgeladen werden könnten), und die
+ * Positionen SIND der Betrag. Ihre Rechnungsart ist deshalb immer die
+ * GESAMTRECHNUNG — das steht im dritten Schritt als Marke, damit es nicht
+ * erraten werden muss.
  *
- * Preise sind netto — dieselbe Lesart wie im Angebot; die MWST steht als eigene
- * Zeile unter dem Netto. Die Vorschau baut das ECHTE Dokument aus dem Entwurf,
- * bevor irgendetwas gespeichert ist.
+ * Preise sind netto — dieselbe Lesart wie im Angebot; die Rabatte greifen
+ * NACHEINANDER auf die Zwischensumme, die MWST rechnet auf dem Ergebnis. Die
+ * Vorschau baut das ECHTE Dokument aus dem Entwurf, bevor irgendetwas
+ * gespeichert ist.
  */
 
-let lineSeed = 0;
-
-interface DraftLine {
-    key: string;
-    /** Katalogartikel, aus dem die Zeile stammt — leer heisst handgetippt. */
-    articleId: string | null;
-    description: string;
-    unit: string;
-    quantity: string;
-    unitPrice: string;
-}
-
-const emptyLine = (): DraftLine => ({
-    key: `line-${lineSeed += 1}`,
-    articleId: null,
-    description: '',
-    unit: '',
-    quantity: '1',
-    unitPrice: '',
-});
-
-const num = (value: string): number => {
-    const parsed = Number(String(value).replace(',', '.'));
-    return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const lineAmount = (line: DraftLine) => round2(num(line.quantity) * num(line.unitPrice));
+const emptyLine = emptyDocumentLine;
+const num = (value: string) => documentNumber(value) || 0;
+const lineAmount = documentLineAmount;
+const lineDiscounts = (line: DocumentLine) => line.discounts;
 
 export const InvoiceDirectPage = () => {
     const navigate = useNavigate();
+    /* `?edit=<id>` — dieselbe Maske schreibt eine BESTEHENDE Direktrechnung
+       neu (Vorgabe Samet 05.09.2026). Nummer und Zahlungsstand bleiben beim
+       Beleg; hier wird nur sein Inhalt bearbeitet. */
+    const [searchParams] = useSearchParams();
+    const editId = searchParams.get('edit');
     const settings = usePdfSettings();
 
     const [step, setStep] = useState(0);
+
+    /* Die Absenderzeile ist aus den MANDANTENEINSTELLUNGEN vorbelegt (die
+       Firmenangaben des gewählten Mandanten, siehe `usePdfSettings`), bleibt
+       aber änderbar — und wird mit der Rechnung EINGEFROREN. Eine später
+       geänderte Firmenadresse schreibt eine gestellte Rechnung nicht um.
+
+       Sie betrifft nur die gedruckte Zeile: der Gläubiger des QR-Zahlteils
+       kommt weiterhin aus den Einstellungen, weil er mit dem Bankkonto
+       übereinstimmen MUSS — sonst wäre der Einzahlungsschein nicht mehr
+       gültig. */
+    const defaultSender = useMemo(() => companySenderLine(settings), [settings]);
+    const [senderAddress, setSenderAddress] = useState(defaultSender);
 
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [recipientName, setRecipientName] = useState('');
@@ -108,23 +120,115 @@ export const InvoiceDirectPage = () => {
     const [notes, setNotes] = useState('');
     const [vatRateText, setVatRateText] = useState(() => String(Number(settings.vatRate) || 8.1));
 
-    const [lines, setLines] = useState<DraftLine[]>(() => [emptyLine()]);
+    /* ── Die drei Abschnitte ───────────────────────────────────────────────
+       Welche gedruckt werden. Ein ausgeschalteter Abschnitt behält seinen
+       Inhalt (Entfernen ist keine Löschung), wird aber weder gerechnet noch
+       gedruckt. */
+    /* Die drei Abschnitte gibt es als SCHALTER nicht mehr (Vorgabe Samet
+       05.09.2026: ein Kasten, keine nummerierten Abschnitte). Das Feld bleibt
+       im Beleg, damit ältere Rechnungen unverändert drucken — eine neue
+       Direktrechnung führt schlicht alle drei. */
+    const sections: InvoiceSectionFlags = ALL_SECTIONS;
+
+    const [lines, setLines] = useState<DocumentLine[]>(() => [emptyLine()]);
+    const [stages, setStages] = useState<PaymentStage[]>([]);
+    const [discounts, setDiscounts] = useState<TenderDiscountEntry[]>([]);
+    // Der Schlusstext steht als Vorschlag da: die Zahlungsbedingung aus den
+    // Firmeneinstellungen — der Satz, den die Rechnung sonst ohnehin drucken
+    // würde. Wer ihn leert, druckt genau diesen Vorgabesatz.
+    const [closingText, setClosingText] = useState(() => (settings.paymentTerms || '').trim());
+
     const [saving, setSaving] = useState(false);
+    /* Die Nummer, die diese Rechnung bekommen wird. Sie steht schon in der
+       Vorschau, statt «Entwurf» zu schreiben (Vorgabe Samet 05.09.2026) — der
+       Server gibt sie aus, ohne den Zähler zu bewegen. */
+    const [nextNumber, setNextNumber] = useState<string | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        void billingApi.nextInvoiceNumber().then((number) => { if (!cancelled) setNextNumber(number); });
+        return () => { cancelled = true; };
+    }, []);
+
+    /* Bearbeiten: den Beleg holen und die Maske damit fuellen. Der Server
+       liefert ihn mit Zeilen; Rabatte und Zahlungsplan stehen als JSON darin. */
+    const [editing, setEditing] = useState<InvoiceDto | null>(null);
+    useEffect(() => {
+        if (!editId) return undefined;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const invoices = await billingApi.listInvoices({});
+                const found = invoices.find((row) => row.id === editId) || null;
+                if (cancelled) return;
+                if (!found) { toast.error(t('crm.order_not_found')); navigate('/sales/invoices'); return; }
+                setEditing(found);
+                setCustomerId(found.customerId ?? null);
+                setRecipientName(found.recipientName || found.customer?.companyName || '');
+                setStreet((found.recipientAddress || '').split('\n')[0] || '');
+                setCity((found.recipientAddress || '').split('\n').slice(1).join(' ').trim());
+                setInvoiceDate((found.invoiceDate || found.createdAt || '').slice(0, 10));
+                setDueDate((found.dueDate || found.invoiceDate || '').slice(0, 10));
+                setSalesperson(found.salespersonName || '');
+                setCommission(found.commissionNumber || '');
+                setIntroText(found.introText || '');
+                setNotes(found.notes || '');
+                setVatRateText(String(found.vatRate ?? settings.vatRate ?? 8.1));
+                setClosingText(found.closingText || '');
+                setSenderAddress(found.senderAddress || defaultSender);
+                setDiscounts(invoiceDiscounts(found));
+                setStages(parsePaymentStages(found.paymentStages ?? null) ?? []);
+                setLines((found.lineItems || []).length
+                    ? (found.lineItems || []).map((item) => ({
+                        ...emptyLine(),
+                        id: item.id,
+                        articleId: item.sourceId ?? null,
+                        description: item.description,
+                        longDescription: item.longDescription || '',
+                        unit: item.unit || '',
+                        quantity: String(item.quantity ?? 1),
+                        unitPrice: String(item.unitAmount ?? 0),
+                        discounts: parseDiscountList(item.discounts ?? null, MAX_LINE_DISCOUNTS),
+                    }))
+                    : [emptyLine()]);
+                // Ein geladener Beleg ist der Ausgangsstand — sonst fragte die
+                // Maske beim Verlassen nach, ohne dass jemand etwas tippte.
+                setStep(1);
+            } catch (error) {
+                if (!cancelled) toast.error(apiError(error, t('billing.invoiceError')));
+            } finally {
+                /* nichts weiter: die Maske steht schon, sie füllt sich nur. */
+            }
+        })();
+        return () => { cancelled = true; };
+        // Absichtlich nur beim Aufbau: die Maske wird je Rechnung neu betreten.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editId]);
 
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
+    const snapshot = JSON.stringify({ senderAddress, customerId, recipientName, street, supplement, postalCode, city, country, invoiceDate, dueDate, salesperson, commission, introText, notes, vatRateText, sections, lines, discounts, closingText, stages });
+    const [initialSnapshot] = useState(snapshot);
+    const guard = useUnsavedChangesGuard(snapshot !== initialSnapshot);
+
     const vatRate = Math.max(0, num(vatRateText));
-    const netTotal = useMemo(() => round2(lines.reduce((sum, line) => sum + lineAmount(line), 0)), [lines]);
+
+    /* Zwischensumme → Rabatte (der Reihe nach, jeder auf den Rest des vorigen)
+       → Netto → MWST → Total. Ist der Rabattabschnitt entfernt, wird der Stapel
+       gar nicht erst angewendet: der Betrag steigt dann, und genau das ist der
+       Sinn des Entfernens. */
+    const subtotal = useMemo(() => round2(lines.reduce((sum, line) => sum + lineAmount(line), 0)), [lines]);
+    // Eigenes `useMemo`: eine bedingt gebaute Liste wäre bei JEDEM Rendern eine
+    // neue Kennung und machte die Erinnerung darunter wertlos.
+    const activeDiscounts = useMemo(
+        () => (sections.discount ? discounts : []),
+        [sections.discount, discounts],
+    );
+    const breakdown = useMemo(() => applyDiscounts(subtotal, activeDiscounts), [subtotal, activeDiscounts]);
+    const netTotal = round2(breakdown.remaining);
     const vatTotal = round2((netTotal * vatRate) / 100);
     const grossTotal = round2(netTotal + vatTotal);
-
-    const patchLine = (key: string, patch: Partial<DraftLine>) =>
-        setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-
-    const removeLine = (key: string) =>
-        setLines((prev) => (prev.length <= 1 ? [emptyLine()] : prev.filter((line) => line.key !== key)));
 
     /* Ein Bestandskunde füllt den Empfängerblock aus seiner Adresse; danach darf
        jedes Feld noch von Hand geändert werden — die Rechnung friert ihren
@@ -151,6 +255,7 @@ export const InvoiceDirectPage = () => {
 
     const payload = () => ({
         customerId,
+        paymentStages: stages,
         recipientName: recipientName.trim(),
         recipientAddress: recipientAddress || null,
         introText: introText.trim() || null,
@@ -160,17 +265,28 @@ export const InvoiceDirectPage = () => {
         commissionNumber: commission.trim() || null,
         vatRate,
         notes: notes.trim() || null,
+        // Die drei Abschnitte: der Server rechnet den Rabatt nur, wenn sein
+        // Abschnitt eingeschaltet ist, und speichert genau diese Schalter.
+        sections,
+        discounts: activeDiscounts,
+        closingText: sections.closing ? (closingText.trim() || null) : null,
+        // Sie wird IMMER mitgespeichert, auch unverändert: die Rechnung soll
+        // in einem Jahr noch den Absender zeigen, mit dem sie gestellt wurde —
+        // nicht den, der dann in den Einstellungen steht.
+        senderAddress: senderAddress.trim() || null,
         lines: filledLines.map<DirectInvoiceLineInput>((line) => ({
             description: line.description.trim(),
+            longDescription: line.longDescription.trim() || null,
             quantity: num(line.quantity),
             unitAmount: num(line.unitPrice),
             unit: line.unit.trim() || null,
+            discounts: lineDiscounts(line),
             articleId: line.articleId,
         })),
     });
 
     const recipientReady = Boolean(recipientName.trim());
-    const linesReady = filledLines.length > 0 && grossTotal > 0;
+    const linesReady = filledLines.length > 0 && grossTotal > 0 && lines.filter(documentLineStarted).every(documentLineValid);
     const furthest = recipientReady ? (linesReady ? 2 : 1) : 0;
 
     const validate = (): boolean => {
@@ -184,6 +300,11 @@ export const InvoiceDirectPage = () => {
             setStep(1);
             return false;
         }
+        if (stages.length && !paymentStagesValid(stages)) {
+            toast.error(t('crm.addon.paymentIncompleteShort'));
+            setStep(1);
+            return false;
+        }
         return true;
     };
 
@@ -191,7 +312,9 @@ export const InvoiceDirectPage = () => {
      * Vorschau des Entwurfs: aus den Feldern wird eine Rechnung GEBAUT, wie der
      * Server sie speichern würde, und durch denselben Generator geschickt.
      * Gezeigt wird damit das echte Dokument — nur die Nummer fehlt noch, denn
-     * die vergibt der Server erst beim Erstellen.
+     * die vergibt der Server erst beim Erstellen. Weil auch die Abschnitte
+     * mitgehen, zeigt die Vorschau schon, was das Entfernen eines Abschnitts
+     * auf dem Papier bedeutet.
      */
     const preview = async () => {
         if (!validate()) return;
@@ -206,7 +329,7 @@ export const InvoiceDirectPage = () => {
                 customerId,
                 projectId: null,
                 salesOrderId: null,
-                invoiceNumber: t('invoices.draftNumber'),
+                invoiceNumber: editing?.invoiceNumber || nextNumber || t('invoices.draftNumber'),
                 billingType: 'FULL',
                 kind: 'RECHNUNG',
                 invoiceDate: body.invoiceDate,
@@ -221,21 +344,34 @@ export const InvoiceDirectPage = () => {
                 recipientName: body.recipientName,
                 recipientAddress: body.recipientAddress,
                 introText: body.introText,
+                paymentStages: serializePaymentStages(stages),
                 vatRate,
+                sections: JSON.stringify(sections),
+                discounts: serializeDiscountList(activeDiscounts),
+                closingText: body.closingText,
+                senderAddress: body.senderAddress,
                 issuedByEmployeeId: '',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 category: 'DIRECT',
-                lineItems: body.lines.map((line, index) => ({
+                // Die Zeilen des Entwurfs tragen dieselben Felder, die der
+                // Server speichern würde — inklusive Beschreibung und
+                // Zeilenrabatt, damit die Vorschau die Tabelle zeigt, die
+                // gedruckt wird.
+                lineItems: filledLines.map((line, index) => ({
                     id: `draft-${index}`,
                     invoiceId: 'draft',
-                    description: line.description,
+                    description: line.description.trim(),
+                    longDescription: line.longDescription.trim() || null,
                     sourceType: line.articleId ? 'EXTRA_MATERIAL' : 'MANUAL',
                     sourceId: line.articleId ?? null,
-                    quantity: Number(line.quantity) || 0,
-                    unitAmount: Number(line.unitAmount) || 0,
-                    lineTotal: round2((Number(line.quantity) || 0) * (Number(line.unitAmount) || 0)),
-                    unit: line.unit ?? null,
+                    quantity: num(line.quantity),
+                    unitAmount: num(line.unitPrice),
+                    // NETTO nach Zeilenrabatt — genau wie serverseitig.
+                    lineTotal: lineAmount(line),
+                    discounts: serializeDiscountList(lineDiscounts(line)),
+                    discount: applyDiscounts(num(line.quantity) * num(line.unitPrice), line.discounts).combinedPercent || null,
+                    unit: line.unit.trim() || null,
                     sortOrder: index,
                 })),
             };
@@ -249,15 +385,21 @@ export const InvoiceDirectPage = () => {
         }
     };
 
-    const create = async () => {
-        if (!validate()) return;
+    const create = async (exit = true) => {
+        if (saving || !validate()) return false;
         setSaving(true);
         try {
-            const { invoice } = await billingApi.createDirectInvoice(payload());
-            toast.success(t('invoices.created', { number: invoice.invoiceNumber }));
-            navigate('/sales/invoices');
+            const { invoice } = editId
+                ? await billingApi.updateDirectInvoice(editId, payload())
+                : await billingApi.createDirectInvoice(payload());
+            toast.success(editId
+                ? t('invoices.saved', { number: invoice.invoiceNumber })
+                : t('invoices.created', { number: invoice.invoiceNumber }));
+            if (exit) navigate('/sales/invoices');
+            return true;
         } catch (e) {
             toast.error(apiError(e, t('billing.invoiceError')));
+            return false;
         } finally {
             setSaving(false);
         }
@@ -265,54 +407,50 @@ export const InvoiceDirectPage = () => {
 
     const STEPS: WizardStep[] = [
         { key: 'recipient', label: t('invoices.stepRecipient'), hint: t('invoices.stepHintRecipient') },
-        { key: 'positions', label: t('invoices.stepPositions'), hint: t('invoices.stepHintPositions') },
+        { key: 'document', label: t('invoices.stepDocument'), hint: t('invoices.stepHintDocument') },
         { key: 'invoice', label: t('invoices.stepDetails'), hint: t('invoices.stepHintInvoice') },
     ];
 
-    const colLabel = {
-        description: t('invoices.colDescription'),
-        unit: t('invoices.colUnit'),
-        qty: t('invoices.colQty'),
-        price: t('invoices.colUnitPrice'),
-        sum: t('invoices.colLineTotal'),
-    };
-
-    const sums = (
-        <div className="ofi-invp-sums">
-            <div className="ofi-invp-sum">
-                <span className="ofi-invp-sum__label">{t('invoices.netTotal')}</span>
-                <span className="ofi-invp-sum__value">{fmtMoney(netTotal)}</span>
-            </div>
-            <div className="ofi-invp-sum">
-                <span className="ofi-invp-sum__label">
-                    {t('invoices.vat')}
-                    <input
-                        type="number"
-                        step="0.1"
-                        aria-label={t('invoices.vatRate')}
-                        className="ofi-invp-vat"
-                        value={vatRateText}
-                        onChange={(event) => setVatRateText(event.target.value)}
-                    />
-                    %
-                </span>
-                <span className="ofi-invp-sum__value">{fmtMoney(vatTotal)}</span>
-            </div>
-            <div className="ofi-invp-sum is-total">
-                <span className="ofi-invp-sum__label">{t('invoices.grossTotal')}</span>
-                <span className="ofi-invp-sum__value">{fmtMoney(grossTotal)}</span>
-            </div>
-        </div>
-    );
-
     return (
         <div className="ofi-invp-page">
-            <InvoicePageHeader title={t('invoices.directTitle')} />
-
-            <InvoiceSteps steps={STEPS} current={step} furthest={furthest} onGo={setStep} />
+            {/* Der Fortschritt steht NEBEN dem Titel: ein schmaler Balken mit
+                drei Marken statt der früheren Leiter mit Erklärsätzen
+                (Vorgabe Samet 05.09.2026). */}
+            <InvoicePageHeader
+                title={editing ? `${t('common.edit')} ${editing.invoiceNumber}` : t('invoices.directTitle')}
+                actions={<InvoiceProgress steps={STEPS} current={step} furthest={furthest} onGo={setStep} />}
+            />
 
             {step === 0 && (
-                <SectionCard title={`${t('invoices.stepCounter', { n: 1, total: STEPS.length })} · ${t('invoices.stepRecipient')}`}>
+                <SectionCard>
+                    {/* Absender: vorbelegt aus den Mandanteneinstellungen, hier
+                        änderbar — und mit der Rechnung eingefroren. */}
+                    <div className="ofi-invp-grid ofi-invp-grid--split">
+                        {/* EIN Feld für EINE Zeile: der Beleg druckt den Absender
+                            als einzelne Zeile über dem Empfängerblock (sie
+                            schrumpft, wenn sie lang wird, aber sie bricht nie um)
+                            — ein Absatzfeld würde Umbrüche versprechen, die das
+                            PDF nicht halten kann. */}
+                        <InvoiceField label={t('invoices.senderAddress')} hint={t('invoices.senderHint')} wide>
+                            <input
+                                className={FIELD_INPUT_CLASS}
+                                value={senderAddress}
+                                onChange={(event) => setSenderAddress(event.target.value)}
+                            />
+                        </InvoiceField>
+                        <div className="ofi-invp-senderfoot">
+                            <button
+                                type="button"
+                                className="ofi-invp-sec__restore"
+                                disabled={senderAddress.trim() === defaultSender}
+                                onClick={() => setSenderAddress(defaultSender)}
+                            >
+                                <RefreshCcw01 size={13} />
+                                {t('invoices.senderReset')}
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="ofi-invp-grid ofi-invp-grid--split">
                         <InvoiceField label={t('invoices.recipientPick')} hint={t('invoices.createDirectHint')}>
                             <CustomerPickCell
@@ -356,106 +494,27 @@ export const InvoiceDirectPage = () => {
             )}
 
             {step === 1 && (
-                <SectionCard
-                    title={`${t('invoices.stepCounter', { n: 2, total: STEPS.length })} · ${t('invoices.stepPositions')}`}
-                    action={
-                        <button
-                            type="button"
-                            onClick={() => setLines((prev) => [...prev, emptyLine()])}
-                            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
-                        >
-                            <Plus size={13} />
-                            {t('invoices.addLine')}
-                        </button>
-                    }
-                >
-                    {/* Der Positionseditor rollt auf schmalen Geräten seitwärts —
-                        wie der Bestelleditor im Lager; die Karte selbst bleibt an
-                        ihrem Platz. */}
-                    <div className="overflow-x-auto">
-                        <table data-inv-table data-grid-lines data-unstyled-table className="w-full" style={{ minWidth: 780 }}>
-                            <colgroup>
-                                <col style={{ width: 46 }} />
-                                {/* Bezeichnung: keine Breite, sie nimmt den Rest. */}
-                                <col />
-                                <col style={{ width: 112 }} />
-                                <col style={{ width: 100 }} />
-                                <col style={{ width: 132 }} />
-                                <col style={{ width: 132 }} />
-                                <col style={{ width: 54 }} />
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th className="text-left">{t('invoices.colPos')}</th>
-                                    <th className="text-left">{colLabel.description}</th>
-                                    <th className="text-left">{colLabel.unit}</th>
-                                    <th className="text-right">{colLabel.qty}</th>
-                                    <th className="text-right">{colLabel.price}</th>
-                                    <th className="text-right">{colLabel.sum}</th>
-                                    <th aria-label={t('common.actions')} />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {lines.map((line, index) => (
-                                    <tr key={line.key}>
-                                        <td className="text-slate-400 dark:text-white/40">{index + 1}</td>
-                                        <td>
-                                            <ArticleLineCell
-                                                value={line.description}
-                                                onChange={(next) => patchLine(line.key, { description: next, articleId: null })}
-                                                onPick={(article) => patchLine(line.key, {
-                                                    articleId: article.id,
-                                                    description: article.name,
-                                                    unit: article.unit || '',
-                                                    unitPrice: String(articlePrice(article)),
-                                                })}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                className={CELL_INPUT_CLASS}
-                                                value={line.unit}
-                                                onChange={(event) => patchLine(line.key, { unit: event.target.value })}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                className={`${CELL_INPUT_CLASS} text-right font-mono`}
-                                                value={line.quantity}
-                                                onChange={(event) => patchLine(line.key, { quantity: event.target.value })}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                type="number"
-                                                step="0.05"
-                                                className={`${CELL_INPUT_CLASS} text-right font-mono`}
-                                                value={line.unitPrice}
-                                                onChange={(event) => patchLine(line.key, { unitPrice: event.target.value })}
-                                            />
-                                        </td>
-                                        <td className="text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white">
-                                            {fmtMoney(lineAmount(line))}
-                                        </td>
-                                        <td className="text-right">
-                                            <button
-                                                type="button"
-                                                className="ofi-invp-glyph is-danger"
-                                                title={t('invoices.removeLine')}
-                                                onClick={() => removeLine(line.key)}
-                                            >
-                                                <Trash01 size={15} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {sums}
+                <SectionCard>
+                    {/* EIN Kasten: die Zeilen, und darüber Anschreiben,
+                        Zahlungsplan, Schlusstext und Rabatt als Reiter. Die
+                        drei nummerierten Abschnitte sind entfallen — was der
+                        Beleg trägt, steht in der Fläche selbst. */}
+                    <DocumentWorkspace
+                        lines={lines}
+                        onChange={setLines}
+                        coverLetter={introText}
+                        onCoverLetterChange={setIntroText}
+                        stages={stages}
+                        onStagesChange={setStages}
+                        discounts={discounts}
+                        onDiscountsChange={setDiscounts}
+                        closingText={closingText}
+                        onClosingTextChange={setClosingText}
+                        closingPlaceholder={(settings.paymentTerms || '').trim() || t('invoices.closingPlaceholder')}
+                        vat={{ rate: vatRate, onRateChange: (rate) => setVatRateText(String(rate)) }}
+                                               formatMoney={fmtMoney}
+                        readOnly={saving}
+                    />
 
                     <InvoiceStepFoot
                         stepIndex={1}
@@ -470,7 +529,7 @@ export const InvoiceDirectPage = () => {
             )}
 
             {step === 2 && (
-                <SectionCard title={`${t('invoices.stepCounter', { n: 3, total: STEPS.length })} · ${t('invoices.stepDetails')}`}>
+                <SectionCard>
                     {/* Die Rechnungsart steht als Marke da, statt erraten zu
                         werden: eine Direktrechnung ist immer eine Gesamtrechnung. */}
                     <div className="ofi-invp-pad">
@@ -486,8 +545,13 @@ export const InvoiceDirectPage = () => {
                                 <div className="ofi-invp-tile__value">{recipientName || '—'}</div>
                             </div>
                             <div className="ofi-invp-tile">
-                                <div className="ofi-invp-tile__label">{t('invoices.stepPositions')}</div>
-                                <div className="ofi-invp-tile__value">{filledLines.length}</div>
+                                <div className="ofi-invp-tile__label">{t('invoices.stepDocument')}</div>
+                                <div className="ofi-invp-tile__value">
+                                    {t('invoices.sectionCount', {
+                                        on: Object.values(sections).filter(Boolean).length,
+                                        total: 3,
+                                    })}
+                                </div>
                             </div>
                             <div className="ofi-invp-tile is-open">
                                 <div className="ofi-invp-tile__label">{t('invoices.grossTotal')}</div>
@@ -563,9 +627,11 @@ export const InvoiceDirectPage = () => {
                 </SectionCard>
             )}
 
+            <UnsavedChangesPopup open={guard.isOpen} saving={saving} onCancel={guard.cancel} onDiscard={guard.proceed}
+                onSave={() => void create(false).then((saved) => { if (saved) guard.proceed(); })} />
             <InvoicePdfPopup
                 open={previewOpen}
-                title={t('invoices.previewTitle', { number: t('invoices.draftNumber') })}
+                title={t('invoices.previewTitle', { number: editing?.invoiceNumber || nextNumber || t('invoices.draftNumber') })}
                 subtitle={`${t('invoices.category_DIRECT')} · ${fmtMoney(grossTotal)}`}
                 blob={previewBlob}
                 loading={previewLoading}

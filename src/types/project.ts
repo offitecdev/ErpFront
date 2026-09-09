@@ -151,6 +151,31 @@ export interface AppointmentDto {
     }>;
 }
 
+/**
+ * ── WAS AN EINEM PROJEKT NOCH OFFENSTEHT (06.09.2026) ────────────────────────
+ * Gelöscht wird nur ein Projekt ohne jede Verknüpfung; storniert wird es nicht
+ * von oben, sondern es fällt mit seinem letzten aktiven Auftrag. Was im Weg
+ * steht, sagen die beiden Sperrlisten.
+ */
+export type ProjectLifecycleBlocker =
+    | 'CANCELLED' | 'SALES_ORDER' | 'INVOICE' | 'REPORT' | 'DELIVERY_REPORT' | 'STOCK_MOVEMENT';
+
+export interface ProjectLifecycleDto {
+    status: ProjectStatus;
+    cancelled: boolean;
+    cancelReason?: string | null;
+    orderCount: number;
+    activeOrderCount: number;
+    invoices: number;
+    reports: number;
+    deliveryReports: number;
+    stockMovements: number;
+    deleteBlockers: ProjectLifecycleBlocker[];
+    cancelBlockers: ProjectLifecycleBlocker[];
+    canDelete: boolean;
+    canCancel: boolean;
+}
+
 export interface ProjectSalesOrder {
     id: string;
     tenantId: string;
@@ -162,6 +187,13 @@ export interface ProjectSalesOrder {
     orderNumber: string;
     orderType: string;
     status: string;
+    /**
+     * STORNO (Vorgabe Samet 06.09.2026): gesetzt = dieser Auftrag ist
+     * zurueckgenommen. Er bleibt in der Liste stehen, zaehlt aber nicht mehr
+     * — weder zum Projektstand noch zur Fakturierung.
+     */
+    cancelledAt?: string | null;
+    cancelReason?: string | null;
     totalAmount: number;
     createdByEmployeeId?: string;
     createdAt: string;
@@ -194,6 +226,9 @@ export interface ProjectDto {
     projectNumber?: string;
     projectName: string;
     status: ProjectStatus;
+    /** STORNO (06.09.2026): gesetzt = das Projekt ist zurueckgenommen. */
+    cancelledAt?: string | null;
+    cancelReason?: string | null;
     plannedBudget: number;
     actualCost: number;
     overtimeHourlyRate?: number;

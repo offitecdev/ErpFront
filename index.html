@@ -10,14 +10,14 @@
   <!-- PWA: makes the panel installable as a standalone desktop/mobile app. -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-  <meta name="application-name" content="Offitec ERP" />
+  <meta name="application-name" content="Offitec Control Center" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Offitec" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#08090a" media="(prefers-color-scheme: dark)" />
   <!-- Roboto Variable is bundled with the critical application stylesheet. -->
-  <title>Offitec Management Panel</title>
+  <title>Offitec Control Center</title>
   <script>
     // Paint-critical decisions that cannot wait for the app bundle: the
     // boot splash below must match the persisted theme (no white flash in
@@ -101,7 +101,7 @@
        tasks check, the mailbox's Outlook mark) reuse them with their own
        palette. Rename here = rename there.
        Dark mode keys on `html.sk-dark` (boot-time) OR `html.dark` (runtime). */
-    html { background: #f6f8fb; }
+    html { background: #ffffff; }
     html.sk-dark { background: #08090a; }
     /* The app stylesheet resets this too, but that file is applied after
        first paint — without the reset here everything shifts 8px when it
@@ -116,8 +116,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #f6f8fb;
-      font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+      background: #ffffff;
+      font-family: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       transition: opacity .38s ease, visibility 0s linear .38s;
     }
     html.sk-dark #ofi-splash { background: #08090a; }
@@ -364,7 +364,7 @@
       stroke-dashoffset: 1;
       animation: ofi-splash-draw .6s cubic-bezier(.3, .7, .3, 1) .44s forwards;
     }
-    /* Fixed line boxes: Open Sans arrives with font-display: swap, and
+    /* Fixed line boxes: Inter Variable arrives with font-display: swap, and
        without a locked height the fallback→webfont swap would nudge the
        block (layout shift). */
     .ofi-splash-text {
@@ -493,7 +493,7 @@
       </div>
       <div class="ofi-splash-text">
         <div class="ofi-splash-brand">Offitec</div>
-        <div class="ofi-splash-sub">Management Panel</div>
+        <div class="ofi-splash-sub">Control Center</div>
       </div>
     </div>
   </div>

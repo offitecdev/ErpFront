@@ -80,15 +80,37 @@ export interface TenderPdfData {
      * Doluysa belgenin EN SONUNA "Zahlungsplan" tablosu eklenir; tutarlar burada
      * DEĞİL, basılan genel toplamdan türetilir — plan ile toplam asla ayrışmaz.
      * Vade tarihleri yalnızca siparişte vardır; teklif tarafında `date` null olur
-     * ve tablo o sütunu hiç çizmez.
+     * ve tablo o sütunu hiç çizmez. `label` taksitin serbest metnidir ("vor
+     * Montage"); en az bir taksitte doluysa açıklama sütunu çizilir.
      */
-    paymentStages?: Array<{ percent: number; date?: string | null }> | null;
+    paymentStages?: Array<{ percent: number; date?: string | null; label?: string | null }> | null;
     /**
      * "Zahlungsbedingungen" kartını basar. Ödeme koşulu bir ödeme talimatıdır ve
      * ancak FATURA aşamasında anlamlıdır; teklif belgesi bunu göstermez
      * (kullanıcı isteği 16.08.2026). Teklifin ödeme cevabı Zahlungsplan'dır.
      */
     showPaymentTerms?: boolean;
+    /**
+     * Text der "Zahlungsbedingungen"-Karte. Leer = der Satz aus den
+     * Firmeneinstellungen. Die Direktrechnung schickt hier ihren SCHLUSSTEXT:
+     * der Abschnitt ist auf dem Beleg frei geschrieben, die Karte ist nur der
+     * Platz, an dem er steht (siehe `showPaymentTerms` für das Abschalten).
+     */
+    paymentTermsText?: string | null;
+    /**
+     * true: die Positionstabelle wird NICHT gezeichnet — der Beleg springt vom
+     * Titel direkt auf den Summenblock. Der Abschnitt „Positionen" einer
+     * Direktrechnung ist damit entfernbar, ohne dass der Betrag verschwindet
+     * (er bleibt die Summe der erfassten Zeilen).
+     */
+    hidePositionsTable?: boolean;
+    /**
+     * Absenderzeile über dem Empfängerblock. Leer = die Zeile aus den
+     * Firmeneinstellungen (`companySenderLine`). Betrifft NUR den Druck: der
+     * Gläubiger des QR-Zahlteils kommt weiterhin aus den Einstellungen, weil
+     * er mit dem Bankkonto übereinstimmen MUSS.
+     */
+    senderLine?: string | null;
     referenceNumber?: string;
     qrBillEnabled?: boolean;
     /** PDF dili (indirmeden önce seçilir). Varsayılan: Almanca. */
@@ -182,6 +204,22 @@ export interface PdfStrings {
     confirmationNumber: string;
     /** Datum der Auftragsbestätigung (Entstehung des Auftrags). */
     confirmationDate: string;
+    /**
+     * NACHTRAG (05.09.2026) — der eigene Beleg eines Zusatzauftrags (NT-…):
+     * Titel, Nummernbeschriftung, die Zeilen der Infokarte (Hauptauftrag,
+     * Projekt) und der Standard-Einleitungssatz, in dem `{{order}}` die Nummer
+     * des Hauptauftrags ist. Gesetzt wird er in `utils/pdf/addonOrderPdf.ts`.
+     */
+    addonTitle: string;
+    addonNumber: string;
+    addonParentOrder: string;
+    addonProject: string;
+    addonIntro: string;
+    /** Positionsart «Mehrarbeit» — Überzeit aus einem Rapport. */
+    addonOvertime: string;
+    /** Mengeneinheiten der Nachtragszeilen: Stunden (Mehrarbeit), pauschal (freie Zeile). */
+    unitHours: string;
+    unitFlat: string;
     /** Yansız tarih etiketi — "Angebotsdatum" yalnızca teklif için doğrudur. */
     docDate: string;
     greeting: string;
@@ -206,6 +244,16 @@ export interface PdfStrings {
     planIntro: string;
     planStage: string;
     planDue: string;
+    /**
+     * Freitext der Rate — «vor Montage». Die Spalte wird nur gedruckt, wenn
+     * mindestens eine Rate einen Text trägt.
+     */
+    planNote: string;
+    /**
+     * Überschrift der Prozentspalte. Sie heisst «Zahlungsanteil» und nicht mehr
+     * «Anteil» (Vorgabe 03.09.2026): neben dem Freitext muss die Spalte allein
+     * sagen, wovon sie den Anteil nennt.
+     */
     planShare: string;
     planAmount: string;
     planTotal: string;
@@ -237,6 +285,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         confirmationTitle: 'Sipariş Onayı',
         confirmationNumber: 'Sipariş Onay No :',
         confirmationDate: 'Sipariş Tarihi:',
+        addonTitle: 'Ek Sipariş',
+        addonNumber: 'Ek Sipariş No :',
+        addonParentOrder: 'Sipariş:',
+        addonProject: 'Proje:',
+        addonIntro: '{{order}} numaralı siparişe ek sipariş. Aşağıdaki pozisyonlar mevcut siparişi tamamlar ve ayrıca faturalandırılır.',
+        addonOvertime: 'Ek çalışma',
+        unitHours: 'sa.',
+        unitFlat: 'götürü',
         docDate: 'Tarih:',
         greeting: 'Sayın Yetkili,',
         intro: 'Talebiniz için teşekkür ederiz. Aşağıda teklifimizi memnuniyetle sunarız. Pozisyonların ayrıntılı dökümünü ilerleyen sayfalarda bulabilirsiniz.',
@@ -259,7 +315,8 @@ const I18N: Record<PdfLang, PdfStrings> = {
         planIntro: 'Faturalandırma aşağıdaki ödeme planına göre yapılır.',
         planStage: 'Taksit',
         planDue: 'Vade',
-        planShare: 'Oran',
+        planNote: 'Açıklama',
+        planShare: 'Ödeme Payı',
         planAmount: 'Tutar',
         planTotal: 'Toplam',
         vatIdLabel: 'Vergi No',
@@ -288,6 +345,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         confirmationTitle: 'Auftragsbestätigung',
         confirmationNumber: 'Auftragsbestätigung-Nr. :',
         confirmationDate: 'Auftragsdatum:',
+        addonTitle: 'Nachtrag',
+        addonNumber: 'Nachtrag-Nr. :',
+        addonParentOrder: 'Auftrag:',
+        addonProject: 'Projekt:',
+        addonIntro: 'Nachtrag zum Auftrag {{order}}. Die nachfolgenden Positionen ergänzen den bestehenden Auftrag und werden zusätzlich verrechnet.',
+        addonOvertime: 'Mehrarbeit',
+        unitHours: 'Std.',
+        unitFlat: 'Pau.',
         docDate: 'Datum:',
         greeting: 'Sehr geehrte Damen und Herren',
         intro: 'Vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen nachfolgend unser Angebot. Eine detaillierte Aufstellung der Positionen finden Sie auf den folgenden Seiten.',
@@ -310,7 +375,8 @@ const I18N: Record<PdfLang, PdfStrings> = {
         planIntro: 'Die Rechnungsstellung erfolgt gemäss nachstehendem Zahlungsplan.',
         planStage: 'Rate',
         planDue: 'Fällig am',
-        planShare: 'Anteil',
+        planNote: 'Beschreibung',
+        planShare: 'Zahlungsanteil',
         planAmount: 'Betrag',
         planTotal: 'Gesamt',
         vatIdLabel: 'MWST-Nr.',
@@ -339,6 +405,14 @@ const I18N: Record<PdfLang, PdfStrings> = {
         confirmationTitle: 'Order Confirmation',
         confirmationNumber: 'Order Confirmation No. :',
         confirmationDate: 'Order Date:',
+        addonTitle: 'Additional Order',
+        addonNumber: 'Additional Order No. :',
+        addonParentOrder: 'Order:',
+        addonProject: 'Project:',
+        addonIntro: 'Additional order to order {{order}}. The positions below supplement the existing order and are charged in addition.',
+        addonOvertime: 'Additional work',
+        unitHours: 'h',
+        unitFlat: 'flat',
         docDate: 'Date:',
         greeting: 'Dear Sir or Madam,',
         intro: 'Thank you for your enquiry. We are pleased to submit our offer below. A detailed breakdown of the positions can be found on the following pages.',
@@ -361,7 +435,8 @@ const I18N: Record<PdfLang, PdfStrings> = {
         planIntro: 'Invoicing follows the payment schedule set out below.',
         planStage: 'Instalment',
         planDue: 'Due on',
-        planShare: 'Share',
+        planNote: 'Description',
+        planShare: 'Payment Share',
         planAmount: 'Amount',
         planTotal: 'Total',
         vatIdLabel: 'VAT No.',
@@ -440,7 +515,15 @@ const FS_HEADER = 8.9;    // Sütun adları — gövdeden ayırt edilecek kadar 
 const LH_TITLE = 4.7;
 const LH_BODY = 4.4;
 const UNIT_GAP = 4.2;
-const IMG_SIZE = 24;      // Ürün görseli — 20 mm küçüktü, 28 mm satırı fazla yükseltti
+// Ürün görseli: sabit bir ÇERÇEVEYE (en × boy) kendi oranı korunarak sığdırılır
+// — asla kareye çekilip bozulmaz. Yatay fotoğraflar çerçevenin genişliğine,
+// dikeyler yüksekliğine dayanır; böylece satırdan satıra aynı boyda dururlar ve
+// hiçbiri çerçevenin boyunu aşamaz. (Eskiden 24 mm KARE idi: 20 kare küçük,
+// 28 kare satırı fazla yükseltiyordu — ve yatay bir fotoğraf o kareye
+// sıkıştırılınca hem uzuyor hem bozuluyordu. 04.09.2026: «görsellerin
+// yüksekliği hâlâ fazla, orantısı doğru olsun».)
+const IMG_BOX_W = 36;
+const IMG_BOX_H = 20;
 // Satır içeriği HER ZAMAN başlık → paragraf → görsel sırasıyla dizilir; üç blok
 // arasındaki boşluk tek bir değerden gelir. Ölçü, metin bloklarında SATIR
 // ARALIĞINA eklenir (dolayısıyla gözle görülen aralık ~2.8 mm'dir).
@@ -781,7 +864,13 @@ async function renderTenderPdfBytes(
     // Faturalar kapak sayfası istemez: tablo başlığın hemen altında, İLK
     // sayfada başlar. Teklifler eskisi gibi 2. sayfadan devam eder.
     const st: TableState = { y: 0, rowIdx: 0 };
-    if (data.startTableOnFirstPage && coverEndY + 30 <= CONTENT_BOTTOM) {
+    // Abschnitt „Positionen" entfernt: weder Tabellenkopf noch Zeilen — der
+    // Beleg geht vom Titel direkt auf den Summenblock (der Betrag bleibt, er
+    // ist die Summe der erfassten Zeilen).
+    const withTable = !data.hidePositionsTable;
+    if (!withTable) {
+        st.y = coverEndY + 6;
+    } else if (data.startTableOnFirstPage && coverEndY + 30 <= CONTENT_BOTTOM) {
         st.y = drawTableHeader(doc, coverEndY + 6, L);
     } else {
         doc.addPage();
@@ -789,7 +878,7 @@ async function renderTenderPdfBytes(
     }
 
     let drawn = 0;
-    for (const pos of data.positions) {
+    for (const pos of (withTable ? data.positions : [])) {
         if (pos.isSectionSubtotal) {
             if (st.y + 10 > CONTENT_BOTTOM) newTablePage(doc, st, L);
             st.y = drawSectionSubtotal(doc, st.y, pos.total ?? 0, fmt, L);
@@ -1133,7 +1222,8 @@ function drawCoverPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L
     // altında müşterinin (montaj yerinin) adresi.
     const addrX = 112;
     const addrW = MR - addrX;
-    const sender = companySenderLine(s);
+    // Eine eigene Absenderzeile des Belegs schlägt die Firmeneinstellung.
+    const sender = (data.senderLine || '').trim() || companySenderLine(s);
     doc.setFont(FONT, 'normal');
     doc.setTextColor(...C.MUTED);
     drawFittedSingleLine(doc, sender, addrX, y0, addrW, 7.5, 5.8);
@@ -1262,7 +1352,12 @@ function splitPosLabel(short: string): { pos: string; text: string } {
 function rowHasOwnAmount(pos: TenderPdfData['positions'][number]): boolean {
     const qty = pos.quantity || 0;
     const unitPrice = pos.unitPrice ?? 0;
-    return (pos.lineTotal ?? 0) > 0 || (qty > 0 && unitPrice > 0);
+    // NEGATIV zählt mit: eine Gutschrift oder die Ausgleichszeile eines alten
+    // Nachtrags IST eine Position mit eigenem Betrag. Nur die Null bleibt, was
+    // sie war — ein Kapitel ohne Zahlenspalten. `drawNumerics` prüft dasselbe;
+    // die beiden Bedingungen müssen gleich bleiben, sonst landet ein
+    // Kapitelband unter einer bepreisten Zeile.
+    return (pos.lineTotal ?? 0) !== 0 || (qty > 0 && unitPrice !== 0);
 }
 
 /** Bu satır türleri her zaman POZİSYON/metin satırıdır — asla kapitel olmaz. */
@@ -1322,13 +1417,44 @@ type RowAtom =
     | { kind: 'lines'; lines: string[]; font: 'normal' | 'bold'; size: number; lineH: number; indent: number; color?: readonly [number, number, number] }
     // Zengin metin paragrafı: kalın/italik/renk KORUNUR, madde imleri desteklenir.
     | { kind: 'rich'; lines: RichVisualLine[]; bullet: boolean; size: number; lineH: number }
-    | { kind: 'image'; url: string; alias?: string; h: number }
+    | { kind: 'image'; url: string; alias?: string; w: number; h: number }
     | { kind: 'gap'; h: number };
 
 function detectImageFormat(dataUrl: string): 'PNG' | 'JPEG' | 'AUTO' {
     if (dataUrl.startsWith('data:image/png')) return 'PNG';
     if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
     return 'AUTO' as any;
+}
+
+// Görselin çerçeve içindeki basılı ölçüsü (mm). Piksel oranı okunur ve görsel
+// çerçeveye "contain" mantığıyla sığdırılır: hangi kenar önce dayanırsa o
+// kenar çerçeveye eşitlenir, öteki oranla küçülür.
+//
+// `getImageProperties` görselin başlığını çözer; aynı satır ölçüm ve çizim
+// için birden çok kez kurulduğundan sonuç BELGE başına önbelleğe alınır.
+// Anahtar görselin kendisi (data-URI) — bir WeakMap ile belgeye bağlı, belge
+// gittiğinde megabaytlık dizeler de gider. Okunamayan bir görsel (ör. WebP,
+// SVG) eskisi gibi kare olarak ölçülür; çizim zaten try/catch içindedir.
+type ImageFit = { w: number; h: number };
+const imageFitByDoc = new WeakMap<jsPDF, Map<string, ImageFit>>();
+function fitProductImage(doc: jsPDF, url: string): ImageFit {
+    let cache = imageFitByDoc.get(doc);
+    if (!cache) {
+        cache = new Map();
+        imageFitByDoc.set(doc, cache);
+    }
+    const hit = cache.get(url);
+    if (hit) return hit;
+    let fit: ImageFit = { w: IMG_BOX_H, h: IMG_BOX_H };
+    try {
+        const props = doc.getImageProperties(url);
+        if (props.width > 0 && props.height > 0) {
+            const ratio = Math.min(IMG_BOX_W / props.width, IMG_BOX_H / props.height);
+            fit = { w: props.width * ratio, h: props.height * ratio };
+        }
+    } catch { /* bilinmeyen biçim: kare varsayımıyla ölçülür */ }
+    cache.set(url, fit);
+    return fit;
 }
 
 function normalizeTrackedLetters(line: string): string {
@@ -1461,12 +1587,14 @@ function buildRowAtoms(doc: jsPDF, pos: TenderPdfData['positions'][number]): { a
     // Görsel satırın EN SONUNDA durur: başlık → paragraf → görsel. Üstündeki ve
     // altındaki boşluk, başlık ile paragraf arasındakiyle aynı görünür.
     if (pos.imageUrl) {
+        const fit = fitProductImage(doc, pos.imageUrl);
         atoms.push({ kind: 'gap', h: IMAGE_TOP_GAP });
         atoms.push({
             kind: 'image',
             url: pos.imageUrl,
             alias: pos.sourceArticleId ? `art-${pos.sourceArticleId}` : undefined,
-            h: IMG_SIZE,
+            w: fit.w,
+            h: fit.h,
         });
         atoms.push({ kind: 'gap', h: IMAGE_BOTTOM_GAP });
     }
@@ -1612,14 +1740,19 @@ function drawNumerics(doc: jsPDF, pos: TenderPdfData['positions'][number], baseY
         drawFittedRight(doc, '—', C_QTY_R, W_QTY, baseY, 'normal');
     }
 
-    drawFittedRight(doc, unitPrice > 0 ? fmtUnitPrice(unitPrice) : '—', C_UP_R, W_UP, baseY, 'normal');
+    // Ein NEGATIVER Preis ist eine gültige Zeile (Gutschrift, Ausgleich) und
+    // wird gedruckt; nur die leere Null bleibt ein Strich.
+    drawFittedRight(doc, unitPrice !== 0 ? fmtUnitPrice(unitPrice) : '—', C_UP_R, W_UP, baseY, 'normal');
     discountColumnLines(pos).forEach((line, index) => {
         drawFittedRight(doc, line, C_DISC_R, W_DISC, baseY + index * DISC_LINE_H, 'normal');
     });
     doc.setTextColor(...C.LABEL);
     drawFittedRight(doc, fmtVatRate(taxRate || 8.1), C_VAT_R, W_VAT, baseY, 'normal');
     doc.setTextColor(...C.TEXT);
-    if (total > 0) {
+    // Auch ein negativer Betrag gehört in die Spalte: sonst stünde eine
+    // Ausgleichszeile ohne Zahl da und die Spalte ginge nicht auf (der
+    // Nachtrag eines alten Zusatzauftrags braucht genau das).
+    if (total !== 0) {
         drawFittedRight(doc, fmt(total), C_PRICE_R, W_PRICE, baseY, 'bold');
         doc.setFont(FONT, 'normal');
     }
@@ -1700,7 +1833,7 @@ function drawRowAtomic(
         if (atom.kind === 'gap') { cy += atom.h; continue; }
         if (atom.kind === 'image') {
             try {
-                doc.addImage(atom.url, detectImageFormat(atom.url) as any, descX, cy, IMG_SIZE, IMG_SIZE, atom.alias, 'NONE');
+                doc.addImage(atom.url, detectImageFormat(atom.url) as any, descX, cy, atom.w, atom.h, atom.alias, 'NONE');
             } catch { /* bozuk görsel satırı düşürmesin */ }
             cy += atom.h;
             continue;
@@ -1764,7 +1897,7 @@ function drawRowFlowing(
         if (atom.kind === 'image') {
             if (cy - 3 + atom.h > CONTENT_BOTTOM) cy = breakPage();
             try {
-                doc.addImage(atom.url, detectImageFormat(atom.url) as any, descX, cy, IMG_SIZE, IMG_SIZE, atom.alias, 'NONE');
+                doc.addImage(atom.url, detectImageFormat(atom.url) as any, descX, cy, atom.w, atom.h, atom.alias, 'NONE');
             } catch { /* bozuk görsel satırı düşürmesin */ }
             cy += atom.h;
             continue;
@@ -1842,18 +1975,21 @@ const TERMS_LINE_H = 4.4;
  */
 const wantsPaymentTerms = (data: TenderPdfData) => data.showPaymentTerms === true;
 
-/** Ayarlarda metin varsa o, boşsa belge dilinin varsayılan cümlesi. */
-const paymentTermsText = (s: PdfCompanySettings, L: PdfStrings) =>
-    (s.paymentTerms || '').trim() || L.paymentTermsFallback;
+/**
+ * Belgenin KENDİ metni (faturanın Schlusstext'i) varsa o; yoksa ayarlardaki
+ * cümle, o da boşsa belge dilinin varsayılanı.
+ */
+const paymentTermsText = (data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings) =>
+    (data.paymentTermsText || '').trim() || (s.paymentTerms || '').trim() || L.paymentTermsFallback;
 
 /**
  * Ödeme koşulu kartının yüksekliği. Sarma genişliği `drawTermsCard` ile
  * BİREBİR aynı olmalı — ayrışırsa ölçü bir satır eksik çıkar ve kart taşar.
  */
-function measureTermsCard(doc: jsPDF, s: PdfCompanySettings, L: PdfStrings): number {
+function measureTermsCard(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings): number {
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
-    const lines = doc.splitTextToSize(paymentTermsText(s, L), TERMS_CARD_W - TERMS_PAD * 2 - 2) as string[];
+    const lines = doc.splitTextToSize(paymentTermsText(data, s, L), TERMS_CARD_W - TERMS_PAD * 2 - 2) as string[];
     return TERMS_PAD * 2 + 4.6 + lines.length * TERMS_LINE_H;
 }
 
@@ -1865,7 +2001,7 @@ function measureTotalsBlock(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettin
     const discountRows = (data.totals?.discounts ?? []).filter((entry) => (entry?.amount ?? 0) > 0).length;
     const rowCount = (discountRows > 0 ? 1 + discountRows : 0) + 2; // [Zwischensumme + Rabatte] + Netto + MwSt.
     const totalsH = rowCount * TOTALS_ROW_H + 1 + TOTALS_BAND_H;
-    const termsH = wantsPaymentTerms(data) ? measureTermsCard(doc, s, L) : 0;
+    const termsH = wantsPaymentTerms(data) ? measureTermsCard(doc, data, s, L) : 0;
     return Math.max(totalsH, termsH) + 4;
 }
 
@@ -1873,10 +2009,10 @@ function measureTotalsBlock(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettin
  * "Zahlungsbedingungen" kartı — toplam sütununun SOLUNDA, onunla aynı hizada;
  * bilgi kartıyla aynı dil: açık zemin, ince çerçeve, solda lacivert şerit.
  */
-function drawTermsCard(doc: jsPDF, y: number, s: PdfCompanySettings, L: PdfStrings): number {
+function drawTermsCard(doc: jsPDF, y: number, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings): number {
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
-    const lines = doc.splitTextToSize(paymentTermsText(s, L), TERMS_CARD_W - TERMS_PAD * 2 - 2) as string[];
+    const lines = doc.splitTextToSize(paymentTermsText(data, s, L), TERMS_CARD_W - TERMS_PAD * 2 - 2) as string[];
     const h = TERMS_PAD * 2 + 4.6 + lines.length * TERMS_LINE_H;
 
     doc.setFillColor(...C.CARD_BG);
@@ -1987,7 +2123,7 @@ function drawTotals(
 
     // Ödeme koşulu kartı toplam sütunuyla AYNI hizada başlar (soldaki boş alan)
     // ve yalnızca faturada çizilir.
-    const termsBottom = wantsPaymentTerms(data) ? drawTermsCard(doc, blockTop, s, L) : 0;
+    const termsBottom = wantsPaymentTerms(data) ? drawTermsCard(doc, blockTop, data, s, L) : 0;
     doc.setFont(FONT, 'normal');
     doc.setTextColor(...C.TEXT);
     return Math.max(y, termsBottom);
@@ -2000,10 +2136,31 @@ function drawTotals(
 const PLAN_HEAD_H = 8;
 const PLAN_ROW_H = 7;
 const PLAN_TITLE_H = 11;
-// Sütunlar: Rate (sol) · Fällig am (sol) · Anteil (sağ) · Betrag (sağ).
-const PLAN_C_DUE = 62;
-const PLAN_C_SHARE_R = 132;
+// Sütunlar: Rate (sol) · Beschreibung (sol) · Fällig am (sol) · Zahlungsanteil
+// (sağ) · Betrag (sağ). Serbest metin, taksit numarasının sağındaki BOŞ alanı
+// doldurur; oran sütunu ona yer açmak için sağa kaydırıldı.
+// 46 mm: İngilizce "1. Instalment" etiketi 9 punto kalınla ~24 mm sürer,
+// açıklama sütunu ondan sonra başlamalı.
+const PLAN_C_NOTE = 46;
+const PLAN_C_DUE = 104;
+const PLAN_C_SHARE_R = 155;
 const PLAN_C_AMOUNT_R = C_PRICE_R;
+
+/** Bir taksitin serbest metni — boşluklar temizlenmiş; yoksa boş dize. */
+const stageNote = (stage: { label?: string | null }) => (stage.label || '').trim();
+
+/**
+ * Serbest metin hücresi: önce punto kademeli küçültülür, o da yetmezse metin
+ * ilk satırda kesilip "…" ile kapatılır — komşu sütuna asla taşmaz.
+ */
+function drawPlanNote(doc: jsPDF, text: string, x: number, maxW: number, baseY: number) {
+    doc.setFont(FONT, 'normal');
+    fitFontSize(doc, text, maxW, FS_BASE - 0.3, 7);
+    const lines = doc.splitTextToSize(text, maxW) as string[];
+    doc.setTextColor(...C.TEXT);
+    doc.text(lines.length > 1 ? `${lines[0]}…` : (lines[0] || ''), x, baseY);
+    doc.setFontSize(FS_BASE);
+}
 
 /** Geçerli taksitler: yüzdesi olan satırlar; hiç yoksa tablo çizilmez. */
 const planStages = (data: TenderPdfData) =>
@@ -2027,6 +2184,8 @@ function drawPaymentPlan(
 
     const grand = data.totals?.grossTotal ?? data.grandTotal;
     const showDue = stages.some((stage) => Boolean(stage.date));
+    // Boş bir sütun başlığı basmayalım: metin girilmemişse tablo eskisi gibi kalır.
+    const showNote = stages.some((stage) => Boolean(stageNote(stage)));
     const blockH = PLAN_TITLE_H + 6 + PLAN_HEAD_H + stages.length * PLAN_ROW_H + PLAN_ROW_H + 2;
 
     y += 12;
@@ -2055,7 +2214,12 @@ function drawPaymentPlan(
     doc.setFontSize(FS_HEADER);
     doc.setTextColor(...C.NAVY);
     const headY = y + PLAN_HEAD_H / 2 + 1.3;
+    // Metin sütunu, sağındaki başlığın SOLUNDA biter: "Zahlungsanteil" uzun bir
+    // kelime, genişliği ölçülmezse açıklama onun altına girer.
+    const noteRight = showDue ? PLAN_C_DUE : PLAN_C_SHARE_R - doc.getTextWidth(L.planShare);
+    const noteMaxW = Math.max(20, noteRight - PLAN_C_NOTE - 3);
     doc.text(L.planStage, ML + 3, headY);
+    if (showNote) doc.text(L.planNote, PLAN_C_NOTE, headY);
     if (showDue) doc.text(L.planDue, PLAN_C_DUE, headY);
     doc.text(L.planShare, PLAN_C_SHARE_R, headY, { align: 'right' });
     doc.text(L.planAmount, PLAN_C_AMOUNT_R, headY, { align: 'right' });
@@ -2073,6 +2237,9 @@ function drawPaymentPlan(
         doc.setFontSize(FS_BASE);
         doc.setTextColor(...C.TEXT);
         doc.text(`${index + 1}. ${L.planStage}`, ML + 3, baseY);
+
+        const note = stageNote(stage);
+        if (showNote && note) drawPlanNote(doc, note, PLAN_C_NOTE, noteMaxW, baseY);
 
         if (showDue) {
             doc.setFont(FONT, 'normal');

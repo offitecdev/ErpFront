@@ -7,7 +7,7 @@ const createMainWindow = async () => {
     height: 860,
     minWidth: 1024,
     minHeight: 700,
-    title: 'Offitec ERP',
+    title: 'Offitec Control Center',
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#f6f7fb',

@@ -507,7 +507,7 @@ export const WhatsNewPopup = () => {
                         <div className="ofi-upd__brand">
                             {/* Die drei Speichen tragen die Töne des Startvorhangs. */}
                             <OffitecMark size={26} spokes={['#ffffff', '#c9d4ff', '#ff9ea3']} dot="#ffffff" />
-                            <span>Offitec ERP</span>
+                            <span>Offitec Control Center</span>
                         </div>
                         <span className="ofi-upd__badge">
                             {note.badge || t('updates.badgeNew')}

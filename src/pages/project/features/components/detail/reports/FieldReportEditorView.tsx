@@ -3,20 +3,22 @@ import { createPortal } from 'react-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { Check, ClockRewind, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
+import { ClockRewind, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
 import { Button } from '@/components/ui-shared/Button';
 import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols } from '@/components/ui-shared/TableKit';
 import { SignaturePad } from '@/components/ui-shared/SignaturePad';
 import { PopupDialog, PopupEmpty } from '@/components/ui-shared/PopupKit';
-import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
+import { TimeField } from '@/components/ui-shared/TimeField';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 import type { ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 import { MontageImageUpload } from '@/pages/montage/components/MontageImageUpload';
 
+import { ReportArticlePicker } from './ReportArticlePicker';
+
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
-import { displayExpenseType, durationFmt, money, numberFmt } from '../../../utils/projectFormatters';
+import { displayExpenseType, durationFmt, money } from '../../../utils/projectFormatters';
 import { orderPayloadId } from '../../../utils/projectOrderScope';
 import { appointmentDuration } from '../../../utils/projectAppointments';
 // Shared field-report operations parser — keeps this editor and the technician
@@ -407,54 +409,34 @@ export const FieldReportEditorView = ({
     const [focusedResourceKey, setFocusedResourceKey] = useState<string | null>(null);
 
     /**
-     * EIN Feld, MEHRERE Artikel (Vorgabe Samet, 02.09.2026): «im Fenster, in
-     * dem wir Produkte hinzufügen, sollen wir mehrere hinzufügen können — im
-     * selben Eingabefeld, und wenn wir mehr als einen wählen, sollen sie sich
-     * nach UNTEN stapeln; ein Klick daneben schliesst.»
+     * ARTIKEL KOMMEN AUS DEM FENSTER (Vorgabe Samet, 02.09.2026): «die Wahl
+     * soll modern sein und als Fenster aufgehen — und was schon hinzugefügt
+     * ist, soll gar nicht mehr in der Liste stehen.»
      *
-     * Der Griff dazu: ein Treffer füllt die angefasste EINGABEZEILE, direkt
-     * darunter entsteht sofort die nächste leere Zeile und der Fokus wandert
-     * mit. Die Trefferliste hängt am Feld, also rutscht sie eine Zeile nach
-     * unten und bleibt offen — für den Benutzer sieht es aus, als sammle
-     * dasselbe Feld einen Stapel ein. Geschlossen wird mit einem Klick daneben
-     * oder Esc (AnchoredPicker).
-     *
-     * Eine SCHON gefüllte Zeile (gespeichert oder bereits mit Artikel) wird nur
-     * ersetzt: dort korrigiert man, man sammelt nicht — eine leere Folgezeile
-     * wäre dort nur Ballast.
+     * Damit ist die alte Trefferliste am Tabellenfeld weg. Ein gewählter
+     * Artikel legt sich als NEUE Zeile unten an, verschwindet im selben
+     * Augenblick aus der Liste des Fensters (`pickedMaterialIds`) und kann
+     * darum kein zweites Mal in denselben Rapport geraten. Das Fenster bleibt
+     * offen, bis der Monteur alles beisammen hat.
      */
-    const pickMaterial = (key: string, material: ProjectMaterial) => {
-        const target = rows.find((row) => row.key === key);
-        const patch = {
-            kind: 'extra' as const,
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const addMaterialRow = (material: ProjectMaterial) => {
+        if (pickedMaterialIds.has(material.id)) return;
+        setRows((current) => [...current, {
+            key: nextRowKey(),
+            kind: 'extra',
             materialId: material.id,
             text: material.name,
-            quantity: Number(target?.quantity) > 0 ? Number(target?.quantity) : 1,
+            quantity: 1,
+            amount: 0,
             unitPrice: Number(material.unitCost) || 0,
-        };
-        if (!target || target.id || target.materialId) { patchRow(key, patch); return; }
-        const nextKey = nextRowKey();
-        setRows((current) => {
-            const index = current.findIndex((row) => row.key === key);
-            if (index < 0) return current;
-            return [
-                ...current.slice(0, index),
-                { ...current[index], ...patch },
-                { key: nextKey, kind: 'expense', text: '', quantity: 1, amount: 0, unitPrice: 0 },
-                ...current.slice(index + 1),
-            ];
-        });
-        setFocusedResourceKey(nextKey);
+        }]);
     };
 
-    const addResourceRow = () => {
-        const existingBlank = rows.find((row) => !row.id && !rowHasContent(row));
-        if (existingBlank) {
-            setFocusedResourceKey(existingBlank.key);
-            return;
-        }
+    /** Freier Text aus demselben Fenster — er wird zu «Externe Kosten». */
+    const addExternalCostRow = (text: string) => {
         const key = nextRowKey();
-        setRows((current) => [...current, { key, kind: 'expense', text: '', quantity: 1, amount: 0, unitPrice: 0 }]);
+        setRows((current) => [...current, { key, kind: 'expense', text, quantity: 1, amount: 0, unitPrice: 0 }]);
         setFocusedResourceKey(key);
     };
 
@@ -693,14 +675,17 @@ export const FieldReportEditorView = ({
                     <span className="ofi-ios-row__value is-strong">{apptDate.format('DD.MM.YYYY')}</span>
                 </div>
                 {/* Both times belong to the appointment's own day, so neither may
-                    run past 23:59 into the next one. */}
+                    run past 23:59 into the next one — `TimeField` kennt nur die
+                    24 Stunden EINES Tages und kann darum gar nicht darüber
+                    hinauslaufen. Gewählt wird im Fenster, nicht im Browserfeld
+                    (Vorgabe Samet, 02.09.2026). */}
                 <div className="ofi-ios-row">
                     <span className="ofi-ios-row__label">{t('common.start')}</span>
-                    <input type="time" min="00:00" max="23:59" disabled={disabled} className="ofi-ios-time" value={start} onChange={(e) => setStart(e.target.value)} />
+                    <TimeField label={t('common.start')} value={start} onChange={setStart} disabled={disabled} />
                 </div>
                 <div className="ofi-ios-row">
                     <span className="ofi-ios-row__label">{t('common.end')}</span>
-                    <input type="time" min="00:00" max="23:59" disabled={disabled} className="ofi-ios-time" value={end} onChange={(e) => setEnd(e.target.value)} />
+                    <TimeField label={t('common.end')} value={end} onChange={setEnd} disabled={disabled} />
                 </div>
                 <div className="ofi-ios-row">
                     <span className="ofi-ios-row__label">{t('projects.calisilan_saat')}</span>
@@ -815,9 +800,10 @@ export const FieldReportEditorView = ({
             )}
 
             {tab === 'expenses' && (<>
-            {/* Tek, düz kaynak tablosu. Boş giriş satırı sürekli görünmez:
-                alttaki «Hinzufügen»-Zeile anında yeni satırı açar ve odaklar. */}
-            <IosGroup title={t('projects.reportsHub.resources')} footer={disabled ? undefined : t('projects.reportsHub.multiPickHint')}>
+            {/* Tek, düz kaynak tablosu. Yeni satırlar alttaki «Hinzufügen»
+                satırından açılan FENSTERDEN gelir — aynı ürün ikinci kez
+                listede görünmez, dolayısıyla iki kez eklenemez. */}
+            <IosGroup title={t('projects.reportsHub.resources')} footer={disabled ? undefined : t('projects.reportsHub.pickArticleHint')}>
                 <div className="ofi-ios-tablewrap">
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <colgroup>
@@ -845,9 +831,6 @@ export const FieldReportEditorView = ({
                     </thead>
                     <tbody>
                         {rows.map((row) => {
-                            // Yalnızca GERÇEKTEN boş giriş satırı silinemez ve giriş
-                            // yer tutucusunu gösterir; içerik yazılan satır normaldir.
-                            const isEntry = !row.id && !row.materialId && row.kind === 'expense' && !rowHasContent(row);
                             const catalogCost = row.kind === 'extra'
                                 ? (row.id ? row.unitPrice : Number(materialById(row.materialId)?.unitCost) || row.unitPrice)
                                 : 0;
@@ -866,18 +849,23 @@ export const FieldReportEditorView = ({
                                             20.08.2026): artık her satırın tutarı aynı kenarda biter. */}
                                         <div className="flex items-center gap-1.5">
                                             <div className="min-w-0 flex-1">
-                                                {row.kind !== 'used' && !disabled ? (
-                                                    <MaterialSuggestCell
-                                                        value={row.text}
-                                                        materials={materials}
-                                                        placeholder={isEntry ? t('projects.reportsHub.entryPlaceholder') : t('auto.harici_giderler')}
+                                                {/* Ein ARTIKEL trägt seinen Katalognamen und wird
+                                                    nicht überschrieben — korrigiert wird er, indem
+                                                    man die Zeile löscht und im Fenster neu wählt.
+                                                    Nur die freie Zeile («Externe Kosten») bleibt
+                                                    ein Schreibfeld. */}
+                                                {row.kind === 'expense' && !disabled ? (
+                                                    <input
+                                                        /* Eine frisch aus dem Fenster gelegte freie
+                                                           Zeile bekommt den Fokus: dort wird sofort
+                                                           der Betrag nachgetragen. */
                                                         autoFocus={focusedResourceKey === row.key}
-                                                        onFocused={() => setFocusedResourceKey(null)}
-                                                        pickedIds={pickedMaterialIds}
-                                                        onText={(text) => patchRow(row.key, row.kind === 'extra'
-                                                            ? { text, kind: 'expense', materialId: undefined, unitPrice: 0, quantity: 1 }
-                                                            : { text })}
-                                                        onPick={(material) => pickMaterial(row.key, material)}
+                                                        onFocus={() => setFocusedResourceKey(null)}
+                                                        className="ofi-ios-cellinput"
+                                                        value={row.text}
+                                                        placeholder={t('auto.harici_giderler')}
+                                                        aria-label={t('auto.harici_giderler')}
+                                                        onChange={(e) => patchRow(row.key, { text: e.target.value })}
                                                     />
                                                 ) : (
                                                     <span className={`ofi-fr-cell truncate ${row.kind === 'expense' ? '' : 'font-medium'}`}>{row.text}</span>
@@ -923,8 +911,19 @@ export const FieldReportEditorView = ({
                     </tbody>
                 </table>
                 </div>
-                {!disabled && <IosAddRow label={t('projects.reportsHub.addResource')} onClick={addResourceRow} />}
+                {!disabled && <IosAddRow label={t('projects.reportsHub.addResource')} onClick={() => setPickerOpen(true)} />}
             </IosGroup>
+
+            {/* Die Artikelwahl — ein Fenster, und was schon in der Tabelle steht,
+                kommt darin gar nicht mehr vor. */}
+            <ReportArticlePicker
+                open={pickerOpen && !disabled}
+                materials={materials}
+                pickedIds={pickedMaterialIds}
+                onPick={addMaterialRow}
+                onAddText={addExternalCostRow}
+                onClose={() => setPickerOpen(false)}
+            />
             </>)}
 
             </div>
@@ -969,106 +968,6 @@ export const FieldReportEditorView = ({
                     </div>
                 )}
             </PopupDialog>
-        </div>
-    );
-};
-
-/** Wie viele Treffer die Liste höchstens zeigt — sie scrollt innerhalb davon. */
-const SUGGEST_LIMIT = 40;
-
-/**
- * Doğrudan giriş hücresi: yazarken malzeme kataloğundan öneriler açılır.
- * Bir öneri seçilirse satır Zusatzmaterial olur; seçilmezse yazılan metin
- * Externe Kosten olarak kalır — ayrı düğme/popup yoktur (kullanıcı isteği).
- *
- * MEHRERE ARTIKEL AUS EINEM FELD (Vorgabe Samet, 02.09.2026): das leere Feld
- * öffnet den Katalog von sich aus, nicht erst nach dem ersten Buchstaben —
- * sonst wäre «mehrere wählen» ein Ratespiel. Ein Treffer legt sich als Zeile
- * ab, die Eingabe rutscht eine Zeile TIEFER und schlägt dort dieselbe Liste
- * wieder auf: für den Benutzer sammelt ein Feld einen Stapel ein, der nach
- * unten wächst. Bereits gewählte Artikel tragen einen Haken. Geschlossen wird
- * mit einem Klick daneben oder Esc — das erledigt AnchoredPicker.
- */
-const MaterialSuggestCell = ({
-    value,
-    materials,
-    placeholder,
-    autoFocus,
-    pickedIds,
-    onFocused,
-    onText,
-    onPick,
-}: {
-    value: string;
-    materials: ProjectMaterial[];
-    placeholder: string;
-    autoFocus?: boolean;
-    /** Schon im Rapport stehende Artikel — sie bekommen den Haken. */
-    pickedIds?: Set<string>;
-    onFocused?: () => void;
-    onText: (text: string) => void;
-    onPick: (material: ProjectMaterial) => void;
-}) => {
-    const [anchorEl, setAnchorEl] = useState<HTMLInputElement | null>(null);
-    const inputRef = useRef<HTMLInputElement | null>(null);
-    useEffect(() => {
-        if (autoFocus) inputRef.current?.focus();
-    }, [autoFocus]);
-    const query = value.trim().toLowerCase();
-    const matches = (query
-        ? materials.filter((m) => m.name.toLowerCase().includes(query) || (m.serialId || '').toLowerCase().includes(query))
-        : materials.filter((m) => m.isActive !== false)
-    ).slice(0, SUGGEST_LIMIT);
-    const open = Boolean(anchorEl && matches.length > 0);
-    return (
-        <div>
-            <input
-                ref={inputRef}
-                autoFocus={autoFocus}
-                className="ofi-ios-cellinput"
-                value={value}
-                placeholder={placeholder}
-                aria-label={placeholder}
-                onChange={(e) => onText(e.target.value)}
-                onFocus={(event) => { setAnchorEl(event.currentTarget); onFocused?.(); }}
-            />
-            <AnchoredPicker
-                anchorEl={open ? anchorEl : null}
-                onClose={() => setAnchorEl(null)}
-                width={380}
-                maxHeight={320}
-                panelClassName="shadow-[0_12px_36px_rgba(15,23,42,0.18)]"
-            >
-                <ul className="space-y-1 overflow-y-auto p-2">
-                    {matches.map((material) => {
-                        const picked = Boolean(pickedIds?.has(material.id));
-                        return (
-                            <li key={material.id}>
-                                <button
-                                    type="button"
-                                    /* Diese Liste schliesst immer — offen bleibt sie nur
-                                       scheinbar: die Eingabe wandert eine Zeile tiefer und
-                                       DEREN Feld schlägt beim Fokus dieselbe Liste wieder
-                                       auf. Zwei Listen gleichzeitig gäbe es sonst. */
-                                    onClick={() => { onPick(material); setAnchorEl(null); }}
-                                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors hover:bg-[#eef2fb] focus:bg-[#eef2fb] focus:outline-none dark:hover:bg-white/10 dark:focus:bg-white/10"
-                                >
-                                    <span className="flex min-w-0 items-center gap-2">
-                                        <span aria-hidden className={`ofi-ios-tick${picked ? ' is-on' : ''}`}>
-                                            {picked && <Check size={12} />}
-                                        </span>
-                                        <span className="truncate font-medium text-slate-800 dark:text-white">{material.name}</span>
-                                    </span>
-                                    <span className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-slate-400">
-                                        <span>{numberFmt(material.stockQuantity)}</span>
-                                        <span>{money(Number(material.unitCost) || 0)}</span>
-                                    </span>
-                                </button>
-                            </li>
-                        );
-                    })}
-                </ul>
-            </AnchoredPicker>
         </div>
     );
 };

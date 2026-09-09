@@ -19,6 +19,7 @@ type TenderLineHeaderCellProps = {
 
 export const TenderLineHeaderCell = ({ label, title, align = 'right', className, noTruncate, onResizeStart, onResizeReset }: TenderLineHeaderCellProps) => (
     <th
+        scope="col"
         title={title}
         aria-label={title}
         className={`relative ${align === 'left' ? 'text-left' : align === 'center' ? 'text-center' : 'text-right'} ${className || ''}`}

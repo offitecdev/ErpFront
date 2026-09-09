@@ -8,10 +8,13 @@ import {
     File05 as FileText,
     Package,
     Plus,
+    SearchLg,
     Tag01,
     Trash01,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import { onIdle } from '@/lib/utils/onIdle';
+import '@/styles/tenderLines.css';
 
 import { AutoFitAmount } from '../common/AutoFitAmount';
 import { PlainCheckbox as Checkbox } from '../common/PlainUi';
@@ -42,9 +45,21 @@ import { BufferedTextInput } from '../TenderLineInputs';
 import { TenderLineHeaderCell } from './TenderLineTableHeader';
 import { TenderLinePriceInput } from './TenderLinePriceInput';
 
+const importInlineDescriptionEditor = () => import('../InlineDescriptionEditor');
 const LazyInlineDescriptionEditor = lazy(() =>
-    import('../InlineDescriptionEditor').then((mod) => ({ default: mod.InlineDescriptionEditor })),
+    importInlineDescriptionEditor().then((mod) => ({ default: mod.InlineDescriptionEditor })),
 );
+
+// Der Editor ist ein eigenes Bündel. Wird es erst beim Aufklappen geholt, steht
+// dort einen Wimpernschlag lang ein leerer Kasten — genau die Lücke, die man
+// beim Öffnen einer Beschreibung sah. Also im Leerlauf vorladen, spätestens
+// aber sobald der Zeiger den Pfeil berührt.
+let inlineEditorPreloadStarted = false;
+const preloadInlineDescriptionEditor = () => {
+    if (inlineEditorPreloadStarted) return;
+    inlineEditorPreloadStarted = true;
+    void importInlineDescriptionEditor();
+};
 
 // Each editable line contains several inputs, buttons and SVGs. Mounting all
 // lines before first paint made an ordinary quote create roughly 2,000 nodes.
@@ -54,7 +69,8 @@ const LazyInlineDescriptionEditor = lazy(() =>
 // reveal below fills the window long before the user reaches row 10.
 const INITIAL_RENDERED_ROWS = 10;
 const RENDER_ROW_BATCH = 16;
-const COLLAPSED_ROW_HEIGHT_PX = 37;
+// 30px inline field + 8px padding on each side + the row's hairline.
+const COLLAPSED_ROW_HEIGHT_PX = 47;
 
 // Small square pop-up behind the profit/loss icon: sales, cost, result and the
 // margin ratio for one line. Portal + fixed position so it overlays the rows
@@ -163,7 +179,7 @@ type TenderLineTableProps = {
     onSelectRow: (rowId: string) => void;
     onToggleAllRows: (checked: boolean) => void;
     onToggleRow: (rowId: string, checked: boolean) => void;
-    commitTextField: (positionId: string, field: TextField, value: string) => void;
+    commitTextField: (positionId: string, field: TextField, value: string) => void | boolean;
     commitNumberField: (positionId: string, field: NumberField, value: number) => void;
     commitLongDescription: (positionId: string, value: string) => void;
     registerCell: (key: string, handle: { focus: () => void } | null) => void;
@@ -321,6 +337,13 @@ export const TenderLineTable = ({
         return onArrowNav(col, rowIndex, dir);
     }, [effectiveRenderedRowCount, onArrowNav, rows.length]);
 
+    // Vorladen, solange niemand wartet: bis zum ersten Klick auf einen Pfeil
+    // liegt der Editor bereit und die Beschreibung steht sofort da.
+    useEffect(() => {
+        if (!isDraft) return;
+        return onIdle(preloadInlineDescriptionEditor);
+    }, [isDraft]);
+
     const canReorder = isDraft && canManage;
     const popoverProfit = profitPopover ? profitByRowId.get(profitPopover.rowId) : undefined;
 
@@ -355,7 +378,7 @@ export const TenderLineTable = ({
             data-reorderable={canReorder ? 'true' : undefined}
             data-move-active={moveState ? 'true' : undefined}
             style={{ minWidth: TENDER_LINE_TABLE_MIN_WIDTH }}
-            className="w-full"
+            className="ofi-quote-lines w-full"
         >
             <colgroup>
                 <col ref={setColRef('pos')} style={{ width: widths.pos }} />
@@ -371,11 +394,11 @@ export const TenderLineTable = ({
                 <tr className="group/head">
                     {/* Mirrors the rows: "Pos." at rest, select-all on hover or
                         once a selection exists. */}
-                    <th className="border-l-0 text-left font-semibold">
+                    <th scope="col" className="border-l-0 text-left font-semibold">
                         <span className="relative flex h-4 w-full items-center">
                             <span
                                 aria-hidden
-                                className={`transition-opacity ${someRowsSelected ? 'opacity-0' : 'opacity-100 group-hover/head:opacity-0'}`}
+                                className={`ofi-quote-lines__position-label transition-opacity ${someRowsSelected ? 'opacity-0' : 'opacity-100 group-hover/head:opacity-0'}`}
                             >
                                 {t('tenders.pos')}
                             </span>
@@ -409,8 +432,13 @@ export const TenderLineTable = ({
             </thead>
             <tbody>
                 {isEmpty && (
-                    <tr>
-                        <td colSpan={9} className="px-3 py-10 text-center text-[12px] text-slate-400">{t('tenders.tender_line_not_found')}</td>
+                    <tr data-tender-lines-empty>
+                        <td colSpan={9}>
+                            <div className="ofi-quote-lines__empty">
+                                <Package size={24} aria-hidden />
+                                <span>{t('tenders.tender_line_not_found')}</span>
+                            </div>
+                        </td>
                     </tr>
                 )}
                 {rows.slice(0, effectiveRenderedRowCount).map((row, rowIndex) => {
@@ -422,9 +450,16 @@ export const TenderLineTable = ({
                     const isProduct = row.kind === 'PRODUCT';
                     const isDescription = row.kind === 'DESCRIPTION';
                     const taxRate = Number(position.taxRate || fallbackTaxRate);
-                    const visibleLongDescription = isProduct
+                    const ownLongDescription = isProduct
                         ? cleanImportedProductDescription(position.longDescription)
                         : position.longDescription || '';
+                    // Once the quote is a sales order (or otherwise left draft)
+                    // nothing can be typed, so a product line without a text of
+                    // its own shows the article's catalogue description instead —
+                    // read-only, and never written back. In draft the empty
+                    // editor stays empty: that is the salesperson's own field.
+                    const visibleLongDescription = ownLongDescription
+                        || (!isDraft && isProduct ? cleanImportedProductDescription(position.sourceArticleDescription) : '');
                     const profit = isProduct ? profitByRowId.get(row.id) : undefined;
                     const canExpand = (isProduct || isDescription) && (Boolean(visibleLongDescription) || isDraft);
                     // An empty DESCRIPTION row in draft is always open — there is
@@ -441,6 +476,8 @@ export const TenderLineTable = ({
                             aria-expanded={isExpanded}
                             aria-label={t('tenders.description')}
                             title={t('tenders.description')}
+                            onPointerEnter={isDraft ? preloadInlineDescriptionEditor : undefined}
+                            onPointerDown={isDraft ? preloadInlineDescriptionEditor : undefined}
                             onClick={(event) => {
                                 event.stopPropagation();
                                 onSelectRow(row.id);
@@ -448,7 +485,7 @@ export const TenderLineTable = ({
                             }}
                             // Open state wears a circle so the one control that
                             // collapses the description is visibly "on".
-                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
+                            className={`ofi-quote-lines__expand ofi-btn-plain flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
                                 isExpanded
                                     ? 'bg-[#1f2654]/10 text-[#1f2654]'
                                     : visibleLongDescription
@@ -456,9 +493,12 @@ export const TenderLineTable = ({
                                         : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'
                             }`}
                         >
+                            {/* Apple-Art: gross, dünn gestrichen, runde Enden —
+                                und eine weiche Drehung statt eines Umschlags. */}
                             <ChevronDown
-                                size={18}
-                                className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                size={22}
+                                strokeWidth={2}
+                                className={`transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isExpanded ? 'rotate-180' : ''}`}
                             />
                         </button>
                     ) : null;
@@ -471,13 +511,26 @@ export const TenderLineTable = ({
                         // right under the caret — the row collapsed and showed
                         // nothing, which read as "my text was deleted".
                         <div
-                            className="mt-1 min-w-0"
+                            className="ofi-quote-lines__description mt-1 min-w-0"
                             onFocusCapture={() => {
                                 if (expandedId !== row.id) setExpandedId(row.id);
                             }}
                         >
                             {isDraft ? (
-                                <Suspense fallback={<div className="min-h-[60px] rounded bg-slate-50" />}>
+                                // Der Ersatz ist kein leerer Kasten mehr, sondern
+                                // derselbe Text im selben Rahmen: kommt das Bündel
+                                // doch einmal zu spät, wechselt nur die
+                                // Schreibbarkeit, nicht der Inhalt.
+                                <Suspense fallback={(
+                                    <div className="min-h-[60px] rounded-[2px] border border-slate-300 bg-white px-2 py-1 shadow-xs">
+                                        {visibleLongDescription ? (
+                                            <div
+                                                className="rich-text-preview whitespace-pre-wrap break-words py-0.5 text-[13px] leading-6 text-black [&_ul]:list-disc [&_ul]:pl-6 [&_li]:my-0.5"
+                                                dangerouslySetInnerHTML={{ __html: richTextToHtml(visibleLongDescription) }}
+                                            />
+                                        ) : null}
+                                    </div>
+                                )}>
                                     <LazyInlineDescriptionEditor
                                         positionId={row.id}
                                         value={visibleLongDescription}
@@ -500,6 +553,8 @@ export const TenderLineTable = ({
                         <tr
                             key={stableRowKeys.get(row.id) ?? row.id}
                             data-row-id={row.id}
+                            data-line-kind={row.kind}
+                            data-row-checked={selectedRowIds[row.id] ? 'true' : undefined}
                             onClick={() => onSelectRow(row.id)}
                             onPointerDown={canReorder ? (event) => onRowPointerDown(event, row.id) : undefined}
                             // Every row is white — a title line is told apart by its
@@ -526,7 +581,7 @@ export const TenderLineTable = ({
                                     <span className="relative flex h-5 w-6 shrink-0 items-center justify-start">
                                         <span
                                             aria-hidden
-                                            className={`text-[12.5px] font-semibold tabular-nums transition-opacity ${
+                                            className={`ofi-quote-lines__position-label text-[12.5px] font-semibold tabular-nums transition-opacity ${
                                                 row.kind === 'TITLE' ? 'text-[#1f2654]' : 'text-slate-500'
                                             } ${showSelection ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'}`}
                                         >
@@ -562,7 +617,7 @@ export const TenderLineTable = ({
                                                 event.stopPropagation();
                                                 window.open(`/inventory/articles/${position.sourceArticleId}`, '_blank', 'noopener');
                                             }}
-                                            className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            className="ofi-quote-lines__article-link ofi-btn-plain inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                         >
                                             <Tag01 size={13} />
                                         </button>
@@ -644,7 +699,7 @@ export const TenderLineTable = ({
                                         basePx={13}
                                         shrink={false}
                                         scrollbar="thin"
-                                        className="py-0.5 text-right font-bold tabular-nums text-[#1f2654]"
+                                        className="ofi-quote-lines__amount py-0.5 text-right font-bold tabular-nums text-[#1f2654]"
                                     />
                                 ) : null}
                             </td>
@@ -670,7 +725,7 @@ export const TenderLineTable = ({
                                                     current?.rowId === row.id ? null : { rowId: row.id, anchorEl: anchor },
                                                 );
                                             }}
-                                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] transition-colors ${
+                                            className={`ofi-quote-lines__profit ofi-btn-plain flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] transition-colors ${
                                                 profit.result >= 0
                                                     ? 'text-emerald-600 hover:bg-emerald-50'
                                                     : 'text-rose-600 hover:bg-rose-50'
@@ -688,7 +743,7 @@ export const TenderLineTable = ({
                                             aria-label={t('common.delete')}
                                             title={t('common.delete')}
                                             onClick={(event) => { event.stopPropagation(); onDeleteRow(row.id); }}
-                                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                                            className="ofi-quote-lines__delete ofi-btn-plain flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
                                         >
                                             <Trash01 size={13} />
                                         </button>
@@ -721,9 +776,10 @@ export const TenderLineTable = ({
                                     setRenderedRowCount(rows.length + 1);
                                     onAddProductRow(lastRowId);
                                 }}
-                                className="block w-full max-w-[380px] rounded-[2px] border border-dashed border-slate-300 px-2.5 py-1.5 text-left text-[12px] text-slate-400 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-slate-600"
+                                className="ofi-quote-lines__search ofi-btn-plain"
                             >
-                                {t('tenders.search_product')}
+                                <SearchLg size={15} aria-hidden />
+                                <span>{t('tenders.search_product')}</span>
                             </button>
                         </td>
                     </tr>
@@ -733,14 +789,14 @@ export const TenderLineTable = ({
                         <td colSpan={9} className="!border-b-0">
                             {/* One row of add-actions: the product button leads, with
                                 the title / description pair grouped beside it. */}
-                            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto py-0.5">
+                            <div className="ofi-quote-lines__actions flex flex-nowrap items-center gap-2 overflow-x-auto">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setRenderedRowCount(rows.length + 1);
                                         onAddProductRow(lastRowId);
                                     }}
-                                    className="ofi-quote-addbtn is-primary"
+                                    className="ofi-quote-addbtn ofi-btn-plain is-primary"
                                 >
                                     <Package size={14} />
                                     {t('tenders.product_add')}
@@ -751,7 +807,7 @@ export const TenderLineTable = ({
                                         setRenderedRowCount(rows.length + 1);
                                         onAddRow('TITLE', undefined, undefined, lastRowId);
                                     }}
-                                    className="ofi-quote-addbtn"
+                                    className="ofi-quote-addbtn ofi-btn-plain"
                                 >
                                     <Plus size={13} />
                                     {t('tenders.baslik')}
@@ -762,7 +818,7 @@ export const TenderLineTable = ({
                                         setRenderedRowCount(rows.length + 1);
                                         onAddRow('DESCRIPTION', undefined, undefined, lastRowId);
                                     }}
-                                    className="ofi-quote-addbtn"
+                                    className="ofi-quote-addbtn ofi-btn-plain"
                                 >
                                     <FileText size={13} />
                                     {t('tenders.description_add')}

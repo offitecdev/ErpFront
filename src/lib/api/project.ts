@@ -1,5 +1,6 @@
 import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
-import type { AppointmentDto, MailSettingDto, MontageOrdersPageDto, MontageReportOrderDetailDto, MontageReportOrdersPageDto, MontageReportResourcesDto, ProjectAddonRequestDto, ProjectDto, ProjectMaterial, ProjectStatus } from '../../types/project';
+import { publicTokenHeader } from './publicToken';
+import type { AppointmentDto, MailSettingDto, MontageOrdersPageDto, MontageReportOrderDetailDto, MontageReportOrdersPageDto, MontageReportResourcesDto, ProjectAddonRequestDto, ProjectDto, ProjectLifecycleDto, ProjectMaterial, ProjectStatus } from '../../types/project';
 
 /* ── Mehrtägige Einsätze (24.08.2026) ───────────────────────────────────────
    Ein Einsatz über mehrere Tage ist EINE ZEILE JE TAG, zusammengehalten von
@@ -19,6 +20,8 @@ export interface AppointmentSeriesDay {
     startTime: string;
     endTime: string;
     status: string;
+    /** Hängt ein Rapport daran? Dann darf der Tag nicht aus dem Einsatz gestrichen werden. */
+    hasReport?: boolean;
 }
 
 /** Eine Unterlage — ohne Inhalt; der kommt erst beim Öffnen. */
@@ -278,12 +281,40 @@ export const projectApi = {
 
     // Admin/manager-facing: delete a project sales order. The backend guards this —
     // main orders with addons or any invoiced order are rejected.
-    deleteSalesOrder: async (projectId: string, salesOrderId: string): Promise<void> => {
-        await apiClient.delete(`/projects/${projectId}/sales-orders/${salesOrderId}`);
+    /**
+     * Der Server sagt in der Antwort, was die Löschung nach sich gezogen hat:
+     * `projectDeleted` heisst, es war der LETZTE Auftrag — das Projekt ist mit
+     * ihm verschwunden und die Seite muss auf die Liste zurück, statt in ein
+     * 404 zu laden (Vorgabe Samet 05.09.2026).
+     */
+    deleteSalesOrder: async (projectId: string, salesOrderId: string): Promise<{ projectDeleted: boolean; addonIds: string[] }> => {
+        const res = await apiClient.delete(`/projects/${projectId}/sales-orders/${salesOrderId}`);
+        return res.data ?? { projectDeleted: false, addonIds: [] };
     },
 
-    // Projeyi tüm operasyonel kayıtlarıyla siler; faturalanmış proje sunucuda
-    // reddedilir. İstemci onay için "DELETE" yazdırır.
+    /**
+     * ── LÖSCHEN / STORNO DES PROJEKTS (Vorgabe Samet 06.09.2026) ────────────
+     * Gelöscht wird ein Projekt nur, wenn nichts mehr daran hängt; storniert
+     * wird es NICHT von oben — es fällt mit seinem letzten aktiven Auftrag.
+     * Von Hand geht das Storno nur, wenn kein aktiver Auftrag mehr darin steht.
+     */
+    lifecycle: async (projectId: string): Promise<ProjectLifecycleDto> => {
+        const res = await apiClient.get(`/projects/${projectId}/lifecycle`);
+        return res.data;
+    },
+
+    cancelProject: async (projectId: string, reason?: string | null): Promise<{ projectId: string; cancelled: boolean }> => {
+        const res = await apiClient.post(`/projects/${projectId}/cancel`, { reason: reason || null });
+        return res.data;
+    },
+
+    uncancelProject: async (projectId: string): Promise<{ projectId: string; cancelled: boolean }> => {
+        const res = await apiClient.post(`/projects/${projectId}/uncancel`);
+        return res.data;
+    },
+
+    // Projeyi siler — YALNIZCA bağlı hiçbir kayıt kalmadıysa (sipariş, fatura,
+    // rapor, stok hareketi). İstemci onay için "DELETE" yazdırır.
     deleteProject: async (projectId: string): Promise<void> => {
         await apiClient.delete(`/projects/${projectId}`);
     },
@@ -954,11 +985,11 @@ export const signatureApi = {
         await apiClient.delete(`/signature-requests/${id}`);
     },
     publicGet: async (token: string): Promise<PublicSignatureView> => {
-        const res = await apiClient.get(`/signature-requests/public/${token}`);
+        const res = await apiClient.get('/signature-requests/public', publicTokenHeader(token));
         return res.data;
     },
     publicSign: async (token: string, signatureBase64?: string | null): Promise<{ message: string; signed: boolean }> => {
-        const res = await apiClient.post(`/signature-requests/public/${token}/sign`, { signatureBase64: signatureBase64 || null });
+        const res = await apiClient.post('/signature-requests/public/sign', { signatureBase64: signatureBase64 || null }, publicTokenHeader(token));
         return res.data;
     },
 };

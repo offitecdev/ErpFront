@@ -85,6 +85,9 @@ export const PAGE_MODULES: CatalogModule[] = [
         pages: [
             { key: 'sales.quotes', path: '/sales/quotes', labelKey: 'nav.tenderManagement', maxLevel: 2 },
             { key: 'sales.orders', path: '/sales/orders', labelKey: 'nav.myOrders', maxLevel: 2 },
+            // Zusatzaufträge / Nachträge (05.09.2026) — erbt die Stufe der
+            // Auftragsliste, bis eine Rolle ihre eigene trägt (pageAccess.ts).
+            { key: 'sales.addonOrders', path: '/sales/addon-orders', labelKey: 'nav.addonOrders', maxLevel: 2 },
             // OSP (04.09.2026): Offertanfragen der Offitec Selection Platform.
             { key: 'sales.osp', path: '/sales/osp', labelKey: 'nav.salesOsp', maxLevel: 2 },
             // Rechnungsliste (30.08.2026) — Löschen ist hier eine eigene Stufe:

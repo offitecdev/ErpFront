@@ -2,17 +2,19 @@ import type { ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuLayoutTemplate, LuListChecks } from 'react-icons/lu';
 import { t } from '@/i18n/translate';
-import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
 import { CHECKLIST_PATHS, type ChecklistTabKey } from '../routes';
 
 /**
- * Reiterband des Checklisten-Bereichs — dieselbe Bauart wie die übrigen
- * CRM-Seiten (Schnellerfassung / Projektansicht): der Streifen trägt Rahmen
- * und Überlauf, die Reiter liegen INNEN in einer flex-Reihe.
+ * Der Reiterstreifen des Checklisten-Bereichs — seit dem 02.09.2026 ein
+ * SEGMENTWÄHLER im Apple-Kleid (graue Schiene, das Gewählte als weisse
+ * Pille) statt der Karteireiter der übrigen CRM-Seiten. Das ist Absicht und
+ * die Vorgabe: dieser Bereich soll modern aussehen; der Wähler ist dasselbe
+ * Bauteil, das auch in den Checklisten selbst eine Auswahl trägt
+ * (`.ofi-chk-seg`, index.css «CHECKLISTEN IM APPLE-KLEID»).
  *
  * Der Bereich hat genau ZWEI Seiten: die ausgefüllten Checklisten
  * (/crm/forms) und die Vorlagen (/crm/forms/templates). Der Vorlagen-Editor
- * ist eine Unterseite der Vorlagen und zeigt darum denselben Reiter aktiv.
+ * ist eine Unterseite der Vorlagen und zeigt darum denselben Abschnitt aktiv.
  *
  * `onLeave` darf einen Wechsel abfangen (der Editor fragt bei ungesicherten
  * Änderungen nach): `false` bricht die Navigation ab.
@@ -47,30 +49,25 @@ export const ChecklistTabs = ({
     };
 
     return (
-        <nav
-            aria-label={t('forms.tabs.aria')}
-            className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 md:overflow-visible dark:border-white/15"
-        >
-            <SlidingTopTabs activeKey={active} className="flex min-w-max items-stretch gap-1">
+        <nav aria-label={t('forms.tabs.aria')} className="ofi-chk">
+            <div className="ofi-chk-seg ofi-chk-seg--tabs" role="tablist">
                 {TABS.map(({ key, labelKey, Icon }) => {
                     const isActive = key === active;
                     return (
-                        <div key={key} data-tab-key={key} className="relative -mb-px shrink-0">
-                            <button
-                                type="button"
-                                aria-current={isActive ? 'page' : undefined}
-                                onClick={() => go(key)}
-                                className={`ofi-quote-tab inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${isActive
-                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'}`}
-                            >
-                                <Icon size={13} />
-                                <span>{t(labelKey)}</span>
-                            </button>
-                        </div>
+                        <button
+                            key={key}
+                            type="button"
+                            role="tab"
+                            aria-selected={isActive}
+                            onClick={() => go(key)}
+                            className={`ofi-chk-seg__item ${isActive ? 'is-on' : ''}`}
+                        >
+                            <Icon size={14} />
+                            <span>{t(labelKey)}</span>
+                        </button>
                     );
                 })}
-            </SlidingTopTabs>
+            </div>
         </nav>
     );
 };

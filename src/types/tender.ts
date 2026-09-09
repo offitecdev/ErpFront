@@ -1,7 +1,33 @@
 import type { PersonLite } from './maintenance';
 
 export type TenderFormat = 'SIA451' | 'CRBX';
-export type TenderStatus = 'Draft' | 'Approved' | 'Exported';
+/**
+ * ── WAS AN EINER OFFERTE NOCH OFFENSTEHT (06.09.2026) ────────────────────────
+ * Der Server entscheidet, ob gelöscht oder nur noch storniert werden darf, und
+ * sagt mit `deleteBlockers` / `cancelBlockers`, was im Weg steht.
+ */
+export type TenderLifecycleBlocker = 'CANCELLED' | 'SALES_ORDER' | 'PROJECT';
+
+export interface TenderLifecycleDto {
+    status: TenderStatus;
+    cancelled: boolean;
+    cancelledAt?: string | null;
+    cancelReason?: string | null;
+    salesOrderId: string | null;
+    salesOrderNumber: string | null;
+    salesOrderCancelled: boolean;
+    projectId: string | null;
+    deleteBlockers: TenderLifecycleBlocker[];
+    cancelBlockers: TenderLifecycleBlocker[];
+    canDelete: boolean;
+    canCancel: boolean;
+}
+
+/**
+ * STORNIERT (06.09.2026): eine offizielle Offerte wird nicht geloescht, sondern
+ * zurueckgenommen — der Status sperrt sie zugleich gegen jede Bearbeitung.
+ */
+export type TenderStatus = 'Draft' | 'Approved' | 'Exported' | 'Cancelled';
 export type TenderRowType = 'SECTION' | 'TITLE' | 'DESCRIPTION' | 'PRODUCT' | 'CUSTOM';
 
 export interface TenderListItem {
@@ -27,6 +53,9 @@ export interface TenderListItem {
      * ekranındaki ana düğme "Zum Auftrag" olur ve siparişi doğrudan açar.
      */
     salesOrder?: { id: string; orderNumber: string; projectId?: string | null } | null;
+    /** STORNO: gesetzt = die Offerte ist zurueckgenommen (bleibt als Beleg). */
+    cancelledAt?: string | null;
+    cancelReason?: string | null;
     tenderNumber: string;
     version: number;
     format: TenderFormat;
@@ -275,6 +304,10 @@ export interface PositionDto {
     positionNumber: string;
     shortDescription: string;
     longDescription?: string | null;
+    /** Catalogue text of the linked article — sent by the detail endpoint only
+     *  for product lines whose own longDescription is empty. Read-only quotes
+     *  (sales orders) open it in place of the missing description. */
+    sourceArticleDescription?: string | null;
     quantity: number;
     unit?: string | null;
     hierarchyLevel: number;

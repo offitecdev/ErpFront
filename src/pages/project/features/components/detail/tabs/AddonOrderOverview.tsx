@@ -1,8 +1,11 @@
 import { memo, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 import { BillingStatusChip } from '@/components/billing/BillingStatusChip';
-import { Receipt as ReceiptText } from '@/components/icons/antIconCompat';
+import { Edit01, Receipt as ReceiptText } from '@/components/icons/antIconCompat';
+import { addonEditPath } from '@/components/orders/addonEditorRoute';
+import { AddonOrderPdfButton } from '@/components/orders/AddonOrderPdfButton';
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 
@@ -19,7 +22,16 @@ import type { calculateTotals } from '../../../utils/projectTotals';
  * Kostenarten als EINE Zahlenspalte — die drei Beträge und die Summe fluchten,
  * statt in einem grauen Kasten mit gelber Summenpille zu stehen.
  */
-export const AddonOrderOverview = memo(({ project, order, isPrimary, totals }: { project: ProjectDto; order: ProjectSalesOrder; isPrimary: boolean; totals: ReturnType<typeof calculateTotals> }) => {
+export const AddonOrderOverview = memo(({ project, order, isPrimary, totals, canEdit = false }: {
+    project: ProjectDto;
+    order: ProjectSalesOrder;
+    isPrimary: boolean;
+    totals: ReturnType<typeof calculateTotals>;
+    /** Nachträge anlegen dürfen = ihre Positionen bearbeiten dürfen. */
+    canEdit?: boolean;
+}) => {
+    const navigate = useNavigate();
+    const isReal = !order.id.startsWith('project-main-');
     const materialRows = useMemo(
         () => scopedRecords(project.extraMaterials, order, isPrimary, project.salesOrders).map((item: any) => ({
             id: item.id,
@@ -71,9 +83,27 @@ export const AddonOrderOverview = memo(({ project, order, isPrimary, totals }: {
                         <span className="truncate">{t('auto.ek_siparis')}</span>
                         <span className="ofi-inv-chip">{order.orderNumber}</span>
                     </span>
-                    {!order.id.startsWith('project-main-') && (
+                    {isReal && (
                         <div className="ofi-inv-card__actions">
                             <BillingStatusChip salesOrderId={order.id} />
+                            {canEdit && (
+                                <button
+                                    type="button"
+                                    className="ofi-inv-btn"
+                                    title={t('crm.addon.editTitle')}
+                                    /* Bearbeitet wird IM Zusatzauftrags-Bereich
+                                       (Vorgabe 05.09.2026); dorthin führt auch
+                                       der Rückweg. */
+                                    onClick={() => navigate(addonEditPath(order.id, `/projects/${project.id}?section=addons`))}
+                                >
+                                    <Edit01 size={13} />
+                                    {t('common.edit')}
+                                </button>
+                            )}
+                            {/* Der EIGENE Beleg des Nachtrags — neben der
+                                Auftragsbestätigung des Hauptauftrags das zweite
+                                Dokument des Projekts, in drei Sprachen. */}
+                            <AddonOrderPdfButton addon={order} />
                         </div>
                     )}
                 </header>

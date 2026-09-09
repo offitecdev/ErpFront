@@ -1,0 +1,800 @@
+/* =========================================================
+   Offitec — SCHNELLERFASSUNG IM LAGER (02.09.2026)
+
+   Vorgabe Samet: «Ein Foto, der Produktname wird erkannt
+   (oder der Bereich markiert), antippen, Menge eingeben,
+   weiter zum nächsten — schnell, mit einem Schliessen-Knopf
+   unten; Produktcodes vergibt das System. Auf Tablet und
+   Telefon muss es flüssig laufen, auf dem Telefon soll nur
+   dieser eine Knopf da sein.»
+
+   Das Fenster (`.ofi-qa`) ist am Schreibtisch und auf dem
+   Tablet eine mittige Karte mit zwei Spalten — links das
+   Foto mit den Textrahmen, rechts die Eingabe —, auf dem
+   Telefon der GANZE Schirm in einer Spalte, Foto oben,
+   Eingabe darunter, «Schliessen» fest am Fuss.
+
+   Farben kommen ausschliesslich aus den Kalender-Token
+   (`--ofi-cal-*`), Dunkelmodus ist damit der Variablentausch
+   aus styles/dark.css. Die Knöpfe hier tragen KEINE
+   Tailwind-Innenmasse (`px-*`), damit die gemeinsame
+   Knopfregel in buttons.css sie nicht anfasst: das Foto-
+   und das Hinzufügen-Feld sind absichtlich grösser als der
+   Standardknopf — ein Daumen trifft 48px, nicht 40.
+
+   Ladereihenfolge (main.tsx): … refine.css → DIESE DATEI →
+   buttons.css. Sie steht ausserhalb jeder `@layer`.
+   ========================================================= */
+
+/* ── Der Knopf in der Produktliste ─────────────────────────────────────── */
+.ofi-qa-launch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--ofi-cal-accent);
+    border-radius: 4px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
+}
+.ofi-qa-launch:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
+.ofi-qa-launch:active { transform: scale(0.965); }
+.ofi-qa-launch svg { flex: none; }
+/* Telefon: der einzige Knopf im Kopf — gross genug für den Daumen. */
+.ofi-qa-launch.is-phone {
+    height: 46px;
+    padding: 0 18px;
+    font-size: 14px;
+    border-radius: 10px;
+}
+
+/* ── Fenster ───────────────────────────────────────────────────────────── */
+.ofi-qa-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 720;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(32, 33, 36, 0.45);
+}
+.ofi-qa-scrim.is-phone { padding: 0; background: transparent; }
+
+.ofi-qa {
+    display: flex;
+    flex-direction: column;
+    width: min(1040px, 100%);
+    max-height: calc(100dvh - 32px);
+    overflow: hidden;
+    /* Fläche, Haarlinie, Schatten und Radius: `.ofi-pop` (index.css). */
+}
+.ofi-qa.is-phone {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.ofi-qa__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 14px 12px 20px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+}
+.ofi-qa__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+    flex: none;
+}
+.ofi-qa__titles { min-width: 0; flex: 1; }
+.ofi-qa__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-qa__sub {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-qa__count {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ofi-qa__body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+    -webkit-overflow-scrolling: touch;
+}
+.ofi-qa.is-phone .ofi-qa__body,
+.ofi-qa.is-stacked .ofi-qa__body { display: block; }
+
+/* ── Foto und Rahmen ───────────────────────────────────────────────────── */
+.ofi-qa__stage {
+    padding: 16px;
+    border-right: 1px solid var(--ofi-cal-line);
+}
+.ofi-qa.is-phone .ofi-qa__stage,
+.ofi-qa.is-stacked .ofi-qa__stage { border-right: 0; padding: 12px 12px 4px; }
+
+.ofi-qa__frame {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #16181c;
+}
+.ofi-qa.is-phone .ofi-qa__frame { min-height: 220px; }
+
+.ofi-qa__picture {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+    max-width: 100%;
+    /* Ziehen auf dem Foto ZEICHNET (Nachtrag Samet 02.09.2026: «mit dem
+       Finger über den Bereich fahren»). `touch-action: none` nimmt dem
+       Browser das Wischen auf dieser Fläche weg — sonst bräche er das Ziehen
+       nach ein paar Punkten mit `pointercancel` ab und rollte die Seite. Die
+       Seite rollt weiterhin überall ausserhalb des Fotos. */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.ofi-qa__picture.can-trace { cursor: crosshair; }
+
+/* ── Das Auswahlviereck ────────────────────────────────────────────────────
+   Wie in Google Lens: ein aufgezogenes VIERECK, alles ausserhalb gedimmt, so
+   dass das Auge sofort sieht, was gelesen wird. Drei Erscheinungen:
+   `is-drawing` wächst unter dem Finger (gestrichelt, ohne Griffe), `is-set`
+   ist der gewählte Ausschnitt (Griffe, innen verschiebbar), `is-detected`
+   legt nur die Griffe auf eine angetippte automatische Zeile — die Fläche
+   lässt den Tipp zum Knopf darunter durch.
+
+   Der riesige `box-shadow` IST der Schleier: die Fläche ausserhalb des
+   Vierecks. `.ofi-qa__frame` hat `overflow: hidden` und schneidet ihn ab —
+   ohne das läge er über dem halben Fenster. */
+.ofi-qa__lasso {
+    position: absolute;
+    box-sizing: border-box;
+    border: 2px solid #fff;
+    border-radius: 3px;
+    background: transparent;
+    box-shadow: 0 0 0 9999px rgba(9, 12, 20, 0.55), 0 0 0 1px rgba(9, 12, 20, 0.55) inset;
+    pointer-events: none;
+    z-index: 2;
+}
+.ofi-qa__lasso.is-drawing {
+    border-style: dashed;
+}
+.ofi-qa__lasso.is-detected {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+.ofi-qa__lasso.is-busy { animation: ofi-qa-pulse 900ms ease-in-out infinite; }
+@keyframes ofi-qa-pulse {
+    0%, 100% { border-color: #fff; }
+    50% { border-color: var(--ofi-cal-accent); }
+}
+/* Innen verschieben (nur der eigene Ausschnitt). */
+.ofi-qa__lasso-body {
+    position: absolute;
+    inset: 0;
+    cursor: move;
+    pointer-events: auto;
+    touch-action: none;
+}
+/* Acht Griffe. Sichtbar 14px (Telefon 18px), greifbar 28px — ein Finger
+   trifft keinen 7px-Punkt. Ecken skalieren zwei Kanten, Mitten eine. */
+.ofi-qa__handle {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    margin: -14px 0 0 -14px;
+    pointer-events: auto;
+    touch-action: none;
+    z-index: 3;
+}
+.ofi-qa__handle::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border: 2px solid var(--ofi-cal-accent);
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    transition: transform 100ms ease;
+}
+.ofi-qa__handle:hover::after { transform: scale(1.2); }
+.ofi-qa__handle.is-nw { left: 0; top: 0; cursor: nwse-resize; }
+.ofi-qa__handle.is-n { left: 50%; top: 0; cursor: ns-resize; }
+.ofi-qa__handle.is-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.ofi-qa__handle.is-e { left: 100%; top: 50%; cursor: ew-resize; }
+.ofi-qa__handle.is-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.ofi-qa__handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
+.ofi-qa__handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.ofi-qa__handle.is-w { left: 0; top: 50%; cursor: ew-resize; }
+/* Die Griffe an einer automatischen Zeile sind dezenter, bis man sie greift. */
+.ofi-qa__lasso.is-detected .ofi-qa__handle::after {
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    border-color: var(--ofi-cal-accent);
+    background: rgba(255, 255, 255, 0.95);
+}
+@media (pointer: coarse) {
+    .ofi-qa__handle { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+    .ofi-qa__handle::after { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+    .ofi-qa__lasso.is-detected .ofi-qa__handle::after { width: 16px; height: 16px; margin: -8px 0 0 -8px; }
+}
+.ofi-qa__img {
+    display: block;
+    max-width: 100%;
+    max-height: min(64dvh, 720px);
+    width: auto;
+    height: auto;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.ofi-qa.is-phone .ofi-qa__img { max-height: 44dvh; }
+
+/* Ein Rahmen je erkannter Zeile — antippbar. Gelb = erkannt, grün = der
+   Vorschlag, navy = übernommen. Kein Text im Rahmen: der würde die Zeile
+   verdecken, die man gerade lesen will. */
+.ofi-qa__box {
+    position: absolute;
+    box-sizing: border-box;
+    min-width: 10px;
+    min-height: 10px;
+    margin: 0;
+    padding: 0;
+    border: 1.5px solid rgba(255, 200, 40, 0.9);
+    border-radius: 3px;
+    background: rgba(255, 200, 40, 0.14);
+    cursor: pointer;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-qa__box:hover { background: rgba(255, 200, 40, 0.3); }
+.ofi-qa__box.is-best {
+    border-color: rgba(52, 199, 120, 0.95);
+    background: rgba(52, 199, 120, 0.18);
+}
+/* Die übernommene Zeile trägt einen doppelten Ring statt einer deckenden
+   Fläche: der Anwender muss den Namen, den er gerade wählt, noch LESEN
+   können — eine 40%-Füllung hatte ihn genau dann verdeckt. */
+.ofi-qa__box.is-selected {
+    border-color: var(--ofi-cal-accent);
+    background: rgba(7, 20, 92, 0.12);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 0 0 4px var(--ofi-cal-accent);
+}
+.ofi-qa__box:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* Leerer Zustand: die Kamera als grosser Knopf, darunter der Dateiweg. */
+.ofi-qa__idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    width: 100%;
+    padding: 36px 20px;
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+}
+.ofi-qa__idle p { margin: 0; font-size: 13px; max-width: 360px; line-height: 1.5; }
+.ofi-qa__camera {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-width: 220px;
+    height: 56px;
+    padding: 0 26px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(7, 20, 92, 0.35);
+    transition: background-color 140ms ease, transform 90ms ease;
+}
+.ofi-qa__camera:hover { background: var(--ofi-cal-accent-hover); }
+.ofi-qa__camera:active { transform: scale(0.965); }
+.ofi-qa.is-phone .ofi-qa__camera { width: 100%; max-width: 360px; }
+.ofi-qa__ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    background: transparent;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 140ms ease;
+}
+.ofi-qa__ghost:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Fortschritt unten über dem Bild. */
+.ofi-qa__progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 14px 16px 12px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    pointer-events: none;
+}
+.ofi-qa__progress.is-centered {
+    position: static;
+    padding: 36px 20px;
+    text-align: center;
+    background: transparent;
+}
+.ofi-qa__bar {
+    height: 6px;
+    margin-top: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    overflow: hidden;
+}
+.ofi-qa__bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #ffc828;
+    transition: width 160ms ease;
+}
+.ofi-qa__bar.is-indeterminate > span {
+    width: 40%;
+    animation: ofi-qa-slide 1.1s ease-in-out infinite;
+}
+@keyframes ofi-qa-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(260%); }
+}
+
+/* Werkzeuge unter dem Bild: neues Foto, erneut erkennen. */
+.ofi-qa__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+.ofi-qa__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+.ofi-qa__pill:hover { background: var(--ofi-cal-hover); }
+.ofi-qa__pill:disabled { opacity: 0.45; cursor: not-allowed; }
+.ofi-qa__engine {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Eingabe ───────────────────────────────────────────────────────────── */
+.ofi-qa__form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 18px 18px;
+}
+.ofi-qa.is-phone .ofi-qa__form { padding: 8px 14px 18px; }
+
+.ofi-qa__label {
+    display: block;
+    margin: 0 0 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-qa__hint { margin: 4px 0 0; font-size: 12px; color: var(--ofi-cal-muted); line-height: 1.45; }
+.ofi-qa__error { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--ofi-cal-danger); }
+.ofi-qa__empty {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--ofi-cal-surface-2);
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+
+/* Erkannte Zeilen als Pillen — die Rahmen auf dem Bild sind auf dem Telefon
+   oft zu klein für einen Finger; hier stehen dieselben Zeilen gross. */
+.ofi-qa__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ofi-qa__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-height: 36px;
+    padding: 6px 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-text);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.ofi-qa__chip:hover { background: var(--ofi-cal-hover); border-color: var(--ofi-cal-border); }
+.ofi-qa__chip.is-best::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #34c778;
+    flex: none;
+}
+.ofi-qa__chip.is-selected {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-qa__chip.is-selected::before { background: #fff; }
+.ofi-qa__chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ofi-qa__input {
+    width: 100%;
+    height: 46px;
+    padding: 0 12px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-size: 14.5px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-qa__input-wrap { position: relative; }
+.ofi-qa__input-wrap .ofi-qa__input { padding-right: 46px; }
+.ofi-qa__input-clear {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.ofi-qa__input-clear:hover {
+    background: rgba(185, 28, 28, 0.1);
+    color: var(--ofi-cal-danger);
+}
+.ofi-qa__input-clear:focus-visible {
+    outline: 2px solid var(--ofi-cal-accent);
+    outline-offset: 1px;
+}
+.ofi-qa__input:focus { border-color: var(--ofi-cal-accent); box-shadow: 0 0 0 3px var(--ofi-cal-accent-soft); }
+.ofi-qa__input::placeholder { color: var(--ofi-cal-faint); font-weight: 400; }
+
+/* The final route after photo selection and suggestions: type a name directly,
+   or correct the OCR text that was placed in this field. */
+.ofi-qa__manual {
+    padding-top: 13px;
+    border-top: 1px solid var(--ofi-cal-line);
+}
+.ofi-qa__manual-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.ofi-qa__manual-head > span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    margin-bottom: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Treffer in der Produktliste: «schon vorhanden → Eingang buchen». */
+.ofi-qa__matches { display: flex; flex-direction: column; gap: 6px; }
+.ofi-qa__match {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+.ofi-qa__match:hover { background: var(--ofi-cal-hover); }
+.ofi-qa__match.is-linked {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-tint);
+}
+.ofi-qa__match-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-qa__match-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+}
+.ofi-qa__match-check { color: var(--ofi-cal-accent); flex: none; }
+
+.ofi-qa__linked {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--ofi-cal-accent-tint);
+    border: 1px solid var(--ofi-cal-accent-soft);
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+}
+.ofi-qa__linked strong { font-weight: 700; }
+.ofi-qa__link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ofi-cal-accent);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+/* Menge: grosse −/+ Tasten, Zahl in der Mitte, Einheit daneben. */
+.ofi-qa__qtyrow {
+    display: grid;
+    grid-template-columns: auto minmax(120px, 1fr);
+    gap: 10px;
+    align-items: end;
+}
+.ofi-qa__stepper {
+    display: inline-flex;
+    align-items: stretch;
+    height: 46px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--ofi-cal-surface);
+}
+.ofi-qa__step {
+    width: 46px;
+    border: 0;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-accent);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 120ms ease;
+}
+.ofi-qa__step:hover { background: var(--ofi-cal-hover); }
+.ofi-qa__step:active { background: var(--ofi-cal-accent-soft); }
+.ofi-qa__qty {
+    width: 96px;
+    border: 0;
+    border-left: 1px solid var(--ofi-cal-border-soft);
+    border-right: 1px solid var(--ofi-cal-border-soft);
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 19px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+}
+.ofi-qa__qty:focus { background: var(--ofi-cal-accent-tint); }
+/* Das Einheitenfeld (UnitSelect) auf Fensterhöhe bringen. */
+.ofi-qa__unit input { height: 46px !important; border-radius: 8px !important; font-size: 14px; }
+
+.ofi-qa__check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+    user-select: none;
+}
+.ofi-qa__check input { width: 18px; height: 18px; accent-color: var(--ofi-cal-accent); margin: 0; }
+
+.ofi-qa__add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 50px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 140ms ease, transform 90ms ease, opacity 120ms ease;
+}
+.ofi-qa__add:hover { background: var(--ofi-cal-accent-hover); }
+.ofi-qa__add:active { transform: scale(0.975); }
+.ofi-qa__add:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.ofi-qa__add.is-stock { background: #0f766e; }
+.ofi-qa__add.is-stock:hover { background: #0b5f59; }
+
+/* Das Protokoll der Sitzung: was schon drin ist. */
+.ofi-qa__log { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.ofi-qa__logrow {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--ofi-cal-surface-2);
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+    animation: ofi-qa-rise 220ms ease;
+}
+.ofi-qa__logrow.is-error { background: rgba(185, 28, 28, 0.08); color: var(--ofi-cal-danger); }
+.ofi-qa__logrow > svg { color: #1a9e5c; }
+.ofi-qa__logrow.is-error > svg { color: var(--ofi-cal-danger); }
+.ofi-qa__logname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ofi-qa__logname small {
+    margin-left: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+}
+.ofi-qa__logqty { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: nowrap; }
+.ofi-qa__logkind {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.ofi-qa__logkind.is-stock { background: rgba(15, 118, 110, 0.14); color: #0f766e; }
+@keyframes ofi-qa-rise {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Fuss: Schliessen ──────────────────────────────────────────────────── */
+.ofi-qa__foot {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--ofi-cal-line);
+    background: var(--ofi-cal-surface);
+}
+.ofi-qa__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 180px;
+    height: 46px;
+    padding: 0 22px;
+    border: 1px solid var(--ofi-cal-accent);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-accent);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 140ms ease, transform 90ms ease;
+}
+.ofi-qa__close:hover { background: var(--ofi-cal-accent-tint); }
+.ofi-qa__close:active { transform: scale(0.97); }
+.ofi-qa.is-phone .ofi-qa__foot {
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+}
+.ofi-qa.is-phone .ofi-qa__close { width: 100%; }
+
+/* Schmale Fenster (Tablet hochkant, halbes Fenster): eine Spalte. */
+@media (max-width: 860px) {
+    .ofi-qa__body { display: block; }
+    .ofi-qa__stage { border-right: 0; }
+}

@@ -105,6 +105,7 @@ export const FloatingCard = ({
     leading,
     initialHeight,
     className,
+    z,
     children,
 }: {
     open: boolean;
@@ -157,6 +158,11 @@ export const FloatingCard = ({
     initialHeight?: number;
     /* Extra class on the card itself (a module's own paint). */
     className?: string;
+    /* Höher als die 120 des Stilblatts stapeln. Gebraucht, wenn die Karte über
+       einem Fenster MIT Schleier steht (`PopupDialog`, z 750) — sonst läge sie
+       darunter. Escape gehört dann weiterhin dem Fenster (`data-cal-stacked`),
+       der Aufrufer regelt die Taste selbst. */
+    z?: number;
     children: ReactNode;
 }) => {
     const cardRef = useRef<HTMLElement | null>(null);
@@ -402,7 +408,7 @@ export const FloatingCard = ({
             role="dialog"
             aria-label={typeof title === 'string' ? title : undefined}
             className={`ofi-float-card ${compact ? 'is-compact' : ''} ${narrow ? 'is-narrow' : ''} ${className || ''}`}
-            style={{ left: pos!.x, top: pos!.y, width: cardWidth, height: height ?? undefined }}
+            style={{ left: pos!.x, top: pos!.y, width: cardWidth, height: height ?? undefined, zIndex: z }}
         >
             {movable && <span className="ofi-float-card__edge is-top" onPointerDown={(event) => startResize(event, 'top')} aria-hidden />}
             {header}

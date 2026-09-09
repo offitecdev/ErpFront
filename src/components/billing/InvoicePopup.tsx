@@ -44,6 +44,7 @@ export const InvoicePopup = ({
     /** Ein Blatt (PDF) füllt die Karte — es soll wachsen, nicht scrollen. */
     fill = false,
     closeOnOutside = true,
+    zIndex,
     children,
 }: {
     open: boolean;
@@ -56,6 +57,8 @@ export const InvoicePopup = ({
     bodyClassName?: string;
     fill?: boolean;
     closeOnOutside?: boolean;
+    /** Über einer anderen schwebenden Karte geöffnet (Rapport-Fenster → Zusatzaufträge): höher stapeln. */
+    zIndex?: number;
     children: ReactNode;
 }) => {
     const [maximised, setMaximised] = useState(false);
@@ -95,6 +98,7 @@ export const InvoicePopup = ({
             footer={footer}
             bodyClassName={`ofi-inv-pop ofi-inv-scope ${fill ? 'ofi-inv-pop--fill' : ''} ${bodyClassName || ''}`}
             closeOnOutside={closeOnOutside}
+            z={zIndex}
         >
             {children}
         </FloatingCard>

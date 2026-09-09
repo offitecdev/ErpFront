@@ -126,8 +126,10 @@ const I18N: Record<PriceRequestPdfLang, PriceRequestPdfStrings> = {
 };
 
 // ── Sayfa geometrisi (A4, mm) — sipariş şablonuyla birebir ──────────────────
-const ML = 14;
-const MR = 196;
+/* Zwei Millimeter schmalere Raender seit dem 09.09.2026 — dieselbe Vorgabe
+   wie beim Bestell-PDF (orderPdf.ts). */
+const ML = 12;
+const MR = 198;
 const CONTENT_W = MR - ML;
 
 const LOGO_X = ML;
@@ -144,31 +146,136 @@ const COVER_LETTER_MAX_LINES = 20;
 // Fiyatsız tablo: Pos | Açıklama | Seri Kod | Miktar. Kod sütunu yalnızca
 // siparişte gerçekten kod varsa çizilir; genişliği açıklamaya kalır.
 const C_POS_X = ML + 1.5;
-const C_DESC = 25;
+const C_DESC = ML + 8;
 const C_QTY_R = MR - 1;
-const COL_W_QTY = 20;
-const COL_W_CODE = 30;
 const GAP = 2;
 
 interface TableLayout {
     descEnd: number;
+    extraX: number[];
+    extraWidths: number[];
     codeX: number | null;
     qtyR: number;
     wCode: number;
     wQty: number;
 }
 
-const buildTableLayout = (hasCode: boolean): TableLayout => {
-    let right = C_QTY_R - COL_W_QTY;
-    const codeX = hasCode ? right - COL_W_CODE : null;
-    if (hasCode) right -= COL_W_CODE;
+type PdfExtraColumn = { key: string; name: string; width: number };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIE SPALTEN RICHTEN SICH NACH IHREM INHALT — dieselbe Regel wie im
+   Bestell-PDF (siehe den langen Kommentar in orderPdf.ts, Vorgabe Samet
+   09.09.2026): kein Titel schrumpft, kein Wort bricht in der Mitte, nichts
+   wandert unter den Produktnamen. Jede Spalte bekommt mindestens ihr laengstes
+   Wort, der Rest wird nach Bedarf verteilt, die Beschreibung nimmt, was
+   uebrig bleibt. Ein Code ohne Leerzeichen darf an seinen Trennzeichen
+   brechen.
+   ═════════════════════════════════════════════════════════════════════════ */
+const DESC_MIN_W = 22;
+const FS_HEADER_MIN = 7;
+
+const widestWord = (doc: jsPDF, text: string, style: 'normal' | 'bold', size: number): number => {
+    doc.setFont(FONT, style);
+    doc.setFontSize(size);
+    return Math.max(0, ...text.split(/[\s\u200b]+/).filter(Boolean).map((word) => doc.getTextWidth(word)));
+};
+
+const fullWidth = (doc: jsPDF, text: string, style: 'normal' | 'bold', size: number): number => {
+    doc.setFont(FONT, style);
+    doc.setFontSize(size);
+    return doc.getTextWidth(text);
+};
+
+const breakableCode = (code: string): string => code.replace(/([-_/.])/g, '$1\u200b');
+
+interface MeasuredColumn { kind: 'code' | 'qty' | string; min: number; full: number; align: 'left' | 'right' }
+
+const measureColumn = (
+    doc: jsPDF,
+    kind: MeasuredColumn['kind'],
+    header: string,
+    values: string[],
+    align: 'left' | 'right',
+    valueStyle: 'normal' | 'bold' = 'normal',
+    valueSize = FS_BASE,
+): MeasuredColumn => {
+    const headMin = widestWord(doc, header, 'bold', FS_HEADER_MIN);
+    const headFull = fullWidth(doc, header, 'bold', FS_HEADER);
+    const valueMin = Math.max(0, ...values.map((value) => widestWord(doc, value, valueStyle, valueSize)));
+    const valueFull = Math.max(0, ...values.map((value) => fullWidth(doc, value, valueStyle, valueSize)));
+    const valueNeed = align === 'right' ? valueFull : valueMin;
     return {
-        descEnd: right - GAP,
-        codeX,
-        qtyR: C_QTY_R,
-        wCode: COL_W_CODE - GAP,
-        wQty: COL_W_QTY - GAP,
+        kind,
+        min: Math.max(headMin, valueNeed) * 1.03 + GAP,
+        full: Math.max(headFull, valueFull) + GAP,
+        align,
     };
+};
+
+const buildTableLayout = (
+    doc: jsPDF,
+    order: PurchaseOrderRow,
+    L: PriceRequestPdfStrings,
+    hasCode: boolean,
+    extraCols: PdfExtraColumn[],
+): TableLayout => {
+    const items = order.items ?? [];
+    const columns: MeasuredColumn[] = [];
+    extraCols.forEach((column) => {
+        columns.push(measureColumn(doc, column.key, column.name,
+            items.map((item) => requestExtraValue(item, column.key) || '—'), 'left', 'normal', FS_BASE - 0.4));
+    });
+    if (hasCode) {
+        columns.push(measureColumn(doc, 'code', L.colCode,
+            items.map((item) => breakableCode((item.code || '').trim()) || '—'), 'left', 'normal', FS_BASE - 0.4));
+    }
+    columns.push(measureColumn(doc, 'qty', L.colQty, items.map((item) => fmtQty(item.quantity || 0)), 'right', 'bold'));
+
+    const descMin = Math.max(
+        DESC_MIN_W,
+        widestWord(doc, L.colDesc, 'bold', FS_HEADER) + GAP,
+        ...items.map((item) => widestWord(doc, (item.name || '').trim(), 'bold', FS_TITLE) + GAP),
+    );
+    const room = C_QTY_R - C_DESC;
+    const minSum = columns.reduce((sum, column) => sum + column.min, 0);
+    const descWish = Math.max(descMin, 70);
+    const wishSum = columns.reduce((sum, column) => sum + column.full, 0) + descWish;
+    let widths: number[];
+    let descW: number;
+    if (minSum + descMin >= room) {
+        descW = Math.max(DESC_MIN_W, room - minSum);
+        const deficit = Math.max(0, minSum + descW - room);
+        const textMin = columns.reduce((sum, column) => sum + (column.align === 'left' ? column.min : 0), 0);
+        const textScale = textMin > 0 ? Math.max(0.5, (textMin - deficit) / textMin) : 1;
+        widths = columns.map((column) => (column.align === 'left' ? column.min * textScale : column.min));
+    } else if (wishSum <= room) {
+        widths = columns.map((column) => column.full);
+        descW = room - widths.reduce((sum, width) => sum + width, 0);
+    } else {
+        const spare = room - minSum - descMin;
+        const needs = columns.map((column) => column.full - column.min);
+        const descNeed = descWish - descMin;
+        const needSum = needs.reduce((sum, need) => sum + need, 0) + descNeed;
+        widths = columns.map((column, index) => column.min + (needSum > 0 ? spare * (needs[index] / needSum) : 0));
+        descW = descMin + (needSum > 0 ? spare * (descNeed / needSum) : spare);
+    }
+
+    let x = C_DESC + descW;
+    const descEnd = x - GAP;
+    const extraX: number[] = [];
+    const extraWidths: number[] = [];
+    let codeX: number | null = null;
+    let wCode = 0;
+    let qtyR = C_QTY_R;
+    let wQty = 0;
+    columns.forEach((column, index) => {
+        const width = widths[index];
+        if (column.kind === 'code') { codeX = x; wCode = width - GAP; }
+        else if (column.kind === 'qty') { qtyR = x + width - GAP; wQty = width - GAP; }
+        else { extraX.push(x); extraWidths.push(width); }
+        x += width;
+    });
+    return { descEnd, extraX, extraWidths, codeX, qtyR, wCode, wQty };
 };
 
 const HEAD_H = 9;
@@ -352,17 +459,28 @@ export async function buildPriceRequestPdfBytes(
     drawCoverPage(doc, order, settings, L);
 
     // ── SAYFA 2+: Pozisyonlar (fiyatsız) ─────────────────────────────────────
-    const layout = buildTableLayout(order.items.some((item) => Boolean((item.code || '').trim())));
+    const extraCols = requestExtraColumns(order);
+    // Der ausgeblendete Seriencode bleibt auch in der Preisanfrage weg
+    // (siehe `orderHiddenKeys` im Bestell-PDF).
+    const hiddenKeys = new Set(order.hiddenColumnKeys ?? []);
+    const visibleExtras = extraCols.filter((column) => !hiddenKeys.has(column.key));
+    const layout = buildTableLayout(
+        doc,
+        order,
+        L,
+        !hiddenKeys.has('code') && order.items.some((item) => Boolean((item.code || '').trim())),
+        visibleExtras,
+    );
     doc.addPage();
     const st: TableState = { y: 0, rowIdx: 0 };
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout);
+    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout, extraCols);
 
     order.items.forEach((item, index) => {
-        const h = measureRow(doc, item, L, layout);
+        const h = measureRow(doc, item, L, layout, visibleExtras);
         if (st.y + h > CONTENT_BOTTOM || CONTENT_BOTTOM - st.y < MIN_ROW_START) {
-            newTablePage(doc, st, L, layout);
+            newTablePage(doc, st, L, layout, extraCols);
         }
-        st.y = drawRow(doc, item, index, st.y, Math.min(h, CONTENT_BOTTOM - st.y), st.rowIdx, L, layout);
+        st.y = drawRow(doc, item, index, st.y, Math.min(h, CONTENT_BOTTOM - st.y), st.rowIdx, L, layout, extraCols);
         st.rowIdx++;
     });
 
@@ -655,37 +773,109 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
 
 interface TableState { y: number; rowIdx: number }
 
-function newTablePage(doc: jsPDF, st: TableState, L: PriceRequestPdfStrings, layout: TableLayout) {
-    doc.addPage();
-    st.rowIdx = 0;
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout);
+function requestExtraColumns(order: PurchaseOrderRow): PdfExtraColumn[] {
+    const seen = new Map<string, PdfExtraColumn>();
+    for (const item of order.items ?? []) {
+        for (const entry of item.extras ?? []) {
+            if (!entry?.key || !entry?.name || seen.has(entry.key)) continue;
+            seen.set(entry.key, {
+                key: entry.key,
+                name: entry.name,
+                width: Math.min(240, Math.max(80, entry.width ?? 120)),
+            });
+        }
+    }
+    return [...seen.values()].slice(0, 5);
 }
 
-function drawTableHeader(doc: jsPDF, y: number, L: PriceRequestPdfStrings, layout: TableLayout): number {
+function requestExtraValue(item: OrderItem, key: string): string {
+    return String(item.extras?.find((entry) => entry.key === key)?.value ?? '').trim();
+}
+
+function newTablePage(
+    doc: jsPDF,
+    st: TableState,
+    L: PriceRequestPdfStrings,
+    layout: TableLayout,
+    extraCols: PdfExtraColumn[],
+) {
+    doc.addPage();
+    st.rowIdx = 0;
+    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout, extraCols);
+}
+
+/**
+ * ── DIE KOPFZEILE BRICHT UM, STATT ZU SCHRUMPFEN ─────────────────────────────
+ * Dieselbe Regel wie im Bestell-PDF (siehe `drawTableHeader` in orderPdf.ts,
+ * Vorgabe Samet 09.09.2026): alle Titel in EINER Schrift; wer nicht in seine
+ * Spalte passt, bekommt eine zweite Zeile, und der Kopf wird so hoch wie sein
+ * laengster Titel. Verkleinert wird nur ein einzelnes Wort, das allein nicht
+ * passt — und nie unter `FS_HEADER_MIN`.
+ */
+const HEAD_LH = 3.6;
+const HEAD_PAD = 2.4;
+
+type HeadCell = { lines: string[]; x: number; align: 'left' | 'right'; size: number };
+
+function splitHeader(doc: jsPDF, label: string, width: number, size: number): { lines: string[]; chopped: boolean } {
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(size);
+    const words = label.split(/\s+/).filter(Boolean);
+    const lines = doc.splitTextToSize(label, width) as string[];
+    return { lines, chopped: lines.length > words.length };
+}
+
+function headerSizeFor(doc: jsPDF, label: string, maxW: number): number {
+    const width = Math.max(4, maxW);
+    let size = FS_HEADER;
+    while (size > FS_HEADER_MIN && splitHeader(doc, label, width, size).chopped) size -= 0.2;
+    return size;
+}
+
+function headCell(doc: jsPDF, label: string, x: number, maxW: number, align: 'left' | 'right', size: number): HeadCell {
+    const { lines } = splitHeader(doc, label, Math.max(4, maxW), size);
+    doc.setFontSize(FS_HEADER);
+    return { lines, x, align, size };
+}
+
+function drawTableHeader(
+    doc: jsPDF,
+    y: number,
+    L: PriceRequestPdfStrings,
+    layout: TableLayout,
+    extraCols: PdfExtraColumn[],
+): number {
+    const specs: Array<[string, number, number, 'left' | 'right']> = [
+        [L.colPos, C_POS_X, C_DESC - C_POS_X - 1, 'left'],
+        [L.colDesc, C_DESC, layout.descEnd - C_DESC, 'left'],
+        ...layout.extraX.map((x, index): [string, number, number, 'left' | 'right'] =>
+            [extraCols[index]?.name ?? '', x, layout.extraWidths[index] - GAP, 'left']),
+        ...(layout.codeX !== null ? [[L.colCode, layout.codeX, layout.wCode, 'left'] as [string, number, number, 'left' | 'right']] : []),
+        [L.colQty, layout.qtyR, layout.wQty, 'right'],
+    ];
+    const rowSize = Math.min(FS_HEADER, ...specs.map(([label, , maxW]) => headerSizeFor(doc, label, maxW)));
+    const cells: HeadCell[] = specs.map(([label, x, maxW, align]) => headCell(doc, label, x, maxW, align, rowSize));
+    const lineCount = Math.max(1, ...cells.map((cell) => cell.lines.length));
+    const headH = Math.max(HEAD_H, HEAD_PAD * 2 + lineCount * HEAD_LH);
+
     doc.setFillColor(...COLOR_HEAD_BG);
-    doc.rect(ML, y, CONTENT_W, HEAD_H, 'F');
+    doc.rect(ML, y, CONTENT_W, headH, 'F');
     doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(ML, y + HEAD_H - 0.35, CONTENT_W, 0.35, 'F');
+    doc.rect(ML, y + headH - 0.35, CONTENT_W, 0.35, 'F');
 
     doc.setFont(FONT, 'bold');
-    doc.setFontSize(FS_HEADER);
     doc.setTextColor(...COLOR_NAVY);
-
-    const ty = y + HEAD_H / 2 + 1.3;
-    fitFontSize(doc, L.colPos, C_DESC - C_POS_X - 1, FS_HEADER, 5.8);
-    doc.text(L.colPos, C_POS_X, ty);
-    doc.setFontSize(FS_HEADER);
-    fitFontSize(doc, L.colDesc, layout.descEnd - C_DESC, FS_HEADER, 5.8);
-    doc.text(L.colDesc, C_DESC, ty);
-    if (layout.codeX !== null) {
-        fitFontSize(doc, L.colCode, layout.wCode, FS_HEADER, 5.8);
-        doc.text(L.colCode, layout.codeX, ty);
+    const bottom = y + headH - HEAD_PAD - 0.6;
+    for (const cell of cells) {
+        doc.setFontSize(cell.size);
+        cell.lines.forEach((line, index) => {
+            const ly = bottom - (cell.lines.length - 1 - index) * HEAD_LH;
+            doc.text(line, cell.x, ly, cell.align === 'right' ? { align: 'right' } : undefined);
+        });
     }
-    fitFontSize(doc, L.colQty, layout.wQty, FS_HEADER, 5.8);
-    doc.text(L.colQty, layout.qtyR, ty, { align: 'right' });
     doc.setFontSize(FS_HEADER);
 
-    return y + HEAD_H + HEAD_GAP;
+    return y + headH + HEAD_GAP;
 }
 
 function fitFontSize(doc: jsPDF, text: string, maxW: number, base: number, min = 6.4): number {
@@ -715,28 +905,42 @@ function drawFittedRight(
 
 type OrderItem = PurchaseOrderRow['items'][number];
 
-/** Açıklama hücresi: ürün adı (kalın) + seri no ikinci satırda (soluk). */
+/** Die Zeilen einer Zelle: der Text bricht in seiner Spalte um. */
+function cellLines(doc: jsPDF, text: string, maxW: number, size: number): string[] {
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(text || '—', Math.max(4, maxW)) as string[];
+    return lines.map((line) => line.replace(/\u200b/g, ''));
+}
+
+/** Açıklama hücresi: ürün adı (kalın) + seri no ikinci satırda (soluk). Der
+    Code steht NICHT mehr hier — er bricht in seiner eigenen Spalte um. */
 function buildRowLines(doc: jsPDF, item: OrderItem, L: PriceRequestPdfStrings, layout: TableLayout): { title: string[]; meta: string[] } {
     const descW = layout.descEnd - C_DESC;
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_TITLE);
     const title = doc.splitTextToSize((item.name || '').trim(), descW) as string[];
-
-    const metaParts = [
-        item.serialNumber ? `${L.serialShort}: ${item.serialNumber}` : '',
-    ].filter(Boolean);
     let meta: string[] = [];
-    if (metaParts.length) {
+    if (item.serialNumber) {
         doc.setFont(FONT, 'normal');
         doc.setFontSize(FS_BASE - 0.4);
-        meta = doc.splitTextToSize(metaParts.join('  ·  '), descW) as string[];
+        meta = doc.splitTextToSize(`${L.serialShort}: ${item.serialNumber}`, descW) as string[];
     }
     return { title, meta };
 }
 
-function measureRow(doc: jsPDF, item: OrderItem, L: PriceRequestPdfStrings, layout: TableLayout): number {
+function measureRow(doc: jsPDF, item: OrderItem, L: PriceRequestPdfStrings, layout: TableLayout, extraCols: PdfExtraColumn[]): number {
     const { title, meta } = buildRowLines(doc, item, L, layout);
-    const contentH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
+    const descH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
+    const extraH = Math.max(0, ...layout.extraX.map((_, position) => {
+        const column = extraCols[position];
+        if (!column) return 0;
+        return cellLines(doc, requestExtraValue(item, column.key), layout.extraWidths[position] - GAP, FS_BASE - 0.4).length * LH_BODY;
+    }));
+    const codeH = layout.codeX === null
+        ? 0
+        : cellLines(doc, breakableCode((item.code || '').trim()), layout.wCode, FS_BASE - 0.4).length * LH_BODY;
+    const contentH = Math.max(descH, extraH, codeH);
     // BİRİM SATIRI YOKTUR (kullanıcı isteği 2026-08-21: "adet vs. yazmasın").
     const numericsH = FIRST_BASELINE - 2;
     return Math.max(ROW_MIN_H, Math.max(contentH, numericsH) + ROW_PAD * 2);
@@ -750,7 +954,8 @@ function drawRow(
     rowH: number,
     rowIdx: number,
     L: PriceRequestPdfStrings,
-    layout: TableLayout
+    layout: TableLayout,
+    extraCols: PdfExtraColumn[],
 ): number {
     if (rowIdx % 2 === 1) {
         doc.setFillColor(...COLOR_ZEBRA);
@@ -786,11 +991,20 @@ function drawRow(
         doc.setTextColor(...COLOR_TEXT);
     }
 
-    if (layout.codeX !== null) {
-        doc.setFont(FONT, 'normal');
+    layout.extraX.forEach((x, position) => {
+        const column = extraCols[position];
+        if (!column) return;
         doc.setTextColor(...COLOR_LABEL);
-        fitFontSize(doc, item.code || '—', layout.wCode, FS_BASE - 0.4);
-        doc.text(item.code || '—', layout.codeX, baseY);
+        cellLines(doc, requestExtraValue(item, column.key), layout.extraWidths[position] - GAP, FS_BASE - 0.4)
+            .forEach((line, lineIdx) => doc.text(line, x, baseY + lineIdx * LH_BODY));
+        doc.setFontSize(FS_BASE);
+        doc.setTextColor(...COLOR_TEXT);
+    });
+
+    if (layout.codeX !== null) {
+        doc.setTextColor(...COLOR_LABEL);
+        cellLines(doc, breakableCode((item.code || '').trim()), layout.wCode, FS_BASE - 0.4)
+            .forEach((line, lineIdx) => doc.text(line, layout.codeX!, baseY + lineIdx * LH_BODY));
         doc.setFontSize(FS_BASE);
         doc.setTextColor(...COLOR_TEXT);
     }

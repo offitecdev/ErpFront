@@ -3,10 +3,12 @@ import { toast } from 'sonner';
 
 import {
     Calendar as CalendarIcon, ChevronLeft, ChevronRight, Mail01, MarkerPin01,
-    Phone, Plus, RefreshCcw01, SearchLg, Trash01, Users01,
+    Phone, Plus, RefreshCcw01, Trash01, Users01,
 } from '@/components/icons/antIconCompat';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { InlineLoading } from '@/components/ui-shared/Loader';
+import { FilterBar, FilterSelect, FilterSlot, SearchBox } from '@/components/ui-shared/TableKit';
+import { CrmFilterDate } from './components/CrmFilterBar';
 import { t } from '@/i18n/translate';
 import i18n from '@/i18n';
 import { crmApi } from '@/lib/api/crm';
@@ -167,15 +169,6 @@ export const CommunicationPage = () => {
                     <span className="ofi-crm-head__count">{total}</span>
                 </div>
                 <div className="ofi-crm-head__actions">
-                    <label className="ofi-crm-search">
-                        <SearchLg size={15} />
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t('crm.comm.searchPlaceholder')}
-                            aria-label={t('crm.comm.searchPlaceholder')}
-                        />
-                    </label>
                     <button type="button" className="ofi-crm-iconbtn" onClick={reload} title={t('common.refresh')}>
                         <RefreshCcw01 size={15} />
                     </button>
@@ -186,8 +179,50 @@ export const CommunicationPage = () => {
                 </div>
             </header>
 
-            {/* Art als Kapseln (das wechselt man oft), Kunde/Zeitraum/Person als
-                Auswahlfelder daneben (das setzt man einmal). */}
+            {/* Werkzeugzeile — dieselbe wie auf jeder anderen Liste (Suche zuerst,
+                Filter dahinter, gemeinsames Mass aus styles/controls.css). Die Art
+                steht als Segmentschalter darunter: das wechselt man oft, Kunde,
+                Zeitraum und Person setzt man einmal. */}
+            <FilterBar>
+                <SearchBox value={search} onChange={setSearch} placeholder={t('crm.comm.searchPlaceholder')} busy={loading} />
+                <FilterSlot width="wide">
+                    <CustomerPicker
+                        value={customer}
+                        onPick={(pick) => pickCustomer(pick?.customer ?? null)}
+                        placeholder={t('crm.comm.filterCustomer')}
+                    />
+                </FilterSlot>
+                <CrmFilterDate
+                    value={filters.from}
+                    onChange={(value) => setFilters((c) => ({ ...c, from: value }))}
+                    label={t('crm.comm.filterFrom')}
+                />
+                <CrmFilterDate
+                    value={filters.to}
+                    onChange={(value) => setFilters((c) => ({ ...c, to: value }))}
+                    label={t('crm.comm.filterTo')}
+                />
+                <FilterSelect
+                    value={filters.employeeId}
+                    onChange={(value) => setFilters((c) => ({ ...c, employeeId: value }))}
+                    label={t('crm.comm.filterEmployee')}
+                >
+                    <option value="">{t('crm.comm.allEmployees')}</option>
+                    {staffOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                </FilterSelect>
+                {hasFilters && (
+                    <button
+                        type="button"
+                        className="ofi-crm-btn is-quiet"
+                        onClick={() => { setFilters(EMPTY_COMMUNICATION_FILTER); setCustomer(null); }}
+                    >
+                        {t('crm.comm.resetFilters')}
+                    </button>
+                )}
+            </FilterBar>
+
             <div className="ofi-crm-filters">
                 <div className="ofi-crm-chips">
                     <button
@@ -208,48 +243,6 @@ export const CommunicationPage = () => {
                         </button>
                     ))}
                 </div>
-
-                <div className="w-56">
-                    <CustomerPicker
-                        value={customer}
-                        onPick={(pick) => pickCustomer(pick?.customer ?? null)}
-                        placeholder={t('crm.comm.filterCustomer')}
-                    />
-                </div>
-                <input
-                    type="date"
-                    className="ofi-crm-select"
-                    value={filters.from}
-                    onChange={(event) => setFilters((c) => ({ ...c, from: event.target.value }))}
-                    aria-label={t('crm.comm.filterFrom')}
-                />
-                <input
-                    type="date"
-                    className="ofi-crm-select"
-                    value={filters.to}
-                    onChange={(event) => setFilters((c) => ({ ...c, to: event.target.value }))}
-                    aria-label={t('crm.comm.filterTo')}
-                />
-                <select
-                    className="ofi-crm-select"
-                    value={filters.employeeId}
-                    onChange={(event) => setFilters((c) => ({ ...c, employeeId: event.target.value }))}
-                    aria-label={t('crm.comm.filterEmployee')}
-                >
-                    <option value="">{t('crm.comm.allEmployees')}</option>
-                    {staffOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                </select>
-                {hasFilters && (
-                    <button
-                        type="button"
-                        className="ofi-crm-btn is-quiet"
-                        onClick={() => { setFilters(EMPTY_COMMUNICATION_FILTER); setCustomer(null); }}
-                    >
-                        {t('crm.comm.resetFilters')}
-                    </button>
-                )}
             </div>
 
             <section className="ofi-crm-surface">

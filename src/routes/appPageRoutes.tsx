@@ -2,7 +2,7 @@ import type { LazyExoticComponent } from 'react';
 import { Route, Navigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { isProjectModuleEnabledForTenant } from '../lib/moduleCatalog';
-import { lazyNamed, page } from './routeHelpers';
+import { applePage, lazyNamed, page } from './routeHelpers';
 import type { RouteComponent } from './routeHelpers';
 import { TechnicianBridge } from './montageRoutes';
 import { LazyItGate } from './LazyItGate';
@@ -51,6 +51,12 @@ const FormSubmissionPage = lazyNamed(() => import('../pages/crm/forms/FormSubmis
 // Angebote und Aufträge leben seit dem CRM-Umbau (2026-08-14) unter "Verkauf".
 const MyOrders = lazyNamed(() => import('../pages/sales/MyOrders'), 'MyOrders');
 const MyOrderDetail = lazyNamed(() => import('../pages/sales/MyOrderDetail'), 'MyOrderDetail');
+// Zusatzaufträge / Nachträge (05.09.2026): ALLE NT-Belege in einer Liste,
+// neben den Aufträgen (AB) — mit eigenem PDF je Nachtrag.
+const AddonOrdersPage = lazyNamed(() => import('../pages/sales/AddonOrdersPage'), 'AddonOrdersPage');
+// Der Nachtrag entsteht auf einer eigenen SEITE (kein Fenster) — Positions-
+// erfassung wie in der Angebotsmaske, mit Zahlungsplan.
+const AddonOrderCreatePage = lazyNamed(() => import('../pages/sales/AddonOrderCreatePage'), 'AddonOrderCreatePage');
 const TenderList = lazyNamed(() => import('../pages/sales/TenderList'), 'TenderList');
 const TenderDetail = lazyNamed(() => import('../pages/sales/TenderDetail'), 'TenderDetail');
 const TenderReport = lazyNamed(() => import('../pages/sales/TenderReport'), 'TenderReport');
@@ -72,6 +78,7 @@ const StockMovementsPage = lazyNamed(() => import('../pages/inventory/StockMovem
 const SuppliersPage = lazyNamed(() => import('../pages/inventory/SuppliersPage'), 'SuppliersPage');
 const OrdersPage = lazyNamed(() => import('../pages/inventory/OrdersPage'), 'OrdersPage');
 const OrderCreatePage = lazyNamed(() => import('../pages/inventory/OrderCreatePage'), 'OrderCreatePage');
+const OrderDetailPage = lazyNamed(() => import('../pages/inventory/OrderDetailPage'), 'OrderDetailPage');
 // Mal kabul artık pop-up değil, stok ekranı gibi kendi sayfası.
 const OrderReceivePage = lazyNamed(() => import('../pages/inventory/OrderReceivePage'), 'OrderReceivePage');
 const Shipments = lazyNamed(() => import('../pages/logistics/Shipments'), 'Shipments');
@@ -205,23 +212,23 @@ export const renderAppPageRoutes = () => (
         <Route path="/attendance-records" element={<Navigate to="/personnel/time-records" replace />} />
         <Route path="/attendance-settings" element={<Navigate to="/settings/modules?module=personnel&category=shift" replace />} />
         <Route path="/crm/overview" element={page(CrmOverview)} />
-        <Route path="/crm/customers" element={page(CustomerList)} />
-        <Route path="/crm/customers/:id" element={page(CustomerDashboard)} />
-        <Route path="/crm/contacts" element={page(ContactsPage)} />
-        <Route path="/crm/communication" element={page(CommunicationPage)} />
+        <Route path="/crm/customers" element={applePage(CustomerList)} />
+        <Route path="/crm/customers/:id" element={applePage(CustomerDashboard)} />
+        <Route path="/crm/contacts" element={applePage(ContactsPage)} />
+        <Route path="/crm/communication" element={applePage(CommunicationPage)} />
         {/* Anfragen und Aktivitaeten (10.09.2026) — die beiden neuen Listen
             des CRM-Menues; das oeffentliche Formular haengt unter /anfrage. */}
-        <Route path="/crm/enquiries" element={page(EnquiriesPage)} />
-        <Route path="/crm/activities" element={page(ActivitiesPage)} />
+        <Route path="/crm/enquiries" element={applePage(EnquiriesPage)} />
+        <Route path="/crm/activities" element={applePage(ActivitiesPage)} />
         <Route path="/crm/mail" element={page(MailPage)} />
-        <Route path="/crm/tasks" element={page(TasksPage)} />
-        <Route path="/crm/tasks/:id" element={page(TaskDetailPage)} />
-        <Route path="/crm/reminders" element={page(RemindersPage)} />
-        <Route path="/crm/quick-entry" element={page(QuickEntryPage)} />
+        <Route path="/crm/tasks" element={applePage(TasksPage)} />
+        <Route path="/crm/tasks/:id" element={applePage(TaskDetailPage)} />
+        <Route path="/crm/reminders" element={applePage(RemindersPage)} />
+        <Route path="/crm/quick-entry" element={applePage(QuickEntryPage)} />
         {/* Checklisten / Formulare: Liste, Vorlagen (fester Pfad VOR ':id'),
             Vorlagen-Editor, Einzelformular. */}
-        <Route path="/crm/forms" element={page(FormsPage)} />
-        <Route path="/crm/forms/templates" element={page(FormTemplatesPage)} />
+        <Route path="/crm/forms" element={applePage(FormsPage)} />
+        <Route path="/crm/forms/templates" element={applePage(FormTemplatesPage)} />
         <Route path="/crm/forms/templates/new" element={page(FormTemplateBuilderPage)} />
         <Route path="/crm/forms/templates/:id" element={page(FormTemplateBuilderPage)} />
         <Route path="/crm/forms/:id" element={page(FormSubmissionPage)} />
@@ -236,6 +243,10 @@ export const renderAppPageRoutes = () => (
         <Route path="/sales/osp" element={page(OspPage)} />
         <Route path="/sales/orders" element={page(MyOrders)} />
         <Route path="/sales/orders/:id" element={page(MyOrderDetail)} />
+        <Route path="/sales/addon-orders" element={page(AddonOrdersPage)} />
+        {/* Feste Wege vor jedem ':id' — hier gibt es ohnehin keinen. */}
+        <Route path="/sales/addon-orders/new" element={page(AddonOrderCreatePage)} />
+        <Route path="/sales/addon-orders/:id/edit" element={page(AddonOrderCreatePage)} />
         {/* Rechnungen (30.08.2026): eine Liste ALLER Rechnungen — Projekt-,
             Liefer- und Direktrechnung. Die beiden Erstellungswege sind EIGENE
             SEITEN mit Zurück-Knopf, kein Fenster (Vorgabe). Die festen Adressen
@@ -272,6 +283,10 @@ export const renderAppPageRoutes = () => (
         {/* Mal kabul: siparişin satırlarını stoğa aktarma ekranı ('/new' sabit
             yolundan sonra tanımlıdır, :id ile çakışmaz). */}
         <Route path="/inventory/orders/:id/receive" element={page(OrderReceivePage)} />
+        {/* Die BESTELLSEITE (08.09.2026): sie hat das alte Detail-Popup abgelöst.
+            Steht NACH '/new' und nach dem Wareneingang, damit ':id' die festen
+            Wege nicht schluckt. */}
+        <Route path="/inventory/orders/:id" element={page(OrderDetailPage)} />
         <Route path="/logistics/shipments" element={page(Shipments)} />
         <Route path="/logistics/shipments/new" element={page(ShipmentCreate)} />
         <Route path="/maintenance" element={page(MaintenanceDashboard)} />

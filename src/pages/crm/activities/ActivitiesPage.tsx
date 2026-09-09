@@ -4,9 +4,10 @@ import { toast } from 'sonner';
 
 import {
     Calendar, Check, ChevronLeft, ChevronRight, File05, Mail01, Phone,
-    Receipt, RefreshCcw01, SearchLg, ShoppingCart01,
+    Receipt, RefreshCcw01, ShoppingCart01,
 } from '@/components/icons/antIconCompat';
 import { InlineLoading } from '@/components/ui-shared/Loader';
+import { FilterBar, SearchBox } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import i18n from '@/i18n';
 import { activitiesApi, type ActivityKind, type ActivityRow, type ActivityStats } from '@/lib/api/enquiries';
@@ -163,22 +164,15 @@ export const ActivitiesPage = () => {
                     </span>
                 </div>
                 <div className="ofi-crm-head__actions">
-                    <label className="ofi-crm-search">
-                        <SearchLg size={15} />
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t('crm.activity.searchPlaceholder')}
-                            aria-label={t('crm.activity.searchPlaceholder')}
-                        />
-                    </label>
                     <button type="button" className="ofi-crm-iconbtn" onClick={() => { void load(); loadStats(); }} title={t('common.refresh')}>
                         <RefreshCcw01 size={15} />
                     </button>
                 </div>
             </header>
 
-            <div className="ofi-crm-filters">
+            {/* Werkzeugzeile wie auf jeder Liste; die Art als Segmentschalter daneben. */}
+            <FilterBar>
+                <SearchBox value={search} onChange={setSearch} placeholder={t('crm.activity.searchPlaceholder')} busy={loading} />
                 <div className="ofi-crm-chips">
                     <button
                         type="button"
@@ -201,7 +195,7 @@ export const ActivitiesPage = () => {
                         </button>
                     ))}
                 </div>
-            </div>
+            </FilterBar>
 
             <section className="ofi-crm-surface">
                 {loading && <div className="ofi-crm-empty"><InlineLoading label={t('common.loading')} /></div>}

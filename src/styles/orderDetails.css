@@ -1,0 +1,903 @@
+/* =========================================================
+   Offitec — BESTELLDETAILS DER LIEFERANTENBESTELLUNG (07.09.2026)
+
+   Vorgabe Samet: «Oben soll nur noch EIN Stift stehen. Ein
+   Klick, und alles ist in EINER einfachen Kiste im Apple-Stil
+   — die vielen einzelnen Texte fallen weg. Und das Plus für
+   eine neue Zeile gehört unten links an die Tabelle, nicht in
+   die leere Fläche.»
+
+   Daraus wird:
+     `.ofi-ord-pencil`  der eine Knopf in der Bestellzeile;
+     `.ofi-ord-plus`    das Plus unten links an der Tabelle;
+     `.ofi-ord`         das Fenster, eine Karte mit weichen
+                        Ecken über einem geblendeten Schleier;
+     `.ofi-ord-group`   die KISTE: weisse Fläche auf grauem
+                        Grund, Zeilen durch Haarlinien
+                        getrennt, Beschriftung links, Wert
+                        rechts — der eingerückte Gruppenblock
+                        aus den iOS-Einstellungen.
+
+   Farben kommen ausschliesslich aus den Kalender-Token
+   (`--ofi-cal-*`), der Dunkelmodus ist damit der reine
+   Variablentausch aus styles/dark.css. Die Knöpfe hier tragen
+   KEINE Tailwind-Innenmasse, damit die gemeinsame Knopfregel
+   in styles/buttons.css sie nicht anfasst.
+   ========================================================= */
+
+/* ── DER EINE STIFT ───────────────────────────────────────────────────────
+   Er ersetzt «Bestelldetails» UND «Zusatzkosten»: zwei Knöpfe mit vier
+   Wörtern wurden ein Symbol. Trägt die Bestellung Zusatzkosten, sitzt ein
+   Punkt an seiner Ecke — die einzige Auskunft, die von aussen nötig ist. */
+.ofi-ord-pencil {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-ord-pencil:hover {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-accent);
+}
+.ofi-ord-pencil:active { transform: scale(0.94); }
+/* Der Stift ist seit dem 08.09.2026 ein SCHALTER: er öffnet den
+   Detailabschnitt und klappt ihn wieder zu. Solange der Abschnitt offen ist,
+   trägt er die Akzentfarbe — sonst sähe man dem Knopf nicht an, dass er
+   gedrückt ist, und suchte ein X, das es nicht mehr gibt. */
+.ofi-ord-pencil.is-on {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-ord-pencil.is-on:hover { background: var(--ofi-cal-accent-hover); color: var(--ofi-cal-on-accent); }
+.ofi-ord-pencil.is-on.is-marked::after { box-shadow: 0 0 0 2px var(--ofi-cal-accent); background: var(--ofi-cal-on-accent); }
+.ofi-ord-pencil.is-marked::after {
+    content: '';
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    box-shadow: 0 0 0 2px var(--ofi-cal-surface);
+}
+
+/* ── DAS PLUS UNTEN LINKS ─────────────────────────────────────────────────
+   Es steht IMMER da — auch bei leerer Tabelle, denn dort wird es am
+   dringendsten gebraucht. Rund, in der Akzentfarbe, ohne Beschriftung:
+   ein Plus erklärt sich. */
+.ofi-ord-foot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+}
+.ofi-ord-foot > .ofi-ord-spacer { margin-left: auto; }
+.ofi-ord-plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* 36px wie `.ofi-poi-btn` daneben — die Hausgroesse (40px, styles/buttons.css)
+       gilt fuer beschriftete Knoepfe; ein Symbol darf knapper sein, aber nicht
+       kleiner als der Knopf am anderen Ende derselben Leiste. */
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    cursor: pointer;
+    box-shadow: var(--ofi-cal-shadow-soft);
+    transition: background-color 140ms ease, transform 120ms cubic-bezier(0.2, 0.8, 0.3, 1.4);
+}
+.ofi-ord-plus:hover { background: var(--ofi-cal-accent-hover); transform: scale(1.08); }
+.ofi-ord-plus:active { transform: scale(0.9); }
+.ofi-ord-plus svg { flex: none; }
+
+/* ── DAS FENSTER ──────────────────────────────────────────────────────────
+   Ein Schleier mit Unschärfe, darüber eine Karte, die AUFPOPPT statt
+   einzublenden — die kleine Überschwingung am Ende ist der ganze
+   Unterschied zwischen «erschienen» und «gekommen». */
+.ofi-ord-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 820;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.32);
+    backdrop-filter: blur(6px) saturate(1.2);
+    animation: ofi-ord-fade 180ms ease both;
+}
+@keyframes ofi-ord-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.ofi-ord {
+    display: flex;
+    flex-direction: column;
+    width: min(640px, 100%);
+    max-height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 20px;
+    background: var(--ofi-cal-surface-2);
+    box-shadow: var(--ofi-cal-shadow);
+    animation: ofi-ord-pop 320ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+@keyframes ofi-ord-pop {
+    from { opacity: 0; transform: translateY(18px) scale(0.94); }
+    to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-ord { animation-duration: 1ms; }
+}
+
+/* Kopf: der Titel steht MITTIG wie auf einer iOS-Karte, das X sitzt rechts
+   als graue Scheibe. Kein Untertitel — der war der «viele einzelne Text». */
+.ofi-ord-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    padding: 14px 14px 12px;
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-ord-head > b {
+    flex: 1;
+    text-align: center;
+    font-size: 15.5px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--ofi-cal-text);
+}
+.ofi-ord-x {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-ord-x:hover { color: var(--ofi-cal-text); }
+.ofi-ord-x:active { transform: scale(0.9); }
+/* Ein leeres Gegenstück links, damit der Titel wirklich mittig sitzt. */
+.ofi-ord-ghost { flex: none; width: 30px; }
+
+.ofi-ord-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 2px 14px 16px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ── DIE KISTE ────────────────────────────────────────────────────────────
+   Weisse Fläche, weiche Ecken, Zeilen durch eine eingerückte Haarlinie
+   getrennt. Alles, was zu einer Sache gehört, liegt in EINER Kiste; über
+   ihr steht ein kleiner, ruhiger Titel. */
+.ofi-ord-cap {
+    display: block;
+    margin: 18px 0 7px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-ord-cap:first-child { margin-top: 8px; }
+/* Die erste Kiste steht ohne Titel direkt unter dem Kopf. */
+.ofi-ord-body > .ofi-ord-group:first-child { margin-top: 8px; }
+
+.ofi-ord-group {
+    overflow: hidden;
+    border-radius: 14px;
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 0 0 1px var(--ofi-cal-border-soft);
+}
+
+.ofi-ord-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 46px;
+    padding: 0 14px;
+}
+.ofi-ord-row.is-muted { opacity: 0.56; }
+.ofi-ord-visibility {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ofi-cal-accent);
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease, transform 100ms ease;
+}
+.ofi-ord-visibility:hover { background: var(--ofi-cal-accent-tint); transform: scale(1.06); }
+.ofi-ord-visibility.is-off { color: var(--ofi-cal-faint); }
+/* Die Trennlinie ist EINGERÜCKT — sie beginnt dort, wo die Beschriftung
+   beginnt, nicht an der Kante. Genau daran erkennt man die Liste. */
+.ofi-ord-row + .ofi-ord-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 0;
+    height: 1px;
+    background: var(--ofi-cal-line);
+}
+.ofi-ord-row > label,
+.ofi-ord-row > .ofi-ord-label {
+    flex: none;
+    min-width: 128px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+}
+/* Der Wert steht RECHTS und trägt keinen eigenen Rahmen: die Zeile IST das
+   Feld. Erst beim Schreiben legt sich ein weicher Grund darunter. */
+.ofi-ord-row input,
+.ofi-ord-row select,
+.ofi-ord-row textarea {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    padding: 0 9px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-family: inherit;
+    font-size: 13px;
+    /* ── LINKS, IMMER (Vorgabe Samet, 07.09.2026) ────────────────────────
+       «Eingabefelder müssen links beginnen, niemals rechts.» Die Werte
+       standen hier bis eben rechtsbündig — das ist die Formularzeile aus
+       den iOS-Einstellungen und liest sich in einer Liste sehr ruhig, aber
+       beim TIPPEN wächst der Text nach links weg, und das war die Klage.
+       Also beginnt jede Eingabe links; die Beschriftung links davor gibt
+       ihr die Spur. */
+    text-align: left;
+    outline: none;
+    transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+.ofi-ord-row input::placeholder,
+.ofi-ord-row textarea::placeholder { color: var(--ofi-cal-faint); }
+.ofi-ord-row input:hover,
+.ofi-ord-row select:hover { background: var(--ofi-cal-hover); }
+.ofi-ord-row input:focus,
+.ofi-ord-row select:focus,
+.ofi-ord-row textarea:focus {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint);
+}
+.ofi-ord-row input.is-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+/* Die Zusatzkosten-Zeile: Bezeichnung links und dehnbar, Betrag rechts und
+   schmal — zwei rechtsbuendige Felder nebeneinander waeren nicht lesbar. */
+.ofi-ord-row input.is-amount {
+    flex: none;
+    width: 116px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ord-row input.is-num { font-variant-numeric: tabular-nums; }
+.ofi-ord-row select {
+    flex: 1;
+    cursor: pointer;
+    text-align: left;
+    text-align-last: left;
+    color: var(--ofi-cal-text);
+}
+.ofi-ord-row.is-invalid input { border-color: var(--ofi-cal-danger); }
+
+/* Eine Zeile, die sich wie ein Knopf verhält (Vorlagen, Zurücksetzen). */
+.ofi-ord-action {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-accent);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+.ofi-ord-action:hover { background: var(--ofi-cal-hover); }
+.ofi-ord-action:disabled { color: var(--ofi-cal-faint); cursor: not-allowed; }
+.ofi-ord-action:disabled:hover { background: transparent; }
+.ofi-ord-action svg { flex: none; }
+/* Auch hier ist die Trennlinie eingerueckt — sonst faellt die letzte Zeile
+   aus der Liste heraus. */
+.ofi-ord-action { position: relative; }
+.ofi-ord-action + .ofi-ord-action::before,
+.ofi-ord-row + .ofi-ord-action::before,
+.ofi-ord-action + .ofi-ord-row::before,
+.ofi-ord-text + .ofi-ord-action::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 0;
+    height: 1px;
+    background: var(--ofi-cal-line);
+}
+
+/* Das runde Plus / Minus am Zeilenanfang — der Griff aus der iOS-Liste. */
+.ofi-ord-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 21px;
+    height: 21px;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 110ms cubic-bezier(0.2, 0.8, 0.3, 1.4), filter 140ms ease;
+}
+.ofi-ord-dot:hover { filter: brightness(1.08); transform: scale(1.12); }
+.ofi-ord-dot:active { transform: scale(0.88); }
+.ofi-ord-dot.is-remove { background: #ff453a; }
+.ofi-ord-dot.is-add { background: #34c759; }
+
+/* Der freie Text (Anschreiben) füllt seine Kiste ganz aus. */
+.ofi-ord-text {
+    display: block;
+    width: 100%;
+    min-height: 132px;
+    padding: 12px 14px;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+}
+.ofi-ord-text::placeholder { color: var(--ofi-cal-faint); }
+
+
+/* Die Sätze als Pillen — eine Reihe, die umbricht, kein Auswahlfeld. */
+.ofi-ord-pills {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+}
+.ofi-ord-pills button {
+    height: 28px;
+    padding: 0 11px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-ord-pills button:hover { border-color: var(--ofi-cal-accent); color: var(--ofi-cal-accent); }
+.ofi-ord-pills button:active { transform: scale(0.94); }
+.ofi-ord-pills button.is-on {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-ord-pills input {
+    flex: none;
+    width: 66px;
+    height: 28px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    text-align: left;
+}
+.ofi-ord-pills input:hover { background: var(--ofi-cal-surface); }
+/* Das Prozentzeichen hinter dem freien Feld — ohne es liest sich «8.1» wie ein
+   Betrag. */
+.ofi-ord-pills > em { font-style: normal; font-size: 12px; color: var(--ofi-cal-muted); }
+
+/* Zwei Felder nebeneinander in EINER Zeile (Land + Satz hinzufügen). */
+.ofi-ord-pair { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; }
+.ofi-ord-pair input:first-child { text-align: left; }
+.ofi-ord-pair input:last-of-type { flex: none; width: 74px; }
+
+/* ── DER FUSS ─────────────────────────────────────────────────────────────
+   Eine Summe links, ein Knopf rechts — mehr steht hier nicht. */
+.ofi-ord-footbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    padding: 12px 16px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-ord-total {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+}
+.ofi-ord-err { font-size: 11.5px; font-weight: 600; color: var(--ofi-cal-danger); }
+/* Derselbe Knopf steht im Fuss der Karte UND im Fuss der Tabelle — «fertig»
+   und «speichern» sind dieselbe Geste, sie sollen auch gleich aussehen. */
+.ofi-ord-done {
+    height: 36px;
+    margin-left: auto;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background-color 140ms ease, transform 90ms ease;
+}
+.ofi-ord-done:hover { background: var(--ofi-cal-accent-hover); }
+.ofi-ord-done:active { transform: scale(0.96); }
+.ofi-ord-done:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ── DER PAPIERKORB IN DER TABELLENLEISTE (09.09.2026) ────────────────────
+   Er steht gleich rechts vom Plus: hinzufügen und wegwerfen sind dieselbe
+   Sorte Handlung und gehören nebeneinander. Rund wie das Plus, aber ohne
+   Füllung — er soll nicht um Aufmerksamkeit bitten. Sind Zeilen angekreuzt,
+   trägt er ihre Anzahl und färbt sich rot: dann ist er scharf. */
+.ofi-ord-bin {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.ofi-ord-bin:hover { border-color: var(--ofi-cal-danger); color: var(--ofi-cal-danger); }
+.ofi-ord-bin:active { transform: scale(0.94); }
+.ofi-ord-bin:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.ofi-ord-bin > b {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 700;
+}
+/* KEIN `:has()` — die Hausregel verbietet es in globalem CSS (es kostete
+   einmal 800ms je Neuberechnung, siehe styles/README bzw. lib/tableChrome).
+   Die Bedingung steht darum als Klasse in der Maske. */
+.ofi-ord-bin.is-armed { border-color: var(--ofi-cal-danger); color: var(--ofi-cal-danger); }
+
+/* Die Rückfrage in der Leiste — Satz, Abbrechen, Bestätigen. Kein Fenster. */
+.ofi-ord-ask {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 0 12px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+}
+.ofi-ord-ask > button {
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.ofi-ord-ask > button:hover { border-color: var(--ofi-cal-muted); color: var(--ofi-cal-text); }
+.ofi-ord-ask > button.is-danger {
+    border-color: transparent;
+    background: var(--ofi-cal-danger);
+    color: #fff;
+}
+.ofi-ord-ask > button.is-danger:hover { filter: brightness(0.94); color: #fff; }
+
+/* ── DIE SPALTENLISTE (09.09.2026) ────────────────────────────────────────
+   Dieselbe Kiste wie die Bestelldetails, nur trägt jede Zeile hier eine
+   SPALTE der Tabelle: Griff, Platznummer, Name, zwei Pfeile. Oben = links. */
+.ofi-colrow { cursor: grab; user-select: none; }
+.ofi-colrow:active { cursor: grabbing; }
+.ofi-colrow.is-dragging { opacity: 0.45; }
+/* Die Ablegestelle ist eine LINIE über der Zeile, unter die gelegt wird —
+   kein umgefärbter Block: man legt zwischen zwei Zeilen ab, nicht auf eine. */
+.ofi-colrow.is-over { box-shadow: inset 0 2px 0 0 var(--ofi-cal-accent); }
+.ofi-colrow__end { height: 10px; }
+.ofi-colrow__end.is-over { box-shadow: inset 0 -2px 0 0 var(--ofi-cal-accent); }
+
+.ofi-colrow__grip { display: inline-flex; flex: none; color: var(--ofi-cal-faint); }
+.ofi-colrow__pos {
+    flex: none;
+    width: 22px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--ofi-cal-faint);
+    text-align: right;
+}
+.ofi-colrow__name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+}
+/* Woher die Spalte kommt — klein und ruhig, damit die Liste EINE Liste bleibt. */
+.ofi-colrow__tag {
+    margin-left: 8px;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-faint);
+}
+.ofi-colrow__moves { display: inline-flex; flex: none; gap: 2px; }
+.ofi-colrow__moves > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.ofi-colrow__moves > button:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+.ofi-colrow__moves > button:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; }
+
+/* ── Telefon ─────────────────────────────────────────────────────────────
+   Unter 640px füllt die Karte den Schirm von unten — ein Rand ringsum wäre
+   auf dem Telefon verschenkte Fläche. */
+@media (max-width: 640px) {
+    .ofi-ord-scrim { padding: 0; align-items: flex-end; }
+    .ofi-ord {
+        width: 100%;
+        max-height: 94%;
+        border-radius: 20px 20px 0 0;
+        animation-name: ofi-ord-up;
+    }
+    @keyframes ofi-ord-up {
+        from { opacity: 0; transform: translateY(40px); }
+        to { opacity: 1; transform: none; }
+    }
+    .ofi-ord-row { flex-wrap: wrap; padding: 8px 14px; }
+    .ofi-ord-row > label,
+    .ofi-ord-row > .ofi-ord-label { min-width: 0; flex: 1; }
+    .ofi-ord-row input,
+    .ofi-ord-row textarea { flex: 1 0 100%; }
+}
+
+/* ── DAS TOTAL, ALS ZAHL ──────────────────────────────────────────────────
+   Vorgabe Samet (07.09.2026): «Das Gesamttotal bitte direkt als Zahl — nicht
+   bloss ‹CHF›, nicht hinter einem Hover versteckt; die Ziffern, auch die
+   Nullen, sollen dastehen.» Also gross, ruhig und dauerhaft: die Zerlegung
+   klein davor, das Ergebnis in Zifferngrösse daneben. */
+.ofi-ord-sum {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.ofi-ord-sum__parts {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+}
+.ofi-ord-sum__value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* 19px: gross genug, um von der anderen Seite des Schirms lesbar zu sein,
+       klein genug, um den Titel der Karte nicht zu erschlagen. */
+    font-size: 19px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
+    color: var(--ofi-cal-text);
+    white-space: nowrap;
+}
+
+/* ── DAS GEZEICHNETE HÄKCHEN ──────────────────────────────────────────────
+   Vorgabe Samet: «Nach dem Hinzufügen soll ein Haken kommen — und er soll
+   wirklich auf den Schirm gezeichnet werden.» Der Kreis läuft in einem Zug
+   herum, dann fährt der Haken hinein; beides ist eine wandernde Strichlücke.
+   Das Zeichen liegt über allem, fängt nichts ab und geht von selbst wieder. */
+.ofi-ord-check {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 900;
+    width: 116px;
+    height: 116px;
+    margin: -58px 0 0 -58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 26px;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(1.4);
+    box-shadow: var(--ofi-cal-shadow);
+    pointer-events: none;
+    animation: ofi-ord-check-in 200ms cubic-bezier(0.22, 1.2, 0.36, 1) both,
+               ofi-ord-check-out 260ms ease 940ms both;
+}
+@keyframes ofi-ord-check-in {
+    from { opacity: 0; transform: scale(0.86); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes ofi-ord-check-out {
+    to { opacity: 0; transform: scale(1.06); }
+}
+.ofi-ord-check svg { width: 72px; height: 72px; overflow: visible; }
+.ofi-ord-check__ring,
+.ofi-ord-check__tick {
+    fill: none;
+    stroke: #34c759;
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+/* Umfang 2πr bei r = 30 → 188.5; der Haken misst rund 42. */
+.ofi-ord-check__ring {
+    stroke-dasharray: 189;
+    stroke-dashoffset: 189;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    animation: ofi-ord-draw 460ms cubic-bezier(0.4, 0, 0.2, 1) 40ms forwards;
+}
+.ofi-ord-check__tick {
+    stroke-dasharray: 44;
+    stroke-dashoffset: 44;
+    animation: ofi-ord-draw 300ms cubic-bezier(0.4, 0, 0.2, 1) 400ms forwards;
+}
+@keyframes ofi-ord-draw { to { stroke-dashoffset: 0; } }
+/* Wer Bewegung abgestellt hat, bekommt den Haken fertig gezeichnet zu sehen. */
+@media (prefers-reduced-motion: reduce) {
+    .ofi-ord-check { animation: ofi-ord-check-out 260ms ease 940ms both; }
+    .ofi-ord-check__ring,
+    .ofi-ord-check__tick { stroke-dashoffset: 0; animation: none; }
+}
+
+/* ── DIE KISTE IN EINEM WEISSEN FENSTER ───────────────────────────────────
+   Die Gruppen sind weiss auf grau. Liegen sie in einem Fenster, dessen Rumpf
+   schon weiss ist (`.ofi-poi-body`), fehlt der Grund — und die Liste löst
+   sich auf. `.ofi-ord-plate` legt ihn nach: derselbe graue Grund, mit dem
+   Rand der Karte. So trägt die Rechenvorlage dieselbe Sprache wie die
+   Bestelldetails, ohne dass die Fenster darum umgebaut werden müssen. */
+.ofi-ord-plate {
+    padding: 2px 14px 14px;
+    border-radius: 16px;
+    background: var(--ofi-cal-surface-2);
+}
+.ofi-ord-plate + .ofi-ord-plate { margin-top: 12px; }
+
+/* ── EINE ZEILE, DIE MAN WÄHLT ────────────────────────────────────────────
+   Die Auswahlliste aus den iOS-Einstellungen: Name und Erklärung links, der
+   Haken rechts. Kein Radiokranz — der Haken IST die Antwort. */
+.ofi-ord-pick {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 14px;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+.ofi-ord-pick:hover { background: var(--ofi-cal-hover); }
+.ofi-ord-pick + .ofi-ord-pick::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 0;
+    height: 1px;
+    background: var(--ofi-cal-line);
+}
+.ofi-ord-pick > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.ofi-ord-pick b { font-size: 13px; font-weight: 600; }
+.ofi-ord-pick small { font-size: 11.5px; line-height: 1.5; color: var(--ofi-cal-muted); }
+.ofi-ord-pick > svg { flex: none; color: var(--ofi-cal-accent); }
+.ofi-ord-pick.is-on b { color: var(--ofi-cal-accent); }
+
+/* ── EINE ZEILE, DIE NUR BERICHTET ────────────────────────────────────────
+   Die festen Felder der Vorlage: was gelesen wird, und von welcher Art. */
+.ofi-ord-bullet {
+    flex: none;
+    width: 21px;
+    height: 21px;
+    border-radius: 999px;
+    background: var(--ofi-cal-border-soft);
+    box-shadow: inset 0 0 0 1px var(--ofi-cal-border);
+}
+.ofi-ord-label.is-grow { flex: 1; min-width: 0; }
+.ofi-ord-kind {
+    flex: none;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--ofi-cal-surface-2);
+    color: var(--ofi-cal-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Der Griff einer ziehbaren Zeile — der einzige Ort, an dem der Zeiger zum
+   Verschieben wird; das Feld daneben bleibt schreibbar. */
+.ofi-ord-grip {
+    flex: none;
+    padding: 0 2px;
+    color: var(--ofi-cal-faint);
+    font-size: 14px;
+    line-height: 1;
+    cursor: grab;
+    user-select: none;
+}
+.ofi-ord-row.is-dragging { opacity: 0.45; }
+.ofi-ord-row.is-dragging .ofi-ord-grip { cursor: grabbing; }
+
+/* Der leise Satz unter einer Kiste — die Erklärung gehört nicht IN die Liste. */
+.ofi-ord-foot-note {
+    margin: 7px 14px 0;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--ofi-cal-muted);
+}
+/* Die Platz-Warnung unter den eigenen Spalten: derselbe Satz-Stil, nur in der
+   Warnfarbe — kein Kasten, kein Symbol, der Satz selbst ist die Auskunft. */
+.ofi-ord-foot-note.is-warn { color: var(--ofi-cal-danger); font-weight: 600; }
+
+/* Ein Auswahlfeld mit eigener Liste (Lieferant) in einer Zeile: es bringt
+   seinen eigenen Rahmen mit und braucht nur den Platz rechts. */
+.ofi-ord-combo { display: block; flex: 1; min-width: 0; }
+.ofi-ord-combo input { text-align: left; }
+
+/* Auf schmalen Schirmen faellt die Zerlegung weg, nicht die Zahl: gefragt war
+   ausdruecklich das TOTAL, und das bleibt unter allen Umstaenden stehen. */
+@media (max-width: 900px) {
+    .ofi-ord-sum__parts { display: none; }
+}
+
+/* ── KEINE KURSIVE SCHRIFT IN EINEM FELD ──────────────────────────────────
+   Vorgabe Samet (07.09.2026): «Der Text im Eingabefeld soll nicht kursiv
+   sein.» Das Haus setzt Platzhalter seit je kursiv (styles/refine.css, «der
+   Platzhalter ist ein Hinweis, kein Inhalt») — in dieser Fläche steht der
+   Platzhalter aber oft für den GELTENDEN Wert: der abgeleitete Nettopreis, der
+   errechnete Betrag, der Standardtext des Anschreibens. Was gilt, darf nicht
+   aussehen wie eine Randnotiz.
+
+   `refine.css` schreibt mit `#root :where(…)` (Spezifität 1,0,0) — eine reine
+   Klassenregel verlöre. Darum steht hier `#root` davor UND der Zwilling für
+   die Fenster, die im Portal ausserhalb von `#root` hängen. */
+#root :is(.ofi-ord, .ofi-ord-plate, .ofi-poi, [data-inv-table]) :is(input, textarea, select),
+#root :is(.ofi-ord, .ofi-ord-plate, .ofi-poi, [data-inv-table]) :is(input, textarea)::placeholder,
+body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea, select),
+body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea)::placeholder {
+    font-style: normal;
+    opacity: 1;
+}
+
+
+/* ── DAS iOS-AUSWAHLFELD ──────────────────────────────────────────────────
+   Vorgabe Samet (07.09.2026): «Die Auswahlfelder sollen stilvolle iOS-
+   Dropdowns sein.» Das Systemfeld sah nach Betriebssystem aus, nicht nach der
+   Anwendung; jetzt steht dort `SelectMenu` (ui-shared) — ein Knopf, der die
+   gemeinsame Trefferliste öffnet. Sein Kleid ist dieses hier: der Wert links,
+   das Winkelzeichen rechts, beim Öffnen eine Kante in der Akzentfarbe. */
+.ofi-ord-menu { display: block; flex: 1; min-width: 0; }
+.ofi-ord-menu.is-narrow { flex: none; width: 132px; }
+.ofi-ord-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 34px;
+    padding: 0 9px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-family: inherit;
+    font-size: 13px;
+    font-style: normal;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+.ofi-ord-select:hover { background: var(--ofi-cal-hover); }
+.ofi-ord-select[aria-expanded="true"] {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint);
+}
+/* Der Name nimmt den Platz, das Winkelzeichen sitzt rechts und dreht sich
+   beim Öffnen — die kleine Bewegung, an der man iOS erkennt. */
+.ofi-ord-select > :first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ord-select svg:last-child { flex: none; color: var(--ofi-cal-faint); transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+.ofi-ord-select[aria-expanded="true"] svg:last-child { transform: rotate(180deg); color: var(--ofi-cal-accent); }
+
+/* ── DIE SCHRITTE IM KOPF EINES FENSTERS ──────────────────────────────────
+   Vorgabe Samet: «Ordnet den Ablauf vielleicht in Schritte — Schritt 1 …»
+   Die Leiste sagt, wo man ist und was noch kommt; der laufende Schritt trägt
+   die Akzentfarbe, die erledigten einen Haken. `.ofi-poi-steps` bringt das
+   Grundgerüst mit (styles/purchaseImport.css) — hier kommt die Nummer dazu. */
+.ofi-poi-step em {
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-faint);
+}
+.ofi-poi-step.is-active em { color: var(--ofi-cal-accent); }
+.ofi-poi-step > span { display: flex; flex-direction: column; gap: 0; align-items: flex-start; }
+.ofi-template-width {
+  display: flex;
+  width: 112px;
+  flex: 0 0 112px;
+  align-items: center;
+  gap: 6px;
+}
+
+.ofi-template-width input[type="range"] {
+  width: 72px;
+  accent-color: #272f67;
+}
+
+.ofi-template-width small {
+  min-width: 34px;
+  color: #64748b;
+  font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}

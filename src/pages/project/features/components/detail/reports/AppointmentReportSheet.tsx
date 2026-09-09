@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { ArrowLeft, ArrowRight, Edit01 as PenLine, File05 as FilePdf, FileDownload02 as FileDown } from '@/components/icons/antIconCompat';
+import { ArrowLeft, ArrowRight, Edit01 as PenLine, File05 as FilePdf, FileDownload02 as FileDown, PackagePlus } from '@/components/icons/antIconCompat';
+import { AddonOrdersPopup } from '@/components/orders/AddonOrdersPopup';
 import { PopupCaption } from '@/components/ui-shared/PopupKit';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
+import { useAuthStore } from '@/store/authStore';
 import type { ProjectDto, ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 
 import { AppointmentSignaturesView } from './AppointmentSignaturesView';
@@ -122,6 +125,21 @@ export const AppointmentReportSheet = ({
     };
 
     const salesOrderId = orderPayloadId(order);
+
+    /* «Zusatzaufträge» aus dem Rapport (Vorgabe Samet, 05.09.2026): der Knopf
+       in der Kopfzeile öffnet die Nachträge des Hauptauftrags, an dem dieser
+       Termin hängt — mit ihren eigenen Belegen. Er steht in JEDER Ansicht des
+       Fensters, denn gesucht wird aus dem Rapport heraus. */
+    const navigate = useNavigate();
+    const { permissions } = useAuthStore();
+    const [addonsOpen, setAddonsOpen] = useState(false);
+    const parentOrder = order?.parentSalesOrderId
+        ? (project.salesOrders || []).find((candidate) => candidate.id === order.parentSalesOrderId) || null
+        : order;
+    const addonParent = salesOrderId && parentOrder
+        ? { id: salesOrderId, orderNumber: parentOrder.orderNumber, projectId: project.id }
+        : null;
+    const addonCount = (project.salesOrders || []).filter((candidate) => candidate.parentSalesOrderId === salesOrderId).length;
 
     const kind = appointmentStatusKind(appointment);
     const isCompleted = kind === 'completed';
@@ -321,7 +339,21 @@ export const AppointmentReportSheet = ({
             openAt={initialView === 'delivery' ? 'top' : 'center'}
             onBack={canBack ? goBack : undefined}
             onClose={handleClose}
-            headerActions={<div ref={setActionsHost} className="flex items-center gap-1.5" />}
+            headerActions={(
+                <div className="flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        className="ofi-cal-btn"
+                        disabled={!addonParent}
+                        title={t('crm.addon.popupTitle')}
+                        onClick={() => setAddonsOpen(true)}
+                    >
+                        <PackagePlus size={14} />
+                        {addonCount > 0 ? `${t('crm.addon.fieldButton')} (${addonCount})` : t('crm.addon.fieldButton')}
+                    </button>
+                    <div ref={setActionsHost} className="flex items-center gap-1.5" />
+                </div>
+            )}
             footer={(
                 /* Nur die Navigation: Gesamtrapport/Abnahme sitzen als Kacheln
                    im Rapporte-Tab, nicht mehr im Popup (Benutzerwunsch). */
@@ -390,7 +422,11 @@ export const AppointmentReportSheet = ({
                 )}
 
                 {view === 'field' && (
-                    <div className="p-6 sm:p-8">
+                    /* `ofi-fr-stage` = der hellgraue Grund des Rapports (Vorgabe
+                       Samet, 02.09.2026). Er liegt AUSSEN und nicht mehr nur um
+                       die Gruppen, damit das Fenster des Projektleiters und der
+                       Montage-Bildschirm dieselbe eine Fläche zeigen. */
+                    <div className="ofi-fr-stage">
                         <FieldReportEditorView
                             project={project}
                             order={order}
@@ -438,6 +474,17 @@ export const AppointmentReportSheet = ({
                     </div>
                 )}
             </div>
+
+            {/* Die Nachträge des Hauptauftrags — über dem Rapport-Fenster
+                gestapelt (beide sind schwebende Karten). */}
+            <AddonOrdersPopup
+                open={addonsOpen}
+                onClose={() => setAddonsOpen(false)}
+                parentOrder={addonParent}
+                canCreate={permissions.includes('projects.createAddonOrder')}
+                zIndex={200}
+                onOpenAddon={(addon) => navigate(`/sales/orders/${addon.parentSalesOrderId}?tab=addons&addon=${addon.id}`)}
+            />
         </ReportPopup>
     );
 };

@@ -1,30 +1,58 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-    Check,
-    Package,
-    Tag01 as Tag,
-} from '@/components/icons/antIconCompat';
+import { Package, Plus } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import type { ArticleQuickPick } from '@/types/inventory';
 
-// Odoo-style combobox list: short, fast, "view all" for the rest.
+import { resolveTypedArticleIndex } from '../../utils/tenderProduct.utils';
+
+// Odoo-style combobox list: short and fast, "Alle Produkte" for the rest.
 const DROPDOWN_PAGE_SIZE = 10;
+// A full first page plus the two action rows, without scrolling.
+const PANEL_HEIGHT_ESTIMATE = 430;
+
+/**
+ * One row of the list. The two action rows are ordinary options: the arrow
+ * keys reach them and Enter takes them, exactly like a product row.
+ */
+type ComboOption =
+    | { kind: 'article'; article: ArticleQuickPick }
+    | { kind: 'add'; name: string }
+    | { kind: 'more' };
 
 type TenderProductSearchDropdownProps = {
-    /** Element the dropdown attaches to (button or the row's product input). */
+    /** The row's product-name input the list attaches to. */
     anchorEl: HTMLElement;
     /**
      * The row cell's live text. The list has no search box of its own — the
      * quote line IS the input, and this mirrors what is being typed into it.
      */
     search: string;
+    /**
+     * What the row held before the user started typing. Empty means a NEW line
+     * being filled — Enter then takes the first hit, like Odoo's product field.
+     * A filled line being edited keeps its typed text on Enter instead; a
+     * product is picked there with the arrow keys or the mouse.
+     */
+    currentName: string;
     onClose: () => void;
     onSelectArticle: (article: ArticleQuickPick) => void;
-    /** "All products" — opens the full product picker pop-up carrying the search text over. */
+    /**
+     * The typed name, confirmed as a line of its own. Nothing the catalogue does
+     * not know is ever written to a line without going through here — the
+     * "Hinzufügen" row below is the only way in (Enter on it, or a click).
+     */
+    onCreateFreeLine: (name: string) => void;
+    /** "Alle Produkte" — opens the full product picker pop-up carrying the search text over. */
     onOpenAllProducts: (search: string) => void;
+    /**
+     * Leave out the "Alle Produkte" row. The sales-document surface (direct
+     * invoice, addon order) has no big product picker behind it, and a row that
+     * leads nowhere is worse than no row.
+     */
+    hideAllProducts?: boolean;
 };
 
 // Fixed-position overlay so the list pops OVER the rows below the anchor (like
@@ -36,53 +64,133 @@ const computeStyle = (anchorEl: HTMLElement): React.CSSProperties => {
     const rect = anchorEl.getBoundingClientRect();
     const width = Math.min(Math.max(rect.width, 300), 440);
     const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
-    // The panel opens ABOVE the anchor by default: the blank product row sits
-    // at the bottom of the table, so an upward list never covers the rows being
-    // entered below it. It only drops downward when the anchor is so close to
-    // the top of the viewport that the panel (~430px at full height) would be
-    // clipped there AND there is more room below.
+    // Under the field, the way Odoo's list hangs off its product field. It only
+    // opens upward when it would be clipped below AND there is more room above.
     const spaceAbove = rect.top;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openUp = spaceAbove >= 430 || spaceAbove >= spaceBelow;
+    const openUp = spaceBelow < PANEL_HEIGHT_ESTIMATE && spaceAbove > spaceBelow;
     return openUp
         ? { position: 'fixed', bottom: window.innerHeight - rect.top + 2, left, width }
         : { position: 'fixed', top: rect.bottom + 2, left, width };
 };
 
+/**
+ * The rows for a result set. `listedFor` is the text the catalogue answered
+ * for; only when it equals the typed text does the answer say anything about
+ * it — and only then does the "Hinzufügen" row appear, because until then the
+ * typed name may still turn out to be a listed product.
+ */
+const buildOptions = (
+    items: ArticleQuickPick[],
+    typedName: string,
+    listedFor: string | null,
+    hideAllProducts = false,
+) => {
+    const answered = listedFor === typedName;
+    const typedIdx = answered ? resolveTypedArticleIndex(items, typedName, listedFor) : -1;
+    const canAddTyped = answered && typedName.length > 0 && typedIdx < 0;
+    const options: ComboOption[] = items.map((article) => ({ kind: 'article', article }));
+    if (canAddTyped) options.push({ kind: 'add', name: typedName });
+    if (!hideAllProducts) options.push({ kind: 'more' });
+    return { options, typedIdx, canAddTyped, answered };
+};
+
+/**
+ * The row Enter takes while the arrow keys have not moved the highlight.
+ *
+ *  - a product named exactly (name or article number) is that product;
+ *  - an empty cell, or a NEW line: the first hit — one keystroke less than
+ *    reaching for the mouse, as in Odoo;
+ *  - an existing line whose text was changed: the "Hinzufügen" row, i.e. the
+ *    typed text stays the line's text. Changing the product of a filled line
+ *    is done on purpose — ArrowDown or a click — never by Enter alone, or a
+ *    free line renamed to "Montage vor Ort" would silently turn into the first
+ *    catalogue article that happens to start with "Montage".
+ */
+const defaultOptionIndex = (
+    built: ReturnType<typeof buildOptions>,
+    itemCount: number,
+    typedName: string,
+    currentName: string,
+): number => {
+    const addIndex = built.canAddTyped ? itemCount : -1;
+    if (built.typedIdx >= 0) return built.typedIdx;
+    if (!typedName) return itemCount > 0 ? 0 : -1;
+    if (!currentName.trim()) return itemCount > 0 ? 0 : addIndex;
+    return addIndex;
+};
+
 // Result list for the article search that happens INSIDE a quote line. It has
 // no search box and never takes focus: the row's own name cell is the input,
-// this only reads back what matches. Arrow keys move the highlight, Enter picks,
-// Escape closes and keeps whatever was typed — all handled on the anchor input
-// (see the keyboard effect below). When nothing matches, the create-actions
-// appear in place of the list.
+// this only reads back what matches. One row is highlighted; the arrow keys
+// move it, Enter takes it, a click takes a row directly. Nothing else selects:
+// clicking away, Tab or Escape leave the row as it was — the page refuses the
+// bare text — so a product only ever lands on a line by a deliberate choice.
 export const TenderProductSearchDropdown = ({
     anchorEl,
     search,
+    currentName,
     onClose,
     onSelectArticle,
+    onCreateFreeLine,
     onOpenAllProducts,
+    hideAllProducts = false,
 }: TenderProductSearchDropdownProps) => {
     const [items, setItems] = useState<ArticleQuickPick[]>([]);
+    // The search text `items` were fetched for; null until the catalogue has
+    // answered once. While it lags behind the cell, the list is stale.
+    const [listedFor, setListedFor] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [style, setStyle] = useState<React.CSSProperties>(() => computeStyle(anchorEl));
     const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
-    // Gold "picked" row: moved with the arrow keys, confirmed with Enter (or the
-    // OK button).
-    const [activeIndex, setActiveIndex] = useState(-1);
-    const listRef = useRef<HTMLDivElement>(null);
+    // Highlight moved with the arrow keys. Only an ARROW move is stored — the
+    // highlight otherwise follows the typed text (see defaultOptionIndex), so
+    // it can never survive into a result set it no longer belongs to.
+    const [arrowIndex, setArrowIndex] = useState(-1);
+    const listRef = useRef<HTMLUListElement>(null);
 
-    const activeIdx = activeIndex >= 0 && activeIndex < items.length ? activeIndex : -1;
+    const typedName = search.trim();
+    const built = useMemo(
+        () => buildOptions(items, typedName, listedFor, hideAllProducts),
+        [items, typedName, listedFor, hideAllProducts],
+    );
+    const { options, answered } = built;
+    const restIndex = defaultOptionIndex(built, items.length, typedName, currentName);
+    const activeIdx = arrowIndex >= 0 && arrowIndex < options.length ? arrowIndex : restIndex;
+
+    // The panel stays mounted while the user moves from one row to the next,
+    // and a deferred Enter (below) fires out of a fetch callback — both must
+    // reach the CURRENT callbacks, never the ones captured when set up.
+    const latestRef = useRef({ currentName, onSelectArticle, onCreateFreeLine, onOpenAllProducts });
+    useEffect(() => {
+        latestRef.current = { currentName, onSelectArticle, onCreateFreeLine, onOpenAllProducts };
+    });
+
+    const act = (option: ComboOption, typed: string) => {
+        const latest = latestRef.current;
+        if (option.kind === 'article') latest.onSelectArticle(option.article);
+        else if (option.kind === 'add') latest.onCreateFreeLine(option.name);
+        else latest.onOpenAllProducts(typed);
+    };
+
     const moveActive = (dir: 1 | -1) => {
-        if (items.length === 0) return;
-        const next = Math.min(items.length - 1, Math.max(0, (activeIdx < 0 ? -1 : activeIdx) + dir));
-        setActiveIndex(next);
+        if (options.length === 0) return;
+        const next = activeIdx < 0
+            ? (dir === 1 ? 0 : options.length - 1)
+            : (activeIdx + dir + options.length) % options.length;
+        setArrowIndex(next);
         listRef.current
             ?.querySelector(`[data-item-index="${next}"]`)
             ?.scrollIntoView({ block: 'nearest' });
     };
-    const confirmActive = () => {
-        if (activeIdx >= 0) onSelectArticle(items[activeIdx]);
-    };
+
+    // Enter pressed while the list still belongs to an OLDER text (typing is
+    // debounced): the answer is awaited and then acted on, so a name typed or
+    // pasted quickly and confirmed at once is not lost. Cleared as soon as the
+    // text changes again.
+    const pendingConfirmRef = useRef<string | null>(null);
+    // One per mounted panel: see the fetch effect below.
+    const firstFetchRef = useRef(true);
 
     // Follow the anchor while the page scrolls or resizes (capture catches the
     // inner scroll containers too).
@@ -114,10 +222,35 @@ export const TenderProductSearchDropdown = ({
 
     // Debounced fetch: first page loads immediately on open, then every
     // keystroke re-queries the server 300ms after typing stops.
+    //
+    // The very first query of a cell skips the debounce even when it already
+    // carries text — there is no earlier keystroke to wait for, and a name that
+    // was PASTED in would otherwise still be unresolved 300ms later, i.e. exactly
+    // when Enter arrives.
     useEffect(() => {
         const normalizedSearch = search.trim();
+        if (pendingConfirmRef.current !== null && pendingConfirmRef.current !== normalizedSearch) {
+            pendingConfirmRef.current = null;
+        }
+        const debounce = firstFetchRef.current ? 0 : (normalizedSearch ? 300 : 0);
         let cancelled = false;
+        // The answer is in: show it, and carry out an Enter that was waiting
+        // for exactly this text.
+        const settle = (nextItems: ArticleQuickPick[]) => {
+            setItems(nextItems);
+            setListedFor(normalizedSearch);
+            // New result set — an arrow selection must not silently point at a
+            // different article. The typed-text highlight is derived and
+            // re-resolves itself against the new list.
+            setArrowIndex(-1);
+            if (pendingConfirmRef.current !== normalizedSearch) return;
+            pendingConfirmRef.current = null;
+            const fresh = buildOptions(nextItems, normalizedSearch, normalizedSearch, hideAllProducts);
+            const index = defaultOptionIndex(fresh, nextItems.length, normalizedSearch, latestRef.current.currentName);
+            if (index >= 0) act(fresh.options[index], normalizedSearch);
+        };
         const id = setTimeout(() => {
+            firstFetchRef.current = false;
             setLoading(true);
             inventoryApi
                 // Lean feed: only the fields that end up on the quote line, so
@@ -128,20 +261,19 @@ export const TenderProductSearchDropdown = ({
                     pageSize: DROPDOWN_PAGE_SIZE,
                     search: normalizedSearch || undefined,
                 })
-                .then((res) => {
-                    if (cancelled) return;
-                    setItems(res.items);
-                    // New result set — the gold selection must not silently point
-                    // at a different article.
-                    setActiveIndex(-1);
-                })
-                .catch(() => { if (!cancelled) setItems([]); })
+                .then((res) => { if (!cancelled) settle(res.items); })
+                .catch(() => { if (!cancelled) settle([]); })
                 .finally(() => { if (!cancelled) setLoading(false); });
-        }, normalizedSearch ? 300 : 0);
+        }, debounce);
         return () => { cancelled = true; clearTimeout(id); };
-    }, [search]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search, hideAllProducts]);
 
-    // Click outside (panel AND anchor) closes the dropdown.
+    // Click outside (panel AND anchor) closes the dropdown, and so does the
+    // cell losing focus in any other way (Tab, a click into another cell). The
+    // page then puts the cell back the way it was — leaving never chooses
+    // anything. A press on a row of the list keeps the focus in the cell (its
+    // pointerdown is prevented), so the list is never closed under a click.
     useEffect(() => {
         const onPointerDown = (event: MouseEvent) => {
             const target = event.target as Node | null;
@@ -149,8 +281,13 @@ export const TenderProductSearchDropdown = ({
             if (panelEl?.contains(target) || anchorEl?.contains(target)) return;
             onClose();
         };
+        const onBlur = () => onClose();
         document.addEventListener('mousedown', onPointerDown);
-        return () => document.removeEventListener('mousedown', onPointerDown);
+        anchorEl.addEventListener('blur', onBlur);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            anchorEl.removeEventListener('blur', onBlur);
+        };
     }, [anchorEl, panelEl, onClose]);
 
     // Keyboard control, driven from the ROW INPUT rather than from the panel.
@@ -167,27 +304,35 @@ export const TenderProductSearchDropdown = ({
         if (!anchor) return;
 
         const onKeyDown = (event: KeyboardEvent) => {
-            // Nothing to steer: leave every key to the cell itself, so ArrowUp /
-            // ArrowDown still move between rows when the search found nothing.
-            if (items.length === 0) return;
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (options.length === 0) return;
                 event.preventDefault();
                 event.stopPropagation();
                 moveActive(event.key === 'ArrowDown' ? 1 : -1);
                 return;
             }
             if (event.key === 'Enter') {
+                // The list does not belong to this text yet: hold the Enter
+                // until the catalogue has answered, then take the row it lands
+                // on. Acting on the stale list would pick the wrong product.
+                if (!answered) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    pendingConfirmRef.current = typedName;
+                    return;
+                }
+                // Nothing highlighted (an emptied cell over an empty catalogue):
+                // leave Enter to the cell — committing the empty text is how the
+                // product is taken off the row.
                 if (activeIdx < 0) return;
                 event.preventDefault();
                 event.stopPropagation();
-                onSelectArticle(items[activeIdx]);
+                act(options[activeIdx], typedName);
                 return;
             }
             if (event.key === 'Escape') {
-                // Close the list, but let the cell keep what was typed — the
-                // input's own Escape would otherwise revert the draft.
-                event.preventDefault();
-                event.stopPropagation();
+                // Close the list and let the cell's own Escape run too: it drops
+                // the typed text and leaves the row as it was.
                 onClose();
             }
         };
@@ -195,119 +340,81 @@ export const TenderProductSearchDropdown = ({
         anchor.addEventListener('keydown', onKeyDown, true);
         return () => anchor.removeEventListener('keydown', onKeyDown, true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [anchorEl, items, activeIdx, onClose]);
+    }, [anchorEl, options, activeIdx, answered, typedName, onClose]);
 
-    // A search that matches nothing renders NOTHING. There is no "not found"
-    // panel to read or dismiss: an article that does not exist is just a name
-    // the user keeps typing, and the row is already the field they are typing
-    // into. The fetch effects above keep running, so the list reappears the
-    // moment the text matches something again.
-    if (!loading && items.length === 0) return null;
+    const optionLabel = (option: ComboOption) => {
+        if (option.kind === 'add') {
+            return currentName.trim()
+                ? t('tenders.combo_use_typed_name', { name: option.name })
+                : t('tenders.combo_add_free_line', { name: option.name });
+        }
+        return `${t('tenders.all_products')} …`;
+    };
+
+    // Rows are taken on `pointerdown`, not `click`: it fires before the anchor
+    // input's blur re-renders (and with a click, unmounts) this list, and the
+    // default is prevented so the cell keeps its focus. The WHOLE row is the
+    // hit target.
+    const rowProps = (index: number, option: ComboOption) => ({
+        'data-item-index': index,
+        role: 'option' as const,
+        'aria-selected': index === activeIdx,
+        onPointerDown: (event: React.PointerEvent) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            act(option, typedName);
+        },
+        onPointerMove: () => {
+            if (arrowIndex !== index) setArrowIndex(index);
+        },
+    });
+
+    const articleOptions = options.filter((option) => option.kind === 'article');
+    const actionOptions = options
+        .map((option, index) => ({ option, index }))
+        .filter(({ option }) => option.kind !== 'article');
 
     return createPortal(
         <div
             ref={setPanelEl}
             style={style}
-            className="ofi-tp-menu relative z-[999] overflow-hidden"
+            className="ofi-tp-menu ofi-tp-combo relative z-[999]"
         >
-            {/* The spinner only replaces the list on the FIRST load. A refresh
-                keeps the current items on screen and clickable — blanking or
-                disabling them mid-query is what made a click go nowhere. */}
-            {/* Tall enough for the full first page (10 rows) without scrolling. */}
-            <div ref={listRef} aria-busy={loading} className="relative max-h-[320px] overflow-y-auto">
-                {loading && items.length === 0 ? (
-                    <div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-slate-500">
-                        <span
-                            aria-hidden
-                            className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654]"
-                        />
+            <ul ref={listRef} role="listbox" aria-busy={loading} className="ofi-tp-combo__list">
+                {/* The spinner only replaces the list on the FIRST load. A refresh
+                    keeps the current rows on screen and clickable — blanking or
+                    disabling them mid-query is what made a click go nowhere. */}
+                {loading && articleOptions.length === 0 && (
+                    <li className="ofi-tp-combo__state" role="presentation">
+                        <span aria-hidden className="ofi-tp-combo__spinner" />
                         {t('tenders.productler_loading')}
-                    </div>
-                ) : (
-                    <ul role="listbox">
-                        {items.map((article, index) => (
-                            // The WHOLE row is the hit target — its padding and the gap
-                            // beside the name used to be dead zones, so a click that
-                            // visibly highlighted the row selected nothing and the user
-                            // had to click again. `pointerdown` also fires before the
-                            // anchor input's blur/commit re-renders this list, which a
-                            // `click` would then never survive.
-                            <li
-                                key={article.id}
-                                data-item-index={index}
-                                role="option"
-                                aria-selected={index === activeIdx}
-                                title={article.name}
-                                onPointerDown={(event) => {
-                                    if (event.button !== 0) return;
-                                    event.preventDefault();
-                                    onSelectArticle(article);
-                                }}
-                                className={`ofi-option-row group flex cursor-pointer items-center gap-1.5 px-2 py-1.5 transition-colors ${
-                                    index === activeIdx ? 'is-active' : ''
-                                }`}
-                            >
-                                <span className="min-w-0 flex-1 truncate text-left text-[13px] text-slate-900 transition-colors group-hover:!text-white">
-                                    {article.name}
-                                </span>
-                                {/* Tag icon opens the product's detail page in a new window;
-                                    it must not also select the row. */}
-                                <button
-                                    type="button"
-                                    onPointerDown={(event) => {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                    }}
-                                    onClick={() => window.open(`/inventory/articles/${article.id}`, '_blank', 'noopener')}
-                                    className="inline-flex size-5 shrink-0 items-center justify-center rounded-[2px] text-slate-300 transition-colors hover:bg-white/10 group-hover:text-white/70 group-hover:hover:text-white"
-                                    title={t('common.detail')}
-                                    aria-label={t('common.detail')}
-                                >
-                                    <Tag size={12} />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
+                    </li>
                 )}
-            </div>
-            {/* Control strip: OK confirms the highlighted row (same as Enter).
-                The ▼ button and the trash button are gone — the arrow keys move
-                the highlight and the row's own text is the search, so a button
-                to scroll the list and a button to erase what was just typed only
-                crowded the panel. */}
-            <div className="flex items-center justify-end gap-1 border-t border-slate-200 bg-slate-50 px-2 py-1">
-                {/* Refresh indicator for a query running behind a list that is
-                    still on screen and still clickable. */}
-                {loading && items.length > 0 && (
-                    <span
-                        role="status"
-                        aria-label={t('tenders.productler_loading')}
-                        className="mr-auto h-3 w-3 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654]"
-                    />
-                )}
-                <button
-                    type="button"
-                    aria-label="OK"
-                    title="OK (Enter)"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={confirmActive}
-                    disabled={loading || activeIdx < 0}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded border border-emerald-200 bg-white text-emerald-600 transition-colors hover:border-emerald-600 hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-emerald-200 disabled:hover:bg-white disabled:hover:text-emerald-600"
-                >
-                    <Check size={13} />
-                </button>
-            </div>
-            <div className="border-t border-slate-100 px-2 py-1">
-                <button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => onOpenAllProducts(search.trim())}
-                    className="ofi-option-action flex w-full items-center gap-1 rounded px-1 py-1 text-left text-[12px] font-medium text-[#1f2654] transition-colors"
-                >
-                    <Package size={12} />
-                    {t('tenders.all_products')} …
-                </button>
-            </div>
+                {articleOptions.map((option, index) => option.kind === 'article' && (
+                    <li
+                        key={option.article.id}
+                        title={option.article.name}
+                        className={`ofi-option-row ofi-tp-combo__row ${index === activeIdx ? 'is-active' : ''}`}
+                        {...rowProps(index, option)}
+                    >
+                        <span className="ofi-tp-combo__name">{option.article.name}</span>
+                        {option.article.articleCode && (
+                            <span className="ofi-tp-combo__code">{option.article.articleCode}</span>
+                        )}
+                    </li>
+                ))}
+                {articleOptions.length > 0 && <li role="separator" className="ofi-tp-combo__sep" />}
+                {actionOptions.map(({ option, index }) => (
+                    <li
+                        key={option.kind}
+                        className={`ofi-option-row ofi-tp-combo__row is-action ${index === activeIdx ? 'is-active' : ''}`}
+                        {...rowProps(index, option)}
+                    >
+                        {option.kind === 'add' ? <Plus size={13} className="shrink-0" /> : <Package size={13} className="shrink-0" />}
+                        <span className="ofi-tp-combo__name">{optionLabel(option)}</span>
+                    </li>
+                ))}
+            </ul>
         </div>,
         document.body,
     );

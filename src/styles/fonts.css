@@ -1,68 +1,49 @@
-/* Subset builds (scripts: pyftsubset, Latin + Latin Extended + punctuation +
-   currency — everything German/Turkish/French text needs) weigh ~12 KB per
-   weight instead of the 46-64 KB full builds; the originals stay next to them
-   in assets/fonts as *-webfont.woff2. Characters outside the subset (Cyrillic,
-   Greek, CJK) render in the Arial fallback. */
+/* Programmschrift: Inter Variable (Samet, 09.09.2026) — EINE Familie für
+   Fliesstext, Titel und Formulare (theme.css: --font-body / --font-display).
+   Variable Schnitte 100–900 in je einer Datei; Latin (48 KB) und Latin
+   Extended (85 KB — Türkisch, Osteuropa, Währungszeichen) sind getrennt und
+   per unicode-range aufgeteilt, so lädt der Browser die Erweiterung nur,
+   wenn ein Zeichen daraus vorkommt. Die Dateien stammen aus
+   @fontsource-variable/inter (files/inter-latin*-wght-*.woff2) und liegen
+   hier als Kopie, damit Vite sie wie die übrigen Assets hasht und der
+   Service-Worker sie cachen kann. Kyrillisch/Griechisch fallen auf die
+   Systemschrift zurück.
+
+   `font-display: swap`: die Schrift ist die Identität der Oberfläche, darum
+   darf sie beim allerersten Aufruf kurz nachrücken statt (wie `optional`)
+   ganz auszubleiben; ab dem zweiten Aufruf liegt sie im Cache. */
 @font-face {
-  font-family: "Open Sans";
+  font-family: "Inter Variable";
   font-style: normal;
-  font-display: optional;
-  font-weight: 300;
-  src: url("../assets/fonts/OpenSans-Light-subset.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../assets/fonts/Inter-Variable-latin.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "Open Sans";
+  font-family: "Inter Variable";
   font-style: italic;
-  font-display: optional;
-  font-weight: 300;
-  src: url("../assets/fonts/OpenSans-LightItalic-subset.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../assets/fonts/Inter-Variable-latin-italic.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "Open Sans";
+  font-family: "Inter Variable";
   font-style: normal;
-  font-display: optional;
-  font-weight: 400;
-  src: url("../assets/fonts/OpenSans-Regular-subset.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../assets/fonts/Inter-Variable-latin-ext.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "Open Sans";
+  font-family: "Inter Variable";
   font-style: italic;
-  font-display: optional;
-  font-weight: 400;
-  src: url("../assets/fonts/OpenSans-Italic-subset.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Open Sans";
-  font-style: normal;
-  font-display: optional;
-  font-weight: 600;
-  src: url("../assets/fonts/OpenSans-Semibold-subset.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Open Sans";
-  font-style: italic;
-  font-display: optional;
-  font-weight: 600;
-  src: url("../assets/fonts/OpenSans-SemiboldItalic-subset.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Open Sans";
-  font-style: normal;
-  font-display: optional;
-  font-weight: 700;
-  src: url("../assets/fonts/OpenSans-Bold-subset.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Open Sans";
-  font-style: italic;
-  font-display: optional;
-  font-weight: 700;
-  src: url("../assets/fonts/OpenSans-BoldItalic-subset.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../assets/fonts/Inter-Variable-latin-ext-italic.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }

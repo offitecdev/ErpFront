@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { CornerDownRight, Plus, Receipt } from '../../components/icons/antIconCompat';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../hooks/useColumnWidths';
 import { myOrdersApi } from '../../lib/api/billing';
 import { lineBilled, linePercent, lineRemaining, lineTotal, orderBillingLines, orderBillingTotals } from '../../lib/orderBillingTotals';
@@ -165,28 +165,26 @@ export const MyOrders = () => {
                 }
             />
 
-            {/* Üst çubuk — ürün listesiyle aynı: genel arama + durum seçici.
-                Telefonda ikisi de tam genişlik: 390px'te yan yana sıkışmak
-                yerine alt alta, dokunulacak kadar geniş dururlar. */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Werkzeugzeile — dieselbe wie auf jeder anderen Liste: Suchfeld
+                links, Filter dahinter, gemeinsames Mass aus
+                styles/controls.css. */}
+            <FilterBar>
                 <SearchBox
                     value={search}
                     onChange={setSearch}
                     placeholder={t('crm.order_customer_search')}
-                    className="w-full sm:w-64"
                 />
-                <select
+                <FilterSelect
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as '' | OrderBillingState)}
-                    aria-label={t('common.status')}
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none sm:w-auto dark:border-white/20 dark:bg-transparent dark:text-white"
+                    onChange={(next) => setStatusFilter(next as '' | OrderBillingState)}
+                    label={t('common.status')}
                 >
                     <option value="">{t('common.all')}</option>
                     <option value="notBilled">{t('crm.faturalanmadi')}</option>
                     <option value="partial">{t('projects.orderPartial')}</option>
                     <option value="billed">{t('projects.orderBilled')}</option>
-                </select>
-            </div>
+                </FilterSelect>
+            </FilterBar>
 
             <SectionCard title={`${t('nav.myOrders')} (${total})`}>
                 {/* `data-list-table`: ferah satır ölçüsü + telefonda kart
@@ -256,7 +254,15 @@ export const MyOrders = () => {
                                 <tr className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5" onClick={() => navigate(`/sales/orders/${order.id}`)}>
                                     <td>
                                         <div className="flex min-w-0 items-center gap-2">
-                                            <span className="truncate font-semibold text-slate-800 dark:text-white">{order.orderNumber}</span>
+                                            {/* STORNIERT (06.09.2026): der Auftrag bleibt in der
+                                                Liste stehen — durchgestrichen und mit rotem
+                                                Zeichen, damit man ihn nicht fuer offen haelt. */}
+                                            <span className={`truncate font-semibold text-slate-800 dark:text-white ${order.cancelledAt ? 'line-through opacity-60' : ''}`}>{order.orderNumber}</span>
+                                            {order.cancelledAt && (
+                                                <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded bg-rose-100 px-1.5 py-px text-[10px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+                                                    {t('orders.lifecycle.statusCancelled')}
+                                                </span>
+                                            )}
                                             {addons.length > 0 && (
                                                 <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                                                     <Plus size={9} />{t('crm.additionalOrdersCount', { count: addons.length })}

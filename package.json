@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "main": "electron/main.cjs",
-  "productName": "Offitec ERP",
+  "productName": "Offitec Control Center",
   "scripts": {
     "dev": "npm run dev:prod",
     "dev:vite": "npm run dev:prod",
@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.offitec.erp",
-    "productName": "Offitec ERP",
+    "productName": "Offitec Control Center",
     "directories": {
       "output": "release"
     },

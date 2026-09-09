@@ -45,10 +45,50 @@ export interface OspUnitDto {
     datasheetFetchedAt: string | null;
     datasheetError: string | null;
     datasheetSpecs: OspDatasheetSpecs | null;
+    /** Das Blatt als MARKDOWN — die lesbare Fassung UND die Quelle der
+        Produktangaben. Sie lebt in der Datenbank und ist auch dann noch da,
+        wenn die OSP das PDF drüben längst ersetzt hat. */
+    datasheetMarkdown?: string | null;
+    markdownUrl?: string | null;
+    markdownFetchedAt?: string | null;
     /** §1a: was an DIESER Einheit passiert ist. `[]` heisst: neu gerendert
         durch eine Änderung am Projekt, an der Einheit selbst nichts. */
     changes: string[] | null;
     receivedAt: string | null;
+}
+
+/** Die Antwort der Markdown-Adresse: die Fassung samt ihrer Herkunft. */
+export interface OspUnitMarkdownDto {
+    id: string;
+    ospDocumentId: string;
+    unitName: string | null;
+    unitModel: string | null;
+    datasheetMarkdown: string | null;
+    markdownFetchedAt: string | null;
+    datasheetSpecs: OspDatasheetSpecs | null;
+    datasheetError: string | null;
+    pdfUrl: string | null;
+    datasheetFile: string | null;
+    request?: { reference: string; projectName: string } | null;
+}
+
+/** Was das Holen der Dokumente EINES PROJEKTS ergeben hat — je Einheit. */
+export interface OspDatasheetFetchResult {
+    reference: string;
+    total: number;
+    /** Neu geholt. */
+    fetched: number;
+    /** Lag schon bei uns und wurde nicht angefasst. */
+    kept: number;
+    failed: number;
+    results: Array<{
+        unitId: string;
+        ospDocumentId: string;
+        ok: boolean;
+        skipped?: boolean;
+        error?: string;
+    }>;
+    document: OspDocumentDto;
 }
 
 export interface OspDocumentDto {
@@ -145,6 +185,14 @@ export interface OspDatasheetSpecs {
     sound10m?: string;
     dimensions?: string;
     weight?: string;
+    /** Aus dem Blatt selbst — §1 nennt sie nicht. Das Modell gibt der
+        Offertposition ihren Titel. */
+    model?: string;
+    brand?: string;
+    category?: string;
+    /** Der unverbindliche Listenpreis, wie das Blatt ihn druckt. Er wird
+        ANGEZEIGT und NIE in die Offerte übernommen. */
+    listPrice?: string;
 }
 
 export interface OspListResponse {
@@ -311,6 +359,21 @@ export const ospApi = {
             `/osp/units/${unitId}/datasheet`,
             pdfUrl ? { pdfUrl } : {},
         ).then((r) => r.data),
+
+    /**
+     * DIE DOKUMENTE EINES PROJEKTS HOLEN. Eine Anfrage ist ein Projekt und hat
+     * mehrere Datenblätter; geholt werden sie zusammen, und beantwortet wird
+     * einzeln — ein totes Blatt unter fünf lebenden ist kein Gesamtfehler.
+     *
+     * `force` holt auch, was bereits bei uns liegt.
+     */
+    fetchDatasheets: (documentId: string, force = false) =>
+        apiClient.post<OspDatasheetFetchResult>(`/osp/documents/${documentId}/datasheets`, { force })
+            .then((r) => r.data),
+
+    /** Das Blatt als Markdown — lesbar, und die Quelle der Produktangaben. */
+    unitMarkdown: (unitId: string) =>
+        apiClient.get<OspUnitMarkdownDto>(`/osp/units/${unitId}/markdown`).then((r) => r.data),
 
     getSettings: () => apiClient.get<OspSettingsDto>('/osp/settings').then((r) => r.data),
 

@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { LuPaperclip } from 'react-icons/lu';
-import { Camera01, Check, FileDownload02, Trash01, UploadCloud02, XClose } from '@/components/icons/antIconCompat';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { LuCamera, LuDownload, LuPaperclip, LuTrash2, LuUpload, LuX } from 'react-icons/lu';
 import { toast } from 'sonner';
 import { t } from '@/i18n/translate';
 import {
@@ -15,30 +14,28 @@ import {
     type FormValues,
 } from '@/lib/formFields';
 import { QuoteDatePicker } from '@/pages/sales/detail/components/common/QuoteDatePicker';
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
+import { Switch } from '@/components/ui-shared/Switch';
 import { DrawingPad } from './DrawingPad';
 import { SignatureField } from './SignatureField';
-import {
-    downloadDataUrl,
-    fileToDataUrl,
-    formatBytes,
-    imageFileToScaledDataUrl,
-    INPUT_CLASS,
-    SELECT_CLASS,
-    TEXTAREA_CLASS,
-} from '../ui';
+import { downloadDataUrl, fileToDataUrl, formatBytes, imageFileToScaledDataUrl } from '../ui';
 
 /**
- * Rendert die Felder einer Vorlage zum Ausfüllen (oder nur zum Ansehen).
+ * ── DIE FELDER EINER CHECKLISTE ─────────────────────────────────────────────
+ * Rendert die Felder einer Vorlage zum Ausfüllen (oder nur zum Ansehen) — seit
+ * dem 02.09.2026 im Apple-Kleid («Inset Grouped» wie die iOS-Einstellungen,
+ * dasselbe Kleid wie der Rapport-Editor): je Abschnitt eine WEISSE, runde
+ * Gruppe mit kleiner grauer Überschrift darüber; darin eine Zeile je Feld mit
+ * der Beschriftung links und dem Feld rechts (44px Zeilenhöhe, eingerückte
+ * Haarlinie). Was breit ist — mehrzeiliger Text, Fotos, Dateien, Zeichnung,
+ * Unterschrift — steht in einer gestapelten Zeile unter seiner Beschriftung.
  *
  * Bedingte Felder: `computeFieldVisibility` (Spiegel des Servers) entscheidet
  * je Render, was sichtbar ist — "Kernbohrung nötig? = Ja" blendet
- * Bohrdurchmesser/Wandstärke/Anzahl ein, sobald der Wert steht; verschwindet
- * die Bedingung, verschwinden die Felder wieder (ihre Werte bleiben im
- * Zustand, der Server prüft nur SICHTBARE Pflichtfelder).
+ * Bohrdurchmesser/Wandstärke/Anzahl ein; verschwindet die Bedingung,
+ * verschwinden die Felder wieder (ihre Werte bleiben im Zustand).
  *
- * `errors` = Ids der Pflichtfelder ohne Wert (nach einem Abschluss-Versuch):
- * die Zeile bekommt einen roten Rand und einen Hinweis. Ein Ausfüllen läuft
- * über `onChange(fieldId, wert)`; die Wertformen stehen in lib/formFields.ts.
+ * `errors` = Ids der Pflichtfelder ohne Wert: die Zeile wird rot markiert.
  */
 export const FormRenderer = ({
     fields,
@@ -62,48 +59,77 @@ export const FormRenderer = ({
     const visibleFields = fields.filter((field) => visibility[field.id] !== false);
 
     if (visibleFields.length === 0) {
-        return <div className="py-10 text-center text-[13px] text-slate-400 dark:text-white/50">{emptyText ?? t('forms.render.empty')}</div>;
+        return <div className="ofi-chk-empty">{emptyText ?? t('forms.render.empty')}</div>;
     }
 
     const set = (fieldId: string, value: unknown) => onChange?.(fieldId, value);
 
+    /* Gruppen: ein Abschnitt öffnet eine neue; was vor dem ersten Abschnitt
+       steht, heisst «Allgemein». Eine Überschrift ohne Felder darunter bleibt
+       trotzdem stehen — sie ist in der Vorlage gewollt. */
+    type Group = { key: string; title: string | null; help?: string; fields: FormFieldDef[] };
+    const groups: Group[] = [];
+    let current: Group | null = null;
+    for (const field of visibleFields) {
+        if (field.type === 'SECTION') {
+            current = { key: field.id, title: field.label, help: field.help, fields: [] };
+            groups.push(current);
+            continue;
+        }
+        if (!current) {
+            current = { key: 'general', title: null, fields: [] };
+            groups.push(current);
+        }
+        current.fields.push(field);
+    }
+
+    let ordinal = 0;
+
     return (
-        <div className={dense ? 'space-y-2' : 'space-y-3'}>
-            {visibleFields.map((field) => {
-                if (field.type === 'SECTION') {
-                    return (
-                        <div key={field.id} className="flex items-center gap-3 pt-3 first:pt-0">
-                            <span className="h-4 w-1 rounded-full bg-[#1f2654] dark:bg-amber-400" />
-                            <h3 className="text-[14px] font-bold text-[#1f2654] dark:text-white">{field.label}</h3>
-                            {field.help && <span className="text-[12px] text-slate-400">{field.help}</span>}
-                            <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+        <div className={`ofi-chk-groups ${dense ? 'is-dense' : ''}`}>
+            {groups.map((group) => (
+                <section key={group.key} className="ofi-chk-group">
+                    <div className="ofi-ios-group__title">{group.title ?? t('forms.fill.sectionGeneral')}</div>
+                    {group.fields.length > 0 && (
+                        <div className="ofi-chk-card">
+                            {group.fields.map((field) => {
+                                ordinal += 1;
+                                const invalid = Boolean(errors?.has(field.id));
+                                const stacked = STACKED_TYPES.has(field.type) || (field.type === 'TEXT' && Boolean(field.multiline));
+                                return (
+                                    <div
+                                        key={field.id}
+                                        data-field-id={field.id}
+                                        className={`ofi-chk-row ${stacked ? 'is-stack' : ''} ${invalid ? 'is-invalid' : ''} ${field.visibleWhen ? 'is-conditional' : ''}`}
+                                    >
+                                        <div className="ofi-chk-row__label">
+                                            <span className="ofi-chk-row__num">{ordinal}</span>
+                                            <span className="min-w-0">
+                                                <span className="ofi-chk-row__text">
+                                                    {field.label}
+                                                    {field.required && <span className="ofi-chk-row__req" aria-hidden> *</span>}
+                                                </span>
+                                                {field.help && <span className="ofi-chk-row__help">{field.help}</span>}
+                                                {invalid && <span className="ofi-chk-row__error">{t('forms.render.required')}</span>}
+                                            </span>
+                                        </div>
+                                        <div className="ofi-chk-row__control">
+                                            <FieldControl field={field} value={values[field.id]} onChange={(value) => set(field.id, value)} readOnly={readOnly} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    );
-                }
-                const invalid = Boolean(errors?.has(field.id));
-                return (
-                    <div
-                        key={field.id}
-                        data-field-id={field.id}
-                        className={`rounded-xl border bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-white/5 ${
-                            invalid ? 'border-red-400 dark:border-red-500/60' : 'border-slate-200 dark:border-white/15'
-                        } ${field.visibleWhen ? 'ml-4 border-l-4 border-l-[#1f2654]/40 dark:border-l-amber-400/50' : ''}`}
-                    >
-                        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                            <label className="text-[13px] font-semibold text-slate-800 dark:text-white">
-                                {field.label}
-                                {field.required && <span className="ml-0.5 text-red-500">*</span>}
-                            </label>
-                            {field.help && <span className="text-[11.5px] text-slate-500 dark:text-white/60">{field.help}</span>}
-                        </div>
-                        <FieldControl field={field} value={values[field.id]} onChange={(value) => set(field.id, value)} readOnly={readOnly} />
-                        {invalid && <div className="mt-1.5 text-[11.5px] font-semibold text-red-600 dark:text-red-400">{t('forms.render.required')}</div>}
-                    </div>
-                );
-            })}
+                    )}
+                    {group.help && <div className="ofi-ios-group__footer">{group.help}</div>}
+                </section>
+            ))}
         </div>
     );
 };
+
+/** Feldtypen, die ihre ganze Zeile brauchen. */
+const STACKED_TYPES: ReadonlySet<string> = new Set(['PHOTO', 'FILE', 'DRAWING', 'SIGNATURE']);
 
 // ── Einzelne Eingabesteuerungen ─────────────────────────────────────────────
 
@@ -127,35 +153,40 @@ const FieldControl = ({
                     placeholder={field.placeholder}
                     disabled={readOnly}
                     rows={3}
-                    className={TEXTAREA_CLASS}
+                    className="ofi-chk-input is-area"
                 />
             ) : (
                 <input
                     value={typeof value === 'string' ? value : ''}
                     onChange={(event) => onChange(event.target.value)}
-                    placeholder={field.placeholder}
+                    placeholder={field.placeholder || '…'}
                     disabled={readOnly}
-                    className={INPUT_CLASS}
+                    className="ofi-chk-input"
                 />
             );
         case 'DATE':
             // QuoteDatePicker statt <input type="date">: das native Feld zeigt
             // Format und Kalender in der BROWSER-Sprache (CrmFilterBar-Regel).
             return readOnly ? (
-                <span className="text-[13.5px] text-slate-700 dark:text-white/80">{formatFormValue(field, value) || '—'}</span>
+                <span className="ofi-chk-readout">{formatFormValue(field, value) || '—'}</span>
             ) : (
-                <div className="max-w-xs">
+                <div className="ofi-chk-datefield">
                     <QuoteDatePicker
                         value={typeof value === 'string' ? value : ''}
                         onChange={(next) => onChange(next)}
                         ariaLabel={field.label}
                         placeholder={field.placeholder || t('forms.render.datePlaceholder')}
-                        className={INPUT_CLASS}
+                        className="ofi-chk-input"
                     />
                 </div>
             );
         case 'CHECKBOX':
-            return <CheckboxControl checked={value === true} onChange={onChange} disabled={readOnly} />;
+            return (
+                <span className="ofi-chk-toggle">
+                    <span className={`ofi-chk-toggle__word ${value === true ? 'is-on' : ''}`}>{value === true ? t('forms.value.yes') : t('forms.value.no')}</span>
+                    <Switch checked={value === true} onChange={(next) => onChange(next)} label={field.label} disabled={readOnly} />
+                </span>
+            );
         case 'SELECT':
             return <SelectControl field={field} value={typeof value === 'string' ? value : ''} onChange={onChange} disabled={readOnly} />;
         case 'PHOTO':
@@ -170,7 +201,7 @@ const FieldControl = ({
             if (NUMERIC_FIELD_TYPES.has(field.type)) {
                 return <NumberControl field={field} value={value} onChange={onChange} disabled={readOnly} />;
             }
-            return <span className="text-[13px] text-slate-500">{formatFormValue(field, value)}</span>;
+            return <span className="ofi-chk-readout">{formatFormValue(field, value)}</span>;
     }
 };
 
@@ -178,10 +209,9 @@ const NumberControl = ({ field, value, onChange, disabled }: { field: FormFieldD
     // Eigener Textzustand: "1," oder "-" sind gültige Zwischenzustände beim
     // Tippen, die als Zahl noch nicht bestehen. Gespeichert wird die Zahl.
     const [text, setText] = useState(() => (typeof value === 'number' ? String(value) : ''));
-    // Kommt von aussen ein anderer Wert (Neuladen, Zurücksetzen), zieht der
-    // Text nach — aber nur, wenn er nicht ohnehin schon diese Zahl bedeutet
-    // ("1,5" bleibt beim Tippen stehen). Zustand aus Prop ableiten, wie React
-    // es vorsieht: beim Rendern vergleichen, kein Effekt.
+    // Kommt von aussen ein anderer Wert (Neuladen), zieht der Text nach — aber
+    // nur, wenn er nicht ohnehin schon diese Zahl bedeutet ("1,5" bleibt beim
+    // Tippen stehen). Zustand aus Prop ableiten: beim Rendern, kein Effekt.
     const [seenValue, setSeenValue] = useState(value);
     if (seenValue !== value) {
         setSeenValue(value);
@@ -190,48 +220,33 @@ const NumberControl = ({ field, value, onChange, disabled }: { field: FormFieldD
     }
     const unit = FIELD_UNITS[field.type];
     return (
-        <div className="relative max-w-xs">
+        <span className={`ofi-chk-unitfield ${unit ? 'has-unit' : ''}`}>
             <input
                 inputMode="decimal"
                 value={text}
                 disabled={disabled}
-                placeholder={field.placeholder}
+                placeholder={field.placeholder || '0'}
                 onChange={(event) => {
                     const next = event.target.value;
                     setText(next);
                     const parsed = Number(next.replace(',', '.'));
                     onChange(next.trim() === '' || Number.isNaN(parsed) ? null : parsed);
                 }}
-                className={`${INPUT_CLASS} font-mono ${unit ? 'pr-12' : ''}`}
+                className="ofi-chk-input is-number"
             />
-            {unit && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[12.5px] font-semibold text-slate-400">{unit}</span>}
-        </div>
+            {unit && <span className="ofi-chk-unitfield__unit">{unit}</span>}
+        </span>
     );
 };
 
-const CheckboxControl = ({ checked, onChange, disabled }: { checked: boolean; onChange: (value: unknown) => void; disabled: boolean }) => (
-    <div className="flex items-center gap-3">
-        <button
-            type="button"
-            role="checkbox"
-            aria-checked={checked}
-            disabled={disabled}
-            onClick={() => onChange(!checked)}
-            className={`flex size-9 items-center justify-center rounded-lg border-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                checked ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-300 bg-white text-transparent hover:border-emerald-500 dark:border-white/25 dark:bg-transparent'
-            }`}
-        >
-            <Check size={20} strokeWidth={3} />
-        </button>
-        <span className="text-[13px] text-slate-600 dark:text-white/70">{checked ? t('forms.value.yes') : t('forms.value.no')}</span>
-    </div>
-);
+/** Bis zu vier Optionen: Segmentwähler (iOS); mehr: Aufklappliste. */
+const SEGMENT_MAX = 4;
 
 const SelectControl = ({ field, value, onChange, disabled }: { field: FormFieldDef; value: string; onChange: (value: unknown) => void; disabled: boolean }) => {
     const options = field.options || [];
-    if (field.display === 'radio') {
+    if (field.display === 'radio' && options.length <= SEGMENT_MAX) {
         return (
-            <div className="flex flex-wrap gap-2">
+            <span className="ofi-chk-seg" role="radiogroup" aria-label={field.label}>
                 {options.map((option) => {
                     const active = option.id === value;
                     return (
@@ -242,24 +257,27 @@ const SelectControl = ({ field, value, onChange, disabled }: { field: FormFieldD
                             aria-checked={active}
                             disabled={disabled}
                             onClick={() => onChange(active ? '' : option.id)}
-                            className={`rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                                active
-                                    ? 'border-[#1f2654] bg-[#1f2654] text-white dark:border-amber-500 dark:bg-amber-500 dark:text-slate-900'
-                                    : 'border-slate-300 bg-white text-slate-700 hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:bg-transparent dark:text-white/80'
-                            }`}
+                            className={`ofi-chk-seg__item ${active ? 'is-on' : ''}`}
                         >
                             {option.label}
                         </button>
                     );
                 })}
-            </div>
+            </span>
         );
     }
     return (
-        <select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={`${SELECT_CLASS} max-w-md`}>
-            <option value="">{field.placeholder || t('forms.render.selectPlaceholder')}</option>
-            {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-        </select>
+        <SelectMenu
+            value={value}
+            disabled={disabled}
+            ariaLabel={field.label}
+            placeholder={field.placeholder || t('forms.render.selectPlaceholder')}
+            buttonClassName="ofi-chk-input is-select"
+            className="ofi-chk-selectwrap"
+            listWidth={280}
+            options={[{ value: '', label: field.placeholder || t('forms.render.selectPlaceholder') }, ...options.map((option) => ({ value: option.id, label: option.label }))]}
+            onChange={(next) => onChange(next)}
+        />
     );
 };
 
@@ -284,45 +302,40 @@ const PhotoControl = ({ value, onChange, disabled }: { value: FormPhotoValue[]; 
     };
 
     return (
-        <div className="space-y-2">
+        <div className="ofi-chk-media">
             {value.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                <div className="ofi-chk-photos">
                     {value.map((photo, index) => (
-                        <div key={index} className="group overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-white/15 dark:bg-white/5">
-                            <div className="relative aspect-[4/3]">
-                                <img src={photo.dataUrl} alt="" className="h-full w-full object-cover" />
+                        <figure key={index} className="ofi-chk-photo">
+                            <span className="ofi-chk-photo__frame">
+                                <img src={photo.dataUrl} alt="" />
                                 {!disabled && (
                                     <button
                                         type="button"
                                         title={t('common.delete')}
+                                        aria-label={t('common.delete')}
                                         onClick={() => onChange(value.filter((_, i) => i !== index))}
-                                        className="absolute right-1 top-1 grid size-7 place-items-center rounded-full bg-black/55 text-white transition-opacity hover:bg-black/75 md:opacity-0 md:group-hover:opacity-100"
+                                        className="ofi-chk-photo__remove"
                                     >
-                                        <XClose size={14} />
+                                        <LuX size={13} />
                                     </button>
                                 )}
-                            </div>
+                            </span>
                             <input
                                 value={photo.caption || ''}
                                 disabled={disabled}
                                 placeholder={t('forms.render.captionPlaceholder')}
                                 onChange={(event) => onChange(value.map((item, i) => (i === index ? { ...item, caption: event.target.value } : item)))}
-                                className="h-8 w-full border-t border-slate-200 bg-transparent px-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:outline-none dark:border-white/10 dark:text-white"
+                                className="ofi-chk-photo__caption"
                             />
-                        </div>
+                        </figure>
                     ))}
                 </div>
             )}
             {!disabled && value.length < MAX_PHOTOS && (
-                <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => inputRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-wait dark:border-white/20 dark:bg-white/5 dark:text-white/70"
-                >
-                    <Camera01 size={16} />
-                    {busy ? t('common.loading') : t('forms.render.addPhoto')}
-                </button>
+                <AddLine busy={busy} icon={<LuCamera size={15} />} onClick={() => inputRef.current?.click()}>
+                    {t('forms.render.addPhoto')}
+                </AddLine>
             )}
             <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => void addFiles(event.target.files)} />
         </div>
@@ -357,22 +370,22 @@ const FileControl = ({ value, onChange, disabled }: { value: FormFileValue[]; on
     };
 
     return (
-        <div className="space-y-2">
+        <div className="ofi-chk-media">
             {value.length > 0 && (
-                <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-white/10 dark:border-white/15">
+                <ul className="ofi-chk-files">
                     {value.map((file, index) => (
-                        <li key={index} className="flex items-center gap-3 px-3 py-2">
-                            <LuPaperclip size={15} className="shrink-0 text-slate-400" />
+                        <li key={index} className="ofi-chk-file">
+                            <LuPaperclip size={15} className="ofi-chk-file__icon" />
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[13px] font-medium text-slate-800 dark:text-white">{file.name}</span>
-                                <span className="block text-[11.5px] text-slate-400">{formatBytes(file.size)}{file.mimeType ? ` · ${file.mimeType}` : ''}</span>
+                                <span className="ofi-chk-file__name">{file.name}</span>
+                                <span className="ofi-chk-file__meta">{formatBytes(file.size)}{file.mimeType ? ` · ${file.mimeType}` : ''}</span>
                             </span>
-                            <button type="button" title={t('forms.render.download')} onClick={() => downloadDataUrl(file.dataUrl, file.name)} className="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/15">
-                                <FileDownload02 size={14} />
+                            <button type="button" title={t('forms.render.download')} aria-label={t('forms.render.download')} onClick={() => downloadDataUrl(file.dataUrl, file.name)} className="ofi-chk-iconbtn">
+                                <LuDownload size={15} />
                             </button>
                             {!disabled && (
-                                <button type="button" title={t('common.delete')} onClick={() => onChange(value.filter((_, i) => i !== index))} className="inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-600 dark:border-white/15">
-                                    <Trash01 size={14} />
+                                <button type="button" title={t('common.delete')} aria-label={t('common.delete')} onClick={() => onChange(value.filter((_, i) => i !== index))} className="ofi-chk-iconbtn is-danger">
+                                    <LuTrash2 size={15} />
                                 </button>
                             )}
                         </li>
@@ -380,17 +393,19 @@ const FileControl = ({ value, onChange, disabled }: { value: FormFileValue[]; on
                 </ul>
             )}
             {!disabled && value.length < MAX_FILES && (
-                <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => inputRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-wait dark:border-white/20 dark:bg-white/5 dark:text-white/70"
-                >
-                    <UploadCloud02 size={16} />
-                    {busy ? t('common.loading') : t('forms.render.addFile')}
-                </button>
+                <AddLine busy={busy} icon={<LuUpload size={15} />} onClick={() => inputRef.current?.click()}>
+                    {t('forms.render.addFile')}
+                </AddLine>
             )}
             <input ref={inputRef} type="file" multiple className="hidden" onChange={(event) => void addFiles(event.target.files)} />
         </div>
     );
 };
+
+/** Die Hinzufügen-Zeile im iOS-Stil: Ring mit Symbol, daneben das Wort. */
+const AddLine = ({ busy, icon, onClick, children }: { busy: boolean; icon: ReactNode; onClick: () => void; children: ReactNode }) => (
+    <button type="button" disabled={busy} onClick={onClick} className="ofi-chk-addline">
+        <span className="ofi-chk-addline__ring">{icon}</span>
+        <span>{busy ? t('common.loading') : children}</span>
+    </button>
+);

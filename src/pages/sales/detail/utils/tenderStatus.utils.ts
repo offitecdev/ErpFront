@@ -26,7 +26,16 @@ type TenderStateSource = {
     sourceStatus?: string | null;
     validUntil?: string | Date | null;
     offerAcceptedAt?: string | Date | null;
+    /* STORNIERT (06.09.2026): schlaegt jeden anderen Zustand. Eine stornierte
+       Offerte bleibt als Beleg stehen — sie ist weder Entwurf noch Auftrag
+       noch abgelaufen, und die schlanke Listenzeile traegt `cancelledAt`
+       genau dafuer mit. */
+    cancelledAt?: string | Date | null;
+    status?: string | null;
 };
+
+export const isCancelledTender = (tender: TenderStateSource) =>
+    Boolean(tender.cancelledAt) || tender.status === 'Cancelled';
 
 export const isOrderTender = (tender: TenderStateSource) =>
     Boolean(tender.projectId) || isSourceSalesOrder(tender.sourceStatus);
@@ -38,6 +47,7 @@ export const isOrderTender = (tender: TenderStateSource) =>
  * die Liste und die Detailansicht zeigen den Zustand als Status.
  */
 export const isExpiredTender = (tender: TenderStateSource): boolean => {
+    if (isCancelledTender(tender)) return false;
     if (isOrderTender(tender) || tender.offerAcceptedAt || !tender.validUntil) return false;
     const validUntil = new Date(tender.validUntil);
     if (Number.isNaN(validUntil.getTime())) return false;
@@ -48,12 +58,14 @@ export const isExpiredTender = (tender: TenderStateSource): boolean => {
 };
 
 export const tenderStatusLabel = (tender: TenderStateSource) => {
+    if (isCancelledTender(tender)) return t('orders.lifecycle.statusCancelled');
     if (isOrderTender(tender)) return t('crm.tenders.statusOrdered');
     if (isExpiredTender(tender)) return t('crm.tenders.statusExpired');
     return t('crm.tenders.statusDraft');
 };
 
 export const tenderStatusVariant = (tender: TenderStateSource): 'passive' | 'order' | 'danger' => {
+    if (isCancelledTender(tender)) return 'danger';
     if (isOrderTender(tender)) return 'order';
     if (isExpiredTender(tender)) return 'danger';
     return 'passive';

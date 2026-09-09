@@ -2,13 +2,15 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
-    Building02 as Building2,
     ChevronDown,
     Save01 as Save,
     X as XIcon,
 } from '@/components/icons/antIconCompat';
 
 import { t as i18nT } from '@/i18n/translate';
+// Das Kleid der Kundenakte (Mac-Fenster: Haarlinien, 28px-Felder, 6px-Ecke) —
+// gilt nur unter `.ofi-list-apple` (routes → applePage).
+import '@/styles/customerApple.css';
 import { apiClient } from '../../../lib/axios';
 import { Button } from '../../../components/ui-shared/Button';
 import { CountrySelect } from '../../../components/ui-shared/CountrySelect';
@@ -45,6 +47,9 @@ type FieldKey = keyof CustomerInfoValue | 'responsible' | 'address';
 
 const COLLAPSE_STORAGE_KEY = 'offitec:customer-detail:info-card-collapsed';
 
+/** Das Feld dieser Karte: die gemeinsame Klasse plus der Haken für das Kleid. */
+const CONTROL_CLASS = `${CUSTOMER_CONTROL_CLASS} ofi-cust-info__control`;
+
 /** Eine Beschriftungs-/Wertzeile; `control` ersetzt im Bearbeitungsmodus den Wert. */
 const InfoFieldRow = ({
     label,
@@ -53,8 +58,8 @@ const InfoFieldRow = ({
     label: ReactNode;
     children: ReactNode;
 }) => (
-    <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] items-start gap-2.5 border-b border-slate-100 py-1.5 last:border-b-0 dark:border-white/10">
-        <span className={`${CUSTOMER_LABEL_CLASS} pt-2`}>{label}</span>
+    <div className="ofi-cust-info__row grid min-w-0 grid-cols-[104px_minmax(0,1fr)] items-start gap-2.5 border-b border-slate-100 py-1.5 last:border-b-0 dark:border-white/10">
+        <span className={`${CUSTOMER_LABEL_CLASS} ofi-cust-info__label pt-2`}>{label}</span>
         <div className="min-w-0">{children}</div>
     </div>
 );
@@ -146,9 +151,9 @@ export const CustomerInfoCard = ({
 
     /** Klickbarer Wert: sieht wie Text aus, wird beim Klick zum Eingabefeld. */
     const readValue = (key: FieldKey, text: string | null | undefined) => (
-        <button type="button" onClick={() => openField(key)} className={CUSTOMER_EDITABLE_CLASS}>
+        <button type="button" onClick={() => openField(key)} className={`${CUSTOMER_EDITABLE_CLASS} ofi-cust-info__value`}>
             <span className="min-w-0 truncate">
-                {text || <span className="text-slate-400 dark:text-white/40">{i18nT('common.empty')}</span>}
+                {text || <span className="ofi-cust-info__empty text-slate-400 dark:text-white/40">{i18nT('common.empty')}</span>}
             </span>
         </button>
     );
@@ -164,7 +169,7 @@ export const CustomerInfoCard = ({
                     type={type}
                     value={draft[key]}
                     onChange={(event) => set({ [key]: event.target.value } as Partial<CustomerInfoValue>)}
-                    className={CUSTOMER_CONTROL_CLASS}
+                    className={CONTROL_CLASS}
                 />
             ) : (
                 readValue(key, draft[key])
@@ -200,7 +205,7 @@ export const CustomerInfoCard = ({
                     type="text"
                     value={draft[key]}
                     onChange={(event) => set({ [key]: event.target.value } as Partial<CustomerInfoValue>)}
-                    className={CUSTOMER_CONTROL_CLASS}
+                    className={CONTROL_CLASS}
                 />
             ) : (
                 readValue('address', draft[key])
@@ -221,7 +226,7 @@ export const CustomerInfoCard = ({
                     autoFocus
                     value={draft[key]}
                     onChange={(event) => set({ [key]: event.target.value } as Partial<CustomerInfoValue>)}
-                    className={CUSTOMER_CONTROL_CLASS}
+                    className={CONTROL_CLASS}
                 >
                     {withBlank && <option value="">{i18nT('common.select')}</option>}
                     {options.map((option) => (
@@ -237,25 +242,25 @@ export const CustomerInfoCard = ({
     const responsibleName = [draft.responsibleFirstName, draft.responsibleLastName].filter(Boolean).join(' ');
 
     return (
-        <section data-ui-card className="relative z-10 mb-2 overflow-hidden rounded-[2px] border border-slate-300 bg-white dark:border-white/15 dark:bg-transparent">
+        <section data-ui-card data-collapsed={collapsed ? 'true' : 'false'} className="ofi-cust-info relative z-10 mb-2 overflow-hidden rounded-[2px] border border-slate-300 bg-white dark:border-white/15 dark:bg-transparent">
+            {/* Kopf ohne Kachel und ohne Tönung (Kleid der Kundenakte,
+                styles/customerApple.css): Titel, eingeklappt der Firmenname,
+                rechts der Pfeil. */}
             <button
                 type="button"
                 onClick={toggleCollapsed}
                 aria-expanded={!collapsed}
-                className="flex w-full items-center gap-2.5 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5 text-left transition-colors hover:bg-[#e9effb] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                className="ofi-cust-info__head flex w-full items-center gap-2.5 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5 text-left transition-colors hover:bg-[#e9effb] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
             >
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-[2px] bg-[#1f2654] text-white">
-                    <Building2 size={12} />
-                </span>
-                <span className="text-[13px] font-semibold tracking-[0.01em] text-[#1f2654] dark:text-white">
+                <span className="ofi-cust-info__title text-[13px] font-semibold tracking-[0.01em] text-[#1f2654] dark:text-white">
                     {i18nT('crm.customer_profili')}
                 </span>
                 {collapsed && (
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-slate-600 dark:text-white/60">
+                    <span className="ofi-cust-info__summary min-w-0 flex-1 truncate text-[12.5px] text-slate-600 dark:text-white/60">
                         {draft.companyName}
                     </span>
                 )}
-                <span className={`flex h-5 w-5 items-center justify-center rounded-[2px] text-slate-400 ${collapsed ? '' : 'ml-auto'}`}>
+                <span className={`ofi-cust-info__chevron flex h-5 w-5 items-center justify-center rounded-[2px] text-slate-400 ${collapsed ? '' : 'ml-auto'}`}>
                     <ChevronDown size={14} className={`transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
                 </span>
             </button>
@@ -263,8 +268,8 @@ export const CustomerInfoCard = ({
             {!collapsed && (
                 <>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3">
-                        <div className="min-w-0 px-3 py-2">
-                            <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                        <div className="ofi-cust-info__group min-w-0 px-3 py-2">
+                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
                                 {i18nT('crm.customers.customerType')}
                             </span>
                             {textField('companyName', i18nT('crm.customers.companyName'))}
@@ -278,8 +283,8 @@ export const CustomerInfoCard = ({
                             Spalten bleiben, wo sie sind: sie hängen an der POSITION, nicht am
                             Inhalt (bei `md` rutscht die dritte Spalte in eine zweite Zeile und
                             braucht dort ihre obere Linie). */}
-                        <div className="min-w-0 border-t border-slate-200 px-3 py-2 md:border-l md:border-t-0 dark:border-white/10">
-                            <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                        <div className="ofi-cust-info__group min-w-0 border-t border-slate-200 px-3 py-2 md:border-l md:border-t-0 dark:border-white/10">
+                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
                                 {i18nT('crm.locationPrimary')}
                             </span>
                             {textField('addressName', i18nT('crm.locationName'))}
@@ -299,7 +304,7 @@ export const CustomerInfoCard = ({
                                         value={draft.country}
                                         onChange={(next) => set({ country: next })}
                                         onPick={onCountryPicked}
-                                        inputClassName={CUSTOMER_CONTROL_CLASS}
+                                        inputClassName={CONTROL_CLASS}
                                     />
                                 ) : (
                                     readValue('address', draft.country)
@@ -307,8 +312,8 @@ export const CustomerInfoCard = ({
                             </InfoFieldRow>
                         </div>
 
-                        <div className="min-w-0 border-t border-slate-200 px-3 py-2 md:border-l lg:border-t-0 dark:border-white/10">
-                            <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                        <div className="ofi-cust-info__group min-w-0 border-t border-slate-200 px-3 py-2 md:border-l lg:border-t-0 dark:border-white/10">
+                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
                                 {i18nT('crm.customers.contactData')}
                             </span>
                             {textField('mainEmail', i18nT('common.email'), 'email')}
@@ -328,13 +333,13 @@ export const CustomerInfoCard = ({
                                             value={draft.responsibleFirstName}
                                             onChange={(event) => set({ responsibleFirstName: event.target.value })}
                                             placeholder={i18nT('crm.customers.responsibleFirstName')}
-                                            className={CUSTOMER_CONTROL_CLASS}
+                                            className={CONTROL_CLASS}
                                         />
                                         <input
                                             value={draft.responsibleLastName}
                                             onChange={(event) => set({ responsibleLastName: event.target.value })}
                                             placeholder={i18nT('crm.customers.responsibleLastName')}
-                                            className={CUSTOMER_CONTROL_CLASS}
+                                            className={CONTROL_CLASS}
                                         />
                                     </div>
                                 ) : (
@@ -346,8 +351,8 @@ export const CustomerInfoCard = ({
 
                     {/* Speichern-Leiste erscheint erst, wenn wirklich etwas offen oder geändert ist. */}
                     {(openFields.size > 0 || dirty) && (
-                        <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                            <span className={`mr-auto ${CUSTOMER_READONLY_CLASS} w-auto border-0 bg-transparent px-0 text-[12px] font-normal text-slate-500`}>
+                        <div className="ofi-cust-info__bar flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                            <span className={`ofi-cust-info__hint mr-auto ${CUSTOMER_READONLY_CLASS} w-auto border-0 bg-transparent px-0 text-[12px] font-normal text-slate-500`}>
                                 {dirty ? i18nT('crm.unsavedChanges') : ''}
                             </span>
                             <Button variant="secondary" size="sm" icon={<XIcon size={12} />} onClick={cancel}>

@@ -1,0 +1,834 @@
+/* =========================================================
+   Offitec — EIN FENSTER FÜR DIE GANZE ANWENDUNG (09.09.2026)
+
+   Vorgabe Samet: «Alle Pop-ups und Fenster der Anwendung —
+   Kalender, CRM, Projekt, Angebot — auf DERSELBEN Stufe und
+   im selben sauberen Apple-Fenster, sehr modern.»
+
+   Der Massstab ist die Angebotsseite vom selben Tag
+   (styles/tenderDetail.css): ein NATIVES Mac-Fenster, nicht
+   apple.com — Haarlinien, weisse Fläche, 6px-Kontrollen mit
+   Rahmen, EIN Systemblau für die Hauptaktion, keine Pillen,
+   keine Tönungen, keine Glaseffekte, Inter Variable.
+
+   Bis hierher trugen die Fenster das Google-Kleid vom
+   17./24.08.2026: 14px-Kante, Pillenknöpfe, graue Felder ohne
+   Rahmen, getönte Symbolkreise, Grossbuchstaben-Beschriftungen.
+   Die Bauteile bleiben (PopupKit, FloatingCard, ConfirmDialog,
+   CenterModal, BottomSheet, AnchoredPicker, die antd-Reste) —
+   NUR das Kleid wechselt, hier, an einer Stelle.
+
+   Ladereihenfolge (main.tsx): … controls.css → DIESE DATEI.
+   Sie steht zuletzt und ausserhalb jeder `@layer`; `!important`
+   nur dort, wo index.css selbst welches trägt (Radienband,
+   Feldradius, antd, die Mail-/Aufgaben-Menüs).
+
+   Die Fenster hängen in Portalen ausserhalb von #root, darum
+   trägt jede Kontrollregel den Zwilling
+   `#root … , body > :not(#root) …` (Notiz «Portal popups need
+   a CSS twin»).
+
+   ── DIE KABINEN ──────────────────────────────────────────────
+     .ofi-pop               Bestätigen/Löschen, CenterModal,
+                            BottomSheet, AnchoredPicker (.is-list)
+     .ofi-float-card        FloatingCard / PopupCard (Kalender,
+                            Angebot, Projekt, Rapporte)
+     .ofi-tp-dialog         PopupDialog (mittig, mit Schleier)
+     .ofi-calendar-dialog   CenterModal
+     .ofi-tp-menu           Menü an einem Feld (PopupKit)
+     .ofi-quick-pop         Trefferlisten (Mail, Aufgaben, Lager)
+     .ofi-mailconfirm-card  Sende-Bestätigung der Mailseite
+     .ofi-slide-panel       Kopfleisten-Panel
+     .ofi-invp-menu         Rechnungsmenü
+     .ant-modal-content …   die letzten antd-Fenster
+   ========================================================= */
+
+/* ── 1. Die Farbtafel eines Fensters ─────────────────────── */
+:root {
+    --ofi-modal-radius: 12px;
+    --ofi-pop-list-radius: 8px;
+    --ofi-pop-row-radius: 5px;
+
+    /* Die Programmschrift (styles/fonts.css + theme.css: Inter Variable);
+       der Rückfall steht nur für den Fall, dass theme.css noch nicht da ist. */
+    --ofi-win-font: var(--font-body, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    --ofi-win-surface: #ffffff;
+    --ofi-win-surface-2: #f7f7f8;
+    --ofi-win-text: #1d1d1f;
+    --ofi-win-secondary: #6e6e73;
+    --ofi-win-muted: #a1a1a6;
+    --ofi-win-border: rgba(0, 0, 0, 0.1);
+    --ofi-win-hairline: rgba(0, 0, 0, 0.07);
+    --ofi-win-field-border: rgba(0, 0, 0, 0.14);
+    --ofi-win-field-border-hover: rgba(0, 0, 0, 0.22);
+    --ofi-win-field: #ffffff;
+    --ofi-win-hover: rgba(0, 0, 0, 0.035);
+    --ofi-win-fill: rgba(0, 0, 0, 0.045);
+    --ofi-win-fill-hover: rgba(0, 0, 0, 0.08);
+    /* Marine statt Systemblau (09.09.2026, gleiche Vorgabe wie auf der
+       Offerte); dunkel bleibt das helle Blau lesbar. */
+    --ofi-win-accent: #272f67;
+    --ofi-win-accent-hover: #1f2654;
+    --ofi-win-on-accent: #ffffff;
+    --ofi-win-accent-soft: rgba(39, 47, 103, 0.1);
+    --ofi-win-accent-tint: rgba(39, 47, 103, 0.06);
+    --ofi-win-focus: rgba(39, 47, 103, 0.3);
+    --ofi-win-danger: #d70015;
+    --ofi-win-danger-soft: rgba(215, 0, 21, 0.08);
+    --ofi-win-success: #1f8a3b;
+    --ofi-win-success-soft: rgba(31, 138, 59, 0.1);
+    --ofi-win-warning: #9a5b00;
+    --ofi-win-warning-soft: rgba(255, 159, 10, 0.14);
+    --ofi-win-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+    --ofi-win-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 20px 56px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.06);
+    --ofi-win-shadow-menu: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 10px 32px rgba(0, 0, 0, 0.14);
+    --ofi-win-shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.14);
+    --ofi-win-shadow-drawer: -12px 0 40px rgba(0, 0, 0, 0.12);
+    --ofi-win-scrim: rgba(0, 0, 0, 0.22);
+    /* 34px (Samet, 09.09.2026: «die Knöpfe etwas grösser, sie sind zu
+       klein» — die 30px des ersten Wurfs). Knopf UND Feld lesen dasselbe
+       Mass, damit Suchfeld und Knopf in einer Zeile auf einer Linie stehen. */
+    --ofi-win-control-h: 34px;
+    --ofi-win-control-radius: 6px;
+}
+.dark {
+    --ofi-win-surface: #1c1c1e;
+    --ofi-win-surface-2: #232326;
+    --ofi-win-text: #f5f5f7;
+    --ofi-win-secondary: #a1a1a6;
+    --ofi-win-muted: #6e6e73;
+    --ofi-win-border: rgba(255, 255, 255, 0.1);
+    --ofi-win-hairline: rgba(255, 255, 255, 0.08);
+    --ofi-win-field-border: rgba(255, 255, 255, 0.16);
+    --ofi-win-field-border-hover: rgba(255, 255, 255, 0.26);
+    --ofi-win-field: #161719;
+    --ofi-win-hover: rgba(255, 255, 255, 0.05);
+    --ofi-win-fill: rgba(255, 255, 255, 0.07);
+    --ofi-win-fill-hover: rgba(255, 255, 255, 0.12);
+    --ofi-win-accent: #3b8dff;
+    --ofi-win-accent-hover: #5c9fff;
+    --ofi-win-accent-soft: rgba(59, 141, 255, 0.18);
+    --ofi-win-accent-tint: rgba(59, 141, 255, 0.1);
+    --ofi-win-focus: rgba(59, 141, 255, 0.4);
+    --ofi-win-danger: #ff453a;
+    --ofi-win-danger-soft: rgba(255, 69, 58, 0.14);
+    --ofi-win-success: #30d158;
+    --ofi-win-success-soft: rgba(48, 209, 88, 0.14);
+    --ofi-win-warning: #ffb340;
+    --ofi-win-warning-soft: rgba(255, 179, 64, 0.14);
+    --ofi-win-btn-shadow: none;
+    --ofi-win-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 24px 64px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.4);
+    --ofi-win-shadow-menu: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 12px 36px rgba(0, 0, 0, 0.55);
+    --ofi-win-shadow-sheet: 0 -14px 48px rgba(0, 0, 0, 0.6);
+    --ofi-win-shadow-drawer: -14px 0 48px rgba(0, 0, 0, 0.55);
+    --ofi-win-scrim: rgba(0, 0, 0, 0.5);
+}
+
+/* ── 2. Jedes Fenster liest ab hier die Fenstertafel ───────
+   Die Fensterbauteile malen aus den `--ofi-cal-*`-Marken des
+   Kalenders. Statt jede ihrer Regeln neu zu schreiben, werden
+   die Marken IN den Kabinen umgebogen: Fläche, Schrift, Kanten,
+   Akzent, Schatten — und die angesteuerte Menüzeile
+   (`--ofi-pop-row-bg`) wechselt von Marine auf das Systemblau.
+   Die Kalenderseite selbst (Raster, Heute-Kreis, Karten) liest
+   die Marken weiter aus index.css, weil sie in keiner Kabine
+   steht. */
+.ofi-pop,
+.ofi-float-card,
+.ofi-tp-dialog,
+.ofi-calendar-dialog,
+.ofi-tp-menu,
+.ofi-quick-pop,
+.ofi-mailconfirm-card,
+.ofi-slide-panel,
+.ofi-invp-menu,
+.ant-modal-content,
+.ant-drawer-content,
+.ant-popover-inner,
+.ant-dropdown-menu,
+.ant-select-dropdown,
+.ant-picker-panel-container {
+    --ofi-cal-surface: var(--ofi-win-surface);
+    --ofi-cal-surface-2: var(--ofi-win-surface-2);
+    --ofi-cal-surface-3: var(--ofi-win-surface-2);
+    --ofi-cal-hover: var(--ofi-win-hover);
+    --ofi-cal-border: var(--ofi-win-field-border);
+    --ofi-cal-border-soft: var(--ofi-win-border);
+    --ofi-cal-line: var(--ofi-win-hairline);
+    --ofi-cal-text: var(--ofi-win-text);
+    --ofi-cal-text-2: var(--ofi-win-text);
+    --ofi-cal-muted: var(--ofi-win-secondary);
+    --ofi-cal-faint: var(--ofi-win-muted);
+    --ofi-cal-accent: var(--ofi-win-accent);
+    --ofi-cal-accent-hover: var(--ofi-win-accent-hover);
+    --ofi-cal-on-accent: var(--ofi-win-on-accent);
+    --ofi-cal-accent-soft: var(--ofi-win-accent-soft);
+    --ofi-cal-accent-tint: var(--ofi-win-accent-tint);
+    --ofi-cal-accent-line: var(--ofi-win-accent);
+    --ofi-cal-tab-active-bg: var(--ofi-win-fill);
+    --ofi-cal-tab-active-text: var(--ofi-win-text);
+    --ofi-cal-shadow: var(--ofi-win-shadow);
+    --ofi-cal-shadow-soft: var(--ofi-win-shadow-menu);
+    --ofi-cal-danger: var(--ofi-win-danger);
+    --ofi-pop-row-bg: var(--ofi-win-accent);
+    --ofi-pop-row-text: #ffffff;
+    --ofi-field-focus: var(--ofi-win-accent);
+    --ofi-field-ring: var(--ofi-win-focus);
+    font-family: var(--ofi-win-font);
+    font-feature-settings: 'cv11', 'calt';
+    -webkit-font-smoothing: antialiased;
+    color: var(--ofi-win-text);
+}
+
+/* ── 3. Die Fläche: weiss, EINE Haarlinie, EINE Kante ───────
+   Der Schatten bleibt — ein schwebendes Fenster ohne Schatten
+   klebt auf der Seite. Er ist der weiche, breite eines Mac-
+   Fensters, nicht der dreifache Google-Stapel. */
+.ofi-pop,
+.ofi-float-card,
+.ofi-tp-dialog,
+.ofi-calendar-dialog,
+.ofi-mailconfirm-card {
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--ofi-modal-radius);
+    background: var(--ofi-win-surface);
+    box-shadow: var(--ofi-win-shadow);
+}
+.ofi-calendar-dialog { border-radius: var(--ofi-modal-radius) !important; }
+.dark .ofi-float-card,
+.dark .ofi-tp-dialog,
+.dark .ofi-mailconfirm-card,
+.dark .ofi-pop { background: var(--ofi-win-surface); }
+
+/* Angedockte Karte (Kalender im Vollbild): Teil der Seite, kein Fenster. */
+.ofi-float-card.is-docked {
+    border: 0;
+    border-right: 1px solid var(--ofi-win-border);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sockelfenster: nur die oberen Ecken, Schatten nach oben. */
+.ofi-pop.is-sheet,
+.ofi-sheet.ofi-pop {
+    border-bottom: 0;
+    border-color: var(--ofi-win-border);
+    border-radius: var(--ofi-modal-radius) var(--ofi-modal-radius) 0 0;
+    background: var(--ofi-win-surface);
+    box-shadow: var(--ofi-win-shadow-sheet);
+}
+.dark .ofi-pop.is-sheet { box-shadow: var(--ofi-win-shadow-sheet); }
+/* Seitenfenster: nur die linken Ecken, Schatten nach links. */
+.ofi-pop.is-drawer,
+.ofi-slide-panel {
+    border-right: 0;
+    border-left: 1px solid var(--ofi-win-border);
+    border-radius: var(--ofi-modal-radius) 0 0 var(--ofi-modal-radius);
+    background: var(--ofi-win-surface);
+    box-shadow: var(--ofi-win-shadow-drawer);
+}
+.dark .ofi-pop.is-drawer,
+.dark .ofi-slide-panel { box-shadow: var(--ofi-win-shadow-drawer); }
+
+/* Der Schleier unter einem mittigen Fenster: leicht, wie unter
+   einem Mac-Blatt. ConfirmDialog, DangerConfirmDialog und
+   CenterModal tragen `.ofi-win-scrim` an ihrer Rückwand. */
+.ofi-tp-scrim__hit,
+.ofi-win-scrim,
+.ofi-sheet-backdrop {
+    background: var(--ofi-win-scrim);
+}
+.dark .ofi-tp-scrim__hit,
+.dark .ofi-win-scrim,
+.dark .ofi-sheet-backdrop { background: var(--ofi-win-scrim); }
+
+/* Auftritt: kurz, ruhig, ohne den 28px-Hub — ein Fenster eines
+   Mac-Blatts wächst aus seiner Mitte. */
+@keyframes ofi-win-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+.ofi-float-card:not(.is-docked),
+.ofi-tp-dialog,
+.ofi-pop.ofi-rise-in,
+.ofi-mailconfirm-card {
+    animation: ofi-win-in 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-float-card, .ofi-tp-dialog, .ofi-pop.ofi-rise-in, .ofi-mailconfirm-card { animation: none; }
+}
+
+/* ── 4. Menüs an einem Feld ────────────────────────────────
+   8px-Kante, 4px Luft, Haarlinie, kurzer Schatten; die Zeile
+   darin ein 5px-Block. Die Mail- und Aufgabenmenüs setzen ihre
+   Kante selbst mit `!important` — hier ebenso, und später. */
+.ofi-pop.is-list,
+.ofi-tp-menu,
+.ofi-quick-pop,
+.ofi-quick-pop.ofi-taskcombo-pop,
+.ofi-quick-pop.ofi-mail-pop,
+.ofi-invp-menu,
+.ofi-pickerlist {
+    border: 1px solid var(--ofi-win-border) !important;
+    border-radius: var(--ofi-pop-list-radius) !important;
+    background: var(--ofi-win-surface) !important;
+    box-shadow: var(--ofi-win-shadow-menu) !important;
+    padding: 4px;
+}
+.ofi-pickerlist { box-shadow: none !important; }
+.dark .ofi-quick-pop.ofi-mail-pop,
+.dark .ofi-quick-pop.ofi-taskcombo-pop,
+.dark .ofi-tp-menu,
+.dark .ofi-pop.is-list { background: var(--ofi-win-surface) !important; border-color: var(--ofi-win-border) !important; }
+.ofi-quick-pop.ofi-mail-pop .ofi-option-row { border-radius: var(--ofi-pop-row-radius); }
+.ant-popover-inner,
+.ant-dropdown-menu,
+.ant-select-dropdown,
+.ant-picker-panel-container {
+    border: 1px solid var(--ofi-win-border) !important;
+    border-radius: var(--ofi-pop-list-radius) !important;
+    box-shadow: var(--ofi-win-shadow-menu) !important;
+}
+
+/* ── 5. Kopf und Fuss ──────────────────────────────────────
+   Die schwebende Karte ist ein FENSTER: Titelleiste mit
+   Haarlinie darunter, ohne den Zwei-Strich-Griff (die Leiste
+   selbst ist der Griff, wie am Mac). Der mittige Dialog ist ein
+   BLATT/ALARM: kein Strich unter dem Titel, mehr Luft. */
+.ofi-float-card__grip {
+    gap: 8px;
+    padding: 9px 8px 9px 16px;
+    border-bottom: 1px solid var(--ofi-win-hairline);
+}
+.ofi-float-card__grip.is-docked { border-bottom-color: var(--ofi-win-hairline); }
+.ofi-float-card__gripicon { display: none; }
+.ofi-float-card__title,
+.ofi-pop__title {
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ofi-win-text);
+}
+.ofi-float-card__subtitle,
+.ofi-pop__subtitle {
+    padding-top: 1px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ofi-win-secondary);
+}
+.ofi-pop .ofi-pop__rule { border-color: var(--ofi-win-hairline); }
+.ofi-float-card__footer {
+    border-top: 1px solid var(--ofi-win-hairline);
+    padding: 10px 14px;
+    background: var(--ofi-win-surface);
+}
+.ofi-float-card__body.ofi-tp-body { padding: 4px 16px 12px; }
+
+.ofi-tp-dialog__head { gap: 12px; padding: 20px 14px 0 22px; }
+.ofi-tp-dialog__title {
+    padding-top: 2px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ofi-win-text);
+}
+.ofi-tp-dialog__subtitle { margin-top: 3px; font-size: 12.5px; color: var(--ofi-win-secondary); }
+.ofi-tp-dialog__body { padding: 14px 22px 8px; }
+.ofi-tp-dialog__foot { padding: 8px 18px 18px; }
+.ofi-tp-dialog__spacer { height: 20px; }
+
+/* Symbolkasten im Kopf eines Alarms: KEIN getönter Kreis — ein
+   kleiner Rahmen in der Ecke, das Zeichen trägt die Farbe. */
+.ofi-tp-iconbadge {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-accent);
+    box-shadow: var(--ofi-win-btn-shadow);
+}
+.ofi-tp-iconbadge.is-neutral { color: var(--ofi-win-secondary); }
+.ofi-tp-iconbadge.is-danger,
+.dark .ofi-tp-iconbadge.is-danger { background: var(--ofi-win-surface); color: var(--ofi-win-danger); }
+.ofi-tp-iconbadge.is-success,
+.dark .ofi-tp-iconbadge.is-success { background: var(--ofi-win-surface); color: var(--ofi-win-success); }
+.ofi-tp-iconbadge.is-warning,
+.dark .ofi-tp-iconbadge.is-warning { background: var(--ofi-win-surface); color: var(--ofi-win-warning); }
+/* Bestätigen-/Löschen-Fenster: derselbe Kasten, eine Stufe kleiner. */
+.ofi-pop > header .ofi-tp-iconbadge { width: 30px; height: 30px; }
+
+/* Symbolknopf (Kreuz, Vergrössern): 6px-Quadrat statt Kreis. */
+#root .ofi-float-card__iconbtn,
+body > :not(#root) .ofi-float-card__iconbtn {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--ofi-win-control-radius) !important;
+    color: var(--ofi-win-secondary);
+}
+#root .ofi-float-card__iconbtn:hover,
+body > :not(#root) .ofi-float-card__iconbtn:hover { background: var(--ofi-win-fill); color: var(--ofi-win-text); }
+
+/* ── 6. Der Knopf: ein Mac-Druckknopf ───────────────────────
+   30px, 6px-Kante, weiss mit Haarlinie; die Hauptaktion ist das
+   EINE Blau; die zerstörende Aktion trägt rote Schrift auf dem
+   weissen Knopf. Gilt nur IN einer Kabine — die `.ofi-cal-btn`
+   der Mail- und Kalenderseite bleiben, was sie sind.
+
+   Die Kabine ist oft SELBST die Wurzel des Portals (FloatingCard und
+   AnchoredPicker hängen als <section> direkt unter <body>) — ein
+   `body > :not(#root) :is(Kabine)` findet sie dann nicht, weil sie
+   kein Nachkomme der Portalwurzel ist, sondern die Wurzel. Darum
+   steht der Träger als Klasse AN der Kabine:
+   `:is(Kabine):is(#root *, body > :not(#root) *, body > :not(#root))`
+   — in der Seite, im Portal, oder als Portalwurzel; dieselbe
+   Gewichtsklasse wie der Zwilling (1,1,1).
+
+   Die Klasse steht VIERMAL im Selektor, und das ist kein Tippfehler:
+   styles/buttons.css zählt `.ofi-cal-btn` zu den Handlungsknöpfen
+   der Anwendung und gibt ihm 40px/4px mit einem Selektor, der
+   drei `:not(:is(…))`-Listen mitschleppt — (1,3,2). Ein einfacher
+   Zwilling (1,2,1) verliert dagegen still; mit den vier Klassen
+   steht diese Regel auf (1,5,1) und gewinnt, ohne dass jeder
+   Fensterknopf `.ofi-btn-plain` tragen müsste. */
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn {
+    height: var(--ofi-win-control-h);
+    min-height: var(--ofi-win-control-h);
+    padding: 0 15px;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--ofi-win-control-radius) !important;
+    background: var(--ofi-win-field);
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-family: var(--ofi-win-font);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ofi-win-text);
+    -webkit-text-fill-color: var(--ofi-win-text);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn:hover {
+    background: var(--ofi-win-hover);
+    border-color: var(--ofi-win-field-border-hover);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-primary {
+    padding: 0 18px;
+    border-color: var(--ofi-win-accent);
+    background: var(--ofi-win-accent);
+    color: var(--ofi-win-on-accent);
+    -webkit-text-fill-color: var(--ofi-win-on-accent);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-primary:hover {
+    border-color: var(--ofi-win-accent-hover);
+    background: var(--ofi-win-accent-hover);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-danger {
+    border-color: var(--ofi-win-field-border);
+    background: var(--ofi-win-field);
+    color: var(--ofi-win-danger);
+    -webkit-text-fill-color: var(--ofi-win-danger);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-danger:hover {
+    background: var(--ofi-win-danger-soft);
+    border-color: var(--ofi-win-danger);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-icon {
+    padding: 0 8px;
+    min-width: var(--ofi-win-control-h);
+}
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn:disabled { opacity: 0.4; }
+:is(.ofi-pop, .ofi-float-card, .ofi-tp-dialog, .ofi-calendar-dialog, .ofi-mailconfirm-card, .ofi-slide-panel, .ofi-quick-pop):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ofi-win-focus);
+}
+/* Gleich breit im Fuss — aber mit dem Mindestmass eines Mac-Knopfs. */
+#root :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn,
+body > :not(#root) :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn { min-width: 96px; }
+#root :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-icon,
+body > :not(#root) :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-icon { min-width: var(--ofi-win-control-h); }
+/* Die Knopfreihe im Kopf: dieselbe Höhe wie der Knopf. */
+.ofi-float-card .ofi-float-card__actions > *,
+.ofi-tp-dialog .ofi-tp-dialog__actions > * { height: var(--ofi-win-control-h); min-height: var(--ofi-win-control-h); }
+.ofi-tp-actions__end { gap: 8px; }
+
+/* Das Radienband der Leisten (index.css) zieht jeden Leistenknopf
+   auf eine Pille — hier zurück auf die 6px-Kante, in derselben
+   Lage, später, schwerer. */
+@layer utilities {
+    :is(#root *, body > :not(#root) *, body > :not(#root)):is(
+        .ofi-pop,
+        .ofi-float-card,
+        .ofi-tp-dialog,
+        .ofi-calendar-dialog,
+        .ofi-mailconfirm-card,
+        .ofi-slide-panel,
+        .ant-modal-content,
+        .ant-drawer-content
+    ) :is(
+        header,
+        footer,
+        .ofi-tp-actions,
+        .ofi-tp-dialog__foot,
+        .ofi-float-card__footer,
+        .ofi-float-card__grip,
+        .ofi-newtask__foot,
+        .ofi-pop__foot,
+        .ant-modal-footer,
+        .ant-drawer-footer
+    ) button:not([class~="rounded-full"]):not(.ofi-quote-tab):not(.ant-switch):not(.ofi-float-card__iconbtn) {
+        border-radius: var(--ofi-win-control-radius) !important;
+    }
+    /* … und der Fensterknopf selbst, wo immer er im Fenster steht (auch
+       in einer Zeile des Rumpfs): buttons.css setzt seine 4px in DIESER
+       Lage mit `!important`, darum hier ebenso — später und schwerer. */
+    :is(#root *, body > :not(#root) *, body > :not(#root)):is(
+        .ofi-pop,
+        .ofi-float-card,
+        .ofi-tp-dialog,
+        .ofi-calendar-dialog,
+        .ofi-mailconfirm-card,
+        .ofi-slide-panel,
+        .ofi-quick-pop
+    ) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn {
+        border-radius: var(--ofi-win-control-radius) !important;
+    }
+    /* Ein Feld IM Fenster trägt die Kontrollkante (6px), nicht die
+       Fensterkante (14px) — index.css setzt dort die Fensterkante
+       mit `!important` in derselben Lage. */
+    :is(#root *, body > :not(#root) *, body > :not(#root)):is(
+        .ofi-pop,
+        .ofi-float-card,
+        .ofi-tp-dialog,
+        .ofi-calendar-dialog,
+        .ofi-mailconfirm-card,
+        .ofi-slide-panel,
+        .ant-modal-content,
+        .ant-drawer-content
+    ) :is(
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+        select,
+        textarea,
+        .ofi-quote-control,
+        .ofi-cal-input
+    ) {
+        border-radius: var(--ofi-win-control-radius) !important;
+    }
+    :is(#root, body > :not(#root)) :is(.ofi-pop.is-list, .ofi-quick-pop, .ofi-tp-menu, .ofi-invp-menu) :is(
+        .ofi-option-row,
+        .ofi-option-action,
+        .ofi-tp-menu__item,
+        .ofi-invp-menu__item
+    ) {
+        border-radius: var(--ofi-pop-row-radius) !important;
+    }
+}
+
+/* ── 7. Das Feld: weiss, Haarlinie, blauer Fokusring ───────── */
+.ofi-cal-input,
+#root .ofi-cal-input,
+#root select.ofi-cal-input,
+#root textarea.ofi-cal-input,
+body > :not(#root) .ofi-cal-input,
+body > :not(#root) select.ofi-cal-input,
+body > :not(#root) textarea.ofi-cal-input {
+    height: var(--ofi-win-control-h);
+    min-height: var(--ofi-win-control-h);
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--ofi-win-control-radius);
+    background: var(--ofi-win-field);
+    padding: 0 10px;
+    font-family: var(--ofi-win-font);
+    font-size: 13px;
+    color: var(--ofi-win-text);
+    box-shadow: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+textarea.ofi-cal-input,
+#root textarea.ofi-cal-input,
+body > :not(#root) textarea.ofi-cal-input { height: auto; padding: 6px 10px; line-height: 1.45; }
+.ofi-cal-input:hover:not(:disabled):not(:focus),
+#root .ofi-cal-input:hover:not(:disabled):not(:focus),
+body > :not(#root) .ofi-cal-input:hover:not(:disabled):not(:focus) {
+    background: var(--ofi-win-field);
+    border-color: var(--ofi-win-field-border-hover);
+}
+.ofi-cal-input:focus,
+#root .ofi-cal-input:focus,
+body > :not(#root) .ofi-cal-input:focus,
+.ofi-cal-input:focus-within,
+#root .ofi-cal-input:focus-within,
+body > :not(#root) .ofi-cal-input:focus-within {
+    background: var(--ofi-win-field);
+    border-color: var(--ofi-win-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-win-focus);
+    outline: none;
+}
+.ofi-cal-input::placeholder,
+#root .ofi-cal-input::placeholder,
+body > :not(#root) .ofi-cal-input::placeholder { color: var(--ofi-win-muted); }
+.dark .ofi-cal-input,
+.dark #root .ofi-cal-input,
+.dark #root select.ofi-cal-input,
+.dark #root textarea.ofi-cal-input,
+.dark body > :not(#root) .ofi-cal-input {
+    background: var(--ofi-win-field);
+    border-color: var(--ofi-win-field-border);
+    color: var(--ofi-win-text);
+}
+.dark .ofi-cal-input:hover:not(:disabled):not(:focus),
+.dark #root .ofi-cal-input:hover:not(:disabled):not(:focus),
+.dark body > :not(#root) .ofi-cal-input:hover:not(:disabled):not(:focus) { background: var(--ofi-win-field); border-color: var(--ofi-win-field-border-hover); }
+.dark .ofi-cal-input:focus,
+.dark #root .ofi-cal-input:focus,
+.dark body > :not(#root) .ofi-cal-input:focus { background: var(--ofi-win-field); border-color: var(--ofi-win-accent) !important; }
+.dark select.ofi-cal-input option { background: var(--ofi-win-surface); color: var(--ofi-win-text); }
+select.ofi-cal-input {
+    padding-right: 28px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+    background-position: right 8px center;
+}
+/* Die Feinabstimmungen aus index.css, die das Grundfeld oben sonst
+   überstimmt (sie stehen dort ohne den Zwilling): Tagesreihe, Auskunfts-
+   spalte, Suchfeld mit Lupe, Kundenwahl des OSP-Imports. */
+:is(#root, body > :not(#root)) .ofi-cal-dayrow .ofi-cal-input[type="time"] { padding: 0 5px; }
+:is(#root, body > :not(#root)) .ofi-cal-dayrow .ofi-cal-input[type="date"] { padding: 0 7px; }
+:is(#root, body > :not(#root)) .ofi-cal-detailcol.is-pane .ofi-cal-input { height: 30px; min-height: 30px; padding: 0 8px; font-size: 12px; }
+:is(#root, body > :not(#root)) .ofi-tp-search > input.ofi-cal-input { width: 100%; height: var(--ofi-win-control-h); padding-left: 34px; border-radius: var(--ofi-win-control-radius); }
+.ofi-tp-search > svg { left: 11px; }
+:is(#root, body > :not(#root)) .ofi-osp-import__customer-combo .ofi-cal-input { padding-left: 36px; padding-right: 36px; }
+
+/* ── 8. Beschriftungen: Satzschrift, keine Versalien ───────── */
+.ofi-cal-field { padding: 7px 0; }
+.ofi-cal-field__label {
+    padding-bottom: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-win-secondary);
+}
+.ofi-cal-field__hint { color: var(--ofi-win-muted); }
+.ofi-tp-caption {
+    padding: 12px 0 5px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    color: var(--ofi-win-text);
+}
+.ofi-cal-detail__label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+.ofi-cal-detail__value { font-size: 13px; color: var(--ofi-win-text); }
+.ofi-tp-meter__label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+.ofi-tp-meter__value { font-weight: 600; }
+
+/* ── 9. Die Bausteine im Fenster ───────────────────────────── */
+/* Hinweiskasten: Haarlinie + leise Füllung, kein bunter Block. */
+.ofi-tp-note {
+    border: 1px solid var(--ofi-win-hairline);
+    border-radius: var(--ofi-win-control-radius);
+    background: var(--ofi-win-surface-2);
+    color: var(--ofi-win-text);
+}
+.ofi-tp-note.is-warning, .dark .ofi-tp-note.is-warning { background: var(--ofi-win-warning-soft); border-color: transparent; color: var(--ofi-win-warning); }
+.ofi-tp-note.is-danger, .dark .ofi-tp-note.is-danger { background: var(--ofi-win-danger-soft); border-color: transparent; color: var(--ofi-win-danger); }
+.ofi-tp-note.is-success, .dark .ofi-tp-note.is-success { background: var(--ofi-win-success-soft); border-color: transparent; color: var(--ofi-win-success); }
+.ofi-cal-warn { border-radius: var(--ofi-win-control-radius); background: var(--ofi-win-warning-soft); color: var(--ofi-win-warning); }
+.ofi-cal-emptyline { border-radius: var(--ofi-win-control-radius); border-color: var(--ofi-win-field-border); }
+.ofi-cal-scopeline { border-radius: var(--ofi-win-control-radius); background: var(--ofi-win-fill); }
+
+/* Voreinstellungs-Chips: kleine Druckknöpfe statt Pillen. */
+#root .ofi-tp-chip,
+body > :not(#root) .ofi-tp-chip {
+    height: 28px;
+    padding: 0 11px;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--ofi-win-control-radius) !important;
+    background: var(--ofi-win-field);
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+#root .ofi-tp-chip:hover,
+body > :not(#root) .ofi-tp-chip:hover { background: var(--ofi-win-hover); }
+#root .ofi-tp-chip.is-on,
+body > :not(#root) .ofi-tp-chip.is-on { border-color: var(--ofi-win-accent); background: var(--ofi-win-accent); color: var(--ofi-win-on-accent); }
+
+/* Segmentwahl: die Mac-Segmentleiste — Schiene mit Füllung, das
+   gewählte Segment liegt weiss darauf. */
+.ofi-tp-segment {
+    gap: 2px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--ofi-win-fill);
+    padding: 2px;
+}
+#root .ofi-tp-segment button,
+body > :not(#root) .ofi-tp-segment button {
+    height: 24px;
+    border-radius: 5px !important;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+#root .ofi-tp-segment button + button,
+body > :not(#root) .ofi-tp-segment button + button { border-left: 0; }
+#root .ofi-tp-segment button:hover,
+body > :not(#root) .ofi-tp-segment button:hover { background: var(--ofi-win-hover); }
+#root .ofi-tp-segment button.is-on,
+body > :not(#root) .ofi-tp-segment button.is-on {
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.dark #root .ofi-tp-segment button.is-on,
+.dark body > :not(#root) .ofi-tp-segment button.is-on { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+.ofi-tp-kind { border-radius: 6px; background: var(--ofi-win-fill); }
+#root .ofi-tp-kind button.is-on,
+body > :not(#root) .ofi-tp-kind button.is-on { color: var(--ofi-win-text); }
+
+/* Reiter im Erstellen-Fenster des Kalenders: 6px, Füllung statt Tönung. */
+#root .ofi-cal-tab,
+body > :not(#root) .ofi-cal-tab { height: 28px; border-radius: var(--ofi-win-control-radius) !important; }
+#root .ofi-cal-tab.is-active,
+body > :not(#root) .ofi-cal-tab.is-active { background: var(--ofi-win-fill); color: var(--ofi-win-text); }
+
+/* Auswahlkachel, Liste, Vorschau, Randkasten: 8px, Haarlinie. */
+#root .ofi-tp-tile,
+body > :not(#root) .ofi-tp-tile { border-color: var(--ofi-win-border); border-radius: 8px !important; }
+#root .ofi-tp-tile.is-on,
+body > :not(#root) .ofi-tp-tile.is-on { border-color: var(--ofi-win-accent); background: var(--ofi-win-accent-tint); box-shadow: 0 0 0 1px var(--ofi-win-accent) inset; }
+.ofi-tp-list { border-color: var(--ofi-win-border); border-radius: 8px; }
+.ofi-tp-row + .ofi-tp-row,
+.ofi-tp-row + .ofi-tp-row__wrap,
+.ofi-tp-row__wrap + .ofi-tp-row,
+.ofi-tp-row__wrap + .ofi-tp-row__wrap { border-top-color: var(--ofi-win-hairline); }
+.ofi-tp-row.is-selected { background: var(--ofi-win-accent-tint); }
+.ofi-tp-aside { border: 1px solid var(--ofi-win-hairline); border-radius: 8px; background: var(--ofi-win-surface-2); }
+.dark .ofi-tp-aside { background: var(--ofi-win-surface-2); }
+.ofi-tp-preview { border: 1px solid var(--ofi-win-hairline); border-radius: 8px; background: var(--ofi-win-surface-2); }
+#root .ofi-tp-rowbtn,
+body > :not(#root) .ofi-tp-rowbtn { border-radius: var(--ofi-win-control-radius) !important; }
+#root .ofi-tp-rowbtn.is-danger:hover,
+body > :not(#root) .ofi-tp-rowbtn.is-danger:hover { background: var(--ofi-win-danger-soft); color: var(--ofi-win-danger); }
+#root .ofi-tp-addline,
+body > :not(#root) .ofi-tp-addline { height: var(--ofi-win-control-h); border-color: var(--ofi-win-field-border); border-radius: var(--ofi-win-control-radius) !important; font-weight: 500; }
+.ofi-tp-badge { border-radius: 4px; font-weight: 600; }
+.ofi-tp-icon { border-radius: 6px; background: var(--ofi-win-fill); color: var(--ofi-win-text); }
+.ofi-tp-icon.is-addon, .dark .ofi-tp-icon.is-addon { background: var(--ofi-win-warning-soft); color: var(--ofi-win-warning); }
+.ofi-tp-ordinal { background: var(--ofi-win-fill); color: var(--ofi-win-secondary); }
+.ofi-tp-file::file-selector-button {
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--ofi-win-control-radius);
+    background: var(--ofi-win-field);
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-family: var(--ofi-win-font);
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+.ofi-tp-file::file-selector-button:hover { background: var(--ofi-win-hover); }
+/* Die grosse Zahl (Sammelrabatt): ein Feld mit Rahmen, ohne die 34px-Schau. */
+.ofi-tp-bigfield {
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--ofi-win-control-radius);
+    background: var(--ofi-win-field);
+    padding: 8px 12px 7px;
+}
+.ofi-tp-bigfield:focus-within { border-color: var(--ofi-win-accent); box-shadow: 0 0 0 3px var(--ofi-win-focus); }
+.ofi-tp-bigfield input { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+.ofi-tp-bigfield__unit { font-size: 15px; color: var(--ofi-win-secondary); }
+/* Summe: kräftig, nicht riesig. */
+.ofi-tp-kv.is-total { border-top-color: var(--ofi-win-border); }
+.ofi-tp-kv.is-total dd { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.ofi-tp-neg, .dark .ofi-tp-neg { color: var(--ofi-win-danger); }
+.ofi-tp-pos, .dark .ofi-tp-pos { color: var(--ofi-win-success); }
+.ofi-tp-meter__track { height: 5px; background: var(--ofi-win-fill); }
+.ofi-tp-meter__fill.is-accent, .dark .ofi-tp-meter__fill.is-accent { background: var(--ofi-win-accent); }
+.ofi-tp-state__value.is-done, .dark .ofi-tp-state__value.is-done { color: var(--ofi-win-success); }
+.ofi-cal-steptitle__num { background: var(--ofi-win-fill); color: var(--ofi-win-secondary); }
+
+/* ── 10. Die letzten antd-Fenster ──────────────────────────── */
+.ant-modal-content {
+    border: 1px solid var(--ofi-win-border) !important;
+    border-radius: var(--ofi-modal-radius) !important;
+    background: var(--ofi-win-surface) !important;
+    box-shadow: var(--ofi-win-shadow) !important;
+}
+.ant-drawer-content {
+    border-left: 1px solid var(--ofi-win-border) !important;
+    border-radius: var(--ofi-modal-radius) 0 0 var(--ofi-modal-radius) !important;
+    background: var(--ofi-win-surface) !important;
+    box-shadow: var(--ofi-win-shadow-drawer) !important;
+}
+.ant-modal-mask { background: var(--ofi-win-scrim) !important; }
+:is(.ant-modal-content, .ant-drawer-content) .ant-btn {
+    height: var(--ofi-win-control-h) !important;
+    min-height: var(--ofi-win-control-h) !important;
+    padding-inline: 13px !important;
+    border-radius: var(--ofi-win-control-radius) !important;
+    font-family: var(--ofi-win-font);
+    font-size: 13px !important;
+    font-weight: 500;
+    box-shadow: var(--ofi-win-btn-shadow);
+}
+:is(.ant-modal-content, .ant-drawer-content) .ant-btn-default {
+    border-color: var(--ofi-win-field-border) !important;
+    background: var(--ofi-win-field) !important;
+    color: var(--ofi-win-text) !important;
+}
+:is(.ant-modal-content, .ant-drawer-content) .ant-btn-primary {
+    border-color: var(--ofi-win-accent) !important;
+    background: var(--ofi-win-accent) !important;
+    color: #fff !important;
+}
+
+/* ── 11. Telefon und Tablet (index.css «FENSTER AUF TELEFON UND
+   TABLET» bleibt) — nur das Fingermass, das die Schreibtischregel
+   oben sonst wieder zurücknähme. */
+@media (max-width: 1024px) {
+    .ofi-float-card .ofi-float-card__actions > *,
+    .ofi-tp-dialog .ofi-tp-dialog__actions > * { height: 36px; min-height: 36px; }
+}
+@media (max-width: 640px) {
+    #root :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn,
+    body > :not(#root) :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn {
+        height: 40px;
+        min-height: 40px;
+        min-width: 0;
+    }
+    #root :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-icon,
+    body > :not(#root) :is(.ofi-float-card__footer, .ofi-tp-dialog__foot) .ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.ofi-cal-btn.is-icon { min-width: 40px; }
+    .ofi-cal-input,
+    #root .ofi-cal-input,
+    body > :not(#root) .ofi-cal-input { height: 36px; min-height: 36px; }
+    textarea.ofi-cal-input,
+    #root textarea.ofi-cal-input,
+    body > :not(#root) textarea.ofi-cal-input { height: auto; }
+}
+
+/* Titel und Text eines ALARMS (ConfirmDialog, DangerConfirmDialog) dürfen
+   umbrechen — `.ofi-pop__title` schneidet sonst wie in einer Titelleiste ab. */
+.ofi-pop .ofi-pop__title.whitespace-normal,
+.ofi-pop .ofi-pop__subtitle.whitespace-normal { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* Die Abschnittstitel der Auskunftskarte des Kalenders (VORGANG, KONTAKT,
+   Tagesplan) standen in Versalien mit Sperrung — Satzschrift, wie jede
+   andere Beschriftung im Fenster. */
+.ofi-float-card .ofi-cal-detailcol__head,
+.ofi-float-card .ofi-montage-days__label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    color: var(--ofi-win-text);
+}

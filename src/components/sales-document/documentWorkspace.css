@@ -1,0 +1,388 @@
+/* ── BELEGFLÄCHE (Positionen, Anschreiben, Rabatte) ─────────────────────────
+   Eine Fläche für Offertlogik, Direktrechnung und Nachtrag.
+
+   Kleid: das ruhige Grau der iOS-Einstellungen — weisse Karte, HELLE Grautöne
+   (Vorgabe Samet 05.09.2026: «die Grautöne sauberer, heller»), eine Haarlinie
+   als Trennung und Blau nur dort, wo etwas geschieht. Jedes Eingabefeld der
+   Fläche ist GLEICH HOCH (32px) und in seiner Spalte gleich ausgerichtet:
+   Text links, Zahlen rechts. */
+/* Die Farbwerte stehen auf BEIDEN Flächen: die Kopf- und Fussknöpfe des
+   Editors liegen AUSSERHALB der Tabellenkarte, und ohne die Werte dort wäre
+   ihr Blau (`var(--doc-accent)`) ungültig — weisse Schrift auf weissem Grund. */
+.document-workspace,
+.document-editor-window {
+    --doc-line: #ececf0;         /* Haarlinie */
+    --doc-surface: #fafafc;      /* ruhige Fläche (Kopf, Fusszeile, Feldgrund) */
+    --doc-surface-strong: #f4f4f7;
+    --doc-muted: #71717a;
+    --doc-accent: #007aff;
+    --doc-field-h: 32px;
+}
+.document-workspace {
+    background: #fff;
+    color: #1d1d1f;
+    border: 1px solid var(--doc-line);
+    border-radius: 16px;
+    overflow: hidden;
+    font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.dark .document-workspace,
+.dark .document-editor-window {
+    --doc-line: #313135;
+    --doc-surface: #202023;
+    --doc-surface-strong: #26262a;
+    --doc-muted: #a1a1aa;
+}
+.dark .document-workspace { background: #1a1a1c; color: #f5f5f7; }
+
+/* ── Reiterzeile oben ─────────────────────────────────────────────────────
+   Vier Dinge nebeneinander; das gewählte klappt darunter auf. Es ist immer
+   nur EINES offen, darum trägt der offene Reiter die Fläche des Bereichs. */
+.document-tabs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--doc-line);
+}
+.document-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: var(--doc-field-h);
+    padding: 0 11px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--doc-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.document-tab:hover { background: var(--doc-surface); color: inherit; }
+.document-tab.is-on { background: var(--doc-surface); border-color: var(--doc-line); color: var(--doc-accent); }
+.document-panel { padding: 12px 14px; border-bottom: 1px solid var(--doc-line); background: var(--doc-surface); }
+.document-panel-field {
+    width: 100%;
+    border: 1px solid var(--doc-line);
+    border-radius: 9px;
+    background: #fff;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 12.5px;
+    line-height: 1.5;
+    resize: vertical;
+    color: inherit;
+}
+.dark .document-panel-field { background: #1a1a1c; }
+
+/* ── Unter der Tabelle: Auswahl links, «+» RECHTS ───────────────────────── */
+/* «+» ganz links, danach nur, was gerade nötig ist. */
+.document-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--doc-line);
+}
+
+/* Die Summe: schmale Spalte am rechten Rand. */
+.document-foot {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 14px;
+    border-top: 1px solid var(--doc-line);
+    background: var(--doc-surface);
+}
+.document-toolbar-end { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+/* Die Summe bleibt SCHMAL (Vorgabe): eine Spalte am rechten Rand. */
+.document-totals { min-width: 232px; max-width: 300px; margin: 0; font-size: 12.5px; }
+.document-total-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 3px 0; }
+.document-total-row dt { color: var(--doc-muted); display: inline-flex; align-items: center; gap: 4px; }
+.document-total-row dd { margin: 0; font-variant-numeric: tabular-nums; }
+.document-total-row.is-discount dd { color: #b06000; }
+.dark .document-total-row.is-discount dd { color: #fdd663; }
+.document-total-row.is-total {
+    margin-top: 5px;
+    padding-top: 7px;
+    border-top: 1px solid var(--doc-line);
+    font-size: 14px;
+    font-weight: 600;
+}
+.document-total-row.is-total dt { color: inherit; }
+.document-vat {
+    width: 46px;
+    height: 24px;
+    border: 1px solid var(--doc-line);
+    border-radius: 7px;
+    background: #fff;
+    padding: 0 5px;
+    font: inherit;
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.dark .document-vat { background: #1a1a1c; }
+
+/* ── Knöpfe: EINE Höhe, EIN Radius ───────────────────────────────────────── */
+.document-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: var(--doc-field-h);
+    border: 1px solid var(--doc-line);
+    border-radius: 9px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    background: #fff;
+    color: inherit;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.dark .document-button { background: var(--doc-surface-strong); }
+.document-button:hover:not(:disabled) { background: var(--doc-surface-strong); }
+.document-button.is-on { border-color: var(--doc-accent); color: var(--doc-accent); }
+.document-button.is-primary { color: #fff; background: var(--doc-accent); border-color: var(--doc-accent); }
+.document-button.is-primary:hover:not(:disabled) { background: #0069d9; border-color: #0069d9; }
+.document-button.is-icon { width: var(--doc-field-h); padding: 0; gap: 0; }
+.document-button:disabled { opacity: .4; cursor: default; }
+.document-button:focus-visible,
+.document-workspace button:focus-visible,
+.document-cell:focus-visible,
+.document-detail-field:focus-visible { outline: 2px solid var(--doc-accent); outline-offset: 2px; }
+.document-count { border-radius: 6px; padding: 1px 6px; font-size: 11px; background: color-mix(in srgb, var(--doc-accent) 12%, transparent); color: var(--doc-accent); }
+.document-chevron { transition: transform 160ms ease; }
+.document-chevron.is-open { transform: rotate(180deg); }
+
+/* Aufklappender Bereich (Anschreiben) — er sitzt in derselben Karte. */
+.document-inline { padding: 12px 14px; border-bottom: 1px solid var(--doc-line); background: var(--doc-surface); }
+
+/* ── Tabelle ─────────────────────────────────────────────────────────────── */
+.document-table-scroll { overflow-x: auto; }
+.document-table { width: 100%; min-width: 880px; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.document-table th {
+    position: relative;
+    background: var(--doc-surface);
+    color: var(--doc-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    padding: 9px 10px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--doc-line);
+}
+/* Zahlenspalten stehen rechts — Kopf wie Zelle. */
+.document-table th.document-th-num { text-align: right; }
+.document-table td { padding: 8px 10px; border-bottom: 1px solid var(--doc-line); vertical-align: top; }
+.document-table tr:last-child td { border-bottom: 0; }
+.document-table tbody tr:hover td { background: color-mix(in srgb, var(--doc-surface) 60%, transparent); }
+.document-table tr.is-selected td { background: color-mix(in srgb, var(--doc-accent) 6%, transparent); }
+.document-table input[type=checkbox] { accent-color: var(--doc-accent); width: 15px; height: 15px; margin-top: 9px; }
+
+/* Zellen: gleiche Höhe wie die Knöpfe, Zahlen rechtsbündig. */
+.document-cell {
+    width: 100%;
+    height: var(--doc-field-h);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    padding: 0 8px;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.document-cell.is-text { text-align: left; }
+.document-cell:hover:not([readonly]),
+.document-cell:focus { background: var(--doc-surface); border-color: var(--doc-line); }
+.document-cell[readonly] { cursor: default; }
+
+.document-ordinal { color: var(--doc-muted); padding-top: 16px !important; font-variant-numeric: tabular-nums; }
+.document-amount { white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; padding-top: 16px !important; }
+.document-description { min-width: 260px; }
+.document-namerow { display: flex; align-items: center; gap: 4px; }
+.document-namerow > *:last-child { flex: 1; min-width: 0; }
+.document-name { padding: 6px 2px; font-weight: 500; }
+
+/* Die Beschreibung: der Griff steht RECHTS in der Zeile und ist nur noch ein
+   GROSSER PFEIL — kein erklärender Text mehr (Vorgabe Samet 05.09.2026). Er
+   zeigt hinunter, solange zu ist, und hinauf, sobald offen. */
+.document-namerow > *:first-child { flex: 1; min-width: 0; }
+/* Der Pfeil ist ein Symbol, kein Feld: die Regel oben («das letzte Kind
+   dehnt sich») gewinnt sonst nach Spezifitaet und macht ihn 350 px breit. */
+.document-namerow > .document-desc-toggle { flex: none; width: 30px; }
+.document-desc-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 999px;
+    color: var(--doc-accent);
+    background: transparent;
+    transition: background 140ms ease, opacity 140ms ease;
+    opacity: .6;
+}
+.document-desc-toggle:hover { background: var(--doc-surface-strong); opacity: 1; }
+.document-desc-toggle.has-text,
+.document-desc-toggle.is-open { opacity: 1; }
+
+/* Die Nachlässe: schmale Zeilen, linksbündig, ohne Kasten. */
+.document-discounts { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.document-discount-row { display: flex; align-items: center; gap: 6px; width: 100%; max-width: 560px; }
+.document-discount-name,
+.document-discount-value {
+    height: 28px;
+    border: 1px solid var(--doc-line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 8px;
+    font: inherit;
+    font-size: 12.5px;
+    color: inherit;
+}
+.dark .document-discount-name,
+.dark .document-discount-value { background: #1a1a1c; }
+.document-discount-name { flex: 1; min-width: 0; }
+.document-discount-value { width: 74px; text-align: right; font-variant-numeric: tabular-nums; }
+.document-discount-kind { display: inline-flex; flex: none; border: 1px solid var(--doc-line); border-radius: 8px; overflow: hidden; }
+.document-discount-kind button {
+    height: 26px;
+    min-width: 30px;
+    padding: 0 7px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--doc-muted);
+    background: transparent;
+}
+.document-discount-kind button.is-on { background: var(--doc-accent); color: #fff; }
+.document-discount-effect { flex: none; min-width: 92px; font-size: 12px; text-align: right; color: #b06000; font-variant-numeric: tabular-nums; }
+.dark .document-discount-effect { color: #fdd663; }
+.document-discount-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--doc-accent);
+    background: transparent;
+}
+.document-discount-add:hover:not(:disabled) { background: var(--doc-surface-strong); }
+.document-discount-add:disabled { opacity: .4; cursor: default; }
+
+/* Der Schreibkasten ist so hoch wie sein Inhalt (Vorgabe Samet 05.09.2026):
+   kein festes Zeilenmass mehr, er wächst und schrumpft mit dem Text. Die
+   Auszeichnung (fett, Aufzählung, Farben) kommt aus der schwebenden Leiste des
+   Offert-Editors, die beim Markieren erscheint. */
+.document-detail-field {
+    width: 100%;
+    margin-top: 6px;
+    border: 1px solid var(--doc-line);
+    border-radius: 9px;
+    background: var(--doc-surface);
+    padding: 6px 9px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: inherit;
+}
+.document-detail-field:focus-within { border-color: var(--doc-accent); }
+.document-detail-text {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--doc-muted);
+}
+/* Aufzählungen und Fettes gelten auch in der Nur-Lese-Ansicht. */
+.document-detail-text ul { list-style: disc; padding-left: 20px; }
+.document-detail-text ol { list-style: decimal; padding-left: 20px; }
+.document-detail-text li { margin: 2px 0; }
+.document-detail-text b,
+.document-detail-text strong { font-weight: 700; }
+.document-detail-text p { margin: 0 0 2px; }
+
+/* Rabattzelle: Zahl und Zeichen bleiben zusammen. */
+.document-discount-cell { display: flex; align-items: center; gap: 3px; }
+.document-discount-cell .document-cell { padding-right: 2px; }
+.document-unit { flex: none; font-size: 11.5px; color: var(--doc-muted); font-variant-numeric: tabular-nums; }
+
+.document-rowbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-top: 2px;
+    border-radius: 8px;
+    color: #c4c4cc;
+    transition: background 140ms ease, color 140ms ease;
+}
+.document-rowbtn:hover { background: var(--doc-surface-strong); color: #d92c2c; }
+
+.document-empty { padding: 30px; text-align: center; font-size: 12.5px; color: var(--doc-muted); }
+.document-help { margin-bottom: 14px; font-size: 12.5px; color: var(--doc-muted); }
+
+/* Eine Karte im selben Kleid wie die Tabelle — für das, was neben ihr steht
+   (Gesamtrabatt). Damit trägt die ganze Fläche EINE Sprache. */
+.document-card {
+    margin-top: 16px;
+    border: 1px solid var(--doc-line);
+    border-radius: 16px;
+    background: #fff;
+    overflow: hidden;
+    font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.dark .document-card { background: #1a1a1c; }
+.document-card__head {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--doc-line);
+    background: var(--doc-surface);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--doc-muted);
+}
+.document-card__body { padding: 12px 14px; }
+
+/* ── Das Fenster des Editors ─────────────────────────────────────────────── */
+.document-editor-window {
+    border-radius: 18px;
+    padding: 18px;
+    background: #f7f7f9;
+    border: 1px solid var(--doc-line);
+    font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.dark .document-editor-window { background: #161618; }
+/* Die Kopfzeile des Editors ist keine Karte — sie steht frei über dem Inhalt. */
+.document-editor-window > .document-toolbar { padding: 0 0 14px; border-bottom: 0; }
+.document-save-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--doc-line);
+    border-radius: 14px;
+    background: var(--doc-surface);
+}
+
+@media (max-width: 640px) {
+    .document-editor-window { padding: 10px; border-radius: 14px; }
+    .document-toolbar, .document-bulk-bar { padding: 10px; }
+    .document-toolbar-end { gap: 6px; }
+}

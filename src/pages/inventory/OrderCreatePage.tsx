@@ -1,34 +1,52 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { FocusEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { CheckCircle, ChevronLeft, ChevronRight, Coins01, Edit01, File05, Plus, RefreshCcw01, Save01, ShoppingCart01, Trash01, UploadCloud02 } from '@/components/icons/antIconCompat';
+import { AlertTriangle, Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Edit01, File05, List, Minus, Plus, RefreshCcw01, Save01, Settings01, ShoppingCart01, SquareDivide, Trash01, X, Zap } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
-import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { LoadingDots } from '@/components/ui-shared/Loader';
+import { BotLoadingPanel } from '@/components/ui-shared/OffitecBot';
 import { t } from '@/i18n/translate';
 import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
+import { usePurchaseTemplateStore } from '@/store/purchaseTemplateStore';
+import { ORDER_MAX_EXTRA_COLUMNS, TEMPLATE_MAX_EXTRA_COLUMNS } from '@/types/inventory';
 import type {
     ArticleListItem,
     ItemType,
     PurchaseOrderItemInput,
     PurchaseOrderStatus,
     PurchaseOrderTextTemplate,
+    SupplierCalcConfig,
+    SupplierOrderTemplate,
+    TemplateColumn,
 } from '@/types/inventory';
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { ArticleComboCell } from './components/ArticleComboCell';
+import { useDrawnCheck } from './components/useDrawnCheck';
 import { ArticlePickerModal } from './components/ArticlePickerModal';
 import { BottomSheet } from './components/BottomSheet';
-import { ExcelImportSheet } from './components/ExcelImportSheet';
+import { OrderFlowSteps } from './components/OrderFlowSteps';
+import { SupplierImportDialog } from './import/SupplierImportDialog';
+import { TemplateManagerPopup } from './import/TemplateManagerPopup';
+import { CalcModePopup } from './import/CalcModePopup';
+import { ColumnOrderPopup } from './components/ColumnOrderPopup';
+import { calcModeLabel, defaultCalcConfig, draftExtras, extrasFromItems, repriceRow } from './import/importTemplate';
 import { SupplierComboCell } from './components/SupplierComboCell';
 import { SupplierPickerModal } from './components/SupplierPickerModal';
 import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from './components/primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
-import type { DraftOrderFee, DraftOrderRow, ImportedRecord } from './types';
-import { normalizeHeader } from './utils/columnMatch';
-import { mergeImportedOrderRows } from './utils/orderImport';
+import type { DraftOrderFee, DraftOrderRow } from './types';
 import { fmtMoney, fmtUnitPricePrecise, parseNum } from './utils/format';
+import {
+    readStoredOrderColumns,
+    resolveOrderColumns,
+    writeStoredOrderColumns,
+    type OrderColumnId,
+} from './utils/orderColumns';
 import {
     allVatCountries,
     clampPercent,
@@ -42,13 +60,16 @@ import {
 } from './utils/orderPricing';
 import {
     captureRowOrigin,
-    cycleRowMode,
     draftRowFigures,
     restoreRowOrigin,
     rowDiffersFromOrigin,
     transitionRowMode,
 } from './utils/orderRowMode';
-import { canConfirmToOrder, canConvertToOrder, isEditableStage, isPriceRequestStage } from './utils/orderStatus';
+import { canConfirmToOrder, isEditableStage, isPriceRequestStage, stageIndexOf } from './utils/orderStatus';
+/* Der eine Stift, die Apple-Kiste und das Plus unten links wohnen hier;
+   die Knoepfe der Belegzeile (`.ofi-poi-*`) im Import-Blatt daneben. */
+import '@/styles/orderDetails.css';
+import '@/styles/purchaseImport.css';
 
 let rowSeed = 0;
 let feeSeed = 0;
@@ -57,13 +78,12 @@ let feeSeed = 0;
 const emptyFee = (): DraftOrderFee => ({ key: `fee-${feeSeed += 1}`, name: '', amount: '' });
 
 const INPUT_BASE_CLASS = 'h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] font-normal normal-case tracking-normal shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white';
-const HEADER_INPUT_CLASS = `w-full ${INPUT_BASE_CLASS}`;
-/** Ön yazı kutusu — tek satırlık girişlerle aynı çerçeve, çok satırlı gövde. */
-const TEXTAREA_CLASS = 'w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[13px] font-normal normal-case leading-relaxed tracking-normal text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white';
+/* Bestelldetails, Zusatzkosten, Steuer und Anschreiben tragen KEINE eigenen
+   Feldklassen mehr: sie liegen in der Apple-Kiste (`styles/orderDetails.css`),
+   wo die Zeile das Feld IST. `INPUT_BASE_CLASS` bleibt für das Blatt mit den
+   Anschreiben-Entwürfen. */
 /** Ön yazı taslakları penceresi: SAYFA BAŞINA kayıt (kullanıcı isteği 2026-08-02). */
 const TEMPLATE_PAGE_SIZE = 15;
-/** Ek ücret satırı: genişliği satır düzeni verir (w-full çakışmasın). */
-const FEE_INPUT_CLASS = INPUT_BASE_CLASS;
 
 /**
  * HESAP KİPİ (kullanıcı isteği 2026-08-01 — "doğrudan kopyala"nın genellemesi):
@@ -113,81 +133,10 @@ const emptyRow = (calcMode: CalcMode = 'DIRECT'): DraftOrderRow => ({
     discount2: '',
     vatRate: '',
     calcMode,
-    modePinned: false,
     receivedQuantity: 0,
     receivedAt: null,
     error: null,
 });
-
-/**
- * Boş satır: Excel aktarımı önce bunları doldurur (stok ekranıyla aynı kural).
- * Doğrudan kopyalama kipinde dosyada brüt fiyat olmayabilir (yalnızca net fiyat
- * ya da satır tutarı), bu yüzden o iki alan da "dolu" sayılır — aksi hâlde
- * aktarılmış bir satırın üzerine ikinci aktarım yazardı.
- */
-const isBlankRow = (row: DraftOrderRow) => !row.articleId
-    && !row.code.trim()
-    && !row.name.trim()
-    && !row.serialNumber.trim()
-    && !row.grossPrice.trim()
-    && !row.netPrice.trim()
-    && !row.lineTotal.trim();
-
-/**
- * Excel sihirbazının sipariş hedef kolonları. Stok içe aktarımıyla AYNI biçim
- * (ürün kodu / ad / miktar / birim fiyat) — o dosyalar doğrudan çalışır; brüt
- * fiyat, indirimler ve KDV sipariş tablosuna özgü ek kolonlardır (eşlenmezse
- * boş kalır).
- *
- * ŞABLONDA SERİ NO YOKTUR (kullanıcı isteği 2026-07-30): ürünün tek kimliği
- * SERİ KOD'dur (`articleCode`). `serialNumber` alanı veri modelinde kalır —
- * mevcut siparişler düzenlenirken yüklenip geri kaydedilir ve PDF'te görünür —
- * ama artık ne tabloda ne Excel'de (dışa ya da içe aktarımda) yer alır.
- *
- * İNDİRİM 1-3 ve KDV (kullanıcı isteği 2026-07-30): dışa aktarılan dosya aynı
- * zamanda ŞABLONdur — bu dört yüzde sütunu her zaman yazılır, dolayısıyla geri
- * içe aktarıldığında da eşlenebilmeleri gerekir. Başlıklar birebir aynı olduğu
- * için `autoMap` bunları kendiliğinden bulur.
- *
- * DOĞRUDAN KOPYALA (kullanıcı isteği 2026-07-31): kip açıkken TABLONUN HER
- * SÜTUNU eşlenebilir olmalıdır — net fiyat tablodaki başlığıyla ("Net Fiyat")
- * listelenir ve SATIR TUTARI da eklenir; ikisi de artık türetilmediği için
- * dosyadan olduğu gibi kopyalanır. Normal kipte satır tutarı sütunu SUNULMAZ:
- * eşlenirse sessizce yok sayılacağı için kullanıcıyı yanıltırdı (net fiyat orada
- * yalnızca brüt fiyatı olmayan dosyalar için taban olarak durur).
- */
-const importFields = (directCopy: boolean, priceless: boolean) => ([
-    { key: 'articleCode', label: t('inv.columns.serialCode'), keyField: true },
-    { key: 'name', label: t('inv.columns.productName'), keyField: true },
-    { key: 'quantity', label: t('inv.columns.quantity'), numeric: true },
-    // FİYAT TALEBİ: dosyadan yalnızca kimlik + miktar okunur — fiyat sütunları
-    // eşlenemez (fiyatlar tedarikçiden İSTENECEKTİR).
-    ...(priceless ? [] : [
-        { key: 'grossPrice', label: t('inv.orders.columns.grossPrice'), numeric: true },
-        {
-            key: 'netPrice',
-            label: directCopy ? t('inv.orders.columns.netPrice') : t('inv.columns.unitCost'),
-            numeric: true,
-        },
-        { key: 'discount', label: t('inv.orders.columns.discount'), numeric: true },
-        { key: 'discount2', label: t('inv.orders.columns.discount2'), numeric: true },
-        { key: 'vatRate', label: t('inv.orders.columns.vat'), numeric: true },
-        ...(directCopy ? [{ key: 'lineTotal', label: t('inv.columns.lineTotal'), numeric: true }] : []),
-    ]),
-]);
-
-const cellText = (value: string | number | null | undefined): string =>
-    value === null || value === undefined ? '' : String(value).trim();
-
-/**
- * Yüzde hücresi → tablo metni. "20", "20%", "12,5" kabul edilir; 0-100 dışına
- * taşan ya da okunamayan değer boş bırakılır (satır yine içe aktarılır).
- */
-const percentCell = (value: string | number | null | undefined): string => {
-    const parsed = parseNum(cellText(value).replace('%', ''));
-    if (parsed === null || parsed < 0 || parsed > 100) return '';
-    return String(parsed);
-};
 
 /**
  * Sipariş oluşturma/düzenleme — stok ekranıyla aynı taslak-tablo deseni.
@@ -233,12 +182,24 @@ export const OrderCreatePage = () => {
      *    18.976666…) — aynı miktarda tutar birebir aynı kalır; 2 haneye
      *    yuvarlanmış fiyattan yeniden hesaplansaydı 56.93 → 56.94 kayardı.
      */
-    // Üstteki anahtar = TOPLU değişim: tıklamak SABİTLENMEMİŞ (boş daireli)
-    // satırları çevirir ve varsayılanı değiştirir. Sağdaki daireyle satıra ÖZGÜ
-    // kip seçilmiş satırlar toplu değişimden ETKİLENMEZ (kullanıcı isteği
-    // 2026-08-02). Geçiş mantığı iki ekranda ortaktır: `utils/orderRowMode.ts`.
+    /* ── EINE RECHENART FUER DIE GANZE BESTELLUNG (Vorgabe Samet, 07.09.2026,
+       zweiter Durchgang) ────────────────────────────────────────────────────
+       «Keine getrennten Berechnungen — manuell, automatisch oder sonstwie —
+       fuer jede einzelne Zeile.» Die Wahl oben gilt darum fuer ALLE Zeilen;
+       das Kreis-Symbol rechts, mit dem eine Zeile sich von der Tabelle
+       abkoppeln konnte, ist samt seiner leeren Spalte fort. `modePinned`
+       existiert nicht mehr — es gibt nichts mehr anzuheften.
+       Die Uebergangslogik bleibt geteilt: `utils/orderRowMode.ts`. */
     const changeCalcMode = (next: CalcMode) => {
-        setRows((current) => current.map((row) => (row.modePinned ? row : transitionRowMode(row, next))));
+        setRows((current) => current.map((row) => {
+            const transitioned = transitionRowMode(row, next);
+            if (next !== 'AUTO') return transitioned;
+            return {
+                ...transitioned,
+                discount: transitioned.discount || String(aiConfig.discounts?.[0] ?? 0),
+                discount2: transitioned.discount2 || String(aiConfig.discounts?.[1] ?? 0),
+            };
+        }));
         setCalcMode(next);
     };
 
@@ -268,11 +229,13 @@ export const OrderCreatePage = () => {
         setRows((current) => current.map((entry) => (entry.key === row.key ? restoreRowOrigin(entry) : entry)));
     };
 
-    // Satırın sağındaki daire: BOŞ başlar (satır tabloyu izler); tıklandıkça
-    // boş → D → A → T → boş döngüsüyle satıra özgü kip seçilir.
-    const cycleRowCalcMode = (row: DraftOrderRow) => {
-        setRows((current) => current.map((entry) => (entry.key === row.key ? cycleRowMode(entry, calcMode) : entry)));
-    };
+    /* ── DIE GANZE ZELLE, NICHT DER CURSOR (Vorgabe Samet) ──────────────────
+       «Wenn wir korrigieren, soll die ganze Zelle uebernommen werden; der
+       Cursor soll nicht herumspringen.» Beim Hineinklicken ist der Inhalt
+       darum MARKIERT: das erste Zeichen ersetzt den ganzen Wert, statt sich
+       irgendwo zwischen die alten Ziffern zu setzen. Wer doch nur eine Stelle
+       aendern will, klickt ein zweites Mal — das hebt die Markierung auf. */
+    const selectWholeCell = (event: FocusEvent<HTMLInputElement>) => event.currentTarget.select();
 
     // Sipariş giriş yolu — yeni siparişte EN BAŞTA seçilir (null = seçim ekranı
     // açık); düzenlemede kaydın durumundan türetilir (fiyat talebi aşamasındaki
@@ -280,6 +243,9 @@ export const OrderCreatePage = () => {
     const [orderMode, setOrderMode] = useState<OrderMode | null>(editId ? 'ORDER' : null);
     // Fiyatsız kip: fiyat/indirim/KDV sütunları ve toplamlar gizlenir.
     const priceless = orderMode === 'PRICE_REQUEST';
+    const templateDocumentType = priceless ? 'PRICE_REQUEST' : 'ORDER';
+    const preferredTemplateId = usePurchaseTemplateStore((state) => state.selected[templateDocumentType]);
+    const selectPreferredTemplate = usePurchaseTemplateStore((state) => state.select);
     // "Bestellung" (sipariş kodu): sunucu BE-{yıl}-{sıra} önerir, kullanıcı
     // değiştirebilir. Boş bırakılırsa (yeni siparişte) sunucu üretir.
     const [reference, setReference] = useState('');
@@ -295,8 +261,40 @@ export const OrderCreatePage = () => {
      * bugünkü hâlinde kalır.
      */
     const [recipientName, setRecipientName] = useState('');
-    const [excelOpen, setExcelOpen] = useState(false);
-    const [importing, setImporting] = useState(false);
+    /**
+     * ── BELEG-IMPORT UND DIE AKTIVE VORLAGE (07.09.2026) ────────────────────
+     *
+     * Vorgabe Samet: «Die Vorlagen und Einstellungen werden gleich am Anfang
+     * festgelegt. Was dort eingestellt ist, bleibt für die folgenden
+     * Bestellungen die Vorgabe — Berechnungsarten, Vorlagen und so weiter —,
+     * bis man es ändert.»
+     *
+     * Darum ist `aiConfig` KEIN Zustand dieser Seite, sondern die Abschrift
+     * einer gespeicherten Vorlage: der allgemeinen Vorgabe, oder — wenn der
+     * gewählte Lieferant eine eigene hat — seiner. Sie wird geladen, nicht
+     * gesetzt, und gilt für das Plus, für die Berechnungsart und für den
+     * Beleg-Import gleichermassen.
+     */
+    const [aiOpen, setAiOpen] = useState(false);
+    const [templatesOpen, setTemplatesOpen] = useState(false);
+    const [calcPopupOpen, setCalcPopupOpen] = useState(false);
+    const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+    /** Die RECHENvorlagen — die Anschreiben-Vorlagen heissen weiter `templates`. */
+    const [calcTemplates, setCalcTemplates] = useState<SupplierOrderTemplate[]>([]);
+    const [activeTemplate, setActiveTemplate] = useState<SupplierOrderTemplate | null>(null);
+    /** Von Hand gewaehlte Vorlage — sie schlaegt jede Vorgabe, bis sie geloescht wird. */
+    const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+    /** Die eigenen Spalten einer GELADENEN Bestellung — sie schlagen die Vorlage. */
+    const [loadedExtraColumns, setLoadedExtraColumns] = useState<TemplateColumn[]>([]);
+    /** Welche Vorlage das Fenster aufschlagen soll (null = die erste). */
+    const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
+    const [aiConfig, setAiConfig] = useState<SupplierCalcConfig>(() => defaultCalcConfig());
+    const [templateTick2, setTemplateTick2] = useState(0);
+    /* DER GEZEICHNETE HAKEN (Vorgabe Samet, 07.09.2026): «Nach dem Hinzufuegen
+       soll ein Haken kommen, und er soll wirklich gezeichnet werden.» Er meldet
+       die beiden Ereignisse, die man sonst nur an einer Zeile mehr erkennt:
+       uebernommene Belegzeilen und die gespeicherte Bestellung. */
+    const drawnCheck = useDrawnCheck();
     const [detailsOpen, setDetailsOpen] = useState(false);
     /**
      * ── ÖN YAZI (ANSCHREIBEN) ────────────────────────────────────────────────
@@ -310,9 +308,9 @@ export const OrderCreatePage = () => {
      * birlikte güncellenmelidir.
      */
     const [coverLetter, setCoverLetter] = useState('');
-    // Ek ücretler ARTIK AYRI PENCEREDE (kullanıcı isteği 2026-08-02): sipariş
-    // detaylarının yanındaki kendi düğmesiyle açılır.
-    const [feesOpen, setFeesOpen] = useState(false);
+    /* Zusatzkosten haben KEIN eigenes Fenster mehr (Vorgabe Samet, 07.09.2026):
+       sie liegen als eigene Kiste in den Bestelldetails, hinter demselben Stift.
+       Der Fehlerfall öffnet darum `detailsOpen`, nicht mehr `feesOpen`. */
     // Ön yazı TASLAKLARI penceresi (tenant geneli şablonlar, 15'erli sayfalar).
     const [draftsOpen, setDraftsOpen] = useState(false);
     const [templates, setTemplates] = useState<PurchaseOrderTextTemplate[]>([]);
@@ -339,6 +337,35 @@ export const OrderCreatePage = () => {
         email: null,
     });
     const [rows, setRows] = useState<DraftOrderRow[]>([]);
+    /**
+     * ── ZEILEN AUSWÄHLEN UND WEGWERFEN (Vorgabe Samet, 09.09.2026) ───────────
+     * «Ein Papierkorb, um Zeilen zu löschen — auch mehrere auf einmal.»
+     * Das Kästchen ganz links wählt, der Papierkorb oben in der Kartenleiste
+     * wirft weg; ist nichts gewählt, leert er die ganze Liste. Der kleine
+     * Papierkorb am Zeilenende bleibt, wo er war — für die eine Zeile.
+     */
+    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+    /** Die Rückfrage vor dem Leeren der ganzen Liste (kein Browserkasten mehr). */
+    const [clearAsk, setClearAsk] = useState(false);
+    const toggleRowSelected = (key: string) => {
+        setSelectedRows((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
+    const toggleSelectAll = () => {
+        setSelectedRows((current) => (current.size === rows.length ? new Set() : new Set(rows.map((row) => row.key))));
+    };
+    const removeRows = (keys: string[]) => {
+        const drop = new Set(keys);
+        setRows((current) => current.filter((row) => !drop.has(row.key)));
+        setSelectedRows((current) => {
+            const next = new Set(current);
+            drop.forEach((key) => next.delete(key));
+            return next;
+        });
+    };
     // Ek ücretler: sipariş detayları penceresinde ad + tutar olarak girilir ve
     // genel toplama net eklenir (kalem değildir — indirim/KDV taşımaz).
     const [fees, setFees] = useState<DraftOrderFee[]>([]);
@@ -419,6 +446,29 @@ export const OrderCreatePage = () => {
                 // düğmesidir, kaydın durumunu göstermez.
                 // Fiyat talebi aşamasındaki sipariş fiyatsız tabloyla düzenlenir.
                 setOrderMode(isPriceRequestStage(order.status) ? 'PRICE_REQUEST' : 'ORDER');
+                /* Die eigenen Spalten kommen aus der BESTELLUNG selbst — sonst
+                   truege eine alte Bestellung ploetzlich die Spaltennamen von
+                   heute (siehe extrasFromItems). */
+                setLoadedExtraColumns(extrasFromItems(order.items));
+                /* ── DIE RECHENART DER BESTELLUNG (Vorgabe Samet, 07.09.2026) ──
+                   Sie ist jetzt EINE fuer die ganze Bestellung. Aeltere
+                   Bestellungen koennen gemischte Zeilen tragen (frueher liess
+                   sich eine Zeile mit dem Kreis abkoppeln); dann gilt die
+                   HAEUFIGSTE — bei Gleichstand die der ersten Zeile. Der Schalter
+                   oben zeigt sie, und die Zeilen rechnen alle mit ihr.
+                   Die gespeicherten Werte der uebrigen Arten gehen dabei NICHT
+                   verloren: sie liegen weiter im `modeStash` jeder Zeile und
+                   kommen zurueck, sobald man die Art wieder umstellt. */
+                const modeTally = new Map<CalcMode, number>();
+                order.items.forEach((item) => {
+                    const mode: CalcMode = item.calcMode === 'SUPPLIER' || item.calcMode === 'AUTO' || item.calcMode === 'DIRECT'
+                        ? item.calcMode
+                        : (item.directCopy === true ? 'DIRECT' : 'AUTO');
+                    modeTally.set(mode, (modeTally.get(mode) ?? 0) + 1);
+                });
+                const orderMainMode: CalcMode = [...modeTally.entries()]
+                    .sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'DIRECT';
+                if (order.items.length) setCalcMode(orderMainMode);
                 setRows(order.items.map((item) => {
                     const storedMode: CalcMode = item.calcMode === 'SUPPLIER' || item.calcMode === 'AUTO' || item.calcMode === 'DIRECT'
                         ? item.calcMode
@@ -446,7 +496,7 @@ export const OrderCreatePage = () => {
                             },
                         };
                     return {
-                        ...emptyRow(itemMode),
+                        ...emptyRow(orderMainMode),
                         itemType: item.itemType,
                         articleId: item.articleId ?? null,
                         code: item.code ?? '',
@@ -482,6 +532,7 @@ export const OrderCreatePage = () => {
                         // Mal kabul durumu aynen taşınır — düzenleme kabulü sıfırlamasın.
                         receivedQuantity: item.receivedQuantity ?? 0,
                         receivedAt: item.receivedAt ?? null,
+                        extras: Object.fromEntries((item.extras ?? []).map((entry) => [entry.key, entry.value])),
                     };
                 }));
                 setFees((order.additionalFees ?? []).map((fee) => ({
@@ -574,18 +625,172 @@ export const OrderCreatePage = () => {
         setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch, error: null } : row)));
     };
 
-    /** Çöp kutusu (başlıkta): tablodaki TÜM satırları temizler. */
-    const clearRows = () => {
-        if (!rows.length) return;
-        if (!window.confirm(t('inv.orders.clearRowsConfirm'))) return;
-        setRows([]);
+    /**
+     * ── MENGE GEÄNDERT → PREIS NEU SUCHEN (07.09.2026, Vorgabe Samet) ───────
+     * «Die Werte ändern sich je nach Menge, das System muss den passenden
+     * nehmen, sobald die Menge gewählt ist.»
+     *
+     * Nur Zeilen, die aus dem Beleg-Import eine Staffel mitgebracht haben (oder
+     * für die der Lieferant eine Staffel trägt), werden angefasst — bei allen
+     * anderen gäbe `repriceRow` die Zeile unverändert zurück, und eine von Hand
+     * getippte Bestellzeile darf sich beim Ändern der Menge NICHT bewegen.
+     */
+    const patchRowQuantity = (key: string, quantity: string) => {
+        setRows((current) => current.map((row) => {
+            if (row.key !== key) return row;
+            const next = repriceRow({ ...row, quantity, error: null }, aiConfig);
+            /* ── DER BETRAG BLEIBT NICHT STEHEN ──────────────────────────────
+               Seit der Beleg-Import den Zeilenbetrag mitbringt (Vorgabe Samet,
+               07.09.2026), traegt eine manuelle Zeile eine ausgerechnete Summe
+               in der Zelle. Aendert sich die MENGE, waere sie ab dem naechsten
+               Zeichen falsch — und zwar unsichtbar, weil eine getippte Summe
+               sonst nie angefasst wird. Also rechnen wir hier nach: Menge ×
+               Nettopreis, mit demselben Nettopreis, den die Zeile anzeigt.
+               Nur in der manuellen Eingabe; die anderen Arten leiten den
+               Betrag ohnehin bei jedem Zeichnen neu ab. */
+            if (next.calcMode !== 'DIRECT' || !next.lineTotal.trim()) return next;
+            const count = parseNum(quantity) ?? 0;
+            const unit = draftRowFigures({ ...next, lineTotal: '' }).netUnitPrice;
+            return { ...next, lineTotal: unit ? String(round2(count * unit)) : next.lineTotal };
+        }));
     };
 
+    /** Çöp kutusu (başlıkta): tablodaki TÜM satırları temizler. */
+
+    /**
+     * DAS PLUS. Jede neue Zeile startet mit der Berechnungsart der AKTIVEN
+     * VORLAGE — nicht mit einer im Quelltext festgeschriebenen. Wer einmal
+     * «Lieferantenberechnung» als allgemeine Vorgabe gesetzt hat, bekommt sie
+     * bei jeder neuen Zeile und in jeder folgenden Bestellung.
+     */
     const addRow = () => {
-        const row = emptyRow(calcMode);
+        const row = {
+            ...emptyRow(calcMode),
+            ...(calcMode === 'AUTO' ? {
+                discount: String(aiConfig.discounts?.[0] ?? 0),
+                discount2: String(aiConfig.discounts?.[1] ?? 0),
+            } : {}),
+        };
         setRows((current) => [...current, row]);
         setFocusRowKey(row.key);
     };
+
+    /* ── DIE AKTIVE VORLAGE LADEN ───────────────────────────────────────────
+       Der Lieferant gewinnt über die allgemeine Vorgabe: hat er eine eigene
+       Standardvorlage, ist sie die spezifischere Antwort auf dieselbe Frage.
+       Sonst gilt die allgemeine (`supplierId: null`, als Vorgabe markiert). */
+    useEffect(() => {
+        let cancelled = false;
+        purchaseOrdersApi.listSupplierTemplates(supplier.id, templateDocumentType)
+            .then((items) => {
+                if (cancelled) return;
+                setCalcTemplates(items);
+                /* Der Lieferant gewinnt über die allgemeine Vorgabe — er ist die
+                   spezifischere Antwort auf dieselbe Frage. Eine von Hand
+                   gewählte Vorlage schlägt beide: sie ist die jüngste Absicht. */
+                const chosen = items.find((entry) => entry.id === (activeTemplateId ?? preferredTemplateId));
+                const forSupplier = supplier.id
+                    ? items.find((entry) => entry.supplierId === supplier.id && entry.isDefault)
+                    : undefined;
+                const general = items.find((entry) => !entry.supplierId && entry.isDefault);
+                const active = chosen ?? forSupplier ?? general ?? items[0] ?? null;
+                setActiveTemplate(active);
+                if (active && active.id !== preferredTemplateId) {
+                    selectPreferredTemplate(templateDocumentType, active.id);
+                }
+                const nextConfig = active ? active.config : defaultCalcConfig(
+                    pdfSettings.vatRate ?? 0,
+                    vatRatesForCountry(pdfSettings.country).label,
+                    pdfSettings.currency || 'CHF',
+                );
+                setAiConfig(nextConfig);
+
+                /* Eine Vorlage ist nicht nur ein Leseschema: ihre Rechenart und
+                   MwSt sind die Vorgabe der neuen Bestellung. Beim Oeffnen einer
+                   bestehenden Bestellung bleiben deren gespeicherte Werte
+                   unangetastet; eine dort bewusst angeklickte Vorlage gilt aber. */
+                if (!editId || activeTemplateId !== null) {
+                    const nextMode: CalcMode = nextConfig.calcMode ?? 'DIRECT';
+                    setCalcMode(nextMode);
+                    setRows((current) => current.map((row) => {
+                        const transitioned = transitionRowMode(row, nextMode);
+                        if (nextMode !== 'AUTO') return transitioned;
+                        return {
+                            ...transitioned,
+                            discount: transitioned.discount || String(nextConfig.discounts?.[0] ?? 0),
+                            discount2: transitioned.discount2 || String(nextConfig.discounts?.[1] ?? 0),
+                        };
+                    }));
+                    setOrderVatRate(String(nextConfig.vatRate ?? 0));
+                    if (nextConfig.vatCountry) setOrderVatCountry(nextConfig.vatCountry);
+                }
+            })
+            .catch(() => { if (!cancelled) setActiveTemplate(null); });
+        return () => { cancelled = true; };
+    }, [supplier.id, templateTick2, activeTemplateId, templateDocumentType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /**
+     * ── DER RECHENMODUS (Vorgabe Samet, 07.09.2026) ─────────────────────────
+     * «Schaltet man den Rechenmodus ein — oder klickt darauf —, ändert sich der
+     * Bildschirm, und der in der Vorlage gewählte Teil wird aktiv und rechnet
+     * danach.»
+     *
+     * Er ist damit KEINE Einstellung, die irgendwo mitläuft, sondern eine
+     * HANDLUNG: das Fenster bietet die drei Möglichkeiten, die Wahl legt sie
+     * auf alle Zeilen, und die Fläche färbt sich, solange gerechnet wird.
+     * «Manuelle Eingabe» ist der Weg zurück — sie rechnet nichts.
+     */
+    const calcActive = calcMode !== 'DIRECT';
+
+    /* Die Berechnungsart der aktiven Vorlage ist die VORGABE dieser Bestellung —
+       aber nur bei einer neuen. Eine bestehende bringt ihre eigene mit, und die
+       darf eine Vorlage nicht ueberschreiben. */
+    useEffect(() => {
+        if (editId) return;
+        setCalcMode((aiConfig.calcMode ?? 'DIRECT') as CalcMode);
+    }, [aiConfig.calcMode, editId]);
+
+    /**
+     * ── DIE EIGENEN SPALTEN DER TABELLE (07.09.2026, Vorgabe Samet) ─────────
+     * «Wir nehmen sie als feste Spalten RECHTS NEBEN den Produktnamen — nicht
+     *  darunter —, insgesamt drei. Und ihre Reihenfolge muss sich ändern
+     *  lassen, die Spaltenüberschriften wandern mit.»
+     *
+     * Die Überschriften und ihre Reihenfolge kommen aus der AKTIVEN VORLAGE;
+     * wer sie dort umstellt, stellt damit die Tabelle um. Nur eine BESTEHENDE
+     * Bestellung bringt ihre eigenen mit (`loadedExtraColumns`) — sonst trüge
+     * eine alte Bestellung plötzlich die Spaltennamen von heute.
+     */
+    const extraColumns = useMemo(
+        /* DREI FUER EINE BESTELLUNG, FUENF FUER EINE PREISANFRAGE (Vorgabe
+           Samet, 07.09.2026). Die Vorlage darf fuenf tragen; was davon in
+           DIESEM Beleg erscheint, entscheidet das Ziel — genau wie beim Lesen
+           (`templateColumns`), damit Tabelle und Erkennung nie verschieden
+           viele Spalten kennen.
+           Eine GESPEICHERTE Bestellung bringt ihre eigenen Spalten mit und
+           wird nicht beschnitten: sonst verschwaende ein alter Beleg beim
+           Oeffnen eine Angabe, die er laengst traegt. */
+        () => (loadedExtraColumns.length
+            ? loadedExtraColumns
+            : (aiConfig.extraColumns ?? [])
+                .filter((column) => column.name.trim())
+                .slice(0, priceless ? TEMPLATE_MAX_EXTRA_COLUMNS : ORDER_MAX_EXTRA_COLUMNS)),
+        [loadedExtraColumns, aiConfig.extraColumns, priceless],
+    );
+
+    /* ESCAPE KLAPPT DEN DETAILABSCHNITT ZU. Er ist seit dem 08.09.2026 kein
+       Fenster mehr, sondern ein Teil der Seite — die Taste bleibt trotzdem der
+       schnellste Weg, ihn wieder loszuwerden. Liegt das Blatt mit den
+       Anschreiben-Entwuerfen darueber, gehoert sie ihm: sonst raeumte ein
+       Druck beide gleichzeitig weg. */
+    useEffect(() => {
+        if (!detailsOpen || draftsOpen) return undefined;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setDetailsOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [detailsOpen, draftsOpen]);
 
     /** KDV listesine ülke + oran ekle (tarayıcıda saklanır, seçim önerisidir). */
     const addCustomVatCountry = () => {
@@ -708,148 +913,76 @@ export const OrderCreatePage = () => {
     };
 
     /**
-     * Excel satırlarını ürünlere bağla — stok ekranındaki akışın aynısı: önce
-     * kod, sonra ad (normalize edilmiş) eşleşir. Eşleşmeyen satır ATILMAZ, yeni
-     * ürün satırı olarak girer; kaydetmede ürün listesine 0 adetle açılır
-     * (STOĞA GİRMEZ — sipariş stok hareketi değildir).
+     * ── DIE ZEILEN AUS DEM BELEG-IMPORT ─────────────────────────────────────
      *
-     * DOĞRUDAN KOPYALAMA kipinde hücreler DÖNÜŞTÜRÜLMEDEN geçer: ürün adı ve kodu
-     * bile dosyadaki hâliyle kalır (eşleşen ürünün kaydı satırı YENİDEN
-     * ADLANDIRMAZ), yüzdeler 0-100 denetiminden geçmez, brüt fiyat yerine ürünün
-     * alış fiyatı gibi varsayılanlar DOLDURULMAZ ve net fiyat ile satır tutarı
-     * dosyadan aynen alınır. Ürün eşleşmesi yine yapılır — satırın hangi ürüne
-     * bağlandığı (stok/rapor tarafı için) kopyalamadan bağımsızdır.
+     * Vorgabe Samet: «Der Import übernimmt nur die eingestellten Angaben, er
+     * rechnet nichts vor.» Genau so kommen sie hier an: die Werte stehen in den
+     * Zellen, die die Vorlage benannt hat, und was daraus für ein Betrag wird,
+     * rechnet die Tabelle danach — nach der Berechnungsart der Zeile, wie bei
+     * jeder von Hand getippten Zeile auch.
+     *
+     * Der Steuersatz der Vorlage kommt MIT — er ist eine EINSTELLUNG, und ihn
+     * hier fallen zu lassen hiesse, ihn zweimal wählen zu lassen.
+     *
+     * ── EIN BELEG ERSETZT DIE LISTE (Vorgabe Samet, 09.09.2026) ─────────────
+     * «Der Beleg-Import soll nicht unten anhängen; ich will, dass er die
+     * bestehende Liste leert und die neuen Zeilen einsetzt.»
+     *
+     * Bis heute mischte der Import (`mergeImportedOrderRows`): passende Zeilen
+     * überschreiben, leere füllen, Rest anhängen. Das war für den ZWEITEN Beleg
+     * desselben Lieferanten gedacht — beim Alltag, EIN Beleg pro Bestellung,
+     * blieben dabei Zeilen des vorigen Belegs stehen und niemand sah es.
+     * Jetzt ist ein Beleg der Inhalt der Bestellung: die Tabelle wird geleert
+     * und mit seinen Zeilen gefüllt. Wer Zeilen behalten will, importiert
+     * zuerst und ergänzt danach von Hand (das Plus unten links).
+     *
+     * Das Mischen lebt weiter — im WARENEINGANG, wo die Tabelle einer
+     * gespeicherten Bestellung gehört und ein Beleg sie nur ergänzt.
      */
-    const applyImport = async (records: ImportedRecord[]) => {
-        setImporting(true);
-        try {
-            const summary = await inventoryApi.articlesSummary();
-            const byCode = new Map(summary.map((article) => [normalizeHeader(article.articleCode), article]));
-            const byName = new Map(summary.map((article) => [normalizeHeader(article.name), article]));
-
-            const additions: DraftOrderRow[] = [];
-            records.forEach((record) => {
-                const code = cellText(record.articleCode);
-                const name = cellText(record.name);
-                const article = (code && byCode.get(normalizeHeader(code)))
-                    || (name && byName.get(normalizeHeader(name)))
-                    || null;
-                if (!article && !code && !name) return;
-                // DOSYA KAZANIR (kullanıcı isteği 2026-08-02): kod zaten kayıtlıysa
-                // satır katalog adına DÖNDÜRÜLMEZ; kaydetmede mevcut ürün dosyadaki
-                // değerlerle GÜNCELLENİR (bulkCreateArticles `overwrite`). Bunun için
-                // KODLU satırlar bağlantısız bırakılır — kaydet, güncelleme yolundan
-                // geçirir ve dönen id'ye bağlar. Ürün oluşturma/güncelleme izni yoksa
-                // eski davranış sürer: satır katalog kaydına bağlanır.
-                const routeThroughOverwrite = canCreateArticles && Boolean(code);
-                const base = {
-                    articleId: article && !routeThroughOverwrite ? article.id : null,
-                    code: code || (article ? article.articleCode : ''),
-                    name: name || (article ? article.name : ''),
-                    unit: article ? article.unit : '',
-                };
-                // FİYAT TALEBİ: yalnızca kimlik + miktar aktarılır, fiyat alanları
-                // boş kalır (tedarikçiden istenecek).
-                if (priceless) {
-                    additions.push({
-                        ...emptyRow('AUTO'),
-                        ...base,
-                        quantity: cellText(record.quantity) || '1',
-                    });
-                    return;
-                }
-                // TEDARİKÇİ HESABI (varsayılan kip): net birim fiyat dosyadan
-                // (varsa) ya da ürünün son alış fiyatından (baseCost) gelir ve
-                // satırda SABİT kalır.
-                if (calcMode === 'SUPPLIER') {
-                    const supplierNet = cellText(record.netPrice)
-                        || (article?.baseCost ? String(article.baseCost) : '');
-                    additions.push({
-                        ...emptyRow('SUPPLIER'),
-                        ...base,
-                        quantity: cellText(record.quantity) || '1',
-                        grossPrice: cellText(record.grossPrice)
-                            || (article?.baseCost ? String(article.baseCost) : ''),
-                        netPrice: supplierNet,
-                        // Dosyadaki KDV oranı satırda değil, SİPARİŞTE tutulur
-                        // (aşağıda ilk dolu oran sipariş oranına alınır).
-                        vatRate: percentCell(record.vatRate),
-                        // Dosyanın hâli stash'e yazılır: kip gezintisinden dönünce
-                        // içe aktarılmış değerler geri gelir.
-                        modeStash: { SUPPLIER: { netPrice: supplierNet, lineTotal: '', quantity: cellText(record.quantity) || '1' } },
-                    });
-                    return;
-                }
-                if (calcMode === 'DIRECT') {
-                    // HER HÜCRE OLDUĞU GİBİ: tek dönüşüm hücrenin kırpılmasıdır —
-                    // kod ve ad da dosyadaki hâliyle kalır. DOSYANIN net fiyatı +
-                    // satır tutarı stash'e de yazılır: satır başka kiplere gidip
-                    // DOĞRUDAN GİRİŞE dönerse Excel'deki değerler geri gelir
-                    // (kullanıcı isteği 2026-08-02).
-                    additions.push({
-                        ...emptyRow('DIRECT'),
-                        ...base,
-                        code,
-                        name,
-                        quantity: cellText(record.quantity),
-                        grossPrice: cellText(record.grossPrice),
-                        netPrice: cellText(record.netPrice),
-                        lineTotal: cellText(record.lineTotal),
-                        discount: cellText(record.discount),
-                        discount2: cellText(record.discount2),
-                        vatRate: cellText(record.vatRate),
-                        modeStash: {
-                            DIRECT: {
-                                netPrice: cellText(record.netPrice),
-                                lineTotal: cellText(record.lineTotal),
-                                quantity: cellText(record.quantity),
-                            },
-                        },
-                    });
-                    return;
-                }
-                additions.push({
-                    ...emptyRow('AUTO'),
-                    ...base,
-                    // Seri no içe aktarılmaz (şablonda sütunu yok); satırın seri
-                    // kodu ürünün kimliğidir.
-                    quantity: cellText(record.quantity) || '1',
-                    // Tek fiyat girişi BRÜTtür: dosyada brüt yoksa net/birim fiyat
-                    // sütunu, o da yoksa ürünün alış fiyatı taban olur.
-                    grossPrice: cellText(record.grossPrice)
-                        || cellText(record.netPrice)
-                        || (article?.baseCost ? String(article.baseCost) : ''),
-                    // İndirimler dosyadan aynen gelir; eşlenmemiş sütun boş kalır.
-                    // KDV oranı satırda tutulmaz — aşağıda siparişin oranı olur.
-                    discount: percentCell(record.discount),
-                    discount2: percentCell(record.discount2),
-                    vatRate: percentCell(record.vatRate),
-                });
-            });
-
-            // Her içe aktarılan satırın ÖZGÜN fiyatı saklanır: fiyat kutusunun
-            // yanındaki geri çağır düğmesi satırı bu hâle döndürür.
-            additions.forEach((row) => { row.origin = captureRowOrigin(row); });
-
-            // Seri kodu (yoksa adı) tutan satırın ÜZERİNE yazılır; kalanlar önce
-            // boş satırları doldurur, artanlar sona eklenir — `utils/orderImport.ts`.
-            setRows((current) => mergeImportedOrderRows(current, additions, isBlankRow));
-
-            // Dosyadan indirim 2/3 geldiyse o sütunlar KENDİLİĞİNDEN açılır:
-            // kapalı sütunun değeri kaydetmede sıfırlanacağı için içe aktarılan
-            // yüzde aksi hâlde sessizce kaybolurdu.
-            // Dosyada KDV sütunu varsa oran SİPARİŞ düzeyine alınır (satır KDV'si
-            // yok): ilk dolu oran siparişin oranı olur.
-            const importedVat = additions.map((row) => parseNum(row.vatRate) ?? 0).find((rate) => rate > 0);
-            if (importedVat) setOrderVatRate(String(importedVat));
-        } catch {
-            toast.error(t('inv.stock.importMatchFailed'));
-        } finally {
-            setImporting(false);
-        }
+    const applyAiRows = (imported: DraftOrderRow[], config: SupplierCalcConfig) => {
+        if (!imported.length) return;
+        imported.forEach((row) => { row.origin = captureRowOrigin(row); });
+        setRows(imported);
+        setSelectedRows(new Set());
+        if (config.vatRate > 0) setOrderVatRate(String(config.vatRate));
+        if (config.vatCountry) setOrderVatCountry(config.vatCountry);
+        /* DIE BERECHNUNGSART WIRD HIER NICHT ANGEFASST. Der Import bringt die
+           Angaben, gerechnet wird erst, wenn jemand den Rechenmodus einschaltet
+           — läuft er schon, kommen die neuen Zeilen sofort in derselben Art
+           herein (`extractedToDraftRow` bekommt sie mit). */
+        toast.success(t('inv.aiImport.importedToast', { count: imported.length }));
+        drawnCheck.show();
     };
 
-    const filledRows = useMemo(() => rows.filter((row) => row.articleId || row.name.trim()), [rows]);
+    /* ── WELCHE ZEILE MITGESPEICHERT WIRD ───────────────────────────────
+       Fehlerbild Samet (08.09.2026): «Es koennen leere Zellen dabei sein
+       oder Zeilen, die trotzdem mit muessen.»
+
+       Hier stand `row.articleId || row.name.trim()`: eine gelesene Zeile
+       OHNE Bezeichnung fiel vor dem Speichern still heraus. Der Beleg
+       hatte 35 Zeilen, die Tabelle zeigte 35 — gespeichert wurden 33, und
+       niemand sah, welche zwei fehlten.
+
+       Eine Zeile bleibt jetzt, sobald sie IRGENDETWAS traegt: einen
+       Artikel, eine Bezeichnung, einen Bezeichner, eine Menge, einen Preis
+       oder eine eigene Angabe. Weg faellt nur die vollstaendig leere Zeile
+       — die, die das Raster ohnehin am Ende bereithaelt. */
+    const filledRows = useMemo(
+        () => rows.filter((row) => Boolean(
+            row.articleId
+            || row.name.trim()
+            || row.code.trim()
+            || row.serialNumber.trim()
+            || row.grossPrice.trim()
+            || row.netPrice.trim()
+            || row.lineTotal.trim()
+            /* Die Menge steht als «1» im leeren Raster — sie allein macht
+               aus einer unberuehrten Zeile noch keine Position. */
+            || (row.quantity.trim() && row.quantity.trim() !== '1')
+            || Object.values(row.extras ?? {}).some((value) => String(value ?? '').trim()),
+        )),
+        [rows],
+    );
 
     // ── Ek ücretler ──────────────────────────────────────────────────────────
     const patchFee = (key: string, patch: Partial<DraftOrderFee>) => {
@@ -891,9 +1024,14 @@ export const OrderCreatePage = () => {
      * genel toplam. `computeOrderTotals` backend/PDF/Excel ile ortak kuraldır.
      */
     const totals = useMemo(() => {
+        /* DIE EINZELNEN ZEILENBETRAEGE gehen mit: die Steuer wird JE ZEILE
+           gerechnet und addiert, damit der Bildschirm dasselbe zeigt, was im
+           PDF Zeile fuer Zeile nachzurechnen ist (Vorgabe Samet, 07.09.2026). */
+        const lines = rows.map((row) => rowFigures(row).lineTotal);
         const net = rows.reduce((sum, row) => sum + rowFigures(row).lineTotal, 0);
         const discount = rows.reduce((sum, row) => sum + rowFigures(row).discountAmount, 0);
         const summary = computeOrderTotals({
+            lines,
             net,
             fees: feesTotal,
             // Fiyat talebinde tutar yoktur; KDV de hesaplanmaz.
@@ -914,6 +1052,7 @@ export const OrderCreatePage = () => {
         // FİYAT TALEBİ: satır fiyatsız kaydedilir (seri kod + ad + miktar) —
         // fiyatlar tedarikçiden istenecektir.
         if (priceless && !rowIsPriced) {
+            const extras = draftExtras(row, extraColumns);
             return {
                 itemType: row.itemType,
                 articleId: articleId ?? row.articleId,
@@ -928,6 +1067,7 @@ export const OrderCreatePage = () => {
                 calcMode: 'DIRECT',
                 directCopy: true,
                 lineTotal: 0,
+                ...(extras.length ? { extras } : {}),
                 // Mal kabul durumu aynen geri gönderilir (sunucu kırparak korur).
                 receivedQuantity: row.receivedQuantity,
                 receivedAt: row.receivedAt,
@@ -948,6 +1088,12 @@ export const OrderCreatePage = () => {
             // TEDARİKÇİ satırında `netPrice` HESABIN tam duyarlıklı tabanıdır;
             // ekranda/belgelerde görünen Excel fiyatı `displayNetPrice` olarak
             // ayrıca saklanır (kullanıcı isteği: yüklenen fiyat değişmesin).
+            ...(() => {
+                // Die eigenen Angaben reisen MIT ihren Ueberschriften, damit die
+                // Bestellung ihre Spalten in einem Jahr noch benennen kann.
+                const extras = draftExtras(row, extraColumns);
+                return extras.length ? { extras } : {};
+            })(),
             netPrice: figures.netUnitPrice,
             ...(row.calcMode === 'SUPPLIER' && row.netPrice.trim()
                 ? { displayNetPrice: parseNum(row.netPrice) ?? undefined }
@@ -985,8 +1131,11 @@ export const OrderCreatePage = () => {
      * düzenleme modunda mevcut sipariş PATCH edilir.
      */
     /**
-     * ONAYI GERİ AL (editör) — "siparişe dönüştür"ün TERSİ (kullanıcı isteği
-     * 2026-08-03): kayıt FİYAT TALEBİNE döner, fiyat/KDV sütunları kapanır.
+     * BESTELLUNG LÖSCHEN (in der Maske) — "siparişe dönüştür"ün TERSİ: kayıt
+     * FİYAT TALEBİNE döner, fiyat/KDV sütunları kapanır. 08.09.2026'da adı
+     * "onayı geri al"dan "Bestellung löschen"e döndü (Vorgabe Samet: «wird die
+     * Bestellung gelöscht, geht der Vorgang eine Stufe zurück») — YAPTIĞI İŞ
+     * AYNIDIR, sadece kullanıcının gördüğü ad akışla uyumlu hâle geldi.
      * Satırlardaki fiyatlar SİLİNMEZ (`rowToItem` fiyatlı satırı olduğu gibi
      * kaydeder), kayıt yeniden siparişe dönüştürülünce olduğu gibi görünürler.
      * Kilitlenmiş (onaylanmış) sipariş bu sayfada zaten AÇILMAZ; oradaki geri
@@ -998,7 +1147,7 @@ export const OrderCreatePage = () => {
             await purchaseOrdersApi.setStatus(editId, 'PRICE_REQUEST');
             setEditStatus('PRICE_REQUEST');
             setOrderMode('PRICE_REQUEST');
-            toast.success(t('inv.orders.revokedToast'));
+            toast.success(t('inv.orders.flow.orderDeleted'));
         } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             toast.error(error?.response?.data?.error || t('inv.orders.saveFailed'));
         }
@@ -1008,7 +1157,10 @@ export const OrderCreatePage = () => {
         if (!filledRows.length) return;
 
         if (!supplier.id && !supplier.name.trim()) {
+            /* Unter dem Feld steht kein Fehlertext mehr (der «viele einzelne
+               Text» ist weg) — ohne Hinweis bliebe das Speichern stumm. */
             setSupplierError(t('inv.orders.supplierRequired'));
+            toast.error(t('inv.orders.supplierRequired'));
             return;
         }
 
@@ -1016,16 +1168,20 @@ export const OrderCreatePage = () => {
         // ama neyin ücreti olduğu belirsiz bir satır sessizce geçmesin.
         if (filledFees.some((fee) => !fee.name.trim())) {
             setFeeError(t('inv.orders.fees.nameRequired'));
-            // Ek ücretler artık KENDİ penceresinde: hatanın görüldüğü yer o.
-            setFeesOpen(true);
+            // Die Zusatzkosten liegen in den Bestelldetails — dort steht der Fehler.
+            setDetailsOpen(true);
             return;
         }
 
+        /* EIN FEHLENDER PRODUKTCODE IST KEIN FEHLER MEHR (Vorgabe Samet,
+           07.09.2026): «Fehlt ein Produktcode, wird einer vergeben.» Solche
+           Zeilen laufen unten über `articles/quick`, wo der Server die Reihe
+           ART-NNNNN führt. Was bleibt, ist die Rechtefrage — wer keine Produkte
+           anlegen darf, kann auch keine unbekannte Zeile bestellen. */
         const rowErrors = new Map<string, string>();
         filledRows.forEach((row) => {
             if (row.articleId) return;
             if (!canCreateArticles) rowErrors.set(row.key, t('inv.bulkProducts.noPermission'));
-            else if (!row.code.trim()) rowErrors.set(row.key, t('inv.stock.codeRequired'));
         });
         if (rowErrors.size) {
             setRows((current) => current.map((row) => (rowErrors.has(row.key)
@@ -1041,8 +1197,51 @@ export const OrderCreatePage = () => {
             //    (`overwrite` — dosya kazanır, kullanıcı isteği 2026-08-02).
             //    Tek toplu çağrı (malzeme/ürün birleşmesi); dönen id satıra bağlanır.
             const createdIds = new Map<string, string>();
+
+            /* ── ZEILEN OHNE CODE ────────────────────────────────────────────
+               Der Server vergibt ART-NNNNN und meldet ihn zurück; erst dann
+               steht die Nummer auch in der Tabelle. Die Menge ist 0: eine
+               Bestellung ist keine Lagerbuchung. */
             {
-                const newRows = filledRows.filter((row) => !row.articleId);
+                const codeless = filledRows.filter((row) => !row.articleId && !row.code.trim());
+                if (codeless.length) {
+                    const result = await inventoryApi.quickCreateArticles(codeless.map((row) => ({
+                        name: row.name.trim(),
+                        quantity: 0,
+                        purchasePrice: rowFigures(row).netUnitPrice,
+                        unit: row.unit || null,
+                    })));
+                    if (result.errors.length) {
+                        const failed = new Map<string, string>();
+                        result.errors.forEach((error) => {
+                            const row = codeless[error.index];
+                            if (row) failed.set(row.key, error.error);
+                        });
+                        setRows((current) => current.map((row) => (failed.has(row.key)
+                            ? { ...row, error: failed.get(row.key) ?? null }
+                            : row)));
+                        toast.error(t('inv.orders.newArticlesFailed', { count: result.errors.length }));
+                        return;
+                    }
+                    /* Der Server antwortet in der REIHENFOLGE der Anfrage — ein
+                       Name allein taugt hier nicht als Schlüssel, denn zwei
+                       Zeilen dürfen gleich heissen. */
+                    result.created.forEach((created, index) => {
+                        const row = codeless[index];
+                        if (!row) return;
+                        createdIds.set(row.key, created.id);
+                        row.code = created.articleCode;
+                    });
+                    const assigned = new Map(codeless.map((row) => [row.key, row.code]));
+                    setRows((current) => current.map((row) => (assigned.get(row.key)
+                        ? { ...row, code: assigned.get(row.key) as string }
+                        : row)));
+                }
+            }
+
+            /* ── ZEILEN MIT CODE ─────────────────────────────────────────── */
+            {
+                const newRows = filledRows.filter((row) => !row.articleId && row.code.trim() && !createdIds.has(row.key));
                 if (newRows.length) {
                     const result = await inventoryApi.bulkCreateArticles(newRows.map((row) => ({
                         articleCode: row.code.trim(),
@@ -1083,6 +1282,10 @@ export const OrderCreatePage = () => {
                 recipientName: recipientName.trim() || null,
                 // Boş ön yazı null gider: sunucu NULL yazar, PDF standart metne döner.
                 coverLetter: coverLetter.trim() || null,
+                // Was die Vorlage ausblendet, merkt sich die Bestellung: das PDF
+                // wird später ohne die Vorlage gebaut (Vorgabe Samet, 09.09.2026:
+                // «göze bastıysak PDF'te de görünmesin»).
+                hiddenColumnKeys: aiConfig.hiddenColumnKeys ?? [],
                 supplierId: supplier.id,
                 supplierName: supplier.name.trim(),
                 supplierEmail: supplier.email,
@@ -1105,7 +1308,7 @@ export const OrderCreatePage = () => {
                     ...header,
                     ...(reference.trim() ? { referenceNumber: reference.trim() } : {}),
                 });
-                if (!options?.confirm) toast.success(t('inv.orders.updatedToast'));
+                if (!options?.confirm) { toast.success(t('inv.orders.updatedToast')); drawnCheck.show(); }
             } else {
                 // 2) Tek sipariş = tek tedarikçi (üstten seçilen). Bestellung boşsa sunucu
                 //    üretir. Fiyat talebi HENÜZ ONAYLANMADIĞI için TASLAK (DRAFT)
@@ -1124,6 +1327,7 @@ export const OrderCreatePage = () => {
                     toast.success(t(priceless
                         ? 'inv.orders.priceRequestCreatedToast'
                         : 'inv.orders.orderDraftCreatedToast'));
+                drawnCheck.show();
                 }
             }
             // SİPARİŞE DÖNÜŞTÜR: fiyat talebi aşamasının SONU (kullanıcı isteği
@@ -1149,7 +1353,10 @@ export const OrderCreatePage = () => {
             if (options?.confirm && savedId) {
                 await purchaseOrdersApi.setStatus(savedId, 'PENDING');
                 toast.success(t('inv.orders.confirmedToast'));
-                navigate('/inventory/orders');
+                // WEITER AUF DIE BESTELLSEITE, nicht in die Liste (08.09.2026):
+                // der Vorgang geht dort der Reihe nach weiter — senden, und dann
+                // in den Wareneingang. Die Liste wäre ein Abbruch mitten im Weg.
+                navigate(`/inventory/orders/${savedId}`);
                 return;
             }
             // KAYDET SAYFADAN ÇIKARMAZ (kullanıcı isteği 2026-08-02): çalışmaya
@@ -1167,20 +1374,47 @@ export const OrderCreatePage = () => {
     };
 
 
-    // Görünür sütun sayısı: sabit 7 (ürün, kod, miktar, brüt, net, indirim,
-    // tutar) + kip göstergesi + eylem sütunu; açık ek indirim sütunları üstüne
-    // eklenir. KDV SÜTUNU YOKTUR (sipariş düzeyinde tek oran).
-    // FİYAT TALEBİNDE fiyat ve kip sütunları da yoktur: ürün + kod + miktar + eylem.
-    const columnCount = priceless ? 4 : 10;
-    const tableMinWidth = priceless ? 560 : 1016;
+    /* ── DIE REIHENFOLGE DER SPALTEN ────────────────────────────────────────
+       EINE Liste für feste Felder UND eigene Angaben (Vorgabe Samet,
+       09.09.2026); oben in der Liste = links in der Tabelle. Sie wohnt im
+       Browser je Anwender, wie die Spaltenbreiten daneben — siehe
+       utils/orderColumns.ts. Fällt eine Spalte weg oder kommt eine dazu,
+       repariert `resolveOrderColumns` die gespeicherte Liste, statt sie zu
+       verwerfen. */
+    const [storedColumnOrder, setStoredColumnOrder] = useState<OrderColumnId[] | null>(readStoredOrderColumns);
+    const columnOrder = useMemo(
+        () => resolveOrderColumns(storedColumnOrder, extraColumns, priceless),
+        [storedColumnOrder, extraColumns, priceless],
+    );
+    const changeColumnOrder = (next: OrderColumnId[]) => {
+        setStoredColumnOrder(next);
+        writeStoredOrderColumns(next);
+    };
+    const resetColumnOrder = () => {
+        setStoredColumnOrder(null);
+        writeStoredOrderColumns(null);
+    };
+    const [columnOrderOpen, setColumnOrderOpen] = useState(false);
+    const extraByKey = useMemo(
+        () => new Map(extraColumns.map((column) => [column.key, column])),
+        [extraColumns],
+    );
+
+    // Sichtbare Spalten + Auswahlkästchen links + Papierkorb rechts.
+    const columnCount = columnOrder.length + 2;
+    const tableMinWidth = (priceless ? 560 : 976) + extraColumns.length * 120;
     // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
     // Fiyat sütunları FİYAT TALEBİ kipinde hiç çizilmez — `<col>` listesi de
     // aynı koşulu izler, yoksa sütunlar kayardı.
     const grid = useColumnWidths({
-        storageKey: 'offitec:inv-order-create:col-widths:v1',
+        storageKey: 'offitec:inv-order-create:col-widths:v2',
         defaults: {
             code: 144, quantity: 96, grossPrice: 112, netPrice: 112,
-            discount: 96, discount2: 96, lineTotal: 128, mode: 40, remove: 48,
+            discount: 96, discount2: 96, lineTotal: 128, remove: 48,
+            // Die eigenen Spalten tragen feste Schlüssel, damit eine
+            // gespeicherte Breite ihre Umbenennung überlebt. Seit 07.09.2026
+            // sind es fünf (Vorgabe Samet: «später etwa fünf weitere»).
+            x1: 120, x2: 120, x3: 120, x4: 120, x5: 120,
         },
         minPx: 40,
     });
@@ -1192,6 +1426,233 @@ export const OrderCreatePage = () => {
         code: t('inv.columns.serialCode'),
         viewAll: `${t('inv.productPicker.viewAll')} …`,
         allTitle: t('inv.productPicker.allTitle'),
+    };
+
+    /* ══ EINE SPALTE, VIER FRAGEN ═══════════════════════════════════════════
+       Seit die Reihenfolge frei ist (09.09.2026), kann die Tabelle ihre Zellen
+       nicht mehr der Reihe nach hinschreiben: sie fragt je Schlüssel, wie die
+       Spalte HEISST, wo sie AUSGERICHTET ist, wie BREIT sie ist und was in der
+       Zelle steht. Feste Felder und eigene Angaben beantworten dieselben vier
+       Fragen — genau deshalb dürfen sie sich mischen. */
+
+    /** Die Überschrift — dieselbe, die auch in der Spaltenliste steht. */
+    const columnLabel = (id: OrderColumnId): string => {
+        const extra = extraByKey.get(id);
+        if (extra) return extra.name;
+        switch (id) {
+            case 'name': return kindLabels.name;
+            case 'code': return kindLabels.code;
+            case 'quantity': return t('inv.columns.quantity');
+            /* EINZELPREIS, nicht «Bruttopreis» (Vorgabe Samet, 07.09.2026):
+               gemeint ist der Stückpreis vor Rabatt, nicht ein Preis inklusive
+               Steuer. Das Feld heisst im Datenmodell weiter `grossPrice`. */
+            case 'grossPrice': return t('inv.orders.columns.unitPrice');
+            case 'netPrice': return t('inv.orders.columns.netPrice');
+            case 'discount': return t('inv.orders.columns.discount');
+            case 'discount2': return t('inv.orders.columns.discount2');
+            case 'lineTotal': return t('inv.columns.lineTotal');
+            default: return id;
+        }
+    };
+
+    /** Zahlen rechts, Text links — auch die eigenen Angaben (`type`). */
+    const columnAlign = (id: OrderColumnId): 'left' | 'right' => {
+        const extra = extraByKey.get(id);
+        if (extra) return extra.type === 'number' ? 'right' : 'left';
+        return id === 'name' || id === 'code' ? 'left' : 'right';
+    };
+
+    /** Der Name trägt KEINE Breite: er saugt auf, was übrig bleibt. */
+    const columnWidthStyle = (id: OrderColumnId) => {
+        if (id === 'name') return undefined;
+        const extra = extraByKey.get(id);
+        const stored = (grid.widths as Record<string, number>)[id];
+        return { width: extra ? (extra.width ?? stored ?? 120) : stored };
+    };
+
+    const cellClassName = (id: OrderColumnId, rowDirect: boolean, rowSupplier: boolean): string | undefined => {
+        // Der Zeilenbetrag steht in der automatischen Rechnung als fertige Zahl
+        // in der Zelle (kein Eingabefeld) — die Zelle trägt dann die Schrift.
+        if (id === 'lineTotal' && !rowDirect) {
+            return 'text-right font-mono text-[13px] font-semibold text-slate-900 dark:text-white';
+        }
+        void rowSupplier;
+        return undefined;
+    };
+
+    /** Der Inhalt der Zelle. */
+    const renderCell = (
+        id: OrderColumnId,
+        row: DraftOrderRow,
+        figures: ReturnType<typeof rowFigures>,
+        rowDirect: boolean,
+        rowSupplier: boolean,
+        rowChanged: boolean,
+    ): React.ReactNode => {
+        // ── Eine eigene Angabe der Vorlage: frei änderbar wie jede Zelle. ────
+        const extra = extraByKey.get(id);
+        if (extra) {
+            return (
+                <input
+                    value={row.extras?.[extra.key] ?? ''}
+                    onChange={(event) => patchRow(row.key, {
+                        extras: { ...(row.extras ?? {}), [extra.key]: event.target.value },
+                    })}
+                    inputMode={extra.type === 'number' ? 'decimal' : undefined}
+                    className={`${CELL_INPUT_CLASS} ${extra.type === 'number' ? 'text-right font-mono' : ''}`}
+                />
+            );
+        }
+
+        switch (id) {
+            case 'name':
+                return (
+                    <>
+                        <ArticleComboCell
+                            value={row.name}
+                            onChange={(next) => onProductTyped(row.key, next)}
+                            onPick={(article) => onProductPicked(row.key, article)}
+                            onCreate={(name) => markAsNewArticle(row.key, name)}
+                            onOpenAll={() => setAllPickerRowKey(row.key)}
+                            linked={Boolean(row.articleId)}
+                            canCreate={canCreateArticles}
+                            autoFocus={row.key === focusRowKey}
+                            addLabel={t('inv.productPicker.addNew', { name: row.name.trim() })}
+                            viewAllLabel={kindLabels.viewAll}
+                        />
+                        {row.error && (
+                            <span className="block text-[10.5px] font-semibold text-red-500">{row.error}</span>
+                        )}
+                    </>
+                );
+
+            /* SERİ KOD: ürüne bağlı satırda normalde salt okunurdur (ürünün
+               kimliği değişmesin). Doğrudan kopyalamada HER hücre düzenlenebilir
+               olduğu için orada da giriş kutusudur. */
+            case 'code':
+                return row.articleId && !rowDirect ? (
+                    <span className="block truncate font-mono text-[12.5px] text-slate-500 dark:text-white/60">
+                        {row.code}
+                    </span>
+                ) : (
+                    <input
+                        value={row.code}
+                        onChange={(event) => patchRow(row.key, { code: event.target.value })}
+                        // Seri kod katalogda varsa o ürün satırın üzerine yazılır.
+                        onBlur={(event) => void applySerialCodeMatch(row.key, event.target.value)}
+                        /* Leer ist erlaubt: fehlt der Code, vergibt ihn der Server
+                           beim Speichern (ART-NNNNN) und trägt ihn danach hier ein. */
+                        className={`${CELL_INPUT_CLASS} font-mono`}
+                    />
+                );
+
+            /* Menge: Zeilen mit einer Mengenstaffel holen sich hier ihren Preis
+               neu (`patchRowQuantity`); alle anderen bleiben unverändert. */
+            case 'quantity':
+                return (
+                    <input
+                        value={row.quantity}
+                        onChange={(event) => patchRowQuantity(row.key, event.target.value)}
+                        onFocus={selectWholeCell}
+                        inputMode="decimal"
+                        className={`${CELL_INPUT_CLASS} text-right font-mono`}
+                    />
+                );
+
+            case 'grossPrice':
+                return (
+                    <input
+                        value={row.grossPrice}
+                        onChange={(event) => patchRow(row.key, { grossPrice: event.target.value })}
+                        onFocus={selectWholeCell}
+                        inputMode="decimal"
+                        className={`${CELL_INPUT_CLASS} text-right font-mono`}
+                    />
+                );
+
+            /* NET FİYAT normalde TÜRETİLMİŞTİR: brüt birim fiyat × indirim
+               çarpanı. Elle girilemez — girilebilse indirim yüzdeleriyle
+               çelişirdi. DOĞRUDAN GİRİŞTE türetme yoktur: hücre dosyadan gelen
+               değeri taşır ve düzenlenebilir. TEDARİKÇİ HESABINDA fiyat karttan
+               gelir ve KİLİTLİDİR — miktar değişince tutar orantılı ölçeklenir. */
+            case 'netPrice':
+                if (rowDirect) {
+                    return (
+                        <span className="flex items-center gap-1">
+                            <input
+                                value={row.netPrice}
+                                onChange={(event) => patchRow(row.key, { netPrice: event.target.value })}
+                                onFocus={selectWholeCell}
+                                inputMode="decimal"
+                                /* Hücre boşken İNDİRİMLİ fiyat soluk yazıyla görünür:
+                                   kaydedilecek değer budur. */
+                                placeholder={fmtMoney(figures.netUnitPrice)}
+                                className={`${CELL_INPUT_CLASS} text-right font-mono placeholder:text-slate-700 dark:placeholder:text-white/80`}
+                            />
+                            {recallButton(row, rowChanged)}
+                        </span>
+                    );
+                }
+                if (rowSupplier) {
+                    /* Sabit birim fiyat TAM DUYARLIKLA gösterilir: 2 haneye
+                       yuvarlanmış hâli satır tutarıyla çelişir görünürdü. */
+                    return (
+                        <span className="flex items-center justify-end gap-1 font-mono text-[13px] text-slate-700 dark:text-white/80">
+                            {row.netPrice.trim() ? fmtUnitPricePrecise(parseNum(row.netPrice) ?? 0) : '—'}
+                            {recallButton(row, rowChanged)}
+                        </span>
+                    );
+                }
+                return (
+                    <span className="flex items-center justify-end gap-1 font-mono text-[13px] text-slate-700 dark:text-white/80">
+                        {row.grossPrice.trim() ? fmtMoney(figures.netUnitPrice) : '—'}
+                        {recallButton(row, rowChanged)}
+                    </span>
+                );
+
+            /* İndirim yüzdeleri. Tedarikçi kipindeki SATIRDA indirim KİLİTLİDİR
+               (fiyat sabittir). */
+            case 'discount':
+            case 'discount2':
+                return rowSupplier ? (
+                    <span className="block text-right font-mono text-[13px] text-slate-700 dark:text-white/80">
+                        {fmtPercent(0)}
+                    </span>
+                ) : (
+                    <input
+                        value={id === 'discount' ? row.discount : row.discount2}
+                        onChange={(event) => patchRow(row.key, id === 'discount'
+                            ? { discount: event.target.value }
+                            : { discount2: event.target.value })}
+                        onFocus={selectWholeCell}
+                        inputMode="decimal"
+                        className={`${CELL_INPUT_CLASS} text-right font-mono placeholder:text-slate-700 dark:placeholder:text-white/80`}
+                    />
+                );
+
+            /* ── DER BETRAG DER ZEILE ───────────────────────────────────────
+               Vorgabe Samet: «Beim direkten Uebertragen soll die Zeilensumme
+               direkt eingetragen werden und das tatsaechliche Ergebnis der
+               Zeile sein.» In der manuellen Eingabe ist die Zelle darum
+               schreibbar und das Getippte IST der Betrag — er wird nie
+               nachgerechnet. Leer heisst «Menge × Nettopreis», und genau das
+               steht dann blass darin. KEINE STEUER AUF DER ZEILE: sie faellt
+               einmal auf die ganze Bestellung, unten im Total. */
+            case 'lineTotal':
+                return rowDirect ? (
+                    <input
+                        value={row.lineTotal}
+                        onChange={(event) => patchRow(row.key, { lineTotal: event.target.value })}
+                        onFocus={selectWholeCell}
+                        inputMode="decimal"
+                        placeholder={fmtMoney(figures.lineTotal)}
+                        className={`${CELL_INPUT_CLASS} text-right font-mono font-semibold text-slate-900 placeholder:font-semibold placeholder:text-slate-900 dark:text-white dark:placeholder:text-white`}
+                    />
+                ) : fmtMoney(figures.lineTotal);
+
+            default:
+                return null;
+        }
     };
 
     // ── GİRİŞ YOLU SEÇİMİ (yalnızca yeni sipariş) ────────────────────────────
@@ -1234,40 +1695,23 @@ export const OrderCreatePage = () => {
 
     return (
         <div className="flex w-full flex-col gap-4">
+            {/* DER KOPF LÄUFT NICHT MEHR MIT (Vorgabe Samet, 09.09.2026:
+                «‹Auftrag bestätigen› soll nicht festgeklebt sein; die
+                Überschriften sollen beim Runterscrollen nicht stehen bleiben»).
+                Er scrollt weg wie jeder andere Seiteninhalt. */}
             <InventoryListHeader
+                /* ── DER VORGANG, AUCH IN DER MASKE ──────────────────────────
+                   Dasselbe Schrittband wie auf der Auftragsseite und im
+                   Wareneingang, an derselben Stelle: mittig in der Kopfzeile.
+                   Man sieht beim Schreiben, auf welcher Stufe man steht. Eine
+                   NEUE, noch nicht gespeicherte Erfassung steht auf der Stufe,
+                   die am Anfang gewählt wurde. */
+                center={<OrderFlowSteps stageIndex={stageIndexOf(editStatus ?? (priceless ? 'DRAFT' : 'ORDER_DRAFT'))} />}
                 title={(
                     <span className="flex items-center gap-2">
                         {editId
-                            ? `${t('inv.orders.editTitle')}${editReference ? ` · ${editReference}` : ''}`
-                            : t('inv.orders.createTitle')}
-                        {/* Başlıkta İKİ İKON (kullanıcı isteği 2026-08-02, mal kabul
-                            ekranıyla aynı düzen): SOLDA çöp kutusu (tabloyu temizler),
-                            SAĞDA KAYDET. Alttaki geniş "taslağı kaydet" düğmesi yerinde
-                            kalır; buradaki ikon aynı işi yapar, sayfanın başından. */}
-                        <span className="ml-1 flex items-center gap-1">
-                            <button
-                                type="button"
-                                disabled={saving || rows.length === 0}
-                                onClick={clearRows}
-                                title={t('inv.orders.clearRows')}
-                                aria-label={t('inv.orders.clearRows')}
-                                className="flex size-9 items-center justify-center rounded-md border border-red-200 text-red-500 transition-colors hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500"
-                            >
-                                <Trash01 size={17} />
-                            </button>
-                            <button
-                                type="button"
-                                disabled={saving || !canTransfer || !filledRows.length}
-                                onClick={() => void save()}
-                                title={canTransfer ? t('common.save') : t('inv.stock.noPermission')}
-                                aria-label={t('common.save')}
-                                className="flex size-9 items-center justify-center rounded-md border border-[#272f67]/30 text-[#272f67] transition-colors hover:bg-[#272f67] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/30 dark:text-white dark:hover:bg-white/15"
-                            >
-                                {saving
-                                    ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                    : <Save01 size={17} />}
-                            </button>
-                        </span>
+                            ? `${t(priceless ? 'inv.orders.editTitlePriceRequest' : 'inv.orders.editTitle')}${editReference ? ` · ${editReference}` : ''}`
+                            : t(priceless ? 'inv.orders.createTitlePriceRequest' : 'inv.orders.createTitle')}
                     </span>
                 )}
                 /* Başlık satırının SAĞ UCUNDA duran TEK eylem — hangi eylem olduğunu
@@ -1282,18 +1726,17 @@ export const OrderCreatePage = () => {
                    Yeni (henüz kaydedilmemiş) fiyat talebinde hiçbiri görünmez —
                    dönüştürülecek bir kayıt yoktur, önce kaydedilir. */
                 action={priceless
-                    ? ((editId && editStatus && canConvertToOrder(editStatus)) ? (
+                    ? (
                         <button
                             type="button"
                             disabled={saving || !canTransfer || !filledRows.length}
-                            onClick={() => setStageConfirm('convert')}
-                            title={t('inv.orders.actions.convertToOrder')}
-                            className="flex h-9 items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            onClick={() => void save()}
+                            title={t('common.save')}
+                            className="flex h-10 items-center rounded-full bg-[#272f67] px-5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                            <ShoppingCart01 size={15} />
-                            {t('inv.orders.actions.convertToOrder')}
+                            {saving ? <LoadingDots label={t('common.loadingData')} /> : t('common.save')}
                         </button>
-                    ) : undefined)
+                    )
                     : ((!editStatus || canConfirmToOrder(editStatus)) ? (
                         <div className="flex items-center gap-2">
                             {/* ONAYI GERİ AL — yalnızca KAYITLI sipariş taslağında:
@@ -1301,16 +1744,23 @@ export const OrderCreatePage = () => {
                                 fiyat talebine döner (kullanıcı isteği 2026-08-03).
                                 Yeni, henüz kaydedilmemiş siparişte geri alınacak
                                 bir onay yoktur. */}
+                            {/* «BESTELLUNG LÖSCHEN» — eine Stufe zurück auf die
+                                Preisanfrage, genau wie auf der Bestellseite. Die
+                                Zeilen und ihre Preise bleiben stehen; auf der
+                                Anfragestufe sind sie nur nicht sichtbar und
+                                kommen beim nächsten Umwandeln zurück. In einer
+                                neuen, noch nicht gespeicherten Erfassung gibt es
+                                nichts, worauf man zurückgehen könnte. */}
                             {editId && editStatus === 'ORDER_DRAFT' && (
                                 <button
                                     type="button"
                                     disabled={saving || !canTransfer}
                                     onClick={() => setStageConfirm('revoke')}
-                                    title={t('inv.orders.actions.revokeApproval')}
-                                    className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                                    title={t('inv.orders.flow.deleteOrder')}
+                                    className="flex h-9 items-center gap-1.5 rounded-md border border-red-200 px-3.5 text-[12.5px] font-semibold text-red-600 transition-colors hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500"
                                 >
-                                    <RefreshCcw01 size={15} />
-                                    {t('inv.orders.actions.revokeApproval')}
+                                    <Trash01 size={15} />
+                                    {t('inv.orders.flow.deleteOrder')}
                                 </button>
                             )}
                             <button
@@ -1327,69 +1777,108 @@ export const OrderCreatePage = () => {
                     ) : undefined)}
             />
 
-            <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="flex flex-wrap items-end gap-3">
-                    {/* Tedarikçi: sipariş düzeyinde tek seçim, her zaman görünür
-                        (kaydetmek için zorunlu). Alana yazıldıkça kısa liste açılır;
-                        "Tüm tedarikçiler …" büyük pencereyi açar. */}
-                    <label className="flex flex-col gap-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t('inv.columns.supplier')}
-                        <div className="w-72">
-                            <SupplierComboCell
-                                value={supplier.name}
-                                onChange={(next) => { setSupplier({ id: null, name: next, email: null }); setSupplierError(null); }}
-                                onSelect={(choice) => {
-                                    setSupplier({ id: choice.supplierId, name: choice.supplierName, email: null });
-                                    setSupplierError(null);
-                                }}
-                                onOpenAll={() => setSupplierPickerOpen(true)}
-                                viewAllLabel={`${t('inv.orders.allSuppliers')} …`}
-                                placeholder={t('inv.orders.supplierPlaceholder')}
-                                inputClassName={`!h-9 !text-[13px] ${supplierError ? '!border-red-400' : ''}`}
-                            />
-                        </div>
-                        {supplierError && <span className="text-[11px] font-semibold normal-case tracking-normal text-red-500">{supplierError}</span>}
-                    </label>
-
-                    {/* Sipariş detayları: kırmızı kalem — alttan açılan pencerede
-                        Bestellung / Besteller / proje / teklif no girilir. Hiçbiri zorunlu
-                        değildir; Bestellung boş bırakılırsa sunucu BE-{yıl}-{sıra} üretir.
-                        Düğmenin ALTINDA özet YAZILMAZ (kullanıcı isteği) — girilen
-                        değerler yalnızca pencerede görünür. */}
-                    <div className="flex flex-col gap-1">
+            {/* ── DIE RÜCKFRAGE IST EIN STREIFEN ─────────────────────────────
+                Kein Fenster mehr (Vorgabe Samet, 08.09.2026): die Frage steht
+                in der Seite, dort wo die Handlung ausgeloest wurde, und der
+                Speichervorgang laeuft danach im Knopf oben weiter. */
+            }
+            {stageConfirm && (
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 dark:border-white/15 dark:bg-white/[0.04]">
+                    <span className="flex min-w-0 flex-1 items-start gap-2 text-[12.5px] text-slate-700 dark:text-white/80">
+                        <AlertTriangle size={15} className="mt-px shrink-0" />
+                        <span>
+                            {t(stageConfirm === 'confirm'
+                                ? 'inv.orders.confirmOrderConfirm'
+                                : stageConfirm === 'revoke'
+                                    ? 'inv.orders.flow.deleteOrderConfirm'
+                                    : 'inv.orders.convertConfirm')}
+                        </span>
+                    </span>
+                    <span className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setDetailsOpen(true)}
-                            className="flex h-9 items-center gap-1.5 rounded-md border border-[#d32026]/40 px-3 text-[12.5px] font-semibold text-[#d32026] transition-colors hover:bg-[#d32026] hover:text-white"
+                            onClick={() => setStageConfirm(null)}
+                            className="flex h-9 items-center rounded-md border border-slate-200 bg-white px-3.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-slate-400 dark:border-white/20 dark:bg-transparent dark:text-white/70"
                         >
-                            <Edit01 size={13} />
-                            {t('inv.orders.detailsButton')}
+                            {t('common.cancel')}
                         </button>
-                    </div>
-
-                    {/* EK ÜCRETLER — sipariş detaylarının SAĞINDA AYRI DÜĞME
-                        (kullanıcı isteği 2026-08-02): nakliye/ambalaj/montaj gibi
-                        kalemler artık detay penceresinin dibinde saklı değil,
-                        kendi penceresinde. Girilmiş tutar varsa düğme toplamı da
-                        gösterir. FİYAT TALEBİNDE GÖRÜNMEZ: o aşamada hiçbir tutar
-                        girilmez (fiyat da KDV de yoktur). */}
-                    {!priceless && (
-                    <div className="flex flex-col gap-1">
                         <button
                             type="button"
-                            onClick={() => setFeesOpen(true)}
-                            className="flex h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                            onClick={() => {
+                                const kind = stageConfirm;
+                                setStageConfirm(null);
+                                // GERİ ALMA kaydetmez: yalnızca durumu geri alır
+                                // (kaydedilmemiş düzenlemeler tabloda durur).
+                                if (kind === 'revoke') { void revokeToPriceRequest(); return; }
+                                void save(kind === 'confirm' ? { confirm: true } : { convert: true });
+                            }}
+                            className={`flex h-9 items-center rounded-md px-3.5 text-[12.5px] font-semibold text-white transition-colors ${
+                                stageConfirm === 'revoke' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#272f67] hover:bg-[#1f2654]'
+                            }`}
                         >
-                            <Coins01 size={13} />
-                            {t('inv.orders.fees.title')}
-                            {filledFees.length > 0 && (
-                                <span className="font-mono text-[12px] font-semibold text-slate-500 dark:text-white/60">
-                                    {fmtMoney(feesTotal)}
-                                </span>
-                            )}
+                            {t('common.confirm')}
                         </button>
+                    </span>
+                </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {/* ── LIEFERANT ────────────────────────────────────────────
+                        OHNE Beschriftung (Vorgabe Samet, 07.09.2026: «da steht
+                        viel einzelner Text, weg damit»): der Platzhalter im Feld
+                        sagt bereits, was hineingehoert. Getippt wird hier
+                        staendig, darum bleibt das Feld draussen; alles Uebrige
+                        liegt hinter dem Stift daneben. */}
+                    <div className="w-72">
+                        <SupplierComboCell
+                            value={supplier.name}
+                            onChange={(next) => { setSupplier({ id: null, name: next, email: null }); setSupplierError(null); }}
+                            onSelect={(choice) => {
+                                setSupplier({ id: choice.supplierId, name: choice.supplierName, email: null });
+                                setSupplierError(null);
+                            }}
+                            onOpenAll={() => setSupplierPickerOpen(true)}
+                            viewAllLabel={`${t('inv.orders.allSuppliers')} …`}
+                            placeholder={t('inv.orders.supplierPlaceholder')}
+                            inputClassName={`!h-10 !text-[13px] ${supplierError ? '!border-red-400' : ''}`}
+                        />
                     </div>
-                    )}
+
+                    {/* ── DER EINE STIFT ───────────────────────────────────────
+                        Vorgabe Samet: «Zusatzkosten gehoeren in die
+                        Bestelldetails; dort soll nur ein Stift stehen. Ein Klick,
+                        und alles liegt in einer einfachen Kiste im Apple-Stil.»
+                        Aus zwei beschrifteten Knoepfen wird ein Symbol; die
+                        Auskunft, die von aussen noetig ist, ist der Punkt an
+                        seiner Ecke: die Bestellung traegt Zusatzkosten. */}
+                    <button
+                        type="button"
+                        onClick={() => setDetailsOpen((open) => !open)}
+                        title={t('inv.orders.detailsTitle')}
+                        aria-label={t('inv.orders.detailsTitle')}
+                        aria-expanded={detailsOpen}
+                        className={`ofi-ord-pencil${filledFees.length > 0 ? ' is-marked' : ''}${detailsOpen ? ' is-on' : ''}`}
+                    >
+                        <Edit01 size={16} />
+                    </button>
+
+                    {/* ── DER LISTENKNOPF (Vorgabe Samet, 09.09.2026) ──────────
+                        «…oder es gibt seitlich einen Listenknopf, über den man
+                        die Reihenfolge verwaltet.» Genau der: er öffnet die
+                        Spaltenliste, in der feste Felder und eigene Angaben
+                        untereinander stehen und sich vertauschen lassen. Er
+                        sitzt neben dem Stift, weil beide dasselbe tun — die
+                        Bestellung einrichten, nicht sie ausfüllen. */}
+                    <button
+                        type="button"
+                        onClick={() => setColumnOrderOpen(true)}
+                        title={t('inv.orders.columnOrder.title')}
+                        aria-label={t('inv.orders.columnOrder.title')}
+                        className="ofi-ord-pencil"
+                    >
+                        <List size={16} />
+                    </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -1401,136 +1890,448 @@ export const OrderCreatePage = () => {
                         {t('inv.orders.mode.priceRequest')}
                     </span>
                 )}
-                {/* HESAP KİPİ — Excel düğmesinin YANINDA durur, çünkü kararın
-                    verildiği yer aktarımdan hemen öncedir (eşlenebilir sütunlar da
-                    buna göre değişir). Doğrudan giriş VARSAYILANDIR ve ilk sırada
-                    durur (kullanıcı isteği 2026-08-02). SATIR SATIR çalışma: satır
-                    seçiliyken anahtar YALNIZCA seçili satırlara uygulanır (seçim
-                    yokken tümüne + varsayılana). Fiyat talebinde kip yoktur. */}
-                {!priceless && (
-                    <span className="flex items-center gap-2">
-                    {/* HESAP KİPİ — TEK AÇILIR LİSTE (kullanıcı isteği 2026-08-02, üç
-                        düğme yerine). Varsayılan DOĞRUDAN GİRİŞtir. Liste TÜM satırlara
-                        uygulanır; tek satır, sağındaki daireden değiştirilir. */}
-                    <select
-                        value={calcMode}
-                        onChange={(event) => changeCalcMode(event.target.value as CalcMode)}
-                        title={t('inv.orders.calcMode.hint')}
-                        aria-label={t('inv.orders.calcMode.hint')}
-                        className="h-[34px] rounded-md border border-slate-300 bg-white px-2.5 text-[12.5px] font-semibold text-slate-600 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white/80"
+
+                {/* ── VORLAGE (Vorgabe Samet: «statt dessen gibt es eine
+                    Vorlagenauswahl») ────────────────────────────────────────
+                    Welche Vorlage gerade gilt, und ein Weg zu jeder anderen.
+                    Die Wahl bleibt stehen — auch für die nächste Bestellung. */}
+                <span className="ofi-poi-menuwrap">
+                    <button
+                        type="button"
+                        className="ofi-poi-ghost"
+                        onClick={() => { setTemplateMenuOpen((open) => !open); }}
                     >
-                        <option value="DIRECT">{t('inv.orders.calcMode.direct')}</option>
-                        <option value="AUTO">{t('inv.orders.calcMode.auto')}</option>
-                        <option value="SUPPLIER">{t('inv.orders.calcMode.supplier')}</option>
-                    </select>
+                        <Settings01 size={14} />
+                        {activeTemplate
+                            ? activeTemplate.title
+                            : t(priceless ? 'inv.aiImport.templatePriceRequest' : 'inv.aiImport.templateFallback')}
+                        <ChevronDown size={13} />
+                    </button>
+                    {templateMenuOpen && (
+                        <>
+                            <span className="fixed inset-0 z-50" onClick={() => setTemplateMenuOpen(false)} />
+                            <span className="ofi-poi-menu">
+                                {calcTemplates.map((template) => (
+                                    <button
+                                        key={template.id}
+                                        type="button"
+                                        className={activeTemplate?.id === template.id ? 'is-on' : ''}
+                                        onClick={() => {
+                                            setActiveTemplateId(template.id);
+                                            selectPreferredTemplate(templateDocumentType, template.id);
+                                            setTemplateMenuOpen(false);
+                                            // Ein Klick oeffnet die Vorlage — die Auswahl allein
+                                            // waere eine stumme Aenderung an der Rechnung.
+                                            setOpenTemplateId(template.id);
+                                            setTemplatesOpen(true);
+                                        }}
+                                    >
+                                        {activeTemplate?.id === template.id ? <Check size={14} /> : <span style={{ width: 14 }} />}
+                                        <span>
+                                            {template.title}
+                                            <small>{template.supplierName || t('inv.aiImport.templatesAllSuppliers')}</small>
+                                        </span>
+                                    </button>
+                                ))}
+                                {calcTemplates.length > 0 && <hr />}
+                                <button type="button" onClick={() => { setTemplateMenuOpen(false); setTemplatesOpen(true); }}>
+                                    <Settings01 size={14} />
+                                    <span>{t('inv.aiImport.menuTemplates')}</span>
+                                </button>
+                            </span>
+                        </>
+                    )}
                 </span>
+
+                {/* ── BERECHNUNG: NUR NOCH EIN ZEICHEN (Vorgabe Samet,
+                    09.09.2026) ────────────────────────────────────────────────
+                    «Den Rechen-Knopf bei Vorlage und Beleg-Import bitte weg —
+                    such ein Zeichen dafür, vielleicht eines für die Grundrechen-
+                    arten; Vorlage und Beleg-Import bleiben.» Der Knopf trug zwei
+                    bis vier Wörter zwischen zwei anderen Knöpfen und war damit
+                    das lauteste an der Zeile, obwohl er am seltensten gebraucht
+                    wird. Jetzt ist er ein Geteiltzeichen; WELCHE Art gerade
+                    rechnet, steht im Kurzhinweis, und dass überhaupt gerechnet
+                    wird, sagt seine Farbe — dieselbe Sprache wie beim Stift
+                    daneben (`is-on`). */}
+                {!priceless && (
+                    <button
+                        type="button"
+                        className={`ofi-poi-icon${calcActive ? ' is-on' : ''}`}
+                        onClick={() => { setCalcPopupOpen(true); setTemplateMenuOpen(false); }}
+                        title={calcActive
+                            ? `${t('inv.aiImport.calcTitle')}: ${calcModeLabel(calcMode)}`
+                            : t('inv.aiImport.calcTitle')}
+                        aria-label={t('inv.aiImport.calcTitle')}
+                    >
+                        <SquareDivide size={17} />
+                    </button>
                 )}
+
+                {/* ── BELEG IMPORTIEREN ────────────────────────────────────
+                    EIN Knopf, EIN Weg (Vorgabe Samet, 07.09.2026): «Unter
+                    ‹Beleg importieren› brauche ich kein ‹Meine Vorlagen› — es
+                    gibt ja schon eine Vorlagenauswahl.» Das Menue darunter trug
+                    danach nur noch einen Eintrag; also faellt es weg und der
+                    Klick oeffnet unmittelbar den Import. Zu den Vorlagen fuehrt
+                    der Knopf links daneben. */}
                 <button
                     type="button"
-                    onClick={() => setExcelOpen(true)}
-                    className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                    className="ofi-poi-launch is-alive"
+                    onClick={() => { setAiOpen(true); setTemplateMenuOpen(false); }}
                 >
-                    <UploadCloud02 size={13} />
-                    {t('inv.excel.importButton')}
+                    <Zap size={14} />
+                    {t('inv.aiImport.importButton')}
                 </button>
-                <button
-                    type="button"
-                    onClick={addRow}
-                    className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
-                >
-                    <Plus size={13} />
-                    {t('inv.stock.addProduct')}
-                </button>
+
                 </div>
             </div>
 
+            {/* ── DIE BESTELLDETAILS STEHEN IN DER MITTE (Vorgabe Samet,
+                09.09.2026) ─────────────────────────────────────────────────
+                Am 08.09. lagen sie kurz IN der Seite; das schob die Tabelle
+                nach unten und kostete beim Tippen jedes Mal den Blick auf die
+                Zeilen. «Die Bearbeiten-Karte gehört in die Mitte, sie darf
+                unten keinen Platz wegnehmen und die Tabelle nicht verschieben.»
+                Also wieder eine Karte über der Seite — die Tabelle bleibt, wo
+                sie ist, und die Karte legt sich mittig darüber. Das ist kein
+                Rückschritt zum alten Blatt: der ABLAUF (Stufen, Handlungen,
+                Rückfragen) bleibt Seite; nur dieses eine Formular schwebt. */}
+            {detailsOpen && createPortal(
+                <div
+                    className="ofi-ord-scrim"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={t('inv.orders.detailsTitle')}
+                    /* Klick auf den Schleier schliesst — wie überall im Haus. */
+                    onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailsOpen(false); }}
+                >
+                    <div className="ofi-ord">
+                        <div className="ofi-ord-head">
+                            <span className="ofi-ord-ghost" />
+                            <b>{t('inv.orders.detailsTitle')}</b>
+                            <button
+                                type="button"
+                                className="ofi-ord-x"
+                                onClick={() => setDetailsOpen(false)}
+                                aria-label={t('common.close')}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="ofi-ord-body">
+                            {/* ── DIE BESTELLUNG ────────────────────────────────
+                                Ohne eigenen Titel: der Titel der Karte steht
+                                direkt darueber und saegte dasselbe Wort zweimal. */}
+                            <div className="ofi-ord-group">
+                                <label className="ofi-ord-row">
+                                    <span className="ofi-ord-label">{t('inv.orders.columns.reference')}</span>
+                                    <input
+                                        value={reference}
+                                        onChange={(event) => setReference(event.target.value)}
+                                        className="is-mono"
+                                    />
+                                </label>
+                                {/* «Besteller»: wer bestellt — vorbelegt mit dem
+                                    vollen Namen des angemeldeten Benutzers. */}
+                                <label className="ofi-ord-row">
+                                    <span className="ofi-ord-label">{t('inv.orders.columns.orderedBy')}</span>
+                                    <input
+                                        value={orderedByName}
+                                        onChange={(event) => setOrderedByName(event.target.value)}
+                                    />
+                                </label>
+                                {/* Empfänger — freiwillig. Steht er da, erscheint er
+                                    im PDF klein unter dem Lieferantennamen. */}
+                                <label className="ofi-ord-row">
+                                    <span className="ofi-ord-label">{t('inv.orders.columns.recipientName')}</span>
+                                    <input
+                                        value={recipientName}
+                                        onChange={(event) => setRecipientName(event.target.value)}
+                                        maxLength={120}
+                                    />
+                                </label>
+                                <label className="ofi-ord-row">
+                                    <span className="ofi-ord-label">{t('inv.orders.columns.project')}</span>
+                                    <input
+                                        value={projectName}
+                                        onChange={(event) => setProjectName(event.target.value)}
+                                    />
+                                </label>
+                                <label className="ofi-ord-row">
+                                    <span className="ofi-ord-label">{t('inv.orders.columns.quoteNumber')}</span>
+                                    <input
+                                        value={quoteNumber}
+                                        onChange={(event) => setQuoteNumber(event.target.value)}
+                                        className="is-mono"
+                                    />
+                                </label>
+                            </div>
+
+                            {/* ── ZUSATZKOSTEN ────────────────────────────────────
+                                Fracht, Verpackung, Montage… Jede Zeile trägt
+                                Bezeichnung und Betrag; die Beträge gehen in die
+                                MEHRWERTSTEUER-GRUNDLAGE ein (Zeilensumme +
+                                Zusatzkosten). Ein Betrag ohne Bezeichnung wird
+                                nicht gespeichert — `save` sagt es und öffnet
+                                dieses Fenster wieder.
+                                IM FIYAT TALEBİ nicht sichtbar: dort gibt es
+                                überhaupt keine Beträge. */}
+                            {!priceless && (
+                                <>
+                                    <span className="ofi-ord-cap">{t('inv.orders.fees.title')}</span>
+                                    <div className="ofi-ord-group">
+                                        {fees.map((fee) => (
+                                            <div
+                                                key={fee.key}
+                                                className={`ofi-ord-row${feeError && !fee.name.trim() ? ' is-invalid' : ''}`}
+                                            >
+                                                {/* Das rote Minus aus der iOS-Liste. */}
+                                                <button
+                                                    type="button"
+                                                    className="ofi-ord-dot is-remove"
+                                                    onClick={() => removeFee(fee.key)}
+                                                    title={t('inv.orders.fees.removeRow')}
+                                                    aria-label={t('inv.orders.fees.removeRow')}
+                                                >
+                                                    <Minus size={13} />
+                                                </button>
+                                                <input
+                                                    value={fee.name}
+                                                    onChange={(event) => patchFee(fee.key, { name: event.target.value })}
+                                                />
+                                                <input
+                                                    value={fee.amount}
+                                                    onChange={(event) => patchFee(fee.key, { amount: event.target.value })}
+                                                    inputMode="decimal"
+                                                    aria-label={t('inv.orders.fees.amountLabel')}
+                                                    className="is-amount"
+                                                />
+                                            </div>
+                                        ))}
+                                        <button type="button" className="ofi-ord-action" onClick={addFee}>
+                                            <span className="ofi-ord-dot is-add">
+                                                <Plus size={13} />
+                                            </span>
+                                            {t('inv.orders.fees.addButton')}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── MEHRWERTSTEUER ──────────────────────────────────
+                                EIN Satz für die ganze Bestellung: das Land kommt
+                                aus der Liste (eigene Länder lassen sich unten
+                                anhängen und bleiben im Browser stehen), der Satz
+                                fällt auf Zeilensumme + Zusatzkosten. Im
+                                Fiyat talebi gibt es keine Beträge — und damit
+                                auch keinen Satz. */}
+                            {!priceless && (
+                                <>
+                                    <span className="ofi-ord-cap">{t('inv.orders.columns.vat')}</span>
+                                    <div className="ofi-ord-group">
+                                        <div className="ofi-ord-row">
+                                            <span className="ofi-ord-label">{t('inv.orders.vatColumn.country')}</span>
+                                            {/* iOS-Auswahl statt Systemfeld (Vorgabe Samet):
+                                                ein Knopf, der die gemeinsame Trefferliste
+                                                oeffnet — dasselbe Bauteil wie ueberall sonst
+                                                im Haus. Ein gespeichertes, inzwischen
+                                                geloeschtes eigenes Land bleibt waehlbar. */}
+                                            <SelectMenu
+                                                className="ofi-ord-menu"
+                                                buttonClassName="ofi-ord-select"
+                                                ariaLabel={t('inv.orders.vatColumn.country')}
+                                                value={orderVatCountry}
+                                                listWidth={260}
+                                                options={[
+                                                    ...(!vatCountryList.some((entry) => entry.label === orderVatCountry) && orderVatCountry
+                                                        ? [{ value: orderVatCountry, label: orderVatCountry }]
+                                                        : []),
+                                                    ...vatCountryList.map((entry) => ({ value: entry.label, label: entry.label })),
+                                                ]}
+                                                onChange={(next) => {
+                                                    setOrderVatCountry(next);
+                                                    const entry = vatCountryList.find((candidate) => candidate.label === next);
+                                                    if (entry?.rates.length) setOrderVatRate(String(entry.rates[0]));
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="ofi-ord-row">
+                                            <span className="ofi-ord-label">{t('inv.orders.vatColumn.rates')}</span>
+                                            <span className="ofi-ord-pills">
+                                                {(vatCountryList.find((entry) => entry.label === orderVatCountry)?.rates ?? []).map((rate) => (
+                                                    <button
+                                                        key={rate}
+                                                        type="button"
+                                                        onClick={() => setOrderVatRate(String(rate))}
+                                                        className={(parseNum(orderVatRate) ?? 0) === rate ? 'is-on' : undefined}
+                                                    >
+                                                        {fmtPercent(rate)}
+                                                    </button>
+                                                ))}
+                                                <input
+                                                    value={orderVatRate}
+                                                    onChange={(event) => setOrderVatRate(event.target.value)}
+                                                    inputMode="decimal"
+                                                    aria-label={t('inv.orders.vatColumn.custom')}
+                                                    className="is-num"
+                                                />
+                                                <em>%</em>
+                                            </span>
+                                        </div>
+                                        <div className="ofi-ord-row">
+                                            <span className="ofi-ord-label">{t('inv.orders.vatSheet.customCountry')}</span>
+                                            <span className="ofi-ord-pair">
+                                                <input
+                                                    value={customVatLabel}
+                                                    onChange={(event) => setCustomVatLabel(event.target.value)}
+                                                />
+                                                <input
+                                                    value={customVatRate}
+                                                    onChange={(event) => setCustomVatRate(event.target.value)}
+                                                    inputMode="decimal"
+                                                    aria-label={t('inv.orders.vatColumn.custom')}
+                                                    className="is-num"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={!customVatLabel.trim()}
+                                                    onClick={addCustomVatCountry}
+                                                    className="ofi-ord-dot is-add"
+                                                    title={t('inv.orders.vatSheet.addToList')}
+                                                    aria-label={t('inv.orders.vatSheet.addToList')}
+                                                >
+                                                    <Plus size={13} />
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── ANSCHREIBEN ─────────────────────────────────────
+                                Der Text, der im PDF VOR den Positionen steht.
+                                Bleibt das Feld leer, druckt das Dokument seinen
+                                eigenen Standardtext — genau den, der als
+                                Platzhalter dasteht. Darunter zwei Zeilen: die
+                                gespeicherten Entwürfe, und der Weg zurück zum
+                                Standardtext (= das Feld leeren). */}
+                            <span className="ofi-ord-cap">{t('inv.orders.coverLetter.title')}</span>
+                            <div className="ofi-ord-group">
+                                <textarea
+                                    value={coverLetter}
+                                    onChange={(event) => setCoverLetter(event.target.value)}
+                                    placeholder={t('inv.orders.coverLetter.defaultText')}
+                                    className="ofi-ord-text"
+                                />
+                                <button
+                                    type="button"
+                                    className="ofi-ord-action"
+                                    onClick={() => { setDraftError(null); setDraftsOpen(true); }}
+                                >
+                                    <File05 size={15} />
+                                    {t('inv.orders.coverLetter.draftsButton')}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ofi-ord-action"
+                                    disabled={!coverLetter.trim()}
+                                    onClick={() => setCoverLetter('')}
+                                >
+                                    <RefreshCcw01 size={15} />
+                                    {t('inv.orders.coverLetter.resetDefault')}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="ofi-ord-footbar">
+                            {feeError
+                                ? <span className="ofi-ord-err">{feeError}</span>
+                                : filledFees.length > 0 && <span className="ofi-ord-total">{fmtMoney(feesTotal)}</span>}
+                            {/* «Fertig» klappt den Abschnitt nur zu — gespeichert
+                                wird die ganze Bestellung mit ihrem einen Knopf. */}
+                            <button type="button" className="ofi-ord-done" onClick={() => setDetailsOpen(false)}>
+                                {t('common.done')}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body,
+            )}
+
+            <div className={calcActive ? 'ofi-poi-calcpage' : undefined}>
             <SectionCard
                 title={t('inv.orders.sectionEditor', { count: filledRows.length })}
                 action={(
-                    <span className="flex items-baseline gap-3">
-                        {!priceless && rows.length > 0 && (
-                            <span className="flex items-baseline gap-2 font-mono text-[12.5px] text-slate-500 dark:text-white/60">
-                                {/* Döküm HESAP SIRASINI gösterir: net + ek ücretler
-                                    → KDV → genel toplam. Yalnızca dolu bileşenler. */}
-                                {(totals.vat > 0 || totals.fees !== 0) && (
-                                    <span className="text-[11.5px]">
-                                        {[
-                                            `${t('inv.orders.totalNet')} ${fmtMoney(totals.net)}`,
-                                            ...(totals.fees !== 0 ? [`${t('inv.orders.fees.title')} ${fmtMoney(totals.fees)}`] : []),
-                                            ...(totals.vat > 0
-                                                ? [`${t('inv.orders.columns.vat')} ${fmtPercent(parseNum(orderVatRate) ?? 0)} ${fmtMoney(totals.vat)}`]
-                                                : []),
-                                        ].join(' + ')} =
-                                    </span>
-                                )}
-                                <span className="font-semibold text-slate-700 dark:text-white/80">
-                                    {fmtMoney(totals.grand)}
+                    /* ── DAS TOTAL, ALS ZAHL ─────────────────────────────────
+                       Vorgabe Samet (07.09.2026): «Das Gesamttotal bitte direkt
+                       als Zahl — nicht bloss ‹CHF›, nicht hinter einem Hover
+                       versteckt; die Ziffern, auch die Nullen, sollen dastehen.»
+                       Also steht es hier gross und dauerhaft, mit seinen zwei
+                       Rappenstellen (`fmtMoney` setzt sie seit heute immer), und
+                       davor in einer Zeile, WORAUS es sich ergibt — sichtbar,
+                       nicht als Sprechblase. Es verschwindet auch nicht mehr,
+                       wenn die Tabelle noch leer ist: dann steht 0.00 da, und
+                       man sieht, dass gerechnet wird.
+                       In der Preisanfrage gibt es keine Betraege — dort nichts. */
+                    !priceless ? (
+                        <span className="ofi-ord-sum">
+                            {(totals.vat > 0 || totals.fees !== 0) && (
+                                <span className="ofi-ord-sum__parts">
+                                    {/* Die Reihenfolge ist die des Rechnens
+                                        (Vorgabe Samet, 07.09.2026): Zeilenbeträge,
+                                        darauf die je Zeile gerechnete Steuer, und
+                                        die Zusatzkosten SEPARAT obendrauf. */}
+                                    {[
+                                        `${t('inv.orders.totalNet')} ${fmtMoney(totals.net)}`,
+                                        ...(totals.vat > 0
+                                            ? [`${t('inv.orders.columns.vat')} ${fmtPercent(parseNum(orderVatRate) ?? 0)} ${fmtMoney(totals.vat)}`]
+                                            : []),
+                                        ...(totals.fees !== 0 ? [`${t('inv.orders.fees.title')} ${fmtMoney(totals.fees)}`] : []),
+                                    ].join('  +  ')}
                                 </span>
-                            </span>
-                        )}
-                    </span>
+                            )}
+                            <b className="ofi-ord-sum__value">{fmtMoney(totals.grand)}</b>
+                        </span>
+                    ) : undefined
                 )}
             >
                 <div className="overflow-x-auto">
                     <table data-inv-table data-grid-lines data-unstyled-table className="w-full" style={{ minWidth: tableMinWidth }}>
+                        {/* Die Spaltenbreiten folgen der REIHENFOLGE, nicht mehr
+                            einer festen Liste: was oben in der Spaltenliste
+                            steht, steht hier links. Der Name trägt keine Breite
+                            — er saugt den Rest auf, wo immer er gerade sitzt. */}
                         <colgroup>
-                            {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
-                            <col />
-                            <ResizableCols keys={['code', 'quantity'] as const} grid={grid} />
-                            {!priceless && (
-                                <ResizableCols keys={['grossPrice', 'netPrice', 'discount', 'discount2', 'lineTotal', 'mode'] as const} grid={grid} />
-                            )}
+                            <col style={{ width: 40 }} />
+                            {columnOrder.map((id) => (
+                                <col key={id} style={columnWidthStyle(id)} />
+                            ))}
                             <ResizableCols keys={['remove'] as const} grid={grid} />
                         </colgroup>
                         <thead>
                             <tr>
-                                <th className="text-left">{kindLabels.name}</th>
-                                <th className="relative text-left">
-                                    {kindLabels.code}
-                                    <ColResizeHandle {...grid.resizeProps('code')} />
+                                {/* Das Kästchen ganz links wählt ALLE Zeilen —
+                                    der kurze Weg zum Papierkorb daneben. */}
+                                <th className="text-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={rows.length > 0 && selectedRows.size === rows.length}
+                                        onChange={toggleSelectAll}
+                                        aria-label={t('inv.orders.rows.selectAll')}
+                                        className="size-3.5 cursor-pointer accent-[#272f67]"
+                                    />
                                 </th>
-                                <th className="relative text-right">
-                                    {t('inv.columns.quantity')}
-                                    <ColResizeHandle {...grid.resizeProps('quantity')} />
-                                </th>
-                                {/* FİYAT TALEBİ fiyatsızdır: fiyat/indirim/KDV/tutar
-                                    sütunları hiç çizilmez. */}
-                                {!priceless && (
-                                    <>
-                                        <th className="relative text-right">
-                                            {t('inv.orders.columns.grossPrice')}
-                                            <ColResizeHandle {...grid.resizeProps('grossPrice')} />
-                                        </th>
-                                        <th className="relative text-right">
-                                            {t('inv.orders.columns.netPrice')}
-                                            <ColResizeHandle {...grid.resizeProps('netPrice')} />
-                                        </th>
-                                        {/* İndirim: başlık altı çizili — tıklanınca İndirim 2 / 3
-                                            sütunlarını açan pencere gelir. Yüzdeler sırayla uygulanır;
-                                            tedarikçi kipindeki SATIRLARDA hücreler kilitlidir. */}
-                                        {/* İKİ indirim sütunu HER ZAMAN görünür: gizli
-                                            sütun = sessizce silinen indirim demekti. */}
-                                        <th className="relative text-right">
-                                            {t('inv.orders.columns.discount')}
-                                            <ColResizeHandle {...grid.resizeProps('discount')} />
-                                        </th>
-                                        <th className="relative text-right">
-                                            {t('inv.orders.columns.discount2')}
-                                            <ColResizeHandle {...grid.resizeProps('discount2')} />
-                                        </th>
-                                        {/* KDV SÜTUNU YOK: tek oran sipariş detaylarından
-                                            seçilir ve genel toplama uygulanır. */}
-                                        <th className="relative text-right">
-                                            {t('inv.columns.lineTotal')}
-                                            <ColResizeHandle {...grid.resizeProps('lineTotal')} />
-                                        </th>
-                                        {/* Kip göstergesi (satırın sağında): tıklamak o satırın
-                                            hesap kipini değiştirir — toplu ayardan bağımsız. */}
-                                        <th className="relative" aria-label={t('inv.orders.calcMode.rowToggleHint')}>
-                                            <ColResizeHandle {...grid.resizeProps('mode')} />
-                                        </th>
-                                    </>
-                                )}
+                                {columnOrder.map((id) => (
+                                    <th
+                                        key={id}
+                                        className={`relative ${columnAlign(id) === 'right' ? 'text-right' : 'text-left'}`}
+                                    >
+                                        {columnLabel(id)}
+                                        {id !== 'name' && <ColResizeHandle {...grid.resizeProps(id as 'code')} />}
+                                    </th>
+                                ))}
                                 <th className="relative">
                                     <ColResizeHandle {...grid.resizeProps('remove')} />
                                 </th>
@@ -1539,12 +2340,13 @@ export const OrderCreatePage = () => {
                         <tbody>
                             {rows.length === 0 && (
                                 <tr>
-                                    <td colSpan={columnCount} className="py-12 text-center text-[13px] text-slate-400 dark:text-white/50">
-                                        {/* Sipariş yükleniyor ya da Excel satırları
-                                            eşleştiriliyor: hesabın sürdüğünü yazı +
-                                            yanıp sönen noktalar gösterir. */}
-                                        {loadingOrder || importing
-                                            ? <LoadingDots label={t('common.loadingData')} />
+                                    <td colSpan={columnCount} className="py-4 text-center text-[13px] text-slate-400 dark:text-white/50">
+                                        {/* Wird die Bestellung geholt, wartet Offi mit
+                                            und gibt einen Hinweis; ist sie da und die
+                                            Tabelle leer, steht hier nur der Satz, wie
+                                            man eine Zeile anlegt. */}
+                                        {loadingOrder
+                                            ? <BotLoadingPanel label={t('common.loadingData')} minHeight={220} size={88} />
                                             : t('inv.orders.editorEmpty')}
                                     </td>
                                 </tr>
@@ -1556,186 +2358,36 @@ export const OrderCreatePage = () => {
                                 const rowSupplier = row.calcMode === 'SUPPLIER';
                                 // Fiyat özgün hâlinden farklıysa geri çağır düğmesi görünür.
                                 const rowChanged = rowDiffersFromOrigin(row);
+                                const selected = selectedRows.has(row.key);
                                 return (
-                                    <tr key={row.key} className={row.error ? 'bg-red-50/60 dark:bg-red-500/10' : undefined}>
-                                        <td>
-                                            <ArticleComboCell
-                                                value={row.name}
-                                                onChange={(next) => onProductTyped(row.key, next)}
-                                                onPick={(article) => onProductPicked(row.key, article)}
-                                                onCreate={(name) => markAsNewArticle(row.key, name)}
-                                                onOpenAll={() => setAllPickerRowKey(row.key)}
-                                                linked={Boolean(row.articleId)}
-                                                canCreate={canCreateArticles}
-                                                autoFocus={row.key === focusRowKey}
-                                                placeholder={kindLabels.pick}
-                                                addLabel={t('inv.productPicker.addNew', { name: row.name.trim() })}
-                                                viewAllLabel={kindLabels.viewAll}
-                                            />
-                                            {row.error && (
-                                                <span className="block text-[10.5px] font-semibold text-red-500">{row.error}</span>
-                                            )}
-                                        </td>
-                                        {/* SERİ KOD: ürüne bağlı satırda normalde salt
-                                            okunurdur (ürünün kimliği değişmesin).
-                                            Doğrudan kopyalamada HER hücre düzenlenebilir
-                                            olduğu için orada da giriş kutusudur. */}
-                                        <td>
-                                            {row.articleId && !rowDirect ? (
-                                                <span className="block truncate font-mono text-[12.5px] text-slate-500 dark:text-white/60">
-                                                    {row.code}
-                                                </span>
-                                            ) : (
-                                                <input
-                                                    value={row.code}
-                                                    onChange={(event) => patchRow(row.key, { code: event.target.value })}
-                                                    // Seri kod katalogda varsa o ürün satırın üzerine yazılır.
-                                                    onBlur={(event) => void applySerialCodeMatch(row.key, event.target.value)}
-                                                    placeholder={kindLabels.code}
-                                                    className={`${CELL_INPUT_CLASS} font-mono ${row.name.trim() && !row.code.trim() ? '!border-red-400' : ''}`}
-                                                />
-                                            )}
-                                        </td>
-                                        <td>
-                                            <input
-                                                value={row.quantity}
-                                                onChange={(event) => patchRow(row.key, { quantity: event.target.value })}
-                                                inputMode="decimal"
-                                                placeholder="1"
-                                                className={`${CELL_INPUT_CLASS} text-right font-mono`}
-                                            />
-                                        </td>
-                                        {!priceless && (
-                                            <>
-                                        <td>
-                                            <input
-                                                value={row.grossPrice}
-                                                onChange={(event) => patchRow(row.key, { grossPrice: event.target.value })}
-                                                inputMode="decimal"
-                                                placeholder="0.00"
-                                                className={`${CELL_INPUT_CLASS} text-right font-mono`}
-                                            />
-                                        </td>
-                                        {/* NET FİYAT normalde TÜRETİLMİŞTİR: brüt birim fiyat
-                                            × indirim çarpanı. Elle girilemez — girilebilse
-                                            indirim yüzdeleriyle çelişirdi (eski hata).
-                                            DOĞRUDAN GİRİŞTE türetme yoktur: hücre dosyadan
-                                            gelen değeri taşır ve düzenlenebilir. TEDARİKÇİ
-                                            HESABINDA fiyat karttan gelir ve KİLİTLİDİR —
-                                            miktar değişince tutar orantılı ölçeklenir. */}
-                                        {rowDirect ? (
-                                            <td>
-                                                <span className="flex items-center gap-1">
-                                                    <input
-                                                        value={row.netPrice}
-                                                        onChange={(event) => patchRow(row.key, { netPrice: event.target.value })}
-                                                        inputMode="decimal"
-                                                        /* Hücre boşken İNDİRİMLİ fiyat (brüt × indirim
-                                                           çarpanı) soluk yazıyla görünür: kaydedilecek
-                                                           değer budur. Yazılan fiyat onun yerini alır. */
-                                                        placeholder={fmtMoney(figures.netUnitPrice)}
-                                                        className={`${CELL_INPUT_CLASS} text-right font-mono`}
-                                                    />
-                                                    {recallButton(row, rowChanged)}
-                                                </span>
-                                            </td>
-                                        ) : rowSupplier ? (
-                                            /* Sabit birim fiyat TAM DUYARLIKLA gösterilir:
-                                               2 haneye yuvarlanmış hâli satır tutarıyla
-                                               çelişir görünürdü (3 × 18.98 ≠ 56.93). */
-                                            <td title={t('inv.orders.calcMode.netFixed')}>
-                                                <span className="flex items-center justify-end gap-1 font-mono text-[13px] text-slate-700 dark:text-white/80">
-                                                    {row.netPrice.trim() ? fmtUnitPricePrecise(parseNum(row.netPrice) ?? 0) : '—'}
-                                                    {recallButton(row, rowChanged)}
-                                                </span>
-                                            </td>
-                                        ) : (
-                                            <td title={t('inv.orders.netPriceDerived')}>
-                                                <span className="flex items-center justify-end gap-1 font-mono text-[13px] text-slate-500 dark:text-white/60">
-                                                    {row.grossPrice.trim() ? fmtMoney(figures.netUnitPrice) : '—'}
-                                                    {recallButton(row, rowChanged)}
-                                                </span>
-                                            </td>
-                                        )}
-                                        {/* İndirim yüzdeleri: ana indirim + açık olan ek sütunlar.
-                                            Tedarikçi kipindeki SATIRDA indirim KİLİTLİDİR (fiyat sabittir). */}
-                                        <td>
-                                            <input
-                                                value={row.discount}
-                                                onChange={(event) => patchRow(row.key, { discount: event.target.value })}
-                                                inputMode="decimal"
-                                                placeholder="0"
-                                                disabled={rowSupplier}
-                                                title={rowSupplier ? t('inv.orders.calcMode.discountLocked') : undefined}
-                                                className={`${CELL_INPUT_CLASS} text-right font-mono disabled:cursor-not-allowed disabled:opacity-40`}
-                                            />
-                                        </td>
-                                        <td>
-                                            <input
-                                                value={row.discount2}
-                                                onChange={(event) => patchRow(row.key, { discount2: event.target.value })}
-                                                inputMode="decimal"
-                                                placeholder="0"
-                                                disabled={rowSupplier}
-                                                title={rowSupplier ? t('inv.orders.calcMode.discountLocked') : undefined}
-                                                className={`${CELL_INPUT_CLASS} text-right font-mono disabled:cursor-not-allowed disabled:opacity-40`}
-                                            />
-                                        </td>
-                                        {/* Satır tutarı NET'tir (indirimler uygulanmış); KDV
-                                            satırda GÖRÜNMEZ, genel toplamda bir kez uygulanır.
-                                            DOĞRUDAN GİRİŞTE hücre düzenlenebilir: boş
-                                            bırakılırsa miktar × net fiyat görünür (yazılan
-                                            değer asla ezilmez). */}
-                                        {rowDirect ? (
-                                            <td>
-                                                <input
-                                                    value={row.lineTotal}
-                                                    onChange={(event) => patchRow(row.key, { lineTotal: event.target.value })}
-                                                    inputMode="decimal"
-                                                    placeholder={fmtMoney(figures.lineTotal)}
-                                                    className={`${CELL_INPUT_CLASS} text-right font-mono`}
-                                                />
-                                            </td>
-                                        ) : (
-                                            <td className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">
-                                                {fmtMoney(figures.lineTotal)}
-                                            </td>
-                                        )}
-                                        {/* KİP GÖSTERGESİ (satırın sağında): BOŞ daire = satır
-                                            tabloyu izler; tıklandıkça boş → D → A → T → boş
-                                            döngüsüyle satıra ÖZGÜ kip seçilir — toplu ayar bu
-                                            satırı artık ETKİLEMEZ. Geri dönüşte eski (Excel'den
-                                            gelen) değerler stash'ten gelir. */}
+                                    <tr
+                                        key={row.key}
+                                        className={row.error
+                                            ? 'bg-red-50/60 dark:bg-red-500/10'
+                                            : (selected ? 'bg-[#272f67]/[0.05] dark:bg-white/[0.06]' : undefined)}
+                                    >
                                         <td className="text-center">
-                                            <button
-                                                type="button"
-                                                onClick={() => cycleRowCalcMode(row)}
-                                                title={row.modePinned
-                                                    ? `${t(`inv.orders.calcMode.${row.calcMode.toLowerCase()}`)} — ${t('inv.orders.calcMode.rowToggleHint')}`
-                                                    : t('inv.orders.calcMode.rowUnset')}
-                                                aria-label={t('inv.orders.calcMode.rowToggleHint')}
-                                                className={`inline-flex size-6 items-center justify-center rounded-full border text-[10px] font-bold transition-colors ${
-                                                    !row.modePinned
-                                                        ? 'border-dashed border-slate-300 text-transparent hover:border-[#1f2654] dark:border-white/25'
-                                                        : rowSupplier
-                                                            ? 'border-sky-300 text-sky-600 hover:bg-sky-50 dark:border-sky-500/40 dark:text-sky-300 dark:hover:bg-sky-500/10'
-                                                            : rowDirect
-                                                                ? 'border-slate-300 text-slate-500 hover:bg-slate-100 dark:border-white/25 dark:text-white/60 dark:hover:bg-white/10'
-                                                                : 'border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10'
-                                                }`}
-                                            >
-                                                {row.modePinned
-                                                    ? t(`inv.orders.calcMode.${row.calcMode.toLowerCase()}`).slice(0, 1).toUpperCase()
-                                                    : '·'}
-                                            </button>
+                                            <input
+                                                type="checkbox"
+                                                checked={selected}
+                                                onChange={() => toggleRowSelected(row.key)}
+                                                aria-label={t('inv.orders.rows.selectRow')}
+                                                className="size-3.5 cursor-pointer accent-[#272f67]"
+                                            />
                                         </td>
-                                            </>
-                                        )}
+                                        {columnOrder.map((id) => (
+                                            <td
+                                                key={id}
+                                                className={cellClassName(id, rowDirect, rowSupplier)}
+                                            >
+                                                {renderCell(id, row, figures, rowDirect, rowSupplier, rowChanged)}
+                                            </td>
+                                        ))}
                                         <td className="text-center">
                                             <button
                                                 type="button"
                                                 aria-label={t('inv.bulkProducts.removeRow')}
-                                                onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}
+                                                onClick={() => removeRows([row.key])}
                                                 className="flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/15"
                                             >
                                                 <Trash01 size={13} />
@@ -1747,37 +2399,82 @@ export const OrderCreatePage = () => {
                         </tbody>
                     </table>
                 </div>
-                {rows.length > 0 && (
-                    <div className="flex items-center justify-between border-t border-slate-200 px-3 py-2.5 dark:border-white/10">
-                        <button
-                            type="button"
-                            onClick={addRow}
-                            className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                        >
-                            <Plus size={12} />
-                            {t('inv.bulkProducts.addRow')}
-                        </button>
-                        <button
-                            type="button"
-                            disabled={saving || !canTransfer || !filledRows.length}
-                            title={canTransfer ? undefined : t('inv.stock.noPermission')}
-                            onClick={() => void save()}
-                            className="rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            {/* Kaydetme sırasında sunucu toplamları yeniden hesaplar —
-                                düğme de yanıp sönen noktalarla bunu gösterir. */}
-                            {/* TEK kaydet düğmesi — "değişiklikleri kaydet" diye ayrı
-                                bir düğme YOKTUR; kaydetmek siparişi TASLAK olarak
-                                saklar ve SAYFADAN ÇIKMAZ (kullanıcı isteği). */}
-                            {saving
-                                ? <LoadingDots label={t('common.loadingData')} />
-                                : priceless
-                                    ? t('inv.orders.savePriceRequest', { count: filledRows.length })
-                                    : t('inv.orders.saveDraft', { count: filledRows.length })}
-                        </button>
-                    </div>
-                )}
+                {/* ── DER FUSS DER TABELLE ─────────────────────────────────
+                    Vorgabe Samet (07.09.2026): «Unten links gehoert IMMER ein
+                    Plus hin; in der leeren Flaeche soll kein ‹Produkt
+                    hinzufuegen›-Knopf stehen.» Also steht er hier — auch bei
+                    leerer Tabelle, denn dort wird er am dringendsten gebraucht
+                    — und nur noch als Symbol. Die neue Zeile rechnet mit der
+                    aktiven Vorlage, wie zuvor. */}
+                <div className="ofi-ord-foot">
+                    <button
+                        type="button"
+                        onClick={addRow}
+                        className="ofi-ord-plus"
+                        title={t('inv.bulkProducts.addRow')}
+                        aria-label={t('inv.bulkProducts.addRow')}
+                    >
+                        <Plus size={18} />
+                    </button>
+                    {/* ── DER PAPIERKORB (Vorgabe Samet, 09.09.2026) ────────
+                        «Ein Papierkorb, um Zeilen zu löschen — auch mehrere auf
+                        einmal.» Sind Zeilen angekreuzt, wirft er GENAU DIESE
+                        weg und sagt daneben, wie viele. Ist nichts angekreuzt,
+                        leert er die ganze Liste — und fragt vorher, denn das
+                        ist die einzige der beiden Gesten, die man nicht
+                        gewollt haben kann. */}
+                    <button
+                        type="button"
+                        disabled={rows.length === 0}
+                        onClick={() => (selectedRows.size ? removeRows([...selectedRows]) : setClearAsk(true))}
+                        title={selectedRows.size
+                            ? t('inv.orders.rows.removeSelected', { count: selectedRows.size })
+                            : t('inv.orders.clearRows')}
+                        aria-label={selectedRows.size
+                            ? t('inv.orders.rows.removeSelected', { count: selectedRows.size })
+                            : t('inv.orders.clearRows')}
+                        className={`ofi-ord-bin${selectedRows.size ? ' is-armed' : ''}`}
+                    >
+                        <Trash01 size={16} />
+                        {selectedRows.size > 0 && <b>{selectedRows.size}</b>}
+                    </button>
+                    {/* Die Rückfrage steht IN der Leiste, nicht in einem
+                        Browserkasten — wie überall in diesem Ablauf. */}
+                    {clearAsk && (
+                        <span className="ofi-ord-ask">
+                            {t('inv.orders.clearRowsConfirm')}
+                            <button type="button" onClick={() => setClearAsk(false)}>{t('common.cancel')}</button>
+                            <button
+                                type="button"
+                                className="is-danger"
+                                onClick={() => { setRows([]); setSelectedRows(new Set()); setClearAsk(false); }}
+                            >
+                                {t('common.confirm')}
+                            </button>
+                        </span>
+                    )}
+                    <span className="ofi-ord-spacer" />
+                    <button
+                        type="button"
+                        disabled={saving || !canTransfer || !filledRows.length}
+                        title={canTransfer ? undefined : t('inv.stock.noPermission')}
+                        onClick={() => void save()}
+                        className="ofi-ord-done"
+                    >
+                        {/* Kaydetme sırasında sunucu toplamları yeniden hesaplar —
+                            düğme de yanıp sönen noktalarla bunu gösterir. */}
+                        {/* TEK kaydet düğmesi — "değişiklikleri kaydet" diye ayrı
+                            bir düğme YOKTUR; kaydetmek siparişi TASLAK olarak
+                            saklar ve SAYFADAN ÇIKMAZ (kullanıcı isteği). */}
+                        {saving
+                            ? <LoadingDots label={t('common.loadingData')} />
+                            : priceless
+                                ? t('inv.orders.savePriceRequest', { count: filledRows.length })
+                                : t('inv.orders.saveDraft', { count: filledRows.length })}
+                    </button>
+                </div>
             </SectionCard>
+            </div>
 
             <ArticlePickerModal
                 open={allPickerRowKey !== null}
@@ -1785,287 +2482,21 @@ export const OrderCreatePage = () => {
                 onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
                 title={kindLabels.allTitle}
             />
-            {/* Sipariş detayları penceresi — alttan yükselen sheet. Tüm alanlar
-                opsiyoneldir; sipariş kodu boş bırakılırsa sunucu üretir. */}
-            <BottomSheet
-                open={detailsOpen}
-                onClose={() => setDetailsOpen(false)}
-                title={t('inv.orders.detailsTitle')}
-                subtitle={t('inv.orders.detailsHint')}
-                width={720}
-                height={620}
-                footer={(
-                    <>
-                        <span className="text-[11.5px] text-slate-400 dark:text-white/50">{t('inv.orders.detailsHint')}</span>
-                        <button
-                            type="button"
-                            onClick={() => setDetailsOpen(false)}
-                            className="rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
-                        >
-                            {t('common.done')}
-                        </button>
-                    </>
-                )}
-            >
-                <div className="grid gap-3.5 p-4 sm:grid-cols-2">
-                    <label className="flex flex-col gap-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t('inv.orders.columns.reference')}
-                        <input
-                            value={reference}
-                            onChange={(event) => setReference(event.target.value)}
-                            placeholder={t('inv.orders.referencePlaceholder')}
-                            className={`${HEADER_INPUT_CLASS} font-mono`}
-                        />
-                    </label>
-                    {/* "Besteller": siparişi veren kişi — kullanıcının tam adıyla dolar. */}
-                    <label className="flex flex-col gap-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t('inv.orders.columns.orderedBy')}
-                        <input
-                            value={orderedByName}
-                            onChange={(event) => setOrderedByName(event.target.value)}
-                            placeholder={t('inv.orders.columns.orderedBy')}
-                            className={HEADER_INPUT_CLASS}
-                        />
-                    </label>
-                    {/* ALICI ADI — opsiyonel. Girilirse PDF'in alıcı bloğunda
-                        tedarikçi adının altında küçük bir satır olarak çıkar. */}
-                    <label className="flex flex-col gap-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t('inv.orders.columns.recipientName')}
-                        <input
-                            value={recipientName}
-                            onChange={(event) => setRecipientName(event.target.value)}
-                            placeholder={t('inv.orders.recipientPlaceholder')}
-                            maxLength={120}
-                            className={HEADER_INPUT_CLASS}
-                        />
-                    </label>
-                    <label className="flex flex-col gap-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t('inv.orders.columns.project')}
-                        <input
-                            value={projectName}
-                            onChange={(event) => setProjectName(event.target.value)}
-                            placeholder={t('inv.orders.projectPlaceholder')}
-                            className={HEADER_INPUT_CLASS}
-                        />
-                    </label>
-                    <label className="flex flex-col gap-1 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                        {t('inv.orders.columns.quoteNumber')}
-                        <input
-                            value={quoteNumber}
-                            onChange={(event) => setQuoteNumber(event.target.value)}
-                            placeholder={t('inv.orders.quotePlaceholder')}
-                            className={`${HEADER_INPUT_CLASS} font-mono`}
-                        />
-                    </label>
-                </div>
+            {/* ── DIE BESTELLDETAILS — EINE KISTE ─────────────────────────────
+                Vorgabe Samet (07.09.2026): «Zusatzkosten gehören unter die
+                Bestelldetails, und dort steht nur ein Stift. Da klickt man
+                drauf — der viele einzelne Text kann weg. Eine einfache Kiste
+                im Apple-Stil, und alles liegt darin.»
 
-                {/* ÖN YAZI (ANSCHREIBEN) — PDF'in ilk sayfasında pozisyonlardan
-                    ÖNCE basılan hitap + giriş metni. Alan BOŞ bırakılırsa belgenin
-                    kendi standart metni basılır (yer tutucuda görünen metin);
-                    yazılan metin onun yerine geçer. Sağdaki "Taslaklar" düğmesi
-                    tenant genelindeki kayıtlı metinleri açar. */}
-                <div className="border-t border-slate-200 px-4 pb-4 pt-3.5 dark:border-white/10">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 flex-col">
-                            <span className="text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                                {t('inv.orders.coverLetter.title')}
-                            </span>
-                            <span className="text-[11px] text-slate-400 dark:text-white/40">
-                                {t('inv.orders.coverLetter.hint')}
-                            </span>
-                        </div>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                            {/* Standart metne dönüş = alanı boşaltmak. */}
-                            <button
-                                type="button"
-                                disabled={!coverLetter.trim()}
-                                onClick={() => setCoverLetter('')}
-                                title={t('inv.orders.coverLetter.resetDefault')}
-                                aria-label={t('inv.orders.coverLetter.resetDefault')}
-                                className="flex size-9 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/60 dark:hover:text-white"
-                            >
-                                <RefreshCcw01 size={14} />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => { setDraftError(null); setDraftsOpen(true); }}
-                                className="flex h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
-                            >
-                                <File05 size={13} />
-                                {t('inv.orders.coverLetter.draftsButton')}
-                            </button>
-                        </span>
-                    </div>
-                    <textarea
-                        value={coverLetter}
-                        onChange={(event) => setCoverLetter(event.target.value)}
-                        rows={7}
-                        placeholder={t('inv.orders.coverLetter.defaultText')}
-                        className={`mt-2.5 ${TEXTAREA_CLASS}`}
-                    />
-                </div>
+                Also liegt hier ALLES, was vorher auf zwei Fenster und drei
+                Knöpfe verteilt war: die Angaben der Bestellung, die
+                Zusatzkosten, die Mehrwertsteuer und das Anschreiben — jede
+                Sache in ihrer eigenen weissen Kiste auf grauem Grund, mit
+                eingerückten Haarlinien dazwischen. Keine Hinweiszeilen mehr:
+                was ein Feld will, sagt sein Platzhalter.
 
-                {/* KDV — SİPARİŞ DÜZEYİNDE TEK ORAN (kullanıcı isteği 2026-08-02).
-                    Aynı oran bütün ürünlere uygulandığı için tabloda sütunu yoktur:
-                    ülke listeden seçilir (listeye yeni ülke + oran eklenebilir) ve
-                    oran, satır toplamı + ek ücretler üzerinden hesaplanır.
-                    Fiyat talebinde tutar olmadığı için bu bölüm gizlenir. */}
-                {!priceless && (
-                    <div className="border-t border-slate-200 px-4 pb-4 pt-3.5 dark:border-white/10">
-                        <div className="flex flex-col">
-                            <span className="text-[11.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/50">
-                                {t('inv.orders.columns.vat')}
-                            </span>
-                            <span className="text-[11px] text-slate-400 dark:text-white/40">{t('inv.orders.vatSheet.hint')}</span>
-                        </div>
-                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                            <select
-                                value={orderVatCountry}
-                                onChange={(event) => {
-                                    setOrderVatCountry(event.target.value);
-                                    const entry = vatCountryList.find((candidate) => candidate.label === event.target.value);
-                                    if (entry?.rates.length) setOrderVatRate(String(entry.rates[0]));
-                                }}
-                                className={`${INPUT_BASE_CLASS} w-48`}
-                            >
-                                {/* Kayıtlı ülke listede yoksa (silinmiş özel ülke) yine seçili görünür. */}
-                                {!vatCountryList.some((entry) => entry.label === orderVatCountry) && orderVatCountry && (
-                                    <option value={orderVatCountry}>{orderVatCountry}</option>
-                                )}
-                                {vatCountryList.map((entry) => (
-                                    <option key={`${entry.code}-${entry.label}`} value={entry.label}>{entry.label}</option>
-                                ))}
-                            </select>
-                            {(vatCountryList.find((entry) => entry.label === orderVatCountry)?.rates ?? []).map((rate) => (
-                                <button
-                                    key={rate}
-                                    type="button"
-                                    onClick={() => setOrderVatRate(String(rate))}
-                                    className={`rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors ${
-                                        (parseNum(orderVatRate) ?? 0) === rate
-                                            ? 'bg-[#272f67] text-white'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15'
-                                    }`}
-                                >
-                                    {fmtPercent(rate)}
-                                </button>
-                            ))}
-                            <input
-                                value={orderVatRate}
-                                onChange={(event) => setOrderVatRate(event.target.value)}
-                                inputMode="decimal"
-                                aria-label={t('inv.orders.vatColumn.custom')}
-                                className={`${INPUT_BASE_CLASS} w-20 text-right font-mono`}
-                            />
-                            <span className="text-[12px] text-slate-400 dark:text-white/50">%</span>
-                        </div>
-                        {/* Listeye yeni ülke + oran ekleme (tarayıcıda saklanır). */}
-                        <div className="mt-2.5 flex items-center gap-2">
-                            <input
-                                value={customVatLabel}
-                                onChange={(event) => setCustomVatLabel(event.target.value)}
-                                placeholder={t('inv.orders.vatSheet.customCountry')}
-                                className={`${INPUT_BASE_CLASS} min-w-0 flex-1`}
-                            />
-                            <input
-                                value={customVatRate}
-                                onChange={(event) => setCustomVatRate(event.target.value)}
-                                inputMode="decimal"
-                                placeholder="%"
-                                className={`${INPUT_BASE_CLASS} w-20 shrink-0 text-right font-mono`}
-                            />
-                            <button
-                                type="button"
-                                disabled={!customVatLabel.trim()}
-                                onClick={addCustomVatCountry}
-                                title={t('inv.orders.vatSheet.addToList')}
-                                aria-label={t('inv.orders.vatSheet.addToList')}
-                                className="flex size-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/60 dark:hover:text-white"
-                            >
-                                <Plus size={14} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-            </BottomSheet>
-
-            {/* ── EK ÜCRETLER — KENDİ PENCERESİ ───────────────────────────────
-                Nakliye, ambalaj, montaj… Her satır ad + tutar taşır; tutarlar KDV
-                MATRAHINA girer (satır toplamı + ücretler). Adı boş bırakılan tutar
-                kaydedilmez (`save` uyarır). Sipariş detaylarının yanındaki kendi
-                düğmesiyle açılır (kullanıcı isteği 2026-08-02). */}
-            <BottomSheet
-                open={feesOpen}
-                onClose={() => setFeesOpen(false)}
-                title={t('inv.orders.fees.title')}
-                subtitle={t('inv.orders.fees.hint')}
-                width={620}
-                height={520}
-                footer={(
-                    <>
-                        <span className="font-mono text-[12.5px] font-semibold text-slate-700 dark:text-white/80">
-                            {filledFees.length > 0 ? fmtMoney(feesTotal) : ''}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => setFeesOpen(false)}
-                            className="rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
-                        >
-                            {t('common.done')}
-                        </button>
-                    </>
-                )}
-            >
-                <div className="px-4 pb-4 pt-3.5">
-                    <div className="flex flex-col gap-2">
-                        {fees.length === 0 && (
-                            <span className="text-[12px] text-slate-400 dark:text-white/50">{t('inv.orders.fees.empty')}</span>
-                        )}
-                        {fees.map((fee) => (
-                            <div key={fee.key} className="flex items-center gap-2">
-                                <input
-                                    value={fee.name}
-                                    onChange={(event) => patchFee(fee.key, { name: event.target.value })}
-                                    placeholder={t('inv.orders.fees.namePlaceholder')}
-                                    className={`${FEE_INPUT_CLASS} min-w-0 flex-1 ${feeError && !fee.name.trim() ? '!border-red-400' : ''}`}
-                                />
-                                <input
-                                    value={fee.amount}
-                                    onChange={(event) => patchFee(fee.key, { amount: event.target.value })}
-                                    inputMode="decimal"
-                                    placeholder="0.00"
-                                    aria-label={t('inv.orders.fees.amountLabel')}
-                                    className={`${FEE_INPUT_CLASS} w-32 shrink-0 text-right font-mono`}
-                                />
-                                <button
-                                    type="button"
-                                    aria-label={t('inv.orders.fees.removeRow')}
-                                    title={t('inv.orders.fees.removeRow')}
-                                    onClick={() => removeFee(fee.key)}
-                                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/15"
-                                >
-                                    <Trash01 size={13} />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-
-                    {feeError && (
-                        <span className="mt-1.5 block text-[11px] font-semibold text-red-500">{feeError}</span>
-                    )}
-
-                    <button
-                        type="button"
-                        onClick={addFee}
-                        className="mt-2.5 flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
-                    >
-                        <Plus size={12} />
-                        {t('inv.orders.fees.addButton')}
-                    </button>
-                </div>
-            </BottomSheet>
-
+                Nichts davon ist Pflicht; bleibt die Bestellnummer leer, vergibt
+                der Server BE-{Jahr}-{Reihe}. */}
             {/* ── ÖN YAZI TASLAKLARI ──────────────────────────────────────────
                 Tenant genelinde paylaşılan metin şablonları: ekrandaki ön yazı
                 başlıkla birlikte kaydedilir, listedeki bir taslağa tıklamak onu
@@ -2078,7 +2509,9 @@ export const OrderCreatePage = () => {
                 subtitle={t('inv.orders.coverLetter.draftsHint')}
                 width={640}
                 height={600}
-                zIndex={90}
+                /* ÜBER der Detailkarte (`.ofi-ord-scrim`, z-index 820) — von dort
+                   wird dieses Blatt geöffnet. */
+                zIndex={860}
                 footer={(
                     <>
                         <span className="text-[11.5px] text-slate-400 dark:text-white/50">
@@ -2175,44 +2608,75 @@ export const OrderCreatePage = () => {
                 </div>
             </BottomSheet>
 
-            {/* Aşama eylemlerinin onayı — sipariş popup'ındaki pencerenin aynısı:
-                dönüştür (talep kapanır) / onayla (sipariş resmîleşir, kilitlenir).
-                Pencere onayla birlikte kapanır; kaydetme göstergesi başlıktaki
-                düğmenin kendisindedir. */}
-            <ConfirmDialog
-                open={stageConfirm !== null}
-                title={t(stageConfirm === 'confirm'
-                    ? 'inv.orders.actions.confirmOrder'
-                    : stageConfirm === 'revoke'
-                        ? 'inv.orders.actions.revokeApproval'
-                        : 'inv.orders.actions.convertToOrder')}
-                message={t(stageConfirm === 'confirm'
-                    ? 'inv.orders.confirmOrderConfirm'
-                    : stageConfirm === 'revoke'
-                        ? 'inv.orders.revokeRequestConfirm'
-                        : 'inv.orders.convertConfirm')}
-                onConfirm={() => {
-                    const kind = stageConfirm;
-                    setStageConfirm(null);
-                    // GERİ ALMA kaydetmez: yalnızca durumu geri alır (kaydedilmemiş
-                    // düzenlemeler tabloda durur, kullanıcı isterse kaydeder).
-                    if (kind === 'revoke') { void revokeToPriceRequest(); return; }
-                    void save(kind === 'confirm' ? { confirm: true } : { convert: true });
-                }}
-                onCancel={() => setStageConfirm(null)}
+            {/* ── BELEG IMPORTIEREN (07.09.2026) ─────────────────────────────
+                Das Fenster rechnet nichts und speichert nichts: es ordnet die
+                gelesenen Angaben nach der AKTIVEN VORLAGE zu und gibt die
+                Zeilen an `applyAiRows` zurück. Gerechnet wird danach in der
+                Tabelle, gespeichert mit demselben Knopf wie immer. */}
+            <SupplierImportDialog
+                open={aiOpen}
+                onClose={() => setAiOpen(false)}
+                config={aiConfig}
+                template={activeTemplate}
+                onApply={applyAiRows}
+                calcMode={calcMode}
+                priceless={priceless}
             />
 
-            {/* Sütun ayar pencereleri — başlıklara (altı çizili) tıklanınca açılır. */}
-            <ExcelImportSheet
-                open={excelOpen}
-                onClose={() => setExcelOpen(false)}
-                title={t(priceless ? 'inv.orders.excelTitlePriceRequest' : 'inv.orders.excelTitle')}
-                // Varsayılan kip doğrudan girişken tablonun HER sütunu eşlenebilir
-                // (net fiyat + satır tutarı da listeye girer); fiyat talebinde
-                // yalnızca kimlik + miktar sütunları sunulur.
-                fields={importFields(calcMode === 'DIRECT', priceless)}
-                onCommit={(records) => void applyImport(records)}
+            {/* ── BERECHNUNG ─────────────────────────────────────────────────
+                Drei Möglichkeiten; die Wahl legt sie auf ALLE Zeilen und färbt
+                die Tabelle, solange gerechnet wird. */}
+            <CalcModePopup
+                open={calcPopupOpen}
+                onClose={() => setCalcPopupOpen(false)}
+                mode={calcMode}
+                onPick={(next) => changeCalcMode(next as CalcMode)}
+                config={aiConfig}
+                templateTitle={activeTemplate ? activeTemplate.title : t('inv.aiImport.templateFallback')}
             />
+
+            {/* ── MEINE VORLAGEN ─────────────────────────────────────────────
+                Der EINE Ort, an dem Schlüsselzuordnung, Berechnungsart,
+                Rabatte, Mengenstaffel und Steuersatz eingestellt werden. Nach
+                dem Speichern lädt die Seite ihre aktive Vorlage neu — sonst
+                zeigte der Rechenknopf noch die alte Einstellung. */}
+            <TemplateManagerPopup
+                open={templatesOpen}
+                onClose={() => { setTemplatesOpen(false); setOpenTemplateId(null); }}
+                openTemplateId={openTemplateId}
+                initialSupplier={{ id: supplier.id, name: supplier.name }}
+                /* Das Ziel entscheidet, welche festen Felder die Vorlage zeigt:
+                   in einer Preisanfrage sind es genau drei (Vorgabe Samet,
+                   08.09.2026), in einer Bestellung acht. */
+                priceless={priceless}
+                /* Eine gespeicherte Vorlage gilt SOFORT: `activeTemplateId`
+                   schaltet sie scharf, der Zähler lädt sie neu. Ohne das erste
+                   blieb eine frisch angelegte Vorlage wirkungslos, bis jemand
+                   sie im Menü noch einmal von Hand auswählte. */
+                onSaved={(templateId) => {
+                    if (templateId) {
+                        setActiveTemplateId(templateId);
+                        selectPreferredTemplate(templateDocumentType, templateId);
+                    }
+                    setTemplateTick2((tick) => tick + 1);
+                }}
+            />
+            {drawnCheck.node}
+
+            {/* ── DIE SPALTENLISTE ───────────────────────────────────────────
+                Eine Liste für ALLE Spalten — feste Felder und eigene Angaben
+                der Vorlage. Oben = links. Sie ändert nur die Ansicht dieser
+                Maske; das PDF folgt weiterhin der Vorlage. */}
+            <ColumnOrderPopup
+                open={columnOrderOpen}
+                order={columnOrder}
+                labelOf={columnLabel}
+                isExtra={(id) => extraByKey.has(id)}
+                onChange={changeColumnOrder}
+                onReset={resetColumnOrder}
+                onClose={() => setColumnOrderOpen(false)}
+            />
+
             <SupplierPickerModal
                 open={supplierPickerOpen}
                 onClose={() => setSupplierPickerOpen(false)}

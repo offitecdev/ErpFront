@@ -71,8 +71,21 @@
        umgebogen, und ein Knopf soll nicht mitwachsen, nur weil er zufällig in
        einem Bereich sitzt, der seine Felder höher stellt. Der Bezug steht
        dafür AUF BEIDEN SEITEN im Kommentar — wer eines ändert, ändert beides. */
-    --ofi-btn-height: 40px;
-    --ofi-btn-padding-x: 16px;
+    /* 09.09.2026, Samet: «Butonlar çok küçük, biraz büyüsün» — 40 → 44px,
+       14 → 15px, 16 → 18px seitlich. index.css (`--ofi-control-height`) und
+       controls.css (`--ofi-ctl-h`) stehen auf demselben 44. */
+    --ofi-btn-height: 44px;
+    /* 09.09.2026, zweiter Durchgang Samet: «yeni müşteri butonu daha büyük
+       olacak» — die HAUPTaktion einer Seite (`.ofi-btn-ios`) waechst noch
+       einmal ueber den Bedienstandard hinaus: 52px statt 48px, 17px Schrift,
+       26px seitlich. Der gewoehnliche Knopf bleibt auf 44px, damit er neben
+       Suche und Filter (`--ofi-ctl-h`) weiter auf derselben Linie steht. */
+    --ofi-btn-ios-height: 52px;
+    /* Die Hausfarbe als Zahl an EINER Stelle — sie steht wortgleich in
+       index.css (`#272f67`) und in controls.css (`--ofi-ctl-border`). */
+    --ofi-ios-navy: #272f67;
+    --ofi-ios-navy-hover: #1f2654;
+    --ofi-btn-padding-x: 18px;
     /* Bewusst knapp: senkrecht mittig sitzt die Beschriftung über
        `align-items: center`, die Polsterung ist nur die Reserve für
        zweizeilige Beschriftungen. Knapp gehalten, damit Rahmen + Polsterung +
@@ -80,7 +93,7 @@
        `min-height` nichts mehr zu klemmen und der Knopf wächst über 40px
        hinaus (mit einer 4px-Kante gemessen: 41px statt 40px). */
     --ofi-btn-padding-y: 2px;
-    --ofi-btn-font-size: 14px;
+    --ofi-btn-font-size: 15px;
 
     /* Die Kante bleibt 1px. Die 4px aus der Vorgabe vom 01.09.2026 waren der
        RADIUS, nicht die Rahmenbreite — siehe `--ofi-btn-radius`. Die Breite
@@ -100,7 +113,9 @@
        Sonst müsste jede Ausnahme (die Pillen der Offertenseite etwa) ihren
        Radius an ZWEI Stellen setzen — und die Fläche bekäme beim Vergessen
        eckige Ecken auf einem runden Knopf. */
-    --ofi-btn-radius: 4px;
+    /* 09.09.2026, Samet: «Butonlar iOS şeklinde olsun» — 4 → 12px, die
+       Ecke eines iOS-Knopfes (die 4px vom 01.09.2026 sind damit abgelöst). */
+    --ofi-btn-radius: 12px;
 
     /* Der Farbwechsel — Zeit und Kurve sind ABGESCHRIEBEN, nicht erfunden.
 
@@ -1201,5 +1216,92 @@ body > :not(#root) [data-dragging]:active {
     .ofi-pop.is-list *
 )) {
         border-radius: var(--ofi-btn-radius) !important;
+    }
+}
+
+
+/* ═══════════════════════════════════════
+   DER GROSSE iOS-KNOPF (`.ofi-btn-ios`, 09.09.2026)
+
+   Vorgabe Samet: «Müşteri listesindeki butonlar ve müşteri detayındaki sil
+   butonu büyük, iOS tipinde ve lacivert olsun.» Die Hauptaktion einer Seite
+   (Neuer Kunde, Löschen auf der Kundenkarte) trägt zusätzlich diese Klasse
+   und wächst über den Bedienstandard hinaus: 52px hoch (09.09.2026, zweiter
+   Durchgang: «daha büyük olacak» — vorher 48px), 17px halbfett, 26px
+   seitlich — das Mass eines iOS-«prominent» Knopfes. Die Farbe steht hier
+   selbst und nicht nur in `.ofi-btn-brand`/`.ant-btn-primary`: ein roher
+   `<button>` mit eigenen Tailwind-Farben soll trotzdem Marine sein. Die Ecke
+   kommt aus `--ofi-btn-radius`. `!important`, weil index.css Höhe und Schrift
+   der AntD-Knöpfe selbst mit `!important` festnagelt.
+   ═══════════════════════════════════════ */
+/* Die beiden `:not()` sind KEIN Beiwerk, sie sind der Grund, warum die Regel
+   überhaupt greift. index.css nagelt das Bedienmass mit
+
+     #root :where(.ant-btn, …):not(.ant-btn-link):not(.ant-btn-text)
+
+   fest — `:where()` zählt null, die beiden `:not()` zählen aber je eine
+   Klasse: (1 ID, 2 Klassen), und ein schlichtes `#root .ofi-btn-ios`
+   (1 ID, 1 Klasse) verliert dagegen TROTZ `!important`. Genau daran ist die
+   Fassung vom Vormittag gescheitert: der Knopf trug die Klasse, blieb aber
+   auf 44px und 14px stehen. Mit den beiden Ausstiegen im Selektor steht die
+   Regel auf (1 ID, 3 Klassen) und gewinnt — und die Ausstiege sind dieselben,
+   die in der Kopfnotiz dieser Datei ohnehin stehen. */
+#root .ofi-btn-ios:not(.ofi-nosize):not(.ofi-btn-plain),
+body > :not(#root) .ofi-btn-ios:not(.ofi-nosize):not(.ofi-btn-plain) {
+    height: var(--ofi-btn-ios-height) !important;
+    min-height: var(--ofi-btn-ios-height) !important;
+    padding-inline: 26px !important;
+    font-size: 17px !important;
+    font-weight: 600 !important;
+    gap: 10px;
+    border-radius: var(--ofi-btn-radius) !important;
+}
+#root .ofi-btn-ios:not(.ofi-nosize) svg,
+body > :not(#root) .ofi-btn-ios:not(.ofi-nosize) svg {
+    width: 20px !important;
+    height: 20px !important;
+}
+/* Marine, auch wenn der Knopf ein roher `<button>` mit eigenen
+   Tailwind-Farben ist: die Hauptaktion einer Seite ist IMMER die Hausfarbe.
+   Ein `.ofi-btn-ios`, der ausdruecklich weiss/rot sein soll, traegt dafuer
+   `.ofi-btn-ios-plain` (der Schliessen-Zustand der Kundenliste) bzw.
+   `.ofi-btn-danger` (Loeschen). */
+#root button.ofi-btn-ios.ofi-btn-brand:not(.ofi-btn-danger):not(.ofi-btn-ios-plain),
+body > :not(#root) button.ofi-btn-ios.ofi-btn-brand:not(.ofi-btn-danger):not(.ofi-btn-ios-plain) {
+    border: 0 !important;
+    background-color: var(--ofi-ios-navy) !important;
+    color: #ffffff !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+}
+#root button.ofi-btn-ios.ofi-btn-brand:not(.ofi-btn-danger):not(.ofi-btn-ios-plain):hover,
+body > :not(#root) button.ofi-btn-ios.ofi-btn-brand:not(.ofi-btn-danger):not(.ofi-btn-ios-plain):hover {
+    background-color: var(--ofi-ios-navy-hover) !important;
+}
+/* Der Gegenzustand desselben Knopfes («Schliessen»): weiss, aber mit
+   derselben KANTE wie Suche und Filter — 2px Marine. So bleibt die
+   Hauptaktion auch dann sichtbar, wenn sie gerade nicht gefuellt ist. */
+#root .ofi-btn-ios.ofi-btn-ios-plain,
+body > :not(#root) .ofi-btn-ios.ofi-btn-ios-plain {
+    border: 2px solid var(--ofi-ios-navy) !important;
+    background-color: #ffffff !important;
+    color: var(--ofi-ios-navy) !important;
+}
+#root .ofi-btn-ios.ofi-btn-ios-plain:hover,
+body > :not(#root) .ofi-btn-ios.ofi-btn-ios-plain:hover {
+    background-color: rgba(39, 47, 103, 0.08) !important;
+}
+.dark #root .ofi-btn-ios.ofi-btn-ios-plain,
+.dark .ofi-btn-ios.ofi-btn-ios-plain {
+    border-color: rgba(255, 246, 232, 0.28) !important;
+    background-color: transparent !important;
+    color: #f4f1ec !important;
+}
+@media (max-width: 640px) {
+    #root .ofi-btn-ios:not(.ofi-nosize):not(.ofi-btn-plain),
+    body > :not(#root) .ofi-btn-ios:not(.ofi-nosize):not(.ofi-btn-plain) {
+        height: 48px !important;
+        min-height: 48px !important;
+        padding-inline: 20px !important;
+        font-size: 16px !important;
     }
 }

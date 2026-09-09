@@ -217,6 +217,9 @@ const MENU_SECTIONS: MenuSection[] = [
             // OSP (04.09.2026): Offertanfragen der Offitec Selection Platform.
             { key: '/sales/osp', label: 'nav.salesOsp', permission: 'tenders.view' },
             { key: '/sales/orders', label: 'nav.myOrders', permission: 'crm.customers.view' },
+            // Zusatzaufträge / Nachträge (05.09.2026): alle NT-Belege in einer
+            // Liste, neben den Aufträgen — jeder mit eigenem PDF.
+            { key: '/sales/addon-orders', label: 'nav.addonOrders', permission: 'crm.customers.view' },
             // Rechnungen (30.08.2026): ALLE Rechnungen an einer Stelle —
             // Projektauftrag, Lieferauftrag und die selbst ausgefüllte
             // Direktrechnung. Sie stehen neben Angebot und Auftrag, weil sie das
@@ -1014,10 +1017,10 @@ const MainLayoutInner: React.FC = () => {
             // fixed app header (h-16). In split view pages run inside iframes, so a
             // fixed bar stays confined to its own pane; the pane shell publishes
             // inset 0 and no header offset (see TenderDetailHeader).
-            // The shell carries the same #f6f8fb canvas as the content column, so
-            // header + sidebar + page read as one continuous surface and only the
-            // page's own white cards lift off it. (dark.css maps #f6f8fb to the
-            // dark page background, so the same holds there.)
+            // Hell ist die Leinwand seit 09.09.2026 WEISS (refine.css zieht die
+            // Klasse `bg-[#f6f8fb]` dort auf #fff; der Klassenname bleibt, weil
+            // dark.css an ihm den Dunkelgrund festmacht). Kopf und Leiste
+            // trennen sich von der Seite durch ihren Schatten, nicht durch Ton.
             className={`min-h-screen font-sans text-[#1D1D1F] lg:flex lg:h-screen [--app-shell-inset:0px] [--app-header-height:4rem] ${hideSidebar ? 'bg-white dark:bg-[#0f1114]' : 'bg-[#f6f8fb]'} ${hideMenuRail || useNativeTouchDrawer ? 'lg:[--app-shell-inset:0px]' : 'lg:[--app-shell-inset:84px]'}`}
         >
             {/* ── Sidebar (Evernote-style rail: hover-peek, flyout side-tabs, no footer) ── */}
@@ -1084,8 +1087,8 @@ const MainLayoutInner: React.FC = () => {
             {/* ── Ana İçerik ── */}
             <div className="flex min-w-0 flex-1 flex-col pt-16">
 
-                {/* Header — the top slice of the shell. Same canvas colour as the
-                    rail and the content column, so the three meet without a seam.
+                {/* Header — the top slice of the shell. Weiss wie die Seite; die
+                    Kante ist der Schatten nach unten (`.ofi-topbar`, refine.css).
                     Montage keeps its own white shell. */}
                 <header data-tour="topbar" className={`ofi-topbar fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between pl-2 pr-3 sm:pr-5 ofi-shell-white ${hideMenuRail || useNativeTouchDrawer ? '' : 'lg:left-[84px]'}`}>
                     <WorkspaceTabsProvider userId={user?.id}>
@@ -1320,7 +1323,7 @@ const MainLayoutInner: React.FC = () => {
                         style={isSplit && !isMobile ? { width: `${splitRatio}%` } : undefined}
                         className={`${isSplit && !isMobile
                             ? `min-w-0 flex-1 overflow-hidden lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70 ${isResizingPanes ? 'pointer-events-none select-none' : ''}`
-                            : 'flex-1 overflow-auto px-[var(--page-gutter)] py-[var(--page-pad-y)] [scrollbar-gutter:stable] [--page-gutter:1rem] [--page-pad-y:1.25rem] sm:[--page-gutter:1.5rem] lg:[--page-gutter:2rem] lg:[--page-pad-y:1.5rem]'}`}
+                            : 'flex-1 overflow-auto px-[var(--page-gutter)] py-[var(--page-pad-y)] [scrollbar-gutter:stable] [--page-gutter:0.75rem] [--page-pad-y:1.25rem] sm:[--page-gutter:1.25rem] lg:[--page-gutter:1.25rem] lg:[--page-pad-y:1.5rem]'}`}
                     >
                         {isSplit && !isMobile ? (
                             <PrimaryPane

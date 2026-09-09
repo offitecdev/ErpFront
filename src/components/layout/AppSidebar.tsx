@@ -62,12 +62,11 @@ const ICON_IDLE = 'text-[#272f67] dark:text-[#e6cf9e]/85';
 const ICON_ACTIVE = 'text-[#272f67] dark:text-[#e6cf9e]';
 const PANEL_BG = 'bg-[#FBFBFA] dark:bg-[#151616]';
 
-/* Desktop rail module button (large icon + caption). */
-const RAIL_BTN_IDLE = 'text-black/75 hover:bg-black/4 hover:text-[#1f2654] dark:text-white/75 dark:hover:bg-white/6 dark:hover:text-white';
-/* Seit die Leiste WEISS ist (Vorgabe 28.08.2026), kann der gewählte Modul
-   nicht mehr als weisser Chip aus ihr heraustreten — er trägt denselben
-   blauen Auswahlton, den die Kopfleiste für ihre Knöpfe benutzt. */
-const RAIL_BTN_ACTIVE = 'bg-[#d3e3fd] text-[#1f2654] dark:!bg-white/10 dark:text-[#e6cf9e] dark:shadow-none';
+/* Desktop rail module button — seit 09.09.2026 eine iPadOS-Kachel: das
+   Zeichen sitzt in einem 56px-Quadrat mit 16px-Ecke, die Beschriftung
+   darunter. Zustände (Ruhe, Hover-Füllung, Marine für das gewählte Modul)
+   stehen in styles/refine.css unter `.ofi-rail-item`, hell wie dunkel. */
+const RAIL_ITEM = 'ofi-rail-item flex w-full flex-col items-center gap-1 px-1 py-1.5 text-center';
 
 type AppSidebarProps = {
     /** Pre-filtered by MainLayout: company-category / personal module package
@@ -386,14 +385,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 
     return (
         <>
-            {/* The rail — full-height slice of the shell, on the same canvas
-                colour as the header and the content column. */}
+            {/* The rail — full-height slice of the shell. Seit 09.09.2026 ist
+                die Seite darunter weiss wie die Leiste selbst; die Trennung
+                ist der Schatten nach rechts (`.ofi-rail`, styles/refine.css). */}
             <aside
                 ref={asideRef}
                 {...hoverProps}
                 /* `ofi-fade`: die Leiste blendet beim Start einmal ein — der
                    ruhige Auftakt der Anmeldeseite, weitergetragen. */
-                className="ofi-fade ofi-shell-white hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[84px] lg:flex-col"
+                className="ofi-fade ofi-shell-white ofi-rail hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[84px] lg:flex-col"
             >
                 {/* Brand icon — same height as the header so the card corner is
                     seamless. Das Zeichen bleibt das Zeichen (Vorgabe 28.08.2026):
@@ -442,12 +442,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                     }}
                                     onMouseEnter={() => { if (touchInputRef.current) return; if (!isSingle) scheduleOpen(section.key); else cancelOpen(); }}
                                     onMouseLeave={cancelOpen}
-                                    className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
+                                    className={`${RAIL_ITEM}${active ? ' is-active' : ''}`}
                                 >
-                                    <Icon size={23} className="shrink-0" />
+                                    <span className="ofi-rail-item__tile" aria-hidden="true">
+                                        <Icon size={24} className="shrink-0" />
+                                    </span>
                                     {/* Nicht 14px: die Beschriftung sitzt in einer 84px breiten
                                         Leiste, dort schneidet schon „Buchhaltung“ bei 12px an. */}
-                                    <span className="w-full truncate text-[12px] font-semibold leading-tight">{t(section.label)}</span>
+                                    <span className="ofi-rail-item__label w-full truncate text-[11.5px] font-semibold leading-tight">{t(section.label)}</span>
                                 </a>
                             );
                         })}
@@ -462,9 +464,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     id="oi-sidebar-panel"
                     style={{ left: SIDEBAR_RAIL_WIDTH, top: HEADER_OFFSET, width: SIDEBAR_PANEL_WIDTH }}
                     {...hoverProps}
-                    /* Immer schwebend: Schatten + Einblenden, weil die Seite
-                       darunter stehen bleibt. */
-                    className="ofi-shell-white fixed bottom-0 z-[45] hidden flex-col border-l border-black/5 shadow-[28px_0_56px_-28px_rgba(16,24,40,0.25)] animate-in fade-in slide-in-from-left-2 duration-150 dark:border-white/8 dark:shadow-[28px_0_56px_-28px_rgba(0,0,0,0.8)] lg:flex"
+                    /* Immer schwebend: Schatten (refine.css, `#oi-sidebar-panel`)
+                       + Einblenden, weil die Seite darunter stehen bleibt. */
+                    className="ofi-shell-white fixed bottom-0 z-[45] hidden flex-col animate-in fade-in slide-in-from-left-2 duration-150 lg:flex"
                 >
                     {/* The panel butts straight against the header (top =
                         --app-header-height), so the title starts tight — extra
@@ -491,9 +493,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         key={child.key}
                                         href={hrefFor(child.key)}
                                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go(child.key); }}
-                                        className={`group flex items-center rounded-xl px-3.5 py-2.5 text-left text-[14px] font-semibold transition-all duration-150 ${active
-                                            ? 'bg-[#272f67] text-white shadow-[0_10px_24px_-12px_rgba(39,47,103,0.55)]'
-                                            : 'text-black/80 hover:translate-x-[3px] hover:bg-[#eef1fa] hover:text-[#1f2654] dark:text-white/80 dark:hover:bg-white/8 dark:hover:text-white'}`}
+                                        className={`group flex items-center rounded-xl px-3.5 py-3 text-left text-[14px] font-semibold transition-colors duration-150 ${active
+                                            ? 'bg-[#272f67] text-white'
+                                            : 'text-[#1d1d1f] hover:bg-black/[0.06] dark:text-white/80 dark:hover:bg-white/8 dark:hover:text-white'}`}
                                     >
                                         {child.icon && <child.icon size={16} className="mr-2.5 shrink-0" />}
                                         <span className="truncate">{t(child.label)}</span>

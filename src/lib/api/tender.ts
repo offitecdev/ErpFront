@@ -17,6 +17,7 @@ import type {
     OfferScheduleSlotDto,
     PositionArticleMappingDto,
     TenderMaterialUsageDto,
+    TenderLifecycleDto,
 } from '../../types/tender';
 import type { PersonLite } from '../../types/maintenance';
 
@@ -225,6 +226,28 @@ export const tenderApi = {
 
     delete: async (id: string): Promise<void> => {
         await apiClient.delete(`/tenders/${id}`);
+    },
+
+    /**
+     * ── LÖSCHEN / STORNO (Vorgabe Samet 06.09.2026) ─────────────────────────
+     * Gelöscht wird nur ein Entwurf, an dem nichts hängt. Sobald ein Auftrag
+     * oder ein Projekt daraus entstanden ist, bleibt die Offerte als Beleg
+     * stehen und wird höchstens STORNIERT — und auch das führt über den
+     * Auftrag, solange der lebt. Was gerade offensteht, sagt `lifecycle`.
+     */
+    lifecycle: async (id: string): Promise<TenderLifecycleDto> => {
+        const res = await apiClient.get(`/tenders/${id}/lifecycle`);
+        return res.data;
+    },
+
+    cancel: async (id: string, reason?: string | null): Promise<{ message: string; cancelled: boolean }> => {
+        const res = await apiClient.post(`/tenders/${id}/cancel`, { reason: reason || null });
+        return res.data;
+    },
+
+    uncancel: async (id: string): Promise<{ message: string; cancelled: boolean }> => {
+        const res = await apiClient.post(`/tenders/${id}/uncancel`);
+        return res.data;
     },
 
     addPosition: async (

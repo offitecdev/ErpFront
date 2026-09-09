@@ -83,7 +83,13 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
     if (isAddon) {
         if (view.section === 'overview' && order) {
             return deferredSection(
-                <LazyAddonOrderOverview project={project} order={order} isPrimary={isPrimary} totals={totals} />,
+                <LazyAddonOrderOverview
+                    project={project}
+                    order={order}
+                    isPrimary={isPrimary}
+                    totals={totals}
+                    canEdit={canCreateAddon}
+                />,
             );
         }
         if (view.section === 'billing') {

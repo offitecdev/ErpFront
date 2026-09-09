@@ -11,13 +11,14 @@ import {
 } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { LuTable2 as MdTableChart } from '@/components/icons/lucideLocal';
 import {
     File05 as FileText,
     FileDownload02 as FileDown,
-    Coins01 as CoinsIcon,
+    RefreshCcw01,
     User01 as User01Icon,
+    XClose,
 } from '@/components/icons/antIconCompat';
+import { PopupActions, PopupButton, PopupDialog, PopupField, PopupNote } from '@/components/ui-shared/PopupKit';
 
 import { PlainButton as Button, PlainCard as Card } from './detail/components/common/PlainUi';
 
@@ -43,6 +44,7 @@ import type { ArticleQuickPick } from '@/types/inventory';
 import type {
     ManualProductForm,
     ProductSource,
+    TextField,
     ChatterTimelineItem,
     CustomerOption,
     TenderSettingsTabKey,
@@ -50,6 +52,7 @@ import type {
 } from './detail/types/tenderDetail.types';
 import { DEFAULT_VAT } from './detail/utils/tenderDetail.constants';
 import { buildSimpleTenderLines } from './detail/utils/tenderLine.utils';
+import { getLineKind } from './detail/utils/tenderCalculation.utils';
 import {
     isPdfDocument,
     normalizeDocumentName,
@@ -99,6 +102,9 @@ import { TenderPriceSummary } from './detail/components/info/TenderPriceSummary'
 import { TenderCommissionInput } from './detail/components/info/TenderCommissionInput';
 import { TenderCurrencySelect } from './detail/components/info/TenderCurrencySelect';
 import { QUOTE_READONLY_CLASS } from './detail/utils/quoteField.constants';
+// Inter Variable is the whole app's typeface since 09.09.2026 (styles/fonts.css,
+// loaded once in main.tsx); this page only brings its own stylesheet.
+import '@/styles/tenderDetail.css';
 
 // Toasts are only produced after a request or user action. Keeping Sonner out
 // of the initial quote module removes its runtime from the LCP/main-thread
@@ -176,7 +182,7 @@ const LazyDeleteOfferPopup = lazy(() =>
 );
 
 const LazyPanelFallback = () => (
-    <div className="min-h-[280px] animate-pulse rounded-[2px] border border-slate-100 bg-slate-50" />
+    <div className="ofi-quote-panel-skeleton min-h-[280px] animate-pulse" />
 );
 
 const EMPTY_POSITIONS: PositionDto[] = [];
@@ -301,6 +307,13 @@ export const TenderDetail = () => {
     const [exportOpen, setExportOpen] = useState(false);
     const [copyingOffer, setCopyingOffer] = useState(false);
     const [deleteOfferOpen, setDeleteOfferOpen] = useState(false);
+    /* STORNO DER OFFERTE (Vorgabe Samet 06.09.2026). Eine Offerte, aus der ein
+       Auftrag geworden ist, wird nicht mehr geloescht — sie wird storniert und
+       bleibt als Beleg stehen. Lebt der Auftrag noch, weist der Server die
+       Rueckfrage an IHN zurueck; die Meldung sagt das. */
+    const [cancelOfferOpen, setCancelOfferOpen] = useState(false);
+    const [cancellingOffer, setCancellingOffer] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
     const [deletingOffer, setDeletingOffer] = useState(false);
     const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(0);
     const [selectedRowIds, setSelectedRowIds] = useState<Record<string, boolean>>({});
@@ -459,6 +472,99 @@ export const TenderDetail = () => {
             ? detail.tender.customerId
             : null,
     });
+    // Writes a product INTO an existing row: name, unit, price, tax, description
+    // and the article link are staged as one inline patch (persisted with Save,
+    // like any other cell edit). Used by the row combobox, by the full picker
+    // when it was opened from a row, and by a manually created product.
+    const fillRowFromProduct = useCallback((
+        rowId: string,
+        article: ProductSource,
+        options?: Partial<ManualProductForm>,
+    ) => {
+        const defaults = buildProductDefaults(article, options, fallbackTaxRate);
+        handleInlinePositionChange(rowId, {
+            sourceArticleId: defaults.sourceArticleId ?? null,
+            shortDescription: defaults.shortDescription,
+            longDescription: defaults.longDescription ?? null,
+            unit: defaults.unit,
+            unitPrice: defaults.unitPrice,
+            discount: defaults.discount,
+            taxRate: defaults.taxRate,
+            // Only a manually entered product states its own quantity. Swapping
+            // the article on an existing row must leave the quantity alone.
+            ...(options?.quantity != null ? { quantity: Number(options.quantity) } : {}),
+        });
+    }, [fallbackTaxRate, handleInlinePositionChange]);
+    // Selecting an article from a row's combobox swaps the product in place,
+    // carrying over any customer-specific discount for that article.
+    const swapRowProduct = useCallback((rowId: string, article: ArticleQuickPick) => {
+        const customerDiscount = customerDiscountMap[article.id];
+        fillRowFromProduct(
+            rowId,
+            article,
+            customerDiscount !== undefined ? { discount: customerDiscount } : undefined,
+        );
+    }, [customerDiscountMap, fillRowFromProduct]);
+
+    // Latest positions without making the commit callback change identity on
+    // every edit (that would re-render every inline input on the page).
+    const localPositionsRef = useRef(localPositions);
+    useEffect(() => {
+        localPositionsRef.current = localPositions;
+    }, [localPositions]);
+
+    // Writes a cell's text, with the rules a product line carries with it. Used
+    // both by the cell itself and by the combobox's "Hinzufügen", which is a
+    // confirmation of exactly this text.
+    const applyLineText = useCallback((positionId: string, field: TextField, value: string) => {
+        if (field === 'shortDescription') {
+            const row = localPositionsRef.current.find((position) => position.id === positionId);
+            // The long description of an ARTICLE row belongs to the article, not
+            // to the line. Renaming the line to something else — or clearing it,
+            // which is how a product is taken off a row — leaves a description
+            // that describes an article the row no longer carries, and it would
+            // go out on the PDF that way. It is dropped with the same patch, so
+            // the row never shows a stale text for a moment. Swapping in another
+            // article brings its own description. A free line's description was
+            // written by hand and stays, as do those of chapters and text rows.
+            //
+            // An emptied name is how a product is taken off a row: the name, the
+            // link to the article card and the article's description all go
+            // together (the price stays — the row can be renamed and priced by
+            // hand).
+            const productRemoved = !value.trim();
+            const isProductRow = row ? getLineKind(row) === 'PRODUCT' : false;
+            const carriesArticle = Boolean(row?.sourceArticleId);
+            if (isProductRow && carriesArticle) {
+                handleInlinePositionChange(positionId, {
+                    shortDescription: value,
+                    ...(row?.longDescription ? { longDescription: null } : {}),
+                    ...(productRemoved ? { sourceArticleId: null } : {}),
+                });
+                return;
+            }
+        }
+        commitTextField(positionId, field, value);
+    }, [commitTextField, handleInlinePositionChange]);
+
+    // What a product-name cell may write when it merely loses focus (a click
+    // somewhere else, Tab). Like Odoo's product field, typed text is NEVER taken
+    // that way: a product is chosen with Enter on the highlighted row or with a
+    // click on it, and a name the catalogue does not know reaches the line only
+    // through the list's "Hinzufügen" row — both call applyLineText directly.
+    // The cell rejects everything else and goes back to what the row held.
+    // Clearing the cell is the one exception: an emptied name is how a product
+    // is taken off a row, and applyLineText then also drops the article link and
+    // its description. Chapter and text rows are plain text fields.
+    const commitLineText = useCallback((positionId: string, field: TextField, value: string) => {
+        if (field === 'shortDescription' && value.trim().length > 0) {
+            const row = localPositionsRef.current.find((position) => position.id === positionId);
+            if (row && getLineKind(row) === 'PRODUCT') return false;
+        }
+        applyLineText(positionId, field, value);
+        return true;
+    }, [applyLineText]);
+
     // Default the Projekt- and Lieferadresse to the customer's primary address
     // while they are empty (the user can still pick another one per row).
     useTenderAddressDefaults({
@@ -640,6 +746,7 @@ export const TenderDetail = () => {
         || manualCustomerOpen
         || exportOpen
         || deleteOfferOpen
+        || cancelOfferOpen
         || orderDecisionOpen
         || documentPreview
         || navGuard.isOpen
@@ -662,17 +769,24 @@ export const TenderDetail = () => {
 
     const tender = detail.tender;
     const isDraft = tender.status === "Draft";
+    // STORNIERT: die Offerte ist zurueckgenommen — sie bleibt als Beleg stehen
+    // und ist gegen jede Bearbeitung gesperrt (Vorgabe Samet 06.09.2026).
+    const tenderCancelled = tender.status === 'Cancelled' || Boolean(tender.cancelledAt);
     // Bu tekliften doğmuş sipariş — ana düğme varsa hedefini DOĞRUDAN açar:
     // proje düzeyinde seçim yapılmışsa projeyi, teslimat siparişiyse siparişi.
     const salesOrderId = tender.salesOrder?.id ?? null;
     const orderProjectId = projectId || tender.salesOrder?.projectId || null;
     const isSalesOrderStatus = Boolean(projectId) || Boolean(salesOrderId) || isSourceSalesOrder(tender.sourceStatus);
     // "Abgelaufen": Entwurf, dessen "gültig bis" vor heute liegt (Vorgabe 15.08.2026).
-    const isExpired = !isSalesOrderStatus && isExpiredTender(tender);
-    const tenderStatusLabel = isSalesOrderStatus
-        ? t('crm.tenders.statusOrdered')
-        : isExpired ? t('crm.tenders.statusExpired') : getStatusLabel()[tender.status];
-    const tenderStatusVariant = isSalesOrderStatus ? 'order' : isExpired ? 'danger' : STATUS_VARIANT[tender.status];
+    const isExpired = !isSalesOrderStatus && !tenderCancelled && isExpiredTender(tender);
+    const tenderStatusLabel = tenderCancelled
+        ? t('orders.lifecycle.statusCancelled')
+        : isSalesOrderStatus
+            ? t('crm.tenders.statusOrdered')
+            : isExpired ? t('crm.tenders.statusExpired') : getStatusLabel()[tender.status];
+    const tenderStatusVariant = tenderCancelled
+        ? 'danger'
+        : isSalesOrderStatus ? 'order' : isExpired ? 'danger' : STATUS_VARIANT[tender.status];
     const currentUserName = user ? `${user.firstName} ${user.lastName}`.trim() || user.email : '';
     // When the creator's display name isn't stored on the tender, fall back to the
     // current user's name if they are the creator (createdByEmployeeId matches), so
@@ -754,6 +868,27 @@ export const TenderDetail = () => {
             toast.error(e.response?.data?.error || t('tenders.tender_kopyalanamadi'));
         } finally {
             setCopyingOffer(false);
+        }
+    };
+
+    /** Storno setzen oder aufheben — beides aus demselben Fenster. */
+    const handleToggleCancelOffer = async () => {
+        setCancellingOffer(true);
+        try {
+            if (tenderCancelled) {
+                await tenderApi.uncancel(tender.id);
+                toast.success(t('tenders.lifecycle.uncancelDone'));
+            } else {
+                await tenderApi.cancel(tender.id, cancelReason.trim() || null);
+                toast.success(t('tenders.lifecycle.cancelDone'));
+            }
+            setCancelOfferOpen(false);
+            setCancelReason('');
+            await fetchDetail(tender.id, true);
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || t('tenders.lifecycle.cancelFailed'));
+        } finally {
+            setCancellingOffer(false);
         }
     };
 
@@ -866,40 +1001,6 @@ export const TenderDetail = () => {
         setAutoFocusProductRowId(null);
         setProductDropdown((current) => (current?.rowId === rowId ? current : { anchorEl, rowId }));
     };
-    // Writes a product INTO an existing row: name, unit, price, tax, description
-    // and the article link are staged as one inline patch (persisted with Save,
-    // like any other cell edit). Used by the row combobox, by the full picker
-    // when it was opened from a row, and by a manually created product.
-    const fillRowFromProduct = (
-        rowId: string,
-        article: ProductSource,
-        options?: Partial<ManualProductForm>,
-    ) => {
-        const defaults = buildProductDefaults(article, options, fallbackTaxRate);
-        handleInlinePositionChange(rowId, {
-            sourceArticleId: defaults.sourceArticleId ?? null,
-            shortDescription: defaults.shortDescription,
-            longDescription: defaults.longDescription ?? null,
-            unit: defaults.unit,
-            unitPrice: defaults.unitPrice,
-            discount: defaults.discount,
-            taxRate: defaults.taxRate,
-            // Only a manually entered product states its own quantity. Swapping
-            // the article on an existing row must leave the quantity alone.
-            ...(options?.quantity != null ? { quantity: Number(options.quantity) } : {}),
-        });
-    };
-    // Selecting an article from a row's combobox swaps the product in place,
-    // carrying over any customer-specific discount for that article.
-    const swapRowProduct = (rowId: string, article: ArticleQuickPick) => {
-        const customerDiscount = customerDiscountMap[article.id];
-        fillRowFromProduct(
-            rowId,
-            article,
-            customerDiscount !== undefined ? { discount: customerDiscount } : undefined,
-        );
-    };
-
     // "Add new product" opens the full product creation page in a new window,
     // carrying the searched text as ?name= so the name field is pre-filled and
     // the user completes the rest of the card there.
@@ -949,8 +1050,11 @@ export const TenderDetail = () => {
     const customerLoadingFlashLabel = t('common.loading').replace(/[.…\s]+$/, '');
     // Das Feld selbst IST die freie Erfassung (der Freihand-Listeneintrag ist
     // weg) — die Liste öffnet deshalb nur noch, wenn sie CRM-Treffer trägt.
+    // Ausnahme: Beim ersten Öffnen holt sie die Kunden erst vom Server; solange
+    // steht das Menü mit der Ladezeile da, damit der Klick nicht wirkungslos
+    // aussieht.
     const tenderCustomerDropdownVisible = newTenderCustomerOpen
-        && filteredNewTenderCustomers.length > 0;
+        && (newTenderCustomersLoading || filteredNewTenderCustomers.length > 0);
     const handleSelectTenderCustomer = (customer: CustomerOption) => {
         if (!customer.id) return;
         // Default the tender's address slot from the customer's structured primary
@@ -1673,16 +1777,15 @@ export const TenderDetail = () => {
     };
 
     return (
-        // `ofi-quote-page` scopes the quote page's fresh look (index.css "QUOTE
-        // PAGE — FRESH LOOK"): rounded hairline cards, soft grey fields, a
-        // table with horizontal rules only, pill buttons.
-        <div className="ofi-quote-page">
+        <div className="ofi-quote-page ofi-quote-apple">
             <TenderDetailHeader
                 tender={tender}
                 tenderStatusVariant={tenderStatusVariant}
                 tenderStatusLabel={tenderStatusLabel}
                 onCopyOffer={() => void handleCopyOffer()}
                 onDeleteOffer={() => setDeleteOfferOpen(true)}
+                onCancelOffer={() => { setCancelReason(''); setCancelOfferOpen(true); }}
+                cancelled={tenderCancelled}
                 canSave={canEditTenderMeta}
                 saving={savingAll}
                 isDirty={isDirty}
@@ -1744,8 +1847,8 @@ export const TenderDetail = () => {
                 <div className="grid grid-cols-1 gap-3">
                     <div className="min-w-0">
                         <Card
+                            className="ofi-quote-lines-card"
                             title={t('tenders.tender_satirlari')}
-                            icon={<MdTableChart size={14} />}
                             noPadding
                             actions={
                                 // Add-row actions live at the bottom of the table itself;
@@ -1777,7 +1880,7 @@ export const TenderDetail = () => {
                         onSelectRow={setSelectedId}
                         onToggleAllRows={toggleAllRows}
                         onToggleRow={toggleRowSelection}
-                        commitTextField={commitTextField}
+                        commitTextField={commitLineText}
                         commitNumberField={commitNumberField}
                         commitLongDescription={commitLongDescription}
                         registerCell={registerCellHandle}
@@ -1806,7 +1909,7 @@ export const TenderDetail = () => {
                    offer's PDF. Their printed position is fixed regardless of where
                    they are edited: intro text below the title on page 1, images
                    after the totals. */
-                <Card title={t('tenders.pdf_content')} icon={<FileText size={14} />}>
+                <Card title={t('tenders.pdf_content')}>
                     {/* Der gespeicherte Inhalt wird nachgeladen (pdfContentDeferred).
                         Das Panel darf erst danach mounten: es füllt einen leeren
                         Einleitungstext mit dem Standard-Textbaustein vor und würde
@@ -1842,7 +1945,7 @@ export const TenderDetail = () => {
                    pays in. Staged like every other quote field: nothing is sent
                    until the user hits Save; the schedule is copied to the order
                    at conversion and drives stage-by-stage invoicing there. */
-                <Card title={t('tenders.payment_schedule_tab')} icon={<CoinsIcon size={14} />}>
+                <Card title={t('tenders.payment_schedule_tab')}>
                     <Suspense fallback={<LazyPanelFallback />}>
                         <LazyTenderPaymentTab
                             tender={tender}
@@ -1876,22 +1979,26 @@ export const TenderDetail = () => {
                     />
                 </Suspense>
             ) : (
-                <Suspense fallback={<LazyPanelFallback />}>
-                    <LazyTenderSettingsModal
-                        open
-                        inline
-                        hideTabs
-                        onClose={() => setWorkspaceTab('lines')}
-                        tenderId={tender.id}
-                        tree={tree}
-                        grandTotal={grandTotal}
-                        pdfTotals={pdfTotals}
-                        initialTab={settingsInitialTab}
-                        overtimeHourlyRate={overtimeHourlyRate}
-                        onOvertimeHourlyRateChange={setOvertimeHourlyRate}
-                        onChanged={() => fetchDetail(tender.id, true)}
-                    />
-                </Suspense>
+                /* The only settings tab reachable from the strip is the offer
+                   mail. It sits in the same card shell as the other panels. */
+                <Card title={t('tenders.tender_maili')}>
+                    <Suspense fallback={<LazyPanelFallback />}>
+                        <LazyTenderSettingsModal
+                            open
+                            inline
+                            hideTabs
+                            onClose={() => setWorkspaceTab('lines')}
+                            tenderId={tender.id}
+                            tree={tree}
+                            grandTotal={grandTotal}
+                            pdfTotals={pdfTotals}
+                            initialTab={settingsInitialTab}
+                            overtimeHourlyRate={overtimeHourlyRate}
+                            onOvertimeHourlyRateChange={setOvertimeHourlyRate}
+                            onChanged={() => fetchDetail(tender.id, true)}
+                        />
+                    </Suspense>
+                </Card>
             )}
 
             {orderDecisionOpen && (
@@ -1924,13 +2031,38 @@ export const TenderDetail = () => {
                 <LazyTenderProductSearchDropdown
                     anchorEl={productDropdown.anchorEl}
                     search={comboSearch}
+                    currentName={localPositions.find((position) => position.id === productDropdown.rowId)?.shortDescription ?? ''}
                     onClose={closeProductDropdown}
                     onSelectArticle={(article) => {
                         // Drop the search text the user typed into the cell before
                         // staging the swap — otherwise it is still the input's
                         // draft and gets committed over the article name on blur.
                         productDropdown.anchorEl.dispatchEvent(new CustomEvent(RESET_DRAFT_EVENT));
-                        swapRowProduct(productDropdown.rowId, article);
+                        const row = localPositionsRef.current.find((position) => position.id === productDropdown.rowId);
+                        if (row?.sourceArticleId === article.id) {
+                            // The row already carries this article: it keeps its own
+                            // numbers and description — confirming the same product
+                            // again must not reset a hand-edited price. Only the
+                            // name is put back to the catalogue's spelling.
+                            if ((row.shortDescription || '') !== article.name) {
+                                commitTextField(productDropdown.rowId, 'shortDescription', article.name);
+                            }
+                        } else {
+                            swapRowProduct(productDropdown.rowId, article);
+                        }
+                        setProductDropdown(null);
+                    }}
+                    onCreateFreeLine={(name) => {
+                        // Confirmed by hand: the typed name becomes the line, with no
+                        // article behind it. The cell's own draft is dropped first so
+                        // its blur cannot write the same text a second time. An
+                        // unchanged name is a no-op — Enter on a line that was only
+                        // opened must not touch its description.
+                        productDropdown.anchorEl.dispatchEvent(new CustomEvent(RESET_DRAFT_EVENT));
+                        const row = localPositionsRef.current.find((position) => position.id === productDropdown.rowId);
+                        if ((row?.shortDescription || '') !== name) {
+                            applyLineText(productDropdown.rowId, 'shortDescription', name);
+                        }
                         setProductDropdown(null);
                     }}
                     onOpenAllProducts={(search) => {
@@ -2135,6 +2267,53 @@ export const TenderDetail = () => {
                     />
                 </Suspense>
             )}
+
+            {/* Storno der Offerte — bzw. seine Ruecknahme. Nichts verschwindet:
+                die Zeile bleibt als Beleg stehen und ist gegen Bearbeitung
+                gesperrt. Auftraege und Projekte fallen NICHT mit (Vorgabe
+                Samet 06.09.2026, §2). */}
+            <PopupDialog
+                open={cancelOfferOpen}
+                title={tenderCancelled ? t('tenders.lifecycle.uncancelOffer') : t('tenders.lifecycle.cancelOffer')}
+                subtitle={tenderCancelled
+                    ? t('tenders.lifecycle.uncancelOfferText')
+                    : t('tenders.lifecycle.cancelOfferText')}
+                icon={tenderCancelled ? <RefreshCcw01 size={20} /> : <XClose size={20} />}
+                tone={tenderCancelled ? 'neutral' : 'danger'}
+                width={460}
+                onClose={() => { if (!cancellingOffer) setCancelOfferOpen(false); }}
+                closeOnBackdrop={!cancellingOffer}
+                closeOnEscape={!cancellingOffer}
+                footer={(
+                    <PopupActions>
+                        <PopupButton disabled={cancellingOffer} onClick={() => setCancelOfferOpen(false)}>
+                            {t('common.cancel')}
+                        </PopupButton>
+                        <PopupButton
+                            variant={tenderCancelled ? 'primary' : 'danger'}
+                            loading={cancellingOffer}
+                            onClick={() => void handleToggleCancelOffer()}
+                        >
+                            {tenderCancelled ? t('orders.lifecycle.uncancelAction') : t('orders.lifecycle.cancelAction')}
+                        </PopupButton>
+                    </PopupActions>
+                )}
+            >
+                {!tenderCancelled && (
+                    <>
+                        {salesOrderId && <PopupNote tone="warning">{t('tenders.lifecycle.cancelOrderFirst')}</PopupNote>}
+                        <PopupField className="pt-3" label={t('orders.lifecycle.reasonLabel')} hint={t('common.optional')}>
+                            <input
+                                value={cancelReason}
+                                onChange={(event) => setCancelReason(event.target.value)}
+                                maxLength={500}
+                                placeholder={t('orders.lifecycle.reasonPlaceholder')}
+                                className="ofi-cal-input w-full"
+                            />
+                        </PopupField>
+                    </>
+                )}
+            </PopupDialog>
 
             {/* Destructive "are you sure?" confirmation for deleting the offer. */}
             {deleteOfferOpen && (

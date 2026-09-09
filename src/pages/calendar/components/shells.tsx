@@ -41,7 +41,7 @@ export const CenterModal = ({ open, onClose, title, subtitle, width = 1400, z = 
     return createPortal(
         <div data-cal-stacked="1" className="fixed inset-0 flex items-center justify-center px-4 py-4 md:px-6" style={{ zIndex: z }}>
             <div
-                className="absolute inset-0 bg-slate-950/30 dark:bg-black/55"
+                className="ofi-win-scrim absolute inset-0"
                 onMouseDown={(event) => { if (closeOnBackdrop && event.target === event.currentTarget) onClose(); }}
             />
             <section

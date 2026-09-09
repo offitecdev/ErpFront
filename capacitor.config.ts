@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.offitec.erp',
-  appName: 'Offitec ERP',
+  appName: 'Offitec Control Center',
   webDir: 'dist',
   server: {
     // Keep the same HTTPS origin as the deployed PWA. Authentication uses

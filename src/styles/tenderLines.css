@@ -1,0 +1,364 @@
+/* Quote line items share the page's neutral surfaces and system typography.
+   The scope and targeted !important declarations beat legacy quote/dark
+   rules without changing other editable tables in the application.
+
+   Native-macOS table (09.09.2026): a 12px grey caption row over one hairline,
+   40px rows on 7% hairlines, hairline column rules, no header band, figures in
+   tabular numerals, inline inputs that only show a border on hover and the
+   blue ring on focus. Selection is the system-blue wash, nothing else. */
+#root .ofi-quote-page.ofi-quote-apple table.ofi-quote-lines {
+    --quote-line-selection: color-mix(in srgb, var(--quote-accent) 9%, var(--quote-surface));
+    --quote-line-accent-soft: var(--quote-accent-soft);
+    --quote-grid-line: var(--quote-hairline);
+    color: var(--quote-text);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > thead > tr > th {
+    height: 34px;
+    padding: 0 6px;
+    border-top: 0;
+    border-bottom: 1px solid var(--quote-border) !important;
+    background: var(--quote-surface) !important;
+    color: var(--quote-secondary) !important;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.3;
+    vertical-align: middle;
+}
+
+/* Column rules stay (Samet, 09.09.2026: "lines between the columns, and the
+   old widen/narrow of the columns") — one hairline on every inner column
+   edge; that edge is also where the resize grip lives. Rows without cells of
+   their own (search row, add-row actions) carry no rules. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > thead > tr > th + th,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-id] > td + td {
+    border-left: 1px solid var(--quote-hairline) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr:not([data-row-id]) > td + td {
+    border-left: 0 !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr > td {
+    padding: 7px 6px;
+    border-bottom: 1px solid var(--quote-hairline);
+    background: var(--quote-surface) !important;
+    color: var(--quote-text) !important;
+    /* Top-aligned on purpose: an opened description grows the row downward
+       and the figures beside it must stay on the first line. The 7px pad
+       centres a 26px control in the 40px row. */
+    vertical-align: top;
+    transition: background-color 120ms ease, opacity 120ms ease, filter 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-id] > td { height: 40px; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > :is(thead, tbody) > tr > :first-child {
+    padding-left: 16px;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > :is(thead, tbody) > tr > :last-child {
+    padding-right: 12px;
+}
+
+/* Trend arrow + delete: two 20px buttons in the 46px action column. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-id] > td:last-child {
+    padding-left: 2px;
+    padding-right: 4px;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-id] > :is(td:first-child, td:last-child) > div {
+    min-height: 26px;
+    gap: 0;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-id]:hover > td {
+    background: var(--quote-hover) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr:is([data-row-selected], [data-row-checked]) > td,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr:is([data-row-selected], [data-row-checked]):hover > td {
+    background: var(--quote-line-selection) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-selected] > td:first-child {
+    box-shadow: none !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines :is(input:not([type="checkbox"]), textarea) {
+    height: 26px;
+    min-height: 26px;
+    padding: 2px 5px;
+    border: 1px solid transparent !important;
+    border-radius: 5px !important;
+    background: transparent !important;
+    color: var(--quote-text) !important;
+    -webkit-text-fill-color: var(--quote-text);
+    font-family: inherit !important;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    box-shadow: none;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines input:not([type="checkbox"]):hover {
+    background: var(--quote-field) !important;
+    border-color: var(--quote-field-border) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines :is(input:not([type="checkbox"]), textarea):focus {
+    border-color: var(--quote-accent) !important;
+    background: var(--quote-field) !important;
+    box-shadow: 0 0 0 3px var(--quote-focus) !important;
+    outline: none;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines tr[data-line-kind="TITLE"] > td:nth-child(2) :is(input, .whitespace-normal) {
+    color: var(--quote-text) !important;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines tr[data-line-kind="PRODUCT"] > td:nth-child(2) :is(input, .whitespace-normal) {
+    font-weight: 400;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__position-label {
+    color: var(--quote-secondary) !important;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines tr:focus-within .ofi-quote-check {
+    opacity: 1;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines tr:focus-within .ofi-quote-lines__position-label {
+    opacity: 0;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines input.ofi-quote-check {
+    accent-color: var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__amount {
+    padding: 3px 0;
+    color: var(--quote-text) !important;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: 0;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines td > span.block:not(.ofi-quote-lines__amount) {
+    padding: 3px 6px;
+    color: var(--quote-secondary) !important;
+    font-weight: 400;
+    line-height: 20px;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines :is(.ofi-quote-lines__article-link, .ofi-quote-lines__profit, .ofi-quote-lines__delete) {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px !important;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__expand {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px !important;
+    color: var(--quote-muted) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__expand svg { width: 16px; height: 16px; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__expand:hover,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__expand[aria-expanded="true"] {
+    background: var(--quote-fill) !important;
+    color: var(--quote-text) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__article-link {
+    color: var(--quote-muted) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__article-link:hover {
+    background: var(--quote-fill) !important;
+    color: var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__profit svg { width: 12px; height: 12px; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__profit.text-emerald-600 { color: var(--quote-success) !important; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__profit.text-rose-600 { color: var(--quote-danger) !important; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__profit:hover { background: var(--quote-fill) !important; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__delete { color: var(--quote-muted) !important; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__delete:hover {
+    background: var(--quote-fill) !important;
+    color: var(--quote-danger) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines :is(button, input[type="checkbox"]):focus-visible {
+    outline: 3px solid var(--quote-focus);
+    outline-offset: 1px;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__description {
+    margin: 4px 0 4px;
+    color: var(--quote-secondary);
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__description > div {
+    border-radius: 6px !important;
+    border: 1px solid var(--quote-field-border) !important;
+    background: var(--quote-field) !important;
+    box-shadow: none !important;
+    padding: 6px 10px;
+    color: var(--quote-text);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__description > div:focus-within {
+    border-color: var(--quote-accent) !important;
+    box-shadow: 0 0 0 3px var(--quote-focus) !important;
+}
+
+/* Keep the resize hit target at its original width; the column rule itself
+   is the marker at rest, the grip only lights up blue while it is grabbed. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-col-grip::before {
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    margin-left: 0;
+    background: transparent;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-col-grip:hover::before,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines th[data-resize-active] .ofi-col-grip::before {
+    width: 2px;
+    margin-left: -1px;
+    background: var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-tender-line-placeholder] > td {
+    padding-top: 10px;
+    padding-bottom: 2px;
+    border-bottom: 0;
+}
+
+/* The blank product row: a bordered Mac search field. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__search {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: min(100%, 320px);
+    min-height: 28px;
+    padding: 3px 9px;
+    border: 1px solid var(--quote-field-border);
+    border-radius: 6px !important;
+    background: var(--quote-field) !important;
+    color: var(--quote-muted) !important;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 400;
+    box-shadow: var(--quote-btn-shadow);
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__search:hover {
+    border-color: color-mix(in srgb, var(--quote-field-border) 100%, var(--quote-text) 12%);
+    color: var(--quote-secondary) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__search svg { width: 13px; height: 13px; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-tender-line-actions] > td {
+    padding: 6px 16px 12px;
+    border-bottom: 0;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__actions {
+    gap: 6px;
+    padding: 2px 0;
+}
+
+/* Add actions: three identical small push buttons, the first one carries
+   the accent in its text only. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-addbtn {
+    flex-shrink: 0;
+    height: 26px;
+    min-height: 26px;
+    padding: 0 10px;
+    gap: 5px;
+    border: 1px solid var(--quote-field-border);
+    border-radius: 6px !important;
+    background: var(--quote-field);
+    color: var(--quote-text) !important;
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: var(--quote-btn-shadow);
+    transition: background-color 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-addbtn svg { width: 13px; height: 13px; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-addbtn:hover {
+    background: var(--quote-hover);
+    color: var(--quote-text) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-addbtn.is-primary {
+    border-color: var(--quote-field-border);
+    background: var(--quote-field);
+    color: var(--quote-accent) !important;
+    font-weight: 500;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-addbtn.is-primary:hover {
+    background: var(--quote-hover);
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines .ofi-quote-lines__empty {
+    display: flex;
+    min-height: 140px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--quote-muted);
+    font-size: 13px;
+}
+
+/* Move feedback uses the same blue as inline focus and selection. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-moving] > td {
+    background: var(--quote-line-accent-soft) !important;
+    box-shadow: inset 0 1px 0 var(--quote-accent), inset 0 -1px 0 var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-row-moving] > td:first-child {
+    box-shadow: inset 2px 0 0 var(--quote-accent), inset 0 1px 0 var(--quote-accent), inset 0 -1px 0 var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-drop-before] > td {
+    box-shadow: inset 0 2px 0 var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-drop-after] > td {
+    box-shadow: inset 0 -2px 0 var(--quote-accent) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines > tbody > tr[data-tender-lines-virtual-spacer] > td {
+    padding: 0 !important;
+    border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-quote-page.ofi-quote-apple .ofi-quote-lines :is(td, input, button, svg) {
+        transition: none !important;
+    }
+}

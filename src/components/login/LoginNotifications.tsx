@@ -22,10 +22,10 @@ import { LOGIN_NOTICES, type LoginNotice } from './loginNotices';
  * KEIN MODAL: nur Glocke und Karte fangen Klicks ab, das Formular dahinter
  * bleibt bedienbar. ESC schliesst.
  *
- * SCHRIFT: die ganze Leiste läuft in der Programmschrift Open Sans. Die drei
+ * SCHRIFT: die ganze Leiste läuft in der Programmschrift Inter Variable. Die drei
  * Titel (Kartenkopf, Mitteilung, Hinweis neben der Glocke) trugen bis
  * 17.08.2026 `.ofi-serif` und damit Times New Roman (siehe styles/login.css);
- * die Datumszeilen standen schon immer in Open Sans. Jetzt ist es eine
+ * die Datumszeilen standen schon immer in der Programmschrift. Jetzt ist es eine
  * Schrift auf dem Schirm.
  */
 

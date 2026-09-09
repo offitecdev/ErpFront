@@ -1,5 +1,5 @@
 /*
- * Offitec ERP service worker.
+ * Offitec Control Center service worker.
  *
  * Hand-written on purpose: the build has no precache-manifest plugin, so this
  * worker never hardcodes hashed filenames. It only precaches the stable shell

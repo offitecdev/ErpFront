@@ -8,9 +8,9 @@
     --color-slate-200: #e5e4e1;
 
     /* FONT FAMILY */
-    --font-body: "Open Sans", Arial, sans-serif;
-    --font-display: "Open Sans", Arial, sans-serif;
-    --font-mono: "Open Sans", "Roboto Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --font-body: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    --font-display: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    --font-mono: "Inter Variable", "Roboto Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
     --text-xs: calc(var(--spacing) * 3);
     --text-xs--line-height: calc(var(--spacing) * 4.5);

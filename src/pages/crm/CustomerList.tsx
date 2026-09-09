@@ -13,7 +13,7 @@ import {
 import { getShared } from '../../lib/axios';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../hooks/useColumnWidths';
 import { CUSTOMER_STATUS_OPTIONS, getCustomerStatusOption, getCustomerStatusLabel } from './customerType';
 import { CustomerCreateModal } from './CustomerCreateModal';
@@ -209,11 +209,19 @@ export const CustomerList = () => {
                     <button
                         type="button"
                         onClick={() => setShowForm(!showForm)}
+                        /* Die Hauptaktion der Seite: gross, iOS-Ecke, MARINE
+                           (Vorgabe 09.09.2026, zweiter Durchgang: «yeni müşteri
+                           butonu da lacivert olacak ve daha büyük olacak»).
+                           Mass, Farbe und Kante stehen vollständig in
+                           `styles/buttons.css` (`.ofi-btn-ios` + `.ofi-btn-brand`
+                           bzw. `.ofi-btn-ios-plain` für den Schliessen-Zustand) —
+                           hier steht KEIN Tailwind-Mass mehr daneben, das
+                           dagegenhält. */
                         className={showForm
-                            ? 'flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10'
-                            : 'ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]'}
+                            ? 'ofi-btn-ios ofi-btn-ios-plain inline-flex items-center justify-center'
+                            : 'ofi-btn-ios ofi-btn-brand inline-flex items-center justify-center'}
                     >
-                        {showForm ? <XIcon size={14} /> : <Plus size={14} />}
+                        {showForm ? <XIcon size={20} /> : <Plus size={20} />}
                         {showForm ?t('common.close') :t('crm.customers.newCustomer')}
                     </button>
                 }
@@ -227,11 +235,12 @@ export const CustomerList = () => {
                 onCreated={() => { setPage(1); setReloadTick((n) => n + 1); }}
             />
 
-            {/* Üst çubuk — ürün listesiyle aynı: genel arama + durum seçici.
-                Telefonda ikisi de tam genişlik: 390px'te yan yana sıkışmak
-                yerine alt alta, dokunulacak kadar geniş dururlar. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="relative w-full sm:w-64">
+            {/* Werkzeugzeile — dieselbe wie auf jeder anderen Liste: Suchfeld
+                links, Filter dahinter, gemeinsames Mass aus
+                styles/controls.css. Der Umschlag um das Suchfeld bleibt: an ihm
+                hängt die Vorschlagsliste. */}
+            <FilterBar>
+                <div className="ofi-searchwrap">
                     <SearchBox
                         value={search}
                         onChange={setSearch}
@@ -277,18 +286,13 @@ export const CustomerList = () => {
                         </div>
                     )}
                 </div>
-                <select
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
-                    aria-label={t('common.status')}
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none sm:w-auto dark:border-white/20 dark:bg-transparent dark:text-white"
-                >
+                <FilterSelect value={statusFilter} onChange={setStatusFilter} label={t('common.status')}>
                     <option value="">{t('common.all')}</option>
                     {CUSTOMER_STATUS_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
                     ))}
-                </select>
-            </div>
+                </FilterSelect>
+            </FilterBar>
 
             <SectionCard title={`${t('nav.customerList')} (${total})`}>
                 {/* `data-list-table`: ferah satır ölçüsü + telefonda kart

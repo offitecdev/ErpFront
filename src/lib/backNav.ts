@@ -74,6 +74,7 @@ const MAIN_PAGES: Record<string, string> = {
     '/sales/quotes': 'nav.tenderManagement',
     '/sales/osp': 'nav.salesOsp',
     '/sales/orders': 'nav.myOrders',
+    '/sales/addon-orders': 'nav.addonOrders',
     '/sales/invoices': 'nav.salesInvoices',
 
     '/projects': 'nav.projectManagement',
@@ -116,6 +117,13 @@ const EXPLICIT_RULES: Array<{ test: RegExp; to: (match: RegExpMatchArray) => str
         test: /^\/sales\/quotes\/([^/]+)\/report$/,
         to: (match) => `/sales/quotes/${match[1]}`,
         labelKey: 'nav.tenderManagement',
+    },
+    // Der Wareneingang gehört zu SEINER Bestellung, nicht zur Bestellliste:
+    // er wird von der Bestellseite aus geöffnet (Stufe 3 des Ablaufs) und
+    // führt dorthin zurück — sonst verlöre man beim Zurückgehen den Vorgang.
+    {
+        test: /^\/inventory\/orders\/(?!new$)([^/]+)\/receive$/,
+        to: (match) => `/inventory/orders/${match[1]}`,
     },
     // Ein Montage-Auftrag gehört zu seiner Liste. Ob das die offenen oder die
     // abgeschlossenen Montagen sind, weiss erst die geladene Seite — bis dahin

@@ -1,19 +1,22 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { Clipboard, Edit01 as PenLine, File05 as FilePdf, FileCheck02 } from '@/components/icons/antIconCompat';
+import { Clipboard, Edit01 as PenLine, File05 as FilePdf, FileCheck02, PackagePlus } from '@/components/icons/antIconCompat';
+import { AddonOrdersPopup } from '@/components/orders/AddonOrdersPopup';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
 import { t } from '@/i18n/translate';
 import { deliveryReportApi, projectApi, type DeliveryReportDto } from '@/lib/api/project';
 import { dayjsLocaleTag } from '@/lib/utils/dayjsLocale';
+import { useAuthStore } from '@/store/authStore';
 import type { ProjectDto, ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 
 import { AllSignaturesSheet } from '../reports/AllSignaturesSheet';
 import { AppointmentReportSheet } from '../reports/AppointmentReportSheet';
 import { appointmentStatusKind, statusLabel } from '../booking/schedule/scheduleShared';
-import { scopedRecords } from '../../../utils/projectOrderScope';
+import { orderPayloadId, scopedRecords } from '../../../utils/projectOrderScope';
 import { findAppointmentReport } from '../../../utils/projectAppointments';
 
 /**
@@ -37,6 +40,21 @@ export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved 
     const [selectedApptId, setSelectedApptId] = useState<string | null>(null);
     const [sheetInitialView, setSheetInitialView] = useState<'overview' | 'pdf' | 'delivery'>('overview');
     const [signaturesOpen, setSignaturesOpen] = useState(false);
+
+    /* «Zusatzaufträge» — die vierte Kachel der Rapporte (Vorgabe Samet,
+       05.09.2026: aus den Rapporten heraus sollen die Nachträge des Auftrags
+       zu finden sein, jeder mit seinem eigenen Beleg). */
+    const navigate = useNavigate();
+    const { permissions } = useAuthStore();
+    const [addonsOpen, setAddonsOpen] = useState(false);
+    const addonParentId = orderPayloadId(order);
+    const addonParentOrder = order?.parentSalesOrderId
+        ? (project.salesOrders || []).find((candidate) => candidate.id === order.parentSalesOrderId) || null
+        : order;
+    const addonParent = addonParentId && addonParentOrder
+        ? { id: addonParentId, orderNumber: addonParentOrder.orderNumber, projectId: project.id }
+        : null;
+    const addonCount = (project.salesOrders || []).filter((candidate) => candidate.parentSalesOrderId === addonParentId).length;
 
     const appointments = useMemo(
         () => scopedRecords(project.appointments, order, isPrimary, project.salesOrders)
@@ -263,6 +281,16 @@ export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved 
                     hint={t('projects.reportsHub.signaturesAll')}
                     onClick={() => setSignaturesOpen(true)}
                 />
+                <DocumentTile
+                    icon={<PackagePlus size={15} />}
+                    title={t('crm.addon.fieldButton')}
+                    state={addonCount > 0
+                        ? t('crm.additionalOrdersCount', { count: addonCount })
+                        : t('projects.detail.overview.noAddons')}
+                    disabled={!addonParent}
+                    hint={t('crm.addon.popupTitle')}
+                    onClick={() => setAddonsOpen(true)}
+                />
             </div>
 
             {/* Ebene 2 — was den TERMINEN gehört. */}
@@ -321,6 +349,13 @@ export const ReportsTab = memo(({ project, order, isPrimary, materials, onSaved 
                 downloadLabel={t('common.download')}
                 onClose={() => setGeneralOpen(false)}
                 onDownload={downloadGeneral}
+            />
+            <AddonOrdersPopup
+                open={addonsOpen}
+                onClose={() => setAddonsOpen(false)}
+                parentOrder={addonParent}
+                canCreate={permissions.includes('projects.createAddonOrder')}
+                onOpenAddon={(addon) => navigate(`/sales/orders/${addon.parentSalesOrderId}?tab=addons&addon=${addon.id}`)}
             />
         </div>
     );

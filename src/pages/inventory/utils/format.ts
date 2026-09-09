@@ -1,7 +1,18 @@
 // Sayı/tarih biçimlendirme — eski envanter sayfalarıyla aynı yerel ayarlar (de-CH / CHF).
 
+/**
+ * ⚠ ZWEI NACHKOMMASTELLEN, IMMER (Vorgabe Samet, 07.09.2026: «die Ziffern —
+ * auch die Nullen — sollen dastehen»). Ohne `minimumFractionDigits` liess
+ * `Intl` glatte Betraege abschneiden: aus 1200.00 wurde «CHF 1'200», und ein
+ * Total ohne Rappen liest sich wie ein gerundeter Vorschlag.
+ */
 export const fmtMoney = (value?: number | null): string =>
-    new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', maximumFractionDigits: 2 }).format(Number(value) || 0);
+    new Intl.NumberFormat('de-CH', {
+        style: 'currency',
+        currency: 'CHF',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
 
 /** Birim maliyet: İsviçre Almancası biçiminde nokta ve tam üç ondalık hane. */
 export const fmtUnitCost = (value?: number | null): string =>
@@ -29,7 +40,12 @@ export const fmtUnitPricePrecise = (value?: number | null): string =>
 /** Para birimi kolonlu kayıtlar (ör. siparişler) için — geçersiz kodda CHF'ye düşer. */
 export const fmtMoneyIn = (value: number | null | undefined, currency?: string | null): string => {
     try {
-        return new Intl.NumberFormat('de-CH', { style: 'currency', currency: currency || 'CHF', maximumFractionDigits: 2 }).format(Number(value) || 0);
+        return new Intl.NumberFormat('de-CH', {
+            style: 'currency',
+            currency: currency || 'CHF',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(Number(value) || 0);
     } catch {
         return fmtMoney(value);
     }
@@ -56,8 +72,30 @@ export const fmtDateTime = (value?: string | Date | null): string => {
 export const parseNum = (value: string | number | null | undefined): number | null => {
     if (value === null || value === undefined || value === '') return null;
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-    const normalized = String(value).trim().replace(/\s/g, '').replace(/'/g, '').replace(',', '.');
+    /* ── EIN BETRAG KOMMT IN VIELEN SCHREIBWEISEN ───────────────────────
+       «1'234.50», «1.234,50», «1,234.50» und «9,5» meinen alle dasselbe.
+       Bis zum 08.09.2026 wurde hier nur das ERSTE Komma zum Punkt: aus
+       «1.234,50» wurde «1.234.50» und daraus NaN — die Zelle blieb leer,
+       ohne dass jemand einen Fehler sah.
+
+       Die Regel ist einfach: Hochkomma und Leerzeichen trennen nur
+       Tausender. Vom Rest entscheidet das LETZTE Trennzeichen: steht
+       dahinter etwas anderes als genau drei Ziffern, ist es das
+       Dezimaltrennzeichen; alle davor sind Tausendertrennzeichen. */
+    let normalized = String(value).trim().replace(/[\s'\u2019\u00a0]/g, '');
     if (!normalized) return null;
+    const lastSeparator = Math.max(normalized.lastIndexOf(','), normalized.lastIndexOf('.'));
+    if (lastSeparator >= 0) {
+        const decimals = normalized.length - lastSeparator - 1;
+        const head = normalized.slice(0, lastSeparator).replace(/[.,]/g, '');
+        const tail = normalized.slice(lastSeparator + 1);
+        /* Genau drei Ziffern dahinter und schon ein Trennzeichen davor:
+           «1.234.567» ist eine Million, keine Kommazahl. */
+        const groupingOnly = decimals === 3
+            && /^\d{3}$/.test(tail)
+            && /[.,]/.test(normalized.slice(0, lastSeparator));
+        normalized = groupingOnly ? `${head}${tail}` : `${head}.${tail}`;
+    }
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
 };

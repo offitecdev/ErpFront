@@ -7,7 +7,7 @@ import { t } from '@/i18n/translate';
 import { crmApi } from '@/lib/api/crm';
 import { reminderTitle } from '@/lib/notificationText';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
-import { ColResizeHandle, Pager, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
+import { ColResizeHandle, FilterSlot, Pager, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { CrmFilterBar, CrmFilterSelect } from './components/CrmFilterBar';
@@ -128,9 +128,9 @@ export const RemindersPage = () => {
             />
 
             <CrmFilterBar>
-                <div className="w-56">
+                <FilterSlot width="wide">
                     <CustomerPicker value={customer} onPick={(pick) => pickCustomer(pick?.customer ?? null)} placeholder={t('crm.tasks.filterCustomer')} />
-                </div>
+                </FilterSlot>
                 <CrmFilterSelect
                     value={filters.assigneeId}
                     onChange={(value) => setFilters((current) => ({ ...current, assigneeId: value }))}

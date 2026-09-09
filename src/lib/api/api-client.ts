@@ -334,7 +334,7 @@ export class HttpClient<SecurityDataType = unknown> {
 }
 
 /**
- * @title OFFITEC ERP API
+ * @title OFFITEC CONTROL CENTER API
  * @version 1.0.0
  * @baseUrl https://demo.offitec.ch/backend/api/v1
  *

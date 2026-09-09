@@ -107,7 +107,7 @@ const Row = ({
                         <span className="ofi-mail-tag is-internal">{t('mail.page.calendarTag')}</span>
                     ) : null}
                     {row.entity?.label && <span className="ofi-mail-tag is-entity">{row.entity.label}</span>}
-                    {row.origin === 'ERP' && <span className="ofi-mail-tag is-erp">ERP</span>}
+                    {row.origin === 'ERP' && <span className="ofi-mail-tag is-erp">OCC</span>}
                 </span>
             </span>
         </div>

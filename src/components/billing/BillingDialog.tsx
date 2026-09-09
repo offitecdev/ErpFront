@@ -158,9 +158,15 @@ export const BillingDialog: React.FC<BillingDialogProps> = ({ open, target, onCl
                                         key={index}
                                         type="button"
                                         disabled={!isNext}
-                                        title={isNext && summary.nextStage
-                                            ? t('billing.billNextStage', { n: index + 1, percent: summary.nextStage.suggestedPercent })
-                                            : status === 'done' ? t('billing.stageDone') : undefined}
+                                        // Der Freitext der Rate («vor Montage») steht
+                                        // im Tooltip: die Pille ist einzeilig und
+                                        // dürfte an einem langen Satz zerreissen.
+                                        title={[
+                                            stage.label || '',
+                                            isNext && summary.nextStage
+                                                ? t('billing.billNextStage', { n: index + 1, percent: summary.nextStage.suggestedPercent })
+                                                : status === 'done' ? t('billing.stageDone') : '',
+                                        ].filter(Boolean).join(' · ') || undefined}
                                         onClick={() => {
                                             if (!isNext || !summary.nextStage) return;
                                             setMode('PARTIAL');

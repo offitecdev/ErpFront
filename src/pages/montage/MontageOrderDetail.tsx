@@ -7,10 +7,12 @@ import {
     CheckCircle,
     File05 as FileIcon,
     FileDownload02 as FileDown,
+    PackagePlus,
     Edit01 as PenIcon,
     Save01 as SaveIcon,
     Send01,
 } from '@/components/icons/antIconCompat';
+import { AddonOrdersPopup } from '@/components/orders/AddonOrdersPopup';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { useAppointmentSeries } from '@/components/ui-shared/AppointmentDocuments';
 import { SignatureSheet } from '@/components/ui-shared/SignatureSheet';
@@ -96,6 +98,10 @@ export const MontageOrderDetail = () => {
        Leiste unten wechselt zwischen ihnen, ohne dass die Monteurin über die
        Liste zurückgehen müsste (Vorgabe: «keine eigene Seite dafür»). */
     const [docsOpen, setDocsOpen] = useState(false);
+    /* «Zusatzaufträge» aus dem Rapport (05.09.2026): die Nachträge des
+       Auftrags, an dem dieser Einsatz hängt, mit ihren eigenen Belegen. Der
+       Monteur sieht sie; anlegen darf nur, wer das Recht dazu trägt. */
+    const [addonsOpen, setAddonsOpen] = useState(false);
     const editorHandle = useRef<FieldReportSaveHandle | null>(null);
 
     // Tenant context is set asynchronously by fetchProfile(); gating the fetch on
@@ -269,6 +275,17 @@ export const MontageOrderDetail = () => {
                     >
                         {t('projects.reportsHub.deliverySection')}
                     </button>
+                    {/* Die Nachträge des Auftrags — aus dem Rapport heraus zu
+                        finden, jeder mit seinem eigenen Beleg. */}
+                    <button
+                        type="button"
+                        className={`ofi-mtg-btn${addonsOpen ? ' is-on' : ''}`}
+                        disabled={!selected.salesOrder?.id}
+                        onClick={() => setAddonsOpen(true)}
+                    >
+                        <PackagePlus size={15} />
+                        {t('crm.addon.fieldButton')}
+                    </button>
                     {/* Der Tagesrapport als PDF — ein Symbol, kein vierter
                         Schriftzug: er wiegt hier weniger als die drei Unterlagen. */}
                     <button
@@ -375,6 +392,22 @@ export const MontageOrderDetail = () => {
             )}
 
             <InstallationDocumentsSheet row={docsOpen ? row : null} onClose={() => setDocsOpen(false)} />
+
+            <AddonOrdersPopup
+                open={addonsOpen}
+                onClose={() => setAddonsOpen(false)}
+                parentOrder={selected.salesOrder?.id
+                    ? {
+                        id: selected.salesOrder.parentSalesOrderId || selected.salesOrder.id,
+                        orderNumber: row.orderNumber,
+                        projectId: selected.project?.id ?? null,
+                    }
+                    : null}
+                /* Auf dem Technikerbildschirm wird NICHT angelegt: das Anlegen
+                   ist eine Seite im Verkauf, und der rote Arbeitsplatz soll
+                   niemanden dorthin hinauswerfen. Ansehen darf der Monteur. */
+                canCreate={false}
+            />
 
             {/* Projektleiter-Popup'taki editörün TA KENDİSİ (kullanıcı isteği —
                 iki yüzeyde birebir aynı akış ve yerleşim). */}

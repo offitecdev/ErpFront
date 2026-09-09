@@ -9,7 +9,7 @@ import type { StaffRow } from './types/personnel';
 import { STAFF_PAGE_SIZE, useLanguageTick, useStaffList } from './hooks/usePersonnel';
 import { StaffCreateSheet } from './components/StaffCreateSheet';
 import { StaffQrSheet } from './components/StaffQrSheet';
-import { Chip, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { Chip, FilterBar, Pager, SearchBox, SectionCard, TableStateRow } from './components/primitives';
 import { formatDate, fullName, workLocationLabel } from './utils/format';
 
 /**
@@ -50,12 +50,13 @@ export const PersonnelListPage = () => {
                 )}
             />
 
-            <SearchBox
-                value={list.search}
-                onChange={list.setSearch}
-                placeholder={t('personnel.list.searchPlaceholder')}
-                className="w-72"
-            />
+            <FilterBar>
+                <SearchBox
+                    value={list.search}
+                    onChange={list.setSearch}
+                    placeholder={t('personnel.list.searchPlaceholder')}
+                />
+            </FilterBar>
 
             <SectionCard title={t('personnel.list.sectionTitle', { count: list.total })}>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
@@ -176,14 +177,13 @@ export const PersonnelListPage = () => {
                 onCreated={list.reload}
             />
 
+            {/* Der Schlüssel steht nicht mehr in der Zeile (er meldet ohne
+                Kennwort an) — das Fenster holt ihn sich selbst, und ein neu
+                ausgegebener bleibt dort. Die Liste hat nichts mehr zu merken. */}
             <StaffQrSheet
                 open={Boolean(qrPerson)}
                 person={qrPerson}
                 onClose={() => setQrPerson(null)}
-                onRotated={(employeeId, qrToken) => {
-                    list.patchRow(employeeId, { qrToken });
-                    setQrPerson((current) => (current && current.id === employeeId ? { ...current, qrToken } : current));
-                }}
             />
         </div>
     );

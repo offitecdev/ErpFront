@@ -1,20 +1,21 @@
 import { useState } from 'react';
-import { X } from '@/components/icons/antIconCompat';
+import { LuRotateCcw } from 'react-icons/lu';
 import { t } from '@/i18n/translate';
-import { BottomSheet } from '@/pages/inventory/components/BottomSheet';
 import type { FormFieldDef, FormValues } from '@/lib/formFields';
 import { FormRenderer } from '../components/FormRenderer';
-import { BTN_SECONDARY } from '../ui';
+import { ChecklistWindow } from '../components/ChecklistWindow';
 
 /**
- * Vorschau des Vorlagen-Editors im Untenfenster — bedienbar, damit sich eine
- * Bedingung sofort ausprobieren lässt ("Kernbohrung nötig?" ankreuzen → die
- * abhängigen Felder erscheinen). Die eingetippten Werte gehören der Vorschau
- * und werden nirgends gespeichert; beim Schliessen sind sie weg.
+ * Vorschau des Vorlagen-Editors — im selben schwebenden Fenster wie eine
+ * echte Checkliste (ChecklistWindow), damit die Vorlage so aussieht, wie sie
+ * später ausgefüllt wird. Bedienbar: eine Bedingung lässt sich sofort
+ * ausprobieren («Kernbohrung nötig?» einschalten → die abhängigen Felder
+ * erscheinen). Die eingetippten Werte gehören der Vorschau und werden
+ * nirgends gespeichert; beim Schliessen sind sie weg.
  *
  * Felder ohne Beschriftung bleiben aussen vor — sie sind noch im Bau.
  */
-export const TemplatePreviewSheet = ({
+export const TemplatePreviewWindow = ({
     templateName,
     fields,
     onClose,
@@ -27,21 +28,18 @@ export const TemplatePreviewSheet = ({
     const ready = fields.filter((field) => field.label.trim());
 
     return (
-        <BottomSheet
+        <ChecklistWindow
             open
             title={templateName || t('forms.builder.preview')}
             subtitle={t('forms.builder.previewHint')}
             onClose={onClose}
-            width={820}
-            height={800}
-            zIndex={800}
             headerActions={(
-                <button type="button" className={BTN_SECONDARY} onClick={() => setValues({})}>
-                    <X size={13} />{t('forms.builder.resetPreview')}
+                <button type="button" className="ofi-cal-btn" onClick={() => setValues({})}>
+                    <LuRotateCcw size={14} />{t('forms.builder.resetPreview')}
                 </button>
             )}
         >
-            <div className="p-5">
+            <div className="ofi-chk ofi-chk-stage">
                 <FormRenderer
                     fields={ready}
                     values={values}
@@ -49,6 +47,6 @@ export const TemplatePreviewSheet = ({
                     emptyText={t('forms.builder.previewEmpty')}
                 />
             </div>
-        </BottomSheet>
+        </ChecklistWindow>
     );
 };

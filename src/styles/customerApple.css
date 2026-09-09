@@ -1,0 +1,184 @@
+/* =========================================================
+   Offitec — DIE KUNDENAKTE IM KLEID DER OFFERTE (09.09.2026)
+
+   Vorgabe Samet: «Im CRM, bei den Kundendetails, sind die Eingabe-
+   felder viel zu gross — richte alles her, alles soll das moderne
+   Apple-Design haben.»
+
+   Die Stammdatenkarte (pages/crm/detail/CustomerInfoCard.tsx) trug
+   Tailwind-Klassen mit 32px-Feldern — aber der Formularstandard der
+   Anwendung (index.css «Form and action-control standard», 40px mit
+   `!important`) zog jedes Feld auf 40px, und der Rest der Karte
+   (navy Kachel im Kopf, blau getönte Kopfzeile, 2px-Ecken, graue
+   Lesefelder) stammte aus einer anderen Zeit.
+
+   Hier trägt die Karte das Kleid der Listenseiten (styles/listApple.css,
+   `.ofi-list-apple`, dieselben `--la-*`-Marken): eine Tafel mit
+   Haarlinie und 10px-Ecke, Kopf 44px ohne Kachel, Gruppentitel klein,
+   Beschriftung links in Grau, Wert rechts, und ein Feld von 28px mit
+   Haarlinie und 6px-Ecke — das Mass der Offertenseite.
+
+   Die Klassen (`.ofi-cust-info*`) hängen an der Karte selbst; das Blatt
+   wird von der Karte geladen und gilt nur unter `.ofi-list-apple`.
+   `!important` nur gegen den 40px-Standard und die `rounded-*`-Regeln
+   aus index.css, die selbst `!important` tragen.
+   ========================================================= */
+
+#root .ofi-list-apple .ofi-cust-info {
+    --ci-control-h: 28px;
+    margin-bottom: 14px;
+    border: 1px solid var(--la-border) !important;
+    background: var(--la-surface) !important;
+    box-shadow: none !important;
+    color: var(--la-text);
+}
+
+/* ── Kopf: Titel, ausgeklappt/eingeklappt, sonst nichts ─────────── */
+#root .ofi-list-apple .ofi-cust-info__head {
+    min-height: 44px;
+    gap: 10px;
+    padding: 8px 16px !important;
+    border-bottom: 1px solid var(--la-hairline);
+    background: var(--la-surface) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__head:hover { background: var(--la-hover) !important; }
+#root .ofi-list-apple .ofi-cust-info[data-collapsed="true"] .ofi-cust-info__head { border-bottom: 0; }
+#root .ofi-list-apple .ofi-cust-info__title {
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--la-text) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__summary { font-size: 12.5px; color: var(--la-secondary) !important; }
+#root .ofi-list-apple .ofi-cust-info__chevron { color: var(--la-muted); }
+
+/* ── Drei Gruppen nebeneinander, Haarlinien dazwischen ────────────── */
+#root .ofi-list-apple .ofi-cust-info__group {
+    padding: 12px 16px 14px;
+    border-color: var(--la-hairline) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__grouptitle {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--la-text) !important;
+}
+
+/* ── Die Zeile: Beschriftung 112px, Wert daneben ───────────────────── */
+#root .ofi-list-apple .ofi-cust-info__row {
+    grid-template-columns: 112px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+    border-color: transparent !important;
+}
+#root .ofi-list-apple .ofi-cust-info__label {
+    padding-top: 0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--la-secondary) !important;
+}
+
+/* Lesefeld: sieht wie Text aus, zeigt beim Überfahren seine Feldkante. */
+/* `!important` gegen styles/buttons.css: der Knopf trägt `px-2.5` und fällt
+   damit unter die 40px-Regel für JEDEN Handlungsknopf der Anwendung. */
+#root .ofi-list-apple .ofi-cust-info__row button.ofi-cust-info__value {
+    min-height: var(--ci-control-h) !important;
+    height: var(--ci-control-h) !important;
+    padding: 0 8px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+#root .ofi-list-apple .ofi-cust-info__row button.ofi-cust-info__value:hover {
+    border-color: var(--la-field-border) !important;
+    background: var(--la-surface) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__row button.ofi-cust-info__value .ofi-cust-info__empty { color: var(--la-muted) !important; -webkit-text-fill-color: var(--la-muted) !important; }
+
+/* Eingabefeld: 28px, weiss, Haarlinie, blauer Ring — das Feld der Offerte.
+   `!important` gegen den 40px-Formularstandard (index.css). */
+#root .ofi-list-apple .ofi-cust-info__row :is(input, select).ofi-cust-info__control,
+#root .ofi-list-apple .ofi-cust-info__row .ofi-cust-info__control :is(input, select) {
+    height: var(--ci-control-h) !important;
+    min-height: var(--ci-control-h) !important;
+    padding: 0 8px !important;
+    border: 1px solid var(--la-field-border) !important;
+    background: var(--la-surface) !important;
+    box-shadow: var(--la-btn-shadow) !important;
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    color: var(--la-text) !important;
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-list-apple .ofi-cust-info__row :is(input, select).ofi-cust-info__control:hover:not(:focus),
+#root .ofi-list-apple .ofi-cust-info__row .ofi-cust-info__control :is(input, select):hover:not(:focus) { border-color: var(--la-field-border-hover) !important; }
+#root .ofi-list-apple .ofi-cust-info__row :is(input, select).ofi-cust-info__control:focus,
+#root .ofi-list-apple .ofi-cust-info__row .ofi-cust-info__control :is(input, select):focus {
+    border-color: var(--la-accent) !important;
+    box-shadow: 0 0 0 3px var(--la-focus) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__row select.ofi-cust-info__control {
+    appearance: none;
+    padding-right: 26px !important;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 7px center !important;
+}
+.dark #root .ofi-list-apple .ofi-cust-info__row :is(input, select).ofi-cust-info__control,
+.dark #root .ofi-list-apple .ofi-cust-info__row .ofi-cust-info__control :is(input, select) { background-color: #161719 !important; }
+#root .ofi-list-apple .ofi-cust-info__row .ofi-cust-info__control::placeholder { color: var(--la-muted); }
+
+/* ── Speichern-Leiste: Haarlinie, weiss, kleine Druckknöpfe ────────── */
+#root .ofi-list-apple .ofi-cust-info__bar {
+    gap: 8px;
+    padding: 8px 16px !important;
+    border-top: 1px solid var(--la-hairline) !important;
+    background: var(--la-surface) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__hint { font-size: 12px; color: var(--la-secondary) !important; }
+#root .ofi-list-apple .ofi-cust-info__bar .ant-btn {
+    height: var(--ci-control-h) !important;
+    min-height: var(--ci-control-h) !important;
+    padding-inline: 11px !important;
+    border: 1px solid var(--la-field-border) !important;
+    background: var(--la-surface) !important;
+    box-shadow: var(--la-btn-shadow) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+}
+#root .ofi-list-apple .ofi-cust-info__bar .ant-btn:not(:disabled):hover { background: var(--la-hover) !important; }
+#root .ofi-list-apple .ofi-cust-info__bar .ant-btn.ant-btn-primary {
+    border-color: var(--la-accent) !important;
+    background: var(--la-accent) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+}
+#root .ofi-list-apple .ofi-cust-info__bar .ant-btn.ant-btn-primary:not(:disabled):hover { background: color-mix(in srgb, var(--la-accent) 88%, #000) !important; }
+#root .ofi-list-apple .ofi-cust-info__bar .ant-btn:disabled { opacity: 0.45; }
+#root .ofi-list-apple .ofi-cust-info__bar .ant-btn svg { width: 12px; height: 12px; }
+
+/* Radius — in `@layer utilities`, weil index.css dort jede `rounded-*`-Klasse
+   mit `!important` plattdrückt (siehe listApple.css, Abschnitt 7). */
+@layer utilities {
+    #root .ofi-list-apple .ofi-cust-info { border-radius: var(--la-radius) !important; }
+    #root .ofi-list-apple .ofi-cust-info__row button.ofi-cust-info__value,
+    #root .ofi-list-apple .ofi-cust-info__row :is(input, select).ofi-cust-info__control,
+    #root .ofi-list-apple .ofi-cust-info__row .ofi-cust-info__control :is(input, select),
+    #root .ofi-list-apple .ofi-cust-info__bar .ant-btn { border-radius: var(--la-control-radius) !important; }
+}
+
+@media (max-width: 640px) {
+    #root .ofi-list-apple .ofi-cust-info__row { grid-template-columns: 96px minmax(0, 1fr); }
+    #root .ofi-list-apple .ofi-cust-info__group { padding: 10px 12px 12px; }
+}

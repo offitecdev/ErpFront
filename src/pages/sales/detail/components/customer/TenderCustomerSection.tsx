@@ -102,10 +102,15 @@ export const TenderCustomerSection = ({
                         onOpenChange(false);
                     }}
                     placeholder={loading ? t('tenders.musteriler_loading') : t('tenders.customer_adi_yazin')}
-                    // Don't disable on metaSaving: changing an address / date must not
-                    // make the customer field look like it is reloading. Re-selecting a
-                    // customer mid-save is still guarded in handleSelectTenderCustomer.
-                    disabled={loading}
+                    // Das Feld wird NICHT gesperrt, solange die Liste lädt: Ein
+                    // `disabled`-Feld nimmt keinen Klick und keinen Fokus mehr an,
+                    // also hätte jede stehengebliebene Ladeanzeige die Kundenwahl
+                    // komplett totgelegt. Getippt werden darf währenddessen auch —
+                    // der Text filtert die Treffer, sobald sie eintreffen.
+                    // (Ebenso wenig sperrt metaSaving: eine geänderte Adresse oder
+                    // ein Datum darf das Kundenfeld nicht wie neu ladend aussehen
+                    // lassen. Die Neuwahl während des Speicherns ist in
+                    // handleSelectTenderCustomer abgesichert.)
                     className={`${QUOTE_CONTROL_CLASS} pr-8`}
                 />
                 {/* Round clear icon pinned at the end of the box; clicking it
@@ -139,6 +144,14 @@ export const TenderCustomerSection = ({
                     estimatedHeight={260}
                 >
                     <ul role="listbox" aria-label={t('tenders.select_customer')} className="max-h-64 overflow-y-auto py-0.5">
+                        {/* Erster Klick: Die Liste kommt vom Server. Statt eines
+                            leeren Feldes, bei dem der Klick wirkungslos aussieht,
+                            steht das Menü sofort da und sagt, dass es lädt. */}
+                        {loading && customers.length === 0 && (
+                            <li role="presentation" className="px-2.5 py-1.5 text-[13px] text-slate-500">
+                                {t('tenders.musteriler_loading')}
+                            </li>
+                        )}
                         {customers.map((customer) => (
                             // The whole row is the hit target, and it commits on
                             // pointerdown — before the field's delayed blur closes

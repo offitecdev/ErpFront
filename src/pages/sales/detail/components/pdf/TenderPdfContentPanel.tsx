@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 
 import {
     File05 as FileText,
@@ -7,8 +7,7 @@ import {
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
-import { tenderApi } from '../../../../../lib/api/tender';
-import type { TenderTextTemplateDto } from '../../../../../types/tender';
+import { useTenderTextTemplates } from '../../hooks/useTenderTextTemplates';
 import { PlainButton as Button } from '../common/PlainUi';
 import { TextTemplatesPopup } from '../../popups/TextTemplatesPopup';
 
@@ -108,107 +107,15 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ── Intro-text templates (Textbausteine) ─────────────────────────────────
-    const [templatesOpen, setTemplatesOpen] = useState(false);
-    const [templates, setTemplates] = useState<TenderTextTemplateDto[] | null>(null);
-    const [templatesLoading, setTemplatesLoading] = useState(false);
-    const [templateBusy, setTemplateBusy] = useState(false);
-    // Das Sheet behält seine Grösse; nur der INHALT wechselt zwischen Liste und
-    // Formular und schiebt sich dabei nach links/rechts (`ofi-slide-in-*`).
-    const [templateView, setTemplateView] = useState<'list' | 'form'>('list');
-    const [editingTemplate, setEditingTemplate] = useState<TenderTextTemplateDto | null>(null);
-    const [formTitle, setFormTitle] = useState('');
-    const [formContent, setFormContent] = useState('');
+    // Liste, Formular und Server liegen im gemeinsamen Haken; das Verkaufs-PDF
+    // des Auftrags benutzt denselben (hooks/useTenderTextTemplates).
+    const templates = useTenderTextTemplates({
+        currentText: value.coverLetter ?? '',
+        onApply: (content) => onChange({ coverLetter: content }),
+        onError,
+    });
 
     const images = value.closingImages ?? [];
-
-    const loadTemplates = async (): Promise<TenderTextTemplateDto[]> => {
-        if (templates) return templates;
-        setTemplatesLoading(true);
-        try {
-            const list = await tenderApi.listTextTemplates();
-            setTemplates(list);
-            return list;
-        } finally {
-            setTemplatesLoading(false);
-        }
-    };
-
-    const openTemplatePicker = () => {
-        setTemplateView('list');
-        setTemplatesOpen(true);
-        void loadTemplates().catch(() => onError(t('tenders.text_templates_load_error')));
-    };
-
-    /** "+" — öffnet das Formular, vorbelegt mit dem aktuellen Einleitungstext. */
-    const startNewTemplate = () => {
-        setEditingTemplate(null);
-        setFormTitle('');
-        setFormContent(value.coverLetter ?? '');
-        setTemplateView('form');
-    };
-
-    const startEditTemplate = (template: TenderTextTemplateDto) => {
-        setEditingTemplate(template);
-        setFormTitle(template.title);
-        setFormContent(template.content ?? '');
-        setTemplateView('form');
-    };
-
-    const saveTemplateForm = async () => {
-        const title = formTitle.trim();
-        if (!title) {
-            onError(t('tenders.text_template_title_required'));
-            return;
-        }
-        if (!hasText(formContent)) {
-            onError(t('tenders.text_template_content_required'));
-            return;
-        }
-        setTemplateBusy(true);
-        try {
-            if (editingTemplate) {
-                const updated = await tenderApi.updateTextTemplate(editingTemplate.id, { title, content: formContent });
-                setTemplates((current) => (current ?? []).map((item) => (item.id === updated.id ? updated : item)));
-            } else {
-                const created = await tenderApi.createTextTemplate({ title, content: formContent });
-                setTemplates((current) => [created, ...(current ?? [])]);
-            }
-            setTemplateView('list');
-        } catch {
-            onError(t('tenders.text_template_save_error'));
-        } finally {
-            setTemplateBusy(false);
-        }
-    };
-
-    const applyTemplate = (template: TenderTextTemplateDto) => {
-        onChange({ coverLetter: template.content ?? '' });
-        setTemplatesOpen(false);
-    };
-
-    const deleteTemplate = async (template: TenderTextTemplateDto) => {
-        setTemplateBusy(true);
-        try {
-            await tenderApi.deleteTextTemplate(template.id);
-            setTemplates((current) => (current ?? []).filter((item) => item.id !== template.id));
-        } catch {
-            onError(t('tenders.text_template_delete_error'));
-        } finally {
-            setTemplateBusy(false);
-        }
-    };
-
-    const makeDefaultTemplate = async (template: TenderTextTemplateDto) => {
-        setTemplateBusy(true);
-        try {
-            await tenderApi.updateTextTemplate(template.id, { isDefault: true });
-            setTemplates((current) => (current ?? []).map((item) => ({ ...item, isDefault: item.id === template.id })));
-        } catch {
-            onError(t('tenders.text_template_save_error'));
-        } finally {
-            setTemplateBusy(false);
-        }
-    };
 
     /**
      * Vorbelegung: Der Einleitungstext hat keinen Hinzufügen-Button mehr, also
@@ -222,12 +129,9 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
     useEffect(() => {
         if (prefillDone.current || !canEdit || hasText(value.coverLetter)) return;
         prefillDone.current = true;
-        void loadTemplates()
-            .then((list) => {
-                const fallback = list.find((item) => item.isDefault) ?? null;
-                if (fallback?.content) onChange({ coverLetter: fallback.content });
-            })
-            .catch(() => { /* stiller Fehlschlag — der Editor bleibt leer */ });
+        void templates.loadDefaultContent().then((content) => {
+            if (content) onChange({ coverLetter: content });
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canEdit]);
 
@@ -263,7 +167,7 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
                 canEdit={canEdit}
                 onRemove={() => onChange({ coverLetter: null })}
                 headerAction={(
-                    <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={openTemplatePicker}>
+                    <Button size="sm" variant="secondary" icon={<FileText size={12} />} onClick={templates.openPicker}>
                         {t('tenders.text_templates')}
                     </Button>
                 )}
@@ -336,25 +240,25 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
 
             {/* ── Textbausteine: floating card beside the button (popups/TextTemplatesPopup) ── */}
             <TextTemplatesPopup
-                open={templatesOpen}
-                onClose={() => setTemplatesOpen(false)}
+                open={templates.open}
+                onClose={templates.close}
                 canEdit={canEdit}
-                view={templateView}
-                onViewChange={setTemplateView}
-                templates={templates}
-                loading={templatesLoading}
-                busy={templateBusy}
-                editingTemplate={editingTemplate}
-                formTitle={formTitle}
-                onFormTitleChange={setFormTitle}
-                formContent={formContent}
-                onFormContentChange={setFormContent}
-                onApply={applyTemplate}
-                onStartNew={startNewTemplate}
-                onStartEdit={startEditTemplate}
-                onMakeDefault={(template) => void makeDefaultTemplate(template)}
-                onDelete={(template) => void deleteTemplate(template)}
-                onSave={() => void saveTemplateForm()}
+                view={templates.view}
+                onViewChange={templates.setView}
+                templates={templates.templates}
+                loading={templates.loading}
+                busy={templates.busy}
+                editingTemplate={templates.editingTemplate}
+                formTitle={templates.formTitle}
+                onFormTitleChange={templates.setFormTitle}
+                formContent={templates.formContent}
+                onFormContentChange={templates.setFormContent}
+                onApply={templates.apply}
+                onStartNew={templates.startNew}
+                onStartEdit={templates.startEdit}
+                onMakeDefault={templates.makeDefault}
+                onDelete={templates.remove}
+                onSave={templates.save}
             />
         </div>
     );

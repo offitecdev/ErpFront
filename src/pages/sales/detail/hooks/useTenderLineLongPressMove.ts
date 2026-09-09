@@ -167,9 +167,14 @@ export const useTenderLineLongPressMove = ({ enabled, rowIds, tableRef, onMoveRo
     const onRowPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>, rowId: string) => {
         if (!enabledRef.current || stateRef.current) return;
         if (event.button !== 0 || !event.isPrimary) return;
+        const target = event.target as Element | null;
+        // Inside the description editor a held press is how text gets
+        // selected and the caret placed with care — lifting the row from
+        // there blurred the editor mid-selection. The row still lifts from
+        // every other spot of the line.
+        if (target?.closest?.('[contenteditable="true"]')) return;
         cancelPress();
         const start = { x: event.clientX, y: event.clientY };
-        const target = event.target as Element | null;
         const immediateDrag = !(target?.closest?.(INTERACTIVE_SELECTOR));
         const onMove = (moveEvent: PointerEvent) => {
             if (moveEvent.pointerId !== event.pointerId) return;

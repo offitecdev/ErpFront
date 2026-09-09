@@ -31,7 +31,10 @@ export const calculateProjectTotals = (project: ProjectDto | null, orders: Proje
     const extraMaterials = (project?.extraMaterials || []).reduce((sum: number, item: any) => {
         return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
     }, 0);
-    const baseOrders = orders.filter((order) => !order.parentSalesOrderId);
+    // STORNIERTE Auftraege zaehlen nicht mehr zum Projektstand (Vorgabe Samet
+    // 06.09.2026): sie bleiben in der Liste stehen, aber ihr Betrag ist
+    // zurueckgenommen.
+    const baseOrders = orders.filter((order) => !order.parentSalesOrderId && !order.cancelledAt);
     const orderBudget = baseOrders.length
         ? baseOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)
         : Number(project?.plannedBudget || 0);

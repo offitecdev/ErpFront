@@ -6,17 +6,17 @@ import { Edit01, Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { formsApi, type FormSubmissionDto, type FormSubmissionRow, type FormTemplateDto } from '@/lib/api/forms';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
-import { ColResizeHandle, Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
+import { ColResizeHandle, FilterSlot, Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { CrmFilterBar, CrmFilterSelect } from '../components/CrmFilterBar';
 import { CustomerPicker } from '../components/CustomerPicker';
 import { useCrmPagedList } from '../hooks/useCrmPagedList';
 import type { CrmCustomerOption } from '../types/crm.types';
-import { ChecklistLinkSheet, type ChecklistTarget } from './components/ChecklistLinkSheet';
+import { ChecklistLinkDialog, type ChecklistTarget } from './components/ChecklistLinkDialog';
 import { DevelopmentNotice } from './components/DevelopmentNotice';
 import { TemplatePickerModal } from './components/TemplatePickerModal';
-import { FormFillSheet } from './components/FormFillSheet';
+import { ChecklistFillWindow } from './components/ChecklistFillWindow';
 import { CustomerCell, LinkChips } from './components/FormsContextPanel';
 import { apiErrorMessage, BTN_ICON, BTN_ICON_DANGER, BTN_PRIMARY, fmtDate, presetsFromLinks } from './ui';
 import { ChecklistTabs } from './components/ChecklistTabs';
@@ -30,14 +30,17 @@ import { ChecklistTabs } from './components/ChecklistTabs';
  * Checkliste wird angelegt, verknüpft und ausgefüllt.
  *
  * "Checkliste ausfüllen" führt in zwei Schritten: Vorlage wählen →
- * VERKNÜPFEN (Kunden und deren Angebote), dann öffnet der Editor im
- * Untenfenster. Es entsteht dabei GENAU EINE Checkliste (Vorgabe 16.08.2026):
- * fünf Kunden mit je vier Angeboten ergeben eine Checkliste mit zwanzig
- * Verknüpfungen, nicht zwanzig Checklisten — einmal ausgefüllt, bei allen
- * beteiligten Kunden sichtbar. Das Angebot entscheidet über die Reichweite:
- * verknüpft erscheint die Checkliste bei dessen Aufträgen, Projekten, auf dem
- * Montagebildschirm und im Rapport. Das Kettensymbol in der Zeile öffnet
- * dieselbe Tabelle wieder — dort kommen Kunden dazu oder fallen weg.
+ * VERKNÜPFEN (Kunden, wahlweise mit Angeboten — bestehende aus der
+ * Aufklappliste oder ein neu erstelltes), dann öffnet der Editor als
+ * schwebendes FENSTER wie eine Kalenderkarte (Vorgabe 02.09.2026). Es entsteht
+ * dabei GENAU EINE Checkliste (Vorgabe 16.08.2026): fünf Kunden mit je vier
+ * Angeboten ergeben eine Checkliste mit zwanzig Verknüpfungen, nicht zwanzig
+ * Checklisten — einmal ausgefüllt, bei allen beteiligten Kunden sichtbar. Das
+ * Angebot ist seit dem 02.09.2026 OPTIONAL, es entscheidet nur über die
+ * Reichweite: verknüpft erscheint die Checkliste bei dessen Aufträgen,
+ * Projekten, auf dem Montagebildschirm und im Rapport; ohne Angebot nur in
+ * der Kundenakte. Das Kettensymbol in der Zeile öffnet dasselbe Fenster
+ * wieder — dort kommen Kunden dazu oder fallen weg.
  *
  * Die Liste lädt NICHT neu, wenn eine Checkliste geöffnet oder gespeichert
  * wird: der Editor schreibt den Speicherstand in die Zeile zurück
@@ -225,11 +228,11 @@ export const FormsPage = () => {
             <ChecklistTabs active="checklists" />
 
             <CrmFilterBar>
-                <SearchBox value={search} onChange={setSearch} placeholder={t('forms.list.search')} className="w-64" />
+                <SearchBox value={search} onChange={setSearch} placeholder={t('forms.list.search')} />
                 <CrmFilterSelect value={templateId} onChange={setTemplateId} label={t('forms.list.filterTemplate')} options={templateOptions} allLabel={t('forms.list.allTemplates')} />
-                <div className="w-56">
+                <FilterSlot width="wide">
                     <CustomerPicker value={customer} onPick={(pick) => setCustomer(pick?.customer ?? null)} placeholder={t('forms.list.filterCustomer')} />
-                </div>
+                </FilterSlot>
             </CrmFilterBar>
 
             <SectionCard title={<span className="inline-flex items-center gap-2"><LuListChecks size={15} className="text-[#1f2654] dark:text-amber-400" />{t('nav.crmForms')} ({total})</span>}>
@@ -296,18 +299,18 @@ export const FormsPage = () => {
             {/* Der Bereich ist noch in Arbeit — der Hinweis steht UNTER der Liste. */}
             <DevelopmentNotice />
 
-            {/* Schritt 1: Vorlage — Schritt 2: Verknüpfung (Kunde + Angebot) */}
+            {/* Schritt 1: Vorlage — Schritt 2: Verknüpfung (Kunde + Angebot, optional) */}
             <TemplatePickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={(template) => setPendingTemplate(template)} />
-            <ChecklistLinkSheet
+            <ChecklistLinkDialog
                 open={Boolean(pendingTemplate)}
                 onClose={() => setPendingTemplate(null)}
                 busy={creating}
                 onSubmit={(targets) => { if (pendingTemplate) void createFor(pendingTemplate, targets); }}
             />
 
-            {/* Dieselbe Tabelle für eine bestehende Checkliste (Kettensymbol):
-                sie bringt alle bisherigen Kunden mit und ersetzt den Satz. */}
-            <ChecklistLinkSheet
+            {/* Dasselbe Fenster für eine bestehende Checkliste (Kettensymbol):
+                es bringt alle bisherigen Kunden mit und ersetzt den Satz. */}
+            <ChecklistLinkDialog
                 open={Boolean(relinking)}
                 onClose={() => setRelinking(null)}
                 busy={creating}
@@ -316,7 +319,7 @@ export const FormsPage = () => {
                 onSubmit={(targets) => { if (relinking) void saveLink(relinking, targets); }}
             />
 
-            <FormFillSheet
+            <ChecklistFillWindow
                 submissionId={openId}
                 open={Boolean(openId)}
                 onClose={closeSheet}

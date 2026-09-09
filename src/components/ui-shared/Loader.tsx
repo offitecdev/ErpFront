@@ -4,8 +4,9 @@ import { t } from '@/i18n/translate';
 /**
  * App-weite Ladeanimation — EIN Ort für alle Ladezustände.
  *
- * Zwei Bausteine, mehr braucht es nicht:
+ * Drei Bausteine, mehr braucht es nicht:
  *  - `Spinner`     — der Ring für "diese Aktion läuft" (Knöpfe, Kopfzeilen).
+ *  - `DotRing`     — der Punktekranz für "dieses Fenster füllt sich gerade".
  *  - `SkeletonBar` — der wandernde Glanz für "hier kommt gleich Inhalt".
  *
  * Der Glanz selbst ist eine CSS-Klasse (`.ofi-shimmer` in `index.css`), damit er
@@ -40,6 +41,59 @@ export const Spinner = ({ size = 'md', className = '' }: { size?: SpinnerSize; c
         </svg>
     );
 };
+
+/**
+ * PUNKTEKRANZ — acht Punkte im Kreis, die im Takt weiterspringen; der vorderste
+ * ist dunkel, dahinter verblassen sie (Vorlage Samet, `loading_spinner.png`).
+ *
+ * Anders als der Ring oben füllt er eine FLÄCHE, die noch leer ist: er steht
+ * mitten in einem Fenster oder Bereich, während dessen Inhalt geholt wird.
+ * Gedreht wird in acht Sprüngen (`steps(8)`) statt fliessend — genau das gibt
+ * das Bild der Vorlage, in dem jeder Punkt seine eigene Helligkeit trägt.
+ *
+ * Die Punkte selbst liegen in CSS (`.ofi-dotring` in `index.css`), damit die
+ * Winkel nicht in jeder Aufrufstelle neu gerechnet werden.
+ */
+export const DotRing = ({
+    size = 40,
+    label,
+    className = '',
+}: {
+    /** Kantenlänge des Kranzes in Pixel. */
+    size?: number;
+    label?: string;
+    className?: string;
+}) => (
+    <span
+        role="status"
+        aria-live="polite"
+        className={`ofi-dotring ${className}`}
+        style={{ '--ofi-dotring-size': `${size}px` } as CSSProperties}
+    >
+        {Array.from({ length: 8 }, (_, index) => (
+            <i key={index} aria-hidden="true" style={{ '--ofi-dotring-i': index } as CSSProperties} />
+        ))}
+        <span className="sr-only">{label ?? t('common.loading')}</span>
+    </span>
+);
+
+/**
+ * Der Punktekranz mitten in einer Fläche, die ihre Höhe behalten soll — der
+ * Ladezustand einer Maske, bevor ihr Inhalt da ist.
+ */
+export const DotRingPanel = ({
+    minHeight = 256,
+    label,
+    className = '',
+}: {
+    minHeight?: number;
+    label?: string;
+    className?: string;
+}) => (
+    <div className={`flex items-center justify-center ${className}`} style={{ minHeight }}>
+        <DotRing size={44} label={label} className="text-slate-800 dark:text-white/85" />
+    </div>
+);
 
 /**
  * Ladehinweis als TEXT mit laufenden Punkten — "Daten werden geladen • • •".

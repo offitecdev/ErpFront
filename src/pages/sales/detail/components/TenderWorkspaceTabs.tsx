@@ -26,18 +26,16 @@ type TenderWorkspaceTabsProps = {
     onOpenSettingsTab: (tab: TenderSettingsTabKey) => void;
 };
 
-// Tab strip sitting directly on the page, aligned with the card edges. It is
-// the SAME strip as the project detail workflow menu (ProjectTopNav) — same
-// classes, same `.ofi-quote-tab*` CSS hooks — so a user moving between a quote,
-// an order and a project sees one navigation idiom, not three.
+// The quote workspace uses a compact segmented rail. Keep the shared tab
+// hooks so selection and navigation behavior remain consistent.
 export const TenderWorkspaceTabs = ({ workspaceTab, onSelectTab, onOpenSettingsTab }: TenderWorkspaceTabsProps) => (
-    <div className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-slate-200 px-1 pt-1 dark:border-white/15">
-        <SlidingTopTabs activeKey={workspaceTab} className="flex min-w-max items-stretch gap-1">
+    <div className="ofi-quote-tabs-strip ofi-quote-workspace-nav min-w-0 overflow-x-auto">
+        <SlidingTopTabs activeKey={workspaceTab} className="ofi-quote-workspace-nav__rail flex min-w-max items-stretch">
             {getTenderWorkspaceTabs().map((tab) => {
                 const active = workspaceTab === tab.key;
                 return (
                     <button
-                        key={tab.label}
+                        key={tab.key}
                         data-tab-key={tab.key}
                         type="button"
                         disabled={tab.disabled}
@@ -49,22 +47,7 @@ export const TenderWorkspaceTabs = ({ workspaceTab, onSelectTab, onOpenSettingsT
                             }
                             onSelectTab(tab.key);
                         }}
-                        // ONE strip style across the app (user request
-                        // 17.08.2026: "make it the same as the other CRM /
-                        // project pages"): the very same classes as
-                        // ProjectTopNav — active tab = filled light-navy panel
-                        // with rounded top corners, hairline edge and bold navy
-                        // label; idle tabs are quiet grey text.
-                        // `ofi-quote-tab-active` is the hook dark.css uses to
-                        // repaint the fill in the accent gold; the light tint
-                        // below has no dark counterpart of its own.
-                        className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
-                            active
-                                ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                : tab.disabled
-                                    ? 'cursor-not-allowed border-transparent font-medium text-slate-300 dark:text-white/35'
-                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
-                        }`}
+                        className={`ofi-quote-tab ofi-quote-workspace-nav__tab inline-flex items-center gap-1.5 transition-colors ${active ? 'ofi-quote-tab-active' : ''}`}
                     >
                         {tab.label}
                         {tab.disabled && tab.label === t('tenders.technician_ata') && (

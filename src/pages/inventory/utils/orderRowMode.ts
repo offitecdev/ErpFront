@@ -19,8 +19,11 @@ import { computeOrderLine, discountFactor, round2 } from './orderPricing';
  *     DUYARLIKLA türetilir (56.93 / 3 = 18.976666…) — tutar kaymaz.
  *   • AUTO → DIRECT bunun İSTİSNASIDIR: hücrelere hiçbir şey yazılmaz (aşağıda
  *     gerekçesi) — doğrudan giriş boş hücrede aynı tutarı zaten türetir.
- *   • `pinned` verilirse satırın "sabitlenmiş" bayrağı da güncellenir: sabit
- *     satırlar toplu kip değişiminden ETKİLENMEZ (boş daire = tabloyu izler).
+ *
+ * ⚠ EINE RECHENART FUER DIE GANZE BESTELLUNG (Vorgabe Samet, 07.09.2026):
+ *   Zeilen koennen sich nicht mehr von der Tabelle abkoppeln. Das fruehere
+ *   `pinned`/`modePinned` und der Kreis, mit dem man es umschaltete, sind
+ *   fort — samt der leeren Spalte, in der er sass.
  */
 /**
  * TEDARİKÇİ kipinde çarpımın tabanı: `supplierUnitBase` varsa O (tam duyarlık),
@@ -78,11 +81,8 @@ export const draftRowFigures = (row: DraftOrderRow) => {
     };
 };
 
-export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode, pinned?: boolean): DraftOrderRow => {
-    const modePinned = pinned ?? row.modePinned;
-    if (row.calcMode === next) {
-        return row.modePinned === modePinned ? row : { ...row, modePinned };
-    }
+export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode): DraftOrderRow => {
+    if (row.calcMode === next) return row;
     const quantity = parseNum(row.quantity) ?? 0;
     const figures = draftRowFigures(row);
     // Terk edilen kipin değerleri saklanır. SATIR TUTARI olarak O ANKİ HESAP
@@ -98,7 +98,7 @@ export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode, pinne
             ...(row.calcMode === 'SUPPLIER' && row.supplierUnitBase ? { base: row.supplierUnitBase } : {}),
         };
     }
-    if (next === 'AUTO') return { ...row, calcMode: next, modeStash, modePinned };
+    if (next === 'AUTO') return { ...row, calcMode: next, modeStash };
 
     const savedTarget = modeStash[next];
     const savedDirect = modeStash.DIRECT;
@@ -127,7 +127,6 @@ export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode, pinne
             netPrice: display,
             supplierUnitBase: base !== null ? String(base) : undefined,
             modeStash,
-            modePinned,
         };
     }
 
@@ -142,7 +141,6 @@ export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode, pinne
             lineTotal: savedTarget.lineTotal,
             supplierUnitBase: undefined,
             modeStash,
-            modePinned,
         };
     }
     // ── OTOMATİK → DOĞRUDAN GİRİŞ (kullanıcı isteği 2026-08-02: "otomatikten
@@ -153,9 +151,9 @@ export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode, pinne
     // giriş zaten brüt fiyat × indirim çarpanını gösterir — tutar birebir aynı
     // kalır, hücre ise yazılabilir durur.
     if (row.calcMode === 'AUTO') {
-        return { ...row, calcMode: next, netPrice: '', lineTotal: '', supplierUnitBase: undefined, modeStash, modePinned };
+        return { ...row, calcMode: next, netPrice: '', lineTotal: '', supplierUnitBase: undefined, modeStash };
     }
-    if (!figures.lineTotal) return { ...row, calcMode: next, supplierUnitBase: undefined, modeStash, modePinned };
+    if (!figures.lineTotal) return { ...row, calcMode: next, supplierUnitBase: undefined, modeStash };
     return {
         ...row,
         calcMode: next,
@@ -164,7 +162,6 @@ export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode, pinne
         lineTotal: String(figures.lineTotal),
         supplierUnitBase: undefined,
         modeStash,
-        modePinned,
     };
 };
 
@@ -214,13 +211,4 @@ export const rowDiffersFromOrigin = (row: DraftOrderRow): boolean => {
         || origin.lineTotal !== row.lineTotal
         || origin.discount !== row.discount
         || origin.discount2 !== row.discount2;
-};
-
-/** Sağdaki dairenin döngüsü: boş → D → A → T → boş (boş = tabloyu izler). */
-export const cycleRowMode = (row: DraftOrderRow, tableDefault: OrderCalcMode): DraftOrderRow => {
-    if (!row.modePinned) return transitionRowMode(row, 'DIRECT', true);
-    if (row.calcMode === 'DIRECT') return transitionRowMode(row, 'AUTO', true);
-    if (row.calcMode === 'AUTO') return transitionRowMode(row, 'SUPPLIER', true);
-    // Sabitleme kalkar: satır tablo varsayılanına döner ve onu izlemeye başlar.
-    return transitionRowMode(row, tableDefault, false);
 };

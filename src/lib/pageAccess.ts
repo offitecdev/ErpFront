@@ -72,6 +72,8 @@ export const pageLevelForKey = (
 const PAGE_LEVEL_FALLBACKS: Readonly<Record<string, string>> = {
     'crm.enquiries': 'crm.customers',
     'crm.activities': 'crm.communication',
+    // Nachträge sind Aufträge — wer die Auftragsliste sieht, sieht auch sie.
+    'sales.addonOrders': 'sales.orders',
 };
 
 /**

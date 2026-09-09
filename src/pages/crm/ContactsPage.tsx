@@ -57,9 +57,7 @@ export const ContactsPage = () => {
             <InventoryListHeader title={t('nav.crmContacts')} />
 
             <CrmFilterBar>
-                <div className="w-64">
-                    <SearchBox value={search} onChange={setSearch} placeholder={t('crm.contactsPage.search')} />
-                </div>
+                <SearchBox value={search} onChange={setSearch} placeholder={t('crm.contactsPage.search')} />
             </CrmFilterBar>
 
             <SectionCard title={`${t('nav.crmContacts')} (${total})`}>

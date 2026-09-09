@@ -13,6 +13,7 @@ import {
     defaultConfirmationValidUntil,
     resolveConfirmationValidUntil,
 } from '@/lib/orderConfirmation';
+import { useTenderTextTemplates } from '@/pages/sales/detail/hooks/useTenderTextTemplates';
 import { richTextToPlain } from '@/pages/sales/detail/utils/markdown.utils';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
 
@@ -23,6 +24,18 @@ const LazyRichTextEditor = lazy(() =>
     import('@/pages/sales/detail/components/RichTextMarkdownEditor')
         .then((module) => ({ default: module.RichTextMarkdownEditor })),
 );
+
+// Dasselbe Vorlagenfenster wie im PDF-Reiter der Offerte. Ebenfalls lazy: es
+// zieht den Editor nach, und die Auftragskarte soll ihn erst laden, wenn jemand
+// die Vorlagen wirklich öffnet.
+const LazyTextTemplatesPopup = lazy(() =>
+    import('@/pages/sales/detail/popups/TextTemplatesPopup')
+        .then((module) => ({ default: module.TextTemplatesPopup })),
+);
+
+/* Die Vorlagenkarte schwebt ÜBER dem Fenster mit dem Schleier (z 750) — ohne
+   eigene Stapelhöhe läge sie darunter und wäre unerreichbar. */
+const TEMPLATES_Z = 800;
 
 /** Leer heisst: kein sichtbarer Text — leere Absätze zählen nicht. */
 const hasText = (value: string) => richTextToPlain(value).replace(/\s|&nbsp;/g, '').length > 0;
@@ -67,7 +80,15 @@ const fullName = (person?: { firstName?: string | null; lastName?: string | null
  *
  *   • Der Text startet beim EINLEITUNGSTEXT DER OFFERTE. Ist am Auftrag schon
  *     einer gesichert, gilt dieser — sonst wird der der Offerte geholt
- *     (`/tenders/:id/pdf-content`) und steht sofort im Editor.
+ *     (`/tenders/:id/pdf-content`) und steht sofort im Editor. Hat die Offerte
+ *     keinen, greift die Standardvorlage der Textbausteine, genau wie in der
+ *     Offertenmaske.
+ *   • Über dem Editor steht derselbe Knopf «Textbausteine» wie im PDF-Reiter
+ *     der Offerte (Vorgabe Samet: «im Verkauf soll für das Anschreiben dasselbe
+ *     kommen wie in den Angebotsdetails, mit dem Vorlagen-Bereich»). Er öffnet
+ *     dieselbe mandantenweite Liste — auswählen, bearbeiten, als Standard
+ *     setzen, löschen, und «+» sichert den Text, der gerade im Feld steht, als
+ *     neue Vorlage (`hooks/useTenderTextTemplates`).
  *   • «Gültig bis» ist standardmässig das AUFTRAGSDATUM PLUS EIN MONAT. Das
  *     Datum des Belegs ist der Zeitpunkt, an dem der Auftrag entstanden ist,
  *     nicht das Datum der Offerte.
@@ -124,6 +145,39 @@ export const OrderConfirmationButton = ({ order, fallbackTenderId, onSaved, clas
         saveRef.current = null;
     }, [order?.id, order?.confirmationNote, order?.confirmationValidUntil]);
 
+    // ── Textbausteine ────────────────────────────────────────────────────────
+    // Genau die Vorlagen der Angebotsdetails: dieselbe mandantenweite Liste,
+    // derselbe Haken, dasselbe Fenster (Vorgabe Samet: im Verkauf soll für das
+    // Anschreiben dasselbe kommen wie in den Angebotsdetails).
+    const templates = useTenderTextTemplates({
+        currentText: note,
+        onApply: setNote,
+        onError: (message) => toast.error(message),
+    });
+
+    // Escape gehört der obersten Karte. Der Dialog gibt die Taste frei, solange
+    // die Vorlagen offen sind (`closeOnEscape` unten), sonst schlösse er sich
+    // mitsamt dem getippten Text.
+    const { open: templatesOpen, close: closeTemplates } = templates;
+    useEffect(() => {
+        if (!templatesOpen) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            closeTemplates();
+        };
+        window.addEventListener('keydown', onKey, true);
+        return () => window.removeEventListener('keydown', onKey, true);
+    }, [templatesOpen, closeTemplates]);
+
+    /* Das Fenster zu heisst: auch die Vorlagenkarte darüber ist zu. Sie hat
+       keinen Schleier, ihr Fenster ist also weiterhin anklickbar — ohne diesen
+       Griff bliebe sie nach «Abbrechen» allein auf der Seite stehen. */
+    const closeDialog = () => {
+        closeTemplates();
+        setOpen(false);
+    };
+
     const openPopup = () => {
         const storedNote = saved.note || '';
         setNote(storedNote);
@@ -133,17 +187,23 @@ export const OrderConfirmationButton = ({ order, fallbackTenderId, onSaved, clas
         // Noch nie bearbeitet: der Text der Offerte ist der Startpunkt. Er wird
         // erst beim Öffnen geholt — die Auftragskarte soll dafür nicht bei
         // jedem Seitenaufbau eine Anfrage bezahlen.
-        if (!hasText(storedNote) && tenderId) {
-            setPrefilling(true);
-            tenderApi.getPdfContent(tenderId)
-                .then((content) => {
-                    const quoteText = content?.coverLetter || '';
-                    // Nur übernehmen, wenn inzwischen niemand selbst getippt hat.
-                    if (quoteText) setNote((current) => (hasText(current) ? current : quoteText));
-                })
-                .catch(() => { /* kein Anschreiben: das Feld bleibt leer und wird getippt */ })
-                .finally(() => setPrefilling(false));
-        }
+        if (hasText(storedNote)) return;
+        setPrefilling(true);
+        void (async () => {
+            try {
+                const content = tenderId
+                    ? await tenderApi.getPdfContent(tenderId).catch(() => null)
+                    : null;
+                // Hat die Offerte selbst kein Anschreiben, gilt die Standard-
+                // vorlage — dieselbe, die die Offertenmaske in ein leeres Feld
+                // schreibt. Sonst bliebe das Feld hier ohne Not leer.
+                const text = content?.coverLetter || (await templates.loadDefaultContent()) || '';
+                // Nur übernehmen, wenn inzwischen niemand selbst getippt hat.
+                if (text) setNote((current) => (hasText(current) ? current : text));
+            } finally {
+                setPrefilling(false);
+            }
+        })();
     };
 
     const generate = async () => {
@@ -163,7 +223,7 @@ export const OrderConfirmationButton = ({ order, fallbackTenderId, onSaved, clas
             };
             setSaved({ note: stored.confirmationNote, validUntil: stored.confirmationValidUntil });
             onSaved?.(stored);
-            setOpen(false);
+            closeDialog();
 
             // Ein neuer Stand heisst ein neues Dokument — der alte wird
             // verworfen, damit die Vorschau nie das vorige PDF zeigt.
@@ -223,12 +283,15 @@ export const OrderConfirmationButton = ({ order, fallbackTenderId, onSaved, clas
                 subtitle={order?.orderNumber || undefined}
                 icon={<File05 size={20} />}
                 width={640}
-                onClose={() => { if (!saving) setOpen(false); }}
-                closeOnBackdrop={!saving}
-                closeOnEscape={!saving}
+                onClose={() => { if (!saving) closeDialog(); }}
+                /* Solange die Vorlagenkarte darüber steht, gehören Schleier und
+                   Escape ihr — sonst nähme ein Klick daneben den getippten
+                   Einleitungstext mit. */
+                closeOnBackdrop={!saving && !templatesOpen}
+                closeOnEscape={!saving && !templatesOpen}
                 footer={(
                     <PopupActions>
-                        <PopupButton disabled={saving} onClick={() => setOpen(false)}>{t('common.cancel')}</PopupButton>
+                        <PopupButton disabled={saving} onClick={closeDialog}>{t('common.cancel')}</PopupButton>
                         <PopupButton
                             variant="primary"
                             loading={saving}
@@ -256,6 +319,18 @@ export const OrderConfirmationButton = ({ order, fallbackTenderId, onSaved, clas
                     label={t('crm.orderConfirmation.introLabel')}
                     hint={t('crm.orderConfirmation.introHint')}
                 >
+                    {/* Derselbe Knopf wie im PDF-Reiter der Offerte: er öffnet
+                        die mandantenweiten Textbausteine, aus denen das
+                        Anschreiben übernommen wird. */}
+                    <div className="mb-1.5 flex justify-end">
+                        <PopupButton
+                            icon={<File05 size={13} />}
+                            disabled={prefilling || saving}
+                            onClick={templates.openPicker}
+                        >
+                            {t('tenders.text_templates')}
+                        </PopupButton>
+                    </div>
                     {prefilling ? (
                         <div className="ofi-shimmer h-40 rounded-[3px]" />
                     ) : (
@@ -272,6 +347,37 @@ export const OrderConfirmationButton = ({ order, fallbackTenderId, onSaved, clas
 
                 <PopupNote className="ofi-ordconf-hint">{t('crm.orderConfirmation.hint')}</PopupNote>
             </PopupDialog>
+
+            {/* ── Textbausteine ────────────────────────────────────────────────
+                Dieselbe Karte wie in den Angebotsdetails, nur über dem Fenster
+                gestapelt: Zeile anklicken = übernehmen, «+» sichert den Text,
+                der gerade im Feld steht, als neue Vorlage. */}
+            {templates.open && (
+                <Suspense fallback={null}>
+                    <LazyTextTemplatesPopup
+                        open={templates.open}
+                        onClose={templates.close}
+                        canEdit={!saving}
+                        view={templates.view}
+                        onViewChange={templates.setView}
+                        templates={templates.templates}
+                        loading={templates.loading}
+                        busy={templates.busy}
+                        editingTemplate={templates.editingTemplate}
+                        formTitle={templates.formTitle}
+                        onFormTitleChange={templates.setFormTitle}
+                        formContent={templates.formContent}
+                        onFormContentChange={templates.setFormContent}
+                        onApply={templates.apply}
+                        onStartNew={templates.startNew}
+                        onStartEdit={templates.startEdit}
+                        onMakeDefault={templates.makeDefault}
+                        onDelete={templates.remove}
+                        onSave={templates.save}
+                        z={TEMPLATES_Z}
+                    />
+                </Suspense>
+            )}
 
             <PdfPreviewSheet
                 open={previewOpen}

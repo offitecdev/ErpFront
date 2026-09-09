@@ -1,8 +1,12 @@
 import { memo, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { AlertTriangle, Receipt as ReceiptText, X } from '@/components/icons/antIconCompat';
+import { AlertTriangle, Edit01, PackagePlus, Receipt as ReceiptText, Trash01, X } from '@/components/icons/antIconCompat';
+import { addonCreatePath, addonEditPath } from '@/components/orders/addonEditorRoute';
+import { AddonEditorSlot } from '@/components/orders/AddonEditorSlot';
+import { useOrderLifecycle } from '@/components/orders/useOrderLifecycle';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
 import { projectApi } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
@@ -44,12 +48,16 @@ export const CreateAddonOrderTab = memo(({
     onCreated: (orderId: string) => Promise<void>;
     onChanged: () => void | Promise<void>;
 }) => {
+    const navigate = useNavigate();
+    // Löschen eines Nachtrags: Material zurück ins Lager, Rapporte und Termine
+    // gehen an den Hauptauftrag zurück (Vorgabe Samet 05.09.2026).
+    const { requestAction, dialog: lifecycleDialog } = useOrderLifecycle(() => onChanged());
     const [loading, setLoading] = useState(false);
     const [dismissingId, setDismissingId] = useState<string | null>(null);
     // Single memo over all the addon scoping/aggregation so the filters, sort and
     // reduces only re-run when the project or the order selection actually changes.
     const {
-        parentOrder, pendingRequests, latestAddon, nextOrderNumber,
+        parentOrder, pendingRequests, latestAddon, nextOrderNumber, existingAddons,
         expenseTotal, materialTotal, overtimeTotal, total,
         expenseCount, materialCount, overtimeCount,
     } = useMemo(() => {
@@ -80,6 +88,8 @@ export const CreateAddonOrderTab = memo(({
         const total = expenseTotal + materialTotal + overtimeTotal;
         return {
             parentOrder, pendingRequests, latestAddon, nextOrderNumber,
+            // Der jüngste zuoberst — bearbeitet und gelöscht wird meist der letzte.
+            existingAddons: [...addons].reverse(),
             expenseTotal, materialTotal, overtimeTotal, total,
             expenseCount: pendingExpenses.length,
             materialCount: pendingExtraMaterials.length,
@@ -115,7 +125,16 @@ export const CreateAddonOrderTab = memo(({
         }
     };
 
+    /* Die Erfassung geschieht IN diesem Bereich (Vorgabe 05.09.2026): ist der
+       Vermerk in der Adresse gesetzt, steht hier die Maske statt der Übersicht
+       — Projektkopf und Reiter bleiben stehen. */
     return (
+        <AddonEditorSlot
+            parent={parentOrder && !parentOrder.id.startsWith('project-main-')
+                ? { id: parentOrder.id, orderNumber: parentOrder.orderNumber, projectId: project.id }
+                : null}
+            onSaved={onChanged}
+        >
         <div className="ofi-inv-scope space-y-4">
             {/* Offene Anfrage des Technikers — sie steht ÜBER der Karte, weil sie
                 der Grund ist, überhaupt hier zu sein. */}
@@ -236,6 +255,101 @@ export const CreateAddonOrderTab = memo(({
                     {canCreate && total <= 0 && <p className="ofi-inv-note">{t('projects.addonNothingToBill')}</p>}
                 </div>
             </section>
+
+            {/* Der ZWEITE Weg (Vorgabe Samet, 05.09.2026): ein Zusatzauftrag mit
+                eigenen Positionen — Produkte oder Material direkt erfasst,
+                unabhängig von den Rapporten, mit eigenem NT-Code. */}
+            <section className="ofi-inv-card">
+                <header className="ofi-inv-card__head">
+                    <span className="ofi-inv-card__title">
+                        <PackagePlus size={14} />
+                        <span className="truncate">{t('crm.addon.standaloneTitle')}</span>
+                    </span>
+                    <div className="ofi-inv-card__actions">
+                        <button
+                            type="button"
+                            className="ofi-inv-btn is-primary"
+                            disabled={!canCreate || parentOrder.id.startsWith('project-main-')}
+                            /* Eigene SEITE statt Fenster (Vorgabe 05.09.2026):
+                               Positionserfassung wie in der Angebotsmaske. */
+                            onClick={() => navigate(addonCreatePath(
+                                { id: parentOrder.id, orderNumber: parentOrder.orderNumber, projectId: project.id },
+                                `/projects/${project.id}?section=addons`,
+                            ))}
+                        >
+                            <PackagePlus size={13} />
+                            {t('crm.addon.newTitle')}
+                        </button>
+                    </div>
+                </header>
+                <div className="ofi-inv-card__body">
+                    <p className="ofi-inv-note">{t('crm.addon.standaloneHint')}</p>
+                </div>
+            </section>
+
+            {/* Was es schon gibt: BEARBEITEN und LÖSCHEN (Vorgabe Samet,
+                05.09.2026). Bearbeiten öffnet dieselbe Maske an genau dieser
+                Stelle, Löschen fragt zuerst und bucht dann Material zurück. */}
+            {existingAddons.length > 0 && (
+                <section className="ofi-inv-card">
+                    <header className="ofi-inv-card__head">
+                        <span className="ofi-inv-card__title">
+                            <ReceiptText size={14} />
+                            <span className="truncate">{t('projects.detail.overview.addonsTitle')}</span>
+                            <span className="ofi-inv-sub">{existingAddons.length}</span>
+                        </span>
+                    </header>
+                    <div className="ofi-inv-card__body">
+                        <table data-inv-table data-unstyled-table data-no-col-resize className="w-full">
+                            <thead>
+                                <tr>
+                                    <th className="text-left">{t('projects.detail.colOrder')}</th>
+                                    <th className="w-40 text-right">{t('projects.detail.colAmount')}</th>
+                                    <th className="w-24 text-right">{t('common.actions')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {existingAddons.map((addon) => (
+                                    <tr key={addon.id}>
+                                        <td>
+                                            <span className="ofi-inv-name">{addon.orderNumber}</span>
+                                            <span className="ofi-inv-sub">{dayjs(addon.orderDate || addon.createdAt).format('DD.MM.YYYY')}</span>
+                                        </td>
+                                        <td className="ofi-inv-num is-strong">{money(Number(addon.totalAmount) || 0)}</td>
+                                        <td className="text-right">
+                                            <span className="inline-flex items-center justify-end gap-1">
+                                                <button
+                                                    type="button"
+                                                    className="ofi-inv-glyph"
+                                                    title={t('crm.addon.editTitle')}
+                                                    aria-label={t('crm.addon.editTitle')}
+                                                    disabled={!canCreate}
+                                                    onClick={() => navigate(addonEditPath(addon.id, `/projects/${project.id}?section=addons`))}
+                                                >
+                                                    <Edit01 size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="ofi-inv-glyph is-danger"
+                                                    title={t('common.delete')}
+                                                    aria-label={t('common.delete')}
+                                                    disabled={!canCreate}
+                                                    onClick={() => requestAction({ id: addon.id, orderNumber: addon.orderNumber, isAddon: true })}
+                                                >
+                                                    <Trash01 size={14} />
+                                                </button>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
+            {lifecycleDialog}
         </div>
+        </AddonEditorSlot>
     );
 });

@@ -14,7 +14,7 @@ import { CHECKLIST_PATHS, templateEditorPath } from './routes';
 import { CHECKPOINT_TYPE } from './template/fieldTypes';
 import { FieldSidePanel } from './template/FieldSidePanel';
 import { TemplateFieldsTable } from './template/TemplateFieldsTable';
-import { TemplatePreviewSheet } from './template/TemplatePreviewSheet';
+import { TemplatePreviewWindow } from './template/TemplatePreviewWindow';
 import { useTemplateEditor } from './template/useTemplateEditor';
 import {
     addField,
@@ -203,7 +203,7 @@ export const FormTemplateBuilderPage = () => {
             </div>
 
             {previewOpen && (
-                <TemplatePreviewSheet
+                <TemplatePreviewWindow
                     templateName={draft.name}
                     fields={draft.fields}
                     onClose={() => setPreviewOpen(false)}

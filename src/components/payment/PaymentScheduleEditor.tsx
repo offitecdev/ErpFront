@@ -4,6 +4,7 @@ import { t } from '@/i18n/translate';
 import {
     formatStageDate,
     MAX_PAYMENT_STAGES,
+    MAX_STAGE_LABEL,
     paymentStagesMissingDate,
     paymentStagesSum,
     paymentStagesValid,
@@ -42,8 +43,10 @@ const parsePercentInput = (raw: string): number => {
 };
 
 // Row list editing a payment schedule (30/20/10/40, 50/50, …). Every instalment
-// carries its percentage and — where `showDates` is on (the order) — the day it
-// falls due; both are then required before the plan counts as valid. Purely
+// carries its percentage, a free text of its own — «vor Montage», «nach
+// Fertigstellung», so the plan reads as a sentence — and, where `showDates` is
+// on (the order), the day it falls due; percentage and date are then required
+// before the plan counts as valid, the text never is. Purely
 // presentational + local math: the parent owns the stage array and decides
 // when/where it is persisted. Amounts are a live preview against the current
 // gross total, never stored.
@@ -87,7 +90,7 @@ export const PaymentScheduleEditor = ({
         if (stages.length >= MAX_PAYMENT_STAGES) return;
         // The new row takes whatever is missing to 100%, so 30/20 → add → 30/20/50.
         const remainder = round2(100 - sum);
-        onChange([...stages, { percent: remainder > 0 && remainder <= 100 ? remainder : 0, date: null }]);
+        onChange([...stages, { percent: remainder > 0 && remainder <= 100 ? remainder : 0, date: null, label: null }]);
     };
 
     return (
@@ -169,7 +172,45 @@ export const PaymentScheduleEditor = ({
                                         />
                                     </span>
                                 )}
-                                <span className="min-w-0 flex-1 truncate text-right text-[12px] tabular-nums text-slate-500 dark:text-white/60">
+                                {/* Freitext der Rate — «vor Montage», «nach
+                                    Fertigstellung» (Vorgabe 03.09.2026). Er
+                                    nimmt den bisher leeren Platz neben dem
+                                    Prozentsatz ein, steht so im PDF und hält
+                                    den Plan nie auf: ohne Text bleibt er
+                                    gültig. Unkontrolliert wie das Prozentfeld,
+                                    damit ein Neuladen des Angebots nicht in
+                                    die laufende Eingabe fährt. */}
+                                {readOnly ? (
+                                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-slate-600 dark:text-white/70">
+                                        {stage.label || ''}
+                                    </span>
+                                ) : (
+                                    <input
+                                        key={`stage-label-${index}-${stage.label ?? ''}`}
+                                        aria-label={t('tenders.payment_stage_note_aria', { n: index + 1 })}
+                                        type="text"
+                                        maxLength={MAX_STAGE_LABEL}
+                                        defaultValue={stage.label ?? ''}
+                                        placeholder={t('tenders.payment_stage_note_placeholder')}
+                                        onBlur={(event) => {
+                                            if (event.target.value !== event.target.defaultValue) {
+                                                patchStage(index, { label: event.target.value.trim() || null });
+                                            }
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter') {
+                                                event.preventDefault();
+                                                (event.target as HTMLInputElement).blur();
+                                            }
+                                        }}
+                                        /* `ofi-plan-note` ist der Griff für das
+                                           Rechnungskleid (`.ofi-inv-plan`), das
+                                           JEDES Textfeld des Editors rechts
+                                           ausrichtet — ein Satz gehört links. */
+                                        className="ofi-plan-note min-w-0 flex-1 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-[12.5px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#1f2654] dark:border-white/25 dark:bg-white/10 dark:text-white dark:placeholder:text-white/35"
+                                    />
+                                )}
+                                <span className="w-24 shrink-0 truncate text-right text-[12px] tabular-nums text-slate-500 dark:text-white/60">
                                     {amount != null ? (formatMoney ? formatMoney(amount) : round2(amount).toFixed(2)) : ''}
                                 </span>
                                 {status === 'done' && (

@@ -1,7 +1,18 @@
 import dayjs from 'dayjs';
 
 import { t } from '@/i18n/translate';
-import type { InvoiceCategory, InvoiceDto, InvoiceStatus } from '@/types/billing';
+import type {
+    InvoiceCategory,
+    InvoiceDto,
+    InvoiceSectionFlags,
+    InvoiceSectionKey,
+    InvoiceStatus,
+} from '@/types/billing';
+import {
+    MAX_TOTAL_DISCOUNTS,
+    parseDiscountList,
+    type TenderDiscountEntry,
+} from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import type { Variant } from '@/components/ui-shared/StatusBadge';
 
 /**
@@ -87,3 +98,40 @@ export const FIELD_INPUT_CLASS = 'ofi-invp-input';
 export const FIELD_TEXTAREA_CLASS = 'ofi-invp-input';
 /** Zahlenfeld: rechtsbündig mit Tabellenziffern. */
 export const FIELD_NUM_CLASS = 'ofi-invp-input is-num';
+
+
+/**
+ * ── DIE DREI ABSCHNITTE DES BELEGS ───────────────────────────────────────────
+ *
+ * Vorgabe Samet (05.09.2026): „Die Rechnung soll drei Abschnitte haben, einer
+ * davon ein Rabattbereich; Abschnitte müssen entfernbar sein, und ein
+ * entfernter Abschnitt darf auch nicht im PDF erscheinen."
+ *
+ * Die Reihenfolge hier IST die Reihenfolge auf dem Beleg. Ein fehlender
+ * Schlüssel gilt als EINGESCHALTET — so drucken die vor dem Umbau erstellten
+ * Rechnungen unverändert weiter alle drei Abschnitte.
+ */
+export const INVOICE_SECTIONS: InvoiceSectionKey[] = ['positions', 'discount', 'closing'];
+
+export const ALL_SECTIONS: InvoiceSectionFlags = { positions: true, discount: true, closing: true };
+
+export const parseInvoiceSections = (raw?: string | null): InvoiceSectionFlags => {
+    if (!raw) return { ...ALL_SECTIONS };
+    try {
+        const parsed = JSON.parse(raw) as Partial<Record<InvoiceSectionKey, unknown>>;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ...ALL_SECTIONS };
+        return {
+            positions: parsed.positions !== false,
+            discount: parsed.discount !== false,
+            closing: parsed.closing !== false,
+        };
+    } catch {
+        return { ...ALL_SECTIONS };
+    }
+};
+
+/** Rabattstapel einer gespeicherten Rechnung — leer, wenn der Abschnitt weg ist. */
+export const invoiceDiscounts = (invoice: Pick<InvoiceDto, 'discounts'>): TenderDiscountEntry[] =>
+    parseDiscountList(invoice.discounts ?? null, MAX_TOTAL_DISCOUNTS);
+
+export const sectionLabel = (key: InvoiceSectionKey): string => t(`invoices.section_${key}`);

@@ -27,8 +27,8 @@ const lazyBackend: BackendModule = {
 };
 
 // Keeps the browser tab title in sync with the active language. Called once init
-// resolves and again on every language switch, so the tab reads e.g. "Offitec
-// Management Panel" / "Offitec Verwaltungspanel" / "Offitec Yönetim Paneli".
+// resolves and again on every language switch; the product name itself no
+// longer translates, so every language reads "Offitec Control Center".
 const syncDocumentTitle = (): void => {
     if (typeof document !== 'undefined') {
         document.title = i18n.t('common.appTitle');

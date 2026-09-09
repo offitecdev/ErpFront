@@ -415,7 +415,11 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                     allDay: false,
                     status: appointmentCalStatus(appointment, startTime, endTime),
                     labelId: appointment.labelId ?? null,
-                    editable: canCreateAppointment,
+                    /* Ein ABGESCHLOSSENER Tag wird nicht verschoben (Vorgabe
+                       Samet, 03.09.2026): keine Griffe, kein Ziehen. An ihm
+                       hängt geleistete Arbeit mit ihrem Datum. Der Server
+                       weist einen Versuch ohnehin ab (updateAppointment). */
+                    editable: canCreateAppointment && appointment.status !== 'COMPLETED',
                     customerId: appointment.project?.customer?.id ?? null,
                     customerName: customerName ?? null,
                     projectId: projectId ?? null,

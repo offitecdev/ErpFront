@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Briefcase01 as BriefcaseBusiness } from '@/components/icons/antIconCompat';
 import { SkeletonBar } from '@/components/ui-shared/Loader';
 
+import { useOrderLifecycle } from '@/components/orders/useOrderLifecycle';
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectSalesOrder } from '../../types/project';
@@ -28,8 +29,8 @@ const LazyProjectProcessModal = lazy(() =>
 const LazyProjectDetailsModal = lazy(() =>
     import('./features/components/detail/ProjectDetailsModal').then((module) => ({ default: module.ProjectDetailsModal })),
 );
-const LazyProjectDeleteOrderModal = lazy(() =>
-    import('./features/components/detail/ProjectDeleteOrderModal').then((module) => ({ default: module.ProjectDeleteOrderModal })),
+const LazyProjectOrderPickerModal = lazy(() =>
+    import('./features/components/detail/ProjectOrderPickerModal').then((module) => ({ default: module.ProjectOrderPickerModal })),
 );
 
 export const ProjectDetail = () => {
@@ -51,8 +52,7 @@ export const ProjectDetail = () => {
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [showComplete, setShowComplete] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
-    const [orderToDelete, setOrderToDelete] = useState<ProjectSalesOrder | null>(null);
-    const [deletingOrder, setDeletingOrder] = useState(false);
+    const [orderPickerOpen, setOrderPickerOpen] = useState(false);
     const [deletingProject, setDeletingProject] = useState(false);
 
     const salesOrders = useMemo(() => getProjectDisplayOrders(project), [project]);
@@ -78,34 +78,42 @@ export const ProjectDetail = () => {
 
     const canManageOrders = permissions.includes('projects.manage');
 
-    // Deleting a main order cascades to its addon orders (backend removes them and
-    // every captured record in one transaction) — the confirm text says so.
-    const orderToDeleteHasAddons = useMemo(
-        () => Boolean(orderToDelete && !orderToDelete.parentSalesOrderId
-            && salesOrders.some((candidate) => candidate.parentSalesOrderId === orderToDelete.id)),
-        [orderToDelete, salesOrders],
-    );
-
-    const requestDeleteOrder = useCallback((order: ProjectSalesOrder) => {
-        setOrderToDelete(order);
-    }, []);
-
-    const confirmDeleteOrder = useCallback(async () => {
-        if (!orderToDelete || !project) return;
-        setDeletingOrder(true);
-        try {
-            await projectApi.deleteSalesOrder(project.id, orderToDelete.id);
-            toast.success(t('projects.orderDeleted', { orderNumber: orderToDelete.orderNumber }));
-            if (selectedOrderId === orderToDelete.id) setSelectedOrderId(null);
-            setOrderToDelete(null);
+    /* ── §5: DER KNOPF STEHT HIER, GEHANDELT WIRD AM AUFTRAG ──────────────────
+       Vorgabe Samet (06.09.2026): «Auf dem Projektbildschirm darf ein Knopf
+       stehen, aber er handelt am jeweiligen Auftrag — bei mehreren Aufträgen
+       muss die Person wählen, welchen sie meint.» Genau das tut das Fenster:
+       es nimmt EINEN Auftrag zurück (Entwurf oder Storno), und das Projekt
+       fällt nur mit seinem letzten aktiven Auftrag. */
+    const { requestAction, dialog: lifecycleDialog } = useOrderLifecycle(async (order, outcome) => {
+        if (selectedOrderId === order.id) setSelectedOrderId(null);
+        // ZURÜCK IN ENTWURF: der Auftrag ist weg und seine Offerte wieder ein
+        // Entwurf. War es der letzte, steht das Projekt weiter da — als leere
+        // Planung —, also bleibt die Seite, wo sie ist, und lädt neu.
+        if (outcome.action === 'REVERT' && outcome.tenderId && outcome.projectReverted) {
             await load(true);
-        } catch (error: unknown) {
-            const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
-            toast.error(message || t('projects.orderDeleteFailed'));
-        } finally {
-            setDeletingOrder(false);
+            return;
         }
-    }, [orderToDelete, project, selectedOrderId, load]);
+        await load(true);
+    });
+
+    const requestOrderAction = useCallback((order: ProjectSalesOrder) => {
+        requestAction({
+            id: order.id,
+            orderNumber: order.orderNumber,
+            isAddon: Boolean(order.parentSalesOrderId),
+            cancelled: Boolean(order.cancelledAt),
+        });
+    }, [requestAction]);
+
+    /* Aus dem Zahnrad heraus: bei genau einem Auftrag geht es direkt, bei
+       mehreren fragt eine Liste zuerst, welcher gemeint ist. */
+    const requestOrderActionFromMenu = useCallback(() => {
+        if (salesOrders.length === 1 && salesOrders[0]) {
+            requestOrderAction(salesOrders[0]);
+            return;
+        }
+        setOrderPickerOpen(true);
+    }, [salesOrders, requestOrderAction]);
 
     // Stable handlers passed down to the header and the section renderer so memo()'d
     // children don't re-render on unrelated ProjectDetail state changes.
@@ -194,7 +202,11 @@ export const ProjectDetail = () => {
                 addonAttention={addonAttention}
                 canManageOrders={canManageOrders}
                 deletingProject={deletingProject}
-                onDeleteOrder={requestDeleteOrder}
+                onOrderAction={requestOrderAction}
+                // Ohne Auftrag gibt es nichts zurueckzunehmen: der Eintrag
+                // verschwindet dann aus dem Zahnrad.
+                onOrderActionFromMenu={salesOrders.length ? requestOrderActionFromMenu : undefined}
+                onProjectChanged={handleReload}
                 onDeleteProject={handleDeleteProject}
                 onSelectOrder={handleSelectOrder}
                 onCreateAddon={handleCreateAddon}
@@ -256,17 +268,19 @@ export const ProjectDetail = () => {
                 </Suspense>
             )}
 
-            {orderToDelete && (
+            {/* §5: erst die Frage «welcher Auftrag?», dann das Fenster, das
+                sagt, was mit ihm geschehen darf. */}
+            {orderPickerOpen && (
                 <Suspense fallback={null}>
-                    <LazyProjectDeleteOrderModal
-                        order={orderToDelete}
-                        hasAddons={orderToDeleteHasAddons}
-                        deleting={deletingOrder}
-                        onClose={() => setOrderToDelete(null)}
-                        onConfirm={() => { void confirmDeleteOrder(); }}
+                    <LazyProjectOrderPickerModal
+                        orders={salesOrders}
+                        onClose={() => setOrderPickerOpen(false)}
+                        onPick={(order) => { setOrderPickerOpen(false); requestOrderAction(order); }}
                     />
                 </Suspense>
             )}
+
+            {lifecycleDialog}
         </div>
     );
 };

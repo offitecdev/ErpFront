@@ -1,21 +1,21 @@
 import type { ReactNode } from 'react';
 
+import { FilterBar, FilterSlot } from '@/components/ui-shared/TableKit';
 import { QuoteDatePicker } from '@/pages/sales/detail/components/common/QuoteDatePicker';
 
 /**
- * Filterleiste über den CRM-Tabellen. Hält die Steuerelemente aller CRM-Seiten
- * auf einer Höhe und in einer Reihe — die Seiten selbst bestimmen nur, WELCHE
- * Felder darin stehen.
+ * Filterleiste über den CRM-Tabellen. Sie ist inzwischen nur noch der CRM-Name
+ * für die hausweite Leiste (`FilterBar` aus ui-shared/TableKit): Mass, Abstand
+ * und Umbruch stehen an EINER Stelle, in styles/controls.css. Vorher trug sie
+ * ihre eigene Klassenkette und stand damit 36px hoch, während die Suche daneben
+ * 38px und der Knopf dahinter 40px mass.
  */
 
-export const CRM_FILTER_CONTROL_CLASS =
-    'h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white';
+/** Das Mass jedes Filterfeldes — dasselbe wie das des Suchfeldes daneben. */
+export const CRM_FILTER_CONTROL_CLASS = 'ofi-filter';
 
 export const CrmFilterBar = ({ children, action }: { children: ReactNode; action?: ReactNode }) => (
-    <div className="flex flex-wrap items-center gap-2">
-        {children}
-        {action && <div className="ml-auto">{action}</div>}
-    </div>
+    <FilterBar end={action}>{children}</FilterBar>
 );
 
 /** Auswahlfeld der Filterleiste — bewusst nativ, damit es exakt so hoch ist wie die Suche. */
@@ -63,13 +63,17 @@ export const CrmFilterDate = ({
     onChange: (value: string) => void;
     label: string;
 }) => (
-    <div className="w-[132px]">
+    // `ofi-btn-plain`: der Auslöser des Wählers ist ein `<button>`, und
+    // styles/buttons.css würde ihn sonst zum Handlungsknopf aufblasen. Das Mass
+    // kommt stattdessen aus `button.ofi-filter` (styles/controls.css) — dasselbe
+    // wie beim `<select>` daneben.
+    <FilterSlot>
         <QuoteDatePicker
             value={value}
             onChange={onChange}
             ariaLabel={label}
             placeholder={label}
-            className={CRM_FILTER_CONTROL_CLASS}
+            className={`${CRM_FILTER_CONTROL_CLASS} ofi-btn-plain ofi-nosize`}
         />
-    </div>
+    </FilterSlot>
 );

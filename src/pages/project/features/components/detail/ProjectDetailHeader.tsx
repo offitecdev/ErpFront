@@ -10,7 +10,6 @@ import {
     Plus,
     Receipt as ReceiptText,
     Settings01 as Settings,
-    Trash01,
     User01 as UserRound,
 } from '@/components/icons/antIconCompat';
 
@@ -32,7 +31,7 @@ const OrderRow = ({
     attention,
     canManage,
     onClick,
-    onDelete,
+    onOrderAction,
 }: {
     order: ProjectSalesOrder;
     total: number;
@@ -41,10 +40,12 @@ const OrderRow = ({
     attention?: boolean;
     canManage?: boolean;
     onClick: () => void;
-    onDelete?: (order: ProjectSalesOrder) => void;
+    onOrderAction?: (order: ProjectSalesOrder) => void;
 }) => {
-    // Synthetic "project-main-*" orders have no real row to delete.
-    const deletable = Boolean(canManage && onDelete && !order.id.startsWith('project-main-'));
+    // Synthetic "project-main-*" orders have no real row to act on.
+    const actionable = Boolean(canManage && onOrderAction && !order.id.startsWith('project-main-'));
+    // STORNIERT: die Zeile bleibt stehen, zählt aber nicht mehr mit.
+    const cancelled = Boolean(order.cancelledAt);
 
     return (
         <div className="ofi-prj-menu__item">
@@ -58,9 +59,11 @@ const OrderRow = ({
                 </span>
                 <span className="ofi-prj-order__main">
                     <span className="ofi-prj-order__num">
-                        <span>{order.orderNumber}</span>
-                        <span className={`ofi-prj-tag ${isMain ? 'is-main' : 'is-addon'}`}>
-                            {isMain ? t('projects.mainOrder') : t('projects.addonOrder')}
+                        <span className={cancelled ? 'line-through opacity-70' : undefined}>{order.orderNumber}</span>
+                        <span className={`ofi-prj-tag ${cancelled ? 'is-addon' : isMain ? 'is-main' : 'is-addon'}`}>
+                            {cancelled
+                                ? t('orders.lifecycle.statusCancelled')
+                                : isMain ? t('projects.mainOrder') : t('projects.addonOrder')}
                         </span>
                         {attention && <span className="ofi-prj-dot" />}
                     </span>
@@ -71,15 +74,17 @@ const OrderRow = ({
                 <span className="ofi-prj-menu__amount">{money(total)}</span>
             </button>
 
-            {deletable && (
+            {/* §5: der Knopf steht am Projekt, gehandelt wird an DIESEM Auftrag —
+                zurück in den Entwurf, solange nichts geschehen ist, sonst Storno. */}
+            {actionable && (
                 <button
                     type="button"
-                    aria-label={t('projects.deleteOrder')}
-                    title={t('projects.deleteOrder')}
-                    onClick={() => onDelete!(order)}
+                    aria-label={t('orders.lifecycle.buttonLabel')}
+                    title={t('orders.lifecycle.buttonLabel')}
+                    onClick={() => onOrderAction!(order)}
                     className="ofi-prj-glyph"
                 >
-                    <Trash01 size={15} />
+                    <AlertTriangle size={15} />
                 </button>
             )}
         </div>
@@ -94,7 +99,7 @@ const OrderDropdown = ({
     canManageOrders,
     onSelectOrder,
     onCreateAddon,
-    onDeleteOrder,
+    onOrderAction,
 }: {
     orders: ProjectSalesOrder[];
     project: ProjectDto;
@@ -103,7 +108,7 @@ const OrderDropdown = ({
     canManageOrders?: boolean;
     onSelectOrder: (orderId: string) => void;
     onCreateAddon: (parentOrderId: string) => void;
-    onDeleteOrder?: (order: ProjectSalesOrder) => void;
+    onOrderAction?: (order: ProjectSalesOrder) => void;
 }) => {
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
@@ -189,7 +194,7 @@ const OrderDropdown = ({
                                         attention={addonAttention && selectedOrderId === order.id}
                                         canManage={canManageOrders}
                                         onClick={() => { onSelectOrder(order.id); setOpen(false); }}
-                                        onDelete={onDeleteOrder}
+                                        onOrderAction={onOrderAction}
                                     />
                                     {(addonsByParent[order.id] || []).map((addon) => (
                                         <OrderRow
@@ -199,7 +204,7 @@ const OrderDropdown = ({
                                             selected={selectedOrderId === addon.id}
                                             canManage={canManageOrders}
                                             onClick={() => { onSelectOrder(addon.id); setOpen(false); }}
-                                            onDelete={onDeleteOrder}
+                                            onOrderAction={onOrderAction}
                                         />
                                     ))}
                                 </div>
@@ -236,7 +241,9 @@ export const ProjectDetailHeader = memo(({
     deletingProject,
     onSelectOrder,
     onCreateAddon,
-    onDeleteOrder,
+    onOrderAction,
+    onOrderActionFromMenu,
+    onProjectChanged,
     onDeleteProject,
     onOpenDetails,
     onComplete,
@@ -249,7 +256,12 @@ export const ProjectDetailHeader = memo(({
     deletingProject: boolean;
     onSelectOrder: (orderId: string) => void;
     onCreateAddon: (parentOrderId: string) => void;
-    onDeleteOrder?: (order: ProjectSalesOrder) => void;
+    /** §5: handelt am ausgewählten AUFTRAG — zurück in den Entwurf oder Storno. */
+    onOrderAction?: (order: ProjectSalesOrder) => void;
+    /** Aus dem Zahnrad: fragt bei mehreren Aufträgen zuerst, welcher gemeint ist. */
+    onOrderActionFromMenu?: () => void;
+    /** Storno des Projekts gesetzt/aufgehoben — die Seite lädt neu. */
+    onProjectChanged?: () => void | Promise<void>;
     /** Dişli menüsündeki "Projeyi sil" — onay ("DELETE") popup'tan sonra çağrılır. */
     onDeleteProject: () => Promise<void> | void;
     onOpenDetails: () => void;
@@ -279,8 +291,12 @@ export const ProjectDetailHeader = memo(({
                     {canManageOrders && (settingsLoaded ? (
                         <Suspense fallback={<span className="size-8 shrink-0" />}>
                             <LazyProjectSettingsMenu
+                                projectId={project.id}
+                                projectCancelled={Boolean(project.cancelledAt) || project.status === 'CANCELLED'}
                                 deleting={deletingProject}
                                 onDeleteProject={onDeleteProject}
+                                onOrderAction={onOrderActionFromMenu}
+                                onProjectChanged={onProjectChanged}
                                 initiallyOpen
                             />
                         </Suspense>
@@ -315,7 +331,7 @@ export const ProjectDetailHeader = memo(({
                     canManageOrders={canManageOrders}
                     onSelectOrder={onSelectOrder}
                     onCreateAddon={onCreateAddon}
-                    onDeleteOrder={onDeleteOrder}
+                    onOrderAction={onOrderAction}
                 />
             </div>
 

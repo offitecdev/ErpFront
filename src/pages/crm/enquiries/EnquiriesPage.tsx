@@ -4,9 +4,10 @@ import { toast } from 'sonner';
 
 import {
     Check, ChevronLeft, ChevronRight, Copy01, File05, Mail01, Plus,
-    RefreshCcw01, SearchLg, Send01, Settings01, User01,
+    RefreshCcw01, Send01, Settings01, User01,
 } from '@/components/icons/antIconCompat';
 import { InlineLoading } from '@/components/ui-shared/Loader';
+import { FilterBar, FilterSelect, SearchBox } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import i18n from '@/i18n';
 import {
@@ -185,15 +186,6 @@ export const EnquiriesPage = () => {
                     <span className="ofi-crm-head__count">{total}</span>
                 </div>
                 <div className="ofi-crm-head__actions">
-                    <label className="ofi-crm-search">
-                        <SearchLg size={15} />
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t('crm.enquiry.searchPlaceholder')}
-                            aria-label={t('crm.enquiry.searchPlaceholder')}
-                        />
-                    </label>
                     <button type="button" className="ofi-crm-iconbtn" onClick={() => { void load(); loadStats(); }} title={t('common.refresh')}>
                         <RefreshCcw01 size={15} />
                     </button>
@@ -228,7 +220,20 @@ export const EnquiriesPage = () => {
                 </section>
             )}
 
-            <div className="ofi-crm-filters">
+            {/* Werkzeugzeile wie auf jeder Liste: Suche, Quelle — und der Stand
+                als Segmentschalter. */}
+            <FilterBar>
+                <SearchBox value={search} onChange={setSearch} placeholder={t('crm.enquiry.searchPlaceholder')} busy={loading} />
+                <FilterSelect
+                    value={source}
+                    onChange={(value) => setSource(value as EnquirySource | '')}
+                    label={t('crm.enquiry.filterSource')}
+                >
+                    <option value="">{t('crm.enquiry.allSources')}</option>
+                    <option value="FORM">{sourceLabel('FORM')}</option>
+                    <option value="MAIL">{sourceLabel('MAIL')}</option>
+                    <option value="MANUAL">{sourceLabel('MANUAL')}</option>
+                </FilterSelect>
                 <div className="ofi-crm-chips">
                     {chips.map((chip) => (
                         <button
@@ -244,18 +249,7 @@ export const EnquiriesPage = () => {
                         </button>
                     ))}
                 </div>
-                <select
-                    className="ofi-crm-select"
-                    value={source}
-                    onChange={(event) => setSource(event.target.value as EnquirySource | '')}
-                    aria-label={t('crm.enquiry.filterSource')}
-                >
-                    <option value="">{t('crm.enquiry.allSources')}</option>
-                    <option value="FORM">{sourceLabel('FORM')}</option>
-                    <option value="MAIL">{sourceLabel('MAIL')}</option>
-                    <option value="MANUAL">{sourceLabel('MANUAL')}</option>
-                </select>
-            </div>
+            </FilterBar>
 
             <section className="ofi-crm-surface">
                 {loading && (

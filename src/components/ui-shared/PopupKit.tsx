@@ -41,6 +41,10 @@ export type PopupCardProps = {
     closeOnOutside?: boolean;
     closeOnEscape?: boolean;
     bodyClassName?: string;
+    /* Stapelhöhe. Vorgabe ist die 120 des Stilblatts; höher nur, wenn die Karte
+       über einem PopupDialog (z 750) stehen muss — dann gehört Escape aber dem
+       Dialog, der Aufrufer schaltet ihn dort ab und schliesst die Karte selbst. */
+    z?: number;
     children: ReactNode;
 };
 

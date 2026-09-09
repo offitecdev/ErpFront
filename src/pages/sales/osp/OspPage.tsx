@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import {
     AlertTriangle,
     ArrowRight,
+    DownloadCloud02,
+    File05,
     RefreshCcw01,
     Settings01,
     Trash01,
@@ -13,7 +15,7 @@ import {
 import { OspPdfIcon } from '@/components/icons/OspMark';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
-import { Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
+import { FilterBar, FilterSelect, Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import {
     ospApi,
@@ -27,6 +29,7 @@ import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
 import { buildOspDescription, specsToDescriptionValues } from './ospDescription';
 import { changeSummary } from './ospChanges';
 import { OspFeedTable } from './OspFeedTable';
+import { OspDatasheetSheet } from './OspDatasheetSheet';
 
 /**
  * ── OSP-SEITE (/sales/osp) ───────────────────────────────────────────────────
@@ -142,6 +145,12 @@ export const OspPage = () => {
     const [sheetBlob, setSheetBlob] = useState<Blob | null>(null);
     const [sheetLoading, setSheetLoading] = useState(false);
 
+    /* Die lesbare Fassung EINER Einheit (Markdown) — dort stehen die
+       Produktangaben, und dort ist nachzulesen, woher eine Zahl kommt. */
+    const [markdownUnit, setMarkdownUnit] = useState<{ id: string; title: string } | null>(null);
+    /* Welches Projekt holt gerade seine Dokumente? */
+    const [fetchingId, setFetchingId] = useState<string | null>(null);
+
     /* Suche entprellt zur Abfrage — jede neue Suche beginnt auf Seite 1. */
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const changeSearch = (next: string) => {
@@ -228,6 +237,40 @@ export const OspPage = () => {
             setSheetUnit(null);
         } finally {
             setSheetLoading(false);
+        }
+    };
+
+    /* ── DIE DOKUMENTE DES PROJEKTS HOLEN ────────────────────────────────────
+       Eine Anfrage ist ein PROJEKT und hält mehrere Datenblätter. Fehlt eines,
+       ist die Frage nie „welche Einheit?", sondern „hol mir die Unterlagen zu
+       diesem Projekt" — und genau ein Knopf tut das.
+
+       Gemeldet wird EINZELN: ein Blatt, das die OSP inzwischen ersetzt und
+       drüben gelöscht hat, darf nicht wie ein Gesamtfehler aussehen, wenn vier
+       andere gekommen sind. */
+    const fetchDocuments = async (doc: OspDocumentDto) => {
+        setFetchingId(doc.id);
+        try {
+            const result = await ospApi.fetchDatasheets(doc.id);
+            replaceRow(result.document);
+            if (result.failed) {
+                // Der erste Grund steht im Text; die übrigen stehen an ihren
+                // Einheiten (rotes Dreieck mit dem Satz im Titel).
+                const first = result.results.find((row) => !row.ok);
+                toast.warning(t('osp.documents.partial', {
+                    fetched: result.fetched + result.kept,
+                    total: result.total,
+                    reason: first?.error || '',
+                }));
+            } else {
+                toast.success(t('osp.documents.done', {
+                    fetched: result.fetched, kept: result.kept, total: result.total,
+                }));
+            }
+        } catch (error: any) {
+            toast.error(error?.response?.data?.error || t('osp.documents.failed'));
+        } finally {
+            setFetchingId(null);
         }
     };
 
@@ -407,7 +450,28 @@ export const OspPage = () => {
        Position je Einheit. */
     const unitList = (doc: OspDocumentDto) => {
         const units = unitsOf(doc);
-        if (!units.length) return <span className="ofi-osp-sub">—</span>;
+        const busyFetch = fetchingId === doc.id;
+        /* Der Knopf steht auch dann da, wenn alles vorhanden ist: er ist die
+           Antwort auf „hol die Unterlagen", nicht auf „etwas fehlt". */
+        const fetchButton = (
+            <button
+                type="button"
+                className="ofi-osp-fetchbtn"
+                disabled={busyFetch || !units.length}
+                title={t('osp.documents.fetchHint')}
+                onClick={() => void fetchDocuments(doc)}
+            >
+                <DownloadCloud02 size={12} className={busyFetch ? 'ofi-osp-spin' : undefined} />
+                {busyFetch ? t('osp.documents.fetching') : t('osp.documents.fetch')}
+            </button>
+        );
+        if (!units.length) {
+            return (
+                <div className="ofi-osp-units">
+                    <span className="ofi-osp-sub">—</span>
+                </div>
+            );
+        }
         return (
             <div className="ofi-osp-units">
                 {units.map((unit) => {
@@ -440,6 +504,20 @@ export const OspPage = () => {
                                     </span>
                                 )}
                             </span>
+                            {/* Die ANGABEN der Einheit — die lesbare Fassung des
+                                Blattes. Sie ist auch dann noch da, wenn die OSP
+                                das PDF drüben ersetzt hat. */}
+                            {unit.datasheetMarkdown && (
+                                <button
+                                    type="button"
+                                    className="ofi-osp-mdbtn"
+                                    title={t('osp.markdown.open')}
+                                    aria-label={`${t('osp.markdown.open')} — ${unitTitle(unit)}`}
+                                    onClick={() => setMarkdownUnit({ id: unit.id, title: unitTitle(unit) })}
+                                >
+                                    <File05 size={13} />
+                                </button>
+                            )}
                             {/* Warum kein Datenblatt da ist, steht als Dreieck an
                                 der Einheit — der Satz hängt im Titel. */}
                             {unit.datasheetError && (
@@ -454,6 +532,7 @@ export const OspPage = () => {
                         </div>
                     );
                 })}
+                {fetchButton}
             </div>
         );
     };
@@ -527,21 +606,23 @@ export const OspPage = () => {
                 <OspFeedTable />
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/* Werkzeugzeile im gemeinsamen Mass (styles/controls.css) —
+                        die Zahl in Klammern bleibt am Filter, sie ist der
+                        schnellste Weg zum Stand eines Auftrags. */}
+                    <FilterBar>
                         <SearchBox
                             value={search}
                             onChange={changeSearch}
                             placeholder={t('osp.searchPlaceholder')}
-                            className="w-full sm:w-72"
                         />
-                        <select
+                        <FilterSelect
                             value={status}
-                            onChange={(event) => {
-                                setStatus(event.target.value as '' | OspStatus);
+                            onChange={(next) => {
+                                setStatus(next as '' | OspStatus);
                                 setPage(1);
                             }}
-                            aria-label={t('osp.filterLabel')}
-                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-slate-300 focus:border-[#1f2654] focus:outline-none sm:w-auto dark:border-white/20 dark:bg-transparent dark:text-white"
+                            label={t('osp.filterLabel')}
+                            width="wide"
                         >
                             <option value="">{t('osp.filterAll')}</option>
                             {STATUS_ORDER.map((key) => (
@@ -549,8 +630,8 @@ export const OspPage = () => {
                                     {counts ? `${statusLabel(key)} (${counts[key] ?? 0})` : statusLabel(key)}
                                 </option>
                             ))}
-                        </select>
-                    </div>
+                        </FilterSelect>
+                    </FilterBar>
 
                     <SectionCard title={`${t('osp.title')} (${total})`}>
                         <table data-inv-table data-list-table data-unstyled-table className="ofi-osp-table w-full">
@@ -762,6 +843,13 @@ export const OspPage = () => {
                     </div>
                 </div>
             ), document.body)}
+            {/* Die lesbare Fassung des Blattes: Produktangaben oben, das ganze
+                Blatt darunter. */}
+            <OspDatasheetSheet
+                unitId={markdownUnit?.id ?? null}
+                title={markdownUnit?.title || ''}
+                onClose={() => setMarkdownUnit(null)}
+            />
             {/* Das Datenblatt in der gemeinsamen PDF-Vorschau — dasselbe
                 Fenster wie bei Offerte und Rapport. */}
             <PdfPreviewSheet

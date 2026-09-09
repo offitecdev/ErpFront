@@ -1,4 +1,5 @@
 import { apiClient, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
+import { publicTokenHeader } from './publicToken';
 import type {
     MaintenanceContractDto,
     MaintenanceAppointmentOptionDto,
@@ -251,17 +252,17 @@ export const maintenanceApi = {
         plannedDate?: string;
         options: MaintenanceAppointmentOptionDto[];
     }> => {
-        const res = await apiClient.get(`/maintenance/public/booking/${encodeURIComponent(token)}`);
+        const res = await apiClient.get('/maintenance/public/booking', publicTokenHeader(token));
         return res.data;
     },
 
     confirmPublicBooking: async (token: string, optionId: string): Promise<{ message: string; task: MaintenanceTaskDto }> => {
-        const res = await apiClient.post(`/maintenance/public/booking/${encodeURIComponent(token)}/confirm`, { optionId });
+        const res = await apiClient.post('/maintenance/public/booking/confirm', { optionId }, publicTokenHeader(token));
         return res.data;
     },
 
     disapprovePublicBooking: async (token: string, reason?: string): Promise<{ message: string; task: MaintenanceTaskDto }> => {
-        const res = await apiClient.post(`/maintenance/public/booking/${encodeURIComponent(token)}/disapprove`, { reason });
+        const res = await apiClient.post('/maintenance/public/booking/disapprove', { reason }, publicTokenHeader(token));
         return res.data;
     },
 };

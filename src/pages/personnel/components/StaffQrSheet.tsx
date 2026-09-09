@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { Printer, RefreshCcw01 } from '@/components/icons/antIconCompat';
@@ -21,6 +21,12 @@ import { GhostButton, PrimaryButton } from './primitives';
  * Person unmittelbar gewählt (`StaffCreateSheet`), die Rechtevergabe läuft
  * über die Einstellungen — dieses Fenster gibt nur die Karte heraus.
  *
+ * DER SCHLÜSSEL WIRD HIER GEHOLT, nicht mitgeliefert: er meldet ohne Kennwort
+ * an, stand aber bis zur Sicherheitskorrektur in jeder Zeile der Personalliste
+ * — wer sie lesen durfte, las damit fremde Zugangsangaben mit. Jetzt fragt
+ * dieses Fenster ihn beim Öffnen einzeln ab (`GET /personnel/staff/:id/qr`,
+ * protokolliert); die Liste kennt ihn nicht mehr.
+ *
  * DRUCKEN ohne Bibliothek: das gezeichnete SVG wird ausgelesen und in ein
  * eigenes Druckfenster geschrieben. `window.print()` auf der Seite selbst würde
  * die ganze Anwendung drucken; ein SVG-in-Bild-Umweg bräuchte eine Leinwand und
@@ -36,20 +42,40 @@ export const StaffQrSheet = ({
     open,
     person,
     onClose,
-    onRotated,
 }: {
     open: boolean;
     person: StaffRow | null;
     onClose: () => void;
-    onRotated: (employeeId: string, qrToken: string) => void;
 }) => {
     const svgHostRef = useRef<HTMLDivElement | null>(null);
     const [rotating, setRotating] = useState(false);
+    const [token, setToken] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const personId = person?.id ?? null;
+    useEffect(() => {
+        // Geschlossen hält das Fenster keinen Schlüssel im Speicher.
+        if (!open || !personId) {
+            setToken(null);
+            return;
+        }
+        let current = true;
+        setLoading(true);
+        personnelApi.getQr(personId)
+            .then((result) => { if (current) setToken(result.qrToken); })
+            .catch((error) => {
+                if (!current) return;
+                setToken(null);
+                toast.error((error as { response?: { data?: { error?: string } } })?.response?.data?.error
+                    || t('personnel.qr.missing'));
+            })
+            .finally(() => { if (current) setLoading(false); });
+        return () => { current = false; };
+    }, [open, personId]);
 
     if (!person) return null;
 
     const name = fullName(person);
-    const token = person.qrToken;
 
     const print = () => {
         const svg = svgHostRef.current?.querySelector('svg');
@@ -89,7 +115,7 @@ export const StaffQrSheet = ({
         setRotating(true);
         try {
             const result = await personnelApi.rotateQr(person.id);
-            onRotated(person.id, result.qrToken);
+            setToken(result.qrToken);
             toast.success(t('personnel.qr.rotated'));
         } catch (error) {
             toast.error((error as { response?: { data?: { error?: string } } })?.response?.data?.error || t('personnel.qr.rotateFailed'));
@@ -123,7 +149,9 @@ export const StaffQrSheet = ({
                         <QRCodeSVG value={token} size={220} level="M" marginSize={2} />
                     </div>
                 ) : (
-                    <p className="py-10 text-center text-[13px] text-slate-400">{t('personnel.qr.missing')}</p>
+                    <p className="py-10 text-center text-[13px] text-slate-400">
+                        {loading ? t('common.loading') : t('personnel.qr.missing')}
+                    </p>
                 )}
 
                 <dl className="w-full max-w-sm space-y-1.5 text-[12.5px]">

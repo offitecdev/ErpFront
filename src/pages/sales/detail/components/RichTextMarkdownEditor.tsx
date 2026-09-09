@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Ban,
     Bold as BoldIcon,
@@ -14,8 +15,8 @@ import { t } from '@/i18n/translate';
 import { richTextToHtml } from '../utils/markdown.utils';
 
 // Keep in step with --font-body (theme.css); 'sans-serif' alone rendered the
-// editor and its toolbar in Arial while the rest of the page is Open Sans.
-export const INLINE_INPUT_FONT_FAMILY = '"Open Sans", Arial, sans-serif';
+// editor and its toolbar in Arial while the rest of the page is Inter Variable.
+export const INLINE_INPUT_FONT_FAMILY = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
 
 // WYSIWYG rich-text editor (contentEditable). Stores HTML; legacy markdown-ish
 // values are converted on load via richTextToHtml. Formatting is available in
@@ -242,7 +243,16 @@ export const RichTextMarkdownEditor: React.FC<{
     placeholder?: string;
     variant?: 'boxed' | 'inline';
     commitOnBlur?: boolean;
-}> = ({ value, onChange, minHeight = 92, className = '', placeholder = t('tenders.description_yazin'), variant = 'boxed', commitOnBlur = false }) => {
+    /** Beim Erscheinen den Blinker setzen — für Felder, die auf Klick aufgehen. */
+    autoFocus?: boolean;
+    /**
+     * Die schwebende Leiste als Fenster am Körper der Seite statt im eigenen
+     * Kasten. Nötig, wo der Editor in einem Bereich MIT Überlauf sitzt (die
+     * Positionstabelle rollt waagerecht) — dort schnitte der Kasten die Leiste
+     * sonst mittendurch.
+     */
+    bubbleInPortal?: boolean;
+}> = ({ value, onChange, minHeight = 92, className = '', placeholder = t('tenders.description_yazin'), variant = 'boxed', commitOnBlur = false, autoFocus = false, bubbleInPortal = false }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<HTMLDivElement>(null);
     const focusedRef = useRef(false);
@@ -250,8 +260,22 @@ export const RichTextMarkdownEditor: React.FC<{
     const commandMutationRef = useRef(false);
     const pendingEmitRef = useRef<number | null>(null);
     // Last value we emitted: matching parent updates must not reset the DOM and
-    // drop the caret.
-    const lastEmitted = useRef<string | null>(null);
+    // drop the caret. Startwert = der übergebene Text, denn die erste Zeichnung
+    // trägt ihn bereits (siehe initialHtmlRef) — sonst schriebe der
+    // Übernahme-Effekt weiter unten dieselbe Zeichenkette noch einmal ins DOM.
+    const lastEmitted = useRef<string | null>(value);
+    // Der Text steht schon in der ERSTEN Zeichnung. Vorher blieb das Feld beim
+    // Aufklappen einen Bildaufbau lang leer, weil erst ein Effekt NACH dem
+    // Zeichnen das innerHTML setzte — das war die sichtbare Lücke.
+    //
+    // Das Objekt selbst muss über alle Zeichnungen hinweg DASSELBE bleiben:
+    // React 19 vergleicht bei `dangerouslySetInnerHTML` nur noch die Identität
+    // des Objekts und schreibt bei jedem neuen `{ __html }` das innerHTML
+    // neu — also bei jedem setState (Fokus, Auswahl, Werkzeugleiste). Ein
+    // getippter Buchstabe war damit sofort wieder weg und der Cursor stand
+    // vorn im leeren Block: «ich kann nicht am Anfang schreiben, nichts
+    // markieren, nichts löschen».
+    const initialHtmlRef = useRef({ __html: richTextToHtml(value || '') });
     // Latest user-edited HTML. The unmount flush below reads it because the
     // editable DOM node is already detached from the ref by the time the
     // cleanup runs.
@@ -262,10 +286,10 @@ export const RichTextMarkdownEditor: React.FC<{
         valueRef.current = value;
         onChangeRef.current = onChange;
     }, [value, onChange]);
-    const [isEmpty, setIsEmpty] = useState(true);
+    const [isEmpty, setIsEmpty] = useState(() => normalizeEmptyHtml(initialHtmlRef.current.__html) === '');
     const [focused, setFocused] = useState(false);
     const [active, setActive] = useState<ActiveState>(EMPTY_ACTIVE);
-    const [bubble, setBubble] = useState<{ top: number; left: number } | null>(null);
+    const [bubble, setBubble] = useState<{ top: number; left: number; viewTop: number; viewLeft: number } | null>(null);
     const isInline = variant === 'inline';
 
     const syncEmpty = useCallback(() => {
@@ -302,9 +326,35 @@ export const RichTextMarkdownEditor: React.FC<{
         if (!el) return;
         el.innerHTML = richTextToHtml(value || '');
         lastEmitted.current = value;
+        // The DOM now represents the parent's value (for example a selected
+        // PDF text template), so an older local edit must not be flushed back
+        // over it when this editor later unmounts.
+        dirtyHtmlRef.current = null;
         savedRangeRef.current = null;
         syncEmpty();
     }, [value, syncEmpty]);
+
+    // Wer das Feld gerade aufgeklappt hat, will schreiben — nicht erst klicken.
+    //
+    // ACHTUNG Reihenfolge: dieser Effekt steht NACH dem Übernehmen des Werts
+    // (oben). Der Übernahme-Effekt steigt aus, sobald das Feld den Fokus trägt
+    // (`focusedRef`) — würde hier zuerst fokussiert, bliebe der Kasten leer,
+    // und das Verlassen schriebe diese Leere in die Zeile zurück.
+    useEffect(() => {
+        if (!autoFocus) return;
+        const el = editorRef.current;
+        if (!el) return;
+        el.focus({ preventScroll: true });
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        // Bewusst nur beim Erscheinen.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const emit = useCallback((always = false) => {
         const el = editorRef.current;
@@ -420,7 +470,14 @@ export const RichTextMarkdownEditor: React.FC<{
             }
             const toolbarWidth = 220;
             const left = Math.max(0, Math.min(rect.left - containerRect.left, container.clientWidth - toolbarWidth));
-            setBubble({ top: rect.bottom - containerRect.top + 7, left });
+            setBubble({
+                top: rect.bottom - containerRect.top + 7,
+                left,
+                // Am Körper der Seite zählt die Lage auf dem Bildschirm; sie
+                // bleibt im Fenster, auch wenn die Auswahl am Rand steht.
+                viewTop: rect.bottom + 7,
+                viewLeft: Math.max(8, Math.min(rect.left, window.innerWidth - toolbarWidth - 8)),
+            });
         };
         document.addEventListener('selectionchange', handleSelectionChange);
         return () => document.removeEventListener('selectionchange', handleSelectionChange);
@@ -573,15 +630,26 @@ export const RichTextMarkdownEditor: React.FC<{
                     <FormatToolbar exec={exec} active={active} />
                 </div>
             )}
-            {bubble && (
-                <div
-                    className="absolute z-40 rounded-[2px] border border-[#dedede] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.14)] dark:border-[#454545] dark:bg-[#171717]"
-                    style={{ top: bubble.top, left: bubble.left }}
-                    onMouseDown={(event) => event.preventDefault()}
-                >
-                    <FormatToolbar exec={exec} active={active} compact />
-                </div>
-            )}
+            {bubble && (bubbleInPortal
+                ? createPortal(
+                    <div
+                        className="fixed z-[900] rounded-[2px] border border-[#dedede] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.14)] dark:border-[#454545] dark:bg-[#171717]"
+                        style={{ top: bubble.viewTop, left: bubble.viewLeft }}
+                        onMouseDown={(event) => event.preventDefault()}
+                    >
+                        <FormatToolbar exec={exec} active={active} compact />
+                    </div>,
+                    document.body,
+                )
+                : (
+                    <div
+                        className="absolute z-40 rounded-[2px] border border-[#dedede] bg-white shadow-[0_6px_18px_rgba(0,0,0,0.14)] dark:border-[#454545] dark:bg-[#171717]"
+                        style={{ top: bubble.top, left: bubble.left }}
+                        onMouseDown={(event) => event.preventDefault()}
+                    >
+                        <FormatToolbar exec={exec} active={active} compact />
+                    </div>
+                ))}
             <div className={`${frameClass} relative`}>
                 {isEmpty && !focused && (
                     <div
@@ -606,6 +674,7 @@ export const RichTextMarkdownEditor: React.FC<{
                     data-gramm_editor="false"
                     data-enable-grammarly="false"
                     style={{ minHeight, fontFamily: INLINE_INPUT_FONT_FAMILY }}
+                    dangerouslySetInnerHTML={initialHtmlRef.current}
                     onInput={() => {
                         // execCommand dispatches synchronous input events for
                         // every internal step. The command itself emits once.

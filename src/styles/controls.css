@@ -1,0 +1,627 @@
+/* =========================================================
+   Offitec — EIN SUCHFELD, EIN FILTER, EINE LINIE (09.09.2026)
+
+   Vorgabe Samet: «Im ganzen System müssen die Eingabe- und
+   Filterelemente gleich gross sein und an derselben Stelle
+   stehen — sauber, im Apple-Stil. Beim Suchen soll sich die
+   Lupe bewegen. Suchfeld und der Filter daneben ("Kunde
+   suchen", "Alle anzeigen") tragen auf JEDER Seite dieselben
+   Masse.»
+
+   Gemessen war der Bestand vierfach uneinheitlich:
+     · Höhe    32px (`.ofi-crm-select`) neben 36px
+               (`.ofi-crm-search`) neben 38px (SearchBox aus
+               TableKit, `px-3 py-2`) neben 40px (der
+               Grundhöhe aus index.css)
+     · Radius  2px (die Kantensprache plattet in `main` jeden
+               `rounded-lg` nieder) neben 8px neben 999px
+     · Breite  w-52 / w-64 / w-72 / flex-1 — je nach Seite
+     · Ort     mal in der Kopfzeile, mal als eigene Zeile,
+               mal ohne Umschlag direkt unter der Überschrift
+
+   Diese Datei setzt dagegen EIN Mass:
+
+     --ofi-ctl-h         40px   dieselbe Höhe wie jeder Knopf
+                                (`--ofi-btn-height`) und jedes
+                                Formularfeld (`--ofi-control-height`)
+     --ofi-ctl-radius    10px   die weiche Apple-Kante
+     --ofi-ctl-search-w  280px  EINE Suchfeldbreite
+     --ofi-ctl-filter-w  184px  EINE Filterbreite
+
+   ── DIE LUPE ──────────────────────────────────────────────
+   Apple-Muster (Safari, iOS-Suche): Lupe und Platzhalter
+   stehen in der RUHE mittig im Feld und rutschen an die linke
+   Kante, sobald die Suche beginnt. Genau das macht
+   `.ofi-search__lead`. Dazu kommt beim ersten Zeichen ein
+   kurzer Ausschlag der Lupe (`ofi-search-scan`) und, solange
+   der Server antwortet, ein ruhiges Pendeln
+   (`ofi-search-sweep`). Bewegt wird NUR die Lupe — die
+   Knopfregel «beim Überfahren nur Farbe, keine Bewegung»
+   (styles/buttons.css) bleibt unberührt.
+
+   Ladereihenfolge (main.tsx):
+     fonts.css → index.css → refine.css → quickAdd.css
+     → buttons.css → DIESE DATEI
+   Sie steht zuletzt, damit sie gegen die Einzelmasse aus
+   index.css und Tailwind gewinnt. Die Radiusregeln stehen in
+   `@layer utilities`: index.css zwingt dort jeden
+   `rounded-*`-Wert mit `!important` nieder, und bei
+   `!important` verliert eine Regel OHNE Lage gegen eine MIT
+   Lage — dieselbe Falle wie beim Ratenplan-Editor.
+
+   Portal-Zwilling: Fenster hängen ausserhalb von #root, also
+   trägt jede Regel, die auf `#root` angewiesen ist, ihren
+   `body > :not(#root)`-Zwilling (siehe Notiz „Portal popups
+   need a CSS twin").
+   ========================================================= */
+
+:root {
+    /* Höhe/Schrift sind bewusst KEINE neuen Zahlen: 40px/14px ist der
+       Bedienstandard aus index.css („Form and action-control standard") und
+       styles/buttons.css. Wer eines ändert, ändert alle drei. */
+    --ofi-ctl-h: 44px; /* 09.09.2026: 40 → 44 wie --ofi-btn-height */
+    --ofi-ctl-font: 14px;
+    --ofi-ctl-radius: 10px;
+    --ofi-ctl-gap: 8px;
+    --ofi-ctl-pad: 12px;
+    /* Die Lupe (16px) plus ihr Abstand zum Text — daraus errechnet sich das
+       linke Innenmass des Eingabefeldes, damit der getippte Text nie unter
+       dem Symbol steht. */
+    --ofi-ctl-icon: 16px;
+    --ofi-ctl-lead: 36px;
+    --ofi-ctl-search-w: 280px;
+    --ofi-ctl-filter-w: 184px;
+    --ofi-ctl-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --ofi-ctl-surface: #ffffff;
+    /* 09.09.2026, Samet: «filtre kutularının kenarları lacivert kalın olsun,
+       diğerlerine de aynı şey geçerli» — Suche, Filter und ihre CRM-Zwillinge
+       tragen hell eine 2px-Kante in der Hauptfarbe; die Ruhefläche der Suche
+       ist darum Weiss und nicht mehr das Grau (Grau in einem Marinerahmen sah
+       eingedrückt aus). Dunkel behält die 1px-Haarlinie. */
+    --ofi-ctl-surface-rest: #ffffff;
+    --ofi-ctl-border-w: 2px;
+    --ofi-ctl-border: #272f67;
+    --ofi-ctl-border-hover: #1f2654;
+    --ofi-ctl-text: #202124;
+    --ofi-ctl-muted: #70757a;
+    --ofi-ctl-accent: #272f67;
+    --ofi-ctl-ring: rgba(39, 47, 103, 0.14);
+}
+
+.dark {
+    --ofi-ctl-surface: var(--ofi-cal-surface, #17191c);
+    --ofi-ctl-surface-rest: rgba(255, 255, 255, 0.07);
+    --ofi-ctl-border-w: 1px;
+    --ofi-ctl-border: var(--ofi-cal-border, rgba(255, 246, 232, 0.14));
+    --ofi-ctl-border-hover: rgba(255, 246, 232, 0.28);
+    --ofi-ctl-text: var(--ofi-cal-text, #f4f1ec);
+    --ofi-ctl-muted: var(--ofi-cal-muted, #a8a29a);
+    --ofi-ctl-accent: #e6cf9e;
+    --ofi-ctl-ring: rgba(230, 207, 158, 0.18);
+}
+
+/* ── 1. Die Leiste: EIN Ort für Suche und Filter ───────────
+   Jede Listenseite trägt ihre Werkzeuge in derselben Zeile, im
+   selben Abstand, in derselben Reihenfolge: Suche zuerst, die
+   Filter dahinter, Handlungen rechts (`.ofi-filterbar__end`). */
+.ofi-filterbar {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ofi-ctl-gap);
+}
+.ofi-filterbar__end {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--ofi-ctl-gap);
+}
+
+/* ── 2. Das Suchfeld ───────────────────────────────────────
+   Ruhend eine graue Kapsel ohne Rahmen (das ist der Apple-
+   Trick: die Kante entsteht erst beim Hineingehen), beim
+   Fokus weiss mit weichem Ring. */
+.ofi-search {
+    position: relative;
+    display: flex;
+    width: var(--ofi-ctl-search-w);
+    max-width: 100%;
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h);
+    flex: 0 0 auto;
+    align-items: center;
+    background: var(--ofi-ctl-surface-rest);
+    box-shadow: inset 0 0 0 var(--ofi-ctl-border-w) var(--ofi-ctl-border);
+    transition: background-color 160ms var(--ofi-ctl-ease), box-shadow 160ms var(--ofi-ctl-ease);
+    cursor: text;
+}
+.ofi-search:hover { box-shadow: inset 0 0 0 var(--ofi-ctl-border-w) var(--ofi-ctl-border-hover); }
+.ofi-search[data-filled="true"] {
+    background: var(--ofi-ctl-surface);
+    box-shadow: inset 0 0 0 var(--ofi-ctl-border-w) var(--ofi-ctl-border);
+}
+.ofi-search:focus-within {
+    background: var(--ofi-ctl-surface);
+    box-shadow: inset 0 0 0 var(--ofi-ctl-border-w) var(--ofi-ctl-accent), 0 0 0 3px var(--ofi-ctl-ring);
+}
+/* `is-grow` — dort, wo die Suche die Zeile füllen soll (Kopfleisten der
+   CRM-Seiten). Das MASS bleibt gleich, nur die Breite atmet. */
+.ofi-search.is-grow {
+    width: auto;
+    flex: 1 1 var(--ofi-ctl-search-w);
+    min-width: 200px;
+    max-width: 420px;
+}
+
+/* Lupe + Platzhalter als EIN Block: ruhend mittig, bei Fokus oder Inhalt
+   an der linken Kante. Beides wird bewegt, nicht nur das Symbol — sonst
+   springt der Platzhalter, statt mitzugehen. */
+.ofi-search__lead {
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    gap: var(--ofi-ctl-gap);
+    transform: translate(-50%, -50%);
+    color: var(--ofi-ctl-muted);
+    pointer-events: none;
+    transition: inset-inline-start 320ms var(--ofi-ctl-ease), transform 320ms var(--ofi-ctl-ease);
+}
+.ofi-search:focus-within .ofi-search__lead,
+.ofi-search[data-filled="true"] .ofi-search__lead {
+    inset-inline-start: var(--ofi-ctl-pad);
+    transform: translate(0, -50%);
+}
+.ofi-search__icon {
+    display: flex;
+    width: var(--ofi-ctl-icon);
+    height: var(--ofi-ctl-icon);
+    flex: none;
+    align-items: center;
+    justify-content: center;
+}
+.ofi-search__icon svg { width: var(--ofi-ctl-icon); height: var(--ofi-ctl-icon); }
+.ofi-search__ph {
+    overflow: hidden;
+    max-width: calc(var(--ofi-ctl-search-w) - var(--ofi-ctl-lead) - var(--ofi-ctl-pad));
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--ofi-ctl-font);
+    line-height: 1.2;
+    transition: opacity 160ms var(--ofi-ctl-ease);
+}
+/* Getippt wird, sobald etwas dasteht — der Platzhalter tritt ab. */
+.ofi-search[data-filled="true"] .ofi-search__ph { opacity: 0; }
+
+/* Die Bewegung der Lupe. `data-scan` schaltet den einmaligen Ausschlag
+   beim Suchbeginn; React tauscht dazu den `key` des Symbols, damit die
+   Bewegung auch beim zweiten Mal wieder von vorn läuft. */
+@keyframes ofi-search-scan {
+    0%   { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+    26%  { transform: translate3d(-2px, 0, 0) rotate(-16deg) scale(1.14); }
+    58%  { transform: translate3d(2.5px, 0, 0) rotate(13deg) scale(1.12); }
+    82%  { transform: translate3d(-0.75px, 0, 0) rotate(-4deg) scale(1.03); }
+    100% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+}
+@keyframes ofi-search-sweep {
+    0%   { transform: translate3d(-1.5px, 0, 0) rotate(-9deg); }
+    50%  { transform: translate3d(1.5px, 0, 0) rotate(9deg); }
+    100% { transform: translate3d(-1.5px, 0, 0) rotate(-9deg); }
+}
+.ofi-search__icon[data-scan="on"] { animation: ofi-search-scan 620ms var(--ofi-ctl-ease) both; }
+.ofi-search[data-busy="true"] .ofi-search__icon,
+.ofi-search[data-busy="true"] .ofi-search__icon[data-scan="on"] {
+    animation: ofi-search-sweep 1150ms ease-in-out infinite;
+}
+.ofi-search:focus-within .ofi-search__icon { color: var(--ofi-ctl-accent); }
+
+/* Das Eingabefeld selbst trägt keinen eigenen Rahmen — die Kapsel darum
+   ist die Kante. Die `!important` stehen, weil index.css jedem rohen
+   `input` Rahmen, Radius und weissen Grund gibt. */
+#root .ofi-search input.ofi-search__input,
+body > :not(#root) .ofi-search input.ofi-search__input {
+    width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 0 var(--ofi-ctl-pad) 0 var(--ofi-ctl-lead);
+    font-size: var(--ofi-ctl-font);
+    line-height: 1.2;
+    color: var(--ofi-ctl-text);
+    outline: none;
+    box-shadow: none !important;
+}
+#root .ofi-search input.ofi-search__input:focus,
+body > :not(#root) .ofi-search input.ofi-search__input:focus {
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none;
+}
+/* Der eigene Platzhalter des Feldes bleibt leer: sichtbar ist der
+   Platzhalter im Lupenblock, der sich mitbewegt. */
+.ofi-search input.ofi-search__input::placeholder { color: transparent; }
+.ofi-search[data-filled="true"] input.ofi-search__input { padding-inline-end: 34px; }
+
+#root .ofi-search .ofi-search__clear,
+body > :not(#root) .ofi-search .ofi-search__clear {
+    position: absolute;
+    inset-inline-end: 6px;
+    top: 50%;
+    display: flex;
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    min-height: 22px;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    padding: 0;
+    color: var(--ofi-ctl-muted);
+    transition: background-color 140ms var(--ofi-ctl-ease), color 140ms var(--ofi-ctl-ease);
+}
+#root .ofi-search .ofi-search__clear:hover,
+body > :not(#root) .ofi-search .ofi-search__clear:hover {
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--ofi-ctl-text);
+}
+.dark .ofi-search .ofi-search__clear:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ── 3. Der Filter daneben ─────────────────────────────────
+   Dasselbe Mass, dieselbe Kante, derselbe Fokusring — nur mit
+   eigenem Pfeil, weil der native Pfeil je nach System anders
+   aussieht. */
+#root select.ofi-filter,
+body > :not(#root) select.ofi-filter {
+    width: var(--ofi-ctl-filter-w);
+    max-width: 100%;
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h) !important;
+    flex: 0 0 auto;
+    border: var(--ofi-ctl-border-w) solid var(--ofi-ctl-border) !important;
+    background-color: var(--ofi-ctl-surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2370757a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding: 0 32px 0 var(--ofi-ctl-pad);
+    font-size: var(--ofi-ctl-font);
+    line-height: 1.2;
+    color: var(--ofi-ctl-text);
+    appearance: none;
+    -webkit-appearance: none;
+    transition: border-color 160ms var(--ofi-ctl-ease), box-shadow 160ms var(--ofi-ctl-ease);
+}
+#root select.ofi-filter:hover,
+body > :not(#root) select.ofi-filter:hover { border-color: var(--ofi-ctl-border-hover) !important; }
+#root select.ofi-filter:focus,
+body > :not(#root) select.ofi-filter:focus {
+    border-color: var(--ofi-ctl-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-ctl-ring) !important;
+    outline: none;
+}
+.dark select.ofi-filter {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8a29a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+/* `is-auto` — ein Filter, dessen Beschriftungen kurz sind und der die feste
+   Breite nicht braucht (Jahr, Seitengrösse). Höhe und Kante bleiben. */
+#root select.ofi-filter.is-auto,
+body > :not(#root) select.ofi-filter.is-auto { width: auto; min-width: 108px; }
+/* `is-wide` — Datumsbereiche und Kundennamen brauchen mehr Platz. */
+#root select.ofi-filter.is-wide,
+body > :not(#root) select.ofi-filter.is-wide { width: 232px; }
+
+/* Ein Feld, das kein `<select>` ist, aber neben einem steht (Datum,
+   Betrag, ein fremdes Auswahlfeld): dieselbe Zeile, dasselbe Mass. */
+#root input.ofi-filter,
+body > :not(#root) input.ofi-filter {
+    width: var(--ofi-ctl-filter-w);
+    max-width: 100%;
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h) !important;
+    flex: 0 0 auto;
+    border: var(--ofi-ctl-border-w) solid var(--ofi-ctl-border) !important;
+    background: var(--ofi-ctl-surface);
+    padding: 0 var(--ofi-ctl-pad);
+    font-size: var(--ofi-ctl-font);
+    color: var(--ofi-ctl-text);
+}
+#root input.ofi-filter:focus,
+body > :not(#root) input.ofi-filter:focus {
+    border-color: var(--ofi-ctl-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-ctl-ring) !important;
+    outline: none;
+}
+#root input.ofi-filter.is-auto,
+body > :not(#root) input.ofi-filter.is-auto { width: auto; min-width: 108px; }
+#root input.ofi-filter.is-wide,
+body > :not(#root) input.ofi-filter.is-wide { width: 232px; }
+
+/* Und ein Knopf, der als Feld auftritt: der eigene Datumswähler
+   (QuoteDatePicker) zeichnet seinen Kalender selbst und ist darum ein
+   `<button>`. Er trägt hier `.ofi-btn-plain`, damit styles/buttons.css ihn in
+   Ruhe lässt, und bekommt dieselbe Kante wie das `<select>` daneben. */
+#root button.ofi-filter,
+body > :not(#root) button.ofi-filter {
+    display: flex;
+    width: var(--ofi-ctl-filter-w);
+    max-width: 100%;
+    height: var(--ofi-ctl-h) !important;
+    min-height: var(--ofi-ctl-h) !important;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: var(--ofi-ctl-border-w) solid var(--ofi-ctl-border) !important;
+    background: var(--ofi-ctl-surface) !important;
+    padding: 0 var(--ofi-ctl-pad) !important;
+    font-size: var(--ofi-ctl-font) !important;
+    font-weight: 400;
+    color: var(--ofi-ctl-text);
+    text-align: start;
+}
+#root button.ofi-filter:hover,
+body > :not(#root) button.ofi-filter:hover { border-color: var(--ofi-ctl-border-hover) !important; }
+#root button.ofi-filter.is-auto,
+body > :not(#root) button.ofi-filter.is-auto { width: auto; min-width: 108px; }
+#root button.ofi-filter.is-wide,
+body > :not(#root) button.ofi-filter.is-wide { width: 232px; }
+
+/* Ein Umschlag um das Suchfeld — dort, wo eine Vorschlagsliste daran hängt
+   und einen `position: relative`-Anker braucht. Er gibt nur die Breite weiter;
+   das Feld darin bleibt das gemeinsame. */
+.ofi-searchwrap {
+    position: relative;
+    display: flex;
+    width: var(--ofi-ctl-search-w);
+    max-width: 100%;
+    flex: 0 0 auto;
+}
+.ofi-searchwrap > .ofi-search { width: 100%; }
+
+/* Ein fremdes Element (Kundenwähler, Mehrfachauswahl) in der Leiste: die
+   Hülle gibt Mass und Breite weiter, ohne dass das Innere angefasst wird. */
+.ofi-filter-slot {
+    display: flex;
+    width: var(--ofi-ctl-filter-w);
+    max-width: 100%;
+    min-height: var(--ofi-ctl-h);
+    flex: 0 0 auto;
+    align-items: center;
+}
+.ofi-filter-slot.is-wide { width: 232px; }
+.ofi-filter-slot > * { width: 100%; }
+
+/* ── 4. Radius ─────────────────────────────────────────────
+   In `@layer utilities`, siehe Kopfnotiz. */
+@layer utilities {
+    .ofi-search,
+    #root select.ofi-filter,
+    body > :not(#root) select.ofi-filter,
+    #root input.ofi-filter,
+    body > :not(#root) input.ofi-filter,
+    #root button.ofi-filter,
+    body > :not(#root) button.ofi-filter,
+    #root .ofi-crm-search,
+    body > :not(#root) .ofi-crm-search,
+    #root select.ofi-crm-select,
+    body > :not(#root) select.ofi-crm-select,
+    #root input.ofi-crm-select,
+    body > :not(#root) input.ofi-crm-select {
+        border-radius: var(--ofi-ctl-radius) !important;
+    }
+}
+
+/* ── 5. Die Altbestände auf dasselbe Mass ──────────────────
+   Seiten, die ihre eigene Such-/Filterklasse tragen, sollen ohne
+   Umbau in derselben Linie stehen. Nur Höhe, Kante und Schrift
+   werden angeglichen — ihr übriges Aussehen bleibt. */
+#root .ofi-crm-search,
+body > :not(#root) .ofi-crm-search {
+    height: var(--ofi-ctl-h);
+    min-width: 220px;
+    flex: 1 1 var(--ofi-ctl-search-w);
+    max-width: 420px;
+    padding: 0 var(--ofi-ctl-pad);
+    background: var(--ofi-ctl-surface-rest);
+    box-shadow: inset 0 0 0 var(--ofi-ctl-border-w) var(--ofi-ctl-border);
+}
+#root .ofi-crm-search:focus-within,
+body > :not(#root) .ofi-crm-search:focus-within {
+    background: var(--ofi-ctl-surface);
+    box-shadow: inset 0 0 0 var(--ofi-ctl-border-w) var(--ofi-ctl-accent), 0 0 0 3px var(--ofi-ctl-ring);
+}
+#root .ofi-crm-search input,
+body > :not(#root) .ofi-crm-search input { font-size: var(--ofi-ctl-font); }
+
+#root select.ofi-crm-select,
+body > :not(#root) select.ofi-crm-select,
+#root input.ofi-crm-select,
+body > :not(#root) input.ofi-crm-select {
+    width: var(--ofi-ctl-filter-w);
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h) !important;
+    padding: 0 32px 0 var(--ofi-ctl-pad);
+    font-size: var(--ofi-ctl-font);
+    border-width: var(--ofi-ctl-border-w) !important;
+    border-style: solid !important;
+    border-color: var(--ofi-ctl-border) !important;
+}
+/* Datumsfelder tragen ihren eigenen Kalenderknopf rechts — dort darf kein
+   Pfeilplatz freigehalten werden. */
+#root input.ofi-crm-select,
+body > :not(#root) input.ofi-crm-select { padding-inline-end: var(--ofi-ctl-pad); }
+#root select.ofi-crm-select:focus,
+body > :not(#root) select.ofi-crm-select:focus,
+#root input.ofi-crm-select:focus,
+body > :not(#root) input.ofi-crm-select:focus {
+    border-color: var(--ofi-ctl-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-ctl-ring) !important;
+}
+/* Die Kapseln der Art-Auswahl stehen in derselben Zeile wie die Felder und
+   dürfen darum nicht acht Pixel kürzer sein. */
+#root .ofi-crm-chip,
+body > :not(#root) .ofi-crm-chip { height: var(--ofi-ctl-h); font-size: 13px; padding: 0 15px; }
+
+/* Das Postfach: Suchfeld und Filterkapseln standen auf 34px bzw. 30px und
+   damit als einzige Werkzeugleiste der Anwendung tiefer als der Abrufknopf
+   rechts daneben. Die Pillenform bleibt — das Postfach ist die einzige Stelle
+   mit Filtern, die man auf- und zuklappt, und die runde Form sagt genau das. */
+#root .ofi-mail-search,
+body > :not(#root) .ofi-mail-search {
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h);
+    flex: 0 1 var(--ofi-ctl-search-w);
+    min-width: 180px;
+    padding: 0 var(--ofi-ctl-pad);
+}
+#root .ofi-mail-search input,
+body > :not(#root) .ofi-mail-search input { font-size: var(--ofi-ctl-font); }
+#root .ofi-mail-filterchip,
+body > :not(#root) .ofi-mail-filterchip { height: var(--ofi-ctl-h); font-size: 13px; padding: 0 12px 0 14px; }
+
+/* Die Filterfelder der Personalanträge tragen ihre Beschriftung ÜBER dem Feld
+   (ein Filterblatt, keine Werkzeugleiste). Das Feld selbst steht trotzdem im
+   gemeinsamen Mass — die Formularfelder der Personalakte behalten dagegen
+   bewusst ihr kleineres Kleid (`.ofi-pf-input` ohne Filterumschlag). */
+#root .ofi-req-filter :is(input, select, button).ofi-cal-input,
+body > :not(#root) .ofi-req-filter :is(input, select, button).ofi-cal-input {
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h);
+    font-size: var(--ofi-ctl-font);
+    border: var(--ofi-ctl-border-w) solid var(--ofi-ctl-border) !important;
+}
+
+/* ── 6. Telefon und Tablet ─────────────────────────────────
+   Unter 640px steht jedes Element in voller Breite unter dem
+   vorigen — nebeneinander wäre auf 390px keines mehr bedienbar.
+   Die HÖHE bleibt: 40px ist das Fingermass. */
+@media (max-width: 640px) {
+    .ofi-search,
+    .ofi-search.is-grow,
+    #root select.ofi-filter,
+    body > :not(#root) select.ofi-filter,
+    #root select.ofi-filter.is-auto,
+    #root select.ofi-filter.is-wide,
+    #root input.ofi-filter,
+    body > :not(#root) input.ofi-filter,
+    #root input.ofi-filter.is-auto,
+    #root input.ofi-filter.is-wide,
+    #root button.ofi-filter,
+    body > :not(#root) button.ofi-filter,
+    #root button.ofi-filter.is-auto,
+    #root button.ofi-filter.is-wide,
+    .ofi-filter-slot,
+    .ofi-filter-slot.is-wide,
+    .ofi-searchwrap,
+    #root .ofi-crm-search,
+    #root select.ofi-crm-select,
+    #root input.ofi-crm-select {
+        width: 100%;
+        max-width: 100%;
+        flex: 1 1 100%;
+    }
+    .ofi-search__ph { max-width: calc(100vw - 6rem); }
+    .ofi-filterbar__end { margin-inline-start: 0; width: 100%; }
+}
+
+/* Wer die Bewegung abbestellt hat, bekommt sie nicht. */
+@media (prefers-reduced-motion: reduce) {
+    .ofi-search__lead,
+    .ofi-search__icon,
+    .ofi-search[data-busy="true"] .ofi-search__icon {
+        transition: none;
+        animation: none;
+    }
+}
+
+/* ── 7. Die Felder IN der Tabelle ──────────────────────────
+   09.09.2026, zweiter Durchgang Samet: «tablo içindeki her şey, filtre
+   kutuları biraz daha belirgin olsun — yani kenarları lacivert olsun.»
+
+   Die Filterzeile unter dem Kopfband (`tr[data-filter-row]`) und die Felder
+   in den Zellen standen als EINZIGE Eingaben der Anwendung noch auf der
+   grauen Haarlinie aus index.css (Tailwind `h-9 border-slate-200`). Neben der
+   2px-Marinekante von Suche und Filter sahen sie aus wie abgeschaltet. Sie
+   tragen jetzt dieselbe Kante, dieselbe Ecke, dasselbe Mass und denselben
+   Fokusring — es gibt damit EIN Eingabefeld für die ganze Anwendung, nicht
+   eines für die Werkzeugleiste und ein zweites für die Tabelle.
+
+   Zwei Wege führen in dieselbe Regel:
+     · `.ofi-filter-input` / `.ofi-cell-input` — die beiden Klassen aus
+       components/ui-shared/TableKit.tsx (FILTER_INPUT_CLASS und
+       CELL_INPUT_CLASS, rund 100 Fundstellen)
+     · `tr[data-filter-row] :is(input, select)` — jede Filterzeile, auch die,
+       die ihre Felder ohne die gemeinsame Klasse baut
+
+   `!important` steht, weil index.css jedem rohen `input` Rahmen, Grund und
+   Mindesthöhe mitgibt (Abschnitt „Form and action-control standard"). Wer
+   ein Feld ausdrücklich anders will, setzt es mit Tailwinds `!`-Präfix: eine
+   GESCHICHTETE `!important`-Erklärung schlägt eine ungeschichtete (dieselbe
+   Regel, die dem Radiusband unten seine `@layer utilities` vorschreibt).
+   `.ofi-cell-input` behält damit seine bestehenden Ausnahmen —
+   `!h-10` in der Schnellerfassung, `!border-red-400` beim Doppeleintrag. */
+#root :is(.ofi-filter-input, .ofi-cell-input),
+body > :not(#root) :is(.ofi-filter-input, .ofi-cell-input),
+#root tr[data-filter-row] :is(input, select):not([type="checkbox"]):not([type="radio"]),
+body > :not(#root) tr[data-filter-row] :is(input, select):not([type="checkbox"]):not([type="radio"]) {
+    width: 100%;
+    height: var(--ofi-ctl-h);
+    min-height: var(--ofi-ctl-h) !important;
+    border: var(--ofi-ctl-border-w) solid var(--ofi-ctl-border) !important;
+    background: var(--ofi-ctl-surface) !important;
+    padding: 0 10px;
+    font-size: var(--ofi-ctl-font);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: normal;
+    text-transform: none;
+    color: var(--ofi-ctl-text);
+    transition: border-color 160ms var(--ofi-ctl-ease), box-shadow 160ms var(--ofi-ctl-ease);
+}
+/* Ein `<select>` in der Filterzeile hält rechts Platz für seinen Pfeil frei. */
+#root select.ofi-filter-input,
+body > :not(#root) select.ofi-filter-input,
+#root tr[data-filter-row] select,
+body > :not(#root) tr[data-filter-row] select {
+    padding-inline-end: 28px;
+}
+#root :is(.ofi-filter-input, .ofi-cell-input):hover,
+body > :not(#root) :is(.ofi-filter-input, .ofi-cell-input):hover,
+#root tr[data-filter-row] :is(input, select):hover,
+body > :not(#root) tr[data-filter-row] :is(input, select):hover {
+    border-color: var(--ofi-ctl-border-hover) !important;
+}
+#root :is(.ofi-filter-input, .ofi-cell-input):focus,
+body > :not(#root) :is(.ofi-filter-input, .ofi-cell-input):focus,
+#root tr[data-filter-row] :is(input, select):focus,
+body > :not(#root) tr[data-filter-row] :is(input, select):focus {
+    border-color: var(--ofi-ctl-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-ctl-ring) !important;
+    outline: none;
+}
+#root :is(.ofi-filter-input, .ofi-cell-input)::placeholder,
+body > :not(#root) :is(.ofi-filter-input, .ofi-cell-input)::placeholder,
+#root tr[data-filter-row] input::placeholder,
+body > :not(#root) tr[data-filter-row] input::placeholder {
+    color: var(--ofi-ctl-muted);
+    font-weight: 400;
+}
+
+/* Der Radius gehört in die Lage — index.css drückt dort jeden `rounded-*`
+   mit `!important` auf 2px/7px nieder, und bei `!important` verliert eine
+   Regel OHNE Lage gegen eine MIT Lage (siehe Kopfnotiz). */
+@layer utilities {
+    #root :is(.ofi-filter-input, .ofi-cell-input),
+    body > :not(#root) :is(.ofi-filter-input, .ofi-cell-input),
+    #root tr[data-filter-row] :is(input, select),
+    body > :not(#root) tr[data-filter-row] :is(input, select) {
+        border-radius: var(--ofi-ctl-radius) !important;
+    }
+}

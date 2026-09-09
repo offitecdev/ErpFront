@@ -92,7 +92,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         colDesc: 'Ürün / Malzeme',
         colCode: 'Seri Kod',
         colQty: 'Miktar',
-        colGrossPrice: 'Brüt Fiyat',
+        colGrossPrice: 'Birim Fiyat',
         colNetPrice: 'Net Fiyat',
         colPrice: 'Tutar',
         colDiscount: 'İndirim',
@@ -126,7 +126,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         colDesc: 'Produkt / Material',
         colCode: 'Seriencode',
         colQty: 'Menge',
-        colGrossPrice: 'Bruttopreis',
+        colGrossPrice: 'Einzelpreis',
         colNetPrice: 'Nettopreis',
         colPrice: 'Betrag',
         colDiscount: 'Rabatt',
@@ -156,7 +156,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         colDesc: 'Product / Material',
         colCode: 'Serial Code',
         colQty: 'Quantity',
-        colGrossPrice: 'Gross Price',
+        colGrossPrice: 'Unit Price',
         colNetPrice: 'Net Price',
         colPrice: 'Amount',
         colDiscount: 'Discount',
@@ -175,8 +175,12 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
 };
 
 // ── Sayfa geometrisi (A4, mm) — teklif şablonuyla birebir ────────────────────
-const ML = 14;
-const MR = 196;
+/* Die Raender sind seit dem 09.09.2026 zwei Millimeter schmaler (Vorgabe
+   Samet: «margini azaltin, ama sigmali ve duezguen durmali»): 12 statt 14 mm
+   links, 198 statt 196 mm rechts — vier Millimeter mehr fuer die Tabelle,
+   ohne dass ein Drucker etwas abschneidet. */
+const ML = 12;
+const MR = 198;
 const CONTENT_W = MR - ML;
 
 const LOGO_X = ML;
@@ -201,21 +205,36 @@ const COVER_LETTER_LH = 10 * 0.3528 * 1.35;
 // sabit genişliklerle yerleşir, böylece çizilmeyen bir sütunun (seri kod, brüt
 // fiyat, indirim, KDV) genişliği açıklama sütununa kalır.
 const C_POS_X = ML + 1.5;
-const C_DESC = 25;
+// Die Pos-Spalte braucht acht Millimeter (zwei Ziffern und ihr Titel), nicht
+// dreizehn — der Rest gehoert seit dem 09.09.2026 der Tabelle.
+const C_DESC = ML + 8;
 const C_PRICE_R = MR - 1;
 
-// Sütun genişlikleri: hepsi çizildiğinde açıklama sütununa ~40 mm kalır
-// (uzun ürün adları satır sarar), tipik siparişte (brüt/kod var, KDV yok) ~52 mm.
-const COL_W_PRICE = 26;
-const COL_W_VAT = 12;
-const COL_W_DISC = 14;
-const COL_W_NET = 19;
-const COL_W_GROSS = 19;
-const COL_W_QTY = 16;
-const COL_W_CODE = 22;
+// Es gibt KEINE festen Spaltenbreiten mehr (09.09.2026): `buildTableLayout`
+// misst Titel und Werte und teilt das Blatt danach auf — siehe dort.
+
+/**
+ * ── DIE EIGENEN SPALTEN IM PDF (07.09.2026, Vorgabe Samet) ─────────────────
+ * «Wir nehmen sie als feste Spalten RECHTS NEBEN den Produktnamen — nicht
+ *  darunter —, insgesamt drei.»
+ *
+ * Sie schneiden ihre Breite vom BESCHREIBUNGSFELD ab, denn rechts ist kein
+ * Platz mehr: dort stehen Menge, Preise, Rabatt und Betrag mit festen Massen.
+ *
+ * DIE GRENZE, die das Blatt lesbar hält: die Beschreibung behält mindestens
+ * `DESC_MIN_W` Millimeter. Reicht es für alle drei nicht, werden so viele
+ * gezeichnet, wie hineinpassen; der Rest wandert in die kleine Zeile unter den
+ * Namen — dort, wo sie vorher alle standen. Lieber eine Angabe eine Zeile
+ * tiefer als ein Produktname, von dem drei Buchstaben übrig sind.
+ */
+const DESC_MIN_W = 22;
 
 interface TableLayout {
     descEnd: number;
+    /** Linke Kanten der gezeichneten eigenen Spalten (sie sind linksbündig). */
+    extraX: number[];
+    /** Proportional aus der Vorlage auf die verfuegbare A4-Breite skaliert. */
+    extraWidths: number[];
     /** Seri kod sütununun SOL kenarı (sola yaslı metin); null → çizilmez. */
     codeX: number | null;
     qtyR: number;
@@ -237,27 +256,214 @@ interface TableLayout {
 /** Komşuya 2 mm nefes payı bırakılır (metin sığdırma genişlikleri). */
 const GAP = 2;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIE SPALTEN RICHTEN SICH NACH IHREM INHALT (Vorgabe Samet, 09.09.2026)
+
+   «In den PDFs schrumpft es: manche Spaltentitel winzig, andere riesig. So
+    nicht. Wenn es sein muss, untereinander — aber versuch NIE, den Code unter
+    den Produktnamen zu schieben, um Platz zu sparen. Was wo ist, bleibt wo es
+    ist. Notfalls mehrzeilig, die Tabelle darf wachsen, der Rand darf kleiner
+    werden — aber es muss passen und ordentlich stehen.»
+
+   Bis heute hatte jede Spalte ein FESTES Mass (19 mm Nettopreis, 22 mm Code …)
+   und drei Auswege, wenn der Inhalt nicht passte: kleiner drucken
+   (`fitFontSize`), abschneiden («…») oder unter den Namen schieben. Alle drei
+   sind jetzt weg. Stattdessen wird gemessen:
+
+     · Jede Spalte braucht MINDESTENS ihr laengstes einzelnes Wort — Titel
+       oder Wert, in der Schrift, in der es gedruckt wird. Unter dieses Mass
+       faellt sie nie; darum bricht kein Wort mehr in der Mitte.
+     · Was nach den Mindestmassen uebrig ist, teilen sich die Spalten im
+       Verhaeltnis ihres VOLLEN Textes (Titel + laengster Wert), gedeckelt bei
+       dem, was sie ganz ausschreiben koennte. Die Beschreibung bekommt den
+       Rest — sie ist die einzige Spalte, die von Natur aus umbricht.
+     · Reicht das Blatt nicht einmal fuer die Mindestmasse, wird ein
+       spaceloser Code (kein Wort, eine Zeichenkette) an seinen Bindestrichen
+       geteilt — sonst nichts. Ein echtes Wort wird nie zerschnitten.
+
+   Ein Wert, der breiter ist als seine Spalte, bricht dort UM (siehe
+   `cellLines`), und `measureRow` macht die Zeile so hoch wie ihre hoechste
+   Zelle. Die Zahlenspalten sind davon ausgenommen: eine Zahl bricht nicht um,
+   sie bekommt ihr Mass gleich hier.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/** Laengstes einzelnes Wort eines Textes, in mm bei der gegebenen Schrift. */
+const widestWord = (doc: jsPDF, text: string, style: 'normal' | 'bold', size: number): number => {
+    doc.setFont(FONT, style);
+    doc.setFontSize(size);
+    // Der Nullbreiten-Trenner aus `breakableCode` ist ein Umbruchpunkt — auch
+    // beim Messen, sonst zaehlt ein Code mit Bindestrichen als ein Wort.
+    return Math.max(0, ...text.split(/[\s\u200b]+/).filter(Boolean).map((word) => doc.getTextWidth(word)));
+};
+
+/** Voller Text in einer Zeile, in mm. */
+const fullWidth = (doc: jsPDF, text: string, style: 'normal' | 'bold', size: number): number => {
+    doc.setFont(FONT, style);
+    doc.setFontSize(size);
+    return doc.getTextWidth(text);
+};
+
+/** Eine spacelose Zeichenkette (Code) an ihren Trennzeichen teilen, damit sie umbrechen kann. */
+const breakableCode = (code: string): string => code.replace(/([-_/.])/g, '$1\u200b');
+
+type ColumnKind = 'code' | 'qty' | 'gross' | 'net' | 'disc' | 'vat' | 'price' | string;
+
+interface MeasuredColumn {
+    kind: ColumnKind;
+    /** Ohne dieses Mass bricht ein Wort in der Mitte. */
+    min: number;
+    /** Mit diesem Mass steht alles in einer Zeile. */
+    full: number;
+    align: 'left' | 'right';
+}
+
+const measureColumn = (
+    doc: jsPDF,
+    kind: ColumnKind,
+    header: string,
+    values: string[],
+    align: 'left' | 'right',
+    valueStyle: 'normal' | 'bold' = 'normal',
+    valueSize = FS_BASE,
+): MeasuredColumn => {
+    // Der Titel darf in `headCell` bis FS_HEADER_MIN fallen, wenn ein
+    // einzelnes Wort sonst nicht passt — also ist DAS sein Mindestmass.
+    const headMin = widestWord(doc, header, 'bold', FS_HEADER_MIN);
+    const headFull = fullWidth(doc, header, 'bold', FS_HEADER);
+    const valueMin = Math.max(0, ...values.map((value) => widestWord(doc, value, valueStyle, valueSize)));
+    const valueFull = Math.max(0, ...values.map((value) => fullWidth(doc, value, valueStyle, valueSize)));
+    /* Eine Zahl ist EIN Wort: «CHF 9.514,96» darf nicht an seinem Leerzeichen
+       gemessen werden, sonst bekommt die Betragsspalte nur Platz fuer die
+       Ziffern und die Waehrung schrumpft. Rechtsbuendige Spalten sind Zahlen. */
+    const valueNeed = align === 'right' ? valueFull : valueMin;
+    // Drei Prozent Luft: `splitTextToSize` misst einen Hauch strenger als
+    // `getTextWidth` und hackte sonst den letzten Buchstaben ab.
+    return {
+        kind,
+        min: Math.max(headMin, valueNeed) * 1.03 + GAP,
+        full: Math.max(headFull, valueFull) + GAP,
+        align,
+    };
+};
+
 const buildTableLayout = (
+    doc: jsPDF,
+    order: PurchaseOrderRow,
+    L: OrderPdfStrings,
+    fmt: (value: number) => string,
     hasCode: boolean,
     hasGross: boolean,
     hasDiscount: boolean,
-    hasVat: boolean
+    hasVat: boolean,
+    extraCols: Array<{ key: string; name: string; width?: number }> = []
 ): TableLayout => {
-    // `right` = o an yerleştirilen sütunun sağ kenarı; sağdan sola ilerler.
-    let right = C_PRICE_R - COL_W_PRICE;
-    const vatR = hasVat ? right : null;
-    if (hasVat) right -= COL_W_VAT;
-    const discR = hasDiscount ? right : null;
-    if (hasDiscount) right -= COL_W_DISC;
-    const netR = right;
-    right -= COL_W_NET;
-    const grossR = hasGross ? right : null;
-    if (hasGross) right -= COL_W_GROSS;
-    const qtyR = right;
-    right -= COL_W_QTY;
-    const codeX = hasCode ? right - COL_W_CODE : null;
+    const items = order.items ?? [];
+    const totalVatRate = order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : null;
+
+    /* ── Was in jeder Spalte stehen wird — genau die Texte, die `drawRow` druckt ─ */
+    const columns: MeasuredColumn[] = [];
+    extraCols.forEach((column) => {
+        columns.push(measureColumn(doc, column.key, column.name,
+            items.map((item) => extraValue(item, column.key) || '—'), 'left', 'normal', FS_BASE - 0.4));
+    });
+    if (hasCode) {
+        columns.push(measureColumn(doc, 'code', L.colCode,
+            items.map((item) => breakableCode((item.code || '').trim()) || '—'), 'left', 'normal', FS_BASE - 0.4));
+    }
+    columns.push(measureColumn(doc, 'qty', L.colQty, items.map((item) => fmtQty(item.quantity || 0)), 'right'));
+    if (hasGross) {
+        columns.push(measureColumn(doc, 'gross', L.colGrossPrice,
+            items.map((item) => ((item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—')), 'right'));
+    }
+    columns.push(measureColumn(doc, 'net', L.colNetPrice, items.map((item) => {
+        const shown = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
+        return shown > 0 ? fmtUnitPrice(shown) : '—';
+    }), 'right'));
+    if (hasDiscount) {
+        columns.push(measureColumn(doc, 'disc', L.colDiscount,
+            items.flatMap((item) => discountLines(item)).concat('—'), 'right'));
+    }
+    if (hasVat) {
+        columns.push(measureColumn(doc, 'vat', L.colVat, items.map((item) => fmtPercent(item.vatRate || 0)), 'right'));
+    }
+    columns.push(measureColumn(doc, 'price', L.colPrice, items.map((item) => {
+        const lineVat = totalVatRate === null ? (item.lineVat || 0) : (item.lineTotal || 0) * (totalVatRate / 100);
+        return fmt(Math.round(((item.lineTotal || 0) + lineVat) * 100) / 100);
+    }), 'right', 'bold'));
+
+    /* ── Verteilen: erst die Mindestmasse, dann den Rest nach Bedarf ────────── */
+    const descMin = Math.max(
+        DESC_MIN_W,
+        widestWord(doc, L.colDesc, 'bold', FS_HEADER) + GAP,
+        ...items.map((item) => widestWord(doc, (item.name || '').trim(), 'bold', FS_TITLE) + GAP),
+    );
+    const room = C_PRICE_R - C_DESC;
+    const minSum = columns.reduce((sum, column) => sum + column.min, 0);
+    // Die Beschreibung will ihre volle Breite selten — 60 mm reichen fuer die
+    // meisten Namen in zwei Zeilen; darueber hinaus gibt sie ab.
+    const descWish = Math.max(descMin, 60);
+    const wishSum = columns.reduce((sum, column) => sum + column.full, 0) + descWish;
+    let widths: number[];
+    let descW: number;
+    if (minSum + descMin >= room) {
+        /* Selbst die Mindestmasse passen nicht (fuenf breite eigene Spalten
+           neben einem langen Produktwort). Dann gibt ZUERST die Beschreibung
+           nach — bis auf ihr hartes Minimum, dort bricht ein langes Wort eben
+           doch —, und erst danach die TEXTSPALTEN (eigene Angaben, Code),
+           anteilig. Die Zahlenspalten geben nie nach: eine Zahl kann weder
+           umbrechen noch kleiner werden, ohne falsch auszusehen. */
+        descW = Math.max(DESC_MIN_W, room - minSum);
+        const deficit = Math.max(0, minSum + descW - room);
+        const textMin = columns.reduce((sum, column) => sum + (column.align === 'left' ? column.min : 0), 0);
+        const textScale = textMin > 0 ? Math.max(0.5, (textMin - deficit) / textMin) : 1;
+        widths = columns.map((column) => (column.align === 'left' ? column.min * textScale : column.min));
+    } else if (wishSum <= room) {
+        // Alles passt in einer Zeile — die Beschreibung nimmt den Ueberschuss.
+        widths = columns.map((column) => column.full);
+        descW = room - widths.reduce((sum, width) => sum + width, 0);
+    } else {
+        // Der Normalfall: jede bekommt ihr Minimum, der Rest wird nach dem
+        // Fehlenden (voll − minimum) verteilt, die Beschreibung zaehlt mit.
+        const spare = room - minSum - descMin;
+        const needs = columns.map((column) => column.full - column.min);
+        const descNeed = descWish - descMin;
+        const needSum = needs.reduce((sum, need) => sum + need, 0) + descNeed;
+        widths = columns.map((column, index) => column.min + (needSum > 0 ? spare * (needs[index] / needSum) : 0));
+        descW = descMin + (needSum > 0 ? spare * (descNeed / needSum) : spare);
+    }
+
+    /* ── Von links nach rechts aufstellen ──────────────────────────────────── */
+    let x = C_DESC + descW;
+    const descEnd = x - GAP;
+    const extraX: number[] = [];
+    const extraWidths: number[] = [];
+    let codeX: number | null = null;
+    let wCode = 0;
+    let qtyR = 0; let wQty = 0;
+    let grossR: number | null = null; let wGross = 0;
+    let netR = 0; let wNet = 0;
+    let discR: number | null = null; let wDisc = 0;
+    let vatR: number | null = null; let wVat = 0;
+    let wPrice = 0;
+    columns.forEach((column, index) => {
+        const width = widths[index];
+        switch (column.kind) {
+            case 'code': codeX = x; wCode = width - GAP; break;
+            case 'qty': qtyR = x + width - GAP; wQty = width - GAP; break;
+            case 'gross': grossR = x + width - GAP; wGross = width - GAP; break;
+            case 'net': netR = x + width - GAP; wNet = width - GAP; break;
+            case 'disc': discR = x + width - GAP; wDisc = width - GAP; break;
+            case 'vat': vatR = x + width - GAP; wVat = width - GAP; break;
+            case 'price': wPrice = width - GAP; break;
+            default: extraX.push(x); extraWidths.push(width); break;
+        }
+        x += width;
+    });
+
     return {
-        descEnd: (codeX ?? right) - GAP,
+        descEnd,
+        extraX,
+        extraWidths,
         codeX,
         qtyR,
         grossR,
@@ -265,17 +471,32 @@ const buildTableLayout = (
         discR,
         vatR,
         priceR: C_PRICE_R,
-        wCode: COL_W_CODE - GAP,
-        wQty: COL_W_QTY - GAP,
-        wGross: COL_W_GROSS - GAP,
-        wNet: COL_W_NET - GAP,
-        wDisc: COL_W_DISC - GAP,
-        wVat: COL_W_VAT - GAP,
-        wPrice: COL_W_PRICE - GAP,
+        wCode,
+        wQty,
+        wGross,
+        wNet,
+        wDisc,
+        wVat,
+        wPrice,
     };
 };
 
 /** Siparişte hiç seri kod / brüt fiyat / indirim / KDV var mı. */
+/**
+ * ── WAS DIE VORLAGE AUSGEBLENDET HAT, ZEICHNET DAS BLATT NICHT ─────────────
+ * Vorgabe Samet (09.09.2026): «Haben wir im PDF, in der Tabelle, wo auch immer
+ * etwas entfernt oder aufs Auge gedrueckt, darf es nicht zu sehen sein.»
+ *
+ * Die Bestellung traegt den Schnappschuss (`hiddenColumnKeys`, Vorlagen-
+ * schluessel wie `priceGross`), weil das PDF spaeter ohne die Vorlage neu
+ * gebaut und gemailt wird. Die Werte bleiben an den Positionen stehen — das
+ * Blatt zeigt sie nur nicht. Was sich AUSBLENDEN laesst: der Seriencode, der
+ * Einzelpreis, der Rabatt und die eigenen Spalten. Menge, Nettopreis und
+ * Betrag bleiben immer stehen: ohne sie ist die Zeile keine Bestellung mehr.
+ */
+const orderHiddenKeys = (order: PurchaseOrderRow): Set<string> =>
+    new Set(order.hiddenColumnKeys ?? []);
+
 const orderHasCode = (order: PurchaseOrderRow): boolean =>
     order.items.some((item) => Boolean((item.code || '').trim()));
 const orderHasGross = (order: PurchaseOrderRow): boolean =>
@@ -475,22 +696,44 @@ export async function buildOrderPdfBytes(
     // ── SAYFA 2+: Sipariş satırları ──────────────────────────────────────────
     // Kolon düzeni siparişin kendisine göre kurulur: seri kod / brüt fiyat /
     // indirim / KDV yoksa o sütunlar hiç çizilmez.
+    /* Die eigenen Spalten der Bestellung — Überschrift und Reihenfolge stehen
+       an den Positionen selbst, damit ein altes Dokument seine eigenen Namen
+       behält (siehe `normalizePurchaseOrderExtras` auf dem Server). */
+    const hidden = orderHiddenKeys(order);
+    const extraCols = orderExtraColumns(order, hidden);
     const layout = buildTableLayout(
-        orderHasCode(order),
-        orderHasGross(order),
-        orderHasDiscount(order),
-        orderHasVat(order)
+        doc,
+        order,
+        L,
+        fmt,
+        orderHasCode(order) && !hidden.has('code'),
+        orderHasGross(order) && !hidden.has('priceGross'),
+        orderHasDiscount(order) && !hidden.has('discount'),
+        orderHasVat(order),
+        extraCols
     );
     doc.addPage();
     const st: TableState = { y: 0, rowIdx: 0 };
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout);
+    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout, extraCols);
 
     order.items.forEach((item, index) => {
-        const h = measureRow(doc, item, L, layout);
+        const h = measureRow(doc, item, L, layout, extraCols);
         if (st.y + h > CONTENT_BOTTOM || CONTENT_BOTTOM - st.y < MIN_ROW_START) {
-            newTablePage(doc, st, L, layout);
+            newTablePage(doc, st, L, layout, extraCols);
         }
-        st.y = drawRow(doc, item, index, st.y, Math.min(h, CONTENT_BOTTOM - st.y), fmt, st.rowIdx, L, layout);
+        st.y = drawRow(
+            doc,
+            item,
+            index,
+            st.y,
+            Math.min(h, CONTENT_BOTTOM - st.y),
+            fmt,
+            st.rowIdx,
+            L,
+            layout,
+            extraCols,
+            order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : null,
+        );
         st.rowIdx++;
     });
 
@@ -793,49 +1036,151 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
 
 interface TableState { y: number; rowIdx: number }
 
-function newTablePage(doc: jsPDF, st: TableState, L: OrderPdfStrings, layout: TableLayout) {
+function newTablePage(
+    doc: jsPDF,
+    st: TableState,
+    L: OrderPdfStrings,
+    layout: TableLayout,
+    extraCols: Array<{ key: string; name: string }> = [],
+) {
     doc.addPage();
     st.rowIdx = 0;
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout);
+    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout, extraCols);
 }
 
-function drawTableHeader(doc: jsPDF, y: number, L: OrderPdfStrings, layout: TableLayout): number {
+/** Die festen Spalten, die sich ausblenden lassen — jede freie gibt einer eigenen Platz. */
+const HIDEABLE_FIXED_KEYS = ['code', 'priceGross', 'discount'] as const;
+
+/**
+ * Die eigenen Spalten einer Bestellung: Schlüssel + Überschrift, in der
+ * Reihenfolge, in der sie an den Positionen stehen. Ausgeblendete fallen weg.
+ *
+ * Wie viele: drei — plus eine je AUSGEBLENDETER fester Spalte (Vorgabe Samet,
+ * 09.09.2026: «blenden wir den Einzelpreis aus, steigt die Zahl der eigenen
+ * Spalten»). Die Drei waren nie ein Prinzip, sondern ein Blatt-Mass; faellt
+ * eine feste Spalte weg, ist ihr Platz frei. Dieselbe Rechnung macht der
+ * Vorlagen-Dialog (`CalcPanel`) — beide muessen dasselbe zaehlen.
+ */
+function orderExtraColumns(
+    order: PurchaseOrderRow,
+    hidden: Set<string> = new Set(),
+): Array<{ key: string; name: string; width: number }> {
+    const seen = new Map<string, { name: string; width: number }>();
+    for (const item of order.items ?? []) {
+        for (const entry of item.extras ?? []) {
+            if (entry?.key && entry?.name && !hidden.has(entry.key) && !seen.has(entry.key)) {
+                seen.set(entry.key, { name: String(entry.name), width: entry.width ?? 120 });
+            }
+        }
+    }
+    const freed = HIDEABLE_FIXED_KEYS.filter((key) => hidden.has(key)).length;
+    return [...seen.entries()].slice(0, 3 + freed).map(([key, entry]) => ({ key, ...entry }));
+}
+
+/** Der Wert einer eigenen Spalte an einer Position ('' = nichts eingetragen). */
+function extraValue(item: OrderItem, key: string): string {
+    for (const entry of item.extras ?? []) {
+        if (entry?.key === key) return String(entry.value ?? '').trim();
+    }
+    return '';
+}
+
+/**
+ * ── DIE KOPFZEILE BRICHT UM, STATT ZU SCHRUMPFEN (Vorgabe Samet, 09.09.2026) ─
+ * «Im PDF werden manche Spaltentitel winzig, andere riesig — so nicht. Wenn
+ *  es sein muss, untereinander; die Tabelle darf wachsen.»
+ *
+ * Bis heute drueckte `fitFontSize` jeden Titel in seine Spalte: «Nettopreis»
+ * in 19 mm wurde 6 pt, «Menge» daneben blieb 8.4 pt — zwei Groessen in einer
+ * Zeile. Jetzt haben ALLE Titel dieselbe Schrift; wer nicht in seine Spalte
+ * passt, bekommt eine zweite Zeile, und der Kopf wird so hoch wie sein
+ * laengster Titel. Nur ein einzelnes Wort, das selbst allein nicht passt,
+ * wird noch verkleinert — aber nie unter `FS_HEADER_MIN`, damit es lesbar
+ * bleibt. Der Kopf gibt seine Hoehe zurueck; wer ihn zeichnet, rechnet
+ * damit weiter (`newTablePage` tut das schon).
+ */
+const FS_HEADER_MIN = 7;
+const HEAD_LH = 3.6;
+const HEAD_PAD = 2.4;
+
+type HeadCell = { lines: string[]; x: number; align: 'left' | 'right'; size: number };
+
+/** Zeilen eines Titels bei einer Schriftgroesse — und ob dabei ein Wort zerhackt wurde. */
+function splitHeader(doc: jsPDF, label: string, width: number, size: number): { lines: string[]; chopped: boolean } {
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(size);
+    const words = label.split(/\s+/).filter(Boolean);
+    const lines = doc.splitTextToSize(label, width) as string[];
+    /* `splitTextToSize` zerhackt ein zu langes Wort in Stuecke, die einzeln
+       «passen» — an den Zeilen allein sieht man das nicht. Ein zerhacktes Wort
+       verraet sich daran, dass es MEHR Zeilen als Woerter gibt. */
+    return { lines, chopped: lines.length > words.length };
+}
+
+/** Die kleinste Schrift, mit der der Titel ohne zerhacktes Wort in die Spalte geht. */
+function headerSizeFor(doc: jsPDF, label: string, maxW: number): number {
+    const width = Math.max(4, maxW);
+    let size = FS_HEADER;
+    while (size > FS_HEADER_MIN && splitHeader(doc, label, width, size).chopped) size -= 0.2;
+    return size;
+}
+
+function headCell(doc: jsPDF, label: string, x: number, maxW: number, align: 'left' | 'right', size: number): HeadCell {
+    const { lines } = splitHeader(doc, label, Math.max(4, maxW), size);
+    doc.setFontSize(FS_HEADER);
+    return { lines, x, align, size };
+}
+
+function drawTableHeader(
+    doc: jsPDF,
+    y: number,
+    L: OrderPdfStrings,
+    layout: TableLayout,
+    extraCols: Array<{ key: string; name: string }> = []
+): number {
+    /* EINE Schrift fuer die ganze Kopfzeile (Vorgabe Samet: «manche Titel
+       winzig, andere riesig — so nicht»): jede Zelle sagt, was sie mindestens
+       braucht, und die kleinste Antwort gilt fuer alle. Meist ist das FS_HEADER
+       selbst — verkleinert wird nur, wenn ein Wort allein nicht in seine
+       Spalte geht, und dann fuer alle gleich. */
+    const specs: Array<[string, number, number, 'left' | 'right']> = [
+        [L.colPos, C_POS_X, C_DESC - C_POS_X - 1, 'left'],
+        [L.colDesc, C_DESC, layout.descEnd - C_DESC, 'left'],
+        ...layout.extraX.map((x, index): [string, number, number, 'left' | 'right'] =>
+            [extraCols[index]?.name ?? '', x, layout.extraWidths[index] - GAP, 'left']),
+        ...(layout.codeX !== null ? [[L.colCode, layout.codeX, layout.wCode, 'left'] as [string, number, number, 'left' | 'right']] : []),
+        [L.colQty, layout.qtyR, layout.wQty, 'right'],
+        ...(layout.grossR !== null ? [[L.colGrossPrice, layout.grossR, layout.wGross, 'right'] as [string, number, number, 'left' | 'right']] : []),
+        [L.colNetPrice, layout.netR, layout.wNet, 'right'],
+        ...(layout.discR !== null ? [[L.colDiscount, layout.discR, layout.wDisc, 'right'] as [string, number, number, 'left' | 'right']] : []),
+        ...(layout.vatR !== null ? [[L.colVat, layout.vatR, layout.wVat, 'right'] as [string, number, number, 'left' | 'right']] : []),
+        [L.colPrice, layout.priceR, layout.wPrice, 'right'],
+    ];
+    const rowSize = Math.min(FS_HEADER, ...specs.map(([label, , maxW]) => headerSizeFor(doc, label, maxW)));
+    const cells: HeadCell[] = specs.map(([label, x, maxW, align]) => headCell(doc, label, x, maxW, align, rowSize));
+    const lineCount = Math.max(1, ...cells.map((cell) => cell.lines.length));
+    const headH = Math.max(HEAD_H, HEAD_PAD * 2 + lineCount * HEAD_LH);
+
     doc.setFillColor(...COLOR_HEAD_BG);
-    doc.rect(ML, y, CONTENT_W, HEAD_H, 'F');
+    doc.rect(ML, y, CONTENT_W, headH, 'F');
     doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(ML, y + HEAD_H - 0.35, CONTENT_W, 0.35, 'F');
+    doc.rect(ML, y + headH - 0.35, CONTENT_W, 0.35, 'F');
 
     doc.setFont(FONT, 'bold');
-    doc.setFontSize(FS_HEADER);
     doc.setTextColor(...COLOR_NAVY);
-
-    const ty = y + HEAD_H / 2 + 1.3;
-    fitFontSize(doc, L.colPos, C_DESC - C_POS_X - 1, FS_HEADER, 5.8);
-    doc.text(L.colPos, C_POS_X, ty);
-    doc.setFontSize(FS_HEADER);
-    fitFontSize(doc, L.colDesc, layout.descEnd - C_DESC, FS_HEADER, 5.8);
-    doc.text(L.colDesc, C_DESC, ty);
-    // Seri kod başlığı — sütunun kendisi gibi SOLA yaslıdır.
-    if (layout.codeX !== null) {
-        fitFontSize(doc, L.colCode, layout.wCode, FS_HEADER, 5.8);
-        doc.text(L.colCode, layout.codeX, ty);
-    }
-
-    const headCells: Array<[string, number, number]> = [
-        [L.colQty, layout.qtyR, layout.wQty],
-        ...(layout.grossR !== null ? [[L.colGrossPrice, layout.grossR, layout.wGross] as [string, number, number]] : []),
-        [L.colNetPrice, layout.netR, layout.wNet],
-        ...(layout.discR !== null ? [[L.colDiscount, layout.discR, layout.wDisc] as [string, number, number]] : []),
-        ...(layout.vatR !== null ? [[L.colVat, layout.vatR, layout.wVat] as [string, number, number]] : []),
-        [L.colPrice, layout.priceR, layout.wPrice],
-    ];
-    for (const [label, rightX, maxW] of headCells) {
-        fitFontSize(doc, label, maxW, FS_HEADER, 5.8);
-        doc.text(label, rightX, ty, { align: 'right' });
+    // Alle Titel haengen an der UNTERKANTE: ein einzeiliger neben einem
+    // zweizeiligen steht auf derselben Grundlinie wie dessen letzte Zeile.
+    const bottom = y + headH - HEAD_PAD - 0.6;
+    for (const cell of cells) {
+        doc.setFontSize(cell.size);
+        cell.lines.forEach((line, index) => {
+            const ly = bottom - (cell.lines.length - 1 - index) * HEAD_LH;
+            doc.text(line, cell.x, ly, cell.align === 'right' ? { align: 'right' } : undefined);
+        });
     }
     doc.setFontSize(FS_HEADER);
 
-    return y + HEAD_H + HEAD_GAP;
+    return y + headH + HEAD_GAP;
 }
 
 function fitFontSize(doc: jsPDF, text: string, maxW: number, base: number, min = 6.4): number {
@@ -885,14 +1230,36 @@ type OrderItem = PurchaseOrderRow['items'][number];
  * ve indirim dökümü artık kendi sütunlarında durur (kod sütunu / alt alta
  * yazılan indirim yüzdeleri).
  */
-function buildRowLines(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: TableLayout): { title: string[]; meta: string[] } {
+function buildRowLines(
+    doc: jsPDF,
+    item: OrderItem,
+    L: OrderPdfStrings,
+    layout: TableLayout,
+): { title: string[]; meta: string[] } {
     const descW = layout.descEnd - C_DESC;
     doc.setFont(FONT, 'bold');
     doc.setFontSize(FS_TITLE);
     const title = doc.splitTextToSize((item.name || '').trim(), descW) as string[];
 
+    /* Die zweite Zeile unter dem Namen. Sie trägt zweierlei, und beides sieht
+       gleich aus, sobald es gedruckt ist:
+         · die SERIENNUMMER einer von Hand erfassten Zeile — sie bekommt ihre
+           Beschriftung («Serien-Nr.: …»), sonst wüsste niemand, was da steht;
+         · die EIGENEN ANGABEN aus dem Beleg-Import (07.09.2026) — die bringen
+           ihre Beschriftungen schon mit («Herstellernummer: 4711 · Farbe: RAL
+           9010»), und ein zweites «Serien-Nr.:» davor wäre schlicht falsch.
+       Unterschieden wird am Doppelpunkt: er steht nur in der zweiten Form.
+       `splitTextToSize` bricht die Zeile ohnehin um, und `measureRow` macht die
+       Zeile dafür höher — die Liste darf also länger werden. */
+    /* Unter dem Namen steht nur noch die SERIENNUMMER einer von Hand
+       erfassten Zeile. Was frueher hier landete, weil es in seine Spalte nicht
+       passte — ueberzaehlige eigene Angaben, ein zu langer Code —, landet nicht
+       mehr hier: die Spalten sind seit dem 09.09.2026 so breit, wie ihr Inhalt
+       es braucht, und ihre Zellen brechen um (Vorgabe Samet: «versuch NIE, den
+       Code unter den Produktnamen zu schieben — was wo ist, bleibt wo es ist»). */
+    const serial = (item.serialNumber || '').trim();
     const metaParts = [
-        item.serialNumber ? `${L.serialShort}: ${item.serialNumber}` : '',
+        serial ? (serial.includes(':') ? serial : `${L.serialShort}: ${serial}`) : '',
     ].filter(Boolean);
     let meta: string[] = [];
     if (metaParts.length) {
@@ -903,9 +1270,39 @@ function buildRowLines(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: 
     return { title, meta };
 }
 
-function measureRow(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: TableLayout): number {
+/**
+ * Die Zeilen einer Zelle: der Text bricht in seiner Spalte um. Ein Code ohne
+ * Leerzeichen darf an seinen Trennzeichen brechen (`breakableCode`) — das ist
+ * kein Wort, das man zerschneidet, sondern eine Kette, die man an ihren
+ * Gliedern trennt.
+ */
+function cellLines(doc: jsPDF, text: string, maxW: number, size: number): string[] {
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(text || '—', Math.max(4, maxW)) as string[];
+    return lines.map((line) => line.replace(/\u200b/g, ''));
+}
+
+function measureRow(
+    doc: jsPDF,
+    item: OrderItem,
+    L: OrderPdfStrings,
+    layout: TableLayout,
+    extraCols: Array<{ key: string; name: string }> = []
+): number {
     const { title, meta } = buildRowLines(doc, item, L, layout);
-    const contentH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
+    const descH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
+    // Die eigenen Spalten und der Code brechen in ihrer Spalte um — die
+    // hoechste Zelle bestimmt die Zeile.
+    const extraH = Math.max(0, ...layout.extraX.map((_, position) => {
+        const column = extraCols[position];
+        if (!column) return 0;
+        return cellLines(doc, extraValue(item, column.key), layout.extraWidths[position] - GAP, FS_BASE - 0.4).length * LH_BODY;
+    }));
+    const codeH = layout.codeX === null
+        ? 0
+        : cellLines(doc, breakableCode((item.code || '').trim()), layout.wCode, FS_BASE - 0.4).length * LH_BODY;
+    const contentH = Math.max(descH, extraH, codeH);
     // Sayısal sütunların yüksekliği: indirim sütununda ALT ALTA yazılan yüzdeler
     // (en fazla üç) satırı büyütebilir. BİRİM SATIRI YOKTUR (kullanıcı isteği
     // 2026-08-21: "adet vs. yazmasın") — miktar çıplak sayıdır.
@@ -923,7 +1320,9 @@ function drawRow(
     fmt: (v: number) => string,
     rowIdx: number,
     L: OrderPdfStrings,
-    layout: TableLayout
+    layout: TableLayout,
+    extraCols: Array<{ key: string; name: string }> = [],
+    totalVatRate: number | null = null,
 ): number {
     if (rowIdx % 2 === 1) {
         doc.setFillColor(...COLOR_ZEBRA);
@@ -960,12 +1359,25 @@ function drawRow(
         doc.setTextColor(...COLOR_TEXT);
     }
 
-    // Seri kod sütunu (sola yaslı, soluk) — ekrandaki sipariş tablosuyla aynı.
-    if (layout.codeX !== null) {
-        doc.setFont(FONT, 'normal');
+    // Die eigenen Spalten — linksbündig neben dem Namen, in der Reihenfolge,
+    // die die Vorlage vorgibt. Zu langer Text bricht in seiner Spalte UM;
+    // `measureRow` hat die Zeile dafür schon hoch genug gemacht.
+    layout.extraX.forEach((x, position) => {
+        const column = extraCols[position];
+        if (!column) return;
         doc.setTextColor(...COLOR_LABEL);
-        fitFontSize(doc, item.code || '—', layout.wCode, FS_BASE - 0.4);
-        doc.text(item.code || '—', layout.codeX, baseY);
+        cellLines(doc, extraValue(item, column.key), layout.extraWidths[position] - GAP, FS_BASE - 0.4)
+            .forEach((line, lineIdx) => doc.text(line, x, baseY + lineIdx * LH_BODY));
+        doc.setFontSize(FS_BASE);
+        doc.setTextColor(...COLOR_TEXT);
+    });
+
+    // Seri kod sütunu (sola yaslı, soluk) — ekrandaki sipariş tablosuyla aynı.
+    // Auch er bricht um, statt kleiner zu werden oder unter den Namen zu gehen.
+    if (layout.codeX !== null) {
+        doc.setTextColor(...COLOR_LABEL);
+        cellLines(doc, breakableCode((item.code || '').trim()), layout.wCode, FS_BASE - 0.4)
+            .forEach((line, lineIdx) => doc.text(line, layout.codeX!, baseY + lineIdx * LH_BODY));
         doc.setFontSize(FS_BASE);
         doc.setTextColor(...COLOR_TEXT);
     }
@@ -998,7 +1410,11 @@ function drawRow(
     if (layout.vatR !== null) {
         drawFittedRight(doc, fmtPercent(item.vatRate || 0), layout.vatR, layout.wVat, baseY, 'normal');
     }
-    drawFittedRight(doc, fmt(item.lineTotal || 0), layout.priceR, layout.wPrice, baseY, 'bold');
+    const lineVat = totalVatRate === null
+        ? (item.lineVat || 0)
+        : (item.lineTotal || 0) * (totalVatRate / 100);
+    const payableTotal = Math.round(((item.lineTotal || 0) + lineVat) * 100) / 100;
+    drawFittedRight(doc, fmt(payableTotal), layout.priceR, layout.wPrice, baseY, 'bold');
     doc.setFont(FONT, 'normal');
 
     doc.setDrawColor(...COLOR_HAIRLINE);

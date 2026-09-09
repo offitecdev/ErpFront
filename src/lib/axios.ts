@@ -83,13 +83,61 @@ export const isRequestTimeout = (error: unknown): boolean => {
     return code === 'ECONNABORTED' || code === 'ETIMEDOUT';
 };
 
-apiClient.interceptors.request.use((config) => {
+const readCsrfCookie = (): string | undefined => {
+    const raw = document.cookie.match(/(?:^|;\s*)ofi_csrf=([^;]+)/)?.[1];
+    return raw ? decodeURIComponent(raw) : undefined;
+};
+
+/**
+ * ── DER CSRF-WERT VOR DER ANMELDUNG ─────────────────────────────────────────
+ *
+ * Anmeldung, QR-Anmeldung, Erneuerung und Abmeldung prüft der Server jetzt
+ * ebenfalls auf die Doppelvorlage (nur wenn OFFITEC_COOKIE_SAMESITE=none —
+ * unter Lax schützt der Browser sie schon von sich aus). Vor der Anmeldung gibt
+ * es aber noch keinen Keks: den holt `GET /auth/csrf`.
+ *
+ * Der Wert kommt dort SOWOHL als Keks ALS AUCH im Rumpf. Der Rumpf ist für den
+ * Fall, dass die Seite den Keks gar nicht lesen kann — die Schreibtisch-
+ * anwendung läuft unter `file://` und sieht die Kekse der Schnittstellen-
+ * adresse nicht. Dass ein Fremder den Rumpf nicht lesen kann, sichert die
+ * Ursprungsliste des Servers (CORS), nicht der Keks.
+ */
+let issuedCsrfToken: string | undefined;
+let csrfRequest: Promise<void> | null = null;
+
+const ensureCsrfToken = async (): Promise<string | undefined> => {
+    const existing = readCsrfCookie() || issuedCsrfToken;
+    if (existing) return existing;
+    if (!csrfRequest) {
+        // Plain axios: die eigenen Abfangjäger dürfen hier nicht laufen.
+        csrfRequest = axios
+            .get(`${apiClient.defaults.baseURL}/auth/csrf`, { withCredentials: true })
+            .then((res) => { issuedCsrfToken = res.data?.csrfToken; })
+            .catch(() => { /* Unter Lax ist der Wert entbehrlich — nicht blockieren. */ })
+            .finally(() => { csrfRequest = null; });
+    }
+    await csrfRequest;
+    return readCsrfCookie() || issuedCsrfToken;
+};
+
+/** Die vier Wege, die ausserhalb von requireAuth liegen. */
+const PUBLIC_AUTH_MUTATIONS = ['/auth/login', '/auth/qr-login', '/auth/refresh', '/auth/logout'];
+
+apiClient.interceptors.request.use(async (config) => {
+    const method = (config.method || 'get').toLowerCase();
+    const path = config.url || '';
+
+    // Vor einer unangemeldeten Anmeldeaktion den Wert erst besorgen.
+    if (method !== 'get' && PUBLIC_AUTH_MUTATIONS.some((route) => path.startsWith(route))) {
+        await ensureCsrfToken();
+    }
+
     // CSRF double-submit: echo the JS-readable csrf cookie back as a header.
     // The server compares them on cookie-authenticated mutations; a cross-site
     // attacker can't read our cookies, so they can't forge this header.
-    const csrfToken = document.cookie.match(/(?:^|;\s*)ofi_csrf=([^;]+)/)?.[1];
+    const csrfToken = readCsrfCookie() || issuedCsrfToken;
     if (csrfToken) {
-        config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken);
+        config.headers['X-CSRF-Token'] = csrfToken;
     }
 
     const selectedTenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
@@ -112,7 +160,13 @@ const refreshSession = async (): Promise<boolean> => {
     try {
         // Plain axios: apiClient's own interceptors must not run for this call.
         // The server reads the refresh cookie and answers with fresh cookies.
-        await axios.post(`${apiClient.defaults.baseURL}/auth/refresh`, null, { withCredentials: true });
+        // Der CSRF-Kopf muss hier von Hand mit: die Erneuerung wird jetzt
+        // ebenfalls geprüft, und dieser Aufruf umgeht den Abfangjäger.
+        const csrfToken = await ensureCsrfToken();
+        await axios.post(`${apiClient.defaults.baseURL}/auth/refresh`, null, {
+            withCredentials: true,
+            headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+        });
         return true;
     } catch {
         return false;

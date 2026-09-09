@@ -5,7 +5,7 @@
  */
 import type { FormSubmissionLinkDto } from '@/lib/api/forms';
 import type { CrmCustomerOption } from '../types/crm.types';
-import type { ChecklistLinkPreset } from './components/ChecklistLinkSheet';
+import type { ChecklistLinkPreset } from './components/ChecklistLinkDialog';
 
 export const BTN_PRIMARY =
     'ofi-btn-brand inline-flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50';

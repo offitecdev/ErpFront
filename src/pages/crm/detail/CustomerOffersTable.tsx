@@ -15,7 +15,7 @@ import { getShared } from '../../../lib/axios';
 import { Button } from '../../../components/ui-shared/Button';
 import { PersonAvatar } from '../../../components/ui-shared/PersonAvatar';
 import { StatusChip } from '../../../components/ui-shared/StatusBadge';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../../hooks/useColumnWidths';
 import { formatMoney, toCurrencyCode } from '../../../utils/currency';
 import { tenderStatusLabel, tenderStatusVariant } from '../../sales/detail/utils/tenderStatus.utils';
@@ -199,26 +199,24 @@ export const CustomerOffersTable = ({
 
     return (
         <div className="flex w-full flex-col gap-3">
-            {/* Obere Leiste — wie in der Angebotsliste: Suche + Zustandsauswahl. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="w-64">
-                    <SearchBox
-                        value={search}
-                        onChange={setSearch}
-                        placeholder={i18nT('tenders.tender_no')}
-                    />
-                </div>
-                <select
+            {/* Obere Leiste — dieselbe wie auf der Angebotsliste, im
+                gemeinsamen Mass (styles/controls.css). */}
+            <FilterBar>
+                <SearchBox
+                    value={search}
+                    onChange={setSearch}
+                    placeholder={i18nT('tenders.tender_no')}
+                />
+                <FilterSelect
                     value={orderState}
-                    onChange={(event) => setOrderState(event.target.value as '' | 'draft' | 'order')}
-                    aria-label={i18nT('common.status')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                    onChange={(next) => setOrderState(next as '' | 'draft' | 'order')}
+                    label={i18nT('common.status')}
                 >
                     <option value="">{i18nT('tenders.all_statuler')}</option>
                     <option value="draft">{i18nT('crm.tenders.statusDraft')}</option>
                     <option value="order">{i18nT('crm.tenders.statusOrdered')}</option>
-                </select>
-            </div>
+                </FilterSelect>
+            </FilterBar>
 
             <SectionCard
                 title={`${i18nT('crm.tenders.tableTitle')} (${total})`}

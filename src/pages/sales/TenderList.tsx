@@ -18,7 +18,7 @@ import { Button } from '../../components/ui-shared/Button';
 import { PersonAvatar } from '../../components/ui-shared/PersonAvatar';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { BlockingDialog } from '../../components/ui-shared/BlockingDialog';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../hooks/useColumnWidths';
 
 import { useTenderStore } from '../../store/tenderStore';
@@ -267,36 +267,26 @@ export const TenderList = () => {
                 }
             />
 
-            {/* Üst çubuk — müşteri listesiyle aynı: genel arama + durum ve e-posta seçicileri. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="w-64">
-                    <SearchBox
-                        value={search}
-                        onChange={setSearch}
-                        placeholder={i18nT('tenders.tender_no')}
-                    />
-                </div>
-                <select
-                    value={orderState}
-                    onChange={(event) => setOrderState(event.target.value as '' | 'draft' | 'order')}
-                    aria-label={i18nT('common.status')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
-                >
+            {/* Werkzeugzeile — dieselbe wie auf jeder anderen Liste: das Suchfeld
+                links, die Filter dahinter, alle im gemeinsamen Mass
+                (styles/controls.css). */}
+            <FilterBar>
+                <SearchBox
+                    value={search}
+                    onChange={setSearch}
+                    placeholder={i18nT('tenders.tender_no')}
+                />
+                <FilterSelect value={orderState} onChange={(next) => setOrderState(next as '' | 'draft' | 'order')} label={i18nT('common.status')}>
                     <option value="">{i18nT('tenders.all_statuler')}</option>
                     <option value="draft">{i18nT('crm.tenders.statusDraft')}</option>
                     <option value="order">{i18nT('crm.tenders.statusOrdered')}</option>
-                </select>
-                <select
-                    value={mailSent}
-                    onChange={(event) => setMailSent(event.target.value as '' | 'yes' | 'no')}
-                    aria-label={i18nT('tenders.mail')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
-                >
+                </FilterSelect>
+                <FilterSelect value={mailSent} onChange={(next) => setMailSent(next as '' | 'yes' | 'no')} label={i18nT('tenders.mail')}>
                     <option value="">{i18nT('common.all')}</option>
                     <option value="yes">{i18nT('tenders.mail_sent')}</option>
                     <option value="no">{i18nT('tenders.mail_not_sent')}</option>
-                </select>
-            </div>
+                </FilterSelect>
+            </FilterBar>
 
             <SectionCard title={`${i18nT('crm.tenders.tableTitle')} (${listTotal})`}>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">

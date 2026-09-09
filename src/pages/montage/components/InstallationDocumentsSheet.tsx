@@ -114,7 +114,9 @@ export const InstallationDocumentsSheet = ({ row, onClose }: {
                         kind="appointment"
                         id={row.id}
                         sections={['forms']}
-                        canCreate
+                        /* Techniker legen keine Checklisten an (Vorgabe
+                           02.09.2026) — sie füllen die des Büros aus. */
+                        canCreate={false}
                         variant="montage"
                         onOpen={(submissionId) => openRoute(`/montage/forms/${submissionId}?back=${encodeURIComponent(location.pathname)}`)}
                     />

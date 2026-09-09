@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ArrowRight } from '@/components/icons/antIconCompat';
-import { Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
+import { FilterBar, Pager, SearchBox, SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import { ospApi, type OspFeedEntryDto, type OspFeedResponse } from '@/lib/api/osp';
 import { useNavigate } from 'react-router-dom';
@@ -96,12 +96,13 @@ export const OspFeedTable = () => {
 
     return (
         <div className="flex w-full flex-col gap-4">
-            <SearchBox
-                value={search}
-                onChange={changeSearch}
-                placeholder={t('osp.feed.searchPlaceholder')}
-                className="w-full sm:w-72"
-            />
+            <FilterBar>
+                <SearchBox
+                    value={search}
+                    onChange={changeSearch}
+                    placeholder={t('osp.feed.searchPlaceholder')}
+                />
+            </FilterBar>
             <SectionCard title={`${t('osp.feed.title')} (${total})`}>
                 {/* Der Satz steht ÜBER der Tabelle, nicht in einer Fussnote:
                     wer hier hereinschaut, soll sofort wissen, dass niemand

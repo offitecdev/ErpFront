@@ -255,7 +255,7 @@ const EXACT_REPLACEMENTS: Record<string, string> = {
     chf: 'CHF',
     crm: 'CRM',
     csv: 'CSV',
-    erp: 'ERP',
+    erp: 'OCC',
     fo: 'FO',
     kg: 'kg',
     m2: 'm2',

@@ -42,6 +42,8 @@ export const AppointmentDaysPane = ({ appointmentId, canEdit, handleRef, onSaved
 }) => {
     const [days, setDays] = useState<DaySpan[] | null>(null);
     const [lockedIds, setLockedIds] = useState<string[]>([]);
+    /** Abgeschlossene Tage: Datum und Zeiten stehen fest (Vorgabe Samet, 03.09.2026). */
+    const [frozenIds, setFrozenIds] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     /* Der Stand, wie er vom Server kam — daran erkennt der Knopf im Fuss, ob es
@@ -63,7 +65,12 @@ export const AppointmentDaysPane = ({ appointmentId, canEdit, handleRef, onSaved
                 })));
                 setDays(loaded);
                 original.current = fingerprint(loaded);
-                setLockedIds(series.days.filter((day) => day.status === 'COMPLETED').map((day) => day.id));
+                /* Gestrichen werden darf nur, woran KEIN Rapport hängt. Nicht
+                   mehr der Status: ein vergangener Tag ist von selbst
+                   «abgeschlossen» und darf trotzdem wieder geöffnet und
+                   umgeplant werden (03.09.2026). */
+                setLockedIds(series.days.filter((day) => day.hasReport).map((day) => day.id));
+                setFrozenIds(series.days.filter((day) => day.status === 'COMPLETED').map((day) => day.id));
             })
             .catch(() => { if (!cancelled) setDays([]); });
         return () => { cancelled = true; };
@@ -162,7 +169,7 @@ export const AppointmentDaysPane = ({ appointmentId, canEdit, handleRef, onSaved
 
     return (
         <>
-            <DayPlanRows days={days} onChange={setDays} lockedIds={lockedIds} disabled={!canEdit} />
+            <DayPlanRows days={days} onChange={setDays} lockedIds={lockedIds} frozenIds={frozenIds} disabled={!canEdit} />
             <div className="ofi-cal-tznote" title={timeZoneId() || undefined}>
                 {t('calendar.timeZone')}: {gmtOffsetLabel()}{timeZoneId() ? ` · ${timeZoneId()}` : ''}
             </div>

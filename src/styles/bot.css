@@ -1,0 +1,166 @@
+/* =========================================================
+   Offitec — OFFI, DER LADE-RATGEBER (09.09.2026)
+
+   Vorgabe Samet: «Ein KI-Berater-Roboter, der beim Laden
+   erscheint — etwas Eigenes für Offitec, gern niedlich, aus
+   dem Zeichen heraus.»
+
+   Alles hier ist Bewegung und Farbe für `ui-shared/OffitecBot.tsx`.
+   Die Farben kommen aus den Kalender-Token (`--ofi-cal-*`), der
+   Dunkelmodus ist damit der reine Variablentausch aus
+   styles/dark.css — Offi braucht keine zweite Zeichnung.
+
+   VIER Bewegungen, mehr nicht: schweben, blinzeln, umherschauen,
+   und das Hauszeichen auf dem Kopf dreht sich. Sie laufen in
+   verschiedenen Takten (2.6 s / 4.4 s / 5.2 s / 9 s), damit sie
+   nie gemeinsam «klicken» — genau das macht den Unterschied
+   zwischen lebendig und mechanisch.
+   ========================================================= */
+
+.ofi-bot {
+    display: inline-block;
+    line-height: 0;
+    color: var(--ofi-cal-accent);
+}
+
+/* ── SCHWEBEN ─────────────────────────────────────────────────────────────
+   Vier Pixel, nicht mehr. Ein Roboter, der springt, lenkt vom Warten ab. */
+.ofi-bot__float { animation: ofi-bot-float 2.6s ease-in-out infinite; transform-origin: 60px 70px; }
+@keyframes ofi-bot-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+/* Der Schatten wird flacher, wenn Offi oben ist — im GLEICHEN Takt. */
+.ofi-bot__shadow {
+    fill: currentColor;
+    opacity: 0.14;
+    transform-origin: 60px 119px;
+    animation: ofi-bot-shadow 2.6s ease-in-out infinite;
+}
+@keyframes ofi-bot-shadow {
+    0%, 100% { transform: scale(1); opacity: 0.14; }
+    50% { transform: scale(0.86); opacity: 0.09; }
+}
+
+/* ── DER KOPF ─────────────────────────────────────────────────────────────
+   Hausfarbe als Fläche, ein Hauch heller Kante darüber: das gibt dem
+   flachen Rechteck die weiche Kante, ohne einen Verlauf zu brauchen. */
+.ofi-bot__head { fill: var(--ofi-cal-accent); }
+.ofi-bot__ear { fill: var(--ofi-cal-accent); opacity: 0.55; }
+.ofi-bot__body { fill: var(--ofi-cal-accent); opacity: 0.9; }
+
+/* Das Visier: eine dunklere Fläche, in der die Augen leuchten. */
+.ofi-bot__visor { fill: rgba(3, 7, 18, 0.55); }
+
+/* ── DIE AUGEN ────────────────────────────────────────────────────────────
+   Zwei Striche in der Gegenfarbe. Sie BLINZELN (Höhe geht auf null) und
+   SCHAUEN UMHER (zwei Pixel nach links und rechts) — die zwei Gesten, an
+   denen man ein Gesicht erkennt, auch wenn es nur vier Rechtecke sind. */
+.ofi-bot__eye { fill: var(--ofi-cal-on-accent); }
+/* Der Glanzpunkt sitzt oben links in beiden Augen — immer auf derselben Seite,
+   sonst schielt Offi. */
+.ofi-bot__glint { fill: var(--ofi-cal-accent); opacity: 0.55; }
+/* Wangen: zwei weiche Flecken, kaum sichtbar. Sie sollen wärmen, nicht schminken. */
+.ofi-bot__cheek { fill: var(--ofi-cal-on-accent); opacity: 0.16; }
+.ofi-bot__blink {
+    transform-origin: 60px 55px;
+    animation: ofi-bot-blink 4.4s ease-in-out infinite;
+}
+@keyframes ofi-bot-blink {
+    0%, 88%, 100% { transform: scaleY(1); }
+    92% { transform: scaleY(0.1); }
+    96% { transform: scaleY(1); }
+}
+.ofi-bot__look { animation: ofi-bot-look 5.2s ease-in-out infinite; }
+@keyframes ofi-bot-look {
+    0%, 100% { transform: translateX(-2px); }
+    45%, 55% { transform: translateX(2px); }
+}
+
+/* ── DER MUND ─────────────────────────────────────────────────────────────
+   Beim Warten ein Strich, im Zustand «happy» ein Bogen. Gezeichnet wird er
+   nicht neu — nur die Kappe und die Dicke ändern sich. */
+.ofi-bot__mouth {
+    fill: none;
+    stroke: var(--ofi-cal-on-accent);
+    stroke-width: 3;
+    stroke-linecap: round;
+    opacity: 0.8;
+}
+/* `d` als Eigenschaft animiert nicht überall zuverlässig — der breitere Bogen
+   entsteht darum durch STRECKEN, das kann jeder Browser. */
+.ofi-bot--happy .ofi-bot__mouth {
+    opacity: 1;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(1.25, 1.6);
+}
+
+/* ── DIE ANTENNE ──────────────────────────────────────────────────────────
+   Das Hauszeichen dreht sich langsam, während Offi nachdenkt. Neun Sekunden
+   für eine Umdrehung: schnell genug, dass man es bemerkt, langsam genug,
+   dass es nicht am Auge zieht. */
+.ofi-bot__stalk { stroke: var(--ofi-cal-accent); stroke-width: 3; stroke-linecap: round; }
+/* Die drei Speichen tragen die Farben des Startvorhangs (index.html). Ohne sie
+   wäre die Antenne irgendein Stern; mit ihnen ist sie DAS Hauszeichen. */
+.ofi-bot__spoke--1 { stroke: #06145c; }
+.ofi-bot__spoke--2 { stroke: #d30f15; }
+.ofi-bot__spoke--3 { stroke: #5d6388; }
+.ofi-bot__stardot { fill: #e38384; }
+/* Im Dunkeln dieselbe Palette wie der Startvorhang dort: das Navy verschwände
+   sonst im Grund, und das Zeichen hätte nur noch zwei Speichen. */
+.dark .ofi-bot__spoke--1 { stroke: #eeeef4; }
+.dark .ofi-bot__spoke--2 { stroke: #e38384; }
+.dark .ofi-bot__spoke--3 { stroke: #9395ad; }
+.dark .ofi-bot__stardot { fill: #d30f15; }
+/* WICHTIG: `transform-origin` bleibt bei 0 0. Die Keyframes tragen das
+   `translate` schon selbst; ein zweiter Ursprung verschöbe das Zeichen um
+   genau diese Strecke — der Stern hing dann neben seinem Stiel. */
+.ofi-bot__star {
+    transform-box: view-box;
+    transform-origin: 0 0;
+    animation: ofi-bot-spin 9s linear infinite;
+}
+@keyframes ofi-bot-spin {
+    from { transform: translate(60px, 12px) scale(0.2) rotate(0deg); }
+    to { transform: translate(60px, 12px) scale(0.2) rotate(360deg); }
+}
+
+/* ── DIE DREI LÄMPCHEN ────────────────────────────────────────────────────
+   Sie laufen von links nach rechts wie ein Gedanke, der durchgeht. */
+.ofi-bot__lamp {
+    fill: var(--ofi-cal-on-accent);
+    opacity: 0.25;
+    animation: ofi-bot-lamp 1.5s ease-in-out infinite;
+    animation-delay: calc(var(--ofi-bot-lamp, 0) * 200ms);
+}
+@keyframes ofi-bot-lamp {
+    0%, 60%, 100% { opacity: 0.25; }
+    30% { opacity: 1; }
+}
+
+/* ── DER HINWEIS ──────────────────────────────────────────────────────────
+   Er blendet auf und steigt dabei zwei Pixel — dieselbe Geste wie `.ofi-rise`
+   im Rest des Hauses, nur kürzer. */
+.ofi-bot-tip { animation: ofi-bot-tip 420ms ease both; }
+@keyframes ofi-bot-tip {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── RUHE ─────────────────────────────────────────────────────────────────
+   Wer Bewegung abbestellt hat, bekommt ein stehendes Bild. Offi bleibt
+   sichtbar — er ist ja die Auskunft, nicht die Verzierung. */
+@media (prefers-reduced-motion: reduce) {
+    .ofi-bot__float,
+    .ofi-bot__shadow,
+    .ofi-bot__blink,
+    .ofi-bot__look,
+    .ofi-bot__star,
+    .ofi-bot__lamp,
+    .ofi-bot-tip {
+        animation: none;
+    }
+    .ofi-bot__star { transform: translate(60px, 12px) scale(0.2); }
+}

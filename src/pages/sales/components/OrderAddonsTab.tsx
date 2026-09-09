@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 
 import { t } from '@/i18n/translate';
-import { Receipt as ReceiptText } from '@/components/icons/antIconCompat';
+import { Edit01, Plus, Receipt as ReceiptText, Trash01 } from '@/components/icons/antIconCompat';
 import { InvoicePopup } from '@/components/billing/InvoicePopup';
+import { addonCreatePath, addonEditPath } from '@/components/orders/addonEditorRoute';
+import { AddonEditorSlot } from '@/components/orders/AddonEditorSlot';
+import { useOrderLifecycle } from '@/components/orders/useOrderLifecycle';
+import { AddonOrderPdfButton } from '@/components/orders/AddonOrderPdfButton';
 import { openAmount } from '@/lib/orderBillingTotals';
 import { CostList } from '@/pages/project/features/components/common/CostList';
 import { displayExpenseType, durationFmt, money, numberFmt } from '@/pages/project/features/utils/projectFormatters';
+import { useAuthStore } from '@/store/authStore';
 import type { MyOrderAddonDto, MyOrderDetailDto } from '@/types/billing';
 
 const fmtDate = (value?: string | null) => (value ? dayjs(value).format('DD.MM.YYYY') : '-');
@@ -46,12 +52,19 @@ const addonSlice = <T,>(
  * Fatura modülünün kılığı (19.08.2026): alttan açılan yaprak DEĞİL, ortada
  * duran, sürüklenebilen `InvoicePopup` — modülün geri kalanıyla aynı pencere.
  */
-const AddonContentSheet = ({ order, addon, onClose }: {
+const AddonContentSheet = ({ order, addon, canEdit, onClose, onDelete }: {
     order: MyOrderDetailDto;
     addon: MyOrderAddonDto;
+    /** Nachträge anlegen dürfen = ihre Positionen bearbeiten dürfen. */
+    canEdit: boolean;
     onClose: () => void;
+    /** Den Nachtrag zurücknehmen — die Registerkarte fragt und lädt danach neu. */
+    onDelete: () => void;
 }) => {
+    const navigate = useNavigate();
     const addons = order.addonSalesOrders || [];
+    // Fakturiert = eingefroren; der Server lehnt Änderungen ohnehin ab.
+    const invoiced = (addon.billingSummary?.invoices || []).some((invoice) => invoice.status !== 'CANCELLED');
 
     const materialRows = useMemo(
         () => addonSlice(order.extraMaterials, addon, addons, (item) => item.addedAt).map((item) => ({
@@ -100,6 +113,42 @@ const AddonContentSheet = ({ order, addon, onClose }: {
             title={addon.orderNumber}
             subtitle={`${addon.revisionNumber ? `${addon.revisionNumber}. ` : ''}${t('projects.addonOrder')} · ${fmtDate(addon.orderDate || addon.createdAt)}`}
             onClose={onClose}
+            /* Der eigene Beleg des Nachtrags (NT-PDF, drei Sprachen) und —
+               für wer darf — das Bearbeiten seiner Positionen. */
+            headerActions={(
+                <span className="flex items-center gap-1.5">
+                    {canEdit && (
+                        <button
+                            type="button"
+                            className="ofi-inv-btn"
+                            disabled={invoiced}
+                            title={invoiced ? t('crm.addon.invoicedLocked') : t('crm.addon.editTitle')}
+                            /* Bearbeiten geschieht IN dieser Registerkarte
+                               (Vorgabe 05.09.2026) — «Zurück» führt hierher. */
+                            onClick={() => navigate(addonEditPath(addon.id, `/sales/orders/${order.id}?tab=addons`))}
+                        >
+                            <Edit01 size={13} />
+                            {t('common.edit')}
+                        </button>
+                    )}
+                    <AddonOrderPdfButton addon={addon} />
+                    {/* Der Bereich zum LÖSCHEN des Nachtrags (Vorgabe
+                        05.09.2026): das Material geht ans Lager zurück, die
+                        Rapporte und Termine an den Hauptauftrag. */}
+                    {canEdit && (
+                        <button
+                            type="button"
+                            className="ofi-inv-btn is-danger"
+                            disabled={invoiced}
+                            title={invoiced ? t('crm.addon.invoicedLocked') : t('common.delete')}
+                            onClick={onDelete}
+                        >
+                            <Trash01 size={13} />
+                            {t('common.delete')}
+                        </button>
+                    )}
+                </span>
+            )}
         >
             <div className="ofi-inv-scope ofi-inv-pop__pad space-y-4">
                 <table data-inv-table data-unstyled-table data-no-col-resize className="w-full">
@@ -146,14 +195,25 @@ const AddonContentSheet = ({ order, addon, onClose }: {
  * Fatura modülünün kılığında (19.08.2026): `.ofi-inv-card` ve aynı sayı sütunu
  * — fakturiert yeşil, offen kehribar, kapanmışsa yeşil sıfır.
  */
-export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }: {
+export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed, onChanged }: {
     order: MyOrderDetailDto;
     /** Liste derin bağlantısı (`?addon=<id>`): açılışta bu ek siparişin popup'ı açılır. */
     initialAddonId?: string | null;
     /** Derin bağlantı tüketildiğinde çağrılır — sekmeden ayrılıp dönmek popup'ı yeniden açmaz. */
     onInitialAddonConsumed?: () => void;
+    /** Ein Nachtrag wurde erfasst oder geändert — die Seite lädt den Auftrag neu. */
+    onChanged?: () => void | Promise<void>;
 }) => {
+    const navigate = useNavigate();
     const addons = order.addonSalesOrders || [];
+    const { permissions } = useAuthStore();
+    const { requestAction, dialog: lifecycleDialog } = useOrderLifecycle(async () => {
+        setActiveAddon(null);
+        await onChanged?.();
+    });
+    // Der FREIE Nachtrag (eigene Positionen, eigener NT-Code) — nur für
+    // Projektaufträge: seine Zeilen sind Projektkostensätze.
+    const canCreate = permissions.includes('projects.createAddonOrder') && Boolean(order.project?.id);
     const [activeAddon, setActiveAddon] = useState<MyOrderAddonDto | null>(
         () => (initialAddonId ? addons.find((addon) => addon.id === initialAddonId) ?? null : null),
     );
@@ -164,7 +224,17 @@ export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    /* Die Erfassung geschieht IN dieser Registerkarte (Vorgabe 05.09.2026) —
+       der Auftragskopf und die Reiter bleiben stehen. */
     return (
+        <AddonEditorSlot
+            parent={{
+                id: order.parentSalesOrder?.id || order.id,
+                orderNumber: order.parentSalesOrder?.orderNumber || order.orderNumber,
+                projectId: order.project?.id ?? null,
+            }}
+            onSaved={onChanged}
+        >
         <div className="ofi-inv-scope space-y-4">
             <section className="ofi-inv-card">
                 <header className="ofi-inv-card__head">
@@ -173,6 +243,28 @@ export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }
                         <span className="truncate">{t('projects.detail.overview.addonsTitle')}</span>
                         {addons.length > 0 && <span className="ofi-inv-sub">{addons.length}</span>}
                     </span>
+                    {/* Der freie Nachtrag: eigener NT-Code, Produkte/Material
+                        direkt erfasst — der zweite Weg neben dem Zusammenziehen
+                        aus den Rapporten (Vorgabe 05.09.2026). */}
+                    {canCreate && (
+                        <div className="ofi-inv-card__actions">
+                            <button
+                                type="button"
+                                className="ofi-inv-btn is-primary"
+                                onClick={() => navigate(addonCreatePath(
+                                    {
+                                        id: order.parentSalesOrder?.id || order.id,
+                                        orderNumber: order.parentSalesOrder?.orderNumber || order.orderNumber,
+                                        projectId: order.project?.id ?? null,
+                                    },
+                                    `/sales/orders/${order.id}?tab=addons`,
+                                ))}
+                            >
+                                <Plus size={13} />
+                                {t('crm.addon.newTitle')}
+                            </button>
+                        </div>
+                    )}
                 </header>
                 <div className="ofi-inv-card__body">
                     <table data-inv-table data-unstyled-table className="w-full">
@@ -182,12 +274,14 @@ export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }
                                 <th className="w-36 text-right">{t('projects.detail.colAmount')}</th>
                                 <th className="w-36 text-right">{t('billing.billed')}</th>
                                 <th className="w-36 text-right">{t('billing.remaining')}</th>
+                                {/* Jeder Nachtrag hat seinen EIGENEN Beleg. */}
+                                <th className="w-14 text-right">PDF</th>
                             </tr>
                         </thead>
                         <tbody>
                             {addons.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="ofi-inv-empty">
+                                    <td colSpan={5} className="ofi-inv-empty">
                                         {t('projects.detail.overview.noAddons')}
                                     </td>
                                 </tr>
@@ -203,7 +297,15 @@ export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }
                                         className="is-link"
                                     >
                                         <td>
-                                            <span className="ofi-inv-name">{addon.orderNumber}</span>
+                                            {/* STORNIERT (06.09.2026): der Nachtrag bleibt
+                                                stehen — durchgestrichen, damit ihn niemand
+                                                fuer offen haelt. */}
+                                            <span className={`ofi-inv-name ${addon.cancelledAt ? 'line-through opacity-60' : ''}`}>{addon.orderNumber}</span>
+                                            {addon.cancelledAt && (
+                                                <span className="ml-1.5 rounded bg-rose-100 px-1.5 py-px text-[10px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+                                                    {t('orders.lifecycle.statusCancelled')}
+                                                </span>
+                                            )}
                                             {/* Tarih = ek işin ait olduğu randevu/iş günü
                                                 (orderDate), proje kutusundaki ile aynı. */}
                                             <span className="ofi-inv-sub">{fmtDate(addon.orderDate || addon.createdAt)}</span>
@@ -211,6 +313,9 @@ export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }
                                         <td className="ofi-inv-num is-strong">{money(total)}</td>
                                         <td className="ofi-inv-num is-billed">{money(billed)}</td>
                                         <td className={`ofi-inv-num ${open > 0 ? 'is-open' : 'is-billed'}`}>{money(open)}</td>
+                                        <td className="text-right">
+                                            <AddonOrderPdfButton addon={addon} variant="icon" />
+                                        </td>
                                     </tr>
                                 );
                             })}
@@ -219,7 +324,18 @@ export const OrderAddonsTab = ({ order, initialAddonId, onInitialAddonConsumed }
                 </div>
             </section>
 
-            {activeAddon && <AddonContentSheet order={order} addon={activeAddon} onClose={() => setActiveAddon(null)} />}
+            {activeAddon && (
+                <AddonContentSheet
+                    order={order}
+                    addon={activeAddon}
+                    canEdit={canCreate}
+                    onClose={() => setActiveAddon(null)}
+                    onDelete={() => requestAction({ id: activeAddon.id, orderNumber: activeAddon.orderNumber, isAddon: true })}
+                />
+            )}
+
+            {lifecycleDialog}
         </div>
+        </AddonEditorSlot>
     );
 };

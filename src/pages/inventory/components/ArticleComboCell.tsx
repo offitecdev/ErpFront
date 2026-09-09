@@ -40,7 +40,9 @@ export const ArticleComboCell = ({
     /** Yeni eklenen satırda hücre hazır olsun diye. */
     autoFocus?: boolean;
     /** Metinler türe göre değişir (ürün / malzeme). */
-    placeholder: string;
+    /** Optional: die Zellen der Bestelltabelle tragen seit 08.09.2026 keinen
+     *  Hinweistext mehr (Vorgabe Samet). */
+    placeholder?: string;
     addLabel: string;
     viewAllLabel: string;
 }) => {

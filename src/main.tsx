@@ -8,7 +8,22 @@ import './styles/refine.css'
 // EIN Knopf fuer die ganze Anwendung (Hoehe, Innenmass, Welle von links nach
 // rechts, Druckpunkt) — MUSS nach refine.css stehen, damit die gemeinsame
 // Groesse gegen die Einzelmasse aus index.css und Tailwind gewinnt.
+// Schnellerfassung im Lager (Foto → Text → Produkt): eigene Knopfmasse
+// (Daumen, nicht Maus) — steht darum VOR buttons.css und nennt keine
+// Tailwind-Innenmasse, damit die gemeinsame Knopfregel sie nicht anfasst.
+import './styles/quickAdd.css'
 import './styles/buttons.css'
+// EIN Suchfeld und EIN Filter fuer die ganze Anwendung (Hoehe, Breite, Kante,
+// Ort in der Zeile — und die Bewegung der Lupe). MUSS nach buttons.css stehen:
+// die Loeschtaste im Suchfeld ist ein <button> und darf nicht auf das
+// Knopfmass von 40px aufgeblasen werden.
+import './styles/controls.css'
+// EIN Fenster fuer die ganze Anwendung (09.09.2026): jedes Pop-up, Menue und
+// jeder Dialog im sauberen Mac-Fensterkleid der Angebotsseite — Haarlinien,
+// 6px-Kontrollen, ein Systemblau, die Programmschrift aus fonts.css. MUSS
+// zuletzt stehen: sie biegt das Radienband und die Knopf-/Feldregeln von
+// index.css um.
+import './styles/appleModal.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
 import { initInstallPrompt } from './lib/pwa/installPrompt'

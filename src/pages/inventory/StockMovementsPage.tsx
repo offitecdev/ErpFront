@@ -1,7 +1,7 @@
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
 import type { MovementKind } from '@/types/inventory';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { MOVEMENTS_PAGE_SIZE, useMovementsList } from './hooks/useMovementsList';
@@ -53,18 +53,17 @@ export const StockMovementsPage = () => {
                 title={t('inv.movements.title')}
             />
 
-            <div className="flex flex-wrap items-center gap-2">
+            <FilterBar>
                 <SearchBox
                     value={list.search}
                     onChange={list.setSearch}
                     placeholder={t('inv.movements.searchPlaceholder')}
-                    className="w-64"
                 />
                 <select
                     value={list.type}
                     onChange={(event) => list.setType(event.target.value as MovementKind | '')}
                     aria-label={t('inv.columns.movementType')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                    className="ofi-filter"
                 >
                     <option value="">{t('inv.movements.allTypes')}</option>
                     {FILTERABLE_KINDS.map((kind) => (
@@ -76,7 +75,7 @@ export const StockMovementsPage = () => {
                     value={list.dateFrom}
                     onChange={(event) => list.setDateFrom(event.target.value)}
                     aria-label={t('inv.movements.dateFrom')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                    className="ofi-filter"
                 />
                 <span className="text-[12px] text-slate-400">—</span>
                 <input
@@ -84,9 +83,9 @@ export const StockMovementsPage = () => {
                     value={list.dateTo}
                     onChange={(event) => list.setDateTo(event.target.value)}
                     aria-label={t('inv.movements.dateTo')}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                    className="ofi-filter"
                 />
-            </div>
+            </FilterBar>
 
             <SectionCard title={t('inv.movements.sectionTitle', { count: list.total })}>
                 <div className="overflow-x-auto">

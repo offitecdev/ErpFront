@@ -29,6 +29,7 @@ import type {
     MovementListQuery,
     SupplierSearchItem,
     BulkArticleItemInput,
+    QuickArticleItemInput,
     BulkArticlesResult,
     BulkMovementItemInput,
     BulkMovementsResult,
@@ -44,6 +45,12 @@ import type {
     SendPurchaseOrderMailResult,
     ReceivePurchaseOrderInput,
     ReceivePurchaseOrderResult,
+    AiImportStatus,
+    AiExtractInput,
+    AiExtractResponse,
+    SupplierCalcConfig,
+    SupplierOrderTemplate,
+    PurchaseTemplateDocumentType,
 } from '../../types/inventory';
 
 const QUICK_PICK_CACHE_TTL_MS = 15_000;
@@ -130,6 +137,13 @@ export const inventoryApi = {
      * (code, category, barcodes, status, stock levels, created date) plus the
      * stock-balance JOIN behind `totalQuantity`. None of that is shown in the
      * picker, and none of it is copied onto the line.
+     *
+     * ORDNUNG: erst alphabetisch, dann numerisch von klein nach gross — die
+     * Regel, nach der die Offerte, die Rechnung und der Nachtrag ihre
+     * Produktliste erwarten (Vorgabe Samet). Sie steht im Server (`nameNatural`,
+     * siehe `InventoryRepository`), denn die Liste kommt seitenweise: eine
+     * fertige Seite hier nachzusortieren ordnete bloss die zehn Zeilen, die der
+     * Server nach einer anderen Regel schon ausgewählt hätte.
      */
     articlesQuickPick: async (params: {
         page?: number;
@@ -141,6 +155,8 @@ export const inventoryApi = {
         query.set('pageSize', String(params.pageSize ?? 15));
         query.set('lean', 'true');
         query.set('includeDescription', 'true');
+        query.set('sortBy', 'nameNatural');
+        query.set('sortDirection', 'asc');
         if (params.search) query.set('search', params.search);
         const tenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId') || '';
         const url = `/inventory/articles/summary/paged?${query.toString()}`;
@@ -264,6 +280,17 @@ export const inventoryApi = {
             itemType,
             ...(options?.overwrite ? { overwrite: true } : {}),
         });
+        return res.data;
+    },
+
+    /**
+     * Schnellerfassung (Foto → Text → Produkt): wie `bulkCreateArticles`, nur
+     * OHNE Code — der Server vergibt `ART-NNNNN` fortlaufend je Firma und
+     * meldet ihn in `created[].articleCode` zurück. Neue Produkte werden
+     * immer als PRODUKT angelegt; die Menge wird als Eingang gebucht.
+     */
+    quickCreateArticles: async (items: QuickArticleItemInput[]): Promise<BulkArticlesResult> => {
+        const res = await apiClient.post('/inventory/articles/quick', { items });
         return res.data;
     },
 
@@ -452,6 +479,16 @@ export const purchaseOrdersApi = {
         return res.data;
     },
 
+    /**
+     * WARENEINGANG LÖSCHEN — nimmt die Lagerbuchungen dieser Bestellung zurück
+     * (Eingangsbewegungen + Partien werden gelöscht, der Bestand fällt wieder)
+     * und stellt die Bestellung eine Stufe zurück auf die Bestellstufe.
+     */
+    revertReceive: async (id: string): Promise<{ revertedMovements: number; order: PurchaseOrderRow }> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/receive/revert`);
+        return res.data;
+    },
+
     sendMail: async (id: string, input: SendPurchaseOrderMailInput): Promise<SendPurchaseOrderMailResult> => {
         const res = await apiClient.post(`/inventory/purchase-orders/${id}/send-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
@@ -490,6 +527,75 @@ export const purchaseOrdersApi = {
 
     deleteTextTemplate: async (templateId: string): Promise<void> => {
         await apiClient.delete(`/inventory/purchase-orders/text-templates/${templateId}`);
+    },
+
+    // ── BELEG-IMPORT (07.09.2026) ──────────────────────────────────────────
+    // Ein PDF/Foto/eine Tabelle wird auf dem SERVER in Text gewandelt und dort
+    // einem Sprachmodell vorgelegt. Der Schlüssel bleibt dort — er darf nicht
+    // im Browser-Bündel liegen.
+
+    /** Steht die Erkennung? Wird VOR dem Hochladen gefragt. */
+    aiStatus: async (): Promise<AiImportStatus> => {
+        const res = await apiClient.get('/inventory/purchase-orders/ai-status');
+        return res.data;
+    },
+
+    /**
+     * Beleg lesen lassen. Das Zeitlimit ist grosszügig: ein mehrseitiger Beleg
+     * läuft in Stücken durch das Modell, und jedes Stück braucht Sekunden.
+     */
+    aiExtract: async (input: AiExtractInput): Promise<AiExtractResponse> => {
+        /* 290 s — knapp unter der Frist von Nginx (300 s) und deutlich ueber
+           der des Servers (240 s), damit bei einem langen Beleg IMMER der
+           Server zuerst antwortet und seine Meldung ankommt. 180 s reichten
+           fuer eine dichte Aufnahme nicht: der Fortschritt blieb bei 92 %
+           stehen und brach dann ohne Grund ab. */
+        const res = await apiClient.post('/inventory/purchase-orders/ai-extract', input, { timeout: 290_000 });
+        return res.data;
+    },
+
+    // ── Rechenvorlagen je Lieferant ────────────────────────────────────────
+    listSupplierTemplates: async (
+        supplierId?: string | null,
+        documentType: PurchaseTemplateDocumentType = 'ORDER',
+    ): Promise<SupplierOrderTemplate[]> => {
+        const params = new URLSearchParams({ documentType });
+        if (supplierId) params.set('supplierId', supplierId);
+        const query = `?${params.toString()}`;
+        const res = await apiClient.get(`/inventory/purchase-orders/supplier-templates${query}`);
+        return res.data?.items ?? [];
+    },
+
+    createSupplierTemplate: async (input: {
+        title: string;
+        supplierId?: string | null;
+        supplierName?: string;
+        isDefault?: boolean;
+        documentType: PurchaseTemplateDocumentType;
+        config: SupplierCalcConfig;
+    }): Promise<SupplierOrderTemplate> => {
+        const res = await apiClient.post('/inventory/purchase-orders/supplier-templates', input);
+        return res.data;
+    },
+
+    updateSupplierTemplate: async (
+        templateId: string,
+        patch: {
+            title?: string;
+            supplierId?: string | null;
+            supplierName?: string;
+            isDefault?: boolean;
+            config?: SupplierCalcConfig;
+            /** Nur mitzählen, dass die Vorlage angewendet wurde. */
+            used?: boolean;
+        },
+    ): Promise<SupplierOrderTemplate> => {
+        const res = await apiClient.patch(`/inventory/purchase-orders/supplier-templates/${templateId}`, patch);
+        return res.data;
+    },
+
+    deleteSupplierTemplate: async (templateId: string): Promise<void> => {
+        await apiClient.delete(`/inventory/purchase-orders/supplier-templates/${templateId}`);
     },
 };
 

@@ -18,7 +18,7 @@
    ========================================================= */
 
 :root {
-    /* Titelschrift: Open Sans — dieselbe Familie wie der Fliesstext
+    /* Titelschrift: Inter Variable — dieselbe Familie wie der Fliesstext
        (`--font-display` aus styles/theme.css). Früher stand hier Times
        New Roman; Überschriften und Fliesstext laufen jetzt in einer
        Schrift. Der Klassenname `.ofi-serif` bleibt, damit die rund
@@ -67,8 +67,8 @@
 }
 
 /* Die zusätzliche Laufweite von 0,01em glich früher aus, dass Times
-   New Roman bei gleicher Punktzahl schmaler läuft als Open Sans. Mit
-   Open Sans als Titelschrift entfällt dieser Ausgleich — die
+   New Roman bei gleicher Punktzahl schmaler läuft als Inter. Mit
+   Inter als Titelschrift entfällt dieser Ausgleich — die
    Grundlaufweite der Familie stimmt bereits. */
 
 /* ── 2. Eingabefelder ──────────────────────────────────────
@@ -263,7 +263,8 @@ body > div:not(#root) :where(
    `.ofi-header-icon-button` (index.css) liest dieselbe Variable; ein
    Uebersteuern auf der Leiste hebt darum die Werkzeuge links gleich mit, ohne
    irgendein Feld ausserhalb des Kopfes anzufassen. */
-#root .ofi-topbar { --ofi-control-height: 44px; }
+#root .ofi-topbar { --ofi-control-height: 48px; }
+/* «Die Knöpfe etwas grösser» (09.09.2026): 44 → 48px, wieder nur im Kopf. */
 
 #root .ofi-topbar .ofi-hdr-ctl {
     height: var(--ofi-control-height);
@@ -334,13 +335,165 @@ body > div:not(#root) :where(
    die Schublade auf dem Telefon, die dieselbe Rolle spielt.
    ========================================================= */
 
-#root .ofi-shell-white { background-color: #ffffff; }
+/* iOS-Grau statt Weiss (Samet, 09.09.2026, vierte Rückmeldung): «Header und
+   Sidebar sollen sich vom normalen Bildschirm klar unterscheiden, iOS/Apple-
+   Look.» Die Seite ist jetzt Weiss; die Schale steht auf Apples
+   System-Grau #f5f5f7 mit einer Haarlinie — so trennt iOS seine Leisten. */
+#root .ofi-shell-white { background-color: #f5f5f7; }
+#root #oi-sidebar-panel.ofi-shell-white { background-color: #ffffff; }
 html.dark #root .ofi-shell-white { background-color: var(--ofi-d-shell); }
 
 /* Das Aufklappfeld schwebt — es steht eine Stufe HÖHER als die
    Seite, nicht tiefer. Sonst läse sich sein Schlagschatten als Loch. */
 html.dark #root #oi-sidebar-panel.ofi-shell-white {
     background-color: var(--ofi-d-surface);
+}
+
+
+/* =========================================================
+   WEISSE LEINWAND + iOS-SCHALE (09.09.2026)
+
+   Vorgabe Samet, in vier Schritten am selben Tag:
+     1. «Arka plan beyaz olsun» — die Seite ist Weiss, nicht mehr #f6f8fb.
+     2. «Gölge olsun» — Kopf und Leiste warfen Schatten. Verworfen:
+     3. «Gölgeleri kaldır, gölgeler sayfayı küçültüyor» — Schatten weg.
+     4. «iOS/Apple görünüm, ekrandan net ayırt edilebilir» — die Schale
+        steht auf Apples System-Grau #f5f5f7, getrennt durch EINE Haarlinie
+        (unter dem Kopf, rechts neben der Leiste). Kein Schatten, kein
+        Tonverlauf. Das ist die Navigationsleiste von iOS.
+
+   Die Haarlinie sitzt auf einem ::after (box-shadow ohne Weichzeichner),
+   nicht als `border`: so verschiebt sie kein Layout und die Leiste selbst
+   bekommt weder overflow noch clip-path — ihre Menüs (Blitz, «+», Sprache,
+   Profil) stehen INLINE mit `absolute top-12` in ihr. Die Modulleiste
+   steht über dem Kopf (z-index 51), damit ihre Linie durchläuft und die
+   Kopflinie an ihr endet — Ecke wie bei einer iPad-Seitenleiste.
+
+   Die Tailwind-Klasse `bg-[#f6f8fb]` bleibt im Markup stehen, weil
+   dark.css genau an diesem Namen den Dunkelgrund festmacht; hell
+   wird sie hier auf Weiss gezogen. Dunkel: Schale #0a0b0d unter der
+   Seite #0f1113, Haarlinie weiss-transparent.
+   ========================================================= */
+
+html:not(.dark),
+html:not(.dark) body { background: #ffffff; }
+html:not(.dark) #root .bg-\[\#f6f8fb\] { background-color: #ffffff; }
+
+/* «Direkt arka plan beyaz olsun» (Samet, dritte Rückmeldung 09.09.2026):
+   nicht nur der Rahmen, JEDE Seitenfläche. Die Hilfsklassen, mit denen
+   einzelne Seiten sich bisher einen eigenen hellgrauen Grund gaben
+   (`bg-slate-50`, `bg-gray-50`, `bg-[#f8fafc]`, `bg-[#f8fafd]`), werden
+   hell auf Weiss gezogen — Zeilen-Hover (`hover:bg-slate-50`) sind andere
+   Klassennamen und bleiben. Dunkel unverändert. */
+html:not(.dark) #root,
+html:not(.dark) #root main { background-color: #ffffff; }
+html:not(.dark) #root :is(.bg-slate-50, .bg-gray-50, .bg-\[\#f8fafc\], .bg-\[\#f8fafd\]) {
+    background-color: #ffffff;
+}
+
+
+/* =========================================================
+   TABELLENKÖPFE: MARINEBLAUE SCHRIFT AUF WEISS (09.09.2026)
+
+   Vorgabe Samet, zweite Fassung: «lacivert değil — yazının rengi lacivert
+   olsun, arka planı lacivert değil.» Der Kopfstreifen jeder Tabelle des
+   gemeinsamen Kits (`data-inv-table`, darauf `data-list-table`) und der
+   Offertenzeilen steht hell auf WEISS mit Schrift in der Hauptfarbe
+   #272f67; eine Haarlinie darunter trennt ihn vom Rumpf. Die Filterzeile
+   (`tr[data-filter-row]`) ist KEIN Kopf und bleibt, wie sie ist.
+
+   Die Schrift im Kopf sitzt oft in Spans/Buttons mit `text-slate-*`,
+   die index.css mit `!important` festnagelt (siehe Merkzettel
+   «Text-colour utility cascade») — darum hier ebenfalls `!important`,
+   drei Ebenen tief, aber NIE auf `.absolute` (aufklappende Menüs im
+   Kopf behalten ihre eigene Schrift). Spaltengriff und Spaltenlinien
+   behalten ihre Grundfarben aus index.css. Telefon (<640px) behält
+   seine Sortier-Chips, dort greift nichts davon. Dunkel: dark.css,
+   unverändert.
+   ========================================================= */
+
+@media (min-width: 640px) {
+    html:not(.dark) #root table[data-inv-table] > thead > tr:not([data-filter-row]) > th {
+        background: #ffffff !important;
+        color: #272f67 !important;
+        border-bottom-color: #e2e8f0 !important;
+        font-weight: 600;
+    }
+    html:not(.dark) #root table[data-inv-table] > thead > tr:not([data-filter-row]) > th > :not(.absolute),
+    html:not(.dark) #root table[data-inv-table] > thead > tr:not([data-filter-row]) > th > :not(.absolute) > :not(.absolute),
+    html:not(.dark) #root table[data-inv-table] > thead > tr:not([data-filter-row]) > th > :not(.absolute) > :not(.absolute) > :not(.absolute) {
+        color: #272f67 !important;
+        -webkit-text-fill-color: #272f67;
+    }
+    html:not(.dark) #root table[data-inv-table] > thead > tr:not([data-filter-row]) > th[data-resize-active] {
+        background: #f3f5fb !important;
+    }
+
+    /* Offertenzeilen: derselbe Kopf. */
+    html:not(.dark) #root .ofi-quote-page .ofi-quote-lines > thead > tr > th {
+        background: #ffffff !important;
+        color: #272f67 !important;
+        -webkit-text-fill-color: #272f67;
+        border-bottom-color: #e2e8f0 !important;
+        font-weight: 600;
+        font-size: 12px;
+        height: 40px;
+    }
+    html:not(.dark) #root .ofi-quote-page .ofi-quote-lines > thead > tr > th :is(span, button, svg, div):not(.absolute) {
+        color: #272f67 !important;
+        -webkit-text-fill-color: #272f67;
+    }
+}
+
+
+/* =========================================================
+   GRÖSSERE BEDIENELEMENTE AUF DER OFFERTE (09.09.2026)
+
+   «Butonlar çok küçük» — die 28px-Felder und 26px-Kopfknöpfe der
+   Offertenseite waren die kleinsten der App. Felder auf 34px/14px,
+   die Kopfknöpfe der Karten auf 32px/13px. Die grossen Knöpfe der
+   Seite hängen an `--ofi-btn-height` (styles/buttons.css) und wachsen
+   mit dem App-Mass (40 → 44px) von selbst.
+   ========================================================= */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control {
+    min-height: 34px !important;
+    font-size: 14px !important;
+    padding: 5px 10px !important;
+}
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head .ofi-quote-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding-inline: 12px !important;
+    font-size: 13px !important;
+}
+
+#root .ofi-topbar::after,
+#root .ofi-rail::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+/* Kopfleiste: Haarlinie unten. */
+#root .ofi-topbar::after { box-shadow: 0 1px 0 rgba(0, 0, 0, 0.09); }
+html.dark #root .ofi-topbar::after { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07); }
+/* Modulleiste: über dem Kopf, Haarlinie rechts. */
+#root .ofi-rail { z-index: 51; }
+#root .ofi-rail::after { box-shadow: 1px 0 0 rgba(0, 0, 0, 0.09); }
+html.dark #root .ofi-rail::after { box-shadow: 1px 0 0 rgba(255, 255, 255, 0.07); }
+
+/* Aufklappfeld: ein Popup, kein Rahmenteil — Haarlinie rechts und ein
+   weicher Schatten, damit es über der Seite liegt. */
+#root #oi-sidebar-panel {
+    box-shadow:
+        1px 0 0 rgba(0, 0, 0, 0.09),
+        12px 0 32px -16px rgba(16, 24, 40, 0.18);
+}
+html.dark #root #oi-sidebar-panel {
+    box-shadow:
+        16px 0 40px -18px rgba(0, 0, 0, 0.8),
+        0 24px 48px -24px rgba(0, 0, 0, 0.7);
 }
 
 
@@ -374,27 +527,33 @@ html.dark #root #oi-sidebar-panel.ofi-shell-white {
    waere lackiertes Glas und genau das war der Einwand.
    ========================================================= */
 
+/* HELL SEIT 09.09.2026: kein Glas mehr, sondern die gefüllte Pille von iOS
+   («daha Apple tarzı temiz tasarım»): Apples tertiäre Füllung
+   rgba(120,120,128,.12) ohne Rand und Schatten, beim Zeigen eine Stufe
+   dichter, geöffnet noch eine. Die offene Seite (Kalender) trägt Marine
+   mit weisser Schrift. Dunkel bleibt das Glas darunter unverändert. */
 #root .ofi-topbar .ofi-glass-ctl {
-    border: 1px solid #e1e5ee;
-    background: linear-gradient(180deg, #ffffff, #f1f4f9);
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
-    transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+    border: 1px solid transparent;
+    background: rgba(120, 120, 128, 0.12);
+    box-shadow: none;
+    transition: background 140ms ease, color 140ms ease;
 }
+/* Schriftfarben nur HELL — dunkel tragen die Klassen im Markup Schiefer/Weizen,
+   und eine ungeschichtete Farbe hier würde sie überschreiben. */
+html:not(.dark) #root .ofi-topbar .ofi-glass-ctl { color: #272f67; }
 #root .ofi-topbar .ofi-glass-ctl:hover {
-    border-color: #ccd3e2;
-    background: linear-gradient(180deg, #ffffff, #e8ecf5);
+    border-color: transparent;
+    background: rgba(120, 120, 128, 0.2);
 }
 #root .ofi-topbar .ofi-glass-ctl.is-open,
 #root .ofi-topbar .ofi-glass-ctl[aria-expanded="true"] {
-    border-color: #bfc8db;
-    background: linear-gradient(180deg, #f7f9fc, #e3e8f3);
-    box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.06);
+    border-color: transparent;
+    background: rgba(120, 120, 128, 0.28);
+    box-shadow: none;
 }
-
-/* Die offene Seite (Kalender): DIE KANTE BLEIBT, nur die Fuellung nimmt den
-   Markenton auf. So trägt jeder Knopf der Leiste denselben Rand. */
-#root .ofi-topbar .ofi-glass-ctl.is-current {
-    background: linear-gradient(180deg, #eef2fd, #e1e8fa);
+html:not(.dark) #root .ofi-topbar .ofi-glass-ctl.is-current {
+    background: #272f67;
+    color: #ffffff;
 }
 
 html.dark #root .ofi-topbar .ofi-glass-ctl {
@@ -440,6 +599,110 @@ html.dark #root .ofi-topbar .ofi-glass-ctl.is-current {
         rgba(230, 207, 158, 0.06) 100%
     );
 }
+
+/* =========================================================
+   iOS-KOPFLEISTE UND iPadOS-MODULLEISTE (09.09.2026)
+
+   Vorgabe Samet: «Header ve sidebar'ı düzgün yapın, daha farklı bir
+   tasarım, daha Apple tarzı temiz tasarım.» Die Schale steht schon auf
+   Apples System-Grau mit Haarlinie (Block «WEISSE LEINWAND + iOS-SCHALE»
+   oben). Hier folgen die Bedienelemente:
+
+   KOPFLEISTE — jeder Knopf ist entweder ein blosses Zeichen, das beim
+   Zeigen eine runde Füllung bekommt (Glocke, Sprache, Profil), oder eine
+   gefüllte Pille (Firmenfeld, Kalender, siehe `.ofi-glass-ctl`). Die
+   Werkzeuge links (Blitz, Doppelbildschirm, «+») verlieren Rand und
+   Schatten und tragen dieselbe Füllung wie die Pillen — das ist die
+   Werkzeugleiste von macOS Sonoma. Geöffnet/aktiv bleibt Marine
+   (Klasse `bg-[#272f67]` im Markup; die Regeln in index.css dafür gelten
+   weiter). Das blaue Google-Hover `#d3e3fd` aus den Klassen wird hier
+   überschrieben — ungeschichtete Regeln schlagen Tailwinds Utilities.
+
+   MODULLEISTE — jedes Modul ist eine iPadOS-Kachel: 56px-Quadrat mit
+   16px-Ecke um das Zeichen, Beschriftung darunter. Ruhe: kein Grund,
+   Zeichen und Schrift in iOS-Sekundärgrau. Zeigen: tertiäre Füllung.
+   Gewählt: Marine, weisses Zeichen, marineblaue Beschriftung. Keine
+   Bewegung, nur Farbe (siehe «One button for the app»).
+   ========================================================= */
+
+/* Werkzeuge links: Rand und Schatten weg, iOS-Füllung. Spezifischer als
+   `#root button.ofi-header-icon-button` in index.css (1,1,1), dessen Rand
+   dort mit !important steht. */
+html:not(.dark) #root .ofi-topbar button.ofi-header-icon-button:not([class~="bg-[#272f67]"]) {
+    border-color: transparent !important;
+    background-color: rgba(120, 120, 128, 0.12);
+    box-shadow: none;
+    color: #272f67;
+}
+html:not(.dark) #root .ofi-topbar button.ofi-header-icon-button:not([class~="bg-[#272f67]"]):hover {
+    border-color: transparent !important;
+    background-color: rgba(120, 120, 128, 0.22);
+    color: #1f2654;
+}
+html.dark #root .ofi-topbar button.ofi-header-icon-button:not([class~="bg-[#272f67]"]) {
+    border-color: transparent !important;
+    background-color: rgba(255, 255, 255, 0.09);
+    box-shadow: none;
+}
+html.dark #root .ofi-topbar button.ofi-header-icon-button:not([class~="bg-[#272f67]"]):hover {
+    border-color: transparent !important;
+    background-color: rgba(255, 255, 255, 0.16);
+}
+/* Auch der navy Zustand (Blitz offen, Doppelbildschirm an) trägt keinen Rand. */
+#root .ofi-topbar button.ofi-header-icon-button[class~="bg-[#272f67]"] {
+    border-color: transparent !important;
+    box-shadow: none;
+}
+
+/* Zeichen rechts (Glocke, Sprache, Profil): frei, beim Zeigen runde Füllung. */
+html:not(.dark) #root .ofi-topbar .ofi-hdr-ctl:not(.ofi-glass-ctl):not(.ofi-header-icon-button):not([class~="bg-[#272f67]"]):hover {
+    background-color: rgba(120, 120, 128, 0.16);
+}
+html.dark #root .ofi-topbar .ofi-hdr-ctl:not(.ofi-glass-ctl):not(.ofi-header-icon-button):not([class~="bg-[#272f67]"]):hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Modulleiste: die Kacheln. */
+#root .ofi-rail-item {
+    color: #6e6e73;
+    transition: color 140ms ease;
+}
+#root .ofi-rail-item__tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    color: #3a3a3c;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-rail-item:hover .ofi-rail-item__tile {
+    background-color: rgba(120, 120, 128, 0.14);
+    color: #272f67;
+}
+#root .ofi-rail-item:hover { color: #272f67; }
+#root .ofi-rail-item.is-active .ofi-rail-item__tile,
+#root .ofi-rail-item.is-active:hover .ofi-rail-item__tile {
+    background-color: #272f67;
+    color: #ffffff;
+}
+#root .ofi-rail-item.is-active { color: #272f67; }
+
+html.dark #root .ofi-rail-item { color: rgba(255, 255, 255, 0.6); }
+html.dark #root .ofi-rail-item__tile { color: rgba(255, 255, 255, 0.78); }
+html.dark #root .ofi-rail-item:hover .ofi-rail-item__tile {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+html.dark #root .ofi-rail-item:hover { color: #ffffff; }
+html.dark #root .ofi-rail-item.is-active .ofi-rail-item__tile,
+html.dark #root .ofi-rail-item.is-active:hover .ofi-rail-item__tile {
+    background-color: rgba(255, 255, 255, 0.14);
+    color: var(--ofi-d-wheat, #e6cf9e);
+}
+html.dark #root .ofi-rail-item.is-active { color: var(--ofi-d-wheat, #e6cf9e); }
+
 
 /* =========================================================
    DAS APPS-ZEICHEN (`.ofi-apps-glyph`)

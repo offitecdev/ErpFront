@@ -38,7 +38,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                     </p>
                 )}
                 {/* Seitentitel in der Titelschrift des Programms
-                    (`.ofi-serif` aus styles/refine.css — Open Sans). */}
+                    (`.ofi-serif` aus styles/refine.css — Inter Variable). */}
                 <h1 className="ofi-serif text-[21px] font-semibold text-slate-900 tracking-tight truncate">
                     {title}
                 </h1>

@@ -63,22 +63,12 @@ export const useOrdersList = () => {
         return () => { cancelled = true; };
     }, [page, debouncedSearch, status, dateFrom, dateTo, debouncedFilters, reloadTick]);
 
-    // Popup içindeki eylemler (ad/durum/mail) listeyi yeniden çekmeden günceller.
-    const replaceItem = useCallback((updated: PurchaseOrderRow) => {
-        setItems((current) => current.map((row) => (row.id === updated.id ? updated : row)));
-    }, []);
-
-    const removeItem = useCallback((id: string) => {
-        setItems((current) => current.filter((row) => row.id !== id));
-        setTotal((current) => Math.max(0, current - 1));
-    }, []);
-
     const totalPages = useMemo(() => Math.max(1, Math.ceil(total / ORDERS_PAGE_SIZE)), [total]);
 
     return {
         items, total, totalPages, page, setPage, loading, error,
         search, setSearch, status, setStatus,
         dateFrom, setDateFrom, dateTo, setDateTo,
-        filters, setFilters, reload, replaceItem, removeItem,
+        filters, setFilters, reload,
     };
 };

@@ -136,7 +136,7 @@ function App() {
                 token: {
                     // Must match --font-body (theme.css) — a bare 'sans-serif'
                     // here rendered every antd control in Arial.
-                    fontFamily: '"Open Sans", Arial, sans-serif',
+                    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
                     borderRadius: 10,
                     borderRadiusXS: 10,
                     borderRadiusSM: 10,

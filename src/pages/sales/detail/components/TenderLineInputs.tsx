@@ -3,8 +3,8 @@ import { memo, useEffect, useRef, useState } from 'react';
 import type { NumberField, TextField } from '../types/tenderDetail.types';
 
 // Keep in step with --font-body (theme.css); 'sans-serif' alone put the quote
-// line inputs (Einheit, description …) in Arial while the page is Open Sans.
-const INLINE_INPUT_FONT_FAMILY = '"Open Sans", Arial, sans-serif';
+// line inputs (Einheit, description …) in Arial while the page is Inter Variable.
+const INLINE_INPUT_FONT_FAMILY = '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
 
 /**
  * Tells a cell input to discard its in-progress text and blur WITHOUT
@@ -42,7 +42,13 @@ export const BufferedTextInput = memo(({
     value: string;
     className: string;
     field: TextField;
-    commit: (positionId: string, field: TextField, value: string) => void;
+    /**
+     * Returning `false` REJECTS the value: the cell drops what was typed and goes
+     * back to what the row holds. The product cell uses it for a name the
+     * catalogue does not know — such a name only reaches the quote through the
+     * combobox's "Hinzufügen", never by clicking away.
+     */
+    commit: (positionId: string, field: TextField, value: string) => void | boolean;
     /**
      * Live draft text plus the input it came from. The article suggestions are
      * driven from here — while typing, and also on focusing an EMPTY cell, so a
@@ -55,7 +61,6 @@ export const BufferedTextInput = memo(({
 } & InlineCellNavProps) => {
     const [draft, setDraft] = useState(value);
     const focusedRef = useRef(false);
-    const wasFocusedOnPointerDownRef = useRef(false);
     const skipCommitRef = useRef(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -77,12 +82,19 @@ export const BufferedTextInput = memo(({
         return () => registerCell(key, null);
     }, [navCol, rowIndex, registerCell]);
 
-    // Runs once per newly added blank row: put the caret in the cell. The
-    // focus handler below then opens the article list — the cell is empty, so
-    // the first products appear without a single keystroke.
+    // Runs once per newly added blank row: put the caret in the cell and open
+    // the article list right away — the cell is empty, so the first products
+    // appear without a single keystroke (Odoo's "Add a product" line).
+    const onDraftChangeRef = useRef(onDraftChange);
+    useEffect(() => {
+        onDraftChangeRef.current = onDraftChange;
+    }, [onDraftChange]);
     useEffect(() => {
         if (!autoFocus) return;
-        inputRef.current?.focus({ preventScroll: true });
+        const input = inputRef.current;
+        if (!input) return;
+        input.focus({ preventScroll: true });
+        onDraftChangeRef.current?.(input.value, input);
     }, [autoFocus]);
 
     // Explicit "abandon what was typed" channel for the article combobox.
@@ -113,7 +125,7 @@ export const BufferedTextInput = memo(({
             setDraft(value);
             return;
         }
-        if (draft !== value) commit(positionId, field, draft);
+        if (draft !== value && commit(positionId, field, draft) === false) setDraft(value);
     };
 
     return (
@@ -145,16 +157,14 @@ export const BufferedTextInput = memo(({
                     if (onArrowNav(navCol, rowIndex, 1)) event.preventDefault();
                 }
             }}
-            onPointerDown={() => {
-                // First click selects/focuses the cell. Only a second click on
-                // the already focused product name opens its suggestions.
-                wasFocusedOnPointerDownRef.current = focusedRef.current;
-            }}
             onClick={(event) => {
+                // A click on the product cell opens its list at once — an empty
+                // cell shows the first products, a filled one the products its
+                // text matches — so a product can be picked without typing.
+                // Moving into the cell with the keyboard does not: the arrow
+                // keys must keep walking the rows until something is typed.
                 event.stopPropagation();
-                if (wasFocusedOnPointerDownRef.current) {
-                    onDraftChange?.(draft, event.currentTarget);
-                }
+                onDraftChange?.(draft, event.currentTarget);
             }}
             className={className}
             style={{ fontFamily: INLINE_INPUT_FONT_FAMILY }}
@@ -201,6 +211,9 @@ export const BufferedNumberInput = memo(({
     const focusedRef = useRef(false);
     const skipCommitRef = useRef(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    // True between the mousedown that focuses the cell and its mouseup: the
+    // click ENTERED the cell, so the whole figure has to end up selected.
+    const selectAllOnClickRef = useRef(false);
 
     useEffect(() => {
         if (!focusedRef.current) setDraft(toNumberDraft(value));
@@ -241,7 +254,27 @@ export const BufferedNumberInput = memo(({
             inputMode="decimal"
             aria-label={ariaLabel}
             value={draft}
-            onFocus={() => { focusedRef.current = true; }}
+            onFocus={(event) => {
+                focusedRef.current = true;
+                // Entering the cell marks its whole figure — Preis, Rabatt and
+                // MwSt. are replaced far more often than they are edited, so the
+                // next digit typed must overwrite what stands there.
+                event.currentTarget.select();
+            }}
+            onMouseDown={() => {
+                selectAllOnClickRef.current = document.activeElement !== inputRef.current;
+            }}
+            onMouseUp={(event) => {
+                if (!selectAllOnClickRef.current) return;
+                selectAllOnClickRef.current = false;
+                const input = event.currentTarget;
+                // A drag inside the cell picked a range on purpose — leave it.
+                if (input.selectionStart !== input.selectionEnd) return;
+                // Without this the mouseup drops the selection made on focus and
+                // only leaves a caret.
+                event.preventDefault();
+                input.select();
+            }}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={commitDraft}
             onKeyDown={(event) => {

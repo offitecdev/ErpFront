@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
-import { ChevronDown, User01 as User } from '@/components/icons/antIconCompat';
+import { ChevronDown } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 import { QUOTE_LABEL_CLASS, QUOTE_READONLY_CLASS } from '../../utils/quoteField.constants';
@@ -41,8 +41,8 @@ const readCollapsed = (): boolean => {
 // One key/value row: the label sits in a fixed left column and the control in
 // the right one, so every field in a group lines up on the same two edges.
 const TenderCardFieldRow = ({ field }: { field: TenderCardField }) => (
-    <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] items-start gap-2.5 border-b border-slate-100 py-1.5 last:border-b-0">
-        <span className={`${QUOTE_LABEL_CLASS} pt-2`}>{field.label}</span>
+    <div className="ofi-quote-detail-field">
+        <span className={`${QUOTE_LABEL_CLASS} ofi-quote-detail-label`}>{field.label}</span>
         <div className="min-w-0">
             {field.control ?? (
                 <div className={QUOTE_READONLY_CLASS}>
@@ -53,16 +53,22 @@ const TenderCardFieldRow = ({ field }: { field: TenderCardField }) => (
     </div>
 );
 
-const TenderCardGroupBlock = ({ group, className }: { group: TenderCardGroup; className: string }) => (
-    <div className={`min-w-0 px-3 py-2 ${className}`}>
-        <span className="mb-1.5 block text-[12px] font-semibold text-[#1f2654]">
-            {group.title}
-        </span>
-        {group.fields.map((field) => (
-            <TenderCardFieldRow key={field.key} field={field} />
-        ))}
-    </div>
-);
+// Section caption only — no glyph: the Apple-clean layout lets whitespace
+// and the small uppercase caption separate the groups.
+const TenderCardGroupBlock = ({ group }: { group: TenderCardGroup }) => {
+    return (
+        <section className="ofi-quote-detail-group" aria-label={group.title}>
+            <h3 className="ofi-quote-detail-group-title">
+                {group.title}
+            </h3>
+            <div className="ofi-quote-detail-fields">
+                {group.fields.map((field) => (
+                    <TenderCardFieldRow key={field.key} field={field} />
+                ))}
+            </div>
+        </section>
+    );
+};
 
 // Header block of the quote: one titled card holding every quote-level field,
 // grouped into labelled bands (who / terms / where) instead of two undivided
@@ -70,6 +76,7 @@ const TenderCardGroupBlock = ({ group, className }: { group: TenderCardGroup; cl
 // line table; the choice is remembered.
 export const TenderCustomerCard = ({ groups, summary }: TenderCustomerCardProps) => {
     const [collapsed, setCollapsed] = useState(readCollapsed);
+    const contentId = useId();
 
     const toggle = () => {
         setCollapsed((current) => {
@@ -87,26 +94,24 @@ export const TenderCustomerCard = ({ groups, summary }: TenderCustomerCardProps)
         <section
             data-ui-card
             className="ofi-tender-customer-card ofi-quote-card relative z-10 mb-2 overflow-hidden rounded-lg border border-[#e6e8eb] bg-white"
+            data-collapsed={collapsed}
         >
             <button
                 type="button"
                 onClick={toggle}
                 aria-expanded={!collapsed}
+                aria-controls={contentId}
                 className="ofi-tender-card-toggle ofi-quote-card__head flex w-full items-center gap-2.5 border-b border-[#eef0f2] bg-white px-4 py-2 text-left transition-colors hover:bg-[#f8f9fb]"
             >
-                <span className="ofi-quote-card__icon flex size-6 shrink-0 items-center justify-center rounded-full text-[#1f2654]">
-                    <User size={13} />
-                </span>
-                <span className="text-[13px] font-semibold tracking-[0.01em] text-[#1f2654]">
+                <span className="ofi-quote-detail-title">
                     {t('tenders.customer_details')}
                 </span>
-                {/* Collapsed, the card still has to answer "whose quote is this?" */}
-                {collapsed && summary && (
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-slate-600">{summary}</span>
+                {summary && (
+                    <span className="ofi-quote-detail-caption">{summary}</span>
                 )}
                 <span
                     title={collapsed ? t('tenders.section_expand') : t('tenders.section_collapse')}
-                    className={`flex h-5 w-5 items-center justify-center rounded-[2px] text-slate-400 transition-colors hover:bg-slate-200 hover:text-[#1f2654] ${collapsed && summary ? '' : 'ml-auto'}`}
+                    className="ofi-quote-detail-chevron ml-auto flex shrink-0 items-center justify-center"
                 >
                     <ChevronDown
                         size={14}
@@ -114,20 +119,16 @@ export const TenderCustomerCard = ({ groups, summary }: TenderCustomerCardProps)
                     />
                 </span>
             </button>
-            {/* Three columns side by side — customer, terms, addresses — each a
-                stack of key/value rows. Two columns at `lg`, one continuous list
-                below that. */}
-            {!collapsed && (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3">
-                    {groups.map((group, index) => (
+            <div id={contentId} hidden={collapsed}>
+                {!collapsed && <div className="ofi-quote-detail-groups">
+                    {groups.map((group) => (
                         <TenderCardGroupBlock
                             key={group.key}
                             group={group}
-                            className={index > 0 ? 'border-t border-slate-200 md:border-l lg:border-t-0' : ''}
                         />
                     ))}
-                </div>
-            )}
+                </div>}
+            </div>
         </section>
     );
 };

@@ -306,7 +306,7 @@ export const CustomerProductDiscounts = ({ customerId }: { customerId: string })
                 title={`${i18nT('crm.tab_productDiscounts')} (${rows.length})`}
                 action={
                     <div className="flex items-center gap-2">
-                        <SearchBox value={filter} onChange={setFilter} placeholder={i18nT('common.search')} className="w-52" />
+                        <SearchBox value={filter} onChange={setFilter} placeholder={i18nT('common.search')} />
                         <Button variant="secondary" size="sm" icon={<Plus size={12} />} onClick={() => setPickerOpen(true)}>
                             {i18nT('crm.productDiscountAdd')}
                         </Button>

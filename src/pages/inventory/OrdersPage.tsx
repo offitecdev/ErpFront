@@ -1,22 +1,25 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { t } from '@/i18n/translate';
 import { useAuthStore } from '@/store/authStore';
 import type { PurchaseOrderStatus } from '@/types/inventory';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
-import { OrderSheet } from './components/OrderSheet';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { ORDERS_PAGE_SIZE, useOrdersList } from './hooks/useOrdersList';
 import { fmtDateTime, fmtMoneyIn } from './utils/format';
 import { FILTERABLE_ORDER_STATUSES, ORDER_STATUS_META } from './utils/orderStatus';
 
-const TOOLBAR_CONTROL_CLASS = 'h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white';
+/* Der Filter neben der Suche trägt das hausweite Mass (styles/controls.css);
+   die frühere handgeschriebene Klassenkette stand 36px hoch und wich damit
+   von jeder anderen Liste ab. */
+const TOOLBAR_CONTROL_CLASS = 'ofi-filter';
 
 /**
- * Satın alma siparişleri listesi. Satıra tıklanınca detay/önizleme popup'ı
- * (OrderSheet) açılır; ok tuşlarıyla sayfadaki siparişler arasında gezilir.
+ * Satın alma siparişleri listesi. Satıra tıklanınca siparişin KENDİ SAYFASI
+ * açılır (`/inventory/orders/:id`) — eski detay/önizleme popup'ı 08.09.2026'da
+ * kaldırıldı (Vorgabe Samet: «statt Popups eine Seite»). Ablauf, Handlungen,
+ * belge ve mail hepsi orada, üst üste binen bir blatt olmadan.
  */
 // Sürüklenebilir sütun genişlikleri. Proje sütunu burada YOKTUR: genişliği
 // olmayan tek sütun odur ve artan yeri o emer.
@@ -45,10 +48,6 @@ export const OrdersPage = () => {
         minPx: 72,
     });
 
-    // Açık popup, sayfadaki listenin indeksiyle takip edilir (sol/sağ gezinme).
-    const [sheetIndex, setSheetIndex] = useState<number | null>(null);
-    const openOrder = sheetIndex !== null ? list.items[sheetIndex] ?? null : null;
-
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
@@ -64,12 +63,11 @@ export const OrdersPage = () => {
                 ) : undefined}
             />
 
-            <div className="flex flex-wrap items-center gap-2">
+            <FilterBar>
                 <SearchBox
                     value={list.search}
                     onChange={list.setSearch}
                     placeholder={t('inv.orders.searchPlaceholder')}
-                    className="w-64"
                 />
                 <select
                     value={list.status}
@@ -97,7 +95,7 @@ export const OrdersPage = () => {
                     aria-label={t('inv.movements.dateTo')}
                     className={TOOLBAR_CONTROL_CLASS}
                 />
-            </div>
+            </FilterBar>
 
             <SectionCard title={t('inv.orders.sectionTitle', { count: list.total })}>
                 <div className="overflow-x-auto">
@@ -191,12 +189,12 @@ export const OrdersPage = () => {
                             {(list.loading || list.items.length === 0) && (
                                 <TableStateRow colSpan={8} loading={list.loading} emptyText={list.error || t('inv.orders.empty')} />
                             )}
-                            {!list.loading && list.items.map((order, index) => {
+                            {!list.loading && list.items.map((order) => {
                                 const meta = ORDER_STATUS_META[order.status] ?? ORDER_STATUS_META.PENDING;
                                 return (
                                     <tr
                                         key={order.id}
-                                        onClick={() => setSheetIndex(index)}
+                                        onClick={() => navigate(`/inventory/orders/${order.id}`)}
                                         className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                                     >
                                         <td className="font-mono text-[13px] text-slate-700 dark:text-white/80">{order.referenceNumber}</td>
@@ -233,20 +231,6 @@ export const OrdersPage = () => {
                     />
                 </div>
             </SectionCard>
-
-            {openOrder && sheetIndex !== null && (
-                <OrderSheet
-                    order={openOrder}
-                    canManage={canManage}
-                    canBack={sheetIndex > 0}
-                    canNext={sheetIndex < list.items.length - 1}
-                    onBack={() => setSheetIndex((current) => Math.max(0, (current ?? 0) - 1))}
-                    onNext={() => setSheetIndex((current) => Math.min(list.items.length - 1, (current ?? 0) + 1))}
-                    onClose={() => setSheetIndex(null)}
-                    onOrderChanged={list.replaceItem}
-                    onDeleted={(id) => { list.removeItem(id); setSheetIndex(null); }}
-                />
-            )}
         </div>
     );
 };

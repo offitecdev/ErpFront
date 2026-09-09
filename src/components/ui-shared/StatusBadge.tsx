@@ -25,7 +25,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     variant = 'neutral',
     children,
 }) => (
-    <span className={`inline-flex size-max items-center gap-1.5 whitespace-nowrap rounded-[13px] border px-2.5 py-0.5 text-[11px] font-semibold ${chipClassMap[variant]}`}>
+    <span data-variant={variant} className={`ofi-status-chip inline-flex size-max items-center gap-1.5 whitespace-nowrap rounded-[13px] border px-2.5 py-0.5 text-[11px] font-semibold ${chipClassMap[variant]}`}>
         {children}
     </span>
 );
@@ -34,7 +34,7 @@ export const StatusChip: React.FC<StatusBadgeProps> = ({
     variant = 'neutral',
     children,
 }) => (
-    <span className={`inline-flex size-max items-center whitespace-nowrap rounded-[13px] border px-2.5 py-0.5 text-[11px] font-semibold ${chipClassMap[variant]}`}>
+    <span data-variant={variant} className={`ofi-status-chip inline-flex size-max items-center whitespace-nowrap rounded-[13px] border px-2.5 py-0.5 text-[11px] font-semibold ${chipClassMap[variant]}`}>
         {children}
     </span>
 );

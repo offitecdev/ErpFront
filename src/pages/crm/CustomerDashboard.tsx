@@ -426,7 +426,14 @@ export const CustomerDashboard = () => {
                     /* Kein Zurück-Knopf mehr: der Weg in die Kundenliste liegt
                        im Blitz ganz vorn in der Kopfleiste, der auf jeder
                        Unterseite zum Pfeil wird (QuickBackButton). */
-                    <Button variant="danger" icon={<TrashIcon size={13} />} onClick={() => setConfirmDelete(true)}>{i18nT('common.delete')}</Button>
+                    /* Gross, iOS-Ecke — und DEUTLICH (Vorgabe Samet 09.09.2026,
+                       zweiter Durchgang: «müşteri detaylarındaki sil butonu da
+                       belirgin olsun»). Marine war er schon und ging in einer
+                       Seite unter, die ohnehin marine ist; darum trägt er jetzt
+                       die Warnfarbe des Hauses — dieselbe, die im Fenster
+                       darunter bestätigt. Das Fenster bleibt die eigentliche
+                       Sicherheitsfrage: dieser Knopf löscht nichts, er fragt. */
+                    <Button variant="danger" className="ofi-btn-ios" icon={<TrashIcon size={18} />} onClick={() => setConfirmDelete(true)}>{i18nT('common.delete')}</Button>
                 }
             />
 
@@ -609,8 +616,8 @@ export const CustomerDashboard = () => {
                 width="sm"
                 footer={
                     <>
-                        <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={deleting}>{i18nT('common.cancel')}</Button>
-                        <Button variant="danger" loading={deleting} icon={<TrashIcon size={13} />} onClick={handleDelete}>{i18nT('crm.delete_customer')}</Button>
+                        <Button variant="secondary" className="ofi-btn-ios" onClick={() => setConfirmDelete(false)} disabled={deleting}>{i18nT('common.cancel')}</Button>
+                        <Button variant="danger" className="ofi-btn-ios" loading={deleting} icon={<TrashIcon size={16} />} onClick={handleDelete}>{i18nT('crm.delete_customer')}</Button>
                     </>
                 }
             >

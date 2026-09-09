@@ -83,7 +83,9 @@ export const STATUS_VARIANT: Record<ProjectStatus, 'warning' | 'active' | 'appro
     ON_HOLD: 'info',
     COMPLETED: 'active',
     SPECIALLY_CLOSED: 'danger',
-    CANCELLED: 'passive',
+    // STORNIERT (06.09.2026) — dasselbe Rot wie ueberall sonst: ein
+    // zurueckgenommenes Projekt ist kein "ruhendes", es ist zurueckgenommen.
+    CANCELLED: 'danger',
 };
 
 export const getStatusLabel = (): Record<ProjectStatus, string> => ({
@@ -92,5 +94,6 @@ export const getStatusLabel = (): Record<ProjectStatus, string> => ({
     ON_HOLD: t('projects.statusOnHold'),
     COMPLETED: t('common.completed'),
     SPECIALLY_CLOSED: t('projects.specialClosure.status'),
-    CANCELLED: t('common.cancel'),
+    // "Abbrechen" (das Verb) stand hier — der Zustand heisst «Storniert».
+    CANCELLED: t('orders.lifecycle.statusCancelled'),
 });

@@ -30,8 +30,8 @@ import {
  * Die Uploadfläche des Moduls "Produkte" — der einzige Bereich, der heute
  * Inhalt hat (die übrigen Module stehen in der Liste links und zeigen den
  * leeren Hinweis). Eine Produktdatei (CSV/Excel) hinein, fertige Warenkarten
- * heraus: interne Produkt-Nr., Bezeichnung, Verkaufspreis, Kosten
- * (durchschnittlicher Stückpreis) und das Produktbild.
+ * heraus: interne Produkt-Nr., Bezeichnung, Verkaufsbeschreibung,
+ * Verkaufspreis, Kosten (durchschnittlicher Stückpreis) und das Produktbild.
  *
  * DER BESTAND IST IMMER 0. Die Mengenspalte der Datei wird nicht gelesen und
  * der Server nagelt die Menge zusätzlich fest (`/inventory/articles/import`) —
@@ -75,6 +75,7 @@ interface UploadResult {
 const FIELD_LABEL: Record<UploadField, string> = {
     articleCode: 'upload.field.articleCode',
     name: 'upload.field.name',
+    description: 'upload.field.description',
     salePrice: 'upload.field.salePrice',
     purchasePrice: 'upload.field.purchasePrice',
     unit: 'upload.field.unit',
@@ -88,8 +89,8 @@ const toPayload = (row: UploadRow): BulkArticleItemInput => ({
     salePrice: row.salePrice,
     purchasePrice: row.purchasePrice,
     ...(row.unit ? { unit: row.unit } : {}),
-    // Nur gesetzt, wenn die Bezeichnung gekürzt werden musste — dann trägt die
-    // Beschreibung den vollständigen Text (siehe productImport.ts).
+    // Die Verkaufsbeschreibung der Datei; musste die Bezeichnung gekürzt
+    // werden, steht der vollständige Name davor (siehe productImport.ts).
     ...(row.description ? { description: row.description } : {}),
     ...(row.imageUrl ? { imageUrl: row.imageUrl } : {}),
 });
@@ -116,7 +117,8 @@ const buildBatches = (rows: UploadRow[]): UploadRow[][] => {
     let bytes = 0;
     for (const row of rows) {
         // Grobschätzung: die Bild-Zeichenkette ist das Gewicht, der Rest ist Beiwerk.
-        const size = (row.imageUrl?.length ?? 0) + row.name.length + row.articleCode.length + 120;
+        const size = (row.imageUrl?.length ?? 0) + (row.description?.length ?? 0)
+            + row.name.length + row.articleCode.length + 120;
         if (current.length && (current.length >= BATCH_MAX_ROWS || bytes + size > BATCH_MAX_BYTES)) {
             batches.push(current);
             current = [];
@@ -366,8 +368,9 @@ export const ProductUploadSection = () => {
                             </button>
                         )}
                     >
-                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
                             <StatTile label={t('upload.stats.rows')} value={preview.rows.length} tone="good" />
+                            <StatTile label={t('upload.stats.withDescription')} value={preview.withDescription} />
                             <StatTile label={t('upload.stats.withImage')} value={preview.withImage} />
                             <StatTile label={t('upload.stats.generatedCodes')} value={preview.generatedCodes} tone={preview.generatedCodes ? 'warn' : 'plain'} />
                             <StatTile label={t('upload.stats.duplicates')} value={preview.droppedDuplicate} tone={preview.droppedDuplicate ? 'warn' : 'plain'} />
@@ -422,6 +425,7 @@ export const ProductUploadSection = () => {
                                     <tr>
                                         <th className="text-left">{t('upload.field.articleCode')}</th>
                                         <th className="text-left">{t('upload.field.name')}</th>
+                                        <th className="text-left">{t('upload.field.description')}</th>
                                         <th className="text-right">{t('upload.field.salePrice')}</th>
                                         <th className="text-right">{t('upload.field.purchasePrice')}</th>
                                         <th className="text-left">{t('upload.field.unit')}</th>
@@ -439,13 +443,20 @@ export const ProductUploadSection = () => {
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="max-w-[22rem] truncate" title={row.description ?? undefined}>
+                                            <td className="max-w-[22rem] truncate">
                                                 {row.name}
                                                 {row.nameShortened && (
                                                     <span className="ml-1.5 rounded bg-amber-100 px-1 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
                                                         {t('upload.shortenedBadge')}
                                                     </span>
                                                 )}
+                                            </td>
+                                            {/* Der volle Text hängt am title — die Zelle bleibt eine Zeile hoch. */}
+                                            <td
+                                                className="max-w-[22rem] truncate text-slate-500 dark:text-white/60"
+                                                title={row.description ?? undefined}
+                                            >
+                                                {row.description ? row.description.replace(/\s+/g, ' ') : '—'}
                                             </td>
                                             <td className="text-right font-mono tabular-nums">{row.salePrice.toFixed(2)}</td>
                                             <td className="text-right font-mono tabular-nums">{row.purchasePrice.toFixed(2)}</td>

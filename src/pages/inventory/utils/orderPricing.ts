@@ -204,49 +204,77 @@ export const sumOrderFees = (fees?: Array<{ amount?: number | null }> | null): n
 };
 
 /**
- * ── SİPARİŞ TOPLAMI: TEK VE KESİN SIRA (kullanıcı isteği 2026-08-02) ────────
+ * ── DAS TOTAL EINER BESTELLUNG ─────────────────────────────────────────────
  *
- *   1. satır tutarları toplanır            → net toplam
- *   2. + ek ücretler (nakliye, ambalaj…)   → KDV MATRAHI
- *   3. matrah × KDV oranı                  → KDV (tek oran, tüm ürünler için)
- *   4. matrah + KDV                        → genel toplam
- *   5. sonuç İKİ ONDALIĞA yuvarlanır       (43'721.34768 → 43'721.35)
+ * Vorgabe Samet (07.09.2026): «Die Mehrwertsteuer muss JE PRODUKT gerechnet und
+ * dann zusammengezählt werden, mit dem Satz der gewählten Vorlage. Der Betrag
+ * der Zeile muss im PDF genau so wiederkommen, damit am Ende dasselbe
+ * herauskommt. Die Versandkosten kommen separat dazu.»
  *
- * KDV artık satır başına DEĞİL sipariş düzeyindedir: aynı oran bütün ürünlere
- * uygulandığı için tabloda KDV sütunu yoktur, oran sipariş detaylarından
- * seçilir. Eski (LINE kipli) kayıtlar satır KDV'leriyle okunmaya devam eder.
+ * Daraus wird diese Reihenfolge — und sie gilt in der Tabelle, im PDF, im
+ * Excel und im Server gleichermassen:
+ *
+ *   1. je Zeile: Betrag × Satz der Vorlage, auf zwei Stellen gerundet
+ *   2. diese Zeilensteuern werden ADDIERT                    → Steuer
+ *   3. Zeilenbeträge addiert                                 → Netto
+ *   4. Zusatzkosten (Versand, Verpackung…) kommen SEPARAT dazu — sie sind
+ *      keine Position und tragen darum auch keine Zeilensteuer
+ *   5. Netto + Steuer + Zusatzkosten                         → Gesamttotal
+ *
+ * ⚠ WARUM JE ZEILE UND NICHT AUF DIE SUMME: weil im PDF die Zeilenbeträge
+ *   stehen. Wer sie nachrechnet, addiert Zeile für Zeile — und käme bei einer
+ *   Steuer auf die Gesamtsumme um ein paar Rappen anders heraus. Genau das war
+ *   die Klage: «das Ergebnis muss übereinstimmen».
+ *
+ * ⚠ Backend-Zwilling: `inventory.routes.ts` → `purchaseOrderTotalVat`.
+ *   Beide zusammen ändern, sonst zeigt der Bildschirm etwas anderes als das
+ *   gespeicherte Dokument.
+ *
+ * Alte Aufzeichnungen im LINE-Modus werden weiter mit ihren eigenen
+ * Zeilensteuern gelesen.
  */
 export interface OrderTotals {
-    /** Satır tutarlarının toplamı. */
+    /** Summe der Zeilenbeträge. */
     net: number;
-    /** Ek ücretlerin toplamı. */
+    /** Summe der Zusatzkosten — sie stehen SEPARAT und tragen keine Steuer. */
     fees: number;
-    /** KDV matrahı = net + ek ücretler. */
+    /** Grundlage der Steuer = die Zeilenbeträge (ohne Zusatzkosten). */
     vatBase: number;
-    /** Matrah × oran. */
+    /** Summe der je Zeile gerechneten Steuern. */
     vat: number;
-    /** Matrah + KDV — ödenecek tutar. */
+    /** Netto + Steuer + Zusatzkosten — der zu zahlende Betrag. */
     grand: number;
 }
 
+/**
+ * `lines` sind die einzelnen Zeilenbeträge. Sind sie da, wird die Steuer JE
+ * ZEILE gerechnet und addiert — so, wie man das PDF nachrechnet. Fehlen sie
+ * (ältere Aufrufer, gespeicherte Aufzeichnungen), bleibt der Satz auf der
+ * Nettosumme; das Ergebnis unterscheidet sich höchstens um Rappen.
+ */
 export const computeOrderTotals = (input: {
     net: number;
     fees?: number;
     vatRate?: number;
+    lines?: number[];
 }): OrderTotals => {
     const net = round2(input.net || 0);
     const fees = round2(input.fees || 0);
-    const vatBase = round2(net + fees);
-    const vat = round2(vatBase * (clampPercent(input.vatRate) / 100));
-    return { net, fees, vatBase, vat, grand: round2(vatBase + vat) };
+    const rate = clampPercent(input.vatRate) / 100;
+    const vatBase = net;
+    const vat = input.lines?.length
+        ? round2(input.lines.reduce((sum, amount) => sum + round2((amount || 0) * rate), 0))
+        : round2(net * rate);
+    return { net, fees, vatBase, vat, grand: round2(net + vat + fees) };
 };
 
 /**
- * Sipariş düzeyi KDV (TOTAL kipi): tek oran, (net kalemler + ek ücretler)
- * üzerinden. LINE kipinde satır KDV'lerinin toplamı geçerlidir.
+ * Die Steuer einer Bestellung im TOTAL-Modus: der EINE Satz der Vorlage, je
+ * Zeile gerechnet und addiert. Zusatzkosten bleiben draussen — sie kommen
+ * separat zum Total (Vorgabe Samet, 07.09.2026). Im LINE-Modus (alte
+ * Aufzeichnungen) gilt weiter die Summe der gespeicherten Zeilensteuern.
  *
- * ⚠ Backend eşi: `inventory.routes.ts` → `purchaseOrderTotalVat` — birlikte
- * güncellenmelidir.
+ * ⚠ Backend-Zwilling: `inventory.routes.ts` → `purchaseOrderTotalVat`.
  */
 export const orderVatTotal = (order: {
     vatMode?: 'LINE' | 'TOTAL' | null;
@@ -254,10 +282,13 @@ export const orderVatTotal = (order: {
     totalNet: number;
     totalFees?: number | null;
     totalVat?: number | null;
+    items?: Array<{ lineTotal?: number | null }> | null;
 }): number => {
     if (order.vatMode === 'TOTAL') {
-        const fees = Number.isFinite(Number(order.totalFees)) ? Number(order.totalFees) : 0;
-        return round2(((order.totalNet || 0) + fees) * (clampPercent(order.orderVatRate) / 100));
+        const rate = clampPercent(order.orderVatRate) / 100;
+        const lines = (order.items ?? []).map((item) => Number(item?.lineTotal) || 0);
+        if (lines.length) return round2(lines.reduce((sum, amount) => sum + round2(amount * rate), 0));
+        return round2((order.totalNet || 0) * rate);
     }
     return order.totalVat || 0;
 };

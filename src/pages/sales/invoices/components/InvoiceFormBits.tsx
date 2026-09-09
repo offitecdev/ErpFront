@@ -83,6 +83,44 @@ export const InvoiceSteps = ({
 );
 
 /**
+ * ── DER FORTSCHRITT ALS BALKEN ───────────────────────────────────────────────
+ * Vorgabe Samet (05.09.2026): der Weg durch die Erfassung soll NEBEN dem Titel
+ * stehen — «ein Fortschrittsbalken, gross genug, aber nicht zu gross».
+ *
+ * Also drei SCHRÄGE Balken in einer Pille (Vorgabe Samet 05.09.2026 mit
+ * Vorlage: «ein Fortschrittsbalken mit schrägen Rauten, etwas grösser»): die
+ * erreichten Schritte sind gefüllt, die kommenden leer, jeder trägt nur seinen
+ * Namen und ist anklickbar, sobald er erreicht war. Was ein Schritt bedeutet,
+ * sagt sein Inhalt — nicht ein Halbsatz darunter.
+ */
+export const InvoiceProgress = ({
+    steps,
+    current,
+    furthest,
+    onGo,
+}: {
+    steps: WizardStep[];
+    current: number;
+    furthest: number;
+    onGo: (index: number) => void;
+}) => (
+    <div className="ofi-invp-progress" role="group" aria-label={steps.map((step) => step.label).join(' · ')}>
+        {steps.map((step, index) => (
+            <button
+                key={step.key}
+                type="button"
+                className={`ofi-invp-progress__seg ${index === current ? 'is-current' : ''} ${index < current ? 'is-done' : ''}`}
+                aria-current={index === current ? 'step' : undefined}
+                disabled={index > furthest}
+                onClick={() => onGo(index)}
+            >
+                <span className="ofi-invp-progress__label">{step.label}</span>
+            </button>
+        ))}
+    </div>
+);
+
+/**
  * Der Umschalter zwischen zwei Wegen — EIN Ort statt zweier Felder (Vorgabe
  * Samet). Die Marke gleitet unter den gewählten Namen; die Fläche ist
  * milchiges Glas, damit der Schalter über der Karte zu schweben scheint.
@@ -142,6 +180,7 @@ export const InvoiceStepFoot = ({
     onFinal,
     finalDisabled,
     extra,
+    backLabel,
 }: {
     stepIndex: number;
     stepCount: number;
@@ -154,13 +193,19 @@ export const InvoiceStepFoot = ({
     finalDisabled?: boolean;
     /** Zusätzlicher Knopf des letzten Schritts (die Vorschau). */
     extra?: ReactNode;
+    /**
+     * Beschriftung des linken Knopfes. Einschrittige Masken — der Nachtrag —
+     * verlassen nicht einen Vorgang, sondern GEHEN ZURÜCK an die Stelle, von
+     * der sie geöffnet wurden (Vorgabe Samet 05.09.2026), und sagen das auch.
+     */
+    backLabel?: string;
 }) => {
     const isLast = stepIndex >= stepCount - 1;
     return (
         <div className="ofi-invp-foot">
             <button type="button" className={NEUTRAL_BTN} onClick={onBack}>
                 <ArrowLeft size={14} />
-                {stepIndex === 0 ? t('invoices.cancelBtn') : t('invoices.stepBack')}
+                {backLabel || (stepIndex === 0 ? t('invoices.cancelBtn') : t('invoices.stepBack'))}
             </button>
             <span className="ofi-invp-foot__spacer" />
             {isLast ? (

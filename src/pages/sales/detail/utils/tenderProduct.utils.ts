@@ -72,3 +72,59 @@ export const parseClosingImages = (raw?: string | null): string[] => {
     }
     return [];
 };
+
+// Vergleichsform für Artikelnamen: Gross-/Kleinschreibung, doppelte Leerzeichen
+// und Akzente spielen keine Rolle. Ein aus einer Liste kopierter Name trägt fast
+// immer ein Leerzeichen zu viel — genau daran scheiterte bisher die Übernahme.
+const normalizeArticleKey = (value?: string | null) =>
+    String(value ?? '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+/**
+ * Der Artikel, den der in die Positionszeile GETIPPTE Text beim Namen nennt —
+ * die Combobox markiert diese Zeile vor, Enter übernimmt sie.
+ *
+ * Es zählt nur, was den Artikel eindeutig NENNT:
+ *   1. genau ein Treffer mit identischem Namen,
+ *   2. genau ein Treffer mit identischer Artikelnummer.
+ * Alles andere ist kein Treffer. Insbesondere wird der letzte verbleibende
+ * Artikel einer Suche NICHT mehr als Auswahl geraten (das machte aus «Tisch»
+ * stillschweigend «Tisch Eiche», sobald nur noch der übrig war) — wie in Odoo
+ * steht der erste Treffer dafür ohnehin markiert bereit, und die Zeile
+ * «hinzufügen» bleibt daneben sichtbar.
+ *
+ * `listedFor` ist der Suchtext, zu dem `items` gehören. Hinkt er dem Getippten
+ * hinterher, gibt es keinen Treffer: eine veraltete Liste darf nie den falschen
+ * Artikel liefern, während weitergetippt wird.
+ */
+export const resolveTypedArticle = <T extends { name: string; articleCode?: string | null }>(
+    items: readonly T[],
+    typed: string,
+    listedFor?: string | null,
+): T | null => {
+    const needle = normalizeArticleKey(typed);
+    if (!needle || items.length === 0) return null;
+    if (listedFor != null && normalizeArticleKey(listedFor) !== needle) return null;
+
+    const byName = items.filter((item) => normalizeArticleKey(item.name) === needle);
+    if (byName.length === 1) return byName[0];
+    // Zwei Artikel mit demselben Namen kann nur der Benutzer auseinanderhalten.
+    if (byName.length > 1) return null;
+
+    const byCode = items.filter((item) => item.articleCode && normalizeArticleKey(item.articleCode) === needle);
+    return byCode.length === 1 ? byCode[0] : null;
+};
+
+/** Index desselben Treffers in der Liste — die Zeile wird damit vorab markiert. */
+export const resolveTypedArticleIndex = <T extends { name: string; articleCode?: string | null }>(
+    items: readonly T[],
+    typed: string,
+    listedFor?: string | null,
+): number => {
+    const match = resolveTypedArticle(items, typed, listedFor);
+    return match ? items.indexOf(match) : -1;
+};

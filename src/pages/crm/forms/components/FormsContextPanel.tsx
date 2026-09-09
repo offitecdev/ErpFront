@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { LuFileText, LuListChecks, LuStickyNote } from 'react-icons/lu';
+import { LuFileText, LuListChecks, LuPencilLine, LuStickyNote } from 'react-icons/lu';
 import { Edit01, Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { formsApi, type FieldNoteDto, type FormContextKind, type FormContextResult, type FormSubmissionRow, type FormTemplateDto } from '@/lib/api/forms';
 import { SectionCard, TableStateRow } from '@/components/ui-shared/TableKit';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { TemplatePickerModal } from './TemplatePickerModal';
-import { FormFillSheet } from './FormFillSheet';
+import { ChecklistFillWindow } from './ChecklistFillWindow';
 import { apiErrorMessage, BTN_ICON, BTN_ICON_DANGER, BTN_PRIMARY, BTN_SECONDARY, fmtDate, fmtDateTime, linkedCustomerLine, TEXTAREA_CLASS } from '../ui';
 
 /**
@@ -22,7 +22,11 @@ import { apiErrorMessage, BTN_ICON, BTN_ICON_DANGER, BTN_PRIMARY, BTN_SECONDARY,
  * und beim Techniker, ohne dass jemand es umhängen muss.
  *
  * `onOpen` überschreibt das Öffnen (Technikerbildschirm: eigene Seite statt
- * Untenfenster); ohne `onOpen` öffnet der Baustein das Untenfenster selbst.
+ * Fenster); ohne `onOpen` öffnet der Baustein das schwebende Checklisten-
+ * Fenster selbst (ChecklistFillWindow).
+ *
+ * `canCreate={false}` (Techniker, Vorgabe 02.09.2026): weder anlegen noch
+ * löschen — nur öffnen, ausfüllen, PDF. Die Zeile heisst dann «Ausfüllen».
  */
 export const FormsContextPanel = ({
     kind,
@@ -148,7 +152,9 @@ export const FormsContextPanel = ({
                         <button type="button" className={`${BTN_PRIMARY}${big}`} disabled={creating} onClick={() => setPickerOpen(true)}>
                             <Plus size={14} />{t('forms.panel.new')}
                         </button>
-                    ) : undefined}
+                    ) : (
+                        <span className="text-[12px] text-slate-500 dark:text-white/55">{t('forms.panel.readOnlyHint')}</span>
+                    )}
                 >
                     <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                         <colgroup>
@@ -156,7 +162,7 @@ export const FormsContextPanel = ({
                             <col style={{ width: 260 }} />
                             <col style={{ width: 160 }} />
                             <col style={{ width: 130 }} />
-                            <col style={{ width: 132 }} />
+                            <col style={{ width: canCreate ? 132 : 150 }} />
                         </colgroup>
                         <thead>
                             <tr>
@@ -169,7 +175,7 @@ export const FormsContextPanel = ({
                         </thead>
                         <tbody>
                             {(loading || submissions.length === 0) && (
-                                <TableStateRow colSpan={5} loading={loading} emptyText={t('forms.panel.empty')} skeletonRows={3} />
+                                <TableStateRow colSpan={5} loading={loading} emptyText={canCreate ? t('forms.panel.empty') : t('forms.panel.emptyReadOnly')} skeletonRows={3} />
                             )}
                             {!loading && submissions.map((row) => (
                                 <tr key={row.id} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5" onClick={() => open(row)}>
@@ -182,9 +188,15 @@ export const FormsContextPanel = ({
                                     <td className="whitespace-nowrap text-[12.5px] text-slate-600 dark:text-white/70">{fmtDate(row.updatedAt)}</td>
                                     <td onClick={(event) => event.stopPropagation()}>
                                         <div className="flex items-center justify-end gap-1.5">
-                                            <button type="button" className={BTN_ICON} title={t('forms.panel.edit')} onClick={() => open(row)}>
-                                                <Edit01 size={14} />
-                                            </button>
+                                            {canCreate ? (
+                                                <button type="button" className={BTN_ICON} title={t('forms.panel.edit')} onClick={() => open(row)}>
+                                                    <Edit01 size={14} />
+                                                </button>
+                                            ) : (
+                                                <button type="button" className={`${BTN_SECONDARY}${big}`} onClick={() => open(row)}>
+                                                    <LuPencilLine size={14} />{t('forms.panel.fill')}
+                                                </button>
+                                            )}
                                             <button type="button" className={BTN_ICON} title={t('forms.fill.pdf')} disabled={busyPdf === row.id} onClick={() => void downloadPdf(row)}>
                                                 <LuFileText size={14} />
                                             </button>
@@ -202,12 +214,16 @@ export const FormsContextPanel = ({
                 </SectionCard>
             )}
 
-            <TemplatePickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={(template) => void startNew(template)} />
+            {canCreate && (
+                <TemplatePickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={(template) => void startNew(template)} />
+            )}
 
             {!onOpen && (
-                <FormFillSheet
+                <ChecklistFillWindow
                     submissionId={openId}
                     open={Boolean(openId)}
+                    allowDelete={canCreate}
+                    canEditLinks={canCreate}
                     // Ansehen/Schliessen lädt NICHTS neu (Vorgabe 16.08.2026);
                     // Gespeichertes schreibt sich in die geladene Zeile.
                     onClose={() => setOpenId(null)}
@@ -238,7 +254,6 @@ export const FormsContextPanel = ({
     );
 };
 
-/** Verknüpfungen einer Zeile als kleine Marken (Kunde / AN / AU / PR / Termin). */
 /**
  * Die Kundenspalte einer Checkliste. Eine Checkliste kann an MEHREREN Kunden
  * hängen (16.08.2026): dann steht die ganze Namensreihe in einer Zeile — sie
@@ -270,7 +285,7 @@ export const CustomerCell = ({ row }: { row: FormSubmissionRow }) => {
  * Hängt die Checkliste an MEHREREN Kunden/Angeboten (16.08.2026), nennt der
  * Anhänger die ZAHL statt nur des ersten Namens — in der Kundenakte stünde
  * sonst ein fremder Kundenname in der Zeile. Die ganze Reihe steht im
- * Tooltip.
+ * Tooltip. Ohne Angebot (seit 02.09.2026 erlaubt) fehlt der Anhänger einfach.
  */
 export const LinkChips = ({ row, showCustomer = true }: { row: FormSubmissionRow; showCustomer?: boolean }) => {
     const chips: Array<{ key: string; text: string; title: string }> = [];

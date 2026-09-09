@@ -9,6 +9,9 @@ import { MontageHeader } from './components/MontageHeader';
  * beim Angebot erfassten Masse, Fotos, Zeichnungen und Unterschriften stehen
  * hier, der Techniker füllt weiter aus oder schliesst ab. `?back=` führt zum
  * Termin zurück, von dem aus geöffnet wurde.
+ *
+ * Techniker füllen nur aus (Vorgabe 02.09.2026): weder löschen noch die
+ * Verknüpfung ändern — das bleibt dem Büro.
  */
 export const MontageFormPage = () => {
     const { submissionId } = useParams<{ submissionId: string }>();
@@ -19,8 +22,8 @@ export const MontageFormPage = () => {
     return (
         <div className="space-y-4">
             <MontageHeader title={t('forms.fill.title')} backTo={back} />
-            <div className="rounded-[3px] border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-[#17191c]">
-                <FormFillView submissionId={submissionId} variant="montage" allowDelete={false} onDeleted={() => navigate(back)} />
+            <div className="ofi-chk-page">
+                <FormFillView submissionId={submissionId} variant="montage" allowDelete={false} canEditLinks={false} onDeleted={() => navigate(back)} />
             </div>
         </div>
     );

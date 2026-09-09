@@ -1,15 +1,25 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, SearchLg, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { SkeletonTableRows } from './Loader';
 
-/** Tablo filtre satırındaki input sınıfı — ferah ve yumuşak köşeli. */
-export const FILTER_INPUT_CLASS =
-    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-700/10 dark:border-white/15 dark:bg-transparent dark:text-white';
+/**
+ * Tablo filtre satırındaki input sınıfı.
+ *
+ * Ölçü, kenar ve köşe artık `styles/controls.css` § 7'de (`.ofi-filter-input`):
+ * arama kutusu ve filtre ile AYNI 44px yükseklik, AYNI 2px lacivert kenar,
+ * AYNI odak halkası (09.09.2026, Samet: «tablo içindeki filtre kutularının
+ * kenarları da lacivert olsun»). Burada yalnızca tablo başlığından gelen
+ * büyük harf/harf aralığını sıfırlayan yardımcı sınıflar kalır — onlar
+ * `th` üzerinden miras alınır, CSS'te de sıfırlanır ama iki yerde durması
+ * zararsızdır ve sınıfın tek başına da doğru görünmesini sağlar.
+ */
+export const FILTER_INPUT_CLASS = 'ofi-filter-input w-full font-normal normal-case tracking-normal';
 
-/** Satır içi (hücre) düzenleme inputu — toplu ekleme tabloları. */
-export const CELL_INPUT_CLASS =
-    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 placeholder:text-slate-300 transition-colors hover:border-slate-300 focus:border-[#1f2654] focus:outline-none dark:border-white/15 dark:bg-transparent dark:text-white';
+/** Satır içi (hücre) düzenleme inputu — toplu ekleme tabloları. Aynı kenar,
+ *  aynı ölçü; istisnalar Tailwind'in `!` önekiyle yazılır (`!h-10`,
+ *  `!border-red-400`) — katmanlı `!important` katmansızı yener. */
+export const CELL_INPUT_CLASS = 'ofi-cell-input w-full font-normal normal-case tracking-normal';
 
 /** Bölüm çerçevesi — yumuşak köşeler, hafif gölge, ferah başlık şeridi. */
 /* `data-table-scroll`: tablet/telefon genişliğinde (lg altı) gövde yatay
@@ -34,9 +44,9 @@ export const SectionCard = ({ title, action, children, collapsible = false, defa
     const headless = title === undefined;
     const expanded = headless || !collapsible || open;
     return (
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-white/15 dark:bg-transparent dark:shadow-none">
+        <section className="ofi-section-card overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-white/15 dark:bg-transparent dark:shadow-none">
             {!headless && (
-            <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
+            <header className="ofi-section-card__head flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5">
                 {collapsible ? (
                     <button
                         type="button"
@@ -62,13 +72,35 @@ export const SectionCard = ({ title, action, children, collapsible = false, defa
     );
 };
 
-/** Genel arama kutusu — etiket sarmalı, odaklanınca çerçeve koyulaşır. */
+/**
+ * Das Suchfeld der ganzen Anwendung — EIN Mass, EIN Ort, EINE Bewegung.
+ *
+ * Aussehen und Masse stehen in `styles/controls.css` (`.ofi-search`); hier
+ * steht nur, WANN sich die Lupe bewegt:
+ *
+ *   · Lupe und Platzhalter stehen in der Ruhe MITTIG im Feld und rutschen an
+ *     die linke Kante, sobald das Feld den Zeiger bekommt oder etwas darin
+ *     steht (Apple-Muster, Safari/iOS). Das macht das Stylesheet allein über
+ *     `:focus-within` und `data-filled`.
+ *   · Beim BEGINN einer Suche — der Übergang von leer zu nicht leer — schlägt
+ *     die Lupe einmal kurz aus. Ein `key`-Wechsel auf dem Symbol hängt das
+ *     Element neu ein; nur so läuft dieselbe Bewegung auch beim zweiten Mal
+ *     wieder von vorn (eine Klasse allein würde beim erneuten Setzen nichts
+ *     auslösen).
+ *   · `busy` — solange der Server antwortet — lässt sie ruhig pendeln.
+ *
+ * Der sichtbare Platzhalter ist bewusst ein eigenes `<span>` und nicht das
+ * `placeholder`-Attribut: nur ein echtes Element lässt sich zusammen mit der
+ * Lupe verschieben. Das Attribut bleibt trotzdem gesetzt (durchsichtig
+ * gefärbt), damit Vorlesehilfen und die Browsersuche es weiter finden.
+ */
 export const SearchBox = ({
     value,
     onChange,
     placeholder,
     className = '',
     autoFocus,
+    busy = false,
     onFocus,
     onBlur,
     onKeyDown,
@@ -77,34 +109,135 @@ export const SearchBox = ({
     onChange: (next: string) => void;
     placeholder?: string;
     className?: string;
+    /** Zusatzklassen — `is-grow`, wenn das Feld die Zeile füllen soll. */
     autoFocus?: boolean;
+    /** Läuft gerade eine Abfrage? Dann pendelt die Lupe. */
+    busy?: boolean;
     onFocus?: () => void;
     onBlur?: () => void;
     onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+}) => {
+    const filled = value.length > 0;
+    // Zählt die Suchbeginne. Der Wert selbst ist gleichgültig — er dient nur
+    // als `key`, damit das Symbol neu eingehängt wird und die Bewegung neu
+    // startet.
+    const [scanTick, setScanTick] = useState(0);
+    const wasFilled = useRef(false);
+
+    useEffect(() => {
+        if (filled && !wasFilled.current) setScanTick((n) => n + 1);
+        wasFilled.current = filled;
+    }, [filled]);
+
+    return (
+        <label
+            className={`ofi-search ${className}`.trim()}
+            data-filled={filled ? 'true' : 'false'}
+            data-busy={busy ? 'true' : 'false'}
+        >
+            <span className="ofi-search__lead" aria-hidden="true">
+                <span key={scanTick} className="ofi-search__icon" data-scan={scanTick > 0 ? 'on' : 'off'}>
+                    <SearchLg size={16} />
+                </span>
+                {placeholder && <span className="ofi-search__ph">{placeholder}</span>}
+            </span>
+            <input
+                type="search"
+                autoFocus={autoFocus}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                onFocus={onFocus}
+                onBlur={onBlur}
+                onKeyDown={onKeyDown}
+                placeholder={placeholder}
+                aria-label={placeholder}
+                className="ofi-search__input"
+            />
+            {filled && (
+                <button
+                    type="button"
+                    aria-label={t('common.clear')}
+                    onClick={() => onChange('')}
+                    className="ofi-search__clear ofi-btn-plain ofi-nosize"
+                >
+                    <X size={13} />
+                </button>
+            )}
+        </label>
+    );
+};
+
+/**
+ * Die Werkzeugzeile einer Listenseite: Suche zuerst, Filter dahinter, alles
+ * im selben Abstand und auf derselben Linie. Handlungen, die rechts stehen
+ * sollen, kommen in `end`.
+ *
+ * Sie ersetzt das seitenweise `flex flex-wrap items-center gap-2`, damit
+ * Abstand und Umbruchverhalten nicht mehr pro Seite driften.
+ */
+export const FilterBar = ({ children, end, className = '' }: {
+    children: ReactNode;
+    end?: ReactNode;
+    className?: string;
 }) => (
-    <label className={`flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-slate-300 focus-within:border-[#1f2654] dark:border-white/20 dark:bg-transparent dark:shadow-none ${className}`}>
-        <SearchLg size={15} className="shrink-0 text-slate-400" />
-        <input
-            autoFocus={autoFocus}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onKeyDown={onKeyDown}
-            placeholder={placeholder}
-            className="w-full bg-transparent text-[13.5px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
-        />
-        {value && (
-            <button
-                type="button"
-                aria-label={t('common.clear')}
-                onClick={() => onChange('')}
-                className="shrink-0 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-white"
-            >
-                <X size={13} />
-            </button>
-        )}
-    </label>
+    <div className={`ofi-filterbar ${className}`.trim()}>
+        {children}
+        {end && <div className="ofi-filterbar__end">{end}</div>}
+    </div>
+);
+
+/**
+ * Der Filter neben der Suche («Alle anzeigen», «Alle Status»). Dasselbe Mass
+ * und dieselbe Kante wie das Suchfeld — das ganze Aussehen kommt aus
+ * `styles/controls.css` (`.ofi-filter`), damit keine Seite mehr ihre eigene
+ * Höhe mitbringt.
+ *
+ * `width`: `fixed` ist der Normalfall (184px, überall gleich), `auto` für
+ * kurze Listen wie ein Jahr, `wide` für Kundennamen und Zeiträume.
+ */
+export const FilterSelect = ({
+    value,
+    onChange,
+    children,
+    label,
+    width = 'fixed',
+    disabled,
+    className = '',
+}: {
+    value: string;
+    onChange: (next: string) => void;
+    children: ReactNode;
+    /** Was der Filter auswählt — steht als `aria-label` am Feld. */
+    label: string;
+    width?: 'fixed' | 'auto' | 'wide';
+    disabled?: boolean;
+    className?: string;
+}) => (
+    <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={label}
+        title={label}
+        disabled={disabled}
+        className={`ofi-filter ${width === 'auto' ? 'is-auto' : width === 'wide' ? 'is-wide' : ''} ${className}`.trim()}
+    >
+        {children}
+    </select>
+);
+
+/**
+ * Ein fremdes Bedienelement (Kundenwähler, Mehrfachauswahl) in der
+ * Werkzeugzeile: die Hülle gibt ihm Breite und Höhe der übrigen Filter, ohne
+ * dass sein Inneres angefasst werden muss.
+ */
+export const FilterSlot = ({ children, width = 'fixed', className = '' }: {
+    children: ReactNode;
+    width?: 'fixed' | 'wide';
+    className?: string;
+}) => (
+    <div className={`ofi-filter-slot ${width === 'wide' ? 'is-wide' : ''} ${className}`.trim()}>
+        {children}
+    </div>
 );
 
 /** Sayfalama alt bloğu: "12-24 / 96" + ok butonları. */
@@ -124,7 +257,7 @@ export const Pager = ({
     const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
     const to = Math.min(total, page * pageSize);
     return (
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="ofi-pager flex items-center justify-between gap-3 px-4 py-3">
             <span className="font-mono text-[12.5px] text-slate-500 dark:text-white/60">{from}-{to} / {total}</span>
             <div className="flex items-center gap-2">
                 <button

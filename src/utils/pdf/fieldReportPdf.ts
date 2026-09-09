@@ -40,9 +40,9 @@ const reportNumber = (project: ProjectDto, report: any) => {
 
 const authorName = (project: ProjectDto, report: any, preparedBy?: string) => {
     if (preparedBy) return preparedBy;
-    if (report?.employee) return `${report.employee.firstName || ''} ${report.employee.lastName || ''}`.trim() || 'Offitec ERP';
+    if (report?.employee) return `${report.employee.firstName || ''} ${report.employee.lastName || ''}`.trim() || 'Offitec Control Center';
     if (project.manager) return `${project.manager.firstName} ${project.manager.lastName}`.trim();
-    return 'Offitec ERP';
+    return 'Offitec Control Center';
 };
 
 // ── Çalışma saatleri: Geplant / Erfasst satırlı tablo + Überzeit bandı ───────

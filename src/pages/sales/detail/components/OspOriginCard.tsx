@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { AlertTriangle, RefreshCcw01 } from '@/components/icons/antIconCompat';
+import { AlertTriangle, DownloadCloud02, File05, RefreshCcw01 } from '@/components/icons/antIconCompat';
 import { OspMark, OspPdfIcon } from '@/components/icons/OspMark';
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
 import { t } from '@/i18n/translate';
 import { ospApi, type OspDocumentDto, type OspUnitDto } from '@/lib/api/osp';
 import { changeSummary } from '@/pages/sales/osp/ospChanges';
+import { OspDatasheetSheet } from '@/pages/sales/osp/OspDatasheetSheet';
 
 /**
  * ── HERKUNFT AUS DER OSP (19.09.2026) ────────────────────────────────────────
@@ -68,6 +69,12 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
     const [sheetBlob, setSheetBlob] = useState<Blob | null>(null);
     const [sheetLoading, setSheetLoading] = useState(false);
 
+    /* Die lesbare Fassung des Blattes — die PRODUKTANGABEN, aus denen diese
+       Offerte beschrieben wurde. Sie ist auch dann noch da, wenn die OSP das
+       PDF drüben längst ersetzt hat. */
+    const [markdownUnit, setMarkdownUnit] = useState<OspUnitDto | null>(null);
+    const [fetching, setFetching] = useState(false);
+
     useEffect(() => {
         let cancelled = false;
         // Die Herkunft ist eine Nebenangabe: scheitert die Abfrage, bleibt die
@@ -106,6 +113,36 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
             setSheetLoading(false);
         }
     }, []);
+
+    /* Die Unterlagen des PROJEKTS holen. Von hier aus ist das der eigentliche
+       Griff: wer an der Offerte sitzt und das Datenblatt nicht aufbekommt, will
+       nicht wissen, welche Einheit klemmt — er will die Unterlagen. */
+    const fetchDocuments = async () => {
+        if (!doc) return;
+        setFetching(true);
+        try {
+            const result = await ospApi.fetchDatasheets(doc.id);
+            setDoc(result.document);
+            // Eine bereits geöffnete Vorschau zeigt sonst die alte Datei.
+            setSheetBlob(null);
+            if (result.failed) {
+                const first = result.results.find((row) => !row.ok);
+                toast.warning(t('osp.documents.partial', {
+                    fetched: result.fetched + result.kept,
+                    total: result.total,
+                    reason: first?.error || '',
+                }));
+            } else {
+                toast.success(t('osp.documents.done', {
+                    fetched: result.fetched, kept: result.kept, total: result.total,
+                }));
+            }
+        } catch (error: any) {
+            toast.error(error?.response?.data?.error || t('osp.documents.failed'));
+        } finally {
+            setFetching(false);
+        }
+    };
 
     const acknowledgeRevision = async () => {
         if (!doc) return;
@@ -169,11 +206,10 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
                     offeriert wird. "OSP PDF", weil sie von drüben stammen und
                     nicht aus unserem Anhang. Eine Kachel je Einheit: ein
                     Projekt kann mehrere haben. */}
-                {units.length > 0 && (
-                    <span className="ml-auto flex shrink-0 items-center gap-1.5">
-                        {units.filter((unit) => unit.pdfUrl || unit.datasheetFile).map((unit) => (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                    {units.filter((unit) => unit.pdfUrl || unit.datasheetFile).map((unit) => (
+                        <span key={unit.id} className="flex shrink-0 items-center">
                             <button
-                                key={unit.id}
                                 type="button"
                                 className="ofi-osp-sheetbtn shrink-0"
                                 title={`${t('osp.datasheetOpen')} — ${unitTitle(unit)}`}
@@ -182,9 +218,33 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
                                 <OspPdfIcon size={26} />
                                 {units.length > 1 ? unitTitle(unit) : t('osp.datasheetTile')}
                             </button>
-                        ))}
-                    </span>
-                )}
+                            {/* Die Angaben in Textform — daraus ist die
+                                Positionsbeschreibung entstanden. */}
+                            {unit.datasheetMarkdown && (
+                                <button
+                                    type="button"
+                                    className="ofi-osp-mdbtn"
+                                    title={`${t('osp.markdown.open')} — ${unitTitle(unit)}`}
+                                    onClick={() => setMarkdownUnit(unit)}
+                                >
+                                    <File05 size={13} />
+                                </button>
+                            )}
+                        </span>
+                    ))}
+                    {units.length > 0 && (
+                        <button
+                            type="button"
+                            className="ofi-osp-fetchbtn shrink-0"
+                            disabled={fetching}
+                            title={t('osp.documents.fetchHint')}
+                            onClick={() => void fetchDocuments()}
+                        >
+                            <DownloadCloud02 size={12} className={fetching ? 'ofi-osp-spin' : undefined} />
+                            {fetching ? t('osp.documents.fetching') : t('osp.documents.fetch')}
+                        </button>
+                    )}
+                </span>
             </div>
 
             {/* Geändert und erneut angefragt (§1a): das Datenblatt hier ist
@@ -250,6 +310,12 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
                 </div>
             )}
 
+
+            <OspDatasheetSheet
+                unitId={markdownUnit?.id ?? null}
+                title={markdownUnit ? unitTitle(markdownUnit) : ''}
+                onClose={() => setMarkdownUnit(null)}
+            />
 
             <PdfPreviewSheet
                 open={Boolean(sheetUnit)}

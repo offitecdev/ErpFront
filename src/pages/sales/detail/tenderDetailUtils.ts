@@ -11,16 +11,19 @@ import {
     parseDiscountList,
 } from './utils/tenderDiscounts.utils';
 
-export const STATUS_VARIANT: Record<string, 'passive' | 'warning' | 'approved' | 'info'> = {
+export const STATUS_VARIANT: Record<string, 'passive' | 'warning' | 'approved' | 'info' | 'danger'> = {
     Draft: 'passive',
     Approved: 'approved',
     Exported: 'info',
+    // STORNIERT (06.09.2026): die Offerte bleibt als Beleg stehen.
+    Cancelled: 'danger',
 };
 
 export const getStatusLabel = (): Record<string, string> => ({
     Draft:t('crm.tenders.statusDraft'),
     Approved:t('crm.tenders.statusApproved'),
     Exported:t('crm.tenders.statusExported'),
+    Cancelled:t('orders.lifecycle.statusCancelled'),
 });
 
 // Currency/number formatters were relocated to `utils/formatters.ts`; re-exported

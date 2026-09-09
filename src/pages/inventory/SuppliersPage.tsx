@@ -10,7 +10,7 @@ import { AddressFields, AddressLines } from '@/components/ui-shared/AddressField
 import { EMPTY_ADDRESS, toAddressForm, toAddressPayload } from '@/components/ui-shared/addressForm';
 import type { AddressFormValue } from '@/components/ui-shared/addressForm';
 import { BottomSheet } from './components/BottomSheet';
-import { CELL_INPUT_CLASS, ColResizeHandle, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
+import { CELL_INPUT_CLASS, ColResizeHandle, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, TableStateRow } from './components/primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { SUPPLIERS_PAGE_SIZE, useSuppliersList } from './hooks/useSuppliersList';
@@ -147,12 +147,13 @@ export const SuppliersPage = () => {
                 )}
             />
 
-            <SearchBox
-                value={list.search}
-                onChange={list.setSearch}
-                placeholder={t('inv.suppliers.searchPlaceholder')}
-                className="w-64"
-            />
+            <FilterBar>
+                <SearchBox
+                    value={list.search}
+                    onChange={list.setSearch}
+                    placeholder={t('inv.suppliers.searchPlaceholder')}
+                />
+            </FilterBar>
 
             <SectionCard title={t('inv.suppliers.sectionTitle', { count: list.totalCount })}>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">

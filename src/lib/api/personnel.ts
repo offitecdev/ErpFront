@@ -70,6 +70,14 @@ export const personnelApi = {
         return res.data;
     },
 
+    /** Der Schlüssel EINER Person, zum Drucken des Ausweises. Er steht seit der
+        Sicherheitskorrektur nicht mehr in der Liste (er meldet ohne Kennwort an),
+        sondern wird einzeln und protokolliert abgeholt. */
+    getQr: async (employeeId: string): Promise<{ qrToken: string | null }> => {
+        const res = await apiClient.get(`/personnel/staff/${employeeId}/qr`);
+        return res.data;
+    },
+
     rotateQr: async (employeeId: string): Promise<{ qrToken: string }> => {
         const res = await apiClient.post(`/personnel/staff/${employeeId}/qr`);
         return res.data;

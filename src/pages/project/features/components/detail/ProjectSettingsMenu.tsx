@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
-import { AlertTriangle, Settings01 as Settings, Trash01 } from '@/components/icons/antIconCompat';
+import {
+    AlertTriangle,
+    RefreshCcw01 as RefreshCw,
+    Settings01 as Settings,
+    Trash01,
+    XClose,
+} from '@/components/icons/antIconCompat';
 import {
     PopupActions,
     PopupButton,
@@ -9,27 +16,54 @@ import {
     PopupNote,
 } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
+import { projectApi } from '@/lib/api/project';
 
 /** Onay için birebir yazılması gereken sözcük — her dilde AYNI (kod gibi). */
 const CONFIRM_WORD = 'DELETE';
 
 /**
  * Proje başlığının yanındaki dişli — proje düzeyindeki tehlikeli işlemler
- * burada durur. Şimdilik tek madde: projeyi silme. Silme, yanlışlıkla
- * tıklamayla tetiklenemesin diye "DELETE" yazılarak onaylanır
- * (kullanıcı isteği).
+ * burada durur.
  *
- * Menü ve onay penceresi, uygulamanın açılır pencere takımını (PopupKit,
- * 18.08.2026) kullanır: aynı yüzey, aynı yazı tipi, karanlık modda aynı
- * değişkenler.
+ * ── LÖSCHEN, STORNO, ZURÜCK IN ENTWURF (Vorgabe Samet 06.09.2026) ────────────
+ * Die drei Handlungen sind auseinandergezogen, und die wichtigste Regel steht
+ * gleich im ersten Eintrag: ein AUFTRAG wird zurückgenommen, nicht das Projekt.
+ * Der Eintrag «Auftrag zurücknehmen» fragt bei mehreren Aufträgen zuerst,
+ * welcher gemeint ist (§5), und handelt dann an genau diesem.
+ *
+ *   · «Auftrag zurücknehmen» → Entwurf oder Storno, je nachdem, was schon
+ *      geschehen ist. Mit dem LETZTEN aktiven Auftrag geht das Projekt mit.
+ *   · «Projekt stornieren»   → nur, wenn kein aktiver Auftrag mehr darin steht;
+ *      sonst weist der Server auf den Auftrag zurück.
+ *   · «Projekt löschen»      → nur, wenn NICHTS mehr daran hängt, und mit
+ *      "DELETE" bestätigt (kullanıcı isteği).
+ *
+ * Menü und Bestätigungsfenster benutzen das Popup-Set der Anwendung (PopupKit,
+ * 18.08.2026): dieselbe Fläche, dieselbe Schrift, im Dunkelmodus dieselben
+ * Variablen.
  */
-export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen = false }: {
+export const ProjectSettingsMenu = ({
+    projectId,
+    projectCancelled,
+    deleting,
+    onDeleteProject,
+    onOrderAction,
+    onProjectChanged,
+    initiallyOpen = false,
+}: {
+    projectId: string;
+    projectCancelled: boolean;
     deleting: boolean;
     onDeleteProject: () => Promise<void> | void;
+    onOrderAction?: () => void;
+    onProjectChanged?: () => void | Promise<void>;
     initiallyOpen?: boolean;
 }) => {
     const [open, setOpen] = useState(initiallyOpen);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [reason, setReason] = useState('');
+    const [working, setWorking] = useState(false);
     const [typed, setTyped] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +79,27 @@ export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen =
     }, [open]);
 
     const armed = typed.trim() === CONFIRM_WORD;
+
+    const runProjectCancel = async () => {
+        setWorking(true);
+        try {
+            if (projectCancelled) {
+                await projectApi.uncancelProject(projectId);
+                toast.success(t('projects.lifecycle.projectUncancelled'));
+            } else {
+                await projectApi.cancelProject(projectId, reason.trim() || null);
+                toast.success(t('projects.lifecycle.projectCancelled'));
+            }
+            setCancelOpen(false);
+            setReason('');
+            await onProjectChanged?.();
+        } catch (error: unknown) {
+            const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+            toast.error(message || t('projects.lifecycle.projectCancelFailed'));
+        } finally {
+            setWorking(false);
+        }
+    };
 
     return (
         <div ref={menuRef} className="relative">
@@ -62,7 +117,26 @@ export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen =
             </button>
 
             {open && (
-                <div role="menu" className="ofi-tp-menu absolute left-0 top-8 z-50 w-56">
+                <div role="menu" className="ofi-tp-menu absolute left-0 top-8 z-50 w-64">
+                    {onOrderAction && (
+                        <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { setOpen(false); onOrderAction(); }}
+                            className="ofi-tp-menu__item"
+                        >
+                            <AlertTriangle size={14} /> {t('orders.lifecycle.buttonLabel')}
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setOpen(false); setReason(''); setCancelOpen(true); }}
+                        className={`ofi-tp-menu__item ${projectCancelled ? '' : 'is-danger'}`}
+                    >
+                        {projectCancelled ? <RefreshCw size={14} /> : <XClose size={14} />}
+                        {projectCancelled ? t('projects.lifecycle.uncancelProject') : t('projects.lifecycle.cancelProject')}
+                    </button>
                     <button
                         type="button"
                         role="menuitem"
@@ -77,6 +151,50 @@ export const ProjectSettingsMenu = ({ deleting, onDeleteProject, initiallyOpen =
                     </button>
                 </div>
             )}
+
+            {/* Projekt stornieren / Storno aufheben. */}
+            <PopupDialog
+                open={cancelOpen}
+                title={projectCancelled ? t('projects.lifecycle.uncancelProject') : t('projects.lifecycle.cancelProject')}
+                subtitle={projectCancelled
+                    ? t('projects.lifecycle.uncancelProjectText')
+                    : t('projects.lifecycle.cancelProjectText')}
+                icon={projectCancelled ? <RefreshCw size={20} /> : <XClose size={20} />}
+                tone={projectCancelled ? 'neutral' : 'danger'}
+                width={460}
+                onClose={() => { if (!working) setCancelOpen(false); }}
+                closeOnBackdrop={!working}
+                closeOnEscape={!working}
+                footer={(
+                    <PopupActions>
+                        <PopupButton disabled={working} onClick={() => setCancelOpen(false)}>
+                            {t('common.cancel')}
+                        </PopupButton>
+                        <PopupButton
+                            variant={projectCancelled ? 'primary' : 'danger'}
+                            loading={working}
+                            onClick={() => void runProjectCancel()}
+                        >
+                            {projectCancelled ? t('orders.lifecycle.uncancelAction') : t('orders.lifecycle.cancelAction')}
+                        </PopupButton>
+                    </PopupActions>
+                )}
+            >
+                {!projectCancelled && (
+                    <>
+                        <PopupNote tone="warning">{t('projects.lifecycle.cancelProjectHint')}</PopupNote>
+                        <PopupField className="pt-3" label={t('orders.lifecycle.reasonLabel')} hint={t('common.optional')}>
+                            <input
+                                value={reason}
+                                onChange={(event) => setReason(event.target.value)}
+                                maxLength={500}
+                                placeholder={t('orders.lifecycle.reasonPlaceholder')}
+                                className="ofi-cal-input w-full"
+                            />
+                        </PopupField>
+                    </>
+                )}
+            </PopupDialog>
 
             <PopupDialog
                 open={confirmOpen}

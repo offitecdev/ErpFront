@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Offitec ERP",
+  "name": "Offitec Control Center",
   "short_name": "Offitec",
-  "description": "Offitec management panel: CRM, projects, inventory, maintenance and field operations in one workspace.",
+  "description": "Offitec Control Center: CRM, projects, inventory, maintenance and field operations in one workspace.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/",

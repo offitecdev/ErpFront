@@ -8,7 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../hooks/useColumnWidths';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
@@ -175,29 +175,27 @@ export const Projects = () => {
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader title={t('nav.projects')} />
 
-            {/* Üst çubuk — müşteri listesiyle aynı: genel arama + durum seçici.
-                Telefonda ikisi de tam genişlik: 390px'te yan yana sıkışmak
-                yerine alt alta, dokunulacak kadar geniş dururlar. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="w-full sm:w-64">
-                    <SearchBox
-                        value={search}
-                        onChange={setSearch}
-                        placeholder={t('projects.searchPlaceholder')}
-                    />
-                </div>
-                <select
+            {/* Werkzeugzeile — dieselbe wie auf jeder anderen Liste: Suchfeld
+                links, Filter dahinter, gemeinsames Mass aus
+                styles/controls.css. Auf dem Telefon stehen beide untereinander
+                in voller Breite (dort besorgt das die Leiste selbst). */}
+            <FilterBar>
+                <SearchBox
+                    value={search}
+                    onChange={setSearch}
+                    placeholder={t('projects.searchPlaceholder')}
+                />
+                <FilterSelect
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value as ProjectStatus | '')}
-                    aria-label={t('common.status')}
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#1f2654] focus:outline-none sm:w-auto dark:border-white/20 dark:bg-transparent dark:text-white"
+                    onChange={(next) => setStatusFilter(next as ProjectStatus | '')}
+                    label={t('common.status')}
                 >
                     <option value="">{t('auto.tum_durumlar')}</option>
                     {FILTERABLE_STATUSES.map((key) => (
                         <option key={key} value={key}>{getStatusLabel()[key]}</option>
                     ))}
-                </select>
-            </div>
+                </FilterSelect>
+            </FilterBar>
 
             <SectionCard title={`${t('nav.projects')} (${total})`}>
                 {/* `data-list-table`: ferah satır ölçüsü + telefonda kart

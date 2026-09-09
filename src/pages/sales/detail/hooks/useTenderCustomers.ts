@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiClient } from '@/lib/axios';
 
@@ -31,26 +31,35 @@ export const useTenderCustomers = ({ canManage, isCreatingTender, detailCustomer
     const [newTenderCustomerOpen, setNewTenderCustomerOpen] = useState(false);
     const [newTenderCustomers, setNewTenderCustomers] = useState<CustomerOption[]>([]);
     const [newTenderCustomersLoading, setNewTenderCustomersLoading] = useState(false);
+    /** Läuft gerade eine Anfrage? Ersetzt den früheren Abbruch (siehe unten). */
+    const customersInFlight = useRef(false);
 
     useEffect(() => {
         if (!canManage || !newTenderCustomerOpen || newTenderCustomers.length > 0) return;
-        let cancelled = false;
-        // The 200-row list is only needed while the picker is open. Keeping it
+        if (customersInFlight.current) return;
+        // The customer list is only fetched once the picker is opened. Keeping it
         // off the initial detail path avoids an unnecessary request and parse.
+        //
+        // Die Anfrage gehört der SEITE, nicht dem geöffneten Menü: Sie wird
+        // bewusst NICHT abgebrochen, wenn das Feld den Fokus verliert. Vorher
+        // hing an diesem Effekt ein `cancelled`-Wächter — verliess der Cursor
+        // das Feld, während die Liste noch lud (der Blur schliesst das Menü nach
+        // 120 ms, der Effekt lief danach mit `open === false` erneut), warfen
+        // `then` UND `finally` ihr Ergebnis weg: die Zeilen kamen nie an und
+        // `loading` blieb für immer stehen. Das Feld war damit dauerhaft
+        // ausgegraut, schluckte jeden weiteren Klick, und die Kundenliste
+        // erschien bis zum Neuladen der Seite nicht mehr.
         setNewTenderCustomersLoading(true);
-        loadCustomerOptions()
-            .then((rows) => {
-                if (!cancelled) setNewTenderCustomers(rows);
-            })
-            .catch(() => {
-                if (!cancelled) setNewTenderCustomers([]);
-            })
+        customersInFlight.current = true;
+        void loadCustomerOptions()
+            .then((rows) => setNewTenderCustomers(rows))
+            // Fehlgeschlagen (offline, fehlendes Recht): Die Liste bleibt leer,
+            // der nächste Klick ins Feld versucht es erneut.
+            .catch(() => undefined)
             .finally(() => {
-                if (!cancelled) setNewTenderCustomersLoading(false);
+                customersInFlight.current = false;
+                setNewTenderCustomersLoading(false);
             });
-        return () => {
-            cancelled = true;
-        };
     }, [canManage, newTenderCustomerOpen, newTenderCustomers.length]);
 
     useEffect(() => {

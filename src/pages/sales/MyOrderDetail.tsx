@@ -19,6 +19,8 @@ import { OrderOverviewTab } from './components/OrderOverviewTab';
 import { OrderAddonsTab } from './components/OrderAddonsTab';
 import { OrderQuoteTab } from './components/OrderQuoteTab';
 import { isDeliveryOrder, stagesForOrder, type Stage, type StageItem } from './components/orderOverviewShared';
+import { OrderLifecycleButton, useOrderLifecycle } from '@/components/orders/useOrderLifecycle';
+import { useAuthStore } from '@/store/authStore';
 
 import { t } from '@/i18n/translate';
 
@@ -129,6 +131,29 @@ export const MyOrderDetail = () => {
     const [loading, setLoading] = useState(true);
     // `?tab=billing` derin bağlantısı: proje Abrechnung sekmesindeki fatura
     // popup'ı sipariş başlığından DOĞRUDAN bu sekmeye getirir.
+    const permissions = useAuthStore((state) => state.permissions);
+    // Zurücknehmen ist derselbe Eingriff wie auf der Projektseite — dieselbe
+    // Berechtigung, dasselbe Fenster (Vorgabe Samet 06.09.2026).
+    const canDeleteOrder = permissions.includes('projects.manage');
+    const { requestAction, dialog: lifecycleDialog } = useOrderLifecycle(async (_order, outcome) => {
+        // ZURÜCK IN ENTWURF: den Auftrag gibt es nicht mehr — der Weg führt in
+        // die Offerte, die gerade wieder ein Entwurf geworden ist.
+        if (outcome.action === 'REVERT') {
+            if (outcome.tenderId) navigate(`/sales/quotes/${outcome.tenderId}`, { replace: true });
+            else if (outcome.projectId) navigate(`/projects/${outcome.projectId}`, { replace: true });
+            else navigate('/sales/orders', { replace: true });
+            return;
+        }
+        // NACHTRAG GELÖSCHT: dieser Auftrag ist weg, sein Projekt nicht.
+        if (outcome.action === 'DELETE_ADDON') {
+            if (outcome.projectId) navigate(`/projects/${outcome.projectId}`, { replace: true });
+            else navigate('/sales/orders', { replace: true });
+            return;
+        }
+        // STORNO / STORNO AUFGEHOBEN: die Zeile bleibt — die Seite lädt neu und
+        // zeigt den neuen Zustand.
+        await load();
+    });
     const [searchParams] = useSearchParams();
     const requestedTab = searchParams.get('tab') as TabKey | null;
     // Varsayılan sekme ÜBERSICHT: Genel Bakış ile Auftrag yer değiştirdi
@@ -229,6 +254,8 @@ export const MyOrderDetail = () => {
     const visibleStages = stagesForOrder(order, stages);
     const delivery = isDeliveryOrder(order);
     const addons = order.addonSalesOrders || [];
+    // STORNIERT: der Auftrag steht noch, gilt aber als zurückgenommen.
+    const orderCancelled = Boolean(order.cancelledAt) || order.status === 'CANCELLED';
     // Teslimat siparişinde ek sipariş sekmesi yoktur; eski bir derin bağlantı
     // yine de 'addons' isterse Auftrag sekmesine düşülür.
     const activeTab: TabKey = delivery && tab === 'addons' ? 'order' : tab;
@@ -309,6 +336,28 @@ export const MyOrderDetail = () => {
                         <span className="inline-flex items-center gap-1 text-[13px] text-slate-600 dark:text-white/70"><UserRound size={12} /> {order.customer.companyName}</span>
                     )}
                 </div>
+                {/* EINEN AUFTRAG ZURÜCKNEHMEN (Vorgabe 06.09.2026) — das Fenster
+                    fragt den Server, was noch offensteht: «zurück in den
+                    Entwurf», solange nichts geschehen ist, sonst nur noch das
+                    Storno. Gelöscht wird hier nichts mehr im Stillen. */}
+                {canDeleteOrder && (
+                    <div className="flex items-center gap-2">
+                        {orderCancelled && (
+                            <span className="ofi-chip-danger inline-flex h-9 items-center rounded-lg border border-rose-200 bg-rose-50 px-3 text-[12.5px] font-semibold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+                                {t('orders.lifecycle.statusCancelled')}
+                            </span>
+                        )}
+                        <OrderLifecycleButton
+                            cancelled={orderCancelled}
+                            onClick={() => requestAction({
+                                id: order.id,
+                                orderNumber: order.orderNumber,
+                                isAddon: Boolean(order.parentSalesOrder?.id),
+                                cancelled: orderCancelled,
+                            })}
+                        />
+                    </div>
+                )}
             </div>
 
             <TabBar tab={activeTab} onSelect={setTab} showAddons={!delivery} addonCount={addons.length} />
@@ -325,6 +374,7 @@ export const MyOrderDetail = () => {
                     order={order}
                     initialAddonId={pendingAddonId}
                     onInitialAddonConsumed={() => setPendingAddonId(null)}
+                    onChanged={() => { void load(); }}
                 />
             )}
 
@@ -379,6 +429,8 @@ export const MyOrderDetail = () => {
             )}
 
             {activeStage && <StageDetailModal stage={activeStage} onClose={() => setActiveStage(null)} />}
+
+            {lifecycleDialog}
         </div>
     );
 };

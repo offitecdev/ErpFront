@@ -1,0 +1,366 @@
+/* Quote detail only. The separate scope keeps the shared ERP components intact.
+
+   Native-macOS look (09.09.2026, Samet: "Apple, but clean and professional —
+   not the generic AI look"): flat white panels with a 1px hairline and a
+   10px corner, no shadows, no tints, no pills. Fields and buttons are the
+   bordered 6px controls of a Mac window; captions stay sentence case; the
+   only colour is the brand navy on the primary action, focus and selection
+   (was the system blue until 09.09.2026).
+   Everything below reads the `--quote-*` tokens; dark mode is the same
+   variable swap. */
+.ofi-quote-page.ofi-quote-apple {
+    /* Same ground as the app shell (MainLayout — weiss seit 09.09.2026), so
+       the page never shows a band where its own background ends. */
+    --quote-canvas: #ffffff;
+    --quote-surface: #fff;
+    --quote-text: #1d1d1f;
+    --quote-secondary: #6e6e73;
+    --quote-muted: #a1a1a6;
+    --quote-border: rgba(0, 0, 0, 0.1);
+    --quote-hairline: rgba(0, 0, 0, 0.07);
+    --quote-field-border: rgba(0, 0, 0, 0.14);
+    --quote-field: #fff;
+    --quote-field-hover: #fff;
+    --quote-hover: rgba(0, 0, 0, 0.03);
+    --quote-fill: rgba(0, 0, 0, 0.045);
+    --quote-fill-hover: rgba(0, 0, 0, 0.08);
+    /* Marine statt Systemblau (Samet 09.09.2026: «Knöpfe in unserer
+       Hauptfarbe, das Apple-Blau kann weg»). Dunkel bleibt das helle Blau —
+       Marine ist auf #0f1113 unsichtbar. */
+    --quote-accent: #272f67;
+    --quote-accent-soft: rgba(39, 47, 103, 0.09);
+    --quote-focus: rgba(39, 47, 103, 0.3);
+    --quote-danger: #d70015;
+    --quote-success: #1f8a3b;
+    --quote-shadow: none;
+    --quote-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+    --quote-radius: 10px;
+    --quote-control-radius: 6px;
+    --quote-font: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* Inter's alternates that read closest to a system face: open digits,
+       single-storey a stays off; tabular numerals are set per table. */
+    font-feature-settings: 'cv11', 'calt';
+    --ofi-field-focus: var(--quote-accent);
+    --ofi-field-ring: var(--quote-focus);
+    --ofi-btn-tint-fill: rgba(0, 0, 0, 0.05);
+    --ofi-q-text: var(--quote-text);
+    min-width: 0;
+    padding-bottom: 32px;
+    color: var(--quote-text);
+    background: var(--quote-canvas);
+    font-family: var(--quote-font);
+    -webkit-font-smoothing: antialiased;
+}
+
+.dark .ofi-quote-page.ofi-quote-apple {
+    --quote-canvas: #0f1113;
+    --quote-surface: #1c1c1e;
+    --quote-text: #f5f5f7;
+    --quote-secondary: #a1a1a6;
+    --quote-muted: #6e6e73;
+    --quote-border: rgba(255, 255, 255, 0.1);
+    --quote-hairline: rgba(255, 255, 255, 0.08);
+    --quote-field-border: rgba(255, 255, 255, 0.16);
+    --quote-field: #161719;
+    --quote-field-hover: #161719;
+    --quote-hover: rgba(255, 255, 255, 0.04);
+    --quote-fill: rgba(255, 255, 255, 0.07);
+    --quote-fill-hover: rgba(255, 255, 255, 0.12);
+    --quote-accent: #3b8dff;
+    --quote-accent-soft: rgba(59, 141, 255, 0.16);
+    --quote-focus: rgba(59, 141, 255, 0.4);
+    --quote-danger: #ff453a;
+    --quote-success: #30d158;
+    --quote-btn-shadow: none;
+}
+
+#root .ofi-quote-page.ofi-quote-apple :where(h1, h2, h3, h4, p, span, label, input, button, select, textarea, td, th) {
+    font-family: var(--quote-font);
+}
+
+/* Override the legacy quote text palette without flattening semantic colors. */
+html #root .ofi-quote-page.ofi-quote-apple :where(.text-slate-500, .text-slate-600) { color: var(--quote-secondary) !important; }
+html #root .ofi-quote-page.ofi-quote-apple :where(.text-slate-700, .text-slate-800, .text-slate-900) { color: var(--quote-text) !important; }
+html #root .ofi-quote-page.ofi-quote-apple .text-slate-400 { color: var(--quote-muted) !important; }
+
+/* ── panels: one hairline, one corner, nothing else ────────────────────── */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card {
+    border: 1px solid var(--quote-border) !important;
+    background: var(--quote-surface) !important;
+    box-shadow: none !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card + .ofi-quote-card,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card + .grid { margin-top: 14px; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head {
+    min-height: 44px;
+    padding: 10px 16px !important;
+    gap: 12px;
+    background: var(--quote-surface) !important;
+    border-bottom: 1px solid var(--quote-hairline) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head h3,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-title {
+    color: var(--quote-text) !important;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head p {
+    color: var(--quote-secondary) !important;
+    font-size: 12.5px;
+}
+
+/* Bulk-selection actions in the lines card head: small Mac push buttons. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head .ofi-quote-btn {
+    height: 26px !important;
+    min-height: 26px !important;
+    padding-inline: 10px !important;
+    font-size: 12px !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head .ofi-quote-btn.is-secondary {
+    border-color: var(--quote-field-border) !important;
+    background: var(--quote-field) !important;
+    color: var(--quote-text) !important;
+    -webkit-text-fill-color: var(--quote-text) !important;
+    box-shadow: var(--quote-btn-shadow);
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head .ofi-quote-btn.is-secondary:hover { background: var(--quote-hover) !important; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head .ofi-quote-btn.is-danger {
+    border-color: var(--quote-field-border) !important;
+    background: var(--quote-field) !important;
+    color: var(--quote-danger) !important;
+    -webkit-text-fill-color: var(--quote-danger) !important;
+}
+
+#root .ofi-quote-page.ofi-quote-apple button.ofi-quote-card__head:hover { background: var(--quote-surface) !important; }
+#root .ofi-quote-page.ofi-quote-apple button.ofi-quote-card__head:hover .ofi-quote-detail-chevron { color: var(--quote-text); }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-tender-customer-card {
+    container: quote-details / inline-size;
+    margin-bottom: 14px;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-tender-card-toggle {
+    width: 100%;
+    height: auto !important;
+    text-align: left;
+}
+
+#root .ofi-quote-page.ofi-quote-apple [data-collapsed='true'] .ofi-tender-card-toggle { border-bottom-color: transparent !important; }
+
+.ofi-quote-apple .ofi-quote-detail-caption {
+    flex: 1;
+    min-width: 0;
+    margin-left: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--quote-secondary);
+    font-size: 12.5px;
+    font-weight: 400;
+}
+
+.ofi-quote-apple .ofi-quote-detail-chevron {
+    width: 22px;
+    height: 22px;
+    color: var(--quote-secondary);
+    background: transparent;
+    border-radius: 5px;
+    transition: color 150ms ease;
+}
+
+/* ── the detail groups: three columns on hairlines ─────────────────────── */
+.ofi-quote-apple .ofi-quote-detail-groups {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 16px;
+}
+
+.ofi-quote-apple .ofi-quote-detail-group {
+    min-width: 0;
+    padding: 12px 0 14px;
+}
+
+.ofi-quote-apple .ofi-quote-detail-group + .ofi-quote-detail-group { border-top: 1px solid var(--quote-hairline); }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    color: var(--quote-text);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+.ofi-quote-apple .ofi-quote-detail-fields { display: grid; gap: 6px; }
+.ofi-quote-apple .ofi-quote-detail-field {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* Fields stop at a Mac-window width: a company name does not need the whole
+   column, and a capped field keeps the section short and readable. */
+.ofi-quote-apple .ofi-quote-detail-field > div { max-width: 340px; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-field textarea.ofi-quote-control { max-height: 84px; overflow: auto; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-label {
+    padding-top: 6px;
+    color: var(--quote-secondary) !important;
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+/* ── fields: bordered Mac text fields, blue focus ring ─────────────────── */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control {
+    min-height: 28px !important;
+    height: auto;
+    border: 1px solid var(--quote-field-border) !important;
+    background: var(--quote-field) !important;
+    color: var(--quote-text) !important;
+    font-size: 13px !important;
+    font-weight: 400;
+    padding: 3px 9px !important;
+    box-shadow: var(--quote-btn-shadow);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control:hover:not(:disabled) { background: var(--quote-field) !important; border-color: color-mix(in srgb, var(--quote-field-border) 100%, var(--quote-text) 12%) !important; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control::placeholder { color: var(--quote-muted); font-style: normal; opacity: 1; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control:focus,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control:focus-within,
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control[aria-expanded='true'] {
+    border-color: var(--quote-accent) !important;
+    background: var(--quote-field) !important;
+    box-shadow: 0 0 0 3px var(--quote-focus) !important;
+    outline: none;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-control:disabled { color: var(--quote-muted) !important; background: var(--quote-canvas) !important; opacity: 1; }
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-readonly,
+#root .ofi-quote-page.ofi-quote-apple .ofi-addr-box {
+    min-height: 28px;
+    padding: 4px 9px;
+    background: var(--quote-fill) !important;
+    border-color: transparent !important;
+    color: var(--quote-text) !important;
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* Small helper buttons beside a field (contact / edit / add): bordered squares. */
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-field button:not(.ofi-quote-control):not(.ofi-quote-readonly):not(.absolute) {
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    color: var(--quote-secondary);
+    border: 1px solid var(--quote-field-border);
+    background-color: var(--quote-field);
+    box-shadow: var(--quote-btn-shadow);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-field button:not(.ofi-quote-control):not(.ofi-quote-readonly):not(.absolute):hover {
+    color: var(--quote-text);
+    background-color: var(--quote-hover);
+}
+
+#root .ofi-quote-page.ofi-quote-apple input[type='checkbox'] { accent-color: var(--quote-accent); }
+#root .ofi-quote-page.ofi-quote-apple button:focus-visible {
+    outline: 3px solid var(--quote-focus) !important;
+    outline-offset: 1px;
+}
+
+/* ── totals: a quiet band under the table ──────────────────────────────── */
+.ofi-quote-apple .ofi-quote-price-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px 40px;
+    padding: 14px 16px 16px;
+    border-top: 1px solid var(--quote-hairline);
+    background: var(--quote-surface);
+}
+
+.ofi-quote-apple .ofi-quote-discounts { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.ofi-quote-apple .ofi-quote-summary-caption { color: var(--quote-secondary); font-size: 12.5px; font-weight: 500; }
+.ofi-quote-apple .ofi-quote-discount-total { color: var(--quote-secondary); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ofi-quote-apple .ofi-quote-totals { width: min(100%, 320px); min-width: 0; margin-left: auto; display: grid; gap: 7px; font-size: 13px; }
+.ofi-quote-apple .ofi-quote-totals .text-rose-600 { color: var(--quote-danger) !important; }
+.ofi-quote-apple .ofi-quote-totals .border-dashed { border-color: var(--quote-hairline) !important; }
+.ofi-quote-apple .ofi-quote-grand-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 18px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--quote-border); }
+.ofi-quote-apple .ofi-quote-grand-total-label { color: var(--quote-text); font-size: 13px; font-weight: 600; }
+.ofi-quote-apple .ofi-quote-grand-total-value { color: var(--quote-text); font-size: 17px; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-discount-action {
+    min-height: 26px !important;
+    height: 26px;
+    padding: 0 10px !important;
+    background: var(--quote-field) !important;
+    color: var(--quote-text) !important;
+    border: 1px solid var(--quote-field-border) !important;
+    box-shadow: var(--quote-btn-shadow);
+    font-size: 12.5px !important;
+    font-weight: 500;
+}
+
+#root .ofi-quote-page.ofi-quote-apple .ofi-quote-discount-action:hover { background: var(--quote-hover) !important; }
+.ofi-quote-panel-skeleton { background: var(--quote-surface, #fff); border: 1px solid var(--quote-border, rgba(0, 0, 0, 0.1)); border-radius: var(--quote-radius, 10px); }
+
+/* Layered rules are necessary because ERP radius utilities are !important. */
+@layer utilities {
+    #root .ofi-quote-page.ofi-quote-apple .ofi-quote-card { border-radius: var(--quote-radius) !important; }
+    #root .ofi-quote-page.ofi-quote-apple .ofi-tender-card-toggle { border-radius: 0 !important; }
+    #root .ofi-quote-page.ofi-quote-apple :is(.ofi-quote-control, .ofi-quote-readonly, .ofi-addr-box, .ofi-quote-discount-action) { border-radius: var(--quote-control-radius) !important; }
+    #root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-field button:not(.ofi-quote-control):not(.ofi-quote-readonly):not(.absolute) { border-radius: var(--quote-control-radius) !important; }
+    #root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head .ofi-quote-btn { border-radius: var(--quote-control-radius) !important; }
+}
+
+@container quote-details (min-width: 760px) {
+    .ofi-quote-apple .ofi-quote-detail-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+    .ofi-quote-apple .ofi-quote-detail-group { padding: 12px 16px 14px; }
+    .ofi-quote-apple .ofi-quote-detail-group + .ofi-quote-detail-group { border-top: 0; border-left: 1px solid var(--quote-hairline); }
+    .ofi-quote-apple .ofi-quote-detail-group:last-child { grid-column: 1 / -1; border-top: 1px solid var(--quote-hairline); border-left: 0; }
+    .ofi-quote-apple .ofi-quote-detail-group:last-child .ofi-quote-detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 32px; }
+}
+
+@container quote-details (min-width: 1120px) {
+    .ofi-quote-apple .ofi-quote-detail-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ofi-quote-apple .ofi-quote-detail-group:last-child { grid-column: auto; border-top: 0; border-left: 1px solid var(--quote-hairline); }
+    .ofi-quote-apple .ofi-quote-detail-group:last-child .ofi-quote-detail-fields { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+
+@container quote-details (max-width: 480px) {
+    .ofi-quote-apple .ofi-quote-detail-caption { display: none; }
+    .ofi-quote-apple .ofi-quote-detail-groups { padding: 0 14px; }
+    .ofi-quote-apple .ofi-quote-detail-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    #root .ofi-quote-page.ofi-quote-apple .ofi-quote-detail-label { padding-top: 0; }
+    .ofi-quote-apple .ofi-quote-detail-fields { gap: 12px; }
+}
+
+@media (max-width: 640px) {
+    #root .ofi-quote-page.ofi-quote-apple .ofi-quote-card__head { padding: 10px 14px !important; flex-wrap: wrap; }
+    .ofi-quote-apple .ofi-quote-price-footer { padding: 14px; }
+    .ofi-quote-apple .ofi-quote-totals { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-quote-page.ofi-quote-apple *,
+    #root .ofi-quote-page.ofi-quote-apple *::before,
+    #root .ofi-quote-page.ofi-quote-apple *::after { animation: none !important; transition: none !important; }
+}

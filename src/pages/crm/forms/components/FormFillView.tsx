@@ -1,37 +1,64 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
-import { LuFileText, LuLink2 } from 'react-icons/lu';
-import { Edit01, Save01, Trash01 } from '@/components/icons/antIconCompat';
+import { LuFileText, LuPencilLine, LuSave, LuTrash2 } from 'react-icons/lu';
 import { t } from '@/i18n/translate';
 import { formsApi, type FormSubmissionDto } from '@/lib/api/forms';
-import type { FormValues } from '@/lib/formFields';
+import { computeFieldVisibility, isFormValueEmpty, type FormValues } from '@/lib/formFields';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { PdfPreviewSheet } from '@/components/pdf/PdfPreviewSheet';
 import { LoadingPanel } from '@/components/ui-shared/Loader';
 import { FormRenderer } from './FormRenderer';
-import { ChecklistLinkSheet } from './ChecklistLinkSheet';
-import { apiErrorMessage, BTN_DANGER_OUTLINE, BTN_PRIMARY, BTN_SECONDARY, fmtDate, fmtDateTime, linkedCustomerLine, presetsFromLinks, TEXTAREA_CLASS } from '../ui';
+import { ChecklistLinkDialog, type ChecklistTarget } from './ChecklistLinkDialog';
+import { apiErrorMessage, fmtDate, fmtDateTime, linkedCustomerLine, presetsFromLinks } from '../ui';
 
 /**
- * Eine Checkliste ansehen / ausfüllen. Lädt sich selbst über die Id (die Werte
- * samt Fotos/Zeichnungen kommen NUR hier, nie in Listen).
+ * ── EINE CHECKLISTE ANSEHEN / AUSFÜLLEN ─────────────────────────────────────
+ * Lädt sich selbst über die Id (die Werte samt Fotos/Zeichnungen kommen NUR
+ * hier, nie in Listen) und zeichnet den Inhalt im Apple-Kleid (`.ofi-chk`):
+ * oben die Gruppe «Verknüpfungen», dann je Abschnitt eine Gruppe mit den
+ * Feldern, unten die Bemerkungen.
  *
- * KEIN Status (Vorgabe 16.08.2026): es gibt weder "Entwurf" noch
- * "Abgeschlossen" — eine Checkliste wird erfasst, verknüpft und ausgefüllt,
- * mehr nicht. Entsprechend ist sie immer bearbeitbar.
+ * KEIN Status (Vorgabe 16.08.2026): weder «Entwurf» noch «Abgeschlossen» —
+ * eine Checkliste wird erfasst, verknüpft und ausgefüllt. Sie ist darum immer
+ * bearbeitbar.
  *
  *  • Gespeichert wird auf Knopfdruck UND von selbst: nach kurzer Ruhe schreibt
- *    der Editor still (keine Meldung — nur die Zeile "Gespeichert HH:MM" im
- *    Kopf). Nur der Knopf meldet sich, weil ihn jemand gedrückt hat.
+ *    der Editor still (keine Meldung — nur die Zeile «Gespeichert HH:MM»).
+ *    Nur der Knopf meldet sich, weil ihn jemand gedrückt hat.
  *  • Der letzte Speicherstand gilt (Ersetzen wie beim Montage-Rapport).
  *  • PDF — Vorschau im Untenfenster + Download (formSubmissionPdf, dynamic
  *    import).
- *  • `saveHandleRef` — für Fenster, die beim Schliessen sichern (still).
+ *
+ * Zwei Kleider, ein Editor: im FENSTER (`chrome="none"`, ChecklistFillWindow)
+ * trägt die Karte Titel, Status und Knöpfe selbst und greift über
+ * `handleRef`/`onState` hinein; als SEITE (`chrome="inline"`, Montage-Tablet
+ * und /crm/forms/:id) steht eine schmale Werkzeugleiste oben.
+ *
+ * Techniker (Vorgabe 02.09.2026): `canEditLinks={false}` — sie füllen aus,
+ * die Verknüpfung pflegt das Büro; löschen können sie ohnehin nicht.
  */
 export interface FormFillHandle {
     dirty: boolean;
     saving: boolean;
+    /** Still speichern (für Fenster, die beim Schliessen sichern). */
     save: () => Promise<boolean>;
+    /** Speichern mit Meldung — der Knopf. */
+    saveNow: () => Promise<void>;
+    openPdf: () => void;
+    requestDelete: () => void;
+    editLinks: () => void;
+}
+
+/** Was das Fenster für Kopf und Fuss wissen muss. */
+export interface FormFillState {
+    submission: FormSubmissionDto | null;
+    loading: boolean;
+    dirty: boolean;
+    saving: boolean;
+    savedAt: Date | null;
+    /** Ausgefüllte / sichtbare Felder (ohne Abschnitte). */
+    done: number;
+    total: number;
 }
 
 /** Ruhezeit, nach der von selbst gespeichert wird. */
@@ -41,19 +68,27 @@ export const FormFillView = ({
     submissionId,
     onSaved,
     onDeleted,
-    saveHandleRef,
+    handleRef,
+    onState,
     allowDelete = true,
+    canEditLinks = true,
     showLinks = true,
     variant = 'default',
+    chrome = 'inline',
 }: {
     submissionId: string;
     onSaved?: (submission: FormSubmissionDto) => void;
     onDeleted?: () => void;
-    saveHandleRef?: MutableRefObject<FormFillHandle | null>;
+    handleRef?: MutableRefObject<FormFillHandle | null>;
+    onState?: (state: FormFillState) => void;
     allowDelete?: boolean;
+    /** Techniker: nein — die Verknüpfung pflegt das Büro. */
+    canEditLinks?: boolean;
     showLinks?: boolean;
     /** montage: grössere Knöpfe für den Tablet-Bildschirm. */
     variant?: 'default' | 'montage';
+    /** 'none' im Fenster (Kopf/Fuss gehören der Karte), 'inline' als Seite. */
+    chrome?: 'inline' | 'none';
 }) => {
     const [submission, setSubmission] = useState<FormSubmissionDto | null>(null);
     // Geladen für welche Id? Daraus leitet sich "lädt" ab — kein setState im
@@ -72,7 +107,6 @@ export const FormFillView = ({
     const [pdfOpen, setPdfOpen] = useState(false);
     const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
     const [pdfLoading, setPdfLoading] = useState(false);
-    const rootRef = useRef<HTMLDivElement>(null);
 
     const adopt = useCallback((next: FormSubmissionDto) => {
         setSubmission(next);
@@ -93,6 +127,13 @@ export const FormFillView = ({
 
     const dirty = useMemo(() => JSON.stringify({ values, notes }) !== baseline, [values, notes, baseline]);
     const fields = useMemo(() => (Array.isArray(submission?.templateFields) ? submission!.templateFields : []), [submission]);
+
+    /* Fortschritt: sichtbare Felder ohne Abschnitte, davon die ausgefüllten. */
+    const progress = useMemo(() => {
+        const visibility = computeFieldVisibility(fields, values);
+        const visible = fields.filter((field) => field.type !== 'SECTION' && visibility[field.id] !== false);
+        return { total: visible.length, done: visible.filter((field) => !isFormValueEmpty(field, values[field.id])).length };
+    }, [fields, values]);
 
     const setValue = useCallback((fieldId: string, value: unknown) => {
         setValues((current) => ({ ...current, [fieldId]: value }));
@@ -164,19 +205,12 @@ export const FormFillView = ({
         return () => clearTimeout(timer);
     }, [submission, dirty, saving, values, notes]);
 
-    const saveNow = async () => {
+    const saveNow = useCallback(async () => {
         const ok = await persist();
         if (ok) toast.success(t('forms.toasts.saved'));
-    };
+    }, [persist]);
 
-    // Für das Untenfenster: dirty/save nach aussen (Sichern beim Schliessen).
-    useEffect(() => {
-        if (!saveHandleRef) return;
-        saveHandleRef.current = { dirty, saving, save: () => persist({ silent: true }) };
-        return () => { saveHandleRef.current = null; };
-    }, [saveHandleRef, dirty, saving, persist]);
-
-    const openPdf = async () => {
+    const openPdf = useCallback(async () => {
         if (!submission) return;
         setPdfOpen(true);
         setPdfLoading(true);
@@ -190,7 +224,7 @@ export const FormFillView = ({
         } finally {
             setPdfLoading(false);
         }
-    };
+    }, [submission, values, notes]);
 
     const downloadPdf = async () => {
         if (!submission) return;
@@ -202,14 +236,32 @@ export const FormFillView = ({
         }
     };
 
+    // Für das Fenster: Griffe (Speichern, PDF, Löschen, Verknüpfung) und Stand.
+    useEffect(() => {
+        if (!handleRef) return;
+        handleRef.current = {
+            dirty,
+            saving,
+            save: () => persist({ silent: true }),
+            saveNow,
+            openPdf: () => { void openPdf(); },
+            requestDelete: () => setConfirmDelete(true),
+            editLinks: () => setLinkOpen(true),
+        };
+        return () => { handleRef.current = null; };
+    }, [handleRef, dirty, saving, persist, saveNow, openPdf]);
+
+    useEffect(() => {
+        onState?.({ submission, loading, dirty, saving, savedAt, done: progress.done, total: progress.total });
+    }, [onState, submission, loading, dirty, saving, savedAt, progress.done, progress.total]);
+
     /**
-     * Schritt 2 ändern: erst das Getippte sichern (sonst ginge es beim
+     * Verknüpfung ändern: erst das Getippte sichern (sonst ginge es beim
      * Neuladen verloren), dann die Verknüpfungen schreiben und die Checkliste
      * frisch holen — der Server ergänzt Auftrag/Projekt/Termin je Verknüpfung
-     * aus der Kette. Die Liste ERSETZT den bisherigen Satz: eine Checkliste
-     * hängt an mehreren Kunden, hier kommen sie dazu oder fallen weg.
+     * aus der Kette. Die Liste ERSETZT den bisherigen Satz.
      */
-    const saveLinks = async (targets: Array<{ customerId: string; tenderId: string }>) => {
+    const saveLinks = async (targets: ChecklistTarget[]) => {
         if (!submission || !targets.length) return;
         setLinking(true);
         try {
@@ -244,104 +296,112 @@ export const FormFillView = ({
         }
     };
 
-    if (loading) return <LoadingPanel rows={5} />;
-    if (!submission) return <div className="py-12 text-center text-[13px] text-slate-400">{t('forms.errors.notFound')}</div>;
+    if (loading) return <div className="ofi-chk ofi-chk-stage"><LoadingPanel rows={5} /></div>;
+    if (!submission) return <div className="ofi-chk ofi-chk-stage"><div className="ofi-chk-empty">{t('forms.errors.notFound')}</div></div>;
 
-    const big = variant === 'montage' ? ' !min-h-11 !px-5 !text-[13.5px]' : '';
     const customerLine = linkedCustomerLine(submission);
-    const links: Array<{ key: string; label: string; value: string }> = [
-        customerLine ? { key: 'customer', label: t('forms.links.customer'), value: customerLine } : null,
-        submission.tenderNumber ? { key: 'tender', label: t('forms.links.tender'), value: submission.tenderNumber } : null,
+    const links: Array<{ key: string; label: string; value: string; muted?: boolean }> = [
+        {
+            key: 'customer',
+            label: submission.customerCount > 1 ? t('forms.links.customerCount', { count: submission.customerCount }) : t('forms.links.customer'),
+            value: customerLine || t('forms.fill.stepLinkEmpty'),
+            muted: !customerLine,
+        },
+        {
+            key: 'tender',
+            label: t('forms.links.tender'),
+            value: submission.tenderCount > 1
+                ? t('forms.link.tenderCount', { count: submission.tenderCount })
+                : (submission.tenderNumber || t('forms.link.noOffer')),
+            muted: !submission.tenderNumber && submission.tenderCount <= 1,
+        },
         submission.orderNumber ? { key: 'order', label: t('forms.links.order'), value: submission.orderNumber } : null,
         submission.projectNumber ? { key: 'project', label: t('forms.links.project'), value: submission.projectNumber } : null,
         submission.appointmentStart ? { key: 'appointment', label: t('forms.links.appointment'), value: fmtDate(submission.appointmentStart) } : null,
-    ].filter((entry): entry is { key: string; label: string; value: string } => Boolean(entry));
+    ].filter((entry): entry is { key: string; label: string; value: string; muted?: boolean } => Boolean(entry));
+
+    const statusText = saving
+        ? t('forms.fill.saving')
+        : dirty
+            ? t('forms.fill.unsaved')
+            : savedAt
+                ? t('forms.fill.autoSaved', { time: savedAt.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }) })
+                : '';
 
     return (
-        <div ref={rootRef} className="space-y-4">
-            {/* Die drei Schritte einer Checkliste — Schritt 2 ist von hier aus
-                änderbar (Vorgabe 16.08.2026: alles bleibt nachträglich
-                bearbeitbar). Die Vorlage bleibt stehen: ein Wechsel würde die
-                bereits erfassten Werte entwerten. */}
-            <ol className="flex flex-wrap items-stretch gap-2">
-                <StepCard index={1} label={t('forms.fill.stepTemplate')} value={submission.templateName} />
-                <StepCard
-                    index={2}
-                    label={t('forms.fill.stepLink')}
-                    /* Mehrere Kunden: die Karte nennt sie alle, sonst wie bisher
-                       "Kunde · Angebotsnummer". */
-                    value={submission.customerCount > 1
-                        ? t('forms.fill.stepLinkMany', { customers: submission.customerCount, count: submission.linkCount })
-                        : [submission.customerName, submission.tenderNumber].filter(Boolean).join(' · ') || t('forms.fill.stepLinkEmpty')}
-                    onEdit={showLinks ? () => setLinkOpen(true) : undefined}
-                    editLabel={t('forms.fill.editLink')}
-                />
-                <StepCard index={3} label={t('forms.fill.stepFill')} value={t('forms.fill.stepFillHint', { count: fields.filter((field) => field.type !== 'SECTION').length })} />
-            </ol>
-
-            {/* Kopf: Vorlage, Speicherstand, Kette */}
-            <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 dark:border-white/15 dark:bg-white/5">
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[15px] font-bold text-slate-900 dark:text-white">{submission.templateName}</span>
-                        {/* Statt einer Meldung je Sicherung: eine ruhige Zeile. */}
-                        <span className="text-[11px] font-semibold text-slate-400">
-                            {saving
-                                ? t('forms.fill.saving')
-                                : dirty
-                                    ? t('forms.fill.unsaved')
-                                    : savedAt
-                                        ? t('forms.fill.autoSaved', { time: savedAt.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }) })
-                                        : ''}
-                        </span>
-                    </div>
-                    {showLinks && links.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-600 dark:text-white/70">
-                            <LuLink2 size={13} className="text-slate-400" />
-                            {links.map((link) => (
-                                <span key={link.key}><span className="text-slate-400">{link.label}:</span> <span className="font-semibold">{link.value}</span></span>
-                            ))}
+        <div className={`ofi-chk ofi-chk-stage ${variant === 'montage' ? 'is-montage' : ''}`}>
+            {/* Als SEITE: schmale Werkzeugleiste. Im Fenster trägt die Karte das. */}
+            {chrome === 'inline' && (
+                <div className="ofi-chk-toolbar">
+                    <div className="min-w-0 flex-1">
+                        <div className="ofi-chk-toolbar__title">{submission.templateName}</div>
+                        <div className="ofi-chk-toolbar__meta">
+                            {[customerLine, submission.tenderNumber].filter(Boolean).join(' · ')}
+                            {statusText && <span className={`ofi-chk-status ${dirty ? 'is-dirty' : ''}`}>{statusText}</span>}
                         </div>
-                    )}
-                    <div className="mt-1 text-[11.5px] text-slate-400">
-                        {submission.filledByName ? `${t('forms.fill.lastEditedBy')} ${submission.filledByName} · ` : ''}
-                        {fmtDateTime(submission.updatedAt)}
+                    </div>
+                    <div className="ofi-chk-toolbar__actions">
+                        <button type="button" className="ofi-cal-btn" onClick={() => void openPdf()}>
+                            <LuFileText size={15} />{t('forms.fill.pdf')}
+                        </button>
+                        <button type="button" className="ofi-cal-btn is-primary" disabled={!dirty || saving} onClick={() => void saveNow()}>
+                            <LuSave size={15} />{t('forms.fill.saveDraft')}
+                        </button>
+                        {allowDelete && (
+                            <button type="button" className="ofi-chk-iconbtn is-danger is-big" onClick={() => setConfirmDelete(true)} title={t('common.delete')} aria-label={t('common.delete')}>
+                                <LuTrash2 size={17} />
+                            </button>
+                        )}
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" className={`${BTN_SECONDARY}${big}`} onClick={() => void openPdf()}>
-                        <LuFileText size={14} />{t('forms.fill.pdf')}
-                    </button>
-                    <button type="button" className={`${BTN_PRIMARY}${big}`} disabled={!dirty || saving} onClick={() => void saveNow()}>
-                        <Save01 size={14} />{t('forms.fill.saveDraft')}
-                    </button>
-                    {allowDelete && (
-                        <button type="button" className={`${BTN_DANGER_OUTLINE}${big}`} onClick={() => setConfirmDelete(true)} title={t('common.delete')}>
-                            <Trash01 size={14} />
-                        </button>
-                    )}
-                </div>
-            </div>
+            )}
+
+            {showLinks && (
+                <section className="ofi-chk-group">
+                    <div className="ofi-ios-group__title">{t('forms.fill.linksTitle')}</div>
+                    <div className="ofi-chk-card">
+                        {links.map((link) => (
+                            <div key={link.key} className="ofi-chk-kv">
+                                <span className="ofi-chk-kv__label">{link.label}</span>
+                                <span className={`ofi-chk-kv__value ${link.muted ? 'is-muted' : ''}`} title={link.value}>{link.value}</span>
+                            </div>
+                        ))}
+                        {canEditLinks && (
+                            <button type="button" className="ofi-ios-add" onClick={() => setLinkOpen(true)}>
+                                <span className="ofi-ios-add__ring"><LuPencilLine size={12} /></span>
+                                {t('forms.fill.editLink')}
+                            </button>
+                        )}
+                    </div>
+                    <div className="ofi-ios-group__footer">
+                        {canEditLinks
+                            ? `${submission.filledByName ? `${t('forms.fill.lastEditedBy')} ${submission.filledByName} · ` : ''}${fmtDateTime(submission.updatedAt)}`
+                            : t('forms.fill.technicianHint')}
+                    </div>
+                </section>
+            )}
 
             <FormRenderer fields={fields} values={values} onChange={setValue} />
 
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/15 dark:bg-white/5">
-                <label className="mb-1.5 block text-[13px] font-semibold text-slate-800 dark:text-white">{t('forms.fill.notes')}</label>
-                <textarea
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    rows={3}
-                    placeholder={t('forms.fill.notesPlaceholder')}
-                    className={TEXTAREA_CLASS}
-                />
-            </div>
+            <section className="ofi-chk-group">
+                <div className="ofi-ios-group__title">{t('forms.fill.notes')}</div>
+                <div className="ofi-chk-card">
+                    <textarea
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        rows={4}
+                        placeholder={t('forms.fill.notesPlaceholder')}
+                        className="ofi-chk-input is-area is-block"
+                    />
+                </div>
+            </section>
 
-            {/* Schritt 2 nachträglich ändern: dieselbe Tabelle wie beim Anlegen
-                mit allen bisherigen Kunden darin. Sie liegt ÜBER diesem Fenster. */}
+            {/* Verknüpfung nachträglich ändern: dasselbe Fenster wie beim
+                Anlegen, mit allen bisherigen Kunden darin. Es liegt ÜBER dem
+                Checklisten-Fenster (z 750 > 120). */}
             {linkOpen && (
-                <ChecklistLinkSheet
+                <ChecklistLinkDialog
                     open
-                    z={900}
                     submitLabel={t('forms.link.save')}
                     busy={linking}
                     initial={presetsFromLinks(submission.links || [])}
@@ -370,47 +430,8 @@ export const FormFillView = ({
                 confirmLabel={t('common.delete')}
                 onConfirm={() => void remove()}
                 onCancel={() => setConfirmDelete(false)}
-                zIndex={200}
+                zIndex={900}
             />
         </div>
     );
 };
-
-/**
- * Eine Stufe im Kopf des Editors: Nummer, Bezeichnung, aktueller Wert — und
- * bei Schritt 2 ein Stift, der die Verknüpfung erneut öffnet.
- */
-const StepCard = ({
-    index,
-    label,
-    value,
-    onEdit,
-    editLabel,
-}: {
-    index: number;
-    label: string;
-    value: string;
-    onEdit?: () => void;
-    editLabel?: string;
-}) => (
-    <li className="flex min-w-[180px] flex-1 items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-white/15 dark:bg-white/5">
-        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#eef2fb] text-[11.5px] font-bold text-[#1f2654] dark:bg-white/10 dark:text-amber-300">
-            {index}
-        </span>
-        <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
-            <span className="block truncate text-[12.5px] font-semibold text-slate-800 dark:text-white">{value}</span>
-        </span>
-        {onEdit && (
-            <button
-                type="button"
-                onClick={onEdit}
-                title={editLabel}
-                aria-label={editLabel}
-                className="flex size-7 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/15 dark:text-white/70 dark:hover:text-white"
-            >
-                <Edit01 size={13} />
-            </button>
-        )}
-    </li>
-);

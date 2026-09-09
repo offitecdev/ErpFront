@@ -403,6 +403,20 @@ export interface BulkArticleItemInput {
     imageUrl?: string | null;
 }
 
+/**
+ * Schnellerfassung (Foto → Text → Produkt): OHNE Code — den vergibt der
+ * Server (`ART-NNNNN`). Sonst dieselben Felder wie eine Sammelzeile.
+ */
+export interface QuickArticleItemInput {
+    name: string;
+    quantity: number;
+    unit?: string | null;
+    purchasePrice?: number;
+    salePrice?: number;
+    /** Das Foto als Produktbild (data URL, max. 2 MB) — freiwillig. */
+    imageUrl?: string | null;
+}
+
 export interface BulkRowError {
     index: number;
     articleCode: string;
@@ -578,6 +592,13 @@ export interface PurchaseOrderItem {
     /** Satirin hesap kipi — eski kayitlarda yoktur (directCopy'den turetilir). */
     calcMode?: OrderCalcMode;
     /**
+     * DIE EIGENEN SPALTEN der Vorlage — rechts neben dem Produktnamen, hoechstens
+     * drei. Als LISTE MIT NAMEN, nicht als Objekt: die Reihenfolge der Liste IST
+     * die Reihenfolge der Spalten, und die Ueberschrift reist mit, damit eine in
+     * einem Jahr geoeffnete Bestellung ihre Spalten noch benennen kann.
+     */
+    extras?: Array<{ key: string; name: string; value: string; width?: number }>;
+    /**
      * GOSTERILEN net birim fiyat (tedarikci listesindeki / Excel'deki deger).
      * `netPrice` hesabin tam duyarlikli tabanidir; Excel'in kendi yuvarlamasi
      * yuzunden ikisi ayrilabilir (18.98 gorunur, 18.9766… ile carpilir).
@@ -621,6 +642,13 @@ export interface PurchaseOrderRow {
      * BOŞ/NULL = PDF şablonunun kendi standart metni basılır.
      */
     coverLetter?: string | null;
+    /**
+     * Die Spalten, die die Vorlage beim Erfassen AUSGEBLENDET hatte (Auge in
+     * «Meine Vorlagen») — Vorlagenschlüssel wie `priceGross`, `discount`, `x2`.
+     * Das PDF wird später ohne die Vorlage neu gebaut und richtet sich danach;
+     * die Werte selbst bleiben an den Positionen stehen.
+     */
+    hiddenColumnKeys?: string[] | null;
     status: PurchaseOrderStatus;
     supplierId?: string | null;
     supplierName: string;
@@ -631,7 +659,13 @@ export interface PurchaseOrderRow {
     additionalFees: PurchaseOrderFee[];
     itemCount: number;
     currency: string;
-    /** KDV kipi — TOTAL ise `totalVat = (totalNet + totalFees) × orderVatRate`. */
+    /**
+     * KDV kipi. TOTAL (07.09.2026 sonrası): oran HER SATIRA ayrı ayrı
+     * uygulanır ve satır KDV'leri TOPLANIR; ek ücretler matraha GİRMEZ,
+     * genel toplama ayrıca eklenir. LINE: kayıtlı satır KDV'lerinin toplamı.
+     * ⚠ Tek kaynak: `orderPricing.ts` → `computeOrderTotals` ve sunucudaki
+     * `purchaseOrderTotalVat` — üçü birlikte güncellenir.
+     */
     vatMode: OrderVatMode;
     /** TOTAL kipindeki oran (%). */
     orderVatRate: number;
@@ -702,6 +736,8 @@ export interface PurchaseOrderItemInput {
     /** Mal kabul durumu — duzenlemede aynen geri gonderilir ki kaybolmasin. */
     receivedQuantity?: number;
     receivedAt?: string | null;
+    /** Ordered template columns, including their relative width for PDF parity. */
+    extras?: Array<{ key: string; name: string; value: string; width?: number }>;
 }
 
 export interface CreatePurchaseOrderInput {
@@ -714,6 +750,8 @@ export interface CreatePurchaseOrderInput {
     recipientName?: string | null;
     /** Ön yazı (Anschreiben) — boş/null gönderilirse PDF standart metnini basar. */
     coverLetter?: string | null;
+    /** Was die Vorlage ausgeblendet hatte — fährt mit, damit das PDF es weiss. */
+    hiddenColumnKeys?: string[] | null;
     /** Giriş yolları: DRAFT (fiyat talebi taslağı), ORDER_DRAFT (sipariş taslağı),
      *  PRICE_REQUEST, PENDING (doğrudan onaylanmış sipariş). */
     status?: Extract<PurchaseOrderStatus, 'DRAFT' | 'ORDER_DRAFT' | 'PRICE_REQUEST' | 'PENDING'>;
@@ -736,6 +774,8 @@ export interface UpdatePurchaseOrderInput {
     projectName?: string | null;
     recipientName?: string | null;
     coverLetter?: string | null;
+    /** Was die Vorlage ausgeblendet hatte — fährt mit, damit das PDF es weiss. */
+    hiddenColumnKeys?: string[] | null;
     supplierId?: string | null;
     supplierName?: string;
     supplierEmail?: string | null;
@@ -812,6 +852,224 @@ export interface SendPurchaseOrderMailResult {
     preview: boolean;
     order: PurchaseOrderRow;
 }
+
+// ── BELEG-IMPORT DER LIEFERANTENBESTELLUNG (07.09.2026) ─────────────────────
+// Ein PDF, ein Foto oder eine Tabelle wird auf dem SERVER in Text gewandelt und
+// dort einem Sprachmodell vorgelegt; zurueck kommen Positionen genau in den
+// Spalten der Vorlage. Die Typen hier sind die Gegenstuecke zu
+// `Erp_Backend/src/presentation/routes/purchaseOrderImport.routes.ts`.
+
+/** Steht die Erkennung bereit? Die Oberflaeche fragt das VOR dem Hochladen. */
+export interface AiImportStatus {
+    configured: boolean;
+    model: string;
+    maxChars: number;
+    chunkChars: number;
+    maxChunks: number;
+    /** Wie viele Spalten hoechstens an das Modell gehen. */
+    maxColumns: number;
+    minColumns: number;
+}
+
+/** Mengenstaffel einer Position, so wie sie auf dem Beleg steht. */
+export interface AiPriceTier {
+    minQuantity: number;
+    unitPrice: number;
+}
+
+/**
+ * Eine erkannte Position. Die Schluessel sind die Spaltenschluessel der
+ * Vorlage (`c1` …) plus `priceTiers` — welche dabei sind, entscheidet die
+ * Anfrage, darum ein offener Datensatz.
+ *
+ * `sourceLine` ist KEINE Spalte, sondern der ZEILENANKER: die gedruckte Zeile
+ * des Belegs, aus der diese Position stammt. Das Modell schreibt sie ab, bevor
+ * es sie zerlegt — daher weiss man zu jedem Wert, aus welcher Zeile er kommt
+ * (Vorgabe Samet 08.09.2026: die Zuordnung geschieht Zeile fuer Zeile).
+ */
+export type AiExtractedRow = Record<string, string | number | AiPriceTier[] | null | undefined>;
+
+/** Kopfdaten des Belegs (Lieferant, Nummer, Waehrung, Steuersatz). */
+export interface AiDocumentHeader {
+    supplierName: string | null;
+    documentNumber: string | null;
+    documentDate: string | null;
+    currency: string | null;
+    vatRate: number | null;
+    totalNet: number | null;
+}
+
+/** Was der Vorgang wirklich gekostet hat — steht am Ende auf dem Bildschirm. */
+export interface AiUsage {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    /** Geschaetzt in US-Dollar; `null`, wenn das Modell unbekannt ist. */
+    estimatedUsd: number | null;
+    /** Wie viele Durchgaenge der Beleg gebraucht hat. */
+    chunks: number;
+}
+
+export interface AiExtractResponse {
+    source: 'pdf' | 'image' | 'text';
+    engine: 'pdf-text' | 'ocr-space' | 'gpt-vision' | 'client-text';
+    model: string;
+    language: string;
+    /** Die Spaltenschluessel, die wirklich gelesen wurden. */
+    columns: string[];
+    document: AiDocumentHeader;
+    rows: AiExtractedRow[];
+    /**
+     * DIE ABRECHNUNG DER ZEILEN (08.09.2026). Niemand sagt eine Zahl an und
+     * niemand schaetzt: die Abschrift hat so viele Zeilen, wie sie hat, und
+     * dagegen steht, was die Zuordnung daraus gemacht hat.
+     */
+    rowCount: {
+        /** Was wirklich zurueckkommt. */
+        returned: number;
+        /** Zeilen der abgeschriebenen Tabelle — null ohne Abschrift (Excel/PDF). */
+        table: number | null;
+        /** Was auf dem Weg wegfiel (leere Zeile, Ueberlappung). */
+        dropped: number;
+    };
+    /**
+     * DIE ORDENTLICHE UMWANDLUNG (Vorgabe Samet, 08.09.2026): Bei einer
+     * Aufnahme wird die Tabelle ZUERST abgeschrieben und erst danach
+     * zugeordnet. Was abgeschrieben wurde, steht hier — es laesst sich mit
+     * dem Blatt vergleichen. Bei Excel und PDF ist es null: die kommen schon
+     * als Text.
+     */
+    transcript: { header: string | null; lines: string[] } | null;
+    usage: AiUsage;
+    text: {
+        rawChars: number;
+        chars: number;
+        approxTokens: number;
+        truncated: boolean;
+        chunks: number;
+        chunksRead: number;
+    };
+}
+
+export interface AiExtractInput {
+    /** `data:…;base64,…` oder reiner Base64-Inhalt. */
+    data?: string;
+    /** Fertiger Text — der Weg fuer xlsx/csv, die der Browser selbst liest. */
+    text?: string;
+    fileName?: string;
+    mimeType?: string;
+    /** Multiple camera/upload images. Each image is transcribed on its own page. */
+    images?: Array<{
+        data: string;
+        fileName?: string;
+        mimeType?: string;
+    }>;
+    /** Lets goods receipt omit supplier/product identity that is already known. */
+    documentType?: PurchaseTemplateDocumentType;
+    language: string;
+    /** DIE SPALTENUEBERSCHRIFTEN — 4 bis 8. Mehr geht nicht an das Modell. */
+    columns: TemplateColumn[];
+    withTiers: boolean;
+}
+
+/**
+ * MENGENSTAFFEL DES LIEFERANTEN: ab `minQuantity` gilt `discount` (Prozent)
+ * oder `unitPrice` (fester Stueckpreis). Es gewinnt immer die HOECHSTE Stufe,
+ * deren Menge erreicht ist.
+ */
+export interface SupplierQtyTier {
+    minQuantity: number;
+    discount: number;
+    unitPrice: number;
+}
+
+/**
+ * EINE EIGENE SPALTE DER VORLAGE (Vorgabe Samet, 07.09.2026):
+ * «Neben den festen Feldern soll man drei weitere Angaben hinzufuegen koennen;
+ *  die muessen im PDF sauber dastehen, auch wenn die Liste laenger wird.»
+ *
+ * `name` ist der Name, den der Anwender vergibt, und zugleich das, was dem
+ * Modell gesagt wird («hol mir die Spalte ‹Herstellernummer›»). `key` ist der
+ * stabile Bezug dahinter (`x1` … `x3`), damit eine Umbenennung nichts zerreisst.
+ */
+export interface TemplateColumn {
+    key: string;
+    name: string;
+    type: 'text' | 'number';
+    /** Relative screen width; PDF export scales the same proportion onto A4. */
+    width?: number;
+}
+
+/**
+ * DIE FESTEN FELDER (Vorgabe Samet): «Es gibt keine Spaltenauswahl mehr; es ist
+ * einfach netto/brutto, Rabatt 1 und Rabatt 2 (freiwillig). Fehlt ein
+ * Produktcode, wird einer vergeben; der Produktname gehoert dazu — das ist
+ * Standard.»
+ *
+ * Diese sechs Schluessel gehen bei JEDER Vorlage an das Modell (Rabatt 2 nur,
+ * wenn er eingeschaltet ist). Sie sind zugleich die Feldnamen im Antwortschema.
+ */
+export const FIXED_COLUMN_KEYS = ['code', 'name', 'quantity', 'priceGross', 'priceNet', 'discount', 'discount2'] as const;
+
+/** Hoechstens drei eigene Angaben — mehr passt im PDF nicht sauber unter die Zeile. */
+/**
+ * ── WIE VIELE EIGENE ANGABEN (Vorgabe Samet, 07.09.2026) ────────────────────
+ * «Für neue Bestellungen höchstens 3 Felder, für Preisanfragen 5.»
+ *
+ * Die VORLAGE darf so viele tragen, wie das grosszügigere der beiden Ziele
+ * braucht — sonst liesse sich eine Vorlage, die für Preisanfragen gedacht ist,
+ * gar nicht erst anlegen. Beim LESEN wird dann auf das Ziel zugeschnitten:
+ * `templateColumns(config, priceless)` gibt einer Bestellung drei und einer
+ * Preisanfrage fünf.
+ */
+export const TEMPLATE_MAX_EXTRA_COLUMNS = 5;
+/** Was eine BESTELLUNG von den eigenen Angaben liest. */
+export const ORDER_MAX_EXTRA_COLUMNS = 3;
+
+/**
+ * Die Vorlage in einem Objekt — genau das, was gespeichert wird.
+ *
+ * Es gibt hier KEINE Zuordnung mehr: die Felder sind fest. Die Vorlage speichert
+ * jedoch ihre Vorgabe fuer Rechenart und MwSt; in der Bestellung kann beides
+ * weiterhin bewusst uebersteuert werden.
+ */
+export interface SupplierCalcConfig {
+    /** Rechenart, die beim Oeffnen/Anwenden der Vorlage vorgeschlagen wird. */
+    calcMode: OrderCalcMode;
+    /** Rabatt 2 ist freiwillig. Aus = er geht gar nicht erst an das Modell. */
+    discount2Enabled: boolean;
+    /** Bis zu drei eigene Angaben; sie stehen im PDF unter dem Produktnamen. */
+    extraColumns: TemplateColumn[];
+    /** Columns hidden here are excluded from the AI schema and downstream merge. */
+    hiddenColumnKeys?: string[];
+    /** Mengenstaffel des Belegs mitlesen. */
+    withTiers: boolean;
+    /** Gestaffelte Rabatte in Prozent — nacheinander, nicht addiert. */
+    discounts: number[];
+    vatRate: number;
+    vatCountry: string;
+    currency: string;
+    qtyTiers: SupplierQtyTier[];
+}
+
+export interface SupplierOrderTemplate {
+    id: string;
+    supplierId: string | null;
+    supplierName: string;
+    title: string;
+    documentType: PurchaseTemplateDocumentType;
+    /**
+     * Die Vorgabe. Ohne Lieferant (`supplierId: null`) ist das die ALLGEMEINE
+     * Vorlage — die, mit der eine neu hinzugefuegte Zeile («+») rechnet.
+     */
+    isDefault: boolean;
+    usageCount: number;
+    config: SupplierCalcConfig;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type PurchaseTemplateDocumentType = 'ORDER' | 'PRICE_REQUEST' | 'GOODS_RECEIPT';
 
 export interface InventoryDashboard {
     kpis: {

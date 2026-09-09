@@ -1,3 +1,4 @@
+import { parsePaymentStages as parseInvoicePaymentStages } from '@/lib/paymentSchedule';
 /**
  * ── FATURA PDF ───────────────────────────────────────────────────────────────
  * Modern teklif şablonunun (tenderPdfModern) fatura sürümü. Şablonun kendisi
@@ -17,11 +18,21 @@
 import { tenderApi } from '@/lib/api/tender';
 import { buildTree, flattenTenderTreeForPdf } from '@/pages/sales/detail/tenderDetailUtils';
 import { buildSimpleTenderLines } from '@/pages/sales/detail/utils/tenderLine.utils';
-import { discountDisplayName, seedTotalDiscounts } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
+import {
+    applyDiscounts,
+    discountDisplayName,
+    MAX_LINE_DISCOUNTS,
+    parseDiscountList,
+    seedTotalDiscounts,
+    type TenderDiscountEntry,
+} from '@/pages/sales/detail/utils/tenderDiscounts.utils';
+import { lineTotalWithTax } from '@/pages/sales/detail/tenderDetailUtils';
+import { billingApi } from '@/lib/api/billing';
+import { ALL_SECTIONS, invoiceDiscounts, parseInvoiceSections } from '@/pages/sales/invoices/invoiceShared';
 import { computeTenderPricingSummary } from '@/pages/sales/detail/utils/tenderPricing.utils';
 import { attachPdfPositionImages } from '@/pages/sales/detail/utils/tenderPdfImages.utils';
 import type { PaymentStage } from '@/lib/paymentSchedule';
-import type { InvoiceDto, InvoiceKind } from '@/types/billing';
+import type { InvoiceDto, InvoiceKind, InvoiceLineItemDto } from '@/types/billing';
 import type { PdfCompanySettings } from '@/store/pdfSettingsStore';
 import {
     buildTenderPdfBytes,
@@ -76,38 +87,110 @@ const partialRowTitle = (kind: InvoiceKind, percent: number): string => {
 };
 
 /**
- * DIREKTRECHNUNG (30.08.2026): die Positionen stehen auf der Rechnung selbst —
- * es gibt keine Offerte, aus der sie nachgeladen werden könnten. Jede Zeile
- * wird gedruckt wie eine Offertposition (Menge · Einheit · Einzelpreis ·
- * Betrag); die Preise sind NETTO, die MWST kommt darunter als eigene Zeile.
+ * Zeilenrabatt einer Rechnungszeile, aufgelöst gegen seine eigene Grundlage —
+ * ein Eintrag je Zeile in der Rabattspalte, GENAU wie `pdfLineDiscounts` es für
+ * eine Offertposition tut (tenderDetailUtils).
+ */
+const pdfLineDiscounts = (line: InvoiceLineItemDto, base: number) => {
+    const entries = parseDiscountList(line.discounts ?? null, MAX_LINE_DISCOUNTS);
+    if (entries.length === 0) return undefined;
+    const rows = applyDiscounts(base, entries).applied
+        .map((entry, index) => ({
+            name: discountDisplayName(entry, index),
+            kind: entry.kind,
+            percent: entry.percent,
+            amount: entry.amount,
+        }))
+        .filter((entry) => entry.amount > 0);
+    return rows.length > 0 ? rows : undefined;
+};
+
+/**
+ * DIREKTRECHNUNG: die Positionen stehen auf der Rechnung selbst — es gibt keine
+ * Offerte, aus der sie nachgeladen werden könnten.
+ *
+ * ── DIESELBE TABELLE WIE DAS ANGEBOT (05.09.2026) ────────────────────────────
+ * Vorgabe Samet: „Die Rechnung muss GENAU der Offertentabelle entsprechen — mit
+ * Beschreibung und allem." Eine Zeile wird darum Feld für Feld so gebaut, wie
+ * `flattenTenderTreeForPdf` eine Offertposition baut:
+ *
+ *   shortDescription  „1 Bezeichnung"        (Positionsnummer + Name)
+ *   longDescription   die Beschreibung darunter
+ *   quantity · unit · unitPrice              die drei Zahlen der Zeile
+ *   discount/discounts                       der Zeilenrabatt in seiner Spalte
+ *   taxRate                                  der Steuersatz der Rechnung
+ *   lineTotal         Netto × (1 + MWST)     — BRUTTO, wie auf der Offerte
+ *   imageUrl          das Produktbild
+ *
+ * `lineTotal` ist der einzige Punkt, an dem man sich vertun kann: die
+ * Betragsspalte der Offerte zeigt den Zeilenbetrag MIT Steuer
+ * (`lineTotalWithTax`), während der Summenblock darunter Netto/MWST/Total
+ * trennt. Genau diese Lesart gilt hier — sonst stünden in derselben Spalte
+ * zweier Belege zwei verschiedene Zahlen.
  */
 const buildDirectPositions = (
     invoice: InvoiceDto,
     vatRate: number,
+    discounts: TenderDiscountEntry[],
 ): { positions: TenderPdfData['positions']; totals: TenderPdfTotals } => {
     const lines = [...(invoice.lineItems || [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    const netTotal = round2(lines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0));
+    // Zwischensumme = die Zeilen NACH ihrem eigenen Rabatt (`lineTotal` ist
+    // netto); darunter greift der RABATTABSCHNITT des Belegs, jeder Rabatt auf
+    // das, was der vorige übrig lässt — dieselbe Rechnung wie auf der Offerte,
+    // damit Beleg und Angebot dieselben Zahlen zeigen.
+    const subtotal = round2(lines.reduce((sum, line) => sum + (Number(line.lineTotal) || 0), 0));
+    const breakdown = applyDiscounts(subtotal, discounts);
+    const netTotal = round2(breakdown.remaining);
     // Gedruckt wird der GESPEICHERTE Betrag: er ist die Zahl, die der QR-Teil
     // einzieht. Die Steuer ergibt sich als Differenz, damit Beleg und Zahlteil
     // nie um einen Rappen auseinanderliegen.
     const grossTotal = round2(Number(invoice.amount) || round2(netTotal * (1 + vatRate / 100)));
+    const discountRows = breakdown.applied
+        // Der Name wird über den Platz in der GANZEN Liste gebildet ("Rabatt 2"),
+        // darum erst benennen und dann die wirkungslosen Zeilen weglassen.
+        .map((entry, index) => ({
+            name: discountDisplayName(entry, index),
+            percent: entry.percent,
+            amount: entry.amount,
+        }))
+        .filter((entry) => entry.amount > 0);
 
     return {
-        positions: lines.map((line, index) => ({
-            shortDescription: `${index + 1} ${line.description}`,
-            // 'PRODUCT' ist eine der Zeilenarten, die NIE zum Kapitel werden
-            // (`NEVER_CHAPTER_ROW_TYPES`) — eine Position zum Preis 0 behält so
-            // ihre Preisspalten und fällt nicht als Titelband aus der Tabelle.
-            rowType: 'PRODUCT',
-            isTopLevel: true,
-            hierarchyLevel: 1,
-            quantity: Number(line.quantity) || 0,
-            unit: line.unit || 'Stk.',
-            unitPrice: Number(line.unitAmount) || 0,
-            taxRate: vatRate,
-            lineTotal: round2(Number(line.lineTotal) || 0),
-        })),
-        totals: { netTotal, vatTotal: round2(grossTotal - netTotal), grossTotal },
+        positions: lines.map((line, index) => {
+            const net = round2(Number(line.lineTotal) || 0);
+            return {
+                shortDescription: `${index + 1} ${line.description}`,
+                // Die Beschreibung steht UNTER der Bezeichnung — dieselbe
+                // Stelle und dieselbe Schrift wie auf der Offerte.
+                longDescription: line.longDescription || null,
+                // 'PRODUCT' ist eine der Zeilenarten, die NIE zum Kapitel werden
+                // (`NEVER_CHAPTER_ROW_TYPES`) — eine Position zum Preis 0 behält so
+                // ihre Preisspalten und fällt nicht als Titelband aus der Tabelle.
+                rowType: 'PRODUCT',
+                isTopLevel: true,
+                hierarchyLevel: 1,
+                // Das Produktbild hängt am Katalogartikel; `sourceId` ist seine
+                // Kennung (siehe CreateDirectInvoiceUseCase).
+                sourceArticleId: line.sourceId ?? null,
+                quantity: Number(line.quantity) || 0,
+                unit: line.unit || 'Stk.',
+                unitPrice: Number(line.unitAmount) || 0,
+                discount: Number(line.discount) || undefined,
+                discounts: pdfLineDiscounts(line, round2((Number(line.quantity) || 0) * (Number(line.unitAmount) || 0))),
+                taxRate: vatRate,
+                // Betragsspalte = Zeilenbetrag MIT Steuer, wie auf der Offerte.
+                lineTotal: round2(lineTotalWithTax(net, vatRate)),
+            };
+        }),
+        totals: {
+            subtotal,
+            discounts: discountRows,
+            totalDiscountAmount: round2(breakdown.totalAmount),
+            combinedDiscountPercent: breakdown.combinedPercent,
+            netTotal,
+            vatTotal: round2(grossTotal - netTotal),
+            grossTotal,
+        },
     };
 };
 
@@ -206,6 +289,36 @@ const buildFullPositions = async (
 export const isDirectInvoice = (invoice: Pick<InvoiceDto, 'salesOrderId' | 'projectId' | 'recipientName'>): boolean =>
     !invoice.salesOrderId && !invoice.projectId && Boolean(invoice.recipientName);
 
+/**
+ * Produktbilder der Direktrechnung nachziehen. Das Angebot holt sie über die
+ * Offerte (`attachPdfPositionImages`); eine Direktrechnung hat keine, also
+ * fragt sie über die ARTIKEL-Kennungen ihrer Zeilen. Die Bilder sind serverseitig
+ * schon auf den Bildrahmen des Belegs verkleinert.
+ *
+ * Ein Fehlschlag ist NICHT fatal — dann entsteht das PDF ohne Bilder, genau wie
+ * beim Angebot.
+ */
+const attachDirectPositionImages = async (
+    positions: TenderPdfData['positions'],
+): Promise<TenderPdfData['positions']> => {
+    const ids = [...new Set(
+        positions.map((row) => (row as { sourceArticleId?: string | null }).sourceArticleId).filter(Boolean),
+    )] as string[];
+    if (ids.length === 0) return positions;
+    try {
+        const images = await billingApi.productImages(ids);
+        if (images.length === 0) return positions;
+        const byId = new Map(images.map((row) => [row.id, row.imageUrl]));
+        return positions.map((row) => {
+            const articleId = (row as { sourceArticleId?: string | null }).sourceArticleId;
+            const imageUrl = articleId ? byId.get(articleId) : undefined;
+            return imageUrl ? { ...row, imageUrl } : row;
+        });
+    } catch {
+        return positions;
+    }
+};
+
 const enrichContextFromTender = async (ctx: InvoiceOrderContext): Promise<InvoiceOrderContext> => {
     if (!ctx.tenderId || (ctx.billingAddress && ctx.commissionNumber && ctx.salespersonName)) return ctx;
     try {
@@ -247,10 +360,19 @@ export async function buildInvoicePdfBytes(
     // Eine Direktrechnung hat keine Offerte — nichts nachzuladen.
     const ctx = direct ? rawCtx : await enrichContextFromTender(rawCtx);
 
+    // ── DIE DREI ABSCHNITTE (nur die Direktrechnung trägt sie) ───────────────
+    // Vorgabe Samet: ein entfernter Abschnitt erscheint AUCH NICHT im PDF.
+    //  - „Rabatt" weg     → der Stapel wird weder gerechnet noch gedruckt
+    //  - „Positionen" weg → keine Tabelle; der Beleg zeigt nur die Summe
+    //  - „Schlusstext" weg → keine Karte unter dem Total
+    // Eine Auftragsrechnung kennt die Abschnitte nicht: sie druckt wie bisher.
+    const sections = direct ? parseInvoiceSections(invoice.sections) : ALL_SECTIONS;
+    const discounts = direct && sections.discount ? invoiceDiscounts(invoice) : [];
+
     // Direktrechnung: die eigenen Positionen. Sonst RECHNUNG aus der Offerte
     // (alle Positionen) bzw. in jedem anderen Fall die eine Prozentzeile.
     const body = direct
-        ? buildDirectPositions(invoice, vatRate)
+        ? buildDirectPositions(invoice, vatRate, discounts)
         : ((invoice.kind === 'RECHNUNG' && ctx.tenderId
             ? await buildFullPositions(ctx.tenderId, vatRate, onProgress)
             : null)
@@ -258,6 +380,12 @@ export async function buildInvoicePdfBytes(
 
     // Kartta TAM BEŞ satır (kullanıcı isteği): Auftrags-Nr. YOK, Fälligkeit
     // EN SONDA. Kommission tekliften gelir (faturalama ekranında girilmez).
+    // Die Bilder kosten eine Runde zum Server — sie werden nur geholt, wenn die
+    // Positionstabelle auch wirklich gedruckt wird (Abschnitt „Positionen").
+    const positions = direct && sections.positions
+        ? await attachDirectPositionImages(body.positions)
+        : body.positions;
+
     const infoRows: NonNullable<TenderPdfData['infoRows']> = [
         { label: 'Rechnungs-Nr.', value: invoice.invoiceNumber, emphasize: true },
         { label: 'Rechnungsdatum', value: fmtDay(invoice.invoiceDate || invoice.createdAt) },
@@ -278,17 +406,25 @@ export async function buildInvoicePdfBytes(
         // Arbeiten erlauben wir uns zu berechnen:") — er steht auf Seite 1
         // unter dem Titel, genau wie der Einleitungstext der Offerte.
         coverLetter: direct ? (invoice.introText || null) : null,
-        positions: body.positions,
+        positions,
         grandTotal: round2(Number(invoice.amount) || 0),
         totals: body.totals,
         // Zahlungsplan des AUFTRAGS — nur auf der Vollrechnung sinnvoll: eine
         // Teilrechnung IST bereits eine Rate, dort würde der Plan gegen den
         // Rechnungsbetrag (nicht gegen die Auftragssumme) gerechnet.
-        paymentStages: invoice.kind === 'RECHNUNG' ? (ctx.paymentStages ?? null) : null,
+        paymentStages: invoice.kind === 'RECHNUNG' ? (direct ? parseInvoicePaymentStages(invoice.paymentStages) : ctx.paymentStages ?? null) : null,
         // Zahlungsbedingungen gehören auf die RECHNUNG, nicht auf die Offerte:
         // erst hier gibt es einen fälligen Betrag, auf den sich "zahlbar innert
-        // 30 Tagen" überhaupt beziehen kann.
-        showPaymentTerms: true,
+        // 30 Tagen" überhaupt beziehen kann. Auf der Direktrechnung IST diese
+        // Karte der Abschnitt „Schlusstext": entfernt heisst, sie fällt weg.
+        showPaymentTerms: sections.closing,
+        paymentTermsText: direct ? (invoice.closingText || null) : null,
+        // Abschnitt „Positionen" entfernt: keine Tabelle, nur die Summe.
+        hidePositionsTable: direct && !sections.positions,
+        // Die Absenderzeile des Belegs. Sie ist beim Erstellen aus den
+        // Mandanteneinstellungen vorbelegt und dann eingefroren — der
+        // QR-Gläubiger bleibt davon unberührt (er muss zum Konto passen).
+        senderLine: direct ? (invoice.senderAddress || null) : null,
         qrBillEnabled: true,
         lang,
         docTitle: title,

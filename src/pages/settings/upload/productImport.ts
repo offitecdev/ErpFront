@@ -15,9 +15,9 @@
 import type { ParsedSheet } from '@/pages/inventory/types';
 
 /** Zielfelder des Uploads. Bestand ist NICHT dabei — er ist immer 0. */
-export type UploadField = 'articleCode' | 'name' | 'salePrice' | 'purchasePrice' | 'unit' | 'image';
+export type UploadField = 'articleCode' | 'name' | 'description' | 'salePrice' | 'purchasePrice' | 'unit' | 'image';
 
-export const UPLOAD_FIELDS: UploadField[] = ['articleCode', 'name', 'salePrice', 'purchasePrice', 'unit', 'image'];
+export const UPLOAD_FIELDS: UploadField[] = ['articleCode', 'name', 'description', 'salePrice', 'purchasePrice', 'unit', 'image'];
 
 /** Ohne diese Spalte ergibt die Datei keinen Produktstamm. */
 export const REQUIRED_FIELDS: UploadField[] = ['name'];
@@ -37,6 +37,19 @@ const HEADER_ALIASES: Record<UploadField, string[]> = {
     name: [
         'name', 'bezeichnung', 'produkt', 'produktname', 'artikel', 'artikelbezeichnung',
         'product name', 'urun adi', 'ad', 'isim',
+    ],
+    /* Die Verkaufsbeschreibung des Odoo-Exports — der Fliesstext, der auf der
+       Produktkarte unter der Bezeichnung steht.
+
+       Die Liste stolpert über kein Nachbarfeld: "verkaufsbeschreibung" trifft
+       exakt (und exakte Treffer werden ZUERST vergeben), enthält weder
+       "bezeichnung" noch "preis" und wird deshalb auch im unscharfen Durchgang
+       weder von `name` noch von `salePrice` beansprucht. */
+    description: [
+        'verkaufsbeschreibung', 'beschreibung', 'produktbeschreibung',
+        'artikelbeschreibung', 'langbeschreibung', 'beschrieb',
+        'sales description', 'description', 'long description',
+        'urun aciklamasi', 'aciklama', 'detay',
     ],
     salePrice: [
         'verkaufspreis', 'vk preis', 'vkpreis', 'listenpreis', 'preis',
@@ -214,6 +227,14 @@ export const generateArticleCode = (name: string, repeat: number): string => {
 
 export const COLUMN_MAX_CHARS = 191;
 
+/* Die Beschreibung liegt in `@db.Text` — 65535 BYTES, keine Zeichen. Ein
+   Umlaut wiegt dort zwei Bytes, ein Zeichen ausserhalb der Grundebene vier.
+   Bei 16000 Zeichen ist selbst der schlimmste Fall noch unter der Grenze, und
+   die längste Beschreibung der Beispieldatei misst 2533 Zeichen — die Schranke
+   greift also nur, wenn eine Datei etwas Abwegiges mitbringt, und dann kostet
+   sie eine Zeile statt des ganzen Pakets. */
+export const DESCRIPTION_MAX_CHARS = 16000;
+
 const fitColumn = (value: string): string => {
     if (value.length <= COLUMN_MAX_CHARS) return value;
     let end = COLUMN_MAX_CHARS;
@@ -233,7 +254,8 @@ export interface UploadRow {
     /** true = aus dem Namen abgeleitet, die Datei trug keine interne Referenz. */
     generatedCode: boolean;
     name: string;
-    /** Gesetzt, wenn die Bezeichnung gekürzt wurde: der VOLLE Text. */
+    /** Beschreibung der Produktkarte: die Verkaufsbeschreibung der Datei — und,
+        falls die Bezeichnung gekürzt werden musste, davor der VOLLE Name. */
     description: string | null;
     /** true = die Bezeichnung passte nicht in die Spalte und wurde gekürzt. */
     nameShortened: boolean;
@@ -254,6 +276,8 @@ export interface UploadPreview {
     droppedNoName: number;
     /** Verworfen, weil die Artikelnummer weiter oben schon vorkam. */
     droppedDuplicate: number;
+    /** Zeilen mit einer Verkaufsbeschreibung in der Datei. */
+    withDescription: number;
     withImage: number;
     /** Bild vorhanden, aber unbrauchbar (Format/Grösse) — Zeile bleibt. */
     imagesSkipped: number;
@@ -301,6 +325,7 @@ export const buildPreview = (fileName: string, headers: string[], rows: string[]
     const nameRepeats = new Map<string, number>();
     let droppedNoName = 0;
     let droppedDuplicate = 0;
+    let withDescription = 0;
     let withImage = 0;
     let imagesSkipped = 0;
     let imagesNotExported = 0;
@@ -338,6 +363,24 @@ export const buildPreview = (fileName: string, headers: string[], rows: string[]
         }
         seenCodes.add(articleCode);
 
+        /* BESCHREIBUNG DER PRODUKTKARTE.
+
+           Sie geht als REINER TEXT los, nicht als HTML: die Anzeige schickt
+           einen Wert ohne Auszeichnungen durch `markdownToHtml`, das die
+           Zeilenumbrüche der Datei zu <br> macht. Selbst gebautes HTML wäre
+           hier also nicht nur unnötig, es würde den Text auch am Sanitizer des
+           Servers vorbeiführen müssen.
+
+           Musste die Bezeichnung gekürzt werden, steht der VOLLE Name voran —
+           durch eine Leerzeile getrennt, damit beides lesbar bleibt und keines
+           der beiden verloren geht. */
+        const fileDescription = cell(row, 'description').trim();
+        if (fileDescription) withDescription += 1;
+        const description = [nameShortened ? fullName : '', fileDescription]
+            .filter(Boolean)
+            .join('\n\n')
+            .slice(0, DESCRIPTION_MAX_CHARS) || null;
+
         const image = toImageDataUrl(cell(row, 'image'));
         if (image.kind === 'ok') withImage += 1;
         else if (image.kind === 'notExported') imagesNotExported += 1;
@@ -349,7 +392,7 @@ export const buildPreview = (fileName: string, headers: string[], rows: string[]
             articleCode,
             generatedCode: generated,
             name,
-            description: nameShortened ? fullName : null,
+            description,
             nameShortened,
             salePrice: parsePrice(cell(row, 'salePrice')),
             purchasePrice: parsePrice(cell(row, 'purchasePrice')),
@@ -366,6 +409,7 @@ export const buildPreview = (fileName: string, headers: string[], rows: string[]
         totalRows: rows.length,
         droppedNoName,
         droppedDuplicate,
+        withDescription,
         withImage,
         imagesSkipped,
         imagesNotExported,

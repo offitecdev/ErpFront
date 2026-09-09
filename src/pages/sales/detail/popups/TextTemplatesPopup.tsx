@@ -34,14 +34,20 @@ type TextTemplatesPopupProps = {
     onMakeDefault: (template: TenderTextTemplateDto) => void;
     onDelete: (template: TenderTextTemplateDto) => void;
     onSave: () => void;
+    /* Nur gesetzt, wenn die Karte über einem Fenster mit Schleier aufgeht —
+       das Verkaufs-PDF des Auftrags ist ein PopupDialog (z 750). */
+    z?: number;
 };
 
 /**
  * Textbausteine — the intro-text templates of the PDF tab. Floats beside the
  * "Textbausteine" button of the intro block; the editor it fills stays visible.
  * List view: click a row to apply it, edit / default / delete on the right.
- * Form view: title + rich text, Back returns to the list. The panel owns the
- * data and the handlers; this is only the window.
+ * Form view: title + rich text, Back returns to the list. This is only the
+ * window — `hooks/useTenderTextTemplates` owns the data and the handlers, and
+ * fills it from BOTH callers: the quote's PDF tab and the order's Verkaufs-PDF
+ * (project module / order view), which passes `z` because it opens over a
+ * dialog with a scrim.
  */
 export const TextTemplatesPopup = ({
     open,
@@ -63,10 +69,12 @@ export const TextTemplatesPopup = ({
     onMakeDefault,
     onDelete,
     onSave,
+    z,
 }: TextTemplatesPopupProps) => (
     <TenderFloatCard
         open={open}
         onClose={onClose}
+        z={z}
         title={view === 'form'
             ? (editingTemplate ? editingTemplate.title : t('tenders.text_template_add'))
             : t('tenders.text_templates')}

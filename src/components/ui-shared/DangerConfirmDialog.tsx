@@ -86,12 +86,14 @@ export const DangerConfirmDialog = ({
         onConfirm(password);
     };
 
-    const fieldClass = 'h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#272f67] dark:border-white/20 dark:bg-white/5 dark:text-white dark:focus:border-white/60';
+    // Das Feld des Fensterbausatzes (styles/appleModal.css): weiss, Haarlinie,
+    // blauer Fokusring — dasselbe Feld wie in jedem anderen Fenster.
+    const fieldClass = 'ofi-cal-input w-full';
 
     return createPortal(
         <div className="fixed inset-0 flex items-center justify-center px-4 py-6" style={{ zIndex: 1200 }}>
             <div
-                className="absolute inset-0 bg-slate-950/35 dark:bg-black/60"
+                className="ofi-win-scrim absolute inset-0"
                 onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel(); }}
             />
             <section
@@ -107,10 +109,10 @@ export const DangerConfirmDialog = ({
             >
                 <header className="ofi-pop__rule flex items-start justify-between gap-3 border-b px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300">
+                        <span className="ofi-tp-iconbadge is-danger">
                             <AlertTriangle size={16} />
                         </span>
-                        <h3 className="text-[13.5px] font-bold text-slate-900 dark:text-white">{title}</h3>
+                        <h3 className="ofi-pop__title whitespace-normal">{title}</h3>
                     </div>
                     <button
                         type="button"
@@ -127,7 +129,7 @@ export const DangerConfirmDialog = ({
                     className="flex flex-col gap-3 px-5 py-4"
                     onSubmit={(event) => { event.preventDefault(); submit(); }}
                 >
-                    <div className="text-[12.5px] leading-relaxed text-slate-600 dark:text-white/70">{message}</div>
+                    <div className="ofi-pop__subtitle whitespace-normal leading-relaxed">{message}</div>
 
                     {confirmPhrase && (
                         <label className="flex flex-col gap-1.5">

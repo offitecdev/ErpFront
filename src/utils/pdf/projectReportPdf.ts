@@ -97,7 +97,7 @@ const reportNumber = (project: ProjectDto, report: any, kind: ReportKind, endDat
 const authorName = (project: ProjectDto, preparedBy?: string) => {
     if (preparedBy) return preparedBy;
     if (project.manager) return `${project.manager.firstName} ${project.manager.lastName}`.trim();
-    return 'Offitec ERP';
+    return 'Offitec Control Center';
 };
 
 const plannedMinutesFor = (reports: any[], appointments: any[]) => {

@@ -148,15 +148,19 @@ export const sameTimesForAll = (days: DaySpan[]): DaySpan[] => {
  * Rückfrage: einen Tag herausnehmen und nicht speichern heisst, es ist nie
  * passiert. Zwei Rückfragen für dieselbe Geste wären eine zu viel.
  */
-export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }: {
+export const DayPlanRows = ({ days, onChange, lockedIds = [], frozenIds = [], disabled = false }: {
     days: DaySpan[];
     onChange: (next: DaySpan[]) => void;
-    /** Tage, die nicht mehr gestrichen werden dürfen (abgeschlossene Arbeit). */
+    /** Tage, die nicht mehr gestrichen werden dürfen (ein Rapport hängt daran). */
     lockedIds?: string[];
+    /** Tage, deren Datum und Zeiten feststehen (abgeschlossen — Vorgabe Samet, 03.09.2026). */
+    frozenIds?: string[];
     disabled?: boolean;
 }) => {
     const multiDay = days.length > 1;
     const locked = new Set(lockedIds);
+    const frozen = new Set(frozenIds);
+    const isFrozen = (day: DaySpan) => frozen.has(day.appointmentId || '');
 
     return (
         <>
@@ -174,14 +178,14 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }
                         <input
                             type="date"
                             value={day.start.format('YYYY-MM-DD')}
-                            disabled={disabled}
+                            disabled={disabled || isFrozen(day)}
                             onChange={(event) => onChange(patchDay(days, index, { date: event.target.value }))}
                             className="ofi-cal-input"
                         />
                         <input
                             type="time"
                             value={day.start.format('HH:mm')}
-                            disabled={disabled}
+                            disabled={disabled || isFrozen(day)}
                             onChange={(event) => onChange(patchDay(days, index, { from: event.target.value }))}
                             className="ofi-cal-input"
                         />
@@ -190,7 +194,7 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }
                             <input
                                 type="time"
                                 value={day.end.format('HH:mm')}
-                                disabled={disabled}
+                                disabled={disabled || isFrozen(day)}
                                 onChange={(event) => onChange(patchDay(days, index, { to: event.target.value }))}
                                 className="ofi-cal-input"
                             />
@@ -222,8 +226,14 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], disabled = false }
                         <Plus size={13} />
                         {t('calendar.days.add')}
                     </button>
+                    {/* Abgeschlossene Tage behalten ihre Zeiten — «gleiche Zeiten»
+                        gilt nur für die offenen. */}
                     {multiDay && (
-                        <button type="button" onClick={() => onChange(sameTimesForAll(days))} className="ofi-cal-btn">
+                        <button
+                            type="button"
+                            onClick={() => onChange(sameTimesForAll(days).map((next, index) => (isFrozen(days[index]!) ? days[index]! : next)))}
+                            className="ofi-cal-btn"
+                        >
                             {t('calendar.days.sameTimes')}
                         </button>
                     )}

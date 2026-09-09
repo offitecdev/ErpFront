@@ -9,7 +9,7 @@ import { customerApi } from '../../../lib/api/customer';
 import type { CustomerOrderDto } from '../../../lib/api/customer';
 import { billingApi } from '../../../lib/api/billing';
 import type { InvoiceDto } from '../../../types/billing';
-import { ColResizeHandle, FILTER_INPUT_CLASS, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
+import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../../hooks/useColumnWidths';
 import {
     cumulativeStages,
@@ -392,6 +392,9 @@ export const CustomerOrdersTable = ({
                     {figures.stages.map((stage, index) => (
                         <span
                             key={index}
+                            // Freitext der Rate nur als Tooltip: die Zeile zeigt
+                            // Zahlen, der Satz dazu steht in Angebot und PDF.
+                            title={stage.label || undefined}
                             className={`inline-flex items-center gap-1 rounded-[2px] border px-2 py-1 font-mono text-[12px] tabular-nums ${
                                 statuses[index] === 'done'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300'
@@ -417,15 +420,13 @@ export const CustomerOrdersTable = ({
         <div className="flex w-full flex-col gap-3">
             {/* Obere Leiste — wie in den übrigen Listen: eine Suche über
                 Auftragsnummer, Projekt und Angebotsnummer. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="w-64">
-                    <SearchBox
-                        value={search}
-                        onChange={changeSearch}
-                        placeholder={i18nT('crm.orderNumber')}
-                    />
-                </div>
-            </div>
+            <FilterBar>
+                <SearchBox
+                    value={search}
+                    onChange={changeSearch}
+                    placeholder={i18nT('crm.orderNumber')}
+                />
+            </FilterBar>
 
             <SectionCard title={`${i18nT('crm.tab_orders')} (${sortedGroups.length})`}>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
