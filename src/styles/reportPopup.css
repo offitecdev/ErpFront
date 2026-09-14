@@ -1,0 +1,782 @@
+/* =========================================================
+   Rapport-Fenster des Projekts im Mac-Kleid (10.09.2026)
+
+   Vorgabe Samet: «projedeki saha raporu pop-up'larını da çok
+   daha temiz ve çok daha güzel bir Apple tasarım yapın» — die
+   Rapport-Fenster der Projektseite (ReportPopup: Termin-
+   Übersicht, Montage-Rapport-Editor, Abnahme-Rapport,
+   Unterschriften, Signaturpult) und die Fenster, die daraus
+   aufgehen (Zeitwahl, Artikelwahl, Checklisten, Protokoll).
+
+   Der Massstab ist derselbe wie für Angebot, Projektseite und
+   jedes Fenster seit dem 09.09.2026 (styles/appleModal.css):
+   ein NATIVES Mac-Fenster — weisse Fläche, Haarlinien, kleine
+   Schrift, 28px-Kontrollen mit Rahmen und 6px-Ecke, EIN
+   Systemblau, keine Pillen, keine Tönungen, keine Schatten
+   im Inhalt, Inter Variable.
+
+   Bis hierher trug der Inhalt das iOS-Kleid vom 02.09.2026
+   (index.css «RAPPORT-EDITOR IM iOS-KLEID»): grauer Grund,
+   weisse 12px-Gruppen, Versalien-Überschriften, 44px-Zeilen,
+   Pillen-Segmentwähler mit Schatten, Ring-Plus. Die Bauteile
+   und Klassen bleiben — dieses Blatt ändert nur das Kleid,
+   und nur IM Rapport-Fenster (`.ofi-rep-popup`). Der Montage-
+   Bildschirm des Technikers (/montage) behält das Fingermass.
+
+   Mechanik:
+   · Die `--ofi-ios-*`-Marken werden im Fenster auf die
+     Fenstertafel `--ofi-win-*` umgebogen; Dunkelmodus bleibt
+     damit ein Variablentausch.
+   · Die schwebende Karte IST die Portalwurzel (<section>
+     direkt unter <body>). `#root …`-Regeln aus index.css
+     greifen dort nicht, ihre Zwillinge `body > :not(#root) …`
+     schon — darum trägt jede Regel hier den Träger
+     `body > :not(#root).ofi-rep-popup` (1,1,1) und gewinnt
+     gegen den Zwilling (1,1,0) durch Gewicht UND Reihenfolge
+     (dieses Blatt lädt als Chunk NACH index.css/appleModal).
+   · Radien, die index.css mit `!important` setzt (Pillen,
+     999px, das Radienband), fallen in `@layer utilities` —
+     ein wichtiges Deklarat in einer Lage schlägt ein
+     wichtiges ohne Lage ([[radius-utilities-flattened]]).
+   · Die Fenster ÜBER dem Rapport (PopupDialog, `.ofi-tp-dialog`)
+     hängen in eigenen Portalen und werden über ihre eigenen
+     Klassen angesprochen.
+   ========================================================= */
+
+/* ── 1. Die Marken: das Fenster liest die Fenstertafel ────── */
+body > :not(#root).ofi-rep-popup,
+body > :not(#root).ofi-rep-popup :is(.ofi-fr-editor, .ofi-fr-stage) {
+    --ofi-ios-group: var(--ofi-win-surface);
+    --ofi-ios-card: var(--ofi-win-surface);
+    --ofi-ios-sep: var(--ofi-win-hairline);
+    --ofi-ios-label: var(--ofi-win-secondary);
+    --ofi-ios-field: var(--ofi-win-field);
+    --ofi-ios-line: var(--ofi-win-field-border);
+    --ofi-ios-radius: 8px;
+    --ofi-ios-row: 34px;
+}
+
+/* ── 2. Der Rumpf: weiss, Luft ringsum ────────────────────── */
+body > :not(#root).ofi-rep-popup > .ofi-float-card__body { background: var(--ofi-win-surface); }
+body > :not(#root).ofi-rep-popup .ofi-rep-view { padding: 16px 20px 20px; }
+body > :not(#root).ofi-rep-popup .ofi-fr-stage {
+    background: var(--ofi-win-surface);
+    padding: 14px 20px 20px;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-panel { gap: 16px; }
+/* Der Fuss trägt nur Zurück/Weiter — eine Haarlinie, keine Fläche. */
+body > :not(#root).ofi-rep-popup > .ofi-float-card__footer { padding: 10px 16px; }
+/* Die Knopfreihe im Kopf: ein Mass, ein Abstand. */
+body > :not(#root).ofi-rep-popup .ofi-float-card__actions { gap: 8px; }
+body > :not(#root).ofi-rep-popup .ofi-float-card__actions .gap-1\.5 { gap: 8px; }
+
+/* ── 3. Übersicht des Termins: Fakten links, Dokumente rechts ── */
+body > :not(#root).ofi-rep-popup .ofi-rep-overview {
+    gap: 18px 24px;
+    padding: 14px 20px 20px;
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-overview .ofi-tp-caption { padding: 0 0 7px; }
+body > :not(#root).ofi-rep-popup .ofi-rep-overview .flex.items-center.justify-between { padding-bottom: 7px; }
+body > :not(#root).ofi-rep-popup .ofi-rep-overview .flex.items-center.justify-between .ofi-tp-caption { padding-bottom: 0; }
+/* Die Fakten des Termins: eine Auskunftsliste im Kasten — Beschriftung
+   in ihrer festen Spalte, Wert daneben, Haarlinie zwischen den Zeilen. */
+body > :not(#root).ofi-rep-popup .ofi-rep-facts {
+    overflow: hidden;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-fact {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 10px;
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 13px;
+    line-height: 18px;
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-fact + .ofi-rep-fact { border-top: 1px solid var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-rep-fact__label { color: var(--ofi-win-secondary); }
+body > :not(#root).ofi-rep-popup .ofi-rep-fact__value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+
+/* Zustandsplakette (Termin abgeschlossen/offen): ein kleiner Rahmen mit
+   farbigem Punkt, keine getönte Pille. */
+body > :not(#root).ofi-rep-popup .ofi-tp-pill,
+.dark body > :not(#root).ofi-rep-popup .ofi-tp-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 5px;
+    background: var(--ofi-win-surface);
+    padding: 0 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-tp-pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--ofi-win-muted);
+}
+body > :not(#root).ofi-rep-popup .ofi-tp-pill.is-done::before { background: var(--ofi-win-success); }
+body > :not(#root).ofi-rep-popup .ofi-tp-pill.is-open::before { background: var(--ofi-win-warning); }
+body > :not(#root).ofi-rep-popup .ofi-tp-pill.is-danger::before { background: var(--ofi-win-danger); }
+
+/* Die Dokumentliste: Symbol im Rahmen, Name + Zustand, zwei 28px-Knöpfe. */
+body > :not(#root).ofi-rep-popup .ofi-rep-doclist {
+    border-color: var(--ofi-win-border);
+    border-radius: 8px;
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow {
+    grid-template-columns: 26px minmax(0, 1fr) 64px;
+    gap: 12px;
+    padding: 9px 12px;
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow + .ofi-rep-docrow { border-top-color: var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow.is-clickable:hover { background: var(--ofi-win-hover); }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow .ofi-tp-icon {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 6px;
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow__title { font-size: 13px; font-weight: 500; }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow__state { padding-top: 1px; font-size: 12px; }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow__state::before { background: var(--ofi-win-muted); }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow__state.is-open::before { background: var(--ofi-win-warning); }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow__state.is-done::before { background: var(--ofi-win-success); }
+body > :not(#root).ofi-rep-popup .ofi-rep-docrow__actions { gap: 6px; }
+body > :not(#root).ofi-rep-popup .ofi-rep-docbtn {
+    width: 28px;
+    height: 28px;
+    border-color: var(--ofi-win-field-border);
+    background: var(--ofi-win-field);
+    box-shadow: var(--ofi-win-btn-shadow);
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-docbtn:hover:not(:disabled) {
+    border-color: var(--ofi-win-field-border-hover);
+    background: var(--ofi-win-hover);
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-rep-docbtn:disabled { opacity: 0.35; }
+
+/* ── 4. Register des Editors: die Mac-Segmentleiste ───────────
+   Eine Schiene mit leiser Füllung, die Abschnitte so breit wie ihr
+   Wort, das gewählte liegt weiss mit einer 1px-Kante darauf — kein
+   gestreckter Fünferblock mit Pillenschatten mehr. */
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tabs {
+    display: inline-flex;
+    align-self: flex-start;
+    flex-wrap: nowrap;
+    gap: 2px;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-radius: 7px;
+    background: var(--ofi-win-fill);
+    padding: 2px;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tabs::-webkit-scrollbar { display: none; }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tab {
+    flex: 0 0 auto;
+    height: 24px;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-win-text);
+    box-shadow: none;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tab:hover { background: var(--ofi-win-hover); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tab.is-active,
+html.dark body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tab.is-active {
+    background: var(--ofi-win-surface);
+    font-weight: 500;
+    color: var(--ofi-win-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+html.dark body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-tab.is-active {
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+}
+
+/* ── 5. Gruppen: Überschrift in Satzschrift, Kasten mit Haarlinie ── */
+body > :not(#root).ofi-rep-popup .ofi-ios-group__title {
+    padding: 0 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-group__footer {
+    padding: 6px 2px 0;
+    font-size: 12px;
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-card {
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-card > * + *::before { left: 12px; background: var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-ios-row {
+    gap: 12px;
+    min-height: 34px;
+    padding: 5px 12px;
+    font-size: 13px;
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-row.is-field { padding: 7px 8px 7px 12px; }
+body > :not(#root).ofi-rep-popup .ofi-ios-row__value {
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-row__value.is-strong { font-weight: 500; color: var(--ofi-win-text); }
+body > :not(#root).ofi-rep-popup .ofi-ios-row__sub { font-size: 11.5px; color: var(--ofi-win-muted); }
+body > :not(#root).ofi-rep-popup .ofi-ios-num {
+    width: 18px;
+    padding-top: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-win-muted);
+}
+
+/* ── 6. Kontrollen: 28px, Rahmen, 6px-Ecke ─────────────────── */
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-time {
+    height: 28px;
+    min-height: 28px;
+    gap: 6px;
+    border-color: var(--ofi-win-field-border);
+    background: var(--ofi-win-field);
+    padding: 0 8px;
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-size: 12.5px;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-time:hover:not(:disabled) {
+    border-color: var(--ofi-win-field-border-hover);
+    background: var(--ofi-win-hover);
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-time__value { font-weight: 500; }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-time > svg { color: var(--ofi-win-secondary); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-time > svg.ofi-ios-time__caret { color: var(--ofi-win-muted); }
+
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-textarea {
+    min-height: 34px;
+    border-color: var(--ofi-win-field-border);
+    padding: 7px 10px;
+    font-size: 13px;
+    line-height: 1.45;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-textarea:hover:not(:disabled) { border-color: var(--ofi-win-field-border-hover); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-textarea:focus {
+    border-color: var(--ofi-win-accent);
+    box-shadow: 0 0 0 3px var(--ofi-win-focus);
+}
+/* Das Notizfeld IST seine Gruppe (`.ofi-ios-group.is-notes`): das Feld trägt
+   Kante und Fokusring selbst, der Kasten darum herum keine zweite. (Kein
+   `:has()` dafür — die Gruppe sagt es per Klasse, siehe Notiz «No broad
+   :has() in global CSS».) */
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-group.is-notes .ofi-ios-card {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-textarea.is-block {
+    min-height: 220px;
+    padding: 10px 12px;
+    line-height: 1.55;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-cellinput {
+    height: 28px;
+    border-color: var(--ofi-win-field-border);
+    padding: 0 8px;
+    font-size: 12.5px;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-cellinput:focus {
+    border-color: var(--ofi-win-accent);
+    box-shadow: 0 0 0 3px var(--ofi-win-focus);
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor td :is(input:not([type="checkbox"]):not([type="radio"])) {
+    height: 28px !important;
+    border-color: var(--ofi-win-field-border) !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    font-size: 12.5px;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor td :is(input:not([type="checkbox"]):not([type="radio"])):focus {
+    border-color: var(--ofi-win-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-win-focus) !important;
+}
+
+/* Hinzufügen-Zeile: ein kleines Plus im Rahmen, das Wort in Systemblau. */
+body > :not(#root).ofi-rep-popup .ofi-ios-add {
+    gap: 8px;
+    min-height: 32px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-win-accent);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-add:hover { background: var(--ofi-win-hover); }
+body > :not(#root).ofi-rep-popup .ofi-ios-add__ring {
+    width: 16px;
+    height: 16px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ofi-win-accent);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-add__ring > svg { width: 10px; height: 10px; }
+/* Löschen: ein stilles 24px-Quadrat, rot erst beim Zeigen. */
+body > :not(#root).ofi-rep-popup .ofi-ios-minus {
+    width: 24px;
+    height: 24px;
+    margin-top: 5px;
+    border-radius: 5px;
+    color: var(--ofi-win-muted);
+}
+body > :not(#root).ofi-rep-popup .ofi-ios-minus:hover:not(:disabled) {
+    background: var(--ofi-win-danger-soft);
+    color: var(--ofi-win-danger);
+}
+
+/* ── 7. Die Kostentabelle in der Gruppe ────────────────────── */
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-card table[data-inv-table] thead th {
+    height: 30px;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: var(--ofi-win-hairline);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-card table[data-inv-table] td {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    font-size: 13px;
+}
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-card table[data-inv-table] tbody tr:last-child td { border-bottom-color: var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-ios-card table[data-grid-lines] { --quote-grid-line: var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor table[data-inv-table] tbody tr:hover td { background: var(--ofi-win-hover); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-cell { min-height: 28px; line-height: 26px; }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-cell.is-muted { color: var(--ofi-win-secondary); }
+body > :not(#root).ofi-rep-popup .ofi-fr-editor .ofi-fr-cell.is-faint { color: var(--ofi-win-muted); }
+
+/* ── 8. Unterschriften: Kasten mit Haarlinie, Papier bleibt weiss ── */
+body > :not(#root).ofi-rep-popup .ofi-sign-grid { gap: 12px; }
+body > :not(#root).ofi-rep-popup .ofi-fr-signs { gap: 12px; }
+body > :not(#root).ofi-rep-popup .ofi-sign-card {
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+}
+body > :not(#root).ofi-rep-popup .ofi-sign-card__head { min-height: 32px; padding: 3px 4px 3px 12px; }
+body > :not(#root).ofi-rep-popup .ofi-sign-card__label,
+body > :not(#root).ofi-rep-popup .ofi-fr-signs .ofi-sign-card__label {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    color: var(--ofi-win-text);
+}
+/* Die Schreibfläche: das eine Papier des Fensters — 150px reichen der
+   Maus, und ein leeres Feld ist damit kein leerer Bildschirm mehr. */
+body > :not(#root).ofi-rep-popup .ofi-sign-card__pad {
+    height: 150px !important;
+    border-top: 1px solid var(--ofi-win-hairline);
+    border-bottom: 0;
+    background: #fff;
+}
+body > :not(#root).ofi-rep-popup .ofi-sign-card__hint { inset: auto 0 9px; font-size: 12px; color: #a1a1a6; }
+body > :not(#root).ofi-rep-popup .ofi-sign-card__caption {
+    border-top: 1px solid var(--ofi-win-hairline);
+    padding: 7px 12px 8px;
+    font-size: 12px;
+    color: var(--ofi-win-secondary);
+}
+
+/* ── 9. Abnahme-Rapport (Checklisten) ──────────────────────── */
+body > :not(#root).ofi-rep-popup .ofi-dlv { gap: 14px; }
+body > :not(#root).ofi-rep-popup .ofi-dlv-card {
+    border-color: var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+}
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__head {
+    gap: 8px;
+    min-height: 36px;
+    border-bottom-color: var(--ofi-win-hairline);
+    background: var(--ofi-win-surface);
+    padding: 4px 6px 4px 12px;
+}
+/* Kein getöntes Symbolplättchen vor dem Namen — der Name sagt es. */
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__icon { display: none; }
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__title { font-size: 12.5px; font-weight: 600; }
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__count,
+.dark body > :not(#root).ofi-rep-popup .ofi-dlv-card__count {
+    border-radius: 0;
+    background: transparent;
+    padding: 0 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__count.is-done,
+.dark body > :not(#root).ofi-rep-popup .ofi-dlv-card__count.is-done { background: transparent; color: var(--ofi-win-success); }
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__body { padding: 12px; }
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__body > .ofi-tp-note { margin-bottom: 0; }
+body > :not(#root).ofi-rep-popup .ofi-dlv-item {
+    gap: 12px;
+    min-height: 36px;
+    padding: 8px 12px;
+}
+body > :not(#root).ofi-rep-popup .ofi-dlv-item + .ofi-dlv-item { border-top-color: var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-dlv-item:hover { background: var(--ofi-win-hover); }
+body > :not(#root).ofi-rep-popup .ofi-dlv-item__label { font-size: 13px; }
+body > :not(#root).ofi-rep-popup .ofi-dlv-item__desc { font-size: 12px; color: var(--ofi-win-secondary); }
+/* Antwortplakette: Rahmen + Punkt, keine gefüllte Pille. */
+body > :not(#root).ofi-rep-popup .ofi-dlv-status,
+.dark body > :not(#root).ofi-rep-popup .ofi-dlv-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 5px;
+    background: var(--ofi-win-surface);
+    padding: 0 8px;
+    box-shadow: none;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1;
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-dlv-status::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--ofi-win-muted);
+}
+body > :not(#root).ofi-rep-popup .ofi-dlv-status.is-yes::before { background: var(--ofi-win-success); }
+body > :not(#root).ofi-rep-popup .ofi-dlv-status.is-no::before { background: var(--ofi-win-danger); }
+body > :not(#root).ofi-rep-popup .ofi-dlv-status.is-open,
+.dark body > :not(#root).ofi-rep-popup .ofi-dlv-status.is-open { color: var(--ofi-win-secondary); }
+body > :not(#root).ofi-rep-popup .ofi-dlv-blank {
+    border-color: var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+    padding: 22px 16px;
+    font-size: 12.5px;
+    color: var(--ofi-win-secondary);
+}
+/* Bild hinzufügen (Fotos): derselbe Druckknopf wie alle anderen. */
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__body button[class*="border-dashed"] {
+    width: auto;
+    height: 30px;
+    gap: 6px;
+    border: 1px solid var(--ofi-win-field-border);
+    background: var(--ofi-win-field);
+    padding: 0 12px;
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-win-text) !important;
+}
+body > :not(#root).ofi-rep-popup .ofi-dlv-card__body button[class*="border-dashed"]:hover {
+    border-color: var(--ofi-win-field-border-hover);
+    background: var(--ofi-win-hover);
+}
+
+/* Papierkörbe/Häkchen/Stifte in Rapport UND Checklisten-Fenstern: 28px-Quadrat. */
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-iconbtn {
+    width: 28px;
+    height: 28px;
+    color: var(--ofi-win-secondary);
+}
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-iconbtn:hover { background: var(--ofi-win-hover); color: var(--ofi-win-text); }
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-iconbtn.is-danger:hover,
+.dark :is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-iconbtn.is-danger:hover {
+    background: var(--ofi-win-danger-soft);
+    color: var(--ofi-win-danger);
+}
+/* Der Hinzufügen-Knopf (Checkliste, Kontrollpunkt): ein Druckknopf, nicht
+   die gestrichelte Bahn über die ganze Breite. */
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-add {
+    width: auto;
+    align-self: flex-start;
+    gap: 6px;
+    height: 30px;
+    border: 1px solid var(--ofi-win-field-border);
+    background: var(--ofi-win-field);
+    padding: 0 12px;
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-add > svg { width: 14px; height: 14px; color: var(--ofi-win-accent); }
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-add:hover {
+    border-color: var(--ofi-win-field-border-hover);
+    background: var(--ofi-win-hover);
+}
+:is(body > :not(#root).ofi-rep-popup, body > :not(#root) .ofi-tp-dialog) .ofi-dlv-add.is-inline { padding: 0 12px; font-size: 12.5px; }
+
+/* ── 10. Signaturpult (Termin und Projekt) ──────────────────── */
+body > :not(#root).ofi-rep-popup .ofi-section-card {
+    border-color: var(--ofi-win-border) !important;
+    border-radius: 8px;
+    background: var(--ofi-win-surface) !important;
+    box-shadow: none !important;
+}
+body > :not(#root).ofi-rep-popup .ofi-section-card__head {
+    min-height: 36px;
+    border-bottom-color: var(--ofi-win-hairline) !important;
+    background: var(--ofi-win-surface) !important;
+    padding: 6px 12px;
+}
+body > :not(#root).ofi-rep-popup .ofi-section-card__head span { font-size: 12.5px !important; font-weight: 600; color: var(--ofi-win-text) !important; }
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] thead th {
+    height: 30px;
+    padding: 0 12px;
+    border-bottom-color: var(--ofi-win-hairline);
+    background: transparent;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] td {
+    padding: 7px 12px;
+    font-size: 13px;
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] td :is(.text-slate-800, .text-slate-500, .text-slate-400) { color: var(--ofi-win-text) !important; }
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] td :is(.text-slate-500, .text-slate-400),
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] td.text-slate-500 { color: var(--ofi-win-secondary) !important; }
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-grid-lines] { --quote-grid-line: var(--ofi-win-hairline); }
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] tbody tr.bg-slate-50 td { background: var(--ofi-win-accent-tint); }
+/* Zustandsplakette (signiert / nicht signiert): Rahmen + Punkt. */
+body > :not(#root).ofi-rep-popup .ofi-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    border: 1px solid var(--ofi-win-border) !important;
+    background: var(--ofi-win-surface) !important;
+    padding: 0 8px !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    line-height: 1;
+    color: var(--ofi-win-text) !important;
+    -webkit-text-fill-color: var(--ofi-win-text) !important;
+}
+body > :not(#root).ofi-rep-popup .ofi-status-chip::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--chip-dot, var(--ofi-win-muted));
+}
+body > :not(#root).ofi-rep-popup .ofi-status-chip:is([data-variant="active"], [data-variant="order"]) { --chip-dot: var(--ofi-win-success); }
+body > :not(#root).ofi-rep-popup .ofi-status-chip:is([data-variant="approved"], [data-variant="info"]) { --chip-dot: var(--ofi-win-accent); }
+body > :not(#root).ofi-rep-popup .ofi-status-chip[data-variant="warning"] { --chip-dot: var(--ofi-win-warning); }
+body > :not(#root).ofi-rep-popup .ofi-status-chip[data-variant="danger"] { --chip-dot: var(--ofi-win-danger); }
+/* «Zur Signatur senden»: ein Druckknopf in der Zelle — die Knopfspalte ist
+   so breit, dass das Wort nie abgeschnitten wird. */
+body > :not(#root).ofi-rep-popup .ofi-section-card table[data-inv-table] th:last-child { width: 228px; min-width: 228px; }
+body > :not(#root).ofi-rep-popup .ofi-sigbtn__text { overflow: visible; }
+body > :not(#root).ofi-rep-popup .ofi-sigbtn {
+    height: 28px;
+    gap: 6px;
+    border-color: var(--ofi-win-field-border);
+    background: var(--ofi-win-field);
+    padding: 0 10px;
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+body > :not(#root).ofi-rep-popup .ofi-sigbtn > svg { color: var(--ofi-win-accent); }
+body > :not(#root).ofi-rep-popup .ofi-sigbtn:hover {
+    border-color: var(--ofi-win-field-border-hover);
+    background: var(--ofi-win-hover);
+}
+
+/* ── 11. Die Fenster ÜBER dem Rapport (PopupDialog) ─────────── */
+/* Zeitwahl: die Zahl ruhig statt riesig, zwei Rollen im Rahmen, 28px-Zeilen. */
+.ofi-tp-dialog .ofi-timepick__display {
+    padding: 0 0 12px;
+    font-size: 26px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+.ofi-tp-dialog .ofi-timepick__collabel {
+    padding: 0 2px 5px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+.ofi-tp-dialog .ofi-timepick__list {
+    max-height: 224px;
+    border-color: var(--ofi-win-border);
+    border-radius: 8px;
+    padding: 3px;
+}
+.ofi-tp-dialog .ofi-timepick__opt {
+    min-height: 28px;
+    border-radius: 5px;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 400;
+}
+/* Artikelwahl: Suchfeld 34px, Liste 8px, Zeilen 32px. */
+.ofi-tp-dialog .ofi-artpick__search {
+    height: 34px;
+    gap: 8px;
+    border-color: var(--ofi-win-field-border);
+    border-radius: 6px;
+    padding: 0 10px;
+    color: var(--ofi-win-secondary);
+}
+.ofi-tp-dialog .ofi-artpick__search:focus-within {
+    border-color: var(--ofi-win-accent);
+    box-shadow: 0 0 0 3px var(--ofi-win-focus);
+}
+.ofi-tp-dialog .ofi-artpick__search input { font-size: 13px; }
+.ofi-tp-dialog .ofi-artpick__list {
+    margin-top: 8px;
+    border-color: var(--ofi-win-border);
+    border-radius: 8px;
+    padding: 3px;
+}
+.ofi-tp-dialog .ofi-artpick__row {
+    gap: 12px;
+    min-height: 32px;
+    border-radius: 5px;
+    padding: 4px 10px;
+}
+.ofi-tp-dialog .ofi-artpick__name { font-size: 13px; font-weight: 400; }
+.ofi-tp-dialog .ofi-artpick__meta {
+    font-family: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-tp-dialog .ofi-artpick__empty { padding: 22px 16px; font-size: 12.5px; }
+.ofi-tp-dialog .ofi-artpick__free {
+    gap: 8px;
+    min-height: 32px;
+    margin-top: 8px;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12.5px;
+    color: var(--ofi-win-text);
+}
+.ofi-tp-dialog .ofi-artpick__free:hover { border-color: var(--ofi-win-field-border-hover); background: var(--ofi-win-hover); }
+.ofi-tp-dialog .ofi-artpick__freering {
+    width: 16px;
+    height: 16px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ofi-win-accent);
+}
+.ofi-tp-dialog .ofi-artpick__freering > svg { width: 10px; height: 10px; }
+.ofi-tp-dialog .ofi-artpick__count { font-size: 12px; color: var(--ofi-win-secondary); }
+/* Checklisten ausfüllen/bearbeiten: Zeilen im 8px-Rahmen, Ja/Nein/N/A
+   als Mac-Segmentleiste. */
+.ofi-tp-dialog :is(.ofi-dlv-fillrow, .ofi-dlv-editrow) {
+    border-color: var(--ofi-win-border);
+    border-radius: 8px;
+}
+.ofi-tp-dialog .ofi-dlv-fillrow { padding: 8px 10px 8px 12px; }
+.ofi-tp-dialog .ofi-dlv-fillrow__label { font-size: 13px; }
+.ofi-tp-dialog .ofi-dlv-seg {
+    border-radius: 7px;
+    background: var(--ofi-win-fill);
+    padding: 2px;
+}
+body > :not(#root) .ofi-tp-dialog .ofi-dlv-seg__btn {
+    min-width: 52px;
+    height: 24px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-win-text);
+}
+body > :not(#root) .ofi-tp-dialog .ofi-dlv-seg__btn:hover:not(.is-on) { background: var(--ofi-win-hover); }
+.ofi-tp-dialog .ofi-dlv-editrow__opt { font-size: 12px; color: var(--ofi-win-secondary); }
+
+/* ── 12. Radien mit `!important`-Gegnern: in der Lage, später, schwerer ── */
+@layer utilities {
+    body > :not(#root).ofi-rep-popup :is(.ofi-fr-tab, .ofi-tp-pill, .ofi-dlv-status, .ofi-status-chip, .ofi-ios-minus) { border-radius: 5px !important; }
+    body > :not(#root).ofi-rep-popup :is(
+        .ofi-ios-time,
+        .ofi-rep-docbtn,
+        .ofi-dlv-iconbtn,
+        .ofi-sigbtn,
+        .ofi-dlv-add,
+        .ofi-dlv-card__body button[class*="border-dashed"],
+        .ofi-rep-docrow .ofi-tp-icon
+    ) { border-radius: 6px !important; }
+    body > :not(#root).ofi-rep-popup :is(.ofi-ios-add__ring) { border-radius: 4px !important; }
+    body > :not(#root).ofi-rep-popup :is(
+        .ofi-section-card,
+        .ofi-ios-card,
+        .ofi-sign-card,
+        .ofi-dlv-card,
+        .ofi-dlv-blank,
+        .ofi-rep-doclist,
+        .ofi-rep-facts
+    ) { border-radius: 8px !important; }
+    body > :not(#root) .ofi-tp-dialog :is(.ofi-dlv-seg__btn, .ofi-timepick__opt, .ofi-artpick__row) { border-radius: 5px !important; }
+    body > :not(#root) .ofi-tp-dialog :is(.ofi-dlv-iconbtn, .ofi-dlv-add, .ofi-artpick__search, .ofi-artpick__free) { border-radius: 6px !important; }
+    body > :not(#root) .ofi-tp-dialog :is(.ofi-dlv-fillrow, .ofi-dlv-editrow, .ofi-timepick__list, .ofi-artpick__list) { border-radius: 8px !important; }
+    body > :not(#root) .ofi-tp-dialog :is(.ofi-artpick__freering) { border-radius: 4px !important; }
+}
+
+/* ── 13. Telefon: die Luft schrumpft, die Masse bleiben ─────── */
+@media (max-width: 640px) {
+    /* Vier Kopfknöpfe (Zusatzaufträge · Protokoll · PDF · Speichern) passen
+       auf 400px nicht in EINE Zeile — sie brechen um, statt rechts aus dem
+       Fenster zu laufen. */
+    body > :not(#root).ofi-rep-popup .ofi-float-card__actions,
+    body > :not(#root).ofi-rep-popup .ofi-float-card__actions > div,
+    body > :not(#root).ofi-rep-popup .ofi-float-card__actions > div > div {
+        flex-wrap: wrap;
+        justify-content: center;
+        row-gap: 6px;
+        /* index.css/appleModal geben dem Kind der Knopfreihe 36px FESTE Höhe —
+           eine umgebrochene zweite Zeile läge damit über den Registern. */
+        height: auto;
+    }
+    body > :not(#root).ofi-rep-popup .ofi-rep-view,
+    body > :not(#root).ofi-rep-popup .ofi-fr-stage,
+    body > :not(#root).ofi-rep-popup .ofi-rep-overview { padding: 12px 12px 16px; }
+    body > :not(#root).ofi-rep-popup .ofi-rep-fact { grid-template-columns: 76px minmax(0, 1fr); }
+}

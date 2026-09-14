@@ -200,7 +200,7 @@ export const QuickEntryForm = ({
                                         aria-checked={active}
                                         onClick={() => setChannel(option)}
                                         className={`flex h-10 items-center justify-center gap-1.5 rounded-lg border text-[12.5px] font-semibold transition-colors ${active
-                                            ? 'border-[#1f2654] bg-[#eef2fb] text-[#1f2654] dark:border-sky-400 dark:bg-sky-500/15 dark:text-sky-200'
+                                            ? 'border-[#0066e0] bg-[#eef2fb] text-[#0066e0] dark:border-sky-400 dark:bg-sky-500/15 dark:text-sky-200'
                                             : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:border-white/15 dark:text-white/60 dark:hover:text-white'}`}
                                     >
                                         <Icon size={13} />
@@ -288,7 +288,7 @@ export const QuickEntryForm = ({
                         type="button"
                         disabled={saving}
                         onClick={() => void save()}
-                        className="ofi-btn-brand inline-flex h-10 items-center gap-1.5 rounded-lg bg-[#272f67] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:opacity-60"
+                        className="ofi-btn-brand inline-flex h-10 items-center gap-1.5 rounded-lg bg-[#0a7aff] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:opacity-60"
                     >
                         <Save size={13} />
                         {saving ? t('common.loading') : t('common.save')}

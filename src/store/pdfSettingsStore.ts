@@ -176,14 +176,20 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
  *
  * Die Absenderzeile lautet immer
  *
- *     <Mandant>, Ceres Tower - Hohenrainstrasse 24, 4133 Pratteln
+ *     <Mandant>, <Adresse>
  *
- * Adresse, IBAN und Bank stehen weiterhin in den PDF-Einstellungen (ein Haus,
- * ein Konto), aber der NAME kommt aus der Firmenauswahl oben rechts: wer den
- * Mandanten wechselt, druckt ab dem nächsten Dokument den Namen dieses
- * Mandanten — auf Angebot, Auftrag, Rapport und als Gläubiger ("Zahlbar an")
- * der QR-Rechnung. Nur so trägt jede Gesellschaft der Firmengruppe ihren
- * eigenen Namen auf ihren eigenen Belegen.
+ * Der NAME kommt aus der Firmenauswahl oben rechts: wer den Mandanten
+ * wechselt, druckt ab dem nächsten Dokument den Namen dieses Mandanten — auf
+ * Angebot, Auftrag, Rapport und als Gläubiger ("Zahlbar an") der
+ * QR-Rechnung. Nur so trägt jede Gesellschaft der Firmengruppe ihren eigenen
+ * Namen auf ihren eigenen Belegen.
+ *
+ * Die ADRESSE ist die gemeinsame aus den PDF-Einstellungen (Ceres Tower -
+ * Hohenrainstrasse 24, 4133 Pratteln), AUSSER der Mandant hat eine eigene
+ * (`TenantOption.companyAddress`, Spalten auf `Tenant` seit 11.09.2026): dann
+ * tragen Absenderzeile und QR-Gläubiger seine Adresse, z. B. "Offitec Isıtma
+ * ve Soğutma A.Ş., Maltepe Serbest Bölgesi, Sarmaşık Sok. No:2 A, 35674
+ * Menemen/İzmir". IBAN, Bank und Briefkopf bleiben gemeinsam.
  *
  * `settings.companyName` bleibt der Rückfall: solange das Profil noch nicht
  * geladen ist (Mandantenliste leer) oder kein Mandant gewählt wurde, wird der
@@ -194,39 +200,58 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
  * Ausnahme ist die Einstellungsseite selbst, die die gespeicherte Fassung
  * bearbeitet.
  */
-const tenantNameOf = (tenants: TenantOption[], tenantId: string | null | undefined): string => {
-    if (!tenantId) return '';
-    return String(tenants.find((tenant) => tenant.id === tenantId)?.tenantName || '').trim();
-};
+const tenantById = (tenants: TenantOption[], tenantId: string | null | undefined): TenantOption | undefined =>
+    tenantId ? tenants.find((tenant) => tenant.id === tenantId) : undefined;
 
-const applyTenantCompanyName = (
+const applyActiveTenant = (
     settings: PdfCompanySettings,
-    tenantName: string,
-): PdfCompanySettings =>
-    tenantName && tenantName !== settings.companyName
-        ? { ...settings, companyName: tenantName }
-        : settings;
-
-/** Name des aktiven Mandanten; leer, wenn (noch) keiner bekannt ist. */
-export const activeTenantCompanyName = (): string => {
-    const { tenants, selectedTenantId, user } = useAuthStore.getState();
-    return tenantNameOf(tenants, selectedTenantId || user?.tenantId);
+    tenant: TenantOption | undefined,
+): PdfCompanySettings => {
+    const tenantName = String(tenant?.tenantName || '').trim();
+    const address = tenant?.companyAddress;
+    if (!address && (!tenantName || tenantName === settings.companyName)) return settings;
+    return {
+        ...settings,
+        ...(tenantName ? { companyName: tenantName } : {}),
+        ...(address ? {
+            addressLine1: address.addressLine1,
+            addressLine2: address.addressLine2,
+            postalCode: address.postalCode,
+            city: address.city,
+            // Ohne eigenes Land gilt das der Einstellungen — der QR-Gläubiger braucht eines.
+            country: address.country || settings.country,
+        } : {}),
+    };
 };
 
-/**
- * PDF-Einstellungen für React-Komponenten — identisch zum Speicher, nur mit dem
- * Mandantennamen als Firmenname. Das Ergebnis ist memoisiert, damit es als
- * Abhängigkeit (z. B. in `useMemo`/`useCallback`) stabil bleibt.
- */
-export function usePdfSettings(): PdfCompanySettings {
-    const settings = usePdfSettingsStore((state) => state.settings);
+/** Aktiver Mandant: die Firmenauswahl, sonst der eigene; undefined, solange das Profil fehlt. */
+const activeTenant = (): TenantOption | undefined => {
+    const { tenants, selectedTenantId, user } = useAuthStore.getState();
+    return tenantById(tenants, selectedTenantId || user?.tenantId);
+};
+
+const useActiveTenant = (): TenantOption | undefined => {
     const tenants = useAuthStore((state) => state.tenants);
     const selectedTenantId = useAuthStore((state) => state.selectedTenantId);
     const homeTenantId = useAuthStore((state) => state.user?.tenantId);
-    const tenantName = tenantNameOf(tenants, selectedTenantId || homeTenantId);
-    return useMemo(() => applyTenantCompanyName(settings, tenantName), [settings, tenantName]);
+    return tenantById(tenants, selectedTenantId || homeTenantId);
+};
+
+/**
+ * PDF-Einstellungen für React-Komponenten — identisch zum Speicher, nur mit
+ * Name und (falls vorhanden) Adresse des aktiven Mandanten. Das Ergebnis ist
+ * memoisiert, damit es als Abhängigkeit (z. B. in `useMemo`/`useCallback`)
+ * stabil bleibt; die Mandantenliste wird nur beim Laden des Profils ersetzt.
+ */
+export function usePdfSettings(): PdfCompanySettings {
+    const settings = usePdfSettingsStore((state) => state.settings);
+    const tenant = useActiveTenant();
+    return useMemo(() => applyActiveTenant(settings, tenant), [settings, tenant]);
 }
+
+/** Ob der aktive Mandant eine eigene Adresse druckt — die Einstellungsseite sperrt dann ihre Adressfelder. */
+export const useActiveTenantHasOwnAddress = (): boolean => Boolean(useActiveTenant()?.companyAddress);
 
 /** Dasselbe ausserhalb von React (PDF-Erzeuger, Ereignishandler). */
 export const getPdfSettings = (): PdfCompanySettings =>
-    applyTenantCompanyName(usePdfSettingsStore.getState().settings, activeTenantCompanyName());
+    applyActiveTenant(usePdfSettingsStore.getState().settings, activeTenant());

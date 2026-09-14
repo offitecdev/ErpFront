@@ -23,3 +23,8 @@ release
 *.njsproj
 *.sln
 *.sw?
+
+# Chrome test profiles (cookies / sessions) - never commit
+.chrome-profile/
+.chrome-profile2/
+.chrome-live-probe/

@@ -34,14 +34,32 @@
 
 const ANY = 'table:not([role="grid"])';
 
+/* What each attribute carried after the previous sweep. Remembering it is what
+   lets `reconcile` below skip `document.querySelectorAll('[attr]')`: during the
+   boot mount the sweep runs on almost every animation frame, and seven
+   document-wide attribute lookups per frame were the bulk of its cost. */
+const applied = new Map<string, Set<Element>>();
+
 /** Set/remove `attr` so that exactly `keep` carries it. Writes only deltas. */
 const reconcile = (attr: string, keep: Set<Element>) => {
-    document.querySelectorAll(`[${attr}]`).forEach((el) => {
-        if (!keep.has(el)) el.removeAttribute(attr);
-    });
+    const previous = applied.get(attr);
+    if (previous) {
+        // Elements that have since left the document are dropped from the set
+        // the same way; removing an attribute from a detached node is a no-op.
+        previous.forEach((el) => {
+            if (!keep.has(el)) el.removeAttribute(attr);
+        });
+    } else {
+        // First sweep of the page (or after a hot reload): the document may
+        // already carry the attribute from a previous module instance.
+        document.querySelectorAll(`[${attr}]`).forEach((el) => {
+            if (!keep.has(el)) el.removeAttribute(attr);
+        });
+    }
     keep.forEach((el) => {
         if (!el.hasAttribute(attr)) el.setAttribute(attr, '');
     });
+    applied.set(attr, keep);
 };
 
 const sweep = () => {

@@ -1,0 +1,904 @@
+/* projectDetail — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ═══════════════ PROJECT DETAIL — Kopf + Übersicht (Google-clean, 19.08.2026)
+   Benutzerwunsch: "die Übersicht sauberer, im Google-Stil, sehr modern und
+   klar — und der Kopfbereich mit den Navigationspfeilen und dem Projektnamen
+   mit ruhigeren Rändern und Farben".
+
+   Wie der Rapport-Hub und der Kalender malt dieser Block AUSSCHLIESSLICH aus
+   den `--ofi-cal-*`-Tokens: weisse Fläche, eine graue Haarlinie, ruhiges Grau
+   für Text, das Markenblau (im Dunkeln Weizen) als EINZIGER Akzent. Dunkelmodus
+   ist damit derselbe Variablentausch und keine zweite Kopie der Regeln.
+
+   Die Selektoren tragen `#root`, weil die app-weiten Knopf- und Radius-Regeln
+   das auch tun — eine nackte Klasse verlöre gegen sie.
+
+   RADIEN (Benutzerwunsch 19.08.2026: "kleiner, wie in der Liste"): Karten und
+   Flächen 8px = `--bs-border-radius-lg`, das die app-weite Regel jedem
+   `rounded-xl` der Listen aufzwingt; Knöpfe erben die 10px von
+   `--ofi-button-radius` und setzen darum GAR KEINEN eigenen Radius; Zeilen in
+   einer Liste 6px. Nur Punkte, Farbtupfer und die Zustands-Pillen bleiben rund. */
+
+/* ── Kopfzeile ──────────────────────────────────────────────────────────── */
+.ofi-prj-head {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 12px;
+}
+
+.ofi-prj-head__id {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 2px;
+}
+.ofi-prj-head__num {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 4px;
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-head__sub {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    padding-top: 3px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-head__cust {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+}
+.ofi-prj-head__cust > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-prj-head__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Runder Symbolknopf — Info und Zahnrad neben dem Namen. Dieselbe Sprache wie
+   der Kalender: kein Rand im Ruhezustand, ein grauer Kreis beim Zeigen. */
+#root .ofi-prj-glyph {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-prj-glyph:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-prj-glyph.is-active { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+#root .ofi-prj-glyph:disabled { background: transparent; color: var(--ofi-cal-faint); cursor: default; }
+
+/* Der Abschluss-Zustand als ruhige Zeile statt als bunter Block. */
+.ofi-prj-head__state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ofi-prj-head__state.is-done { color: #137333; }
+.ofi-prj-head__state.is-closed { color: var(--ofi-cal-danger); }
+.dark .ofi-prj-head__state.is-done { color: #6ee7b7; }
+
+/* ── Auftragswähler ─────────────────────────────────────────────────────── */
+.ofi-prj-picker { position: relative; width: 100%; max-width: 27rem; }
+
+#root .ofi-prj-order {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px !important;
+    background: var(--ofi-cal-surface);
+    padding: 5px 8px 5px 6px;
+    text-align: left;
+    transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-prj-order:hover { background: var(--ofi-cal-hover); }
+#root .ofi-prj-order.is-open {
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow-soft);
+}
+.ofi-prj-order__mark {
+    display: flex;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+.ofi-prj-order__mark.is-addon { background: #fef7e0; color: #b06000; }
+.dark .ofi-prj-order__mark.is-addon { background: rgba(251, 188, 4, 0.18); color: #fdd663; }
+.ofi-prj-order__main { min-width: 0; flex: 1; }
+.ofi-prj-order__num {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-order__num > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-prj-order__meta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 1px;
+    font-size: 11px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-order__sum {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    border-left: 1px solid var(--ofi-cal-border-soft);
+    padding: 1px 6px 1px 12px;
+}
+.ofi-prj-order__amount {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-order__label {
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-order__chev { flex: none; color: var(--ofi-cal-muted); transition: transform 140ms ease; }
+#root .ofi-prj-order.is-open .ofi-prj-order__chev { transform: rotate(180deg); }
+
+/* Aufklappliste — die Karte des Kalenders: weiche Ecken, Haarlinie, Schatten. */
+.ofi-prj-menu {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow);
+}
+.ofi-prj-menu__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 14px 7px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-prj-menu__link {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-cal-accent);
+}
+#root .ofi-prj-menu__link:hover { text-decoration: underline; }
+.ofi-prj-menu__list {
+    max-height: 360px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 2px 6px 6px;
+}
+.ofi-prj-menu__item { display: flex; align-items: center; gap: 2px; }
+#root .ofi-prj-menu__row {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 7px 8px;
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+#root .ofi-prj-menu__row:hover { background: var(--ofi-cal-hover); }
+#root .ofi-prj-menu__row.is-selected { background: var(--ofi-cal-accent-soft); }
+#root .ofi-prj-menu__row.is-addon { padding-left: 26px; }
+.ofi-prj-menu__amount {
+    flex: none;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-prj-menu__foot {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 11px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-accent);
+    transition: background-color 120ms ease;
+}
+#root .ofi-prj-menu__foot:hover:not(:disabled) { background: var(--ofi-cal-accent-tint); }
+#root .ofi-prj-menu__foot:disabled { color: var(--ofi-cal-faint); cursor: not-allowed; }
+
+/* Knöpfe der Kopfzeile — bewusst NICHT die runde Kalender-Pille: sie tragen
+   den Radius, den jeder Knopf der Anwendung trägt (`--ofi-button-radius`), und
+   setzen darum gar keinen eigenen. */
+#root .ofi-prj-btn {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-prj-btn:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+#root .ofi-prj-btn.is-primary {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+#root .ofi-prj-btn.is-primary:hover:not(:disabled) {
+    border-color: var(--ofi-cal-accent-hover);
+    background: var(--ofi-cal-accent-hover);
+}
+#root .ofi-prj-btn:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* ── Etiketten: weiche Google-Pillen statt voller Farbflächen ───────────── */
+.ofi-prj-tag {
+    display: inline-flex;
+    max-width: 100%;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.7;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-tag.is-main { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+.ofi-prj-tag.is-addon { background: #fef7e0; color: #b06000; }
+.ofi-prj-tag.is-alert { background: #fce8e6; color: #c5221f; }
+.dark .ofi-prj-tag.is-addon { background: rgba(251, 188, 4, 0.18); color: #fdd663; }
+.dark .ofi-prj-tag.is-alert { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+.ofi-prj-dot { width: 6px; height: 6px; flex: none; border-radius: 999px; background: #d93025; }
+
+/* Zustands-Pille in Tabellen und Kopfzeile. */
+.ofi-prj-state {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+.ofi-prj-state::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 999px;
+    background: currentcolor;
+}
+.ofi-prj-state.is-green { background: #e6f4ea; color: #137333; }
+.ofi-prj-state.is-blue { background: #e8f0fe; color: #1967d2; }
+.ofi-prj-state.is-amber { background: #fef7e0; color: #b06000; }
+.ofi-prj-state.is-red { background: #fce8e6; color: #c5221f; }
+.ofi-prj-state.is-grey { background: var(--ofi-cal-hover); color: var(--ofi-cal-muted); }
+.dark .ofi-prj-state.is-green { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+.dark .ofi-prj-state.is-blue { background: rgba(138, 180, 248, 0.18); color: #8ab4f8; }
+.dark .ofi-prj-state.is-amber { background: rgba(251, 188, 4, 0.18); color: #fdd663; }
+.dark .ofi-prj-state.is-red { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+
+/* ── Übersicht: die Karte ───────────────────────────────────────────────── */
+.ofi-prj-overview { display: flex; flex-direction: column; gap: 16px; }
+.ofi-prj-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: minmax(0, 1fr);
+}
+.ofi-prj-col { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+/* Masaüstü: Kopf = drei Spalten (Name | Auftragswähler | Aktionen), Übersicht
+ = zwei Spalten. Stand bis 12.09.2026 in index.css — dort lud es VOR dieser
+ Datei, und die einspaltigen Grundregeln oben überschrieben es. Muss darum
+ HINTER den Grundregeln stehen. */
+@media (min-width: 1024px) {
+    .ofi-prj-head {
+        display: grid;
+        align-items: center;
+        gap: 16px;
+        /* Die Seitenspalten sind gleich breit — der Auftragswähler steht damit
+           exakt in der Bildmitte (Vorgabe: nicht mehr verschieben). */
+        grid-template-columns: minmax(0, 1fr) minmax(auto, 27rem) minmax(0, 1fr);
+    }
+}
+@media (min-width: 1024px) { .ofi-prj-head__actions { justify-content: flex-end; } }
+@media (min-width: 1024px) { .ofi-prj-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Eine Stufe leiser als die Arbeitsfläche, in der sie stecken — sonst stehen
+   drei gleich starke Linien ineinander und die Schachtelung verschwindet. */
+.ofi-prj-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+}
+/* Die Kopfzeile trennt den Titel vom Inhalt mit einer Haarlinie — nicht mit
+   einer grauen Fläche. */
+.ofi-prj-card__head {
+    display: flex;
+    min-height: 46px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    padding: 10px 16px;
+}
+.ofi-prj-card__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-card__body { min-width: 0; flex: 1; }
+
+/* „Öffnen ›" im Kartenkopf: der Weg von der Zusammenfassung in den Bereich,
+   den sie zusammenfasst. Der Pfeil rückt beim Überfahren ein Stück mit — das
+   ist die ganze Bewegung, und sie sagt genau das Richtige. */
+#root .ofi-prj-card__link,
+body > :not(#root) .ofi-prj-card__link {
+    display: inline-flex;
+    height: 26px;
+    flex: none;
+    align-items: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 0 7px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-accent);
+    transition: background-color 120ms ease;
+}
+#root .ofi-prj-card__link:hover,
+body > :not(#root) .ofi-prj-card__link:hover { background: var(--ofi-cal-accent-tint); }
+/* Der Pfeil rutschte beim Überfahren zwei Pixel nach rechts. Weg damit:
+   Vorgabe 01.09.2026 — beim Überfahren ändert sich NUR die Farbe, und die
+   Zeile darunter tut das mit ihrem Grund bereits. */
+.ofi-prj-card__scroll { min-width: 0; overflow-x: auto; }
+
+/* Tabellen IN einer Übersichtskarte: keine senkrechten Gitterlinien, KEIN
+   getönter Kopfstreifen und KEINE Zebrastreifen (Benutzerwunsch 19.08.2026:
+   das Grau wieder weg). Die Ordnung tragen Haarlinie, Abstand und Gewicht —
+   graue Flächen sind hier nur Unruhe, und ein Zeigeton wäre eine Antwort auf
+   ein Klicken, das es auf einer Übersicht gar nicht gibt. Die Basisregeln
+   (`:where(table[data-inv-table])`) haben Spezifität 0, eine Klasse genügt
+   darum zum Übermalen. */
+.ofi-prj-card table[data-inv-table] { font-size: 13px; }
+.ofi-prj-card table[data-inv-table] th {
+    height: 36px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: transparent;
+    padding: 0 16px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-card table[data-inv-table] td {
+    height: 42px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    padding: 0 16px;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-card table[data-inv-table] tbody tr:last-child td { border-bottom-color: transparent; }
+
+/* EINE ZEILE, DIE IRGENDWOHIN FÜHRT, sagt es beim Überfahren — und nur die.
+   Auf dieser Übersicht führt jede Zeile irgendwohin (der Lieferschein zum
+   Rapport, der Betrag zu den Positionen, das Verrechnete zur Rechnung, ein
+   Zusatzauftrag zu sich selbst), darum antwortet die ganze Tabelle. Der Ton
+   ist der leiseste, den die Karte hat, die Beschriftung links wird dabei so
+   dunkel wie ihr Wert: die Zeile rückt als GANZES nach vorn, statt dass ein
+   Farbfleck aufblitzt. Ein Zeigeton auf einer Zeile, die nichts tut, wäre die
+   Antwort auf ein Klicken, das es nicht gibt — die gibt es hier nicht. */
+.ofi-prj-card table[data-inv-table] tbody tr.is-link { cursor: pointer; }
+.ofi-prj-card table[data-inv-table] tbody tr.is-link td {
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.ofi-prj-card table[data-inv-table] tbody tr.is-link:hover td { background: var(--ofi-cal-hover); }
+.ofi-prj-card table[data-inv-table] tbody tr.is-link:hover td.ofi-prj-key { color: var(--ofi-cal-text); }
+/* Mit der Tastatur ist dieselbe Zeile erreichbar — der Ring liegt INNEN, sonst
+   schneidet ihn die Karte mit ihrem `overflow: hidden` ab. */
+.ofi-prj-card table[data-inv-table] tbody tr.is-link:focus-visible {
+    outline: 2px solid var(--ofi-cal-accent);
+    outline-offset: -2px;
+}
+.ofi-prj-card table[data-inv-table] tbody tr.is-link:focus-visible td { background: var(--ofi-cal-accent-tint); }
+
+/* Beschriftung → Wert, die Zeilenform der beiden schmalen Tabellen. */
+.ofi-prj-card table[data-inv-table] td.ofi-prj-key { color: var(--ofi-cal-muted); }
+.ofi-prj-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-num.is-billed { color: #137333; }
+.dark .ofi-prj-num.is-billed { color: #6ee7b7; }
+.ofi-prj-strong { font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-prj-muted { color: var(--ofi-cal-muted); }
+.ofi-prj-mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-weight: 600; }
+.ofi-prj-cut { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-prj-empty { padding: 26px 16px; text-align: center; font-size: 12.5px; color: var(--ofi-cal-muted); }
+.ofi-prj-sub { display: block; padding-top: 1px; font-size: 11px; color: var(--ofi-cal-muted); }
+
+/* ── Kontaktzeile ganz oben ───────────────────────────────────────────────
+   Adresse · Telefon · E-Mail stehen OHNE eigenen Rahmen direkt auf der weissen
+   Fläche (19.08.2026): drei Angaben, die zusammengehören, brauchen keinen
+   Kasten, und ein dritter Rahmen über den Karten war genau das, was die Seite
+   voll aussehen liess. Sie FLIESSEN — reicht die Breite nicht, rückt die
+   nächste Angabe eine Zeile tiefer, statt dass die Zeile seitwärts rollt. */
+.ofi-prj-contact {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px 24px;
+    padding: 0 2px;
+}
+.ofi-prj-contact__cell {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+}
+.ofi-prj-contact__icon,
+.ofi-prj-arrow { flex: none; color: var(--ofi-cal-faint); }
+.ofi-prj-contact__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+a.ofi-prj-contact__text { text-decoration: none; }
+a.ofi-prj-contact__text:hover { color: var(--ofi-cal-accent); text-decoration: underline; }
+
+/* ── Kunde · Auftrag: das Tatsachenraster ──────────────────────────────────
+   KEINE Tabelle mehr (Benutzerwunsch 19.08.2026: "unter der Kundenzeile soll
+   nichts seitwärts rollen — es ist doch alles zu sehen"). Sieben Angaben zu
+   EINER Sache sind eine Beschriftung-über-Wert-Liste und keine Tabelle mit
+   einer einzigen Zeile: sieben feste Spalten müssen irgendwann rollen, dieses
+   Raster bricht stattdessen um und passt auf jede Breite. Ganz nebenbei fällt
+   damit auch der automatische Spaltenzieher weg, der den Rollbalken überhaupt
+   erst gesetzt hat. */
+.ofi-prj-facts {
+    display: grid;
+    gap: 14px 24px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin: 0;
+    padding: 15px 16px 17px;
+}
+.ofi-prj-facts__cell { min-width: 0; }
+.ofi-prj-facts__label {
+    display: block;
+    margin: 0;
+    padding-bottom: 3px;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-facts__value {
+    display: block;
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-facts__value.is-strong { font-weight: 600; }
+.ofi-prj-facts__value.is-empty { color: var(--ofi-cal-faint); }
+
+/* ── Glocke der Kopfkarte ───────────────────────────────────────────────── */
+#root .ofi-prj-bell {
+    display: inline-flex;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-prj-bell:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+#root .ofi-prj-bell:disabled { color: var(--ofi-cal-faint); cursor: default; }
+.ofi-prj-bell__count {
+    display: inline-flex;
+    height: 17px;
+    min-width: 17px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 0 5px;
+    font-size: 10.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-muted);
+}
+.ofi-prj-bell__count.is-hot { color: var(--ofi-cal-text); }
+
+/* Die Kopfzeile der Auftragskarte: der Beleg und die Glocke nebeneinander. */
+.ofi-prj-card__actions { display: inline-flex; flex: none; align-items: center; gap: 8px; }
+
+/* ── Auftragsbestätigung ───────────────────────────────────────────────────
+   Der Beleg, der an den KUNDEN geht — also trägt der Knopf die Marken­farbe
+   des Kundendokuments (Marineblau), so wie der Verkaufs-Knopf daneben das Rot
+   seines Ausdrucks trägt. Gleiche Form wie jener (30 px, 6 px Radius, eine
+   Haarlinie), gleiche Bewegung beim Überfahren: nur die Farbe unterscheidet
+   die beiden, und genau daran erkennt man vor dem Klick, was herauskommt.
+
+   Er steht auf ZWEI Flächen — auf der Projektübersicht in `.ofi-prj-card__actions`
+   und in der Auftragsansicht im Kopf einer weissen `Card` — darum hängt er an
+   keiner der beiden Klassen. */
+#root .ofi-ordconf-btn {
+    display: inline-flex;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #c9d0ea;
+    border-radius: 6px !important;
+    background: linear-gradient(135deg, #fbfcff, #eaeefb);
+    padding: 0 11px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #0a7aff;
+    /* DIESE 140ms sind das Vorbild der ganzen Anwendung. Vorgabe Samet
+       01.09.2026: «die Bewegung der Knöpfe soll sein wie beim Verkaufs-PDF im
+       Projekt» — gemeint ist dieser Knopf. `styles/buttons.css` trägt seither
+       dieselbe Zeit und dieselbe Kurve als `--ofi-btn-tint-in/-out/-ease` auf
+       JEDEN Knopf. Wer hier dreht, dreht dort mit; der Hinweis steht auf
+       beiden Seiten. */
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
+                box-shadow 140ms ease;
+}
+#root .ofi-ordconf-btn:hover:not(:disabled) {
+    border-color: #0a7aff;
+    background: linear-gradient(135deg, #0066e0, #3f4a92);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(10, 122, 255, 0.32);
+}
+/* Das Zurücksetzen des Hebens beim Klick braucht es nicht mehr, seit beim
+   Überfahren nichts mehr angehoben wird; das Schrumpfen liefert
+   `styles/buttons.css` für jeden Knopf der Anwendung. */
+#root .ofi-ordconf-btn:active:not(:disabled) { box-shadow: none; }
+#root .ofi-ordconf-btn:disabled {
+    border-color: var(--ofi-cal-border);
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    cursor: default;
+}
+.dark #root .ofi-ordconf-btn {
+    border-color: rgba(160, 175, 235, 0.42);
+    background: rgba(70, 85, 170, 0.18);
+    color: #b9c4ef;
+}
+.dark #root .ofi-ordconf-btn:hover:not(:disabled) {
+    border-color: #8b9ae0;
+    background: linear-gradient(135deg, #2a3269, #4a58a8);
+    color: #fff;
+}
+
+/* Auf der Auftragskarte ist das Verkaufs-PDF das Hauptdokument — dort trägt
+   der Knopf ein grösseres Mass (Benutzerwunsch, 29.08.2026). Farbe, Rahmen und
+   Verlauf bleiben die des Basisknopfs, damit es überall derselbe Beleg ist. */
+#root .ofi-ordconf-btn--lg {
+    height: 38px;
+    gap: 9px;
+    padding: 0 16px;
+    font-size: 13.5px;
+}
+#root .ofi-ordconf-btn--lg svg { width: 17px; height: 17px; }
+
+/* ── Nachtrag-PDF (Zusatzauftrag) ──────────────────────────────────────────
+   Der Beleg des ZUSATZAUFTRAGS (NT-…). Dieselbe Form wie der Knopf der
+   Auftragsbestätigung darüber — 30 px, 6 px Radius, eine Haarlinie, dieselben
+   140 ms —, nur in der Farbe, die die Anwendung dem Nachtrag überall gibt:
+   dem Bernstein der NT-Marken (Liste, Reiter, Zeilen). So sagt schon die
+   Farbe, welcher Beleg herauskommt: Marineblau = Auftrag, Bernstein =
+   Nachtrag. `.is-icon` ist die quadratische Fassung für Tabellenzeilen. */
+#root .ofi-addon-pdf-btn,
+body > :not(#root) .ofi-addon-pdf-btn {
+    display: inline-flex;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid #f1d7a3;
+    border-radius: 6px !important;
+    background: linear-gradient(135deg, #fffbf2, #fdf0d5);
+    padding: 0 11px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #9a5b00;
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease,
+                box-shadow 140ms ease;
+}
+#root .ofi-addon-pdf-btn.is-icon,
+body > :not(#root) .ofi-addon-pdf-btn.is-icon { width: 30px; padding: 0; gap: 0; }
+#root .ofi-addon-pdf-btn:hover:not(:disabled),
+body > :not(#root) .ofi-addon-pdf-btn:hover:not(:disabled) {
+    border-color: #b45309;
+    background: linear-gradient(135deg, #b45309, #f59e0b);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(180, 83, 9, 0.3);
+}
+#root .ofi-addon-pdf-btn:active:not(:disabled),
+body > :not(#root) .ofi-addon-pdf-btn:active:not(:disabled) { box-shadow: none; }
+#root .ofi-addon-pdf-btn:disabled,
+body > :not(#root) .ofi-addon-pdf-btn:disabled {
+    border-color: var(--ofi-cal-border);
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    cursor: default;
+}
+.dark #root .ofi-addon-pdf-btn,
+.dark body > :not(#root) .ofi-addon-pdf-btn {
+    border-color: rgba(245, 158, 11, 0.42);
+    background: rgba(245, 158, 11, 0.14);
+    color: #fcd48a;
+}
+.dark #root .ofi-addon-pdf-btn:hover:not(:disabled),
+.dark body > :not(#root) .ofi-addon-pdf-btn:hover:not(:disabled) {
+    border-color: #f59e0b;
+    background: linear-gradient(135deg, #92400e, #d97706);
+    color: #fff;
+}
+#root .ofi-addon-pdf-btn--lg,
+body > :not(#root) .ofi-addon-pdf-btn--lg {
+    height: 38px;
+    gap: 9px;
+    padding: 0 16px;
+    font-size: 13.5px;
+}
+#root .ofi-addon-pdf-btn--lg svg,
+body > :not(#root) .ofi-addon-pdf-btn--lg svg { width: 17px; height: 17px; }
+
+/* Der Nachtrags-Editor: Positionstabelle mit Eingabefeldern in den Zahlen-
+   spalten; die Summenzeile am Fuss fluchtet mit der Betragsspalte. */
+.ofi-addon-lines td { vertical-align: middle; }
+.ofi-addon-lines input { min-width: 0; }
+.ofi-addon-lines .ofi-addon-lines__num { text-align: right; font-variant-numeric: tabular-nums; }
+.ofi-addon-lines .ofi-addon-lines__name { font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-addon-lines .ofi-addon-lines__meta { display: block; font-size: 11px; color: var(--ofi-cal-muted); }
+
+/* Der Hinweis unter den Feldern trägt dieselbe Tönung wie das Dokument, damit
+   das Fenster nicht zwei Farbfamilien gleichzeitig zeigt. */
+.ofi-ordconf-hint {
+    border-color: #d7dcf1 !important;
+    background: #f4f6fd !important;
+    color: #0a7aff !important;
+}
+.dark .ofi-ordconf-hint {
+    border-color: rgba(150, 165, 230, 0.28) !important;
+    background: rgba(70, 85, 170, 0.14) !important;
+    color: #b9c4ef !important;
+}
+
+/* Das Fenster der Meldungen — dieselbe Karte, nur unten aufsteigend. */
+.ofi-prj-notes {
+    width: 100%;
+    max-width: 32rem;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow);
+    pointer-events: auto;
+}
+.ofi-prj-notes__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+    padding: 9px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-prj-notes__list { max-height: 44vh; overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 6px; }
+#root .ofi-prj-notes__row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 8px;
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+#root .ofi-prj-notes__row:hover { background: var(--ofi-cal-hover); }
+.ofi-prj-notes__mark {
+    display: flex;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+.ofi-prj-notes__mark.is-critical { background: #fce8e6; color: #c5221f; }
+.dark .ofi-prj-notes__mark.is-critical { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+
+/* Das Meldungsfenster hängt in einem Portal DIREKT an <body> und damit
+   ausserhalb von `#root` — die Knopfregeln oben greifen dort nicht. Dieselben
+   Formen noch einmal für den Portal-Fall (so macht es der Kalender auch). */
+body > :not(#root) .ofi-prj-glyph {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+body > :not(#root) .ofi-prj-glyph:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+body > :not(#root) .ofi-prj-notes__row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 8px;
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+body > :not(#root) .ofi-prj-notes__row:hover { background: var(--ofi-cal-hover); }
+
+/* ── Wartende Mehrarbeit (der einzige farbige Block der Übersicht) ──────── */
+.ofi-prj-pending {
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    background: #fef7e0;
+    padding: 11px 14px 12px;
+}
+.dark .ofi-prj-pending { background: rgba(251, 188, 4, 0.09); }
+.ofi-prj-pending__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ofi-prj-pending__title { font-size: 12.5px; font-weight: 600; color: #7a4b00; }
+.ofi-prj-pending__hint { padding-top: 1px; font-size: 11.5px; color: #8a6100; }
+.ofi-prj-pending__sum {
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #7a4b00;
+}
+.dark .ofi-prj-pending__title,
+.dark .ofi-prj-pending__sum { color: #fdd663; }
+.dark .ofi-prj-pending__hint { color: rgba(253, 214, 99, 0.75); }
+
+/* Die Auswertungs-Scheibe zeichnet seit dem 10.09.2026 der Chart-Bausatz
+   (components/charts/swiftChart.css, «.ofi-prj-dial»); der neumorphe Block
+   vom 28.08.2026 ist damit weg. */
+
+/* ── Arbeitsfläche unter den Reitern ──────────────────────────────────────
+   EINE weisse Fläche für JEDEN Reiter, die Übersicht eingeschlossen. */
+.ofi-prj-stage {
+    min-width: 0;
+    overflow-x: hidden;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    padding: 14px;
+}

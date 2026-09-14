@@ -1,4 +1,5 @@
 import { useId, useMemo } from 'react';
+import '@/styles/modules/osp.css';
 
 /**
  * ── OSP-RAUTENMUSTER (04.09.2026) ────────────────────────────────────────────

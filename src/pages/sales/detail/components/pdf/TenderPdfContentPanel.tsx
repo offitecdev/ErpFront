@@ -64,7 +64,7 @@ const BlockShell = ({
     <section className="ofi-quote-card rounded-lg border border-[#e6e8eb] bg-white">
         <header className="ofi-quote-card__head flex items-center justify-between gap-3 border-b border-[#eef0f2] bg-white px-3.5 py-2">
             <span className="min-w-0">
-                <span className="block text-[12.5px] font-semibold text-[#1f2654]">{title}</span>
+                <span className="block text-[12.5px] font-semibold text-[#0066e0]">{title}</span>
                 <span className="block text-[11.5px] text-slate-500">{hint}</span>
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
@@ -216,7 +216,7 @@ export const TenderPdfContentPanel = ({ value, onChange, canEdit, onError }: Ten
                                 onClick={() => fileInputRef.current?.click()}
                                 title={t('tenders.add_closing_image')}
                                 aria-label={t('tenders.add_closing_image')}
-                                className="flex h-24 w-32 flex-col items-center justify-center gap-1 rounded-[3px] border-2 border-dashed border-slate-300 bg-white text-slate-400 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+                                className="flex h-24 w-32 flex-col items-center justify-center gap-1 rounded-[3px] border-2 border-dashed border-slate-300 bg-white text-slate-400 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0]"
                             >
                                 <Plus size={22} />
                                 <span className="text-[11px] font-medium">{t('tenders.add_closing_image')}</span>

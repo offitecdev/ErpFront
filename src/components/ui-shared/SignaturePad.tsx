@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Trash01 as Trash } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/handover.css';
+import '@/styles/modules/reportEditor.css';
 
 /**
  * Inline-Unterschriftenfeld — die eine Signaturfläche der App.

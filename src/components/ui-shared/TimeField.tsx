@@ -4,6 +4,7 @@ import { Check, ChevronDown, Clock } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 import { PopupDialog } from './PopupKit';
+import '@/styles/modules/reportEditor.css';
 
 /**
  * ══ ZEITWAHL ALS FENSTER (Vorgabe Samet, 02.09.2026) ════════════════════════

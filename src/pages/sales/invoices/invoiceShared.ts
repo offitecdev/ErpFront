@@ -14,6 +14,7 @@ import {
     type TenderDiscountEntry,
 } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import type { Variant } from '@/components/ui-shared/StatusBadge';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── RECHNUNGSSEITEN: gemeinsame Rechnung und Beschriftung ────────────────────

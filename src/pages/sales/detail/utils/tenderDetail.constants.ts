@@ -40,7 +40,7 @@ export const TENDER_LINE_TABLE_MIN_WIDTH = Object.entries(DEFAULT_TENDER_LINE_CO
 
 export const LINE_PAGE_SIZE = 10;
 export const PRODUCT_PICKER_PAGE_SIZE = 15;
-export const lineActionButtonClass = '!border-slate-200 !bg-white !text-slate-700 transition-colors hover:!border-[#1f2654] hover:!bg-slate-50 hover:!text-[#1f2654]';
+export const lineActionButtonClass = '!border-slate-200 !bg-white !text-slate-700 transition-colors hover:!border-[#0066e0] hover:!bg-slate-50 hover:!text-[#0066e0]';
 
 
 // Native <input> classes (the inline cells no longer use Ant Design): the font
@@ -54,7 +54,7 @@ export const lineActionButtonClass = '!border-slate-200 !bg-white !text-slate-70
 // it takes a visible border only while hovered or focused, which is what marks
 // it as editable.
 export const INLINE_NUMBER_INPUT_CLASS =
-    'h-6 w-full min-w-0 rounded-[3px] border border-solid border-transparent bg-transparent px-1.5 text-right text-[13px] font-medium tabular-nums leading-none text-slate-900 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/15';
+    'h-6 w-full min-w-0 rounded-[3px] border border-solid border-transparent bg-transparent px-1.5 text-right text-[13px] font-medium tabular-nums leading-none text-slate-900 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-300 hover:bg-white focus:border-[#0066e0] focus:bg-white focus:ring-2 focus:ring-[#0066e0]/15';
 // NOTE: no `truncate` here. It expands to `overflow: hidden`, and on a text
 // <input> that suppresses the browser's own auto-scroll while a selection is
 // being dragged — drag past the right edge and the content cannot follow, so
@@ -62,6 +62,6 @@ export const INLINE_NUMBER_INPUT_CLASS =
 // field. An input already clips its content and never wraps; letting it scroll
 // natively is what makes selecting a long name work.
 export const INLINE_TEXT_INPUT_BASE =
-    'w-full rounded-[3px] border border-transparent bg-transparent px-2 py-1 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-300 hover:bg-slate-50 focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/15';
-export const INLINE_TITLE_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[14.5px] font-semibold text-[#1f2654]`;
+    'w-full rounded-[3px] border border-transparent bg-transparent px-2 py-1 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-300 hover:bg-slate-50 focus:border-[#0066e0] focus:bg-white focus:ring-2 focus:ring-[#0066e0]/15';
+export const INLINE_TITLE_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[14.5px] font-semibold text-[#0066e0]`;
 export const INLINE_NAME_INPUT_CLASS = `${INLINE_TEXT_INPUT_BASE} text-[13.5px] font-medium text-slate-900`;

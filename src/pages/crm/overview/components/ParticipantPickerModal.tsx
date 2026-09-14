@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AntSelect from 'antd/es/select';
+import { AntdTheme } from '../../../../components/ui-shared/AntdTheme';
 import { Building03, Check, SearchLg, User01 } from '@/components/icons/antIconCompat';
 import { Modal } from '../../../../components/ui-shared/Modal';
 import { Button } from '../../../../components/ui-shared/Button';
@@ -133,7 +134,7 @@ export const ParticipantPickerModal: React.FC<ParticipantPickerModalProps> = ({ 
     };
 
     const searchInputCls =
-        'w-full rounded-xl border border-black/10 bg-white py-2 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-[#07145c]/50 dark:border-white/15 dark:bg-white/5 dark:text-white';
+        'w-full rounded-xl border border-black/10 bg-white py-2 pl-8 pr-3 text-[13px] outline-none transition-colors focus:border-[#0052b8]/50 dark:border-white/15 dark:bg-white/5 dark:text-white';
 
     const Row: React.FC<{ picked: PickedParticipant; icon: React.ReactNode }> = ({ picked, icon }) => {
         const isSelected = selected.has(keyOf(picked));
@@ -143,7 +144,7 @@ export const ParticipantPickerModal: React.FC<ParticipantPickerModalProps> = ({ 
                 onClick={() => toggle(picked)}
                 className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-colors ${
                     isSelected
-                        ? 'border-[#07145c]/30 bg-[#07145c]/5 dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/8'
+                        ? 'border-[#0052b8]/30 bg-[#0052b8]/5 dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/8'
                         : 'border-transparent hover:bg-black/4 dark:hover:bg-white/6'
                 }`}
             >
@@ -157,7 +158,7 @@ export const ParticipantPickerModal: React.FC<ParticipantPickerModalProps> = ({ 
                 <span
                     className={`flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
                         isSelected
-                            ? 'border-[#07145c] bg-[#07145c] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
+                            ? 'border-[#0052b8] bg-[#0052b8] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
                             : 'border-black/20 dark:border-white/25'
                     }`}
                 >
@@ -168,133 +169,135 @@ export const ParticipantPickerModal: React.FC<ParticipantPickerModalProps> = ({ 
     };
 
     return (
-        <Modal
-            open={open}
-            onClose={onClose}
-            title={t('crmOverview.picker.title', { defaultValue: 'Katılımcı seç' })}
-            description={t('crmOverview.picker.desc', { defaultValue: 'Personel ve müşteriler arasından katılımcıları işaretleyin.' })}
-            width="xl"
-            footer={
-                <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12.5px] text-[#6B7280] dark:text-[#aab0bb]">
-                        {t('crmOverview.picker.selectedCount', { count: selected.size, defaultValue: '{{count}} katılımcı seçildi' })}
-                    </span>
-                    <div className="flex gap-2">
-                        <Button variant="secondary" onClick={onClose}>
-                            {t('common.cancel', { defaultValue: 'İptal' })}
-                        </Button>
-                        <Button variant="primary" onClick={() => { onConfirm([...selected.values()]); onClose(); }}>
-                            {t('crmOverview.picker.confirm', { defaultValue: 'Ekle' })}
-                        </Button>
-                    </div>
-                </div>
-            }
-        >
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {/* ── Staff column ── */}
-                <section className="flex min-w-0 flex-col gap-2.5">
-                    <h4 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
-                        <User01 size={14} />
-                        {t('crmOverview.picker.staff', { defaultValue: 'Personel' })}
-                        <span className="rounded-full bg-black/6 px-1.5 text-[10.5px] tabular-nums text-[#6B7280] dark:bg-white/10 dark:text-white/60">
-                            {staffRows.length}
+        <AntdTheme>
+            <Modal
+                open={open}
+                onClose={onClose}
+                title={t('crmOverview.picker.title', { defaultValue: 'Katılımcı seç' })}
+                description={t('crmOverview.picker.desc', { defaultValue: 'Personel ve müşteriler arasından katılımcıları işaretleyin.' })}
+                width="xl"
+                footer={
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12.5px] text-[#6B7280] dark:text-[#aab0bb]">
+                            {t('crmOverview.picker.selectedCount', { count: selected.size, defaultValue: '{{count}} katılımcı seçildi' })}
                         </span>
-                    </h4>
-                    <div className="relative">
-                        <SearchLg size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#98A0AE]" />
-                        <input
-                            value={staffSearch}
-                            onChange={(e) => setStaffSearch(e.target.value)}
-                            placeholder={t('crmOverview.picker.searchStaff', { defaultValue: 'Personel ara…' })}
-                            className={searchInputCls}
-                        />
+                        <div className="flex gap-2">
+                            <Button variant="secondary" onClick={onClose}>
+                                {t('common.cancel', { defaultValue: 'İptal' })}
+                            </Button>
+                            <Button variant="primary" onClick={() => { onConfirm([...selected.values()]); onClose(); }}>
+                                {t('crmOverview.picker.confirm', { defaultValue: 'Ekle' })}
+                            </Button>
+                        </div>
                     </div>
-                    <AntSelect
-                        className="w-full [&_.ant-select-selector]:!rounded-xl"
-                        allowClear
-                        placeholder={t('crmOverview.picker.allRoles', { defaultValue: 'Tüm roller' })}
-                        value={staffRole || undefined}
-                        options={roles.map((r) => ({ value: r, label: r }))}
-                        onChange={(v) => setStaffRole(v || '')}
-                    />
-                    <div className="flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-0.5">
-                        {staffRows.length === 0 && (
-                            <p className="rounded-xl border border-dashed border-black/10 px-3 py-6 text-center text-[12.5px] text-[#98A0AE] dark:border-white/15">
-                                {t('crmOverview.picker.empty', { defaultValue: 'Sonuç bulunamadı.' })}
-                            </p>
-                        )}
-                        {staffRows.map((e) => (
-                            <Row
-                                key={e.id}
-                                icon={<User01 size={15} />}
-                                picked={{
-                                    participantType: 'EMPLOYEE',
-                                    id: e.id,
-                                    name: employeeName(e),
-                                    subtitle: e.roleName || e.title || e.email || undefined,
-                                }}
+                }
+            >
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    {/* ── Staff column ── */}
+                    <section className="flex min-w-0 flex-col gap-2.5">
+                        <h4 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
+                            <User01 size={14} />
+                            {t('crmOverview.picker.staff', { defaultValue: 'Personel' })}
+                            <span className="rounded-full bg-black/6 px-1.5 text-[10.5px] tabular-nums text-[#6B7280] dark:bg-white/10 dark:text-white/60">
+                                {staffRows.length}
+                            </span>
+                        </h4>
+                        <div className="relative">
+                            <SearchLg size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#98A0AE]" />
+                            <input
+                                value={staffSearch}
+                                onChange={(e) => setStaffSearch(e.target.value)}
+                                placeholder={t('crmOverview.picker.searchStaff', { defaultValue: 'Personel ara…' })}
+                                className={searchInputCls}
                             />
-                        ))}
-                    </div>
-                </section>
+                        </div>
+                        <AntSelect
+                            className="w-full [&_.ant-select-selector]:!rounded-xl"
+                            allowClear
+                            placeholder={t('crmOverview.picker.allRoles', { defaultValue: 'Tüm roller' })}
+                            value={staffRole || undefined}
+                            options={roles.map((r) => ({ value: r, label: r }))}
+                            onChange={(v) => setStaffRole(v || '')}
+                        />
+                        <div className="flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-0.5">
+                            {staffRows.length === 0 && (
+                                <p className="rounded-xl border border-dashed border-black/10 px-3 py-6 text-center text-[12.5px] text-[#98A0AE] dark:border-white/15">
+                                    {t('crmOverview.picker.empty', { defaultValue: 'Sonuç bulunamadı.' })}
+                                </p>
+                            )}
+                            {staffRows.map((e) => (
+                                <Row
+                                    key={e.id}
+                                    icon={<User01 size={15} />}
+                                    picked={{
+                                        participantType: 'EMPLOYEE',
+                                        id: e.id,
+                                        name: employeeName(e),
+                                        subtitle: e.roleName || e.title || e.email || undefined,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </section>
 
-                {/* ── Customers column ── */}
-                <section className="flex min-w-0 flex-col gap-2.5 border-t border-black/6 pt-4 dark:border-white/8 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                    <h4 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
-                        <Building03 size={14} />
-                        {t('crmOverview.picker.customers', { defaultValue: 'Müşteriler' })}
-                        <span className="rounded-full bg-black/6 px-1.5 text-[10.5px] tabular-nums text-[#6B7280] dark:bg-white/10 dark:text-white/60">
-                            {customerRows.length}
-                        </span>
-                    </h4>
-                    <div className="relative">
-                        <SearchLg size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#98A0AE]" />
-                        <input
-                            value={customerSearch}
-                            onChange={(e) => setCustomerSearch(e.target.value)}
-                            placeholder={t('crmOverview.picker.searchCustomers', { defaultValue: 'Müşteri ara…' })}
-                            className={searchInputCls}
-                        />
-                    </div>
-                    <AntSelect
-                        className="w-full [&_.ant-select-selector]:!rounded-xl"
-                        allowClear
-                        placeholder={t('crmOverview.picker.allTypes', { defaultValue: 'Tüm müşteri türleri' })}
-                        value={customerType || undefined}
-                        options={Object.entries(CUSTOMER_TYPE_LABELS).map(([value, labelKey]) => ({
-                            value,
-                            label: t(labelKey, { defaultValue: value }),
-                        }))}
-                        onChange={(v) => setCustomerType(v || '')}
-                    />
-                    <div className="flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-0.5">
-                        {loadingCustomers && (
-                            <p className="px-3 py-2 text-center text-[12px] text-[#98A0AE]">
-                                {t('common.loading', { defaultValue: 'Yükleniyor…' })}
-                            </p>
-                        )}
-                        {!loadingCustomers && customerRows.length === 0 && (
-                            <p className="rounded-xl border border-dashed border-black/10 px-3 py-6 text-center text-[12.5px] text-[#98A0AE] dark:border-white/15">
-                                {t('crmOverview.picker.empty', { defaultValue: 'Sonuç bulunamadı.' })}
-                            </p>
-                        )}
-                        {customerRows.map((c) => (
-                            <Row
-                                key={c.id}
-                                icon={<Building03 size={15} />}
-                                picked={{
-                                    participantType: 'CUSTOMER',
-                                    id: c.id,
-                                    name: c.companyName,
-                                    subtitle: [c.customerType ? t(CUSTOMER_TYPE_LABELS[c.customerType] || '', { defaultValue: c.customerType }) : null, c.city]
-                                        .filter(Boolean)
-                                        .join(' · ') || c.mainEmail || undefined,
-                                }}
+                    {/* ── Customers column ── */}
+                    <section className="flex min-w-0 flex-col gap-2.5 border-t border-black/6 pt-4 dark:border-white/8 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                        <h4 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
+                            <Building03 size={14} />
+                            {t('crmOverview.picker.customers', { defaultValue: 'Müşteriler' })}
+                            <span className="rounded-full bg-black/6 px-1.5 text-[10.5px] tabular-nums text-[#6B7280] dark:bg-white/10 dark:text-white/60">
+                                {customerRows.length}
+                            </span>
+                        </h4>
+                        <div className="relative">
+                            <SearchLg size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#98A0AE]" />
+                            <input
+                                value={customerSearch}
+                                onChange={(e) => setCustomerSearch(e.target.value)}
+                                placeholder={t('crmOverview.picker.searchCustomers', { defaultValue: 'Müşteri ara…' })}
+                                className={searchInputCls}
                             />
-                        ))}
-                    </div>
-                </section>
-            </div>
-        </Modal>
+                        </div>
+                        <AntSelect
+                            className="w-full [&_.ant-select-selector]:!rounded-xl"
+                            allowClear
+                            placeholder={t('crmOverview.picker.allTypes', { defaultValue: 'Tüm müşteri türleri' })}
+                            value={customerType || undefined}
+                            options={Object.entries(CUSTOMER_TYPE_LABELS).map(([value, labelKey]) => ({
+                                value,
+                                label: t(labelKey, { defaultValue: value }),
+                            }))}
+                            onChange={(v) => setCustomerType(v || '')}
+                        />
+                        <div className="flex max-h-[320px] flex-col gap-1 overflow-y-auto pr-0.5">
+                            {loadingCustomers && (
+                                <p className="px-3 py-2 text-center text-[12px] text-[#98A0AE]">
+                                    {t('common.loading', { defaultValue: 'Yükleniyor…' })}
+                                </p>
+                            )}
+                            {!loadingCustomers && customerRows.length === 0 && (
+                                <p className="rounded-xl border border-dashed border-black/10 px-3 py-6 text-center text-[12.5px] text-[#98A0AE] dark:border-white/15">
+                                    {t('crmOverview.picker.empty', { defaultValue: 'Sonuç bulunamadı.' })}
+                                </p>
+                            )}
+                            {customerRows.map((c) => (
+                                <Row
+                                    key={c.id}
+                                    icon={<Building03 size={15} />}
+                                    picked={{
+                                        participantType: 'CUSTOMER',
+                                        id: c.id,
+                                        name: c.companyName,
+                                        subtitle: [c.customerType ? t(CUSTOMER_TYPE_LABELS[c.customerType] || '', { defaultValue: c.customerType }) : null, c.city]
+                                            .filter(Boolean)
+                                            .join(' · ') || c.mainEmail || undefined,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </section>
+                </div>
+            </Modal>
+        </AntdTheme>
     );
 };

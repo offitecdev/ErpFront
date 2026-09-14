@@ -16,6 +16,7 @@ import { money } from '../../../../utils/projectFormatters';
 import { CardLink } from './CardLink';
 import { linkRow } from './linkRow';
 import { OverviewCard } from './OverviewCard';
+import '@/styles/modules/projectDetail.css';
 
 export type AddonRow = {
     order: ProjectSalesOrder;

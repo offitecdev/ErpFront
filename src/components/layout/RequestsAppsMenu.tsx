@@ -6,10 +6,8 @@ import { AppsGlyph } from '@/components/icons/AppsGlyph';
 import { BellRinging, Mail01, Umbrella } from '@/components/icons/antIconCompat';
 import { TaskMark } from '@/components/icons/TaskMark';
 import { t } from '@/i18n/translate';
-import { crmApi } from '@/lib/api/crm';
-import { mailMessagesApi } from '@/lib/api/mail';
-import { personnelApi } from '@/lib/api/personnel';
-import { onIdle } from '@/lib/utils/onIdle';
+import { fetchHeaderCounts } from '@/lib/api/headerCounts';
+import { afterPageSettled } from '@/lib/utils/onIdle';
 import { useAuthStore } from '@/store/authStore';
 import type { LeaveCounts } from '@/pages/personnel/types/personnel';
 import { REQUEST_TYPES } from '@/pages/personnel/utils/personnel';
@@ -92,7 +90,7 @@ export const useAppsMenuControl = create<{ forced: boolean; setForced: (value: b
 }));
 
 /** Wie oft die Zähler von selbst nachschauen (ms). */
-const POLL_MS = 90_000;
+const POLL_MS = 120_000;
 
 const EMPTY_LEAVES: LeaveCounts = { approver: 0, accounting: 0, mine: 0, incoming: 0 };
 
@@ -135,25 +133,30 @@ export const RequestsAppsMenu = () => {
        einzige Zeile, und die Antwort trägt die Gesamtzahl. Die ganze Liste für
        eine Zahl im Kopf zu ziehen, wäre bei jedem Takt ein Kilobyte je offener
        Aufgabe. Der Zeitraum bleibt offen — «offen» kennt keinen Stichtag. */
+    /* Seit dem 14.09.2026 in EINER Anfrage (lib/api/headerCounts — dieselbe,
+       aus der die Glocke ihre Zahl nimmt): jede Anfrage kostet am
+       Produktivrechner 150–200 ms Laufzeit, vier Zähler kosteten sie viermal. */
     const loadCounts = useCallback(() => {
-        personnelApi.leaveIncomingCount()
-            .then((incoming) => setLeaves({ ...EMPTY_LEAVES, incoming }))
-            .catch(() => setLeaves(EMPTY_LEAVES));
-        if (!canCrm) return;
-        mailMessagesApi.unreadCount().then(setUnreadMail).catch(() => setUnreadMail(0));
-        crmApi.listTasks({ kind: 'TASK', scope: 'me', status: 'OPEN', page: 1, pageSize: 1, view: 'count' })
-            .then((page) => setOpenTasks(page.total))
-            .catch(() => setOpenTasks(0));
-        crmApi.countDueReminders().then(setDueReminders).catch(() => setDueReminders(0));
+        fetchHeaderCounts(canCrm)
+            .then((counts) => {
+                setLeaves({ ...EMPTY_LEAVES, incoming: counts.leavesIncoming ?? 0 });
+                if (!canCrm) return;
+                setUnreadMail(counts.unreadMail ?? 0);
+                setOpenTasks(counts.openTasks ?? 0);
+                setDueReminders(counts.dueReminders ?? 0);
+            })
+            .catch(() => undefined);
     }, [canCrm]);
 
     useEffect(() => {
-        // Header badges are secondary. Let the current route start its critical
-        // requests first instead of competing for the browser/DB connection pool.
-        const cancelIdle = onIdle(loadCounts, 4000);
-        const timer = window.setInterval(loadCounts, POLL_MS);
+        // Header badges are secondary: they wait until the page's own data has
+        // arrived (an idle callback fired DURING the page's network wait and
+        // put these requests in front of the list — measured 14.09.2026).
+        const cancelSettled = afterPageSettled(loadCounts);
+        // A hidden tab needs no fresh figures; the next tick after it returns does.
+        const timer = window.setInterval(() => { if (!document.hidden) loadCounts(); }, POLL_MS);
         return () => {
-            cancelIdle();
+            cancelSettled();
             window.clearInterval(timer);
         };
     }, [loadCounts]);

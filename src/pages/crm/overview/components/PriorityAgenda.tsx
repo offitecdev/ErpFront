@@ -277,7 +277,7 @@ export const PriorityAgenda: React.FC<PriorityAgendaProps> = ({
                             className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${
                                 item.critical
                                     ? 'bg-rose-500/12 text-rose-600 dark:text-rose-300'
-                                    : 'bg-[#07145c]/8 text-[#07145c] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]'
+                                    : 'bg-[#0052b8]/8 text-[#0052b8] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]'
                             }`}
                         >
                             {KIND_ICON[item.kind]}

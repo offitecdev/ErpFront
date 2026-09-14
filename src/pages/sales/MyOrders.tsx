@@ -157,7 +157,7 @@ export const MyOrders = () => {
                     <button
                         type="button"
                         onClick={() => navigate('/sales/invoices?type=DELIVERY')}
-                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                     >
                         <Receipt size={14} />
                         {t('nav.salesInvoices')}
@@ -286,7 +286,7 @@ export const MyOrders = () => {
                                                 <span className="block truncate font-mono text-[12px] text-slate-600 dark:text-white/70">
                                                     {order.project?.projectNumber || order.project?.projectName || '-'}
                                                 </span>
-                                                <span className="ofi-list-sub block truncate text-[10px] font-semibold uppercase tracking-wide text-[#272f67] dark:text-white/50">
+                                                <span className="ofi-list-sub block truncate text-[10px] font-semibold uppercase tracking-wide text-[#0a7aff] dark:text-white/50">
                                                     {t('crm.projectOrder')}
                                                 </span>
                                             </div>

@@ -21,8 +21,8 @@ type PlainButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'typ
 // Confirm"); `.ofi-quote-btn` in index.css pins that corner against the
 // app-wide button radius rule.
 const BUTTON_VARIANT_CLASS: Record<NonNullable<PlainButtonProps['variant']>, string> = {
-    primary: 'ofi-quote-btn is-primary border border-transparent bg-[#1f2654] text-white hover:bg-[#2a3470]',
-    secondary: 'ofi-quote-btn is-secondary border border-[#dadce0] bg-white text-[#1f2654] hover:bg-[#1f2654]/[0.05]',
+    primary: 'ofi-quote-btn is-primary border border-transparent bg-[#0066e0] text-white hover:bg-[#2a3470]',
+    secondary: 'ofi-quote-btn is-secondary border border-[#dadce0] bg-white text-[#0066e0] hover:bg-[#0066e0]/[0.05]',
     ghost: 'ofi-quote-btn is-ghost border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900',
     danger: 'ofi-quote-btn is-danger border border-transparent bg-[#c5221f] text-white hover:bg-[#a50e0e]',
 };
@@ -98,7 +98,7 @@ export const PlainCard = ({
         {(title || actions) && (
             <div data-ui-card-header className="ofi-quote-card__head flex items-center justify-between gap-3 border-b border-[#eef0f2] bg-white px-4 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
-                    {icon && <span className="ofi-quote-card__icon flex size-6 shrink-0 items-center justify-center rounded-full text-[#1f2654]">{icon}</span>}
+                    {icon && <span className="ofi-quote-card__icon flex size-6 shrink-0 items-center justify-center rounded-full text-[#0066e0]">{icon}</span>}
                     <div className="min-w-0">
                         {title && <h3 className="truncate text-[13.5px] font-semibold text-primary">{title}</h3>}
                         {description && <p className="mt-0.5 truncate text-[12px] text-tertiary">{description}</p>}
@@ -150,7 +150,7 @@ export const PlainCheckbox = ({
             // `ofi-quote-check` overrides the app-wide checkbox rule in index.css,
             // which rounds every checkbox to 10px and pins it to 16px square.
             className={clsx(
-                'ofi-quote-check cursor-pointer accent-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50',
+                'ofi-quote-check cursor-pointer accent-[#0066e0] disabled:cursor-not-allowed disabled:opacity-50',
                 size === 'sm' ? 'ofi-quote-check-sm' : '',
                 className,
             )}

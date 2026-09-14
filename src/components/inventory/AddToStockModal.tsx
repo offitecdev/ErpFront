@@ -224,7 +224,7 @@
 //                                 type="button"
 //                                 onClick={() => setMode(key)}
 //                                 className={`flex-1 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
-//                                     mode === key ? 'bg-white text-[#272f67] shadow-sm' : 'text-slate-500 hover:text-slate-800'
+//                                     mode === key ? 'bg-white text-[#0a7aff] shadow-sm' : 'text-slate-500 hover:text-slate-800'
 //                                 }`}
 //                             >
 //                                 {label}

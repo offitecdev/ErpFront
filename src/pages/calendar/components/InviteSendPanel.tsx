@@ -177,7 +177,7 @@ export const InviteSendPanel = ({ target, initialTo, initialCc, initialSubject, 
                             type="checkbox"
                             checked={teamMail}
                             onChange={(event) => setTeamMail(event.target.checked)}
-                            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#07145c] dark:accent-[#d48f16]"
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#0052b8] dark:accent-[#d48f16]"
                         />
                         <span className="min-w-0">
                             <span className="block text-[12.5px] font-semibold text-slate-700 dark:text-white/85">

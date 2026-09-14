@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import AntModal from 'antd/es/modal';
 import Drawer from 'antd/es/drawer';
+import { AntdTheme } from './AntdTheme';
 
 import { BottomSheet } from './BottomSheet';
 
@@ -78,6 +79,7 @@ export const Modal: React.FC<ModalProps> = ({
 
     if (placement === 'drawer') {
         return (
+            <AntdTheme>
             <Drawer
                 open={open}
                 onClose={onClose}
@@ -103,10 +105,12 @@ export const Modal: React.FC<ModalProps> = ({
             >
                 {children}
             </Drawer>
+            </AntdTheme>
         );
     }
 
     return (
+        <AntdTheme>
         <AntModal
             open={open}
             title={
@@ -130,5 +134,6 @@ export const Modal: React.FC<ModalProps> = ({
         >
             {children}
         </AntModal>
+        </AntdTheme>
     );
 };

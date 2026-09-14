@@ -1,21 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { FileDownload02 as DownloadIcon } from '@/components/icons/antIconCompat';
 
 import { t as i18nT } from '@/i18n/translate';
-import { Button } from '@/components/ui-shared/Button';
-import { BottomSheet } from '@/pages/inventory/components/BottomSheet';
+import { PopupDialog } from '@/components/ui-shared/PopupKit';
 
 /**
- * Von unten aufsteigende PDF-Vorschau, geschlossen über das "X" oben rechts.
+ * PDF-Vorschau als Mac-Fenster (10.09.2026, Samet: «die Pop-ups der Rapporte
+ * … wie ein natives macOS-Programm»): ein mittiges Fenster über leichtem
+ * Schleier, Titel und Untertitel in der Titelleiste, rechts daneben EIN
+ * blauer Druckknopf «Herunterladen», darunter das Blatt in einem Haarlinien-
+ * Rahmen. Bis dahin war es ein Sockelfenster von unten mit dunklem Grund.
  *
  * Gezeigt wird das ECHTE PDF: die Generatoren geben mit `output: 'blob'` (bzw.
  * `buildQuotePdf`) ein Dokument zurück statt es herunterzuladen, das hier in
  * einem Rahmen dargestellt wird. Die Vorschau entspricht damit exakt der
- * späteren Datei — es ist kein nachgebauter Entwurf. Der Fussknopf lädt genau
- * diese Datei herunter.
+ * späteren Datei — es ist kein nachgebauter Entwurf. Der Knopf lädt genau
+ * diese Datei herunter. Chromes eigene Werkzeugleiste im Rahmen ist
+ * ausgeblendet (`#toolbar=0`) — Blättern und Zoomen bleiben, die dunkle
+ * Leiste mit Dateinamen und Druck-Symbolen nicht.
  *
- * Benutzt von den Kundenrapporten und von der Angebotsvorschau der
- * Auftragsseite; die Beschriftungen sind darum überschreibbar.
+ * Benutzt von den Kundenrapporten, dem Gesamtrapport des Projekts und der
+ * Angebotsvorschau der Auftragsseite; die Beschriftungen sind darum
+ * überschreibbar.
  */
 export const PdfPreviewSheet = ({
     open,
@@ -43,57 +49,44 @@ export const PdfPreviewSheet = ({
     onClose: () => void;
     onDownload: () => void;
 }) => {
-    const [url, setUrl] = useState<string | null>(null);
-
-    // Objekt-URLs sind eine Ressource: bei jedem Wechsel und beim Schliessen
-    // wird die alte wieder freigegeben, sonst hält der Tab die Dokumente fest.
-    useEffect(() => {
-        if (!blob) { setUrl(null); return; }
-        const next = URL.createObjectURL(blob);
-        setUrl(next);
-        return () => URL.revokeObjectURL(next);
-    }, [blob]);
+    // Objekt-URLs sind eine Ressource: die URL entsteht mit dem Dokument, und
+    // bei jedem Wechsel und beim Schliessen wird die alte wieder freigegeben,
+    // sonst hält der Tab die Dokumente fest.
+    const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
+    useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
 
     const busyLabel = loadingLabel ?? i18nT('common.loading');
 
     return (
-        <BottomSheet
+        <PopupDialog
             open={open}
+            onClose={onClose}
             title={title}
             subtitle={subtitle}
-            onClose={onClose}
             width={1100}
-            height={820}
-            footer={
-                <>
-                    <span className="text-[12px] text-slate-500 dark:text-white/60">
-                        {loading ? busyLabel : ''}
-                    </span>
-                    <Button variant="primary" icon={<DownloadIcon size={13} />} disabled={!blob} onClick={onDownload}>
-                        {downloadLabel ?? i18nT('projects.general.generatePdf')}
-                    </Button>
-                </>
-            }
+            z={650}
+            bodyClassName="ofi-pdfwin"
+            headerActions={(
+                <button
+                    type="button"
+                    className="ofi-cal-btn is-primary"
+                    disabled={!blob}
+                    onClick={onDownload}
+                >
+                    <DownloadIcon size={14} />
+                    {downloadLabel ?? i18nT('projects.general.generatePdf')}
+                </button>
+            )}
         >
-            <div className="h-full min-h-0 bg-slate-100 p-3 dark:bg-black/20">
-                {loading && (
-                    <div className="flex h-full items-center justify-center text-[13px] text-slate-500 dark:text-white/60">
-                        {busyLabel}
-                    </div>
-                )}
+            <div className="ofi-pdfwin__frame">
+                {loading && <div className="ofi-pdfwin__note">{busyLabel}</div>}
                 {!loading && !url && (
-                    <div className="flex h-full items-center justify-center text-[13px] text-slate-500 dark:text-white/60">
-                        {emptyText ?? i18nT('projects.general.noReportsInRange')}
-                    </div>
+                    <div className="ofi-pdfwin__note">{emptyText ?? i18nT('projects.general.noReportsInRange')}</div>
                 )}
                 {!loading && url && (
-                    <iframe
-                        src={url}
-                        title={title}
-                        className="h-full w-full rounded-[2px] border border-slate-300 bg-white dark:border-white/15"
-                    />
+                    <iframe src={`${url}#toolbar=0&navpanes=0`} title={title} className="ofi-pdfwin__paper" />
                 )}
             </div>
-        </BottomSheet>
+        </PopupDialog>
     );
 };

@@ -26,6 +26,7 @@ import { OrderSummaryTable } from './overview/OrderSummaryTable';
 import { OverviewPieCharts } from './overview/OverviewPieCharts';
 import { ProjectAddressLine } from './overview/ProjectAddressLine';
 import { deliveryReportsForOrder } from './overview/overviewShared';
+import '@/styles/modules/projectDetail.css';
 
 /** A summary only exists for real sales orders; the synthetic main order has none. */
 const summaryFor = (order: ProjectSalesOrder, summaries: Record<string, BillingSummaryDto | null>) =>

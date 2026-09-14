@@ -12,6 +12,7 @@ import {
 } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 
 import { FIELD_INPUT_CLASS } from '../invoiceShared';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── DIE DREI ABSCHNITTE DES BELEGS ───────────────────────────────────────────

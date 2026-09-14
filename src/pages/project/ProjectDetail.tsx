@@ -23,6 +23,11 @@ import { type ProjectDetailView, viewForSection, viewFromSearch } from './featur
 import { t } from '@/i18n/translate';
 import { lazyToast as toast } from '@/lib/lazyToast';
 
+// Native-macOS look of the page (10.09.2026) — the quote detail's palette and
+// shapes, scoped to `.ofi-prj-page.ofi-prj-apple`; chunk-local like the quote's.
+import '@/styles/projectDetail.css';
+import '@/styles/modules/projectDetail.css';
+
 const LazyProjectProcessModal = lazy(() =>
     import('./ProjectProcessModal').then((module) => ({ default: module.ProjectProcessModal })),
 );
@@ -173,7 +178,7 @@ export const ProjectDetail = () => {
 
     if (loading) {
         return (
-            <div className="space-y-4">
+            <div className="ofi-prj-page ofi-prj-apple space-y-4">
                 <div className="h-24 animate-pulse rounded-md border border-slate-100 bg-slate-50" />
                 <div className="h-12 animate-pulse rounded-xl border border-slate-100 bg-slate-50" />
                 <div className="h-80 animate-pulse rounded-md border border-slate-100 bg-slate-50" />
@@ -183,7 +188,7 @@ export const ProjectDetail = () => {
 
     if (!project) {
         return (
-            <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 text-center" role="alert">
+            <div className="ofi-prj-page ofi-prj-apple flex min-h-64 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 text-center" role="alert">
                 <BriefcaseBusiness size={32} className="text-slate-400" />
                 <h2 className="mt-3 text-base font-semibold text-slate-900">{t('auto.proje_bulunamadi')}</h2>
                 <p className="mt-1 max-w-lg text-sm text-slate-500">
@@ -194,7 +199,7 @@ export const ProjectDetail = () => {
     }
 
     return (
-        <div className="min-w-0 overflow-x-hidden">
+        <div className="ofi-prj-page ofi-prj-apple min-w-0 overflow-x-hidden">
             <ProjectDetailHeader
                 project={project}
                 orders={salesOrders}

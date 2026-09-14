@@ -1,5 +1,6 @@
 import { apiClient, getShared } from '../axios';
 import { customerApi } from './customer';
+import { cachedQuery } from './queryCache';
 
 /* CRM v2 API: tenant-weite Ansprechpartner-Liste, Interaktionsverlauf
    (Telefon/E-Mail/Besprechung/Notiz/Besuch aus allen Quellen), Aufgaben und
@@ -263,6 +264,17 @@ const toQuery = (params: Record<string, string | number | undefined>) => {
 export const crmApi = {
     listContacts: (params: { search?: string; customerId?: string; page?: number; pageSize?: number }) =>
         getShared<PagedResult<CrmContactRow>>(`/crm/contacts${toQuery(params)}`).then((r) => r.data),
+
+    /** Same list for pickers: served from the client cache for a minute and at
+        once while it refreshes after that (queryCache tag `customers`). */
+    listContactsCached: (params: { search?: string; customerId?: string; page?: number; pageSize?: number }) => {
+        const url = `/crm/contacts${toQuery(params)}`;
+        return cachedQuery(
+            url,
+            async () => (await apiClient.get<PagedResult<CrmContactRow>>(url)).data,
+            { freshMs: 60_000, staleMs: 10 * 60_000, tags: ['customers'] },
+        );
+    },
 
     /** Der Interaktionsverlauf — alle Quellen, nach Typ beschriftet. */
     listInteractions: (params: {

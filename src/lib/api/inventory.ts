@@ -1,5 +1,6 @@
 import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import { itGateHeaders } from '../itGate';
+import { cachedQuery, peekQueryState, refreshQuery } from './queryCache';
 import type {
     InventoryLocation,
     InventoryArticle,
@@ -33,12 +34,15 @@ import type {
     BulkArticlesResult,
     BulkMovementItemInput,
     BulkMovementsResult,
+    ScanLookupResult,
     PurchaseOrderRow,
     PurchaseOrderListPage,
     PurchaseOrderListQuery,
     PurchaseOrderStatus,
     PurchaseOrderTextTemplate,
     PurchaseOrderTextTemplatePage,
+    PurchaseOrderMailDraft,
+    PurchaseOrderMailDraftInput,
     CreatePurchaseOrderInput,
     UpdatePurchaseOrderInput,
     SendPurchaseOrderMailInput,
@@ -53,8 +57,23 @@ import type {
     PurchaseTemplateDocumentType,
 } from '../../types/inventory';
 
-const QUICK_PICK_CACHE_TTL_MS = 15_000;
-const quickPickCache = new Map<string, { expiresAt: number; value: ArticleQuickPickPage }>();
+/* Produktwähler: eine Antwort gilt 60 s ohne Rückfrage und darf bis 10 min
+   sofort gezeigt werden, während sie im Hintergrund erneuert wird. Jede
+   Schreibanfrage an Artikel/Bestand macht sie alt (queryCache, Bereich
+   `catalog`). */
+const QUICK_PICK_QUERY = { freshMs: 60_000, staleMs: 600_000, tags: ['catalog'] };
+
+const quickPickUrl = (params: { page?: number; pageSize?: number; search?: string }) => {
+    const query = new URLSearchParams();
+    query.set('page', String(params.page ?? 1));
+    query.set('pageSize', String(params.pageSize ?? 15));
+    query.set('lean', 'true');
+    query.set('includeDescription', 'true');
+    query.set('sortBy', 'nameNatural');
+    query.set('sortDirection', 'asc');
+    if (params.search) query.set('search', params.search);
+    return `/inventory/articles/summary/paged?${query.toString()}`;
+};
 
 export const inventoryApi = {
     dashboard: async (): Promise<InventoryDashboard> => {
@@ -149,28 +168,21 @@ export const inventoryApi = {
         page?: number;
         pageSize?: number;
         search?: string;
-    }): Promise<ArticleQuickPickPage> => {
-        const query = new URLSearchParams();
-        query.set('page', String(params.page ?? 1));
-        query.set('pageSize', String(params.pageSize ?? 15));
-        query.set('lean', 'true');
-        query.set('includeDescription', 'true');
-        query.set('sortBy', 'nameNatural');
-        query.set('sortDirection', 'asc');
-        if (params.search) query.set('search', params.search);
-        const tenantId = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId') || '';
-        const url = `/inventory/articles/summary/paged?${query.toString()}`;
-        const cacheKey = `${tenantId}|${url}`;
-        const cached = quickPickCache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) return cached.value;
-
-        const res = await getShared<ArticleQuickPickPage>(url);
-        quickPickCache.set(cacheKey, {
-            expiresAt: Date.now() + QUICK_PICK_CACHE_TTL_MS,
-            value: res.data,
-        });
-        return res.data;
+    }, options: { mustBeFresh?: boolean } = {}): Promise<ArticleQuickPickPage> => {
+        const url = quickPickUrl(params);
+        const fetcher = async () => (await apiClient.get<ArticleQuickPickPage>(url)).data;
+        // `mustBeFresh`: eine alte Antwort NICHT als Antwort ausgeben — der
+        // Aufrufer zeigt sie selbst vorläufig (peekArticlesQuickPick) und
+        // entscheidet erst mit der frischen (Enter wählt daraus).
+        if (options.mustBeFresh && !peekQueryState(url, QUICK_PICK_QUERY)?.fresh) {
+            return refreshQuery(url, fetcher, QUICK_PICK_QUERY);
+        }
+        return cachedQuery(url, fetcher, QUICK_PICK_QUERY);
     },
+
+    /** Sofort vorhandene Antwort des Produktwählers (ohne Netz), samt «noch frisch?». */
+    peekArticlesQuickPick: (params: { page?: number; pageSize?: number; search?: string }) =>
+        peekQueryState<ArticleQuickPickPage>(quickPickUrl(params), QUICK_PICK_QUERY),
 
     // Tek ürünün yalın canlı stok bilgisi (sayaç + ortalama maliyet). Depo/lokasyon,
     // tedarikçi listesi ve görsel çekilmez — stok hareketi sonrası hızlı yenileme için.
@@ -258,6 +270,7 @@ export const inventoryApi = {
         if (params.name) query.set('name', params.name);
         if (params.description) query.set('description', params.description);
         if (params.type) query.set('type', params.type);
+        if (params.origin) query.set('origin', params.origin);
         if (params.dateFrom) query.set('dateFrom', params.dateFrom);
         if (params.dateTo) query.set('dateTo', params.dateTo);
         // Filtre ve sayfa URL'nin parçasıdır; yalnızca tamamen aynı sorgular
@@ -284,13 +297,35 @@ export const inventoryApi = {
     },
 
     /**
-     * Schnellerfassung (Foto → Text → Produkt): wie `bulkCreateArticles`, nur
-     * OHNE Code — der Server vergibt `ART-NNNNN` fortlaufend je Firma und
-     * meldet ihn in `created[].articleCode` zurück. Neue Produkte werden
-     * immer als PRODUKT angelegt; die Menge wird als Eingang gebucht.
+     * Schnellerfassung (10.09.2026): wie `bulkCreateArticles`, nur OHNE Code —
+     * der Server zieht den ERP-Code `KAT-UNTER-NNNNN` aus dem gewählten,
+     * von der IT freigegebenen Nummernkreis und meldet ihn in
+     * `created[].articleCode` zurück. Neue Artikel sind immer PRODUKTE; die
+     * Menge (Standard 1) wird als Zugang gebucht, Herkunft QUICK_ADD.
      */
-    quickCreateArticles: async (items: QuickArticleItemInput[]): Promise<BulkArticlesResult> => {
-        const res = await apiClient.post('/inventory/articles/quick', { items });
+    quickCreateArticles: async (schemeId: string, items: QuickArticleItemInput[]): Promise<BulkArticlesResult> => {
+        const res = await apiClient.post('/inventory/articles/quick', { schemeId, items });
+        return res.data;
+    },
+
+    /** Gescannten Code (Barcode / Seriennummer / ERP-Code) einem Artikel zuordnen. */
+    scanLookup: async (code: string): Promise<ScanLookupResult> => {
+        const res = await apiClient.get(`/inventory/articles/scan-lookup?code=${encodeURIComponent(code)}`);
+        return res.data;
+    },
+
+    /**
+     * Einen weiteren Barcode an einen vorhandenen Artikel heften (dasselbe
+     * Modell, anderes Etikett). Wird er der erste, ist er der Hauptbarcode.
+     */
+    addArticleBarcode: async (articleId: string, barcode: string): Promise<{ ok: boolean; primary: boolean }> => {
+        const res = await apiClient.post(`/inventory/articles/${articleId}/barcodes`, { barcode });
+        return res.data;
+    },
+
+    /** Systembarcode erzeugen — nur auf Knopfdruck, nur wenn noch keiner da ist. */
+    generateBarcode: async (articleId: string): Promise<ArticleDetail> => {
+        const res = await apiClient.post(`/inventory/articles/${articleId}/barcode`, {});
         return res.data;
     },
 
@@ -340,8 +375,8 @@ export const inventoryApi = {
         const query = new URLSearchParams();
         if (q) query.set('q', q);
         query.set('limit', String(limit));
-        const res = await apiClient.get(`/inventory/suppliers/search?${query.toString()}`);
-        return res.data;
+        const url = `/inventory/suppliers/search?${query.toString()}`;
+        return cachedQuery(url, async () => (await apiClient.get(url)).data, QUICK_PICK_QUERY);
     },
 
     listProposals: async (): Promise<PurchaseProposalRow[]> => {
@@ -492,6 +527,32 @@ export const purchaseOrdersApi = {
     sendMail: async (id: string, input: SendPurchaseOrderMailInput): Promise<SendPurchaseOrderMailResult> => {
         const res = await apiClient.post(`/inventory/purchase-orders/${id}/send-mail`, input, { timeout: MAIL_REQUEST_TIMEOUT_MS });
         return res.data;
+    },
+
+    /** «Mail manuell gesendet» — setzt oder entfernt das Häkchen (wirkt wie eine Sendung). */
+    setMailManual: async (id: string, sent: boolean, recipient?: string | null): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/mail-manual`, { sent, recipient: recipient ?? undefined });
+        return res.data;
+    },
+
+    // ── Mail-Entwürfe je Auftrag (Mailfenster der Auftragsseite) ────────────
+    listMailDrafts: async (id: string): Promise<PurchaseOrderMailDraft[]> => {
+        const res = await apiClient.get(`/inventory/purchase-orders/${id}/mail-drafts`);
+        return res.data;
+    },
+
+    createMailDraft: async (id: string, input: PurchaseOrderMailDraftInput): Promise<PurchaseOrderMailDraft> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/mail-drafts`, input);
+        return res.data;
+    },
+
+    updateMailDraft: async (id: string, draftId: string, input: PurchaseOrderMailDraftInput): Promise<PurchaseOrderMailDraft> => {
+        const res = await apiClient.patch(`/inventory/purchase-orders/${id}/mail-drafts/${draftId}`, input);
+        return res.data;
+    },
+
+    deleteMailDraft: async (id: string, draftId: string): Promise<void> => {
+        await apiClient.delete(`/inventory/purchase-orders/${id}/mail-drafts/${draftId}`);
     },
 
     // Stok aktarımı tamamlandığında StockPage tarafından çağrılır.

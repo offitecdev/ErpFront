@@ -10,6 +10,7 @@ import type { LeavePolicy } from '@/pages/personnel/types/personnel';
 import { DEFAULT_LEAVE_POLICY, roundHalf } from '@/pages/personnel/utils/personnel';
 import { formatLeaveDays } from '@/pages/personnel/utils/format';
 import { PrimaryButton } from '@/pages/personnel/components/primitives';
+import '@/styles/modules/moduleSettings.css';
 
 /**
  * ── URLAUBSANSPRUCH (Einstellungen → Module → Personal) ─────────────────────

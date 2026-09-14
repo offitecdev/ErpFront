@@ -13,6 +13,7 @@ import type { CrmCustomerOption } from '@/pages/crm/types/crm.types';
 import {
     avatarColor, counterpartOf, forwardSubject, formatBytes, initialOf, longDate, partyFull, partyLabel, quoteMessage, replySubject,
 } from './mailShared';
+import '@/styles/modules/mailModule.css';
 
 /* Lesebereich rechts: Betreff, Absender-Zeile mit Initiale, Empfänger,
    Kundenzuordnung (Chip → Zuordnen-Panel), Rumpf (MailBodyView: Formatierung,

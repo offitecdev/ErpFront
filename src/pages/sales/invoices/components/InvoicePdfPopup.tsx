@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { FileDownload02 } from '@/components/icons/antIconCompat';
 import { InvoicePopup } from '@/components/billing/InvoicePopup';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * PDF-Vorschau des Rechnungsmoduls — die schwebende Karte, kein Bodenblatt

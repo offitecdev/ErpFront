@@ -85,6 +85,12 @@ const MAIN_PAGES: Record<string, string> = {
     '/inventory/orders': 'nav.inventoryOrders',
     '/inventory/suppliers': 'nav.suppliers',
 
+    '/tasks': 'nav.tasksModuleList',
+    '/tasks/board': 'nav.tasksModuleBoard',
+    '/tasks/approvals': 'tasksModule.nav.approvals',
+    '/tasks/people': 'tasksModule.nav.people',
+    '/tasks/chat': 'nav.tasksModuleChat',
+    '/tasks/reports': 'nav.tasksModuleReports',
     '/logistics/shipments': 'nav.shipments',
 
     '/maintenance': 'nav.maintenanceDashboard',

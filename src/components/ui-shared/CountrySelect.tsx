@@ -147,7 +147,7 @@ export const CountrySelect = ({
                             {/* Trennlinie genau einmal: dort, wo die häufigen Länder enden. */}
                             {index > 0 && option.common !== options[index - 1].common && (
                                 <>
-                                    <div className="mx-2 mt-1 h-px bg-[#07145c] dark:bg-[#d48f16]" />
+                                    <div className="mx-2 mt-1 h-px bg-[#0052b8] dark:bg-[#d48f16]" />
                                     <div className="px-2 pb-0.5 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">
                                         {t('address.countryAll')}
                                     </div>

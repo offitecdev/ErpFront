@@ -4,6 +4,7 @@ import { LuChevronRight, LuLayoutTemplate, LuListChecks, LuSearch } from 'react-
 import { t } from '@/i18n/translate';
 import { PopupDialog, PopupEmpty } from '@/components/ui-shared/PopupKit';
 import { formsApi, type FormTemplateDto } from '@/lib/api/forms';
+import '@/styles/modules/checklists.css';
 
 /**
  * Vorlage wählen — der erste Schritt einer neuen Checkliste. Seit dem

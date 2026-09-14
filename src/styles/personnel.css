@@ -881,8 +881,8 @@ body > :not(#root) .ofi-pf-chip {
 
 #root .ofi-pf-chip.is-active,
 body > :not(#root) .ofi-pf-chip.is-active {
-    background: #272f67;
-    border-color: #272f67;
+    background: #0a7aff;
+    border-color: #0a7aff;
     color: #ffffff;
 }
 

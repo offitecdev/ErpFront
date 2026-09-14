@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LuLayoutTemplate, LuListChecks } from 'react-icons/lu';
 import { t } from '@/i18n/translate';
 import { CHECKLIST_PATHS, type ChecklistTabKey } from '../routes';
+import '@/styles/modules/checklists.css';
 
 /**
  * Der Reiterstreifen des Checklisten-Bereichs — seit dem 02.09.2026 ein

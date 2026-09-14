@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { whenBootSplashGone } from '@/lib/bootSplash';
 import { useAuthStore } from '@/store/authStore';
 
-import { WhatsNewPopup } from './WhatsNewPopup';
+import { UpdateWindow } from './UpdateWindow';
 import { selectUnseenIds, useWhatsNewStore } from './whatsNewStore';
 
 /**
@@ -57,5 +57,7 @@ export const WhatsNewHost = () => {
         return () => { cancelled = true; };
     }, [userId]);
 
-    return <WhatsNewPopup />;
+    /* Seit dem 09.09.2026 das Apple-Fenster (UpdateWindow); das Prospekt mit
+       Rundgang (WhatsNewPopup) ist ausgehängt, siehe dort. */
+    return <UpdateWindow />;
 };

@@ -16,6 +16,7 @@ import {
     orderTechnicalState,
     technicalStateLabel,
 } from './overviewShared';
+import '@/styles/modules/projectDetail.css';
 
 type Row = {
     label: string;
@@ -99,7 +100,7 @@ export const OrderSummaryTable = memo(({
 
     return (
         <OverviewCard title={t('projects.detail.overview.orderSummary')}>
-            <table data-inv-table data-unstyled-table data-no-col-resize className="w-full">
+            <table data-inv-table data-unstyled-table data-no-col-resize data-prj-kv className="w-full">
                 <tbody>
                     {rows.map((row) => (
                         <tr key={row.label} {...linkRow(() => onNavigate(row.goes), row.spoken)}>

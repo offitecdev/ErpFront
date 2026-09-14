@@ -30,6 +30,7 @@ import { buildOspDescription, specsToDescriptionValues } from './ospDescription'
 import { changeSummary } from './ospChanges';
 import { OspFeedTable } from './OspFeedTable';
 import { OspDatasheetSheet } from './OspDatasheetSheet';
+import '@/styles/modules/osp.css';
 
 /**
  * ── OSP-SEITE (/sales/osp) ───────────────────────────────────────────────────
@@ -594,7 +595,7 @@ export const OspPage = () => {
                         <p>{t('osp.notEnabled')}</p>
                         <button
                             type="button"
-                            className="ofi-btn-brand inline-flex items-center gap-2 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
+                            className="ofi-btn-brand inline-flex items-center gap-2 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#0066e0]"
                             onClick={() => navigate('/settings/modules?module=sales&category=osp')}
                         >
                             <Settings01 size={14} />

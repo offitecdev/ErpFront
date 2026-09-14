@@ -294,15 +294,16 @@ export const ToggleGroup = <T extends string>({
     value: T;
     onChange: (next: T) => void;
 }) => (
-    <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1 dark:border-white/15 dark:bg-white/5">
+    <div className="ofi-togglegroup inline-flex rounded-md border border-slate-200 bg-slate-50 p-1 dark:border-white/15 dark:bg-white/5">
         {options.map((option) => (
             <button
                 key={option.key}
                 type="button"
                 onClick={() => onChange(option.key)}
-                className={`rounded px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                aria-pressed={value === option.key}
+                className={`ofi-togglegroup__btn ${value === option.key ? 'is-on' : ''} rounded px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
                     value === option.key
-                        ? 'bg-[#272f67] text-white shadow-sm'
+                        ? 'bg-[#0a7aff] text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-950 dark:text-white/70 dark:hover:text-white'
                 }`}
             >
@@ -367,8 +368,8 @@ export const ActionTh = ({
             onClick={onClick}
             title={hint}
             aria-haspopup="dialog"
-            className={`inline-flex items-center gap-1 underline decoration-dotted decoration-from-font underline-offset-[3px] transition-colors hover:text-[#1f2654] dark:hover:text-white ${
-                active ? 'text-[#1f2654] dark:text-white' : ''
+            className={`inline-flex items-center gap-1 underline decoration-dotted decoration-from-font underline-offset-[3px] transition-colors hover:text-[#0066e0] dark:hover:text-white ${
+                active ? 'text-[#0066e0] dark:text-white' : ''
             }`}
         >
             {label}
@@ -452,7 +453,7 @@ export const SortableTh = <K extends string>({
         <button
             type="button"
             onClick={() => onSort(sortKey)}
-            className="inline-flex items-center gap-1 transition-colors hover:text-[#1f2654] dark:hover:text-white"
+            className="inline-flex items-center gap-1 transition-colors hover:text-[#0066e0] dark:hover:text-white"
         >
             {label}
             {activeKey === sortKey && (direction === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}

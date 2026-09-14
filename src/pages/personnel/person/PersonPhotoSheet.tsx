@@ -542,12 +542,12 @@ export const PersonPhotoSheet = ({
                                 step={0.01}
                                 value={zoomValue}
                                 onChange={(event) => onZoomInput(Number(event.target.value))}
-                                className="min-w-0 flex-1 accent-[#272f67]"
+                                className="min-w-0 flex-1 accent-[#0a7aff]"
                             />
                         </label>
                     </>
                 ) : (
-                    <div className="grid size-40 place-items-center overflow-hidden rounded-full bg-[#272f67] text-[42px] font-bold text-white outline outline-4 outline-white/80 dark:outline-white/15">
+                    <div className="grid size-40 place-items-center overflow-hidden rounded-full bg-[#0a7aff] text-[42px] font-bold text-white outline outline-4 outline-white/80 dark:outline-white/15">
                         {shownExisting
                             ? <img src={shownExisting} alt={name} className="size-full object-cover" />
                             : <span>{initials}</span>}

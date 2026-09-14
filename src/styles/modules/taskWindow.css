@@ -1,0 +1,252 @@
+/* taskWindow — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ── Die Zeichenreihe ──────────────────────────────────────────────────────
+   Drei Knöpfe und der Name des offenen Blattes. Die Namen stehen NICHT an den
+   Zeichen: drei Wörter in einer Reihe machten aus den Zeichen wieder
+   Abschnitte, und genau die sollten weg. */
+.ofi-newtask__marks {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    padding-bottom: 10px;
+}
+#root .ofi-newtask__mark,
+body > :not(#root) .ofi-newtask__mark {
+    position: relative;
+    display: inline-flex;
+    height: 32px;
+    width: 32px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-cal-border-soft) !important;
+    border-radius: 999px !important;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted) !important;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-newtask__mark:hover,
+body > :not(#root) .ofi-newtask__mark:hover {
+    background: var(--ofi-cal-hover);
+    color: var(--ofi-cal-text) !important;
+}
+#root .ofi-newtask__mark.is-active,
+body > :not(#root) .ofi-newtask__mark.is-active {
+    border-color: transparent !important;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent) !important;
+}
+/* Der Punkt sagt, dass hinter dem Zeichen etwas steht — ohne ihn müsste man
+   jedes Blatt aufschlagen, um zu sehen, was man schon erfasst hat. */
+.ofi-newtask__markdot {
+    position: absolute;
+    right: -2px;
+    top: -2px;
+    display: inline-flex;
+    min-width: 15px;
+    height: 15px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #d93025;
+    padding: 0 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+.ofi-newtask__marklabel {
+    min-width: 0;
+    flex: 1;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Spanne: Datum und Uhrzeit in EINER Zeile ─────────────────────────────── */
+.ofi-newtask__when { display: flex; min-width: 0; flex: 1; align-items: center; gap: 6px; }
+.ofi-newtask__when > :first-child { min-width: 0; flex: 1; }
+#root .ofi-newtask__time,
+body > :not(#root) .ofi-newtask__time { width: 92px; flex: none; }
+.ofi-newtask__row.is-check { align-items: center; }
+.ofi-newtask__allday {
+    display: inline-flex;
+    /* Auf der Höhe eines Feldes, damit die Zeile im Zeilenraster nicht
+       schmaler ist als die zwei darüber. */
+    height: var(--ofi-newtask-field);
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+}
+.ofi-newtask__allday input { accent-color: var(--ofi-cal-accent); }
+.ofi-newtask__note {
+    margin: -2px 0 2px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ofi-cal-muted);
+}
+.ofi-tasksteps__empty { font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-tasksteps__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+/* DIE ZEILE DER ANLEITUNG STEHT AUF DER ACHSE DES FENSTERS (12.09.2026).
+   Die Nummer sitzt in der Beschriftungsspalte — dort, wo auf den anderen
+   Blättern «Beginn» oder «Kunde» steht —, der Kreis genau an der Feldkante.
+   Weil `.ofi-newtask__pane` die ganze Liste schon um die Beschriftungsspalte
+   einrückt, wird die Nummer mit einem negativen Rand wieder hinausgezogen:
+   so bleibt sie in der Spalte, ohne dass die Liste ihr eigenes Raster
+   braucht. */
+.ofi-tasksteps__row { display: flex; align-items: center; gap: 8px; }
+.ofi-tasksteps__row.is-done .ofi-tasksteps__text { color: var(--ofi-cal-faint); text-decoration: line-through; }
+.ofi-tasksteps__no {
+    width: calc(var(--ofi-newtask-label, 100px) - 8px);
+    margin-left: calc(-1 * (var(--ofi-newtask-label, 100px) + var(--ofi-newtask-gap, 12px)));
+    flex: none;
+    text-align: right;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-faint);
+}
+/* Der Kreis ist die Feldkante — er darf nicht schrumpfen und nicht wachsen. */
+.ofi-tasksteps__row > .ofi-taskrow__check { flex: none; }
+#root .ofi-tasksteps__text,
+body > :not(#root) .ofi-tasksteps__text {
+    height: 32px;
+    min-width: 0;
+    flex: 1;
+    border: 1px solid var(--ofi-cal-border-soft) !important;
+    border-radius: var(--ofi-modal-radius) !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 10px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text) !important;
+    -webkit-text-fill-color: var(--ofi-cal-text) !important;
+}
+#root .ofi-tasksteps__text:focus,
+body > :not(#root) .ofi-tasksteps__text:focus { border-color: var(--ofi-cal-accent) !important; outline: none; }
+#root .ofi-tasksteps__del,
+body > :not(#root) .ofi-tasksteps__del,
+#root .ofi-taskfiles__del,
+body > :not(#root) .ofi-taskfiles__del {
+    display: inline-flex;
+    height: 28px;
+    width: 28px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-faint) !important;
+}
+#root .ofi-tasksteps__del:hover,
+body > :not(#root) .ofi-tasksteps__del:hover,
+#root .ofi-taskfiles__del:hover,
+body > :not(#root) .ofi-taskfiles__del:hover { background: var(--ofi-cal-hover); color: #d93025 !important; }
+#root .ofi-tasksteps__add,
+body > :not(#root) .ofi-tasksteps__add,
+#root .ofi-taskfiles__add,
+body > :not(#root) .ofi-taskfiles__add {
+    display: inline-flex;
+    height: 32px;
+    align-self: flex-start;
+    align-items: center;
+    gap: 6px;
+    border: 1px dashed var(--ofi-cal-border) !important;
+    border-radius: var(--ofi-modal-radius) !important;
+    background: transparent;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-text) !important;
+    -webkit-text-fill-color: var(--ofi-cal-text) !important;
+}
+#root .ofi-tasksteps__add:hover,
+body > :not(#root) .ofi-tasksteps__add:hover,
+#root .ofi-taskfiles__add:hover,
+body > :not(#root) .ofi-taskfiles__add:hover { background: var(--ofi-cal-hover); }
+.ofi-taskfiles__empty { font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-taskfiles__list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.ofi-taskfiles__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--ofi-modal-radius);
+    background: var(--ofi-cal-surface-2);
+    padding: 4px 6px 4px 10px;
+}
+.ofi-taskfiles__row.is-staged { opacity: 0.78; }
+.ofi-taskfiles__icon { display: inline-flex; flex: none; color: var(--ofi-cal-muted); }
+#root .ofi-taskfiles__name,
+body > :not(#root) .ofi-taskfiles__name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    background: transparent;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text) !important;
+    -webkit-text-fill-color: var(--ofi-cal-text) !important;
+}
+#root button.ofi-taskfiles__name:hover,
+body > :not(#root) button.ofi-taskfiles__name:hover { text-decoration: underline; }
+.ofi-taskfiles__name.is-plain { cursor: default; }
+.ofi-taskfiles__size {
+    flex: none;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-faint);
+}
+.ofi-taskfiles__hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-faint);
+}
+
+/* ── Die Karte: Spanne und Offerte auf der Zeile ───────────────────────────
+   Eine mehrtägige Aufgabe trägt ihre Spanne in EINEM Zug ("28.08. – 30.08.");
+   sie bekommt einen leisen Kasten, damit sie sich vom einzelnen Tag daneben
+   unterscheidet, ohne laut zu werden. */
+.ofi-taskrow__due.is-span {
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 1px 7px;
+}
+.ofi-taskrow__quote {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 6px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Mehrfachfilter (TaskFilterCombo) ──────────────────────────────────────
+   Ein Feld mit Wahl trägt den Akzent als Rahmen: man soll auf einen Blick
+   sehen, DASS gefiltert wird, auch wenn nur "Müller +2" darin steht. */
+#root .ofi-taskbar__combo.is-picked .ofi-taskbar__combofield,
+body > :not(#root) .ofi-taskbar__combo.is-picked .ofi-taskbar__combofield {
+    border-color: var(--ofi-cal-accent) !important;
+    font-weight: 600;
+}
+.ofi-taskcombo-row__check { flex: none; color: var(--ofi-cal-accent); }

@@ -13,6 +13,7 @@ import {
     type MailCategoryDto, type MailCategoryKind, type MailCategoryOption,
 } from '@/lib/api/mail';
 import { categoryLabel } from './mailShared';
+import '@/styles/modules/mailModule.css';
 
 /* DIE KATEGORIEN-LEISTE (08.09.2026) — die persönliche Ordnung des Postfachs,
    links unter Posteingang/Postausgang/Papierkorb.

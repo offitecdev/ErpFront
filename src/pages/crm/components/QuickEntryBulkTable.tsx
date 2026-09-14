@@ -200,7 +200,7 @@ export const QuickEntryBulkTable = ({
                     onClick={() => setShowLinks((value) => !value)}
                     aria-pressed={showLinks}
                     className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold transition-colors ${showLinks
-                        ? 'border-[#272f67]/25 bg-[#272f67]/[0.08] text-[#272f67] dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e]'
+                        ? 'border-[#0a7aff]/25 bg-[#0a7aff]/[0.08] text-[#0a7aff] dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/10 dark:text-[#e6cf9e]'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/12 dark:bg-transparent dark:text-white/70'}`}
                 >
                     <Link02 size={13} />
@@ -391,7 +391,7 @@ export const QuickEntryBulkTable = ({
                 <button
                     type="button"
                     onClick={addRow}
-                    className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
+                    className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/60"
                 >
                     <Plus size={12} />
                     {t('crm.quick.addRow')}

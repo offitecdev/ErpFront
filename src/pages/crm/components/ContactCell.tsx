@@ -7,7 +7,9 @@ import { CELL_INPUT_CLASS } from '@/components/ui-shared/TableKit';
 /**
  * Ansprechpartner-Zelle: eine schlichte Auswahl, die erst greift, wenn die
  * Zeile an einen Kunden gebunden ist — vorher gibt es nichts auszuwählen.
- * Geladen wird beim ersten Aufklappen und je Kunde nur einmal.
+ * Geladen wird schon beim Darüberfahren (eine native Auswahl übernimmt
+ * nachgereichte Optionen erst beim nächsten Öffnen) und je Kunde nur einmal;
+ * die Antwort kommt aus dem Zwischenspeicher, wenn sie schon bekannt ist.
  */
 export const ContactCell = ({
     customerId,
@@ -24,7 +26,7 @@ export const ContactCell = ({
     const load = () => {
         if (!customerId || loadedFor === customerId) return;
         setLoadedFor(customerId);
-        crmApi.listContacts({ customerId, pageSize: 50 })
+        crmApi.listContactsCached({ customerId, pageSize: 50 })
             .then((result) => setContacts(result.data.map((contact) => ({
                 id: contact.id,
                 firstName: contact.firstName,
@@ -37,6 +39,7 @@ export const ContactCell = ({
         <select
             value={value}
             disabled={!customerId}
+            onPointerEnter={load}
             onFocus={load}
             onMouseDown={load}
             onChange={(event) => onChange(event.target.value)}

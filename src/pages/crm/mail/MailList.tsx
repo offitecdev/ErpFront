@@ -4,6 +4,7 @@ import { SkeletonBar } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
 import type { MailCategoryDto, MailMessageRow } from '@/lib/api/mail';
 import { avatarColor, counterpartOf, initialOf, partyLabel, shortDate, type MailFolderKey } from './mailShared';
+import '@/styles/modules/mailModule.css';
 
 /* Die Nachrichtenliste — eine Zeile je Mail wie in der Referenz: Initiale in
    Farbe, Absender (fett = ungelesen), Betreff – Vorschau, rechts Uhrzeit/Datum;

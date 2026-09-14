@@ -9,6 +9,8 @@ import { FloatingCard } from '@/pages/calendar/components/FloatingCard';
 import { anchorFromRect, type FloatAnchor } from '@/pages/calendar/calendarShared';
 import { isTaskOverdue, personName } from '../utils/crmFormat.utils';
 import { PAGE_SIZE, columnPages, formatTaskSpan, isMultiDayTask, pageWindow, taskOrigin, type BoardColumn, type TaskOrigin } from './taskBoardModel';
+import '@/styles/modules/taskDeck.css';
+import '@/styles/modules/taskWindow.css';
 
 /**
  * Das Aufgabenbrett (19.08.2026) — ZWEI grosse Spalten neben einander (Vorgabe):

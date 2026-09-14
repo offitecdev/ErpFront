@@ -1,11 +1,11 @@
-import type { LazyExoticComponent } from 'react';
 import { Route, Navigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { isProjectModuleEnabledForTenant } from '../lib/moduleCatalog';
-import { applePage, lazyNamed, page } from './routeHelpers';
+import { applePage, lagerPage, lazyNamed, page } from './routeHelpers';
 import type { RouteComponent } from './routeHelpers';
 import { TechnicianBridge } from './montageRoutes';
 import { LazyItGate } from './LazyItGate';
+import { loadTaskDetailPage } from '../pages/tasks/taskRouteLoaders';
 
 /* ── Shared page-route table ──
    Rendered by AppRouter inside MainLayout, and again by the split view's
@@ -81,6 +81,17 @@ const OrderCreatePage = lazyNamed(() => import('../pages/inventory/OrderCreatePa
 const OrderDetailPage = lazyNamed(() => import('../pages/inventory/OrderDetailPage'), 'OrderDetailPage');
 // Mal kabul artık pop-up değil, stok ekranı gibi kendi sayfası.
 const OrderReceivePage = lazyNamed(() => import('../pages/inventory/OrderReceivePage'), 'OrderReceivePage');
+// Görevler (13.09.2026, Vorgabe Samet): eigenständiges Aufgabenmodul nach dem Vorbild
+// Görevly — NICHT die CRM-Aufgaben unter /crm/tasks. Im Kleid des Lagers (lagerPage).
+const TasksModuleListPage = lazyNamed(() => import('../pages/tasks/TasksListPage'), 'TasksListPage');
+const TasksModuleBoardPage = lazyNamed(() => import('../pages/tasks/TaskBoardPage'), 'TaskBoardPage');
+const TasksModuleApprovalsPage = lazyNamed(() => import('../pages/tasks/TaskApprovalsPage'), 'TaskApprovalsPage');
+const TasksModulePeoplePage = lazyNamed(() => import('../pages/tasks/TaskPeoplePage'), 'TaskPeoplePage');
+const TasksModuleChatPage = lazyNamed(() => import('../pages/tasks/TaskChatPage'), 'TaskChatPage');
+const TasksModuleReportsPage = lazyNamed(() => import('../pages/tasks/TaskReportsPage'), 'TaskReportsPage');
+const TasksModuleDetailPage = lazyNamed(loadTaskDetailPage, 'TaskDetailPage');
+const AdminTaskGuidePage = lazyNamed(() => import('../pages/tasks/AdminTaskGuidePage'), 'AdminTaskGuidePage');
+const MemberTaskGuidePage = lazyNamed(() => import('../pages/tasks/MemberTaskGuidePage'), 'MemberTaskGuidePage');
 const Shipments = lazyNamed(() => import('../pages/logistics/Shipments'), 'Shipments');
 const ShipmentCreate = lazyNamed(() => import('../pages/logistics/ShipmentCreate'), 'ShipmentCreate');
 const MaintenanceDashboard = lazyNamed(() => import('../pages/maintenance/MaintenanceDashboard'), 'MaintenanceDashboard');
@@ -126,7 +137,7 @@ const LegacyOrderRedirect = () => {
    Berichts, deshalb steht sie hinter dem Personal-Schreibrecht. Ohne das Recht
    zeigt die Seite selbst nur noch an, statt zurückzuwerfen — auch wer den Plan
    nicht setzen darf, muss ihn nachschlagen können. */
-const PersonnelReportRoute = ({ component }: { component: LazyExoticComponent<RouteComponent> }) => {
+const PersonnelReportRoute = ({ component }: { component: RouteComponent }) => {
     const permissions = useAuthStore((s) => s.permissions);
     if (!permissions.includes('attendance.read')) {
         return <Navigate to="/personnel" replace />;
@@ -154,7 +165,7 @@ const AuthorizationAdminRoute = ({ detail = false }: { detail?: boolean }) => {
     return page(detail ? RoleEditorPage : AuthorizationPage);
 };
 
-const ProjectModuleRoute = ({ component }: { component: LazyExoticComponent<RouteComponent> }) => {
+const ProjectModuleRoute = ({ component }: { component: RouteComponent }) => {
     const tenants = useAuthStore((s) => s.tenants);
     const selectedTenantId = useAuthStore((s) => s.selectedTenantId);
     const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId);
@@ -212,7 +223,7 @@ export const renderAppPageRoutes = () => (
         <Route path="/attendance-records" element={<Navigate to="/personnel/time-records" replace />} />
         <Route path="/attendance-settings" element={<Navigate to="/settings/modules?module=personnel&category=shift" replace />} />
         <Route path="/crm/overview" element={page(CrmOverview)} />
-        <Route path="/crm/customers" element={applePage(CustomerList)} />
+        <Route path="/crm/customers" element={page(CustomerList)} />
         <Route path="/crm/customers/:id" element={applePage(CustomerDashboard)} />
         <Route path="/crm/contacts" element={applePage(ContactsPage)} />
         <Route path="/crm/communication" element={applePage(CommunicationPage)} />
@@ -260,33 +271,44 @@ export const renderAppPageRoutes = () => (
         <Route path="/crm/my-orders" element={<Navigate to="/sales/orders" replace />} />
         <Route path="/crm/my-orders/:id" element={<LegacyOrderRedirect />} />
         <Route path="/inventory" element={<Navigate to="/inventory/articles" replace />} />
-        <Route path="/inventory/articles" element={page(ProductsPage)} />
+        <Route path="/inventory/articles" element={lagerPage(ProductsPage)} />
         {/* Ürün ekleme artık TEKLİ form (detay ekranı düzeninde); toplu tablo
             kendi sayfasında yaşar. Sabit yollar ':id'den ÖNCE tanımlıdır. */}
-        <Route path="/inventory/articles/new" element={page(ProductCreatePage)} />
-        <Route path="/inventory/articles/bulk-new" element={page(ProductBulkCreatePage)} />
+        <Route path="/inventory/articles/new" element={lagerPage(ProductCreatePage)} />
+        <Route path="/inventory/articles/bulk-new" element={lagerPage(ProductBulkCreatePage)} />
         {/* Detay: listeden satıra tıklayınca açılır; '/new' ile çakışmaması için
             sabit yol ÖNCE tanımlıdır. */}
-        <Route path="/inventory/articles/:id" element={page(ProductDetailPage)} />
+        <Route path="/inventory/articles/:id" element={lagerPage(ProductDetailPage)} />
         {/* Malzeme/ürün birleşmesi (2026-08-14): ayrı malzeme listesi kalktı,
             eski yollar ürün listesine yönlenir. */}
         <Route path="/inventory/materials" element={<Navigate to="/inventory/articles" replace />} />
         <Route path="/inventory/materials/:id" element={<Navigate to="/inventory/articles" replace />} />
-        <Route path="/inventory/stock" element={page(StockPage)} />
-        <Route path="/inventory/stock/movements" element={page(StockMovementsPage)} />
+        <Route path="/inventory/stock" element={lagerPage(StockPage)} />
+        <Route path="/inventory/stock/movements" element={lagerPage(StockMovementsPage)} />
         {/* Eski yol: hareket girişi artık ortak stok ekranında. */}
         <Route path="/inventory/movements" element={<Navigate to="/inventory/stock" replace />} />
-        <Route path="/inventory/suppliers" element={page(SuppliersPage)} />
+        <Route path="/inventory/suppliers" element={lagerPage(SuppliersPage)} />
         {/* Satın alma siparişleri: liste + oluşturma/düzenleme (?id= ile düzenleme). */}
-        <Route path="/inventory/orders" element={page(OrdersPage)} />
-        <Route path="/inventory/orders/new" element={page(OrderCreatePage)} />
+        <Route path="/inventory/orders" element={lagerPage(OrdersPage)} />
+        <Route path="/inventory/orders/new" element={lagerPage(OrderCreatePage)} />
         {/* Mal kabul: siparişin satırlarını stoğa aktarma ekranı ('/new' sabit
             yolundan sonra tanımlıdır, :id ile çakışmaz). */}
-        <Route path="/inventory/orders/:id/receive" element={page(OrderReceivePage)} />
+        <Route path="/inventory/orders/:id/receive" element={lagerPage(OrderReceivePage)} />
         {/* Die BESTELLSEITE (08.09.2026): sie hat das alte Detail-Popup abgelöst.
             Steht NACH '/new' und nach dem Wareneingang, damit ':id' die festen
             Wege nicht schluckt. */}
-        <Route path="/inventory/orders/:id" element={page(OrderDetailPage)} />
+        <Route path="/inventory/orders/:id" element={lagerPage(OrderDetailPage)} />
+        {/* Görevler-Modul: feste Wege vor ':taskId'. */}
+        <Route path="/tasks" element={lagerPage(TasksModuleListPage)} />
+        <Route path="/tasks/board" element={lagerPage(TasksModuleBoardPage)} />
+        <Route path="/tasks/approvals" element={lagerPage(TasksModuleApprovalsPage)} />
+        <Route path="/tasks/people" element={lagerPage(TasksModulePeoplePage)} />
+        <Route path="/tasks/chat" element={lagerPage(TasksModuleChatPage)} />
+        <Route path="/tasks/chat/:roomId" element={lagerPage(TasksModuleChatPage)} />
+        <Route path="/tasks/reports" element={lagerPage(TasksModuleReportsPage)} />
+        <Route path="/tasks/guide/admin" element={lagerPage(AdminTaskGuidePage)} />
+        <Route path="/tasks/guide/member" element={lagerPage(MemberTaskGuidePage)} />
+        <Route path="/tasks/:taskId" element={lagerPage(TasksModuleDetailPage)} />
         <Route path="/logistics/shipments" element={page(Shipments)} />
         <Route path="/logistics/shipments/new" element={page(ShipmentCreate)} />
         <Route path="/maintenance" element={page(MaintenanceDashboard)} />

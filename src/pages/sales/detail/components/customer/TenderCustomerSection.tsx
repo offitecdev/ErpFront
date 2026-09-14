@@ -131,7 +131,7 @@ export const TenderCustomerSection = ({
                     <span
                         role="status"
                         aria-label={t('common.loading')}
-                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 animate-pulse text-[11px] font-medium text-[#1f2654]"
+                        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 animate-pulse text-[11px] font-medium text-[#0066e0]"
                     >
                         {loadingFlashLabel}
                     </span>
@@ -182,7 +182,7 @@ export const TenderCustomerSection = ({
                     onClick={onOpenInfo}
                     title={t('tenders.customer_details')}
                     aria-label={t('tenders.customer_details')}
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0]"
                 >
                     <User01 size={13} />
                 </button>
@@ -194,7 +194,7 @@ export const TenderCustomerSection = ({
                 onClick={onEditCustomerData}
                 title={t('tenders.manualCustomer.title')}
                 aria-label={t('tenders.manualCustomer.title')}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0]"
             >
                 <Edit01 size={13} />
             </button>
@@ -203,7 +203,7 @@ export const TenderCustomerSection = ({
                 onClick={onAddCustomer}
                 title={t('crm.customers.newCustomer')}
                 aria-label={t('crm.customers.newCustomer')}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[3px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0]"
             >
                 <Plus size={13} />
             </button>

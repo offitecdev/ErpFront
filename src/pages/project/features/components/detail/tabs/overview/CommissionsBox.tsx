@@ -5,6 +5,7 @@ import type { ProjectSalesOrder } from '@/types/project';
 
 import { linkRow } from './linkRow';
 import { OverviewCard } from './OverviewCard';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * Die Kommissionen des PROJEKTS — nicht des ausgewählten Auftrags. Ein Projekt

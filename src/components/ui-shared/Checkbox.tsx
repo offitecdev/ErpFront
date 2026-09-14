@@ -1,5 +1,6 @@
 import React from 'react';
 import AntCheckbox from 'antd/es/checkbox';
+import { AntdTheme } from './AntdTheme';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 import { cx } from '../../lib/utils/cx';
 
@@ -32,6 +33,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
     };
 
     return (
+        <AntdTheme>
         <label
             {...rest}
             className={cx(t('auto.inline_flex_items_start_gap_2_text_sm_text_secon'),
@@ -53,5 +55,6 @@ export const Checkbox: React.FC<CheckboxProps> = ({
                 </span>
             )}
         </label>
+        </AntdTheme>
     );
 };

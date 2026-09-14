@@ -126,7 +126,7 @@ const RejectSheet = ({
                     rows={4}
                     value={note}
                     onChange={(event) => setNote(event.target.value)}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13.5px] text-slate-800 outline-none transition-colors hover:border-slate-300 focus:border-[#1f2654] dark:border-white/15 dark:bg-transparent dark:text-white"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13.5px] text-slate-800 outline-none transition-colors hover:border-slate-300 focus:border-[#0066e0] dark:border-white/15 dark:bg-transparent dark:text-white"
                 />
             </Labelled>
         </PersonnelSheet>
@@ -224,7 +224,7 @@ export const LeaveList = ({
                             ref={focused ? focusRef : undefined}
                             className={`flex flex-col rounded-xl border bg-white p-4 dark:bg-transparent ${
                                 focused
-                                    ? 'border-[#272f67] ring-2 ring-[#272f67]/15 dark:border-[#e6cf9e] dark:ring-[#e6cf9e]/20'
+                                    ? 'border-[#0a7aff] ring-2 ring-[#0a7aff]/15 dark:border-[#e6cf9e] dark:ring-[#e6cf9e]/20'
                                     : 'border-slate-200 dark:border-white/15'
                             }`}
                         >

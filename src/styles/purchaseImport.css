@@ -535,6 +535,36 @@
 .ofi-poi-drop svg { color: var(--ofi-cal-accent); }
 .ofi-poi-drop b { font-size: 13.5px; font-weight: 600; }
 .ofi-poi-drop span { font-size: 11.5px; color: var(--ofi-cal-muted); }
+/* Zwischenablage: der Hinweis im Ablagefeld, die Tasten als Tastenkappen.
+   Auf einem Geraet ohne Tastatur faellt er weg — dort steht «Aus der
+   Zwischenablage einfuegen» im Plus-Menue. */
+.ofi-poi-drop .ofi-poi-pastehint {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.ofi-poi-pastehint kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 19px;
+    padding: 0 5px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 5px;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+}
+.ofi-poi-pastehint kbd:first-of-type { margin-left: 2px; }
+@media (hover: none) and (pointer: coarse) {
+    .ofi-poi-drop .ofi-poi-pastehint { display: none; }
+}
 
 .ofi-poi-file {
     display: flex;
@@ -884,51 +914,6 @@
 .ofi-poi-chipx:hover { background: color-mix(in srgb, currentColor 42%, transparent); }
 
 /* ── Die drei Möglichkeiten im Rechenfenster ──────────────────────────────── */
-.ofi-poi-modeopt {
-    display: flex;
-    align-items: flex-start;
-    gap: 11px;
-    width: 100%;
-    padding: 12px 13px;
-    border: 1px solid var(--ofi-cal-border-soft);
-    border-radius: 10px;
-    background: var(--ofi-cal-surface);
-    text-align: left;
-    cursor: pointer;
-    transition: border-color 140ms ease, background-color 140ms ease;
-}
-.ofi-poi-modeopt + .ofi-poi-modeopt { margin-top: 8px; }
-.ofi-poi-modeopt:hover { border-color: var(--ofi-cal-accent); }
-.ofi-poi-modeopt.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
-.ofi-poi-modeopt i {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    background: var(--ofi-cal-surface-2);
-    color: var(--ofi-cal-muted);
-}
-.ofi-poi-modeopt.is-on i { background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent); }
-.ofi-poi-modeopt div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ofi-poi-modeopt b { font-size: 13.5px; font-weight: 600; color: var(--ofi-cal-text); }
-.ofi-poi-modeopt span { font-size: 11.5px; line-height: 1.5; color: var(--ofi-cal-muted); }
-
-/* ── DIE BESTELLSEITE IM RECHENMODUS ──────────────────────────────────────
-   Vorgabe Samet: «Schaltet man den Rechenmodus ein, soll sich der Bildschirm
-   ändern.» Er tut es hier, wo die Zahlen stehen: die Tabelle bekommt den
-   Werkbank-Grund und eine Kante in der Akzentfarbe. Der Wechsel ist eine
-   Blende, keine Bewegung — die Zeilen springen nicht. */
-.ofi-poi-calcpage {
-    border-radius: 12px;
-    padding: 10px;
-    margin: -10px;
-    background: color-mix(in srgb, var(--ofi-cal-accent) 6%, transparent);
-    box-shadow: inset 0 0 0 1px var(--ofi-cal-accent-soft);
-    transition: background-color 260ms ease, box-shadow 260ms ease;
-}
 
 /* ── Die Spalten der Vorlage ──────────────────────────────────────────────
    Name, Art, weg — mehr braucht eine Spalte nicht, und mehr würde die Liste
@@ -1140,22 +1125,6 @@ table.ofi-poi-table input.is-wide { min-width: 190px; }
 table.ofi-poi-table input:hover { border-color: var(--ofi-cal-border); }
 table.ofi-poi-table input:focus { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-surface); }
 table.ofi-poi-table input.is-num { text-align: right; font-variant-numeric: tabular-nums; }
-
-/* Merkzeichen für die greifende Staffel — winzig, aber es beantwortet die
-   Frage «warum steht hier dieser Preis?» ohne Rückfrage. */
-.ofi-poi-tierflag {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    background: var(--ofi-cal-accent-soft);
-    color: var(--ofi-cal-accent);
-    font-size: 10px;
-    font-weight: 700;
-    white-space: nowrap;
-}
 
 /* ── Fortschritt beim Erkennen ─────────────────────────────────────────── */
 .ofi-poi-progress {

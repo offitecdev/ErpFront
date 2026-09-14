@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { FloatingCard } from '@/pages/calendar/components/FloatingCard';
+import '@/styles/modules/checklists.css';
 
 /**
  * ── DAS FENSTER EINER CHECKLISTE ─────────────────────────────────────────────

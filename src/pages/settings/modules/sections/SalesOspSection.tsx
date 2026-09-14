@@ -5,6 +5,8 @@ import { Check } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { ospApi, type OspSettingsDto } from '@/lib/api/osp';
 import { useAuthStore } from '@/store/authStore';
+import '@/styles/modules/moduleSettings.css';
+import '@/styles/modules/osp.css';
 
 /**
  * VERKAUF → OSP: die Anbindung an die Offitec Selection Platform.

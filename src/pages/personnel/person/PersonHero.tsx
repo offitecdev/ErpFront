@@ -99,7 +99,7 @@ export const PersonHero = ({
                         auf die es ankommt, an den Rand. */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {person.roleName && (
-                            <Chip className="bg-[#272f67] text-white ring-[#272f67] dark:bg-[#e6cf9e] dark:text-[#140f05] dark:ring-[#e6cf9e]">
+                            <Chip className="bg-[#0a7aff] text-white ring-[#0a7aff] dark:bg-[#e6cf9e] dark:text-[#140f05] dark:ring-[#e6cf9e]">
                                 {person.roleName}
                             </Chip>
                         )}

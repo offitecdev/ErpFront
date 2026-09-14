@@ -1002,7 +1002,8 @@
             "errorPdfOnly": "Only PDF files can be uploaded.",
             "errorPdfSize": "PDF exceeds 5 MB limit.",
             "successPdfSave": "Letterhead PDF saved.",
-            "companyNameHint": "Taken from the company selector at the top right: the active tenant’s name is always the one printed."
+            "companyNameHint": "Taken from the company selector at the top right: the active tenant’s name is always the one printed.",
+            "tenantAddressHint": "The selected company has its own address: it is printed on all of its PDFs and cannot be changed here."
         },
         "mail": {
             "breadcrumb": "Settings › Mail",

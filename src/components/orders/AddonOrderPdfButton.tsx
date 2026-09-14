@@ -7,6 +7,7 @@ import { t } from '@/i18n/translate';
 import { lazyToast as toast } from '@/lib/lazyToast';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
 import type { PdfLang } from '@/utils/pdf/tenderPdfModern';
+import '@/styles/modules/projectDetail.css';
 
 /* Die drei Sprachen des Belegs — dieselben drei wie beim Offert-Export, mit
    den Namen in ihrer EIGENEN Sprache (eine Sprachwahl, die sich mitübersetzt,

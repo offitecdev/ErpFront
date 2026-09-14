@@ -206,7 +206,7 @@ export const ExcelImportSheet = ({
             <span
                 className={`flex size-5 items-center justify-center rounded-full text-[10.5px] font-bold ${
                     step === index
-                        ? 'bg-[#272f67] text-white'
+                        ? 'bg-[#0a7aff] text-white'
                         : step > index
                             ? 'bg-emerald-500 text-white'
                             : 'bg-slate-200 text-slate-500 dark:bg-white/15 dark:text-white/60'
@@ -254,7 +254,7 @@ export const ExcelImportSheet = ({
                             type="button"
                             disabled={(step === 0 && !sheet) || (step === 1 && !canLeaveMapping)}
                             onClick={() => goTo((step + 1) as WizardStep)}
-                            className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             {t('common.next')}
                             <ArrowRight size={13} />
@@ -264,7 +264,7 @@ export const ExcelImportSheet = ({
                             type="button"
                             disabled={!canSave}
                             onClick={commit}
-                            className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             <FileCheck02 size={13} />
                             {t('inv.excel.saveToTable', { count: records.length })}
@@ -284,8 +284,8 @@ export const ExcelImportSheet = ({
                         onDrop={onDrop}
                         className={`flex h-64 w-full max-w-xl flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
                             dragOver
-                                ? 'border-[#1f2654] bg-slate-50 dark:bg-white/5'
-                                : 'border-slate-300 hover:border-[#1f2654] hover:bg-slate-50/60 dark:border-white/20 dark:hover:bg-white/5'
+                                ? 'border-[#0066e0] bg-slate-50 dark:bg-white/5'
+                                : 'border-slate-300 hover:border-[#0066e0] hover:bg-slate-50/60 dark:border-white/20 dark:hover:bg-white/5'
                         }`}
                     >
                         <UploadCloud02 size={34} className="text-slate-400" />
@@ -343,7 +343,7 @@ export const ExcelImportSheet = ({
                                             <select
                                                 value={currentIndex}
                                                 onChange={(event) => setMapping((current) => ({ ...current, [field.key]: Number(event.target.value) }))}
-                                                className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[12.5px] text-slate-800 focus:border-[#1f2654] focus:outline-none dark:border-white/15 dark:bg-[#151616] dark:text-white"
+                                                className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[12.5px] text-slate-800 focus:border-[#0066e0] focus:outline-none dark:border-white/15 dark:bg-[#151616] dark:text-white"
                                             >
                                                 <option value={-1}>{t('inv.excel.unmatched')}</option>
                                                 {sheet.headers.map((header, headerIndex) => (
@@ -359,7 +359,7 @@ export const ExcelImportSheet = ({
                                                         type="button"
                                                         title={t('inv.excel.applySuggestion')}
                                                         onClick={() => setMapping((current) => ({ ...current, [field.key]: suggestion.headerIndex }))}
-                                                        className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/5 dark:text-white/70"
+                                                        className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/15 dark:bg-white/5 dark:text-white/70"
                                                     >
                                                         ≈ {suggestion.header}
                                                     </button>
@@ -383,7 +383,7 @@ export const ExcelImportSheet = ({
                                 type="checkbox"
                                 checked={blankUnmatched}
                                 onChange={(event) => setBlankUnmatched(event.target.checked)}
-                                className="size-3.5 accent-[#272f67]"
+                                className="size-3.5 accent-[#0a7aff]"
                             />
                             {t('inv.excel.blankUnmatched')}
                         </label>
@@ -392,7 +392,7 @@ export const ExcelImportSheet = ({
                                 type="checkbox"
                                 checked={skipInvalid}
                                 onChange={(event) => setSkipInvalid(event.target.checked)}
-                                className="size-3.5 accent-[#272f67]"
+                                className="size-3.5 accent-[#0a7aff]"
                             />
                             {t('inv.excel.skipInvalidRows')}
                         </label>

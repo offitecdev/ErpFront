@@ -11,13 +11,13 @@ import {
     Receipt as ReceiptText,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
-import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
 import type {
     ProjectDetailView,
     ProjectSectionKey,
     ProjectSubSectionKey,
 } from '../../types/projectDetailNavigation';
 import { viewForSection } from '../../types/projectDetailNavigation';
+import '@/styles/modules/projectDetail.css';
 
 type SubItem = { key: ProjectSubSectionKey; label: () => string };
 
@@ -87,14 +87,15 @@ const getGroups = (): Group[] => [
 
 // A short, readable badge instead of a bare red dot (per ERP-style requirement).
 const AttentionBadge = ({ label }: { label: string }) => (
-    <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-red-700">
-        {label}
-    </span>
+    <span className="ofi-prj-tabs__badge">{label}</span>
 );
 
-// Horizontal workflow menu. Groups with sub-sections open their dropdown on hover
-// (and on focus/click, so keyboard and touch keep working). Clicking a group jumps
-// to its default sub-section.
+// Horizontal workflow menu — a Mac segmented control since 10.09.2026 (the
+// same one the quote detail's workspace tabs use): a 5% rail, 24px segments,
+// the active one white with a hairline shadow. No underline, no gradient bar.
+// Groups with sub-sections open their dropdown on hover (and on focus/click,
+// so keyboard and touch keep working). Clicking a group jumps to its default
+// sub-section.
 export const ProjectTopNav = ({
     activeView,
     onChange,
@@ -128,14 +129,10 @@ export const ProjectTopNav = ({
     };
 
     return (
-        <nav
-            aria-label="Project workflow"
-            // Same tab strip as the tender detail workspace (TenderWorkspaceTabs):
-            // underline on the page edge, active tab = filled panel + brand
-            // underline + weight. `ofi-quote-tab*` are the dark.css accent hooks.
-            className="ofi-quote-tabs-strip mb-2 min-w-0 overflow-x-auto border-b border-[#dadce0] px-1 pt-1 md:overflow-visible dark:border-white/15"
-        >
-            <SlidingTopTabs activeKey={activeView.section} className="flex min-w-max items-stretch gap-1">
+        <nav aria-label="Project workflow" className="ofi-prj-tabs">
+            {/* `role="tablist"` also keeps the app-wide button standard
+                (styles/buttons.css) off these segments. */}
+            <div className="ofi-prj-tabs__rail" role="tablist">
             {groups.map((group) => {
                 const active = activeView.section === group.section;
                 const badge = sectionAttention(group.section);
@@ -145,12 +142,14 @@ export const ProjectTopNav = ({
                     <div
                         key={group.section}
                         data-tab-key={group.section}
-                        className="relative -mb-px shrink-0"
+                        className="ofi-prj-tabs__item"
                         onMouseEnter={() => hasSubs && openMenu(group.section)}
                         onMouseLeave={scheduleClose}
                     >
                         <button
                             type="button"
+                            role="tab"
+                            aria-selected={active}
                             aria-haspopup={hasSubs || undefined}
                             aria-expanded={hasSubs ? open : undefined}
                             aria-current={active ? 'page' : undefined}
@@ -159,25 +158,18 @@ export const ProjectTopNav = ({
                                 setOpenSection(null);
                             }}
                             onFocus={() => hasSubs && openMenu(group.section)}
-                            className={`ofi-quote-tab inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
-                                active
-                                    ? 'ofi-quote-tab-active border-[#dadce0] bg-[#eef2fb] font-bold text-[#1f2654]'
-                                    : 'border-transparent font-medium text-[#70757a] hover:border-[#dadce0] hover:bg-[#f1f3f4] hover:text-[#1f2654] dark:text-white/70'
-                            }`}
+                            className={`ofi-prj-tab ${active ? 'is-active' : ''}`}
                         >
                             <span>{group.label()}</span>
                             {badge && !active && <AttentionBadge label={badge} />}
                             {hasSubs && (
-                                <ChevronDown
-                                    size={13}
-                                    className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${active ? 'text-[#1f2654]/70 dark:text-[#fbbf24]' : 'text-slate-400'}`}
-                                />
+                                <ChevronDown size={13} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                             )}
                         </button>
 
                         {open && (
                             <div
-                                className="absolute left-0 top-full z-30 mt-1 min-w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-white/15 dark:bg-slate-900"
+                                className="ofi-prj-tabs__menu"
                                 onMouseEnter={cancelClose}
                                 onMouseLeave={scheduleClose}
                             >
@@ -192,11 +184,7 @@ export const ProjectTopNav = ({
                                                 onChange({ section: group.section, subSection: sub.key });
                                                 setOpenSection(null);
                                             }}
-                                            className={`flex w-full items-center justify-between gap-2 whitespace-nowrap px-3.5 py-2 text-left text-[12.5px] font-medium transition-colors ${
-                                                subActive
-                                                    ? 'bg-[#eef4ff] text-[#272f67] dark:bg-[#f59e0b]/15 dark:text-[#fbbf24]'
-                                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-white/70 dark:hover:bg-[#f59e0b]/10 dark:hover:text-[#fbbf24]'
-                                            }`}
+                                            className={`ofi-prj-tabs__menuItem ${subActive ? 'is-active' : ''}`}
                                         >
                                             <span>{sub.label()}</span>
                                             {subBadge && <AttentionBadge label={subBadge} />}
@@ -208,7 +196,7 @@ export const ProjectTopNav = ({
                     </div>
                 );
             })}
-            </SlidingTopTabs>
+            </div>
         </nav>
     );
 };

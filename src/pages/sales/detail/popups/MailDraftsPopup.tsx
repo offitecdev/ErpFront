@@ -124,13 +124,22 @@ export const MailDraftsPopup = ({ open, onClose, currentSubject, currentMessage,
         }
     };
 
+    // Optimistic: the draft leaves the list at once and returns to its place
+    // if the server refuses.
     const deleteDraft = async (draft: TenderMailDraftDto) => {
         setDeletingId(draft.id);
+        const index = drafts.findIndex((d) => d.id === draft.id);
+        setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
         try {
             await tenderApi.deleteMailDraft(draft.id);
-            setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
             toast.success(t('tenders.mail_draft_deleted'));
         } catch (e: any) {
+            setDrafts((prev) => {
+                if (prev.some((d) => d.id === draft.id)) return prev;
+                const restored = [...prev];
+                restored.splice(index < 0 ? restored.length : Math.min(index, restored.length), 0, draft);
+                return restored;
+            });
             toast.error(e.response?.data?.error || t('tenders.mail_draft_delete_failed'));
         } finally {
             setDeletingId(null);

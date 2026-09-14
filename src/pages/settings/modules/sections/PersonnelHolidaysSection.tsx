@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import '@/styles/personnel.css';
 import type { HolidayCatalogEntry, HolidayYear } from '@/pages/personnel/types/personnel';
 import { formatDate } from '@/pages/personnel/utils/format';
+import '@/styles/modules/moduleSettings.css';
 
 /**
  * ── FEIERTAGE (Einstellungen → Module → Personal) ───────────────────────────

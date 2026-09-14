@@ -45,7 +45,7 @@ const KEYS: Record<ReminderEntityType, { title: string; reference: string; leadE
 };
 
 const NUMBER_INPUT_CLASS =
-    'w-16 rounded-md border border-slate-200 bg-white px-2 py-1 text-right font-mono text-[13px] tabular-nums text-slate-900 outline-none transition-colors focus:border-[#1f2654] focus:ring-2 focus:ring-[#1f2654]/15 dark:border-white/20 dark:bg-transparent dark:text-white';
+    'w-16 rounded-md border border-slate-200 bg-white px-2 py-1 text-right font-mono text-[13px] tabular-nums text-slate-900 outline-none transition-colors focus:border-[#0066e0] focus:ring-2 focus:ring-[#0066e0]/15 dark:border-white/20 dark:bg-transparent dark:text-white';
 
 /** "10, 7, 4 und 1" — Aufzählung mit dem sprachrichtigen "und". */
 const joinDays = (days: number[]): string => {

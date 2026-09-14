@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { LuEye, LuEyeOff, LuMoon, LuQrCode, LuSun, LuTriangleAlert } from '@/components/icons/lucideLocal';
 import { InstallAppButton } from '@/components/ui-shared/InstallAppButton';
 import { LoginWave } from '@/components/login/LoginWave';
-import { LoginNotifications } from '@/components/login/LoginNotifications';
+import { LoginUpdateCard } from '@/components/login/LoginUpdateCard';
 import { LoginQrDialog } from '@/components/login/LoginQrDialog';
 import { LoginIntro } from '@/components/login/LoginIntro';
 import { LoginMfaStep, type MfaChallengeView } from '@/components/login/LoginMfaStep';
@@ -215,7 +215,7 @@ export const Login = () => {
             setLoading(true);
             try {
                 const response = await apiClient.post('/auth/login', { email: trimmedEmail, password: rawPassword });
-                /* Das Kennwort allein meldet seit dem 29.09.2026 NICHT mehr an:
+                /* Das Kennwort allein meldet seit dem 09.09.2026 NICHT mehr an:
                    die Antwort ist die Aufforderung zum zweiten Faktor. Das
                    Zwischentoken bleibt im HttpOnly-Keks, hier kommt nur an, was
                    die Fläche zeigen soll. */
@@ -574,7 +574,7 @@ export const Login = () => {
                 <span className="ofi-login__copyright">{t('auth.copyright')}</span>
             </footer>
 
-            <LoginNotifications />
+            <LoginUpdateCard />
             <LoginQrDialog open={qrOpen} onClose={() => setQrOpen(false)} onCredentials={handleQrCredentials} />
         </main>
     );

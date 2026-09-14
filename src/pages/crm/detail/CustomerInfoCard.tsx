@@ -252,7 +252,7 @@ export const CustomerInfoCard = ({
                 aria-expanded={!collapsed}
                 className="ofi-cust-info__head flex w-full items-center gap-2.5 border-b border-slate-200 bg-[#f1f5fd] px-3 py-1.5 text-left transition-colors hover:bg-[#e9effb] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
             >
-                <span className="ofi-cust-info__title text-[13px] font-semibold tracking-[0.01em] text-[#1f2654] dark:text-white">
+                <span className="ofi-cust-info__title text-[13px] font-semibold tracking-[0.01em] text-[#0066e0] dark:text-white">
                     {i18nT('crm.customer_profili')}
                 </span>
                 {collapsed && (
@@ -269,7 +269,7 @@ export const CustomerInfoCard = ({
                 <>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3">
                         <div className="ofi-cust-info__group min-w-0 px-3 py-2">
-                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#0066e0] dark:text-white/80">
                                 {i18nT('crm.customers.customerType')}
                             </span>
                             {textField('companyName', i18nT('crm.customers.companyName'))}
@@ -284,7 +284,7 @@ export const CustomerInfoCard = ({
                             Inhalt (bei `md` rutscht die dritte Spalte in eine zweite Zeile und
                             braucht dort ihre obere Linie). */}
                         <div className="ofi-cust-info__group min-w-0 border-t border-slate-200 px-3 py-2 md:border-l md:border-t-0 dark:border-white/10">
-                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#0066e0] dark:text-white/80">
                                 {i18nT('crm.locationPrimary')}
                             </span>
                             {textField('addressName', i18nT('crm.locationName'))}
@@ -313,7 +313,7 @@ export const CustomerInfoCard = ({
                         </div>
 
                         <div className="ofi-cust-info__group min-w-0 border-t border-slate-200 px-3 py-2 md:border-l lg:border-t-0 dark:border-white/10">
-                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#1f2654] dark:text-white/80">
+                            <span className="ofi-cust-info__grouptitle mb-1.5 block text-[12px] font-semibold text-[#0066e0] dark:text-white/80">
                                 {i18nT('crm.customers.contactData')}
                             </span>
                             {textField('mainEmail', i18nT('common.email'), 'email')}

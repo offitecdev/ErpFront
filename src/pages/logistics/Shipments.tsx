@@ -9,11 +9,9 @@ import {
     CalendarCheck01 as CalendarClock,
     Edit01 as Edit,
     File05 as FileText,
-    FilterLines,
     Plus,
     RefreshCcw01 as RefreshCw,
     Save01 as Save,
-    SearchLg as Search,
     Trash01 as Trash,
     Truck01 as Truck,
     UploadCloud02 as UploadCloud,
@@ -26,6 +24,7 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
+import { FilterSelect, SearchBox } from '../../components/ui-shared/TableKit';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { apiClient } from '../../lib/axios';
 import { projectApi } from '../../lib/api/project';
@@ -300,46 +299,30 @@ export const Shipments = () => {
                 noPadding
             >
                 <form
-                    className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-slate-100 px-3 py-3 [scrollbar-width:thin]"
+                    /* Dieselbe Werkzeugzeile wie die Kundenliste (Samet 09.09.2026: «filtreleri CRM'deki gibi yap»). */
+                    className="ofi-filterbar px-3 py-3"
                     onSubmit={(event) => {
                         event.preventDefault();
                         void loadShipments();
                     }}
                 >
-                    <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
-                        <FilterLines size={16} />
-                    </div>
-                    <div className="relative shrink-0">
-                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <Input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={t('logistics.fo_cmr_aw_firma_ara')}
-                            className="ofi-light-search-input w-[230px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400"
-                        />
-                    </div>
-                    <div className="w-[145px] shrink-0">
-                        <Select value={status} onChange={(e) => setStatus(e.target.value as ShipmentStatus | '')}>
-                            <option value="">{t('logistics.tum_durumlar')}</option>
-                            {Object.entries(getStatusLabel()).map(([key, label]) => (
-                                <option key={key} value={key}>{label}</option>
-                            ))}
-                        </Select>
-                    </div>
-                    <div className="w-[125px] shrink-0">
-                        <Select value={etaFilter} onChange={(e) => setEtaFilter(e.target.value as typeof etaFilter)}>
-                            <option value="ALL">{t('logistics.tum_eta')}</option>
-                            <option value="WARNING">{t('logistics.eta_uyarisi')}</option>
-                            <option value="UPCOMING">{t('logistics.yaklasan_eta')}</option>
-                        </Select>
-                    </div>
-                    <div className="w-[135px] shrink-0">
-                        <Select value={invoiceFilter} onChange={(e) => setInvoiceFilter(e.target.value as typeof invoiceFilter)}>
-                            <option value="ALL">{t('logistics.tum_faturalar')}</option>
-                            <option value="WITH">{t('logistics.faturali')}</option>
-                            <option value="WITHOUT">{t('logistics.faturasiz')}</option>
-                        </Select>
-                    </div>
+                    <SearchBox value={search} onChange={setSearch} placeholder={t('logistics.fo_cmr_aw_firma_ara')} />
+                    <FilterSelect value={status} onChange={(next) => setStatus(next as ShipmentStatus | '')} label={t('common.status')}>
+                        <option value="">{t('logistics.tum_durumlar')}</option>
+                        {Object.entries(getStatusLabel()).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </FilterSelect>
+                    <FilterSelect value={etaFilter} onChange={(next) => setEtaFilter(next as typeof etaFilter)} label={t('logistics.tum_eta')}>
+                        <option value="ALL">{t('logistics.tum_eta')}</option>
+                        <option value="WARNING">{t('logistics.eta_uyarisi')}</option>
+                        <option value="UPCOMING">{t('logistics.yaklasan_eta')}</option>
+                    </FilterSelect>
+                    <FilterSelect value={invoiceFilter} onChange={(next) => setInvoiceFilter(next as typeof invoiceFilter)} label={t('logistics.tum_faturalar')}>
+                        <option value="ALL">{t('logistics.tum_faturalar')}</option>
+                        <option value="WITH">{t('logistics.faturali')}</option>
+                        <option value="WITHOUT">{t('logistics.faturasiz')}</option>
+                    </FilterSelect>
                     <Button type="submit" variant="secondary" size="sm" className="shrink-0">{t('logistics.uygula')}</Button>
                     <Button type="button" variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={clearFilters} className="shrink-0">{t('common.clear')}</Button>
                 </form>

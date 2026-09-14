@@ -69,13 +69,13 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewTask }) => {
                         key={action.id}
                         type="button"
                         onClick={action.onClick}
-                        className={`${CLS_LIGHT_GLASS} flex items-center gap-2.5 rounded-2xl px-4 py-3 text-left text-[13.5px] font-semibold text-[#1A1A1A] transition-colors duration-150 hover:border-[#C9D0DF] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#07145c]/25 dark:text-white dark:hover:bg-white/10`}
+                        className={`${CLS_LIGHT_GLASS} flex items-center gap-2.5 rounded-2xl px-4 py-3 text-left text-[13.5px] font-semibold text-[#1A1A1A] transition-colors duration-150 hover:border-[#C9D0DF] hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0052b8]/25 dark:text-white dark:hover:bg-white/10`}
                     >
-                        <span className="relative flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#07145c]/8 text-[#07145c] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]">
+                        <span className="relative flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#0052b8]/8 text-[#0052b8] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]">
                             <Icon size={16} />
                             <Plus
                                 size={11}
-                                className="absolute -right-1 -top-1 rounded-full bg-white p-px text-[#07145c] dark:bg-[#151616] dark:text-[#e6cf9e]"
+                                className="absolute -right-1 -top-1 rounded-full bg-white p-px text-[#0052b8] dark:bg-[#151616] dark:text-[#e6cf9e]"
                             />
                         </span>
                         <span className="truncate">{t(action.labelKey, { defaultValue: action.defaultLabel })}</span>

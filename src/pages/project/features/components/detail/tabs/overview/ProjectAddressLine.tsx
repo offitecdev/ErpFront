@@ -2,6 +2,7 @@ import { memo } from 'react';
 
 import { Mail01, MarkerPin01, Phone } from '@/components/icons/antIconCompat';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * Adresse UND Kontakt als ERSTE Zeile der Übersicht (Benutzerwunsch).

@@ -6,6 +6,7 @@ import { t } from '@/i18n/translate';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import type { TenderListItem } from '@/types/tender';
 import { fmtDate } from '../ui';
+import '@/styles/modules/checklists.css';
 
 /**
  * Die AUFKLAPPLISTE der Angebote eines Kunden (Vorgabe Samet, 02.09.2026):

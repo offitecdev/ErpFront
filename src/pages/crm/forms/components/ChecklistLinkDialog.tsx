@@ -11,6 +11,8 @@ import { apiErrorMessage } from '../ui';
 import { CustomerSearchField } from './CustomerSearchField';
 import { CustomerSelectModal } from './CustomerSelectModal';
 import { OfferDropdown } from './OfferDropdown';
+import '@/styles/modules/reportEditor.css';
+import '@/styles/modules/checklists.css';
 
 /**
  * ── VERKNÜPFEN: KUNDE + ANGEBOT(E) ──────────────────────────────────────────

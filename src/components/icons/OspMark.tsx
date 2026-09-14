@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import '@/styles/modules/osp.css';
 
 /**
  * ── DAS OSP-ZEICHEN ─────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ export const OspMark = ({
                     <defs>
                         <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="48" y2="48">
                             <stop offset="0%" stopColor="#3d4a92" />
-                            <stop offset="55%" stopColor="#272f67" />
+                            <stop offset="55%" stopColor="#0a7aff" />
                             <stop offset="100%" stopColor="#1b2049" />
                         </linearGradient>
                     </defs>
@@ -149,7 +150,7 @@ export const OspPdfIcon = ({
         </g>
         {/* Das Fähnchen — dort, wo ein PDF sein rotes trägt. */}
         <g>
-            <path d="M4 13h20a1.6 1.6 0 0 1 1.6 1.6v6.2A1.6 1.6 0 0 1 24 22.4H4Z" fill="#272f67" />
+            <path d="M4 13h20a1.6 1.6 0 0 1 1.6 1.6v6.2A1.6 1.6 0 0 1 24 22.4H4Z" fill="#0a7aff" />
             <text
                 x="14.4"
                 y="17.9"

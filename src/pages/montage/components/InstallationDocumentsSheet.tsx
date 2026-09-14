@@ -25,7 +25,7 @@ const TabButton = ({ active, icon, children, onClick }: {
         onClick={onClick}
         className={`inline-flex min-h-11 items-center gap-2 border-b-2 px-4 text-[13.5px] font-semibold transition-colors ${
             active
-                ? 'border-[#1f2654] text-[#1f2654] dark:border-amber-400 dark:text-amber-300'
+                ? 'border-[#0066e0] text-[#0066e0] dark:border-amber-400 dark:text-amber-300'
                 : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-white/55 dark:hover:bg-white/5 dark:hover:text-white'
         }`}
     >
@@ -44,9 +44,9 @@ const DocumentCard = ({ icon, title, description, disabled, onClick }: {
         type="button"
         disabled={disabled}
         onClick={onClick}
-        className="group flex min-h-[92px] w-full items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 text-left shadow-sm transition hover:-translate-y-px hover:border-[#1f2654]/35 hover:shadow-md disabled:cursor-default disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:border-slate-200 disabled:hover:shadow-sm dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-amber-400/40"
+        className="group flex min-h-[92px] w-full items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 text-left shadow-sm transition hover:-translate-y-px hover:border-[#0066e0]/35 hover:shadow-md disabled:cursor-default disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:border-slate-200 disabled:hover:shadow-sm dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-amber-400/40"
     >
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#eef2fb] text-[#1f2654] group-hover:bg-[#1f2654] group-hover:text-white dark:bg-amber-500/10 dark:text-amber-300 dark:group-hover:bg-amber-500 dark:group-hover:text-black">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#eef2fb] text-[#0066e0] group-hover:bg-[#0066e0] group-hover:text-white dark:bg-amber-500/10 dark:text-amber-300 dark:group-hover:bg-amber-500 dark:group-hover:text-black">
             {icon}
         </span>
         <span className="min-w-0">
@@ -95,7 +95,7 @@ export const InstallationDocumentsSheet = ({ row, onClose }: {
             onClose={onClose}
             width={1180}
             zIndex={600}
-            headerActions={<LuFolderOpen size={18} className="text-[#1f2654] dark:text-amber-300" />}
+            headerActions={<LuFolderOpen size={18} className="text-[#0066e0] dark:text-amber-300" />}
         >
             <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 backdrop-blur dark:border-white/10 dark:bg-[#17191c]/95 sm:px-8">
                 <nav role="tablist" aria-label={t('montage.documents.title')} className="flex items-center gap-1">

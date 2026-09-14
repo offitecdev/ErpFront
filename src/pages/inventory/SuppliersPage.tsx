@@ -139,7 +139,7 @@ export const SuppliersPage = () => {
                         aria-label={t('inv.suppliers.add')}
                         title={t('inv.suppliers.add')}
                         onClick={openCreate}
-                        className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
+                        className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0]"
                     >
                         <Plus size={14} />
                         {t('inv.suppliers.add')}
@@ -214,7 +214,7 @@ export const SuppliersPage = () => {
                                             type="button"
                                             aria-label={t('common.edit')}
                                             onClick={() => openEdit(supplier)}
-                                            className="inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] dark:hover:bg-white/10 dark:hover:text-white"
+                                            className="inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0066e0] dark:hover:bg-white/10 dark:hover:text-white"
                                         >
                                             <Edit01 size={13} />
                                         </button>
@@ -251,7 +251,7 @@ export const SuppliersPage = () => {
                             type="button"
                             disabled={saving}
                             onClick={() => void save()}
-                            className="rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-md bg-[#0a7aff] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             {saving ? t('common.loading') : t('common.save')}
                         </button>

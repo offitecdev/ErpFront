@@ -1,0 +1,373 @@
+/* reportEditor — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+html.dark .ofi-fr-editor,
+html.dark .ofi-fr-stage,
+html.dark .ofi-mtg-screen {
+    /* Der Grund sinkt unter die Karte, statt wie in Hell darüber zu liegen —
+       sonst verschwimmen Gruppe und Grund zu einer Platte. Und ein Feld bleibt
+       hier eine STUFE der dunklen Fläche: «weiss» ist eine Vorgabe für das
+       helle Kleid, im Dunkeln wäre es ein Scheinwerfer. */
+    /* Die Ersatzwerte stehen daneben, weil dark.css erst beim Umschalten
+       nachgeladen wird: ohne sie wäre der Grund im ersten Lidschlag durchsichtig
+       und der Rapport bliebe kurz weiss. */
+    --ofi-ios-group: var(--ofi-d-bg, #0f1113);
+    --ofi-ios-card: var(--ofi-d-surface, #17191c);
+    --ofi-ios-sep: rgba(255, 246, 232, 0.09);
+    --ofi-ios-label: rgba(255, 255, 255, 0.45);
+    --ofi-ios-field: rgba(255, 255, 255, 0.06);
+    --ofi-ios-line: rgba(255, 246, 232, 0.14);
+}
+/* Im Fenster ist die Bühne ein Flex-Kind: sie muss den Rest der Karte füllen,
+   sonst endet das Grau mitten im Weissen, sobald das Fenster grösser ist als
+   der Rapport. */
+.ofi-fr-stage { flex: 1 1 auto; padding: 18px 14px 24px; }
+
+.ofi-fr-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background: transparent;
+    padding: 0;
+}
+
+.ofi-ios-group__title {
+    padding: 0 16px 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-ios-label);
+}
+.ofi-ios-card {
+    overflow: hidden;
+    border-radius: var(--ofi-ios-radius);
+    background: var(--ofi-ios-card);
+}
+.ofi-ios-group__footer {
+    padding: 7px 16px 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ofi-ios-label);
+}
+
+/* Die Haarlinie ist ein Pseudo-Element und KEIN `border-top`: sie muss links
+   eingerückt beginnen (16px) und rechts am Kartenrand enden — genau so trennt
+   iOS seine Zeilen. Auf eine Tabelle folgt sie nicht: die Tabelle zieht ihre
+   Abschlusslinie weiter unten selbst. */
+.ofi-ios-card > * { position: relative; }
+.ofi-ios-card > * + *::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 0;
+    height: 1px;
+    background: var(--ofi-ios-sep);
+}
+/* Eine Tabelle steht in `.ofi-ios-tablewrap`; sie zieht ihre Abschlusslinie
+   selbst (siehe unten), also bekommt die Zeile DANACH keine zweite. */
+.ofi-ios-tablewrap + *::before { content: none; }
+
+.ofi-ios-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--ofi-ios-row);
+    padding: 7px 16px;
+    font-size: 14.5px;
+    color: var(--ofi-cal-text);
+}
+/* Eine Zeile, die ein FELD trägt, richtet oben aus — ein mehrzeiliger Text
+   soll nach unten wachsen und die Nummer nicht mitziehen. */
+.ofi-ios-row.is-field { align-items: flex-start; padding: 8px 10px 8px 16px; }
+.ofi-ios-row__label { flex: 0 0 auto; min-width: 0; }
+.ofi-ios-row__value {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    text-align: right;
+    color: var(--ofi-ios-label);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ios-row__value.is-strong { font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-ios-row__sub { font-size: 11.5px; color: var(--ofi-cal-faint); }
+.ofi-ios-num {
+    flex: 0 0 auto;
+    width: 20px;
+    padding-top: 9px;
+    text-align: right;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-ios-label);
+}
+
+/* Die Zeit am rechten Rand der Zeile ist seit dem 02.09.2026 KEIN Browserfeld
+   mehr, sondern ein Knopf, der das Zeitfenster aufschlägt (`TimeField`). Er
+   sieht aus wie ein Feld — weiss, mit Kante — und trägt rechts das Winkelchen,
+   das sagt: hier geht etwas auf. */
+#root .ofi-fr-editor .ofi-ios-time,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    min-height: 34px;
+    width: auto;
+    border: 1px solid var(--ofi-ios-line);
+    border-radius: 9px !important;
+    background: var(--ofi-ios-field);
+    padding: 0 10px;
+    font-size: 14.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    outline: none;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-ios-time > svg,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time > svg { color: var(--ofi-ios-label); }
+#root .ofi-fr-editor .ofi-ios-time:hover:not(:disabled),
+body > :not(#root) .ofi-fr-editor .ofi-ios-time:hover:not(:disabled) { border-color: var(--ofi-cal-accent); }
+#root .ofi-fr-editor .ofi-ios-time__value,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time__value { font-weight: 600; }
+/* Das Winkelchen ist die leiseste Angabe des Knopfes — es sagt nur, dass hier
+   etwas aufgeht, und darf die Zeit nicht überstimmen. */
+#root .ofi-fr-editor .ofi-ios-time > svg.ofi-ios-time__caret,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time > svg.ofi-ios-time__caret { color: var(--ofi-cal-faint); }
+#root .ofi-fr-editor .ofi-ios-time:disabled,
+body > :not(#root) .ofi-fr-editor .ofi-ios-time:disabled { opacity: 0.55; }
+
+/* Schreibfelder: WEISS und mit einer eigenen Kante (Vorgabe Samet,
+   02.09.2026). Vorher waren sie randlos und wurden erst beim Anfassen grau —
+   auf einer weissen Karte sah eine leere Arbeitszeile damit aus wie gar kein
+   Feld. Jetzt sieht man, wo man schreibt, bevor man hinfasst; beim Anfassen
+   wechselt nur noch die Kante auf die Akzentfarbe. */
+#root .ofi-fr-editor .ofi-ios-textarea,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea {
+    flex: 1 1 auto;
+    min-height: 46px;
+    resize: vertical;
+    border: 1px solid var(--ofi-ios-line);
+    border-radius: 9px;
+    background: var(--ofi-ios-field);
+    padding: 10px 12px;
+    font-size: 14.5px;
+    line-height: 1.45;
+    color: var(--ofi-cal-text);
+    outline: none;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-ios-textarea::placeholder,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea::placeholder { color: var(--ofi-cal-faint); }
+#root .ofi-fr-editor .ofi-ios-textarea:hover:not(:disabled),
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea:hover:not(:disabled) { border-color: var(--ofi-cal-muted); }
+#root .ofi-fr-editor .ofi-ios-textarea:focus,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea:focus {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-ios-field);
+}
+/* Das Notizfeld füllt seine Gruppe ganz aus. */
+#root .ofi-fr-editor .ofi-ios-textarea.is-block,
+body > :not(#root) .ofi-fr-editor .ofi-ios-textarea.is-block {
+    display: block;
+    width: 100%;
+    min-height: 240px;
+    border-radius: var(--ofi-ios-radius);
+    padding: 14px 16px;
+    line-height: 1.6;
+}
+
+/* Das Eingabefeld IN der Kostentabelle — gleiche Höhe wie eine iOS-Zeile,
+   dasselbe weisse Kleid mit Kante wie die übrigen Felder. */
+#root .ofi-fr-editor .ofi-ios-cellinput,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput {
+    width: 100%;
+    height: 34px;
+    border: 1px solid var(--ofi-ios-line);
+    border-radius: 8px;
+    background: var(--ofi-ios-field);
+    padding: 0 10px;
+    font-size: 13.5px;
+    color: var(--ofi-cal-text);
+    outline: none;
+    box-shadow: none;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-ios-cellinput::placeholder,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput::placeholder { color: var(--ofi-cal-faint); }
+#root .ofi-fr-editor .ofi-ios-cellinput:hover,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput:hover { border-color: var(--ofi-cal-muted); }
+#root .ofi-fr-editor .ofi-ios-cellinput:focus,
+body > :not(#root) .ofi-fr-editor .ofi-ios-cellinput:focus {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-ios-field);
+}
+
+/* Die Hinzufügen-Zeile: ein Ring mit Plus, daneben das Wort — in iOS steht
+   sie IMMER als letzte Zeile der Gruppe und nicht als Knopf daneben. */
+#root .ofi-ios-add,
+body > :not(#root) .ofi-ios-add {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--ofi-ios-row);
+    border: 0;
+    background: transparent;
+    padding: 8px 16px;
+    text-align: left;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-accent);
+    transition: background-color 140ms ease;
+}
+#root .ofi-ios-add:hover,
+body > :not(#root) .ofi-ios-add:hover { background: var(--ofi-cal-hover); }
+.ofi-ios-add__ring {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 21px;
+    height: 21px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+/* Löschen ist still: grau, bis man daraufzeigt. */
+#root .ofi-ios-minus,
+body > :not(#root) .ofi-ios-minus {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-ios-minus:hover:not(:disabled),
+body > :not(#root) .ofi-ios-minus:hover:not(:disabled) { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+#root .ofi-ios-minus:disabled,
+body > :not(#root) .ofi-ios-minus:disabled { opacity: 0.25; }
+
+/* Den Haken vor einem schon gewählten Artikel gibt es seit dem 02.09.2026
+   nicht mehr: ein gewählter Artikel STEHT nicht mehr in der Liste (Vorgabe
+   Samet — «das Hinzugefügte soll ganz aus der Liste verschwinden»), also gibt
+   es auch nichts mehr anzuhaken. Siehe `.ofi-artpick-*` weiter unten. */
+
+/* ── Die Kostentabelle in der Gruppe ────────────────────────────────────────
+   Sie BLEIBT eine Tabelle (die Spalten sind ziehbar und die Beträge müssen an
+   einer Kante enden), trägt aber das Kleid der Liste: eine graue Kopfzeile
+   ohne Fläche und dieselben eingerückten Haarlinien.
+
+   Die UNTERSTE Linie ist eine ausdrückliche Vorgabe (Samet, 02.09.2026: «in
+   der Kostentabelle auf dem Montage-Bildschirm fehlt die untere Linie»). Sie
+   fehlte, weil die Grundregel jeder App-Tabelle die letzte Zeile absichtlich
+   offen lässt (`tbody tr:last-child td { border-bottom-color: transparent }`,
+   ganz oben in dieser Datei) — dort schliesst sonst der Kartenrand ab. In der
+   Gruppe steht darunter aber noch die Hinzufügen-Zeile, und ohne Linie klebte
+   die letzte Kostenzeile an ihr. */
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] thead th {
+    background: transparent;
+    border-bottom: 1px solid var(--ofi-ios-sep);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ofi-ios-label);
+}
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] tbody tr:last-child td {
+    border-bottom: 1px solid var(--ofi-ios-sep);
+}
+/* Die senkrechten Rasterlinien der ziehbaren Spalten bleiben, nehmen aber den
+   ruhigeren Ton der Liste an. */
+.ofi-fr-editor .ofi-ios-card table[data-grid-lines] { --quote-grid-line: var(--ofi-ios-sep); }
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] td,
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] th { padding-left: 12px; padding-right: 12px; }
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] td:first-child,
+.ofi-fr-editor .ofi-ios-card table[data-inv-table] th:first-child { padding-left: 16px; }
+
+/* ── Register als iOS-Segmentwähler ─────────────────────────────────────────
+   Eine graue Schiene, gleich breite Abschnitte, das aktive als weisse Pille.
+   Damit stehen «Ausgeführte Arbeiten» und «Technische Notizen» NEBEN den
+   übrigen und nicht mehr links gegen rechts (Vorgabe 02.09.2026). */
+.ofi-fr-editor .ofi-fr-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    border-radius: 10px;
+    background: rgba(118, 118, 128, 0.12);
+    padding: 2px;
+}
+html.dark .ofi-fr-editor .ofi-fr-tabs { background: rgba(255, 255, 255, 0.07); }
+#root .ofi-fr-editor .ofi-fr-tab,
+body > :not(#root) .ofi-fr-editor .ofi-fr-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 32px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 8px !important;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-fr-editor .ofi-fr-tab:hover,
+body > :not(#root) .ofi-fr-editor .ofi-fr-tab:hover { background: rgba(118, 118, 128, 0.1); }
+#root .ofi-fr-editor .ofi-fr-tab.is-active,
+body > :not(#root) .ofi-fr-editor .ofi-fr-tab.is-active {
+    background: var(--ofi-ios-card);
+    color: var(--ofi-cal-text);
+    font-weight: 600;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+/* Im Dunkeln liegt die Kartenfarbe zu nah an der Schiene: der gewählte
+   Abschnitt steigt darum eine Stufe höher, sonst sieht man nicht, wo man ist. */
+html.dark #root .ofi-fr-editor .ofi-fr-tab.is-active,
+html.dark body > :not(#root) .ofi-fr-editor .ofi-fr-tab.is-active {
+    background: var(--ofi-d-surface-3);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Unterschriften im selben Kleid ─────────────────────────────────────────
+   Die Signaturkarte verliert ihren Rahmen und wird eine Gruppe wie die
+   anderen; die Schreibfläche bleibt weiss, weil die Tinte darauf liegt. */
+.ofi-fr-editor .ofi-sign-card {
+    border: 0;
+    border-radius: var(--ofi-ios-radius);
+    background: var(--ofi-ios-card);
+}
+.ofi-fr-editor .ofi-sign-card__head { min-height: var(--ofi-ios-row); padding: 6px 10px 6px 16px; }
+.ofi-fr-editor .ofi-sign-card__pad {
+    border-top: 1px solid var(--ofi-ios-sep);
+    border-bottom: 0;
+}
+.ofi-fr-editor .ofi-sign-card__caption { padding: 9px 16px 12px; font-size: 12px; color: var(--ofi-ios-label); }
+.ofi-fr-editor .ofi-fr-signs { gap: 14px; }
+.ofi-fr-editor .ofi-fr-signs .ofi-sign-card__label { font-size: 14.5px; font-weight: 600; }

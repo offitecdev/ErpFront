@@ -86,7 +86,7 @@ export const PositionPricingSection: React.FC<{
     };
     const discountModeButtonClass = (active: boolean) =>
         `rounded px-1.5 py-0.5 text-[10.5px] font-semibold transition-colors ${
-            active ? 'bg-[#1f2654] text-white' : 'text-slate-500 hover:bg-white hover:text-[#1f2654]'
+            active ? 'bg-[#0066e0] text-white' : 'text-slate-500 hover:bg-white hover:text-[#0066e0]'
         }`;
     return (
     <div className="border border-slate-200/70 rounded-[2px] p-3 bg-white space-y-2.5">

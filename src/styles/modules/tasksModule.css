@@ -1,0 +1,889 @@
+/* =========================================================
+   Offitec — GÖREVLER / TASKS-MODUL: GRUNDBLATT (13.09.2026)
+
+   Vorgabe Samet: «tasarımı inventory / tender detail swift ui mac os
+   olacak … pop up buton hepsi swift ui mac ui … çok renkli çok ai
+   olmasın, sade Apple». Das Modul steht wie das Lager in der
+   `.ofi-list-apple.ofi-lager`-Hülle (routes → lagerPage) und liest
+   dessen Palette `--la-*` (styles/listApple.css). Hier steht nur,
+   was das Modul selbst mitbringt — alles unter `.ofi-gv` («görev»),
+   damit nichts in die CRM-Aufgaben (`.ofi-task*`) übergreift.
+
+   Sprache der Formen — ein natives Mac-Fenster, nicht apple.com:
+     · Tafeln weiss, 1px Haarlinie, 10px Ecke, KEIN Schatten
+     · Bedienelemente 28px, 6px Ecke, umrandet; EIN Systemblau
+     · Marken (Status, Etikett) = umrandete 5px-Kästchen, Farbe nur
+       im Text/Punkt, keine getönten Flächen
+     · Schrift klein (12–13px), Überschriften halbfett, Satzanfang
+       gross — keine Versalien
+
+   Seiten mit eigenem Blatt (Detail, Pano, Chat, Berichte) importieren
+   dieses Grundblatt UND ihr eigenes (styles/modules/tasks*.css).
+   Fenster hängen ausserhalb von #root: Regeln für Popup-Inhalte
+   tragen den Portal-Zwilling `body > :not(#root)`.
+   ========================================================= */
+
+.ofi-gv {
+    --gv-surface: var(--la-surface, var(--ofi-cal-surface, #fff));
+    --gv-text: var(--la-text, var(--ofi-cal-text, #1d1d1f));
+    --gv-secondary: var(--la-secondary, var(--ofi-cal-muted, #6e6e73));
+    --gv-muted: var(--la-muted, var(--ofi-cal-muted, #a1a1a6));
+    --gv-border: var(--la-border, var(--ofi-cal-border, rgba(0, 0, 0, 0.1)));
+    --gv-hairline: var(--la-hairline, rgba(0, 0, 0, 0.07));
+    --gv-field-border: var(--la-field-border, var(--ofi-cal-border, rgba(0, 0, 0, 0.14)));
+    --gv-field-border-hover: var(--la-field-border-hover, var(--ofi-cal-border, rgba(0, 0, 0, 0.26)));
+    --gv-hover: var(--la-hover, var(--ofi-cal-hover, rgba(0, 0, 0, 0.03)));
+    --gv-fill: var(--la-fill, var(--ofi-cal-hover, rgba(0, 0, 0, 0.045)));
+    --gv-accent: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+    --gv-accent-soft: var(--la-accent-soft, var(--ofi-cal-accent-soft, rgba(10, 122, 255, 0.09)));
+    --gv-focus: var(--la-focus, rgba(10, 122, 255, 0.3));
+    --gv-danger: var(--la-danger, #d70015);
+    --gv-success: var(--la-success, #1f8a3b);
+    --gv-warning: var(--la-warning, #b25000);
+    --gv-purple: #8944ab;
+    --gv-radius: 10px;
+    --gv-control-radius: 6px;
+    --gv-control-h: 28px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    color: var(--gv-text);
+    font-size: 13px;
+}
+
+.dark .ofi-gv {
+    --gv-purple: #bf5af2;
+}
+
+/* ── Modulleiste: Titel, Reiter, laufende Messung ───────────────────────── */
+
+.ofi-gv-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.ofi-gv-bar__spacer { flex: 1 1 auto; }
+
+/* Segmentierte Reiter wie in der Offerte: 5 % Schiene, 24px Segmente. */
+.ofi-gv-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--gv-fill);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ofi-gv-nav::-webkit-scrollbar { display: none; }
+
+#root .ofi-gv .ofi-gv-nav__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-nav__item:hover { color: var(--gv-text); }
+
+#root .ofi-gv .ofi-gv-nav__item.is-active {
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    box-shadow: 0 0 0 0.5px var(--gv-border), 0 1px 1.5px rgba(0, 0, 0, 0.08);
+}
+
+.ofi-gv-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--gv-fill);
+    color: var(--gv-secondary);
+    font-size: 10.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv-count.is-accent {
+    background: var(--gv-accent);
+    color: #fff;
+}
+
+/* Ust filtreler: Apple mavisi yalnizca etkileşimde; secili deger, gri rayin
+   uzerinde belirgin beyaz bir kart olarak kalir. TableKit'in ortak mavi dolgu
+   siniflarini bu modul icinde bilincli olarak ezer. */
+#root .ofi-gv .ofi-togglegroup,
+body > :not(#root) .ofi-gv .ofi-togglegroup {
+    border-color: var(--gv-border);
+    background: var(--gv-fill);
+    padding: 3px;
+    gap: 2px;
+}
+
+#root .ofi-gv .ofi-togglegroup__btn,
+body > :not(#root) .ofi-gv .ofi-togglegroup__btn {
+    color: var(--gv-secondary);
+    background: transparent;
+    box-shadow: none;
+    transition: color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+#root .ofi-gv .ofi-togglegroup__btn:hover:not(.is-on),
+body > :not(#root) .ofi-gv .ofi-togglegroup__btn:hover:not(.is-on) {
+    color: var(--gv-accent);
+    background: var(--gv-accent-soft);
+}
+
+#root .ofi-gv .ofi-togglegroup__btn.is-on,
+body > :not(#root) .ofi-gv .ofi-togglegroup__btn.is-on {
+    color: var(--gv-text);
+    background: var(--gv-surface);
+    box-shadow: 0 0 0 0.5px var(--gv-border), 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+#root .ofi-gv .ofi-togglegroup__btn:focus-visible,
+body > :not(#root) .ofi-gv .ofi-togglegroup__btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+/* ── Tafeln ─────────────────────────────────────────────────────────────── */
+
+.ofi-gv-panel {
+    background: var(--gv-surface);
+    border: 1px solid var(--gv-border);
+    border-radius: var(--gv-radius);
+    min-width: 0;
+}
+
+.ofi-gv-panel__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--gv-hairline);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ofi-gv-panel__body { padding: 12px; }
+
+.ofi-gv-caption {
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+.ofi-gv-muted { color: var(--gv-secondary); }
+
+.ofi-gv-empty {
+    padding: 40px 16px;
+    text-align: center;
+    color: var(--gv-secondary);
+    font-size: 13px;
+}
+
+.ofi-gv-empty__title {
+    color: var(--gv-text);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+/* ── Knöpfe (ausserhalb des Hausknopfs: `ofi-btn-plain` in der Klasse) ──── */
+
+#root .ofi-gv .ofi-gv-btn,
+body > :not(#root) .ofi-gv-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: var(--gv-control-h, 28px);
+    padding: 0 10px;
+    border: 1px solid var(--la-field-border, var(--ofi-cal-border, rgba(0, 0, 0, 0.14)));
+    border-radius: 6px;
+    background: var(--la-surface, var(--ofi-cal-surface, #fff));
+    color: var(--la-text, var(--ofi-cal-text, #1d1d1f));
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-btn:hover:not(:disabled),
+body > :not(#root) .ofi-gv-btn:hover:not(:disabled) {
+    background: var(--la-hover, var(--ofi-cal-hover, rgba(0, 0, 0, 0.03)));
+    border-color: var(--la-field-border-hover, var(--ofi-cal-border, rgba(0, 0, 0, 0.26)));
+}
+
+#root .ofi-gv .ofi-gv-btn.is-primary,
+body > :not(#root) .ofi-gv-btn.is-primary {
+    background: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+    border-color: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+}
+
+#root .ofi-gv .ofi-gv-btn.is-primary:hover:not(:disabled),
+body > :not(#root) .ofi-gv-btn.is-primary:hover:not(:disabled) {
+    background: #0066e0;
+    border-color: #0066e0;
+    color: #fff;
+}
+
+#root .ofi-gv .ofi-gv-btn.is-danger,
+body > :not(#root) .ofi-gv-btn.is-danger {
+    color: var(--la-danger, #d70015);
+    -webkit-text-fill-color: var(--la-danger, #d70015);
+}
+
+#root .ofi-gv .ofi-gv-btn:disabled,
+body > :not(#root) .ofi-gv-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+#root .ofi-gv .ofi-gv-btn:focus-visible,
+body > :not(#root) .ofi-gv-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--la-focus, rgba(10, 122, 255, 0.3));
+}
+
+/* Quadratische Symbolknöpfe (28px), leise in Ruhe. */
+#root .ofi-gv .ofi-gv-iconbtn,
+body > :not(#root) .ofi-gv-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--la-secondary, var(--ofi-cal-muted, #6e6e73));
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-iconbtn:hover:not(:disabled),
+body > :not(#root) .ofi-gv-iconbtn:hover:not(:disabled) {
+    background: var(--la-fill, var(--ofi-cal-hover, rgba(0, 0, 0, 0.045)));
+    color: var(--la-text, var(--ofi-cal-text, #1d1d1f));
+}
+
+#root .ofi-gv .ofi-gv-iconbtn.is-on,
+body > :not(#root) .ofi-gv-iconbtn.is-on {
+    color: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+    background: var(--la-accent-soft, var(--ofi-cal-accent-soft, rgba(10, 122, 255, 0.09)));
+}
+
+#root .ofi-gv .ofi-gv-iconbtn.is-danger:hover:not(:disabled),
+body > :not(#root) .ofi-gv-iconbtn.is-danger:hover:not(:disabled) {
+    color: var(--la-danger, #d70015);
+}
+
+#root .ofi-gv .ofi-gv-iconbtn.is-small,
+body > :not(#root) .ofi-gv-iconbtn.is-small {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+}
+
+#root .ofi-gv .ofi-gv-iconbtn:disabled,
+body > :not(#root) .ofi-gv-iconbtn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Marken ─────────────────────────────────────────────────────────────── */
+
+.ofi-gv-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 6px;
+    border: 1px solid var(--gv-border, var(--ofi-cal-border, rgba(0, 0, 0, 0.1)));
+    border-radius: 5px;
+    color: var(--gv-secondary, var(--ofi-cal-muted, #6e6e73));
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ofi-gv-status::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.85;
+}
+
+.ofi-gv-status.is-progress { color: var(--gv-accent, var(--ofi-cal-accent, #0a7aff)); }
+.ofi-gv-status.is-review { color: var(--gv-warning, #b25000); }
+.ofi-gv-status.is-done { color: var(--gv-success, #1f8a3b); }
+.ofi-gv-status.is-alert { color: var(--gv-danger, #d70015); }
+
+.ofi-gv-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 180px;
+    height: 20px;
+    padding: 0 6px;
+    border: 1px solid var(--la-border, var(--ofi-cal-border, rgba(0, 0, 0, 0.1)));
+    border-radius: 5px;
+    background: var(--la-surface, var(--ofi-cal-surface, #fff));
+    color: var(--la-text, var(--ofi-cal-text, #1d1d1f));
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ofi-gv-label > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ofi-gv-label__dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #8e8e93;
+}
+
+.ofi-gv-label.is-blue .ofi-gv-label__dot { background: #0a7aff; }
+.ofi-gv-label.is-green .ofi-gv-label__dot { background: #34c759; }
+.ofi-gv-label.is-orange .ofi-gv-label__dot { background: #ff9500; }
+.ofi-gv-label.is-red .ofi-gv-label__dot { background: #ff3b30; }
+.ofi-gv-label.is-purple .ofi-gv-label__dot { background: #af52de; }
+
+.ofi-gv-label__remove {
+    display: inline-flex;
+    margin-right: -2px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--la-muted, var(--ofi-cal-muted, #a1a1a6));
+    cursor: pointer;
+}
+
+.ofi-gv-label__remove:hover { color: var(--la-text, var(--ofi-cal-text, #1d1d1f)); }
+
+/* Gestrichelter «+ Etikett»/«+ Person»-Auslöser. */
+#root .ofi-gv .ofi-gv-add,
+body > :not(#root) .ofi-gv-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 6px;
+    border: 1px dashed var(--la-field-border, var(--ofi-cal-border, rgba(0, 0, 0, 0.14)));
+    border-radius: 5px;
+    background: transparent;
+    color: var(--la-secondary, var(--ofi-cal-muted, #6e6e73));
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+#root .ofi-gv .ofi-gv-add:hover,
+body > :not(#root) .ofi-gv-add:hover {
+    border-color: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+    color: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+}
+
+/* ── Fortschritt, Personen, Termine ─────────────────────────────────────── */
+
+.ofi-gv-progress {
+    position: relative;
+    height: 4px;
+    min-width: 48px;
+    border-radius: 999px;
+    background: var(--gv-fill, var(--ofi-cal-hover, rgba(0, 0, 0, 0.045)));
+    overflow: hidden;
+}
+
+.ofi-gv-progress > i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--gv-accent, var(--ofi-cal-accent, #0a7aff));
+    transition: width 200ms ease;
+}
+
+.ofi-gv-progress.is-complete > i { background: var(--gv-success, #1f8a3b); }
+
+/* Namen statt Profilbilder (13.09.2026). */
+.ofi-gv-names {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 220px;
+    color: var(--gv-secondary, var(--ofi-cal-muted, #6e6e73));
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.ofi-gv-names__list {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ofi-gv-names__more {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--gv-fill, var(--ofi-cal-hover, rgba(0, 0, 0, 0.045)));
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 18px;
+}
+
+.ofi-gv-person-name {
+    max-width: 140px;
+    overflow: hidden;
+    color: var(--gv-secondary, var(--ofi-cal-muted, #6e6e73));
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv-due {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--gv-secondary, var(--ofi-cal-muted, #6e6e73));
+    font-size: 12px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv-due.is-late { color: var(--gv-danger, #d70015); }
+.ofi-gv-due.is-soon { color: var(--gv-warning, #b25000); }
+
+/* ── Laufende Messung ───────────────────────────────────────────────────── */
+
+#root .ofi-gv .ofi-gv-timerchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    max-width: 320px;
+    padding: 0 4px 0 10px;
+    border: 1px solid var(--gv-border);
+    border-radius: 6px;
+    background: var(--gv-surface);
+    font-size: 12.5px;
+}
+
+.ofi-gv-live {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #ff3b30;
+    animation: ofi-gv-live 1.6s ease-in-out infinite;
+}
+
+@keyframes ofi-gv-live {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-gv-live { animation: none; }
+}
+
+.ofi-gv-clock {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.ofi-gv-timerchip__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-secondary);
+    text-decoration: none;
+}
+
+.ofi-gv-timerchip__title:hover { color: var(--gv-text); }
+
+/* ── Hinweisstreifen (Freigabe, Blockade, abgeschlossen) ────────────────── */
+
+.ofi-gv-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--gv-border);
+    border-radius: 8px;
+    background: var(--gv-surface);
+    font-size: 12.5px;
+}
+
+.ofi-gv-banner__icon { flex: none; margin-top: 1px; color: var(--gv-secondary); }
+.ofi-gv-banner.is-review .ofi-gv-banner__icon { color: var(--gv-warning); }
+.ofi-gv-banner.is-alert .ofi-gv-banner__icon { color: var(--gv-danger); }
+.ofi-gv-banner.is-done .ofi-gv-banner__icon { color: var(--gv-success); }
+.ofi-gv-banner.is-progress .ofi-gv-banner__icon { color: var(--gv-accent); }
+
+.ofi-gv-banner__body { flex: 1 1 auto; min-width: 0; }
+.ofi-gv-banner__title { font-weight: 600; }
+.ofi-gv-banner__text { color: var(--gv-secondary); margin-top: 2px; white-space: pre-wrap; }
+.ofi-gv-banner__actions { display: flex; gap: 6px; flex: none; }
+
+/* ── Aufgabenzeilen (Liste, Freigaben, Suche) ───────────────────────────── */
+
+.ofi-gv-list { display: flex; flex-direction: column; }
+
+.ofi-gv-group + .ofi-gv-group { margin-top: 4px; }
+
+.ofi-gv-group__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px 6px;
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.ofi-gv-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 6px 12px;
+    border-top: 1px solid var(--gv-hairline);
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.ofi-gv-row:hover { background: var(--gv-hover); }
+.ofi-gv-row.is-done .ofi-gv-row__title { color: var(--gv-secondary); text-decoration: line-through; text-decoration-color: var(--gv-muted); }
+
+.ofi-gv-row__main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+
+.ofi-gv-row__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.ofi-gv-row__title > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv-row__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    color: var(--gv-secondary);
+    font-size: 12px;
+}
+
+.ofi-gv-row__side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ofi-gv-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Runder Abhakkreis (Liste, Checkliste). */
+#root .ofi-gv .ofi-gv-check,
+body > :not(#root) .ofi-gv-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1.5px solid var(--la-field-border-hover, var(--ofi-cal-border, rgba(0, 0, 0, 0.26)));
+    border-radius: 999px;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-check:hover:not(:disabled),
+body > :not(#root) .ofi-gv-check:hover:not(:disabled) { border-color: var(--la-accent, var(--ofi-cal-accent, #0a7aff)); }
+
+#root .ofi-gv .ofi-gv-check.is-done,
+body > :not(#root) .ofi-gv-check.is-done {
+    border-color: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+    background: var(--la-accent, var(--ofi-cal-accent, #0a7aff));
+}
+
+#root .ofi-gv .ofi-gv-check.is-square,
+body > :not(#root) .ofi-gv-check.is-square { border-radius: 5px; }
+
+#root .ofi-gv .ofi-gv-check:disabled,
+body > :not(#root) .ofi-gv-check:disabled { cursor: default; opacity: 0.6; }
+
+.ofi-gv-flag { color: #ff9500; }
+
+/* ── Schlüssel/Wert-Zeilen (Seitenleiste der Detailansicht, Fenster) ─────── */
+
+.ofi-gv-kv {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 10px;
+    font-size: 12.5px;
+}
+
+.ofi-gv-kv > dt { color: var(--gv-secondary, var(--ofi-cal-muted, #6e6e73)); }
+.ofi-gv-kv > dd { margin: 0; min-width: 0; }
+
+/* ── Auswahllisten in Fenstern (Personen, Etiketten) ────────────────────── */
+
+#root .ofi-gv-picker,
+body > :not(#root) .ofi-gv-picker,
+body > .ofi-gv-picker {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+    font-size: 13px;
+}
+
+.ofi-gv-picker__search {
+    padding: 6px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+.ofi-gv-picker__list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.ofi-gv-picker__row {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    padding: 4px 8px !important;
+    text-align: left !important;
+}
+
+.ofi-gv-picker__row > .ofi-gv-picker__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv-picker__hint { color: var(--ofi-cal-muted, #6e6e73); font-size: 11.5px; }
+
+.ofi-gv-picker__foot {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    border-top: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+/* ── Telefon/Tablet ─────────────────────────────────────────────────────── */
+
+@media (max-width: 1023px) {
+    .ofi-gv-row { grid-template-columns: 24px minmax(0, 1fr); }
+    .ofi-gv-row__side { grid-column: 2; flex-wrap: wrap; }
+    .ofi-gv-kv { grid-template-columns: 84px minmax(0, 1fr); }
+}
+
+/* =========================================================
+   APPLE-BLAU STATT ORANGE (13.09.2026, Samet: «üzerine gelince turuncu değil
+   Apple mavisi»). Das Dunkel-Thema der App färbt Akzent und Zeilenfüllung in
+   Weizen/Orange (--ofi-d-wheat-solid). Im Görevler-Modul gilt in BEIDEN
+   Themen das Apple-Blau — auf der Seite und in seinen Popups (Portale tragen
+   eine `ofi-gv-*`-Klasse am Panel). Gefahr bleibt rot.
+   ========================================================= */
+.ofi-gv,
+.ofi-quick-pop[class*="ofi-gv-"] {
+    --gv-accent: #0a7aff;
+    --gv-accent-soft: rgba(10, 122, 255, 0.09);
+    --gv-focus: rgba(10, 122, 255, 0.3);
+    --la-accent: #0a7aff;
+    --la-accent-soft: rgba(10, 122, 255, 0.09);
+    --ofi-cal-accent: #0a7aff;
+    --ofi-cal-accent-soft: rgba(10, 122, 255, 0.09);
+    --ofi-pop-row-bg: #0a7aff;
+    --ofi-pop-row-text: #ffffff;
+}
+
+html.dark .ofi-gv,
+html.dark .ofi-quick-pop[class*="ofi-gv-"] {
+    --gv-accent: #3b8dff;
+    --gv-accent-soft: rgba(59, 141, 255, 0.16);
+    --gv-focus: rgba(59, 141, 255, 0.35);
+    --la-accent: #3b8dff;
+    --la-accent-soft: rgba(59, 141, 255, 0.16);
+    --ofi-cal-accent: #3b8dff;
+    --ofi-cal-accent-soft: rgba(59, 141, 255, 0.16);
+    --ofi-pop-row-bg: #0a7aff;
+    --ofi-pop-row-text: #ffffff;
+}
+
+/* =========================================================
+   14.09.2026 (Samet): Açık/Tamamlanan, Zeitfeld, Etikettenliste
+   ========================================================= */
+
+/* Das Segment (TableKit `ToggleGroup`) trägt `px-3` und im gewählten Zustand
+   `bg-[#0a7aff]` — buttons.css blendet dafür beim Überfahren das Haus-Orange
+   ein (Fläche `::before` bzw. Innenschatten mit !important). Im Modul gilt
+   nur Apple-Blau: die Orange-Fläche ist aus, die Hover-Farbe kommt von oben. */
+#root .ofi-gv button.ofi-togglegroup__btn::before,
+body > :not(#root) .ofi-gv button.ofi-togglegroup__btn::before {
+    display: none !important;
+}
+
+#root .ofi-gv button.ofi-togglegroup__btn:not(:disabled):not([disabled]):hover,
+body > :not(#root) .ofi-gv button.ofi-togglegroup__btn:not(:disabled):not([disabled]):hover {
+    border-color: transparent !important;
+    background: var(--gv-accent-soft) !important;
+    box-shadow: none !important;
+    color: var(--gv-accent) !important;
+    -webkit-text-fill-color: var(--gv-accent) !important;
+}
+
+#root .ofi-gv button.ofi-togglegroup__btn.is-on:not(:disabled):not([disabled]):hover,
+body > :not(#root) .ofi-gv button.ofi-togglegroup__btn.is-on:not(:disabled):not([disabled]):hover {
+    background: var(--gv-surface) !important;
+    box-shadow: 0 0 0 0.5px var(--gv-border), 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    color: var(--gv-accent) !important;
+    -webkit-text-fill-color: var(--gv-accent) !important;
+}
+
+/* Tag · Uhrzeit · Leeren in festen Spalten — untereinander bündig. */
+#root .ofi-gv-datetime,
+body > :not(#root) .ofi-gv-datetime {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 76px;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+#root .ofi-gv-datetime.is-clearable,
+body > :not(#root) .ofi-gv-datetime.is-clearable {
+    grid-template-columns: minmax(0, 1fr) 76px 24px;
+}
+
+#root .ofi-cal-input.ofi-gv-datetime__time,
+body > :not(#root) .ofi-cal-input.ofi-gv-datetime__time {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    padding: 0 10px;
+    white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* Ohne Uhr-Symbol (14.09.2026, Samet: «o saat işaretini kaldır»): nur die Zeit. */
+#root .ofi-gv-datetime__time > svg,
+body > :not(#root) .ofi-gv-datetime__time > svg { display: none; }
+
+#root .ofi-gv-datetime__time > .ofi-ios-time__caret,
+body > :not(#root) .ofi-gv-datetime__time > .ofi-ios-time__caret { display: none; }
+
+#root .ofi-gv-datetime__time .ofi-ios-time__value,
+body > :not(#root) .ofi-gv-datetime__time .ofi-ios-time__value {
+    flex: 1 1 auto;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+#root .ofi-gv-datetime__time:disabled,
+body > :not(#root) .ofi-gv-datetime__time:disabled { cursor: not-allowed; opacity: 0.6; }
+
+#root .ofi-gv-datetime__clear,
+body > :not(#root) .ofi-gv-datetime__clear { justify-self: center; }
+
+/* Etikettenliste: Farbpunkt + Name statt weisser Marke — auf der blauen
+   Zeilenfüllung bleibt der Name so lesbar (weiss auf blau). */
+.ofi-gv-picker__dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #8e8e93;
+}
+
+.ofi-gv-picker__dot.is-blue { background: #0a7aff; }
+.ofi-gv-picker__dot.is-green { background: #34c759; }
+.ofi-gv-picker__dot.is-orange { background: #ff9500; }
+.ofi-gv-picker__dot.is-red { background: #ff3b30; }
+.ofi-gv-picker__dot.is-purple { background: #af52de; }
+
+.ofi-option-row:hover .ofi-gv-picker__dot,
+.ofi-option-row:focus-visible .ofi-gv-picker__dot { box-shadow: 0 0 0 1.5px #fff; }
+
+/* «+ Etiket» / «+ Kişi»: beim Überfahren blaue Schrift auf zartem Blau. */
+#root .ofi-gv .ofi-gv-add:hover,
+body > :not(#root) .ofi-gv-add:hover {
+    background: rgba(10, 122, 255, 0.08);
+}
+
+/* Dunkel: dark.css malt `bg-[#0a7aff]` mit !important in der Markenfarbe —
+   das gewählte Segment bleibt auch dort die helle Karte auf der Schiene. */
+html.dark #root .ofi-gv button.ofi-togglegroup__btn.is-on,
+html.dark #root .ofi-gv button.ofi-togglegroup__btn.is-on * {
+    border-color: transparent !important;
+    background: var(--gv-surface) !important;
+    color: var(--gv-text) !important;
+    -webkit-text-fill-color: var(--gv-text) !important;
+}
+
+html.dark #root .ofi-gv button.ofi-togglegroup__btn.is-on:hover,
+html.dark #root .ofi-gv button.ofi-togglegroup__btn.is-on:hover * {
+    color: var(--gv-accent) !important;
+    -webkit-text-fill-color: var(--gv-accent) !important;
+}

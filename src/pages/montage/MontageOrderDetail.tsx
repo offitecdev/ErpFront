@@ -35,6 +35,7 @@ import { MontageHeader } from './components/MontageHeader';
 import { StatusPill } from './components/StatusPill';
 import { dateFmt, timeRange } from './utils/montageFormat';
 import { toMontageOrderRow } from './utils/montageStatus';
+import '@/styles/modules/reportEditor.css';
 
 const EMPTY_STATE: FieldReportEditorState = {
     dirty: false,
@@ -228,7 +229,7 @@ export const MontageOrderDetail = () => {
     if (loading) {
         return (
             <div className="flex h-64 flex-col items-center justify-center gap-3 rounded-[3px] border border-slate-200 bg-white dark:border-white/10 dark:bg-[#17191c]">
-                <span aria-hidden className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-white/15 dark:border-t-white" />
+                <span aria-hidden className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0] dark:border-white/15 dark:border-t-white" />
                 <span className="text-[13px] text-slate-500 dark:text-slate-400">{t('common.loading')}</span>
             </div>
         );

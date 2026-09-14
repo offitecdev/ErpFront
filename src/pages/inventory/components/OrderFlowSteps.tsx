@@ -31,7 +31,7 @@ export const OrderFlowSteps = ({
     /** Der genaue Zustand der laufenden Stufe — als Titel am Zeiger. */
     activeLine?: string;
 }) => (
-    <ol className="flex flex-wrap items-center gap-1.5">
+    <ol className="ofi-flowsteps flex flex-wrap items-center gap-1.5">
         {ORDER_STAGES.map((entry: OrderStage, index) => {
             const done = index < stageIndex;
             const current = index === stageIndex;
@@ -41,17 +41,17 @@ export const OrderFlowSteps = ({
                     key={entry}
                     aria-current={current ? 'step' : undefined}
                     title={current ? activeLine : undefined}
-                    className={`flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 ${
+                    className={`ofi-flowsteps__step ${current ? 'is-current' : done ? 'is-done' : 'is-locked'} flex items-center gap-1.5 rounded-full border py-1 pl-1 pr-3 ${
                         current
-                            ? 'border-[#272f67] bg-[#272f67]/[0.05] dark:border-white/40 dark:bg-white/[0.07]'
+                            ? 'border-[#0a7aff] bg-[#0a7aff]/[0.05] dark:border-white/40 dark:bg-white/[0.07]'
                             : done
                                 ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/[0.08]'
                                 : 'border-slate-200 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]'
                     }`}
                 >
-                    <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                    <span className={`ofi-flowsteps__mark flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                         current
-                            ? 'bg-[#272f67] text-white'
+                            ? 'bg-[#0a7aff] text-white'
                             : done
                                 ? 'bg-emerald-500 text-white'
                                 : 'bg-slate-200 text-slate-500 dark:bg-white/15 dark:text-white/60'
@@ -59,7 +59,7 @@ export const OrderFlowSteps = ({
                     >
                         {done ? <Check size={12} /> : locked ? <Lock01 size={11} /> : index + 1}
                     </span>
-                    <span className={`whitespace-nowrap text-[12.5px] font-semibold ${
+                    <span className={`ofi-flowsteps__label whitespace-nowrap text-[12.5px] font-semibold ${
                         locked ? 'text-slate-400 dark:text-white/45' : 'text-slate-700 dark:text-white'
                     }`}
                     >

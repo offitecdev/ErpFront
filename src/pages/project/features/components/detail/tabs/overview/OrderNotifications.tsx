@@ -4,6 +4,7 @@ import type React from 'react';
 
 import { Bell01, ChevronRight, X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/projectDetail.css';
 
 export type OrderNotification = {
     key: string;

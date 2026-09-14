@@ -13,7 +13,7 @@ const tinyMetaSpinner = (
     <span
         role="status"
         aria-label={t('common.loading')}
-        className="h-3 w-3 flex-shrink-0 animate-spin rounded-full border border-slate-300 border-t-[#1f2654]"
+        className="h-3 w-3 flex-shrink-0 animate-spin rounded-full border border-slate-300 border-t-[#0066e0]"
     />
 );
 
@@ -138,7 +138,7 @@ export const TenderAddressPicker = ({
                     disabled={!hasCustomer}
                     title={t('crm.addAddressTitle')}
                     aria-label={t('crm.addAddressTitle')}
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654] disabled:opacity-40"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0] disabled:opacity-40"
                 >
                     <Plus size={13} />
                 </button>
@@ -218,7 +218,7 @@ export const TenderMainAddressRow = ({
             onClick={onEdit}
             title={t('tenders.manualCustomer.title')}
             aria-label={t('tenders.manualCustomer.title')}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0]"
         >
             <Edit01 size={13} />
         </button>
@@ -228,7 +228,7 @@ export const TenderMainAddressRow = ({
                 onClick={onAdd}
                 title={t('crm.addAddressTitle')}
                 aria-label={t('crm.addAddressTitle')}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#1f2654] hover:bg-slate-50 hover:text-[#1f2654]"
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[2px] border border-slate-300 bg-white text-slate-500 transition-colors hover:border-[#0066e0] hover:bg-slate-50 hover:text-[#0066e0]"
             >
                 <Plus size={13} />
             </button>

@@ -49,7 +49,7 @@ const LevelRadio = ({
     label: string;
     onSelect: () => void;
 }) => (
-    <label className="inline-flex cursor-pointer items-center justify-center rounded-full p-1 focus-within:ring-2 focus-within:ring-[#272f67]/40 dark:focus-within:ring-[#e6cf9e]/40">
+    <label className="inline-flex cursor-pointer items-center justify-center rounded-full p-1 focus-within:ring-2 focus-within:ring-[#0a7aff]/40 dark:focus-within:ring-[#e6cf9e]/40">
         <input
             type="radio"
             name={name}
@@ -60,12 +60,12 @@ const LevelRadio = ({
         />
         <span
             className={`grid size-[22px] place-items-center rounded-full border-2 transition-colors ${active
-                ? 'border-[#272f67] dark:border-[#e6cf9e]'
+                ? 'border-[#0a7aff] dark:border-[#e6cf9e]'
                 : 'border-slate-300 hover:border-[#8494c9] dark:border-white/25 dark:hover:border-white/50'}`}
         >
             <span
                 className={`size-[11px] rounded-full transition-transform ${active
-                    ? 'scale-100 bg-[#272f67] dark:bg-[#e6cf9e]'
+                    ? 'scale-100 bg-[#0a7aff] dark:bg-[#e6cf9e]'
                     : 'scale-0 bg-transparent'}`}
             />
         </span>
@@ -79,14 +79,14 @@ const LevelDot = ({ active, level }: { active: boolean; level: PageLevel }) => (
         className={`inline-grid size-[22px] place-items-center rounded-full border-2 ${active
             ? level === 0
                 ? 'border-slate-300 dark:border-white/25'
-                : 'border-[#272f67] dark:border-[#8fa2ff]'
+                : 'border-[#0a7aff] dark:border-[#8fa2ff]'
             : 'border-slate-200 dark:border-white/10'}`}
     >
         <span
             className={`size-[11px] rounded-full ${active
                 ? level === 0
                     ? 'bg-slate-300 dark:bg-white/25'
-                    : 'bg-[#272f67] dark:bg-[#8fa2ff]'
+                    : 'bg-[#0a7aff] dark:bg-[#8fa2ff]'
                 : 'bg-transparent'}`}
         />
     </span>
@@ -169,7 +169,7 @@ export const PageLevelTable = ({
                                                 type="button"
                                                 onClick={() => setModule(moduleDef, column.level)}
                                                 title={t('settings.roles.applyToModule', { level: t(column.labelKey) })}
-                                                className="rounded px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:bg-white hover:text-[#272f67] dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white"
+                                                className="rounded px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 transition-colors hover:bg-white hover:text-[#0a7aff] dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white"
                                             >
                                                 {t('settings.roles.applyAll')}
                                             </button>

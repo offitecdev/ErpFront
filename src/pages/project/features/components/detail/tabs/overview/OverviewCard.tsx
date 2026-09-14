@@ -1,4 +1,5 @@
 import type React from 'react';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * The chrome of every box on the project overview — Google-clean since

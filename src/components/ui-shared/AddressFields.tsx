@@ -13,7 +13,7 @@ import type { CountryEntry } from './countries';
  */
 
 const DEFAULT_INPUT_CLASS =
-    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 placeholder:text-slate-300 transition-colors hover:border-slate-300 focus:border-[#1f2654] focus:outline-none dark:border-white/15 dark:bg-transparent dark:text-white';
+    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 placeholder:text-slate-300 transition-colors hover:border-slate-300 focus:border-[#0066e0] focus:outline-none dark:border-white/15 dark:bg-transparent dark:text-white';
 
 const AddressField = ({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) => (
     <label className={`flex flex-col gap-1 ${className}`}>

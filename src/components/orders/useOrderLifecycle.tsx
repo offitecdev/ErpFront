@@ -103,7 +103,7 @@ const ActionRow = ({ icon, title, description, blockers, selected, danger, onSel
                 blocked
                     ? 'cursor-not-allowed border-slate-200 opacity-60 dark:border-white/10'
                     : selected
-                        ? 'border-[#1f2654] bg-[#eef2fb] dark:border-white/40 dark:bg-white/10'
+                        ? 'border-[#0066e0] bg-[#eef2fb] dark:border-white/40 dark:bg-white/10'
                         : 'border-slate-200 dark:border-white/10'
             }`}
         >

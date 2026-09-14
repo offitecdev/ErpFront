@@ -31,19 +31,19 @@
   position: relative;
   isolation: isolate;
   overflow: visible;
-  --color-1: #272f67;
+  --color-1: #0a7aff;
   --color-2: #5364d8;
   --color-3: #8ea2ff;
   --color-4: #d30f15;
   --gooey-nav-radius: 10px;
-  --gooey-nav-text: #272f67;
-  --gooey-nav-border: rgba(39, 47, 103, 0.16);
+  --gooey-nav-text: #0a7aff;
+  --gooey-nav-border: rgba(10, 122, 255, 0.16);
   --gooey-nav-item-bg: rgba(255, 255, 255, 0.86);
   --gooey-nav-item-hover: #ffffff;
-  --gooey-nav-active-bg: #272f67;
+  --gooey-nav-active-bg: #0a7aff;
   --gooey-nav-active-text: #ffffff;
-  --gooey-nav-shadow: 0 8px 24px rgba(39, 47, 103, 0.12);
-  --gooey-nav-active-shadow: 0 12px 34px rgba(39, 47, 103, 0.26);
+  --gooey-nav-shadow: 0 8px 24px rgba(10, 122, 255, 0.12);
+  --gooey-nav-active-shadow: 0 12px 34px rgba(10, 122, 255, 0.26);
 }
 
 .dark .gooey-nav-container {

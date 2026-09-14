@@ -47,7 +47,7 @@ const durationLabel = (minutes: number) => {
 };
 
 const INPUT_CLASS =
-    'h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-[14px] text-slate-800 outline-none transition-colors hover:border-slate-300 focus:border-[#1f2654] dark:border-white/15 dark:bg-transparent dark:text-white';
+    'h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-[14px] text-slate-800 outline-none transition-colors hover:border-slate-300 focus:border-[#0066e0] dark:border-white/15 dark:bg-transparent dark:text-white';
 
 export const PersonnelShiftSection = () => {
     useLanguageTick();
@@ -134,7 +134,7 @@ export const PersonnelShiftSection = () => {
                                             aria-pressed={on}
                                             className={`min-w-[104px] rounded-xl border-2 px-4 py-3 text-[13.5px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                                                 on
-                                                    ? 'border-[#272f67] bg-[#eef2fb] text-[#1f2654] dark:border-[#f59e0b] dark:bg-[#f59e0b]/10 dark:text-[#fbbf24]'
+                                                    ? 'border-[#0a7aff] bg-[#eef2fb] text-[#0066e0] dark:border-[#f59e0b] dark:bg-[#f59e0b]/10 dark:text-[#fbbf24]'
                                                     : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-white/15 dark:bg-transparent dark:text-white/60'
                                             }`}
                                         >

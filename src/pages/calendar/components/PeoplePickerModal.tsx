@@ -140,7 +140,7 @@ export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, tit
                         <button
                             type="button"
                             onClick={() => onConfirm(Array.from(selected.values()))}
-                            className="h-9 rounded-md bg-[#07145c] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0b1a6e] dark:bg-[#d48f16] dark:text-[#151616] dark:hover:bg-[#f2bb5c]"
+                            className="h-9 rounded-md bg-[#0052b8] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0052b8] dark:bg-[#d48f16] dark:text-[#151616] dark:hover:bg-[#f2bb5c]"
                         >
                             {t('common.apply')}
                         </button>
@@ -171,13 +171,13 @@ export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, tit
                         onChange={(event) => setFreeEmail(event.target.value)}
                         onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addFreeEmail(); } }}
                         placeholder={t('calendar.picker.freeEmailPlaceholder')}
-                        className="h-9 flex-1 rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#07145c]/40 dark:border-white/15 dark:bg-white/5 dark:text-white"
+                        className="h-9 flex-1 rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#0052b8]/40 dark:border-white/15 dark:bg-white/5 dark:text-white"
                     />
                     <button
                         type="button"
                         onClick={addFreeEmail}
                         disabled={!freeEmail.trim().includes('@')}
-                        className="flex h-9 items-center gap-1.5 rounded-md border border-[#E3E7F0] bg-white px-3 text-[12.5px] font-semibold text-[#07145c] transition-colors hover:bg-[#F7F8FC] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/6 dark:text-[#d48f16] dark:hover:bg-white/10"
+                        className="flex h-9 items-center gap-1.5 rounded-md border border-[#E3E7F0] bg-white px-3 text-[12.5px] font-semibold text-[#0052b8] transition-colors hover:bg-[#F7F8FC] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/6 dark:text-[#d48f16] dark:hover:bg-white/10"
                     >
                         <Plus size={13} />
                         {t('calendar.picker.addEmail')}
@@ -234,7 +234,7 @@ export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, tit
                             return (
                                 <tr key={row.id} onClick={() => toggle(person)} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
                                     <td>
-                                        <span className={`flex size-[18px] items-center justify-center rounded-[5px] border transition-colors ${active ? 'border-[#07145c] bg-[#07145c] text-white dark:border-[#d48f16] dark:bg-[#d48f16] dark:text-[#151616]' : 'border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
+                                        <span className={`flex size-[18px] items-center justify-center rounded-[5px] border transition-colors ${active ? 'border-[#0052b8] bg-[#0052b8] text-white dark:border-[#d48f16] dark:bg-[#d48f16] dark:text-[#151616]' : 'border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
                                             {active && <Check size={12} />}
                                         </span>
                                     </td>
@@ -256,7 +256,7 @@ export const PeoplePickerModal = ({ open, onClose, mode, initial, onConfirm, tit
                             return (
                                 <tr key={row.id} onClick={() => toggle(person)} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
                                     <td>
-                                        <span className={`flex size-[18px] items-center justify-center rounded-[5px] border transition-colors ${active ? 'border-[#07145c] bg-[#07145c] text-white dark:border-[#d48f16] dark:bg-[#d48f16] dark:text-[#151616]' : 'border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
+                                        <span className={`flex size-[18px] items-center justify-center rounded-[5px] border transition-colors ${active ? 'border-[#0052b8] bg-[#0052b8] text-white dark:border-[#d48f16] dark:bg-[#d48f16] dark:text-[#151616]' : 'border-slate-300 bg-white dark:border-white/25 dark:bg-transparent'}`}>
                                             {active && <Check size={12} />}
                                         </span>
                                     </td>

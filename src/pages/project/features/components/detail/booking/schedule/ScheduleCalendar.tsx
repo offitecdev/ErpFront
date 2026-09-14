@@ -173,7 +173,7 @@ export const ScheduleCalendar = ({
                                 onClick={() => onViewChange(key)}
                                 className={`h-9 min-w-[78px] rounded-lg px-4 text-[13px] font-semibold transition-colors ${
                                     view === key
-                                        ? 'bg-[#272f67] text-white'
+                                        ? 'bg-[#0a7aff] text-white'
                                         : 'text-slate-600 hover:bg-slate-50 dark:text-white/80'
                                 }`}
                             >
@@ -249,7 +249,7 @@ export const ScheduleCalendar = ({
                                 >
                                     <div className="text-[10.5px] font-semibold uppercase text-slate-400">{day.format('dd')}</div>
                                     <div className={`mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full text-[12.5px] font-bold ${
-                                        isToday ? 'bg-[#272f67] text-white' : 'text-slate-700'
+                                        isToday ? 'bg-[#0a7aff] text-white' : 'text-slate-700'
                                     }`}>
                                         {day.date()}
                                     </div>
@@ -276,7 +276,7 @@ export const ScheduleCalendar = ({
                                         }
                                     }}
                                     className={`relative cursor-pointer border-l border-slate-100 transition-colors first:border-l-0 hover:bg-slate-50/60 dark:border-white/8 ${
-                                        isToday ? 'bg-[#272f67]/[0.03]' : ''
+                                        isToday ? 'bg-[#0a7aff]/[0.03]' : ''
                                     }`}
                                     style={{ height: BAND_MINUTES / 60 * HOUR_HEIGHT }}
                                 >
@@ -350,7 +350,7 @@ export const ScheduleCalendar = ({
                                     }`}
                                 >
                                     <span className={`mx-1 mt-1 flex h-5 min-w-5 items-center justify-center self-start rounded-full px-1 text-[11px] font-semibold ${
-                                        isToday ? 'bg-[#272f67] text-white' : outside ? 'text-slate-300' : 'text-slate-700'
+                                        isToday ? 'bg-[#0a7aff] text-white' : outside ? 'text-slate-300' : 'text-slate-700'
                                     }`}>
                                         {day.date()}
                                     </span>

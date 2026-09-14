@@ -145,6 +145,20 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         },
     },
     {
+        // Görevler (13.09.2026): eigenständiges Aufgabenmodul (Görevly). Wortgleich
+        // zur Serverkopie: view = Teammitglied, manage = Leitung, delete = löschen.
+        key: 'tasks',
+        labelKey: 'nav.tasksModule',
+        labelDefault: 'Görevler',
+        menuKeys: ['tasksModule'],
+        pathPrefixes: ['/tasks'],
+        actions: {
+            read: ['tasks.view'],
+            write: ['tasks.manage'],
+            delete: ['tasks.delete'],
+        },
+    },
+    {
         key: 'settings',
         labelKey: 'nav.settings',
         labelDefault: 'Ayarlar',

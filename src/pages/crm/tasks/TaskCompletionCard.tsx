@@ -18,6 +18,8 @@ import { TaskFilesPane } from './TaskFilesPane';
 import { TaskStepsEditor, type TaskStepChange, type TaskStepDraft } from './TaskStepsEditor';
 import { TaskTenderCombo, type TaskTenderPick } from './TaskTenderCombo';
 import { isoToSpan, spanToIso, type TaskSpanFields } from './taskSchedule';
+import '@/styles/modules/taskDeck.css';
+import '@/styles/modules/taskWindow.css';
 
 /**
  * Die ERLEDIGUNGSKARTE (19.08.2026) — ein Popup ÜBER dem Kalender, keine neue
@@ -671,7 +673,7 @@ const CompletionBody = ({ task, anchor, open, onClose, onSetDone, onSaveSpan, on
                                         type="button"
                                         disabled={saving || (!noteText.trim() && noteImages.length === 0)}
                                         onClick={() => void addNote()}
-                                        className="ofi-btn-brand inline-flex h-8 items-center rounded-md bg-[#272f67] px-3 text-[12px] font-semibold text-white hover:bg-[#1f2654] disabled:opacity-50"
+                                        className="ofi-btn-brand inline-flex h-8 items-center rounded-md bg-[#0a7aff] px-3 text-[12px] font-semibold text-white hover:bg-[#0066e0] disabled:opacity-50"
                                     >
                                         {saving ? t('common.saving') : t('crm.tasks.addNote')}
                                     </button>

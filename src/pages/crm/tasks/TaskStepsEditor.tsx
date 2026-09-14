@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { Check, Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/taskDeck.css';
+import '@/styles/modules/taskWindow.css';
 
 /**
  * DIE ANLEITUNG EINER AUFGABE — Schritt für Schritt (11.09.2026, Vorgabe

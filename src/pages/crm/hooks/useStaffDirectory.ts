@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { fetchStaffDirectory } from '@/lib/api/directory';
+import { fetchStaffDirectory, peekStaffDirectory } from '@/lib/api/directory';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 
 /**
@@ -17,8 +17,9 @@ import type { StaffDirectoryRow } from '@/lib/api/directory';
  * im ersten Moment, in dem die Liste aufklappt.
  */
 export const useStaffDirectory = (enabled = true) => {
-    const [staff, setStaff] = useState<StaffDirectoryRow[]>([]);
-    const [loaded, setLoaded] = useState(false);
+    // Already loaded by another picker: open with the rows, no loading state.
+    const [staff, setStaff] = useState<StaffDirectoryRow[]>(() => peekStaffDirectory() ?? []);
+    const [loaded, setLoaded] = useState(() => peekStaffDirectory() !== undefined);
 
     useEffect(() => {
         if (!enabled || loaded) return;

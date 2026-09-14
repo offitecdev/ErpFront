@@ -12,6 +12,9 @@ import './styles/refine.css'
 // (Daumen, nicht Maus) — steht darum VOR buttons.css und nennt keine
 // Tailwind-Innenmasse, damit die gemeinsame Knopfregel sie nicht anfasst.
 import './styles/quickAdd.css'
+// Schnellerfassung per Barcode (10.09.2026): Schritte, Kamera, Formular —
+// dieselbe Stelle wie quickAdd.css, vor buttons.css.
+import './styles/quickEntry.css'
 import './styles/buttons.css'
 // EIN Suchfeld und EIN Filter fuer die ganze Anwendung (Hoehe, Breite, Kante,
 // Ort in der Zeile — und die Bewegung der Lupe). MUSS nach buttons.css stehen:
@@ -24,6 +27,11 @@ import './styles/controls.css'
 // zuletzt stehen: sie biegt das Radienband und die Knopf-/Feldregeln von
 // index.css um.
 import './styles/appleModal.css'
+// Das Neuigkeiten-Fenster liest die Fenstertafel (--ofi-win-*) von oben.
+import './styles/updateWindow.css'
+// Meldungen im Mac-Kleid (10.09.2026): Sonner-Toasts, der Wecker rechts und
+// die Mitteilungszentrale unter der Glocke lesen die Fenstertafel von oben.
+import './styles/notifications.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
 import { initInstallPrompt } from './lib/pwa/installPrompt'
@@ -39,19 +47,33 @@ import App from './App.tsx'
 initInstallPrompt()
 registerServiceWorker()
 
-// Every table gets drag-resizable columns, with no per-table wiring — the
-// tables that declare their own columns in React keep theirs (see
-// hooks/useColumnWidths), this picks up all the rest.
-installAutoColumnResize()
-
 // index.css finds table wrappers/cards via data attributes this module keeps
 // up to date — the `:has()` selectors it replaces made every style recalc walk
-// the whole document (700ms+ tasks on a throttled mobile boot).
+// the whole document (700ms+ tasks on a throttled mobile boot). This one is
+// APPEARANCE, so it stays on the boot path: deferring it would show the first
+// table without its card chrome and then restyle it.
 installTableChrome()
 
-// Der Druckpunkt ist sichtbar (styles/buttons.css); auf Tablet und Telefon
-// kommt hier der kurze Impuls des Vibrationsmotors dazu.
-installButtonFeedback()
+// Die beiden folgenden Erweiterungen sind reine BEDIENUNG — die Ziehgriffe an
+// den Spaltenkanten und der Druckpunkt unter dem Finger. Beide hängen einen
+// MutationObserver an das Dokument, der während des ganzen Startaufbaus bei
+// jeder DOM-Änderung mitläuft; auf der gedrosselten Messung fiel das mitten in
+// das Fenster, aus dem Lighthouse die Total Blocking Time bildet. Sie werden
+// darum erst eingehängt, wenn der Aufbau durch ist — vor dem ersten Klick oder
+// dem ersten Ziehen ist das sicher geschehen.
+const installInteractionLayers = () => {
+    // Every table gets drag-resizable columns, with no per-table wiring — the
+    // tables that declare their own columns in React keep theirs (see
+    // hooks/useColumnWidths), this picks up all the rest.
+    installAutoColumnResize()
+    // Der Druckpunkt ist sichtbar (styles/buttons.css); auf Tablet und Telefon
+    // kommt hier der kurze Impuls des Vibrationsmotors dazu.
+    installButtonFeedback()
+}
+const whenIdle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
+    .requestIdleCallback
+if (whenIdle) whenIdle(installInteractionLayers, { timeout: 3000 })
+else globalThis.setTimeout(installInteractionLayers, 1200)
 
 // Start translations and the app together. Protected routes paint their
 // loading shell while the profile and locale chunks resolve, so waiting here

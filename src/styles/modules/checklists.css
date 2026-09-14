@@ -1,0 +1,631 @@
+/* checklists — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ── Der Rumpf des Fensters ─────────────────────────────────────────────── */
+.ofi-float-card__body.ofi-chk-window__body {
+    padding: 0;
+    background: var(--ofi-cal-surface);
+}
+/* Die Bühne: die Fläche des Fensters mit Luft ringsum, auf der die Blöcke
+   liegen. */
+.ofi-chk-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-height: 100%;
+    background: var(--ofi-ios-group);
+    padding: 18px 20px 26px;
+}
+/* Als SEITE (Montage-Tablet, /crm/forms/:id) trägt der Kasten die Rundung. */
+.ofi-chk-page {
+    overflow: hidden;
+    border-radius: 16px;
+}
+.ofi-chk-page > .ofi-chk-stage { min-height: 0; }
+/* Auf dem Tablet des Monteurs ist alles eine Spur grösser. */
+.ofi-chk-stage.is-montage { font-size: 15px; }
+.ofi-chk-stage.is-montage .ofi-chk-row { min-height: 50px; }
+
+/* Der Rumpf eines FENSTERS (PopupDialog) trägt denselben Grund — dort mit
+   der Kante des Fensters unten, damit das Grau nicht über die Ecke läuft. */
+.ofi-tp-dialog__body.ofi-chk-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--ofi-ios-group);
+    padding: 14px 20px 8px;
+}
+.ofi-chk-lead {
+    margin: 0;
+    padding: 0 4px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ofi-ios-label);
+}
+
+/* ── Gruppe und Karte ───────────────────────────────────────────────────── */
+.ofi-chk-groups { display: flex; flex-direction: column; gap: 22px; }
+.ofi-chk-groups.is-dense { gap: 14px; }
+.ofi-chk-group { display: block; }
+.ofi-chk-card {
+    overflow: hidden;
+    border-radius: var(--ofi-ios-radius);
+    background: var(--ofi-ios-card);
+}
+/* Die Haarlinie ist ein Pseudo-Element und KEIN `border-top`: sie beginnt
+   16px eingerückt und endet am Kartenrand — genau so trennt iOS seine Zeilen. */
+.ofi-chk-card > * { position: relative; }
+.ofi-chk-card > * + *::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 0;
+    height: 1px;
+    background: var(--ofi-ios-sep);
+}
+.ofi-chk-empty {
+    padding: 34px 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ofi-ios-label);
+}
+
+/* ── Die Zeile eines Feldes ─────────────────────────────────────────────── */
+.ofi-chk-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: var(--ofi-ios-row);
+    padding: 8px 16px;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    color: var(--ofi-cal-text);
+}
+/* Breite Felder (Foto, Datei, Zeichnung, Unterschrift, mehrzeiliger Text)
+   stehen UNTER ihrer Beschriftung — nebeneinander bliebe für beides zu wenig. */
+.ofi-chk-row.is-stack { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 16px; }
+.ofi-chk-row__label { display: flex; min-width: 0; flex: 1 1 auto; align-items: baseline; gap: 10px; }
+.ofi-chk-row.is-stack .ofi-chk-row__label { flex: none; }
+.ofi-chk-row__num {
+    flex: 0 0 auto;
+    width: 18px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-faint);
+}
+.ofi-chk-row__text { display: block; line-height: 1.35; }
+.ofi-chk-row__req { color: #ff3b30; }
+.ofi-chk-row__help { display: block; padding-top: 2px; font-size: 12px; line-height: 1.4; color: var(--ofi-ios-label); }
+.ofi-chk-row__error { display: block; padding-top: 3px; font-size: 12px; font-weight: 600; color: #ff3b30; }
+.ofi-chk-row__control { display: flex; min-width: 0; flex: 0 1 auto; align-items: center; justify-content: flex-end; }
+.ofi-chk-row.is-stack .ofi-chk-row__control { flex: 1 1 auto; justify-content: stretch; }
+.ofi-chk-row.is-stack .ofi-chk-row__control > * { width: 100%; }
+/* Ein bedingtes Feld trägt links einen ruhigen Streifen: man sieht, dass es
+   nur wegen einer Antwort weiter oben da ist. */
+.ofi-chk-row.is-conditional { box-shadow: inset 3px 0 0 var(--ofi-cal-accent-soft); }
+.ofi-chk-row.is-invalid { background: rgba(255, 59, 48, 0.06); }
+.ofi-chk-readout { font-size: 14.5px; color: var(--ofi-ios-label); }
+
+/* ── Auskunftszeile (Verknüpfungen) ─────────────────────────────────────── */
+.ofi-chk-kv {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    min-height: var(--ofi-ios-row);
+    padding: 8px 16px;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+}
+.ofi-chk-kv__label { flex: 0 0 auto; color: var(--ofi-ios-label); }
+.ofi-chk-kv__value {
+    margin-left: auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-chk-kv__value.is-muted { font-weight: 400; color: var(--ofi-cal-faint); }
+
+/* ── Felder ─────────────────────────────────────────────────────────────── */
+#root .ofi-chk .ofi-chk-input,
+body > :not(#root) .ofi-chk .ofi-chk-input {
+    min-width: 0;
+    height: 34px;
+    border: 1px solid var(--ofi-ios-line);
+    border-radius: 9px !important;
+    background: var(--ofi-ios-field);
+    padding: 0 11px;
+    font-size: 14.5px;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    outline: none;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+#root .ofi-chk .ofi-chk-input::placeholder,
+body > :not(#root) .ofi-chk .ofi-chk-input::placeholder { color: var(--ofi-cal-faint); font-style: normal; }
+#root .ofi-chk .ofi-chk-input:hover:not(:disabled),
+body > :not(#root) .ofi-chk .ofi-chk-input:hover:not(:disabled) { border-color: var(--ofi-cal-muted); }
+#root .ofi-chk .ofi-chk-input:focus,
+body > :not(#root) .ofi-chk .ofi-chk-input:focus { border-color: var(--ofi-cal-accent); background: var(--ofi-ios-field); }
+#root .ofi-chk .ofi-chk-input:disabled,
+body > :not(#root) .ofi-chk .ofi-chk-input:disabled { opacity: 0.55; }
+/* Ein Textfeld in der Zeile bleibt so schmal wie nötig; gestapelt füllt es. */
+.ofi-chk-row:not(.is-stack) .ofi-chk-input { width: 260px; max-width: 100%; }
+.ofi-chk-row.is-stack .ofi-chk-input { width: 100%; }
+#root .ofi-chk .ofi-chk-input.is-area,
+body > :not(#root) .ofi-chk .ofi-chk-input.is-area {
+    width: 100%;
+    height: auto;
+    min-height: 76px;
+    resize: vertical;
+    padding: 10px 12px;
+    line-height: 1.5;
+}
+#root .ofi-chk .ofi-chk-input.is-area.is-block,
+body > :not(#root) .ofi-chk .ofi-chk-input.is-area.is-block {
+    min-height: 120px;
+    border: 0;
+    border-radius: var(--ofi-ios-radius) !important;
+    padding: 14px 16px;
+}
+#root .ofi-chk .ofi-chk-input.is-number,
+body > :not(#root) .ofi-chk .ofi-chk-input.is-number {
+    width: 150px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-chk-unitfield { display: inline-flex; align-items: center; gap: 7px; }
+.ofi-chk-unitfield__unit { flex: none; font-size: 13px; font-weight: 600; color: var(--ofi-ios-label); }
+.ofi-chk-datefield { width: 190px; max-width: 100%; }
+.ofi-chk-row.is-stack .ofi-chk-datefield { width: 100%; }
+.ofi-chk-selectwrap { width: 240px; max-width: 100%; }
+#root .ofi-chk .ofi-chk-input.is-select,
+body > :not(#root) .ofi-chk .ofi-chk-input.is-select { width: 100%; text-align: left; }
+
+/* Der Ein/Aus-Schalter mit seinem Wort daneben (Ja/Nein). */
+.ofi-chk-toggle { display: inline-flex; align-items: center; gap: 10px; }
+.ofi-chk-toggle__word { font-size: 14px; color: var(--ofi-ios-label); }
+.ofi-chk-toggle__word.is-on { font-weight: 600; color: var(--ofi-cal-text); }
+
+/* Segmentwähler wie in iOS: graue Schiene, das Gewählte als weisse Pille. */
+.ofi-chk-seg {
+    display: inline-flex;
+    max-width: 100%;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 9px;
+    background: rgba(118, 118, 128, 0.12);
+    padding: 2px;
+}
+html.dark .ofi-chk-seg { background: rgba(255, 255, 255, 0.07); }
+#root .ofi-chk .ofi-chk-seg__item,
+body > :not(#root) .ofi-chk .ofi-chk-seg__item {
+    min-width: 0;
+    height: 30px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 7px !important;
+    background: transparent;
+    padding: 0 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-chk .ofi-chk-seg__item:hover,
+body > :not(#root) .ofi-chk .ofi-chk-seg__item:hover { background: rgba(118, 118, 128, 0.1); }
+#root .ofi-chk .ofi-chk-seg__item.is-on,
+body > :not(#root) .ofi-chk .ofi-chk-seg__item.is-on {
+    background: var(--ofi-ios-card);
+    font-weight: 600;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+html.dark #root .ofi-chk .ofi-chk-seg__item.is-on,
+html.dark body > :not(#root) .ofi-chk .ofi-chk-seg__item.is-on {
+    background: var(--ofi-d-surface-3);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+/* Der Segmentwähler ALS REITERBAND des Bereichs (02.09.2026): dieselbe
+   Schiene, nur breiter angelegt und mit Symbol — er steht als eigener Streifen
+   über der Liste, nicht in einer Zeile. */
+.ofi-chk-seg--tabs { display: inline-flex; gap: 3px; padding: 3px; border-radius: 11px; }
+#root .ofi-chk .ofi-chk-seg--tabs .ofi-chk-seg__item,
+body > :not(#root) .ofi-chk .ofi-chk-seg--tabs .ofi-chk-seg__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 9px !important;
+    font-size: 13.5px;
+}
+
+/* ── Fotos, Dateien, Hinzufügen-Zeile ───────────────────────────────────── */
+.ofi-chk-media { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.ofi-chk-photos { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
+.ofi-chk-photo { margin: 0; overflow: hidden; border-radius: 12px; background: var(--ofi-ios-tint); }
+.ofi-chk-photo__frame { position: relative; display: block; aspect-ratio: 4 / 3; }
+.ofi-chk-photo__frame img { height: 100%; width: 100%; object-fit: cover; }
+#root .ofi-chk .ofi-chk-photo__remove,
+body > :not(#root) .ofi-chk .ofi-chk-photo__remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px !important;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    backdrop-filter: blur(6px);
+}
+#root .ofi-chk .ofi-chk-photo__remove:hover,
+body > :not(#root) .ofi-chk .ofi-chk-photo__remove:hover { background: rgba(0, 0, 0, 0.75); }
+#root .ofi-chk .ofi-chk-photo__caption,
+body > :not(#root) .ofi-chk .ofi-chk-photo__caption {
+    width: 100%;
+    height: 32px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+    outline: none;
+}
+.ofi-chk-files { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--ofi-ios-line); border-radius: 10px; overflow: hidden; }
+.ofi-chk-file { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; }
+.ofi-chk-file + .ofi-chk-file { border-top: 1px solid var(--ofi-ios-sep); }
+.ofi-chk-file__icon { flex: none; color: var(--ofi-ios-label); }
+.ofi-chk-file__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 500; }
+.ofi-chk-file__meta { display: block; font-size: 11.5px; color: var(--ofi-ios-label); }
+/* Die Hinzufügen-Zeile: ein Ring mit Symbol, daneben das Wort — in iOS steht
+   sie immer als letzte Zeile und nicht als Knopf daneben. */
+#root .ofi-chk .ofi-chk-addline,
+body > :not(#root) .ofi-chk .ofi-chk-addline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    border: 1px dashed var(--ofi-ios-line);
+    border-radius: 10px !important;
+    background: transparent;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ofi-cal-accent);
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-chk .ofi-chk-addline:hover:not(:disabled),
+body > :not(#root) .ofi-chk .ofi-chk-addline:hover:not(:disabled) { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+#root .ofi-chk .ofi-chk-addline:disabled,
+body > :not(#root) .ofi-chk .ofi-chk-addline:disabled { opacity: 0.5; }
+.ofi-chk-addline__ring {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+
+/* ── Symbolknöpfe ───────────────────────────────────────────────────────── */
+#root .ofi-chk-iconbtn,
+body > :not(#root) .ofi-chk-iconbtn {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-chk-iconbtn.is-big,
+body > :not(#root) .ofi-chk-iconbtn.is-big { width: 38px; height: 38px; }
+#root .ofi-chk-iconbtn:hover:not(:disabled),
+body > :not(#root) .ofi-chk-iconbtn:hover:not(:disabled) { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-chk-iconbtn.is-danger:hover:not(:disabled),
+body > :not(#root) .ofi-chk-iconbtn.is-danger:hover:not(:disabled) { background: rgba(255, 59, 48, 0.1); color: #ff3b30; }
+#root .ofi-chk-iconbtn:disabled,
+body > :not(#root) .ofi-chk-iconbtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Kopf, Fuss und Stand des Fensters ──────────────────────────────────── */
+.ofi-chk-status {
+    flex: none;
+    padding: 0 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+.ofi-chk-status.is-dirty { color: #b06000; }
+html.dark .ofi-chk-status.is-dirty { color: #f4c15f; }
+.ofi-chk-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.ofi-chk-foot__progress { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 10px; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-chk-foot__actions { display: flex; flex: none; align-items: center; gap: 6px; }
+.ofi-chk-meter {
+    display: block;
+    width: 110px;
+    height: 5px;
+    flex: none;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+}
+.ofi-chk-meter > span { display: block; height: 100%; border-radius: 999px; background: var(--ofi-cal-accent); transition: width 200ms ease; }
+/* Die Werkzeugleiste, wenn die Checkliste als SEITE steht. */
+.ofi-chk-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-radius: var(--ofi-ios-radius);
+    background: var(--ofi-ios-card);
+    padding: 10px 12px 10px 16px;
+}
+.ofi-chk-toolbar__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-chk-toolbar__meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding-top: 2px; font-size: 12.5px; color: var(--ofi-ios-label); }
+.ofi-chk-toolbar__actions { display: flex; flex: none; align-items: center; gap: 6px; }
+
+/* ── Verknüpfen: Kunde + Angebot ────────────────────────────────────────── */
+.ofi-chk-linkhead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+    gap: 12px;
+    padding: 9px 12px 7px 16px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ofi-ios-label);
+}
+.ofi-chk-linkhead em { font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.ofi-chk-linkrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 7px 12px 7px 16px;
+}
+/* Die immer freie letzte Zeile ist leiser: sie ist ein Angebot, kein Eintrag. */
+.ofi-chk-linkrow.is-spare { opacity: 0.75; }
+.ofi-chk-linkrow.is-spare:focus-within { opacity: 1; }
+.ofi-chk-summary { display: inline-flex; align-items: baseline; gap: 6px; }
+.ofi-chk-summary strong { color: var(--ofi-cal-text); }
+
+/* Das Kundenfeld: ein Suchfeld mit Symbol; gebunden wechselt das Symbol. */
+.ofi-chk-search {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    border: 1px solid var(--ofi-ios-line);
+    border-radius: 9px;
+    background: var(--ofi-ios-field);
+    padding: 0 11px;
+    color: var(--ofi-cal-faint);
+    transition: border-color 140ms ease, color 140ms ease;
+}
+.ofi-chk-search:focus-within { border-color: var(--ofi-cal-accent); }
+.ofi-chk-search.is-linked { color: var(--ofi-cal-accent); }
+#root .ofi-chk .ofi-chk-search__input,
+body > :not(#root) .ofi-chk .ofi-chk-search__input {
+    min-width: 0;
+    flex: 1 1 auto;
+    height: 100%;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    outline: none;
+}
+#root .ofi-chk .ofi-chk-search__input::placeholder,
+body > :not(#root) .ofi-chk .ofi-chk-search__input::placeholder { font-weight: 400; color: var(--ofi-cal-faint); }
+
+/* Die Aufklappliste der Angebote: ein Feld, das sich als Menü öffnet. */
+#root .ofi-chk .ofi-chk-select,
+body > :not(#root) .ofi-chk .ofi-chk-select {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    border: 1px solid var(--ofi-ios-line);
+    border-radius: 9px !important;
+    background: var(--ofi-ios-field);
+    padding: 0 10px 0 11px;
+    text-align: left;
+    font-size: 14px;
+    color: var(--ofi-cal-faint);
+    box-shadow: none;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+#root .ofi-chk .ofi-chk-select:hover:not(:disabled),
+body > :not(#root) .ofi-chk .ofi-chk-select:hover:not(:disabled) { border-color: var(--ofi-cal-muted); }
+#root .ofi-chk .ofi-chk-select:disabled,
+body > :not(#root) .ofi-chk .ofi-chk-select:disabled { opacity: 0.5; cursor: not-allowed; }
+#root .ofi-chk .ofi-chk-select.has-value,
+body > :not(#root) .ofi-chk .ofi-chk-select.has-value { color: var(--ofi-cal-text); }
+.ofi-chk-select__icon { flex: none; color: var(--ofi-ios-label); }
+.ofi-chk-select__value { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.ofi-chk-select__caret { flex: none; color: var(--ofi-cal-faint); transition: transform 140ms ease; }
+.ofi-chk-select__caret.is-open { transform: rotate(180deg); }
+.ofi-chk-count {
+    flex: none;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-accent);
+}
+
+/* ── Die Zeilen der angehefteten Menüs ──────────────────────────────────── */
+.ofi-chk-menu__row,
+.ofi-chk-menu__create {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    border: 0;
+    background: transparent;
+    padding: 6px 10px;
+    text-align: left;
+    color: var(--ofi-cal-text);
+}
+.ofi-chk-menu__row.is-check { gap: 12px; }
+.ofi-chk-menu__title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 500; }
+.ofi-chk-menu__meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 1px; font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-chk-menu__caption {
+    padding: 8px 12px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-chk-menu__empty { padding: 18px 12px; text-align: center; font-size: 12.5px; color: var(--ofi-cal-muted); }
+.ofi-chk-menu__ring {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-chk-menu__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 8px 7px 12px; }
+.ofi-chk-menu__hint { font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-chk-menu__action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 38px;
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    text-align: left;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-accent);
+}
+/* Das Kästchen einer ankreuzbaren Zeile. Auf der gefüllten Zeile (hell navy,
+   dunkel orange) tauscht es die Farben — sonst verschwände der Haken. */
+.ofi-chk-check {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 19px;
+    height: 19px;
+    border: 1.5px solid var(--ofi-cal-border);
+    border-radius: 6px;
+    background: transparent;
+    color: transparent;
+}
+.ofi-chk-check.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent); }
+
+/* ── Vorlagen- und Kundenwahl ───────────────────────────────────────────── */
+.ofi-chk-searchbar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 40px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--ofi-ios-tint);
+    padding: 0 14px;
+    color: var(--ofi-ios-label);
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+.ofi-chk-searchbar:focus-within { border-color: var(--ofi-cal-accent); background: var(--ofi-ios-field); }
+#root .ofi-chk .ofi-chk-searchbar__input,
+body > :not(#root) .ofi-chk .ofi-chk-searchbar__input {
+    min-width: 0;
+    flex: 1 1 auto;
+    height: 100%;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 0;
+    font-size: 14px;
+    color: var(--ofi-cal-text);
+    box-shadow: none;
+    outline: none;
+}
+.ofi-chk-list { max-height: 48vh; overflow-y: auto; overscroll-behavior: contain; }
+#root .ofi-chk .ofi-chk-pick,
+body > :not(#root) .ofi-chk .ofi-chk-pick {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 58px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 9px 16px;
+    text-align: left;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease;
+}
+#root .ofi-chk .ofi-chk-pick:disabled,
+body > :not(#root) .ofi-chk .ofi-chk-pick:disabled { opacity: 0.45; cursor: not-allowed; }
+.ofi-chk-pick__icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+.ofi-chk-pick__icon.is-soft { background: var(--ofi-ios-tint); color: var(--ofi-ios-label); }
+.ofi-chk-pick__title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
+.ofi-chk-pick__meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 2px; font-size: 12.5px; color: var(--ofi-ios-label); }
+.ofi-chk-pick__caret { flex: none; color: var(--ofi-cal-faint); }
+.ofi-chk-pager__nav { display: inline-flex; align-items: center; gap: 4px; }
+.ofi-chk-pager__page { padding: 0 4px; font-variant-numeric: tabular-nums; }

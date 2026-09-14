@@ -4,6 +4,7 @@ import { Plus, Receipt as ReceiptText } from '@/components/icons/antIconCompat';
 import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import type { ProjectSalesOrder } from '@/types/project';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * «WELCHEN AUFTRAG MEINEN SIE?» (Vorgabe Samet 06.09.2026, §5)

@@ -23,8 +23,8 @@ export const PdfGeneratingOverlay = ({ open, detail, progress }: PdfGeneratingOv
                 "FENSTER-OBERFLÄCHE". `rounded-2xl` kam als 8px an. */}
             <div className="ofi-pop flex flex-col items-center gap-4 px-10 py-8">
                 <div className="relative flex h-14 w-14 items-center justify-center">
-                    <span className="absolute inset-0 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#1f2654]" />
-                    <FileText size={22} className="text-[#1f2654]" />
+                    <span className="absolute inset-0 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#0066e0]" />
+                    <FileText size={22} className="text-[#0066e0]" />
                 </div>
                 <div className="text-center">
                     <div className="text-[14px] font-semibold text-slate-800">{t('tenders.pdf_olusturuluyor')}</div>
@@ -33,7 +33,7 @@ export const PdfGeneratingOverlay = ({ open, detail, progress }: PdfGeneratingOv
                 {typeof progress === 'number' && (
                     <div className="h-1.5 w-52 overflow-hidden rounded-full bg-slate-200">
                         <div
-                            className="h-full rounded-full bg-[#1f2654] transition-[width] duration-200 ease-out"
+                            className="h-full rounded-full bg-[#0066e0] transition-[width] duration-200 ease-out"
                             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
                         />
                     </div>

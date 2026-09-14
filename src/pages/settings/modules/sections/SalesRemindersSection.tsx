@@ -9,6 +9,7 @@ import { clampReminderSetting } from '@/lib/reminderSchedule';
 import { InlineLoading } from '@/components/ui-shared/Loader';
 import { ReminderSettingItem } from '../components/ReminderSettingItem';
 import type { ReminderDraft } from '../components/ReminderSettingItem';
+import '@/styles/modules/moduleSettings.css';
 
 /**
  * Verkauf → Erinnerungen: GENAU ZWEI Einstellungen als schlichte Textliste —

@@ -9,6 +9,7 @@ import { CardLink } from './CardLink';
 import { linkRow } from './linkRow';
 import { OverviewCard } from './OverviewCard';
 import { Chip } from './overviewChips';
+import '@/styles/modules/projectDetail.css';
 
 const DELIVERY: ProjectDetailView = { section: 'field', subSection: 'delivery' };
 
@@ -46,7 +47,7 @@ export const DeliveryStatusBox = memo(({ reports, onNavigate }: {
 
     return (
         <OverviewCard title={title} action={<CardLink label={title} onOpen={open} />}>
-            <table data-inv-table data-unstyled-table data-no-col-resize className="w-full">
+            <table data-inv-table data-unstyled-table data-no-col-resize data-prj-kv className="w-full">
                 <tbody>
                     <tr {...linkRow(open, `${t('projects.flow.deliveryReport')}: ${yesNoText(exists)}`)}>
                         <td className="ofi-prj-key">{t('projects.flow.deliveryReport')}</td>

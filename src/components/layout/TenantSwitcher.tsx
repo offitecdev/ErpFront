@@ -35,7 +35,7 @@ import '@/styles/tenantSwitcher.css';
    Dunkeln — ruhige, gesättigte Töne, keine Signalfarben: das Kürzel soll die
    Firma unterscheiden und nicht neben der Glocke um Aufmerksamkeit rufen.
    Die erste ist das Marken-Navy. */
-const TONES = ['#07145c', '#0b57d0', '#0e7c66', '#5b2ea8', '#b3245c'] as const;
+const TONES = ['#0052b8', '#0b57d0', '#0e7c66', '#5b2ea8', '#b3245c'] as const;
 
 /* Rechtsformen tragen nichts zur Unterscheidung bei — «OFFITEC GMBH» und
    «OFFITEC SERVICE GMBH» ergäben sonst beide «OG». */

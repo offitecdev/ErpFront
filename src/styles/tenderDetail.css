@@ -18,7 +18,7 @@
     --quote-muted: #a1a1a6;
     --quote-border: rgba(0, 0, 0, 0.1);
     --quote-hairline: rgba(0, 0, 0, 0.07);
-    --quote-field-border: rgba(0, 0, 0, 0.14);
+    --quote-field-border: #c3c6cd;
     --quote-field: #fff;
     --quote-field-hover: #fff;
     --quote-hover: rgba(0, 0, 0, 0.03);
@@ -27,9 +27,9 @@
     /* Marine statt Systemblau (Samet 09.09.2026: «Knöpfe in unserer
        Hauptfarbe, das Apple-Blau kann weg»). Dunkel bleibt das helle Blau —
        Marine ist auf #0f1113 unsichtbar. */
-    --quote-accent: #272f67;
-    --quote-accent-soft: rgba(39, 47, 103, 0.09);
-    --quote-focus: rgba(39, 47, 103, 0.3);
+    --quote-accent: #0a7aff;
+    --quote-accent-soft: rgba(10, 122, 255, 0.09);
+    --quote-focus: rgba(10, 122, 255, 0.3);
     --quote-danger: #d70015;
     --quote-success: #1f8a3b;
     --quote-shadow: none;

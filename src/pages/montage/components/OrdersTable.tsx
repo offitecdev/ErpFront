@@ -99,7 +99,7 @@ export const OrdersTable = ({
                                         title={t('calendar.docs.title')}
                                         aria-label={t('calendar.docs.title')}
                                         onClick={(event) => { event.stopPropagation(); onOpenDocuments(row); }}
-                                        className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 text-[11.5px] font-semibold text-[#1f2654] transition-colors hover:border-[#1f2654]/45 hover:bg-[#eef2fb] dark:border-white/15 dark:bg-transparent dark:text-amber-300 dark:hover:bg-white/10"
+                                        className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 text-[11.5px] font-semibold text-[#0066e0] transition-colors hover:border-[#0066e0]/45 hover:bg-[#eef2fb] dark:border-white/15 dark:bg-transparent dark:text-amber-300 dark:hover:bg-white/10"
                                     >
                                         <LuFolderOpen size={14} />
                                         {t('calendar.docs.title')}

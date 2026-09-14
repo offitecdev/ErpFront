@@ -82,7 +82,7 @@ export const MontageHome = () => {
             <section className="order-last flex min-h-[360px] min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)] xl:order-first xl:min-h-0 dark:border-white/10 dark:bg-[#17191c] dark:shadow-none">
                 <header className="flex min-h-16 items-center justify-between gap-3 border-b border-slate-200/80 px-5 py-3.5 dark:border-white/10">
                     <span className="flex items-center gap-3">
-                        <span className="grid size-10 place-items-center rounded-xl bg-[#eef2fb] text-[#1f2654] dark:bg-amber-500/10 dark:text-amber-300">
+                        <span className="grid size-10 place-items-center rounded-xl bg-[#eef2fb] text-[#0066e0] dark:bg-amber-500/10 dark:text-amber-300">
                             <Bell01 size={19} />
                         </span>
                         <span>
@@ -96,7 +96,7 @@ export const MontageHome = () => {
                 </header>
                 {loadingNotifications ? (
                     <div className="flex flex-1 items-center justify-center gap-3 text-[14px] text-slate-400">
-                        <span className="size-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-t-amber-500" />
+                        <span className="size-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0] dark:border-t-amber-500" />
                         {t('common.loading')}
                     </div>
                 ) : notifications.length === 0 ? (
@@ -118,7 +118,7 @@ export const MontageHome = () => {
                                     <span className="mt-1 block truncate text-[12.5px] text-slate-500 dark:text-slate-400">{notification.message}</span>
                                 </span>
                                 <span className="shrink-0 text-[11.5px] tabular-nums text-slate-400">{dateFmt(notification.createdAt)}</span>
-                                {notification.linkUrl && <ChevronRight size={18} className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1f2654] dark:group-hover:text-amber-300" />}
+                                {notification.linkUrl && <ChevronRight size={18} className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#0066e0] dark:group-hover:text-amber-300" />}
                             </button>
                         ))}
                     </div>
@@ -131,14 +131,14 @@ export const MontageHome = () => {
                         key={to}
                         type="button"
                         onClick={() => navigate(to)}
-                        className="group relative flex h-full min-h-[190px] flex-col items-start justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-[#1f2654]/25 hover:shadow-[0_10px_28px_rgba(15,23,42,0.10)] active:translate-y-0 active:bg-slate-50 xl:min-h-0 dark:border-white/10 dark:bg-[#17191c] dark:shadow-none dark:hover:border-amber-400/30 dark:hover:bg-white/[0.04]"
+                        className="group relative flex h-full min-h-[190px] flex-col items-start justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-[#0066e0]/25 hover:shadow-[0_10px_28px_rgba(15,23,42,0.10)] active:translate-y-0 active:bg-slate-50 xl:min-h-0 dark:border-white/10 dark:bg-[#17191c] dark:shadow-none dark:hover:border-amber-400/30 dark:hover:bg-white/[0.04]"
                     >
                         <span className="grid size-14 place-items-center rounded-2xl bg-[#d30f15] text-white shadow-[0_6px_16px_rgba(211,15,21,0.18)] transition-transform duration-200 group-hover:scale-105 dark:bg-amber-500 dark:text-[#151616] dark:shadow-none">
                             <Icon size={26} />
                         </span>
                         <span className="flex w-full items-end justify-between gap-3">
                             <span className="max-w-[220px] text-[17px] font-bold leading-snug text-slate-900 dark:text-slate-50">{t(labelKey)}</span>
-                            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-400 transition-colors group-hover:bg-[#eef2fb] group-hover:text-[#1f2654] dark:bg-white/10 dark:text-white/50 dark:group-hover:text-amber-300">
+                            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-400 transition-colors group-hover:bg-[#eef2fb] group-hover:text-[#0066e0] dark:bg-white/10 dark:text-white/50 dark:group-hover:text-amber-300">
                                 <ChevronRight size={18} />
                             </span>
                         </span>

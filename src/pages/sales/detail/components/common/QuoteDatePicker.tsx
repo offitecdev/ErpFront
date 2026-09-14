@@ -88,7 +88,7 @@ export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder, 
                 aria-label={ariaLabel}
                 aria-expanded={open}
                 onClick={() => (open ? setOpen(false) : openPicker())}
-                className={`${QUOTE_CONTROL_CLASS} flex items-center justify-between gap-2 ${open ? 'border-[#1f2654] ring-2 ring-[#1f2654]/15' : ''} ${className}`}
+                className={`${QUOTE_CONTROL_CLASS} flex items-center justify-between gap-2 ${open ? 'border-[#0066e0] ring-2 ring-[#0066e0]/15' : ''} ${className}`}
             >
                 <Calendar size={13} className="order-2 shrink-0 text-slate-400" />
                 <span className={`min-w-0 flex-1 truncate text-left tabular-nums ${selected ? '' : 'font-normal text-slate-400'}`}>
@@ -108,7 +108,7 @@ export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder, 
                                 type="button"
                                 aria-label={t('common.previous')}
                                 onClick={() => setViewMonth((current) => current.subtract(1, 'month'))}
-                                className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#1f2654]"
+                                className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0066e0]"
                             >
                                 <ChevronLeft size={14} />
                             </button>
@@ -117,7 +117,7 @@ export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder, 
                                 type="button"
                                 aria-label={t('common.next')}
                                 onClick={() => setViewMonth((current) => current.add(1, 'month'))}
-                                className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#1f2654]"
+                                className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0066e0]"
                             >
                                 <ChevronRight size={14} />
                             </button>
@@ -144,13 +144,13 @@ export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder, 
                                         onClick={() => commit(day)}
                                         className={`flex h-7 items-center justify-center rounded-[3px] text-[12px] tabular-nums transition-colors ${
                                             isSelected
-                                                ? 'bg-[#1f2654] font-semibold text-white'
+                                                ? 'bg-[#0066e0] font-semibold text-white'
                                                 : isDisabled
                                                     ? 'cursor-not-allowed text-slate-200'
                                                     : inMonth
                                                         ? 'text-slate-700 hover:bg-slate-100'
                                                         : 'text-slate-300 hover:bg-slate-50'
-                                        } ${isToday && !isSelected ? 'font-bold text-[#1f2654] ring-1 ring-inset ring-[#1f2654]/35' : ''}`}
+                                        } ${isToday && !isSelected ? 'font-bold text-[#0066e0] ring-1 ring-inset ring-[#0066e0]/35' : ''}`}
                                     >
                                         {day.date()}
                                     </button>
@@ -161,7 +161,7 @@ export const QuoteDatePicker = ({ value, onChange, min, ariaLabel, placeholder, 
                             <button
                                 type="button"
                                 onClick={() => commit(today)}
-                                className="rounded-[3px] px-2 py-1 text-[12px] font-medium text-[#1f2654] transition-colors hover:bg-slate-100"
+                                className="rounded-[3px] px-2 py-1 text-[12px] font-medium text-[#0066e0] transition-colors hover:bg-slate-100"
                             >
                                 {t('common.today')}
                             </button>

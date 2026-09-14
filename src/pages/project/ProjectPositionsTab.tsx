@@ -85,7 +85,7 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
 
     if (!tenderId) {
         return (
-            <Card title={t('auto.pozisyon_ozeti')} icon={<List size={14} />}>
+            <Card title={t('auto.pozisyon_ozeti')}>
                 <EmptyState
                     icon={<List size={32} />}
                     title={t('auto.pozisyon_ozeti')}
@@ -98,7 +98,6 @@ export const ProjectPositionsTab = ({ project }: { project: ProjectDto }) => {
     return (
         <Card
             title={t('auto.pozisyon_ozeti')}
-            icon={<List size={14} />}
             noPadding
             actions={detail?.tender.tenderNumber ? (
                 <span className="font-mono text-[11.5px] text-slate-500">{detail.tender.tenderNumber}</span>

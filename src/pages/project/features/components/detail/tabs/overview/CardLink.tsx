@@ -2,6 +2,7 @@ import { memo } from 'react';
 
 import { ChevronRight } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * Der Weg von einer Übersichtskarte in den Bereich, den sie zusammenfasst —

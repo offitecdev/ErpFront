@@ -30,7 +30,7 @@ export const CrmOverview = () => {
                 transition={{ duration: 0.35, delay: 0.05, ease: 'easeOut' }}
                 className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-[#E3E7F0] bg-white px-6 py-16 text-center dark:border-white/12 dark:bg-white/4"
             >
-                <span className="flex size-12 items-center justify-center rounded-full bg-[#07145c]/8 text-[#07145c] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]">
+                <span className="flex size-12 items-center justify-center rounded-full bg-[#0052b8]/8 text-[#0052b8] dark:bg-[#e6cf9e]/12 dark:text-[#e6cf9e]">
                     <RefreshCcw01 size={22} />
                 </span>
                 <p className="max-w-[520px] text-[14.5px] font-semibold leading-relaxed text-[#3F4350] dark:text-[#d9dce3]">

@@ -1,0 +1,748 @@
+/* =========================================================
+   Offitec — BENACHRICHTIGUNGEN IM MAC-KLEID (10.09.2026)
+
+   Vorgabe Samet: «Die Meldungen, die rechts hereinkommen, und
+   das Glocken-Fenster: sehr modern, sauber, weiche Kanten —
+   macOS / iOS / SwiftUI. Das Glocken-Fenster grösser, von
+   Grund auf neu.»
+
+   Drei Bauteile, EIN Kleid:
+     1. Sonner-Toasts (App.tsx, `.offitec-toaster`) — die
+        kurzen Rückmeldungen «Gespeichert», «Fehler» …
+     2. Der Wecker (ReminderToasts.tsx, `.ofi-notice`) —
+        fällige Erinnerungen + Ereignis-Meldungen, 15 s.
+     3. Die Mitteilungszentrale (NotificationCenter.tsx,
+        `.ofi-nc`) — das Fenster unter der Glocke.
+
+   Das Vorbild ist der macOS-Banner: eine weisse, leicht
+   mattierte Karte mit 16px-Kante und EINER Haarlinie, links
+   ein farbiges Symbolquadrat wie ein App-Symbol, rechts
+   Titel (13px halbfett) über Text (12.5px, zweite Farbe),
+   oben rechts die Zeit, der Schliesskreis erscheint erst
+   unter der Maus. Keine Pillen, keine Grossbuchstaben,
+   keine Farbverläufe. Die Farbtafel ist die Fenstertafel
+   (`--ofi-win-*` aus appleModal.css); dunkel = Variablen-
+   tausch.
+
+   Ladereihenfolge (main.tsx): … appleModal.css → DIESE DATEI.
+   Sonner malt mit eigenen `data-*`-Regeln; darum `!important`
+   nur im Sonner-Block. Alles hängt in Portalen an <body>.
+   ========================================================= */
+
+:root {
+    --ofi-ntf-radius: 16px;
+    --ofi-ntf-surface: rgba(255, 255, 255, 0.92);
+    --ofi-ntf-surface-solid: #ffffff;
+    --ofi-ntf-border: rgba(0, 0, 0, 0.08);
+    --ofi-ntf-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 12px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.05);
+    --ofi-ntf-blur: saturate(1.6) blur(24px);
+    --ofi-ntf-text: #1d1d1f;
+    --ofi-ntf-secondary: #6e6e73;
+    --ofi-ntf-muted: #a1a1a6;
+    --ofi-ntf-hover: rgba(0, 0, 0, 0.035);
+    --ofi-ntf-fill: rgba(0, 0, 0, 0.05);
+    --ofi-ntf-fill-hover: rgba(0, 0, 0, 0.09);
+    --ofi-ntf-hairline: rgba(0, 0, 0, 0.07);
+    --ofi-ntf-close: rgba(120, 120, 128, 0.16);
+    --ofi-ntf-close-hover: rgba(120, 120, 128, 0.28);
+    /* Die iOS-Systemfarben der Symbolquadrate. */
+    --ofi-ntf-blue: #0a7aff;
+    --ofi-ntf-green: #34c759;
+    --ofi-ntf-orange: #ff9500;
+    --ofi-ntf-red: #ff3b30;
+    --ofi-ntf-indigo: #5856d6;
+    --ofi-ntf-teal: #30b0c7;
+    --ofi-ntf-gray: #8e8e93;
+    --ofi-ntf-font: var(--ofi-win-font, var(--font-body, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif));
+}
+.dark {
+    --ofi-ntf-surface: rgba(44, 44, 46, 0.88);
+    --ofi-ntf-surface-solid: #1c1c1e;
+    --ofi-ntf-border: rgba(255, 255, 255, 0.1);
+    --ofi-ntf-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 16px 48px rgba(0, 0, 0, 0.6), 0 2px 10px rgba(0, 0, 0, 0.4);
+    --ofi-ntf-text: #f5f5f7;
+    --ofi-ntf-secondary: #a1a1a6;
+    --ofi-ntf-muted: #6e6e73;
+    --ofi-ntf-hover: rgba(255, 255, 255, 0.05);
+    --ofi-ntf-fill: rgba(255, 255, 255, 0.08);
+    --ofi-ntf-fill-hover: rgba(255, 255, 255, 0.14);
+    --ofi-ntf-hairline: rgba(255, 255, 255, 0.08);
+    --ofi-ntf-close: rgba(120, 120, 128, 0.32);
+    --ofi-ntf-close-hover: rgba(120, 120, 128, 0.5);
+    --ofi-ntf-blue: #3b8dff;
+    --ofi-ntf-green: #30d158;
+    --ofi-ntf-orange: #ff9f0a;
+    --ofi-ntf-red: #ff453a;
+    --ofi-ntf-indigo: #5e5ce6;
+    --ofi-ntf-teal: #40c8e0;
+    --ofi-ntf-gray: #98989d;
+}
+
+/* Auftritt: von rechts hereingleiten wie ein Mac-Banner. */
+@keyframes ofi-ntf-in {
+    from { opacity: 0; transform: translateX(24px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes ofi-ntf-out {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translateX(24px) scale(0.98); }
+}
+@keyframes ofi-nc-in {
+    from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Gemeinsame Bausteine ──────────────────────────────────
+   Das Symbolquadrat («App-Symbol») und der Schliesskreis
+   werden von allen drei Bauteilen gelesen. */
+.ofi-ntf-app {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    color: #ffffff;
+    background: var(--ofi-ntf-gray);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.ofi-ntf-app svg { width: 18px; height: 18px; stroke-width: 2.1; }
+.ofi-ntf-app.is-blue { background: var(--ofi-ntf-blue); }
+.ofi-ntf-app.is-green { background: var(--ofi-ntf-green); }
+.ofi-ntf-app.is-orange { background: var(--ofi-ntf-orange); }
+.ofi-ntf-app.is-red { background: var(--ofi-ntf-red); }
+.ofi-ntf-app.is-indigo { background: var(--ofi-ntf-indigo); }
+.ofi-ntf-app.is-teal { background: var(--ofi-ntf-teal); }
+.ofi-ntf-app.is-gray { background: var(--ofi-ntf-gray); }
+
+/* Der Mac-Schliesskreis: sitzt AUF der linken oberen Ecke und
+   erscheint erst unter der Maus; ohne Maus (Touch) steht er. */
+.ofi-ntf-close {
+    position: absolute;
+    top: -7px;
+    left: -7px;
+    z-index: 2;
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0.5px solid var(--ofi-ntf-border);
+    border-radius: 999px !important;
+    background: var(--ofi-ntf-surface-solid);
+    color: var(--ofi-ntf-text);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 140ms ease, transform 140ms ease, background-color 140ms ease;
+    cursor: pointer;
+}
+.ofi-ntf-close svg { width: 11px; height: 11px; stroke-width: 2.6; }
+.ofi-ntf-close:hover { background: var(--ofi-ntf-fill-hover); }
+.ofi-ntf-close:focus-visible,
+:is(.ofi-notice, [data-sonner-toast]):is(:hover, :focus-within) .ofi-ntf-close {
+    opacity: 1;
+    transform: none;
+}
+@media (hover: none) {
+    .ofi-ntf-close { opacity: 1; transform: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   1. SONNER — die kurzen Rückmeldungen
+   ═══════════════════════════════════════════════════════════ */
+.offitec-toaster {
+    --width: 340px;
+    --gap: 10px;
+    --toast-border-radius: var(--ofi-ntf-radius);
+    font-family: var(--ofi-ntf-font);
+}
+
+.offitec-toaster [data-sonner-toast],
+.offitec-toast {
+    width: 340px !important;
+    min-height: auto !important;
+    box-sizing: border-box !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 40px 12px 12px !important;
+    border: 1px solid var(--ofi-ntf-border) !important;
+    border-radius: var(--ofi-ntf-radius) !important;
+    background: var(--ofi-ntf-surface) !important;
+    -webkit-backdrop-filter: var(--ofi-ntf-blur);
+    backdrop-filter: var(--ofi-ntf-blur);
+    color: var(--ofi-ntf-text) !important;
+    box-shadow: var(--ofi-ntf-shadow) !important;
+    font-family: var(--ofi-ntf-font) !important;
+    -webkit-font-smoothing: antialiased;
+}
+/* Sonner klappt den Stapel zusammen: die hinteren Karten
+   bleiben weiss, damit keine grauen Kanten durchscheinen. */
+.offitec-toaster [data-sonner-toast][data-expanded="false"][data-front="false"] {
+    background: var(--ofi-ntf-surface-solid) !important;
+}
+
+.offitec-toaster [data-content],
+.offitec-toast-content {
+    display: flex !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    gap: 1px !important;
+}
+
+.offitec-toaster [data-title],
+.offitec-toast-title {
+    color: var(--ofi-ntf-text) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    line-height: 17px !important;
+    letter-spacing: -0.005em !important;
+    overflow-wrap: anywhere !important;
+}
+
+.offitec-toaster [data-description],
+.offitec-toast-description {
+    margin-top: 0 !important;
+    color: var(--ofi-ntf-secondary) !important;
+    font-size: 12.5px !important;
+    font-weight: 400 !important;
+    line-height: 16px !important;
+    letter-spacing: 0 !important;
+    overflow-wrap: anywhere !important;
+}
+
+/* Das Symbolquadrat: Sonner reserviert 16px, wir wollen 34. */
+.offitec-toaster [data-icon],
+.offitec-toast-icon {
+    display: flex !important;
+    width: 34px !important;
+    height: 34px !important;
+    flex: none !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+}
+.offitec-toaster [data-icon] > * { margin: 0 !important; }
+.toast-icon-ring {
+    position: relative;
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    color: #ffffff;
+    background: var(--ofi-ntf-gray);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.toast-icon-ring::before,
+.toast-icon-ring::after { display: none; }
+.toast-icon-ring svg { position: relative; z-index: 1; width: 18px; height: 18px; stroke-width: 2.1; }
+.toast-icon-info { background: var(--ofi-ntf-blue); }
+.toast-icon-success { background: var(--ofi-ntf-green); }
+.toast-icon-warning { background: var(--ofi-ntf-orange); }
+.toast-icon-error { background: var(--ofi-ntf-red); }
+
+/* Der Schliesskreis — Sonner setzt ihn selbst links oben; wir
+   geben ihm das Mac-Mass und blenden ihn unter der Maus ein. */
+.offitec-toaster [data-close-button],
+.offitec-toast-close {
+    top: -7px !important;
+    left: -7px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 22px !important;
+    height: 22px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    transform: scale(0.85) !important;
+    border: 0.5px solid var(--ofi-ntf-border) !important;
+    border-radius: 999px !important;
+    background: var(--ofi-ntf-surface-solid) !important;
+    color: var(--ofi-ntf-text) !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14) !important;
+    opacity: 0 !important;
+    transition: opacity 140ms ease, transform 140ms ease, background-color 140ms ease !important;
+}
+.offitec-toaster [data-sonner-toast]:is(:hover, :focus-within) [data-close-button],
+.offitec-toaster [data-close-button]:focus-visible {
+    opacity: 1 !important;
+    transform: none !important;
+}
+@media (hover: none) {
+    .offitec-toaster [data-close-button] { opacity: 1 !important; transform: none !important; }
+}
+.offitec-toast-close-icon,
+.offitec-toast-close-icon .anticon {
+    display: inline-flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+}
+.offitec-toaster [data-close-button] svg,
+.offitec-toast-close svg {
+    position: static !important;
+    display: block !important;
+    width: 11px !important;
+    height: 11px !important;
+    margin: 0 !important;
+    transform: none !important;
+    stroke-width: 2.6 !important;
+}
+.offitec-toaster [data-close-button]:hover,
+.offitec-toast-close:hover {
+    background: var(--ofi-ntf-fill-hover) !important;
+    color: var(--ofi-ntf-text) !important;
+}
+.offitec-toaster [data-close-button]:focus-visible,
+.offitec-toast-close:focus-visible {
+    box-shadow: 0 0 0 3px var(--ofi-win-focus, rgba(10, 122, 255, 0.3)) !important;
+}
+
+/* Aktionen: kleine Mac-Knöpfe mit Rahmen, kein Text-Link. */
+.offitec-toaster [data-button],
+.offitec-toast-action,
+.offitec-toast-cancel {
+    height: 26px !important;
+    margin: 8px 0 0 !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--ofi-ntf-border) !important;
+    border-radius: 7px !important;
+    background: var(--ofi-ntf-fill) !important;
+    color: var(--ofi-ntf-text) !important;
+    box-shadow: none !important;
+    font-family: var(--ofi-ntf-font) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    line-height: 24px !important;
+    transition: background-color 140ms ease !important;
+}
+.offitec-toaster [data-button]:hover { background: var(--ofi-ntf-fill-hover) !important; }
+.offitec-toast-action,
+.offitec-toaster [data-button][data-action] {
+    border-color: transparent !important;
+    background: var(--ofi-ntf-blue) !important;
+    color: #ffffff !important;
+}
+.offitec-toaster [data-button][data-action]:hover { background: var(--ofi-win-accent-hover, #0066e0) !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   2. DER WECKER — Erinnerungen + Ereignis-Meldungen
+   ═══════════════════════════════════════════════════════════ */
+/* In der rechten oberen Ecke über der Kopfzeile (Samet, 11.09.): die
+   Karte beginnt 10px vom oberen und rechten Rand, auf der Linie der
+   Sonner-Toasts (App.tsx `offset`) — 2px + 8px Luft für den Schliess-
+   kreis. Über jedem Fenster (Popups enden bei 1200), wie die Toasts. */
+.ofi-notice-stack {
+    position: fixed;
+    top: 2px;
+    right: 10px;
+    z-index: 1300;
+    display: flex;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 18px);
+    flex-direction: column;
+    gap: 10px;
+    /* Der Schliesskreis ragt über die Karte hinaus — Luft dafür. */
+    padding: 8px 0 8px 8px;
+    overflow-y: auto;
+    overflow-x: visible;
+    pointer-events: none;
+    scrollbar-width: none;
+    font-family: var(--ofi-ntf-font);
+    -webkit-font-smoothing: antialiased;
+}
+.ofi-notice-stack::-webkit-scrollbar { display: none; }
+
+.ofi-notice {
+    position: relative;
+    display: flex;
+    flex: none;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 14px 12px 12px;
+    border: 1px solid var(--ofi-ntf-border);
+    border-radius: var(--ofi-ntf-radius);
+    background: var(--ofi-ntf-surface);
+    -webkit-backdrop-filter: var(--ofi-ntf-blur);
+    backdrop-filter: var(--ofi-ntf-blur);
+    color: var(--ofi-ntf-text);
+    box-shadow: var(--ofi-ntf-shadow);
+    pointer-events: auto;
+    animation: ofi-ntf-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ofi-notice.is-leaving {
+    animation: ofi-ntf-out 200ms ease-in forwards;
+}
+.ofi-notice__body { min-width: 0; flex: 1 1 auto; padding-top: 1px; }
+.ofi-notice__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+.ofi-notice__kind {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--ofi-ntf-muted);
+}
+.ofi-notice__time {
+    flex: none;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-ntf-muted);
+}
+.ofi-notice__title {
+    margin: 1px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 17px;
+    letter-spacing: -0.005em;
+    overflow-wrap: anywhere;
+}
+.ofi-notice__text {
+    margin: 1px 0 0;
+    font-size: 12.5px;
+    line-height: 16px;
+    color: var(--ofi-ntf-secondary);
+    overflow-wrap: anywhere;
+}
+.ofi-notice__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+#root .ofi-notice__open,
+body > :not(#root) .ofi-notice__open {
+    display: inline-flex;
+    height: 26px;
+    min-height: 26px;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    border: 1px solid var(--ofi-ntf-border);
+    border-radius: 7px !important;
+    background: var(--ofi-ntf-fill);
+    color: var(--ofi-ntf-text);
+    font-family: var(--ofi-ntf-font);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    box-shadow: none;
+    transition: background-color 140ms ease;
+}
+#root .ofi-notice__open:hover,
+body > :not(#root) .ofi-notice__open:hover {
+    background: var(--ofi-ntf-fill-hover);
+    color: var(--ofi-ntf-text);
+}
+.ofi-notice__open svg { width: 12px; height: 12px; stroke-width: 2.4; }
+
+/* Die Restlaufzeit: eine 2px-Linie am Fuss, innerhalb der Kante. */
+.ofi-notice__timer {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 0;
+    height: 2px;
+    overflow: hidden;
+    border-radius: 2px 2px 0 0;
+    background: var(--ofi-ntf-hairline);
+}
+.ofi-notice__timer > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ofi-ntf-blue);
+    opacity: 0.55;
+    transition: width 1000ms linear;
+}
+.ofi-notice.is-reminder .ofi-notice__timer > span { background: var(--ofi-ntf-orange); }
+
+/* ═══════════════════════════════════════════════════════════
+   3. DIE MITTEILUNGSZENTRALE — das Fenster unter der Glocke
+   ═══════════════════════════════════════════════════════════ */
+.ofi-nc-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 190;
+    /* Unsichtbar: die Zentrale ist ein Ausschnitt, kein Blatt —
+       ein Klick daneben schliesst sie, die Seite bleibt hell. */
+    background: transparent;
+}
+.ofi-nc {
+    position: fixed;
+    top: 72px;
+    right: 16px;
+    z-index: 191;
+    display: flex;
+    width: 420px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 88px);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ofi-ntf-border);
+    border-radius: var(--ofi-ntf-radius);
+    background: var(--ofi-ntf-surface-solid);
+    color: var(--ofi-ntf-text);
+    box-shadow: var(--ofi-ntf-shadow);
+    outline: none;
+    font-family: var(--ofi-ntf-font);
+    -webkit-font-smoothing: antialiased;
+    transform-origin: top right;
+    animation: ofi-nc-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Der Kopf: iOS-Grosstitel, rechts «Alle gelesen» + Schliesskreis. */
+.ofi-nc__head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 18px 16px 12px 20px;
+}
+.ofi-nc__title {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+.ofi-nc__count {
+    margin-left: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--ofi-ntf-muted);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-nc__tools { display: flex; flex: none; align-items: center; gap: 6px; }
+#root .ofi-nc__readall,
+body > :not(#root) .ofi-nc__readall {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 7px !important;
+    background: transparent;
+    color: var(--ofi-ntf-blue);
+    font-family: var(--ofi-ntf-font);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    box-shadow: none;
+    transition: background-color 140ms ease;
+}
+#root .ofi-nc__readall:hover,
+body > :not(#root) .ofi-nc__readall:hover {
+    background: var(--ofi-ntf-hover);
+    color: var(--ofi-ntf-blue);
+}
+#root .ofi-nc__readall:disabled,
+body > :not(#root) .ofi-nc__readall:disabled { opacity: 0.4; }
+#root .ofi-nc__x,
+body > :not(#root) .ofi-nc__x {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px !important;
+    background: var(--ofi-ntf-close);
+    color: var(--ofi-ntf-secondary);
+    box-shadow: none;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-nc__x:hover,
+body > :not(#root) .ofi-nc__x:hover {
+    background: var(--ofi-ntf-close-hover);
+    color: var(--ofi-ntf-text);
+}
+.ofi-nc__x svg { width: 13px; height: 13px; stroke-width: 2.6; }
+
+.ofi-nc__body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0 8px 10px;
+    overscroll-behavior: contain;
+}
+
+/* Die Tagesgruppen: iOS-Abschnittskopf, klein und grau. */
+.ofi-nc__group { margin-top: 6px; }
+.ofi-nc__group-label {
+    margin: 0;
+    padding: 6px 12px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-ntf-secondary);
+}
+.ofi-nc__list { display: flex; flex-direction: column; }
+
+/* Eine Meldung: Symbolquadrat · Text · Zeit + Pfeil. Die
+   Trennlinie beginnt beim Text (iOS «inset separator»). */
+#root .ofi-nc__row,
+body > :not(#root) .ofi-nc__row {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    padding: 10px 10px 10px 12px;
+    border: 0;
+    border-radius: 10px !important;
+    background: transparent;
+    color: var(--ofi-ntf-text);
+    text-align: left;
+    box-shadow: none;
+    font-family: var(--ofi-ntf-font);
+    transition: background-color 120ms ease;
+}
+#root .ofi-nc__row:hover,
+body > :not(#root) .ofi-nc__row:hover {
+    background: var(--ofi-ntf-hover);
+    color: var(--ofi-ntf-text);
+}
+.ofi-nc__row + .ofi-nc__row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 58px;
+    right: 10px;
+    height: 1px;
+    background: var(--ofi-ntf-hairline);
+}
+.ofi-nc__row:hover::before,
+.ofi-nc__row:hover + .ofi-nc__row::before { opacity: 0; }
+
+.ofi-nc__icon { position: relative; }
+/* Ungelesen: der blaue Punkt am Symbol, wie das iOS-Abzeichen. */
+.ofi-nc__row.is-unread .ofi-nc__icon::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--ofi-ntf-surface-solid);
+    border-radius: 999px;
+    background: var(--ofi-ntf-blue);
+}
+.ofi-nc__text { min-width: 0; padding-top: 1px; }
+.ofi-nc__row-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 17px;
+    letter-spacing: -0.005em;
+    overflow-wrap: anywhere;
+}
+.ofi-nc__row.is-read .ofi-nc__row-title { font-weight: 500; }
+.ofi-nc__row-msg {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    margin: 1px 0 0;
+    font-size: 12.5px;
+    line-height: 16px;
+    color: var(--ofi-ntf-secondary);
+}
+.ofi-nc__meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding-top: 2px;
+}
+.ofi-nc__time {
+    font-size: 11px;
+    line-height: 14px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-ntf-muted);
+}
+.ofi-nc__chev {
+    color: var(--ofi-ntf-muted);
+    opacity: 0.7;
+}
+.ofi-nc__chev svg { width: 14px; height: 14px; stroke-width: 2.2; }
+
+/* Leer: ein stiller Glockenkreis. */
+.ofi-nc__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 44px 20px 40px;
+    text-align: center;
+}
+.ofi-nc__empty-icon {
+    display: inline-flex;
+    width: 52px;
+    height: 52px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 6px;
+    border-radius: 999px;
+    background: var(--ofi-ntf-fill);
+    color: var(--ofi-ntf-secondary);
+}
+.ofi-nc__empty-icon svg { width: 22px; height: 22px; stroke-width: 1.9; }
+.ofi-nc__empty-title { margin: 0; font-size: 15px; font-weight: 600; }
+.ofi-nc__empty-sub { margin: 0; font-size: 12.5px; color: var(--ofi-ntf-secondary); }
+
+.ofi-nc__skel {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px 10px 10px 12px;
+}
+.ofi-nc__skel-icon { width: 34px; height: 34px; border-radius: 9px; background: var(--ofi-ntf-fill); }
+.ofi-nc__skel-lines { display: flex; flex-direction: column; gap: 7px; padding-top: 3px; }
+
+/* Telefon: die Zentrale füllt die Breite, der Wecker auch. */
+@media (max-width: 640px) {
+    .ofi-nc {
+        top: 68px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+        max-height: calc(100vh - 80px);
+    }
+    .ofi-notice-stack {
+        right: 8px;
+        width: calc(100vw - 16px);
+        max-width: none;
+    }
+    .offitec-toaster { --width: calc(100vw - 32px); }
+    .offitec-toaster [data-sonner-toast] { width: calc(100vw - 32px) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-notice,
+    .ofi-notice.is-leaving,
+    .ofi-nc { animation: none; }
+}

@@ -1,0 +1,1475 @@
+/* =========================================================
+   Offitec — GÖREVLER / TASKS-MODUL: DETAILSEITE (13.09.2026)
+
+   /tasks/:taskId — Kopf, Hinweise, Reiter (İçerik · Yorumlar ·
+   Dosyalar · Geçmiş), Blockeditor, Checklisten, Seitenleiste.
+   Vorlage ist die Offerte (styles/tenderDetail.css): weisse Tafeln
+   mit Haarlinie, 28px-Bedienelemente, kleine Schrift, EIN Blau.
+   Keine Schatten, keine getönten Flächen, nichts bewegt sich beim
+   Überfahren — nur Farben blenden (140ms).
+
+   Präfixe: .ofi-gv-detail-* (Seite), .ofi-gv-editor-* (Editor),
+   .ofi-gv-checklist-* (Checklisten), .ofi-gv-comments-*,
+   .ofi-gv-files-*, .ofi-gv-activity-*, .ofi-gv-menu* (Menüs).
+   Menüs und Fenster hängen ausserhalb von #root: dort gelten keine
+   --gv-* Variablen — Regeln mit Portal-Zwilling und --ofi-cal-*.
+   ========================================================= */
+
+/* ── Raster der Seite ───────────────────────────────────────────────────── */
+
+.ofi-gv-detail {
+    --ofi-field-focus: var(--gv-accent);
+    --ofi-field-ring: var(--gv-focus);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.ofi-gv-detail-main,
+.ofi-gv-detail-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+@media (max-width: 1023px) {
+    .ofi-gv-detail { grid-template-columns: minmax(0, 1fr); }
+}
+
+.ofi-gv-detail-error-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+#root .ofi-gv a.ofi-gv-btn { text-decoration: none; }
+
+/* ── Kopf: Titel, Beschreibung, Etiketten, Fortschritt ──────────────────── */
+
+.ofi-gv-detail-head { padding: 12px 16px 14px; }
+
+.ofi-gv-detail-head__top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+#root .ofi-gv .ofi-gv-detail-title {
+    margin: 0;
+    color: var(--gv-text);
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+    outline: none;
+}
+
+#root .ofi-gv .ofi-gv-detail-title.is-editable {
+    margin: 0 -6px;
+    padding: 1px 6px;
+    cursor: text;
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-detail-title.is-editable:hover { background: var(--gv-hover); }
+
+#root .ofi-gv .ofi-gv-detail-title.is-editable:focus {
+    background: var(--gv-surface);
+    box-shadow: 0 0 0 1px var(--gv-accent), 0 0 0 4px var(--gv-focus);
+}
+
+#root .ofi-gv .ofi-gv-detail-desc {
+    margin: 6px 0 0;
+    color: var(--gv-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+#root .ofi-gv textarea.ofi-gv-detail-desc.is-editable {
+    display: block;
+    width: calc(100% + 12px);
+    min-height: 28px;
+    margin: 4px -6px 0;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--gv-text);
+    resize: none;
+    overflow: hidden;
+    box-shadow: none;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+#root .ofi-gv textarea.ofi-gv-detail-desc.is-editable::placeholder { color: var(--gv-muted); font-style: normal; opacity: 1; }
+#root .ofi-gv textarea.ofi-gv-detail-desc.is-editable:hover:not(:focus) { border-color: var(--gv-field-border); }
+
+#root .ofi-gv textarea.ofi-gv-detail-desc.is-editable:focus {
+    border-color: var(--gv-accent);
+    background: var(--gv-surface);
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+.ofi-gv-detail-head__labels {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.ofi-gv-detail-head__progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.ofi-gv-detail-head__bar { flex: 1 1 auto; max-width: 320px; }
+
+.ofi-gv-detail-banners {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ofi-gv-detail-tabs { align-self: flex-start; max-width: 100%; }
+
+/* ── Seitenleiste ───────────────────────────────────────────────────────── */
+
+.ofi-gv-detail-kv { padding: 12px; }
+
+.ofi-gv-detail-kv > dt { align-self: start; padding-top: 3px; }
+
+.ofi-gv-detail-kv > dd {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+}
+
+#root .ofi-gv .ofi-gv-detail-railvalue {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    height: 24px;
+    margin: 0 -6px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--gv-text);
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-detail-railvalue:hover { background: var(--gv-fill); }
+#root .ofi-gv .ofi-gv-detail-railvalue.is-empty { color: var(--gv-secondary); }
+#root .ofi-gv .ofi-gv-detail-railvalue:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gv-focus); }
+
+.ofi-gv-detail-assignees {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 2px 0;
+}
+
+.ofi-gv-detail-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    height: 22px;
+    padding: 0 3px 0 2px;
+    border: 1px solid var(--gv-border);
+    border-radius: 5px;
+    background: var(--gv-surface);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+.ofi-gv-detail-person__name {
+    min-width: 0;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#root .ofi-gv .ofi-gv-detail-person__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--gv-muted);
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-detail-person__remove:hover { color: var(--gv-text); background: var(--gv-fill); }
+
+.ofi-gv-detail-creator { gap: 6px; min-width: 0; }
+
+.ofi-gv-detail-total {
+    color: var(--gv-text);
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+.ofi-gv-detail-work {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ofi-gv-detail-work__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-detail-work__name {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 12.5px;
+    line-height: 1.3;
+}
+
+.ofi-gv-detail-work__time {
+    flex: none;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv-detail-forecast {
+    margin-top: 4px;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.ofi-gv-detail-rooms {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#root .ofi-gv .ofi-gv-detail-room {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    margin: 0 -6px;
+    padding: 5px 6px;
+    border-radius: 6px;
+    color: var(--gv-text);
+    font-size: 12.5px;
+    text-decoration: none;
+    transition: background-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-detail-room svg { flex: none; color: var(--gv-secondary); }
+#root .ofi-gv .ofi-gv-detail-room:hover { background: var(--gv-fill); }
+
+.ofi-gv-detail-rooms__add { align-self: flex-start; margin-top: 6px; }
+
+/* Schnellwahl im Datumsfenster (Portal). */
+#root .ofi-gv-detail-quick,
+body > :not(#root) .ofi-gv-detail-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+/* ── Menüs (AnchoredPicker, immer im Portal) ────────────────────────────── */
+
+#root .ofi-gv-menu__list,
+body > :not(#root) .ofi-gv-menu__list,
+body > .ofi-gv-menu .ofi-gv-menu__list {
+    padding: 5px;
+}
+
+#root .ofi-gv-menu__row,
+body > .ofi-gv-menu .ofi-gv-menu__row {
+    min-height: 30px;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-text, #1d1d1f);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.25;
+    cursor: pointer;
+}
+
+#root .ofi-gv-menu__row > svg,
+body > .ofi-gv-menu .ofi-gv-menu__row > svg {
+    flex: none;
+    color: var(--ofi-cal-muted, #6e6e73);
+}
+
+#root .ofi-gv-menu__row.is-danger,
+body > .ofi-gv-menu .ofi-gv-menu__row.is-danger,
+#root .ofi-gv-menu__row.is-danger > svg,
+body > .ofi-gv-menu .ofi-gv-menu__row.is-danger > svg {
+    color: var(--ofi-cal-danger, #d70015);
+}
+
+#root .ofi-gv-menu__row:disabled,
+body > .ofi-gv-menu .ofi-gv-menu__row:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#root .ofi-gv-menu__row:focus-visible,
+body > .ofi-gv-menu .ofi-gv-menu__row:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--ofi-cal-accent, #0a7aff);
+}
+
+#root .ofi-gv-menu__noicon,
+body > .ofi-gv-menu .ofi-gv-menu__noicon {
+    display: inline-block;
+    flex: none;
+    width: 15px;
+}
+
+#root .ofi-gv-menu__check,
+body > .ofi-gv-menu .ofi-gv-menu__check {
+    flex: none;
+    margin-left: auto;
+    color: var(--ofi-cal-accent, #0a7aff) !important;
+}
+
+#root .ofi-gv-menu__sep,
+body > .ofi-gv-menu .ofi-gv-menu__sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+#root .ofi-gv-menu__caption,
+body > .ofi-gv-menu .ofi-gv-menu__caption {
+    padding: 6px 8px 3px;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+/* ── Inhalt: Tafel und Blockeditor ──────────────────────────────────────── */
+
+.ofi-gv-detail-content { padding: 0 14px 14px; }
+
+.ofi-gv-editor {
+    position: relative;
+    min-width: 0;
+    font-size: 13px;
+}
+
+.ofi-gv-editor.is-readonly { padding-top: 12px; }
+
+.ofi-gv-editor-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    margin: 0 -14px 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--gv-hairline);
+    border-radius: var(--gv-radius) var(--gv-radius) 0 0;
+    background: var(--gv-surface);
+}
+
+.ofi-gv-editor-toolbar__sep {
+    flex: none;
+    width: 1px;
+    height: 18px;
+    margin: 0 6px;
+    background: var(--gv-border);
+}
+
+.ofi-gv-editor-toolbar__spacer { flex: 1 1 auto; }
+
+.ofi-gv-editor-toolbar__status {
+    padding: 0 2px;
+    white-space: nowrap;
+}
+
+.ofi-gv-editor-blocks {
+    display: flex;
+    flex-direction: column;
+    padding-left: 28px;
+}
+
+.ofi-gv-editor-block {
+    position: relative;
+    display: flex;
+    min-width: 0;
+}
+
+.ofi-gv-editor-block__gutter {
+    position: absolute;
+    top: 2px;
+    left: -28px;
+    opacity: 0;
+    transition: opacity 140ms ease;
+}
+
+.ofi-gv-editor-block.is-h2 .ofi-gv-editor-block__gutter { top: 11px; }
+.ofi-gv-editor-block.is-h3 .ofi-gv-editor-block__gutter { top: 6px; }
+.ofi-gv-editor-block.is-checklist .ofi-gv-editor-block__gutter { top: 8px; }
+
+.ofi-gv-editor-block:hover .ofi-gv-editor-block__gutter,
+.ofi-gv-editor-block:focus-within .ofi-gv-editor-block__gutter { opacity: 1; }
+
+@media (hover: none) {
+    .ofi-gv-editor-block__gutter { opacity: 0.7; }
+}
+
+.ofi-gv-editor-block__body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Textblöcke */
+.ofi-gv-editor-text {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ofi-gv-editor-text__marker { display: none; }
+
+.ofi-gv-editor-text.is-bullet .ofi-gv-editor-text__marker,
+.ofi-gv-editor-text.is-number .ofi-gv-editor-text__marker {
+    display: inline-flex;
+    flex: none;
+    justify-content: flex-end;
+    min-width: 16px;
+    color: var(--gv-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv-editor-text.is-bullet .ofi-gv-editor-text__marker::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    margin: 0 3px 2px 0;
+    border-radius: 999px;
+    background: currentColor;
+    align-self: center;
+}
+
+#root .ofi-gv .ofi-gv-editor-text__body {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 1.55em;
+    padding: 3px 2px;
+    color: var(--gv-text);
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    outline: none;
+    caret-color: var(--gv-accent);
+}
+
+#root .ofi-gv .ofi-gv-editor-text.is-h2 .ofi-gv-editor-text__body {
+    padding-top: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+}
+
+#root .ofi-gv .ofi-gv-editor-text.is-h3 .ofi-gv-editor-text__body {
+    padding-top: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+#root .ofi-gv .ofi-gv-editor-text.is-quote .ofi-gv-editor-text__body {
+    margin: 2px 0;
+    padding-left: 11px;
+    border-left: 2px solid var(--gv-border);
+    color: var(--gv-secondary);
+}
+
+/* Platzhalter: nur im leeren Block mit Fokus, oder im einzigen Block. */
+#root .ofi-gv .ofi-gv-editor.is-editable .ofi-gv-editor-text__body.is-empty:focus::before,
+#root .ofi-gv .ofi-gv-editor.is-editable .ofi-gv-editor-text__body.is-empty.is-hinted::before {
+    content: attr(data-placeholder);
+    position: absolute;
+    left: 2px;
+    color: var(--gv-muted);
+    font-weight: 400;
+    pointer-events: none;
+}
+
+#root .ofi-gv .ofi-gv-editor.is-editable .ofi-gv-editor-text.is-quote .ofi-gv-editor-text__body.is-empty::before { left: 13px; }
+
+#root .ofi-gv .ofi-gv-editor-text__body a {
+    color: var(--gv-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+#root .ofi-gv .ofi-gv-editor-text__body :is(b, strong) { font-weight: 650; }
+
+#root .ofi-gv .ofi-gv-editor-text__body code {
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--gv-fill);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+}
+
+.ofi-gv-editor-divider {
+    margin: 10px 0;
+    border: 0;
+    border-top: 1px solid var(--gv-border);
+}
+
+/* Tabelle */
+/* Tabelle im Apple-Stil (14.09.2026, Vorbild Samet): nur dünne graue Linien,
+   feste Spalten (Text bricht in der Zelle um). Griffleisten oben/links mit
+   EINEM blauen «+» und die Punkte-Ecke erscheinen erst nach einem Klick in die
+   Tabelle (`.is-active`) — ohne graue Fläche, und ausserhalb der Tabelle: die
+   Tabelle steht bündig mit dem Text darüber. */
+.ofi-gv-tbl { margin: 8px 0; min-width: 0; }
+
+.ofi-gv-tbl__scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 3px 0 3px 3px;
+    margin-left: -3px;
+    scrollbar-width: thin;
+}
+
+.ofi-gv-tbl__frame {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ofi-gv-tbl.is-editable .ofi-gv-tbl__frame {
+    grid-template-columns: 16px minmax(0, 1fr);
+    grid-template-rows: 16px auto;
+}
+
+/* Die Leisten ragen links und oben über den Block hinaus (negativer Rand), die
+   Tabelle selbst bleibt bündig. Solange sie unsichtbar sind, fangen sie keine
+   Klicks ab, die dem Block darüber gelten. */
+.ofi-gv-tbl.is-editable .ofi-gv-tbl__scroll {
+    padding: 19px 0 3px 19px;
+    margin: -19px 0 0 -19px;
+    pointer-events: none;
+}
+
+.ofi-gv-tbl.is-editable .ofi-gv-tbl__stage { pointer-events: auto; }
+
+#root .ofi-gv .ofi-gv-tbl.is-editable:not(.is-active) :is(.ofi-gv-tbl__colbar, .ofi-gv-tbl__rowbar, .ofi-gv-tbl__corner) {
+    visibility: hidden;
+}
+
+#root .ofi-gv .ofi-gv-tbl.is-active :is(.ofi-gv-tbl__colbar, .ofi-gv-tbl__rowbar, .ofi-gv-tbl__corner) { pointer-events: auto; }
+
+.ofi-gv-tbl__frame.is-resizing,
+.ofi-gv-tbl__frame.is-resizing * { cursor: col-resize !important; user-select: none; }
+
+.ofi-gv-tbl__stage { position: relative; min-width: 0; }
+.ofi-gv-tbl.is-editable .ofi-gv-tbl__stage { grid-column: 2; grid-row: 2; }
+
+#root .ofi-gv .ofi-gv-tbl__grid {
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+#root .ofi-gv .ofi-gv-tbl__cell {
+    position: relative;
+    min-width: 0;
+    padding: 0;
+    border: 1px solid var(--gv-border);
+    background: var(--cell-bg, var(--gv-surface));
+    color: var(--gv-text);
+    text-align: left;
+    vertical-align: top;
+}
+
+/* Zeilen-Hover der App (dark.css `.dark tbody tr:hover > td`, !important) gilt hier nicht. */
+#root .ofi-gv .ofi-gv-tbl__grid tbody tr:hover > td.ofi-gv-tbl__cell {
+    background: var(--cell-bg, var(--gv-surface)) !important;
+}
+
+#root .ofi-gv .ofi-gv-tbl__text {
+    min-height: 30px;
+    padding: 5px 24px 5px 8px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    outline: none;
+    cursor: text;
+}
+
+#root .ofi-gv .ofi-gv-editor.is-readonly .ofi-gv-tbl__text { padding-right: 10px; cursor: default; }
+
+/* Gefärbte Zellen: Pastell mit dunkler, kräftige Farbe mit weisser Schrift — in beiden Themen. */
+#root .ofi-gv .ofi-gv-tbl__cell.has-bg { color: #1d1d1f; }
+#root .ofi-gv .ofi-gv-tbl__cell.is-dark { color: #fff; }
+
+#root .ofi-gv .ofi-gv-tbl__cell.is-selected { box-shadow: inset 0 0 0 999px rgba(10, 122, 255, 0.1); }
+
+#root .ofi-gv .ofi-gv-tbl__chevron {
+    position: absolute;
+    top: 5px;
+    right: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--gv-secondary);
+    opacity: 0;
+    pointer-events: none;
+    cursor: pointer;
+    transition: opacity 120ms ease, background-color 120ms ease;
+}
+
+#root .ofi-gv .ofi-gv-tbl__cell.is-dark .ofi-gv-tbl__chevron { color: rgba(255, 255, 255, 0.85); }
+
+#root .ofi-gv .ofi-gv-tbl__cell:focus-within .ofi-gv-tbl__chevron {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#root .ofi-gv .ofi-gv-tbl__chevron:hover { background: rgba(0, 0, 0, 0.06); }
+
+/* Griffleisten */
+#root .ofi-gv .ofi-gv-tbl__colbar,
+#root .ofi-gv .ofi-gv-tbl__rowbar {
+    position: relative;
+    background: transparent;
+}
+
+#root .ofi-gv .ofi-gv-tbl__corner {
+    grid-column: 1;
+    grid-row: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 3px);
+    align-content: center;
+    justify-content: center;
+    gap: 2px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px 0 0 0;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+#root .ofi-gv .ofi-gv-tbl__corner > i {
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--gv-text);
+    opacity: 0.7;
+}
+
+#root .ofi-gv .ofi-gv-tbl__corner:hover { background: rgba(0, 0, 0, 0.08); }
+
+.dark #root .ofi-gv .ofi-gv-tbl__corner:hover { background: rgba(255, 255, 255, 0.1); }
+
+#root .ofi-gv .ofi-gv-tbl__colbar { grid-column: 2; grid-row: 1; height: 16px; }
+#root .ofi-gv .ofi-gv-tbl__rowbar { grid-column: 1; grid-row: 2; width: 16px; }
+
+#root .ofi-gv .ofi-gv-tbl__handle {
+    position: absolute;
+    top: 0;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+#root .ofi-gv .ofi-gv-tbl__handle.is-row { left: 0; width: 16px; }
+
+#root .ofi-gv .ofi-gv-tbl__handle > i {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--gv-text);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+#root .ofi-gv .ofi-gv-tbl__handle.is-hover > i,
+#root .ofi-gv .ofi-gv-tbl__handle:focus-visible > i { opacity: 0.75; }
+
+/* Das eine «+»: blauer Kreis auf der Kante, dazu die blaue Führungslinie. */
+#root .ofi-gv .ofi-gv-tbl__plus {
+    position: absolute;
+    top: -2px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-left: -10px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #0a7aff;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+
+#root .ofi-gv .ofi-gv-tbl__plus.is-end { margin-left: -20px; }
+#root .ofi-gv .ofi-gv-tbl__plus.is-row { top: auto; left: -2px; margin: -10px 0 0; }
+#root .ofi-gv .ofi-gv-tbl__plus.is-row.is-end { margin-top: -20px; }
+#root .ofi-gv .ofi-gv-tbl__plus:hover { background: #0066d6; }
+#root .ofi-gv .ofi-gv-tbl__plus > svg { color: #fff; }
+
+#root .ofi-gv .ofi-gv-tbl__guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 2;
+    width: 3px;
+    background: #0a7aff;
+    pointer-events: none;
+}
+
+#root .ofi-gv .ofi-gv-tbl__guide.is-row { top: auto; right: 0; bottom: auto; left: 0; width: auto; height: 3px; }
+
+/* Spaltenkante ziehen: 6px Griff, sichtbar erst als dünne blaue Linie. */
+#root .ofi-gv .ofi-gv-tbl__resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 6px;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+#root .ofi-gv .ofi-gv-tbl__resize::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 2px;
+    width: 2px;
+    background: #0a7aff;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+#root .ofi-gv .ofi-gv-tbl__resize:hover::after,
+#root .ofi-gv .ofi-gv-tbl__frame.is-resizing .ofi-gv-tbl__resize:active::after { opacity: 1; }
+
+/* Menü der Tabelle (Portal) */
+#root .ofi-gv-tblmenu__caption,
+body > .ofi-gv-menu .ofi-gv-tblmenu__caption {
+    padding: 8px 10px 6px;
+    color: var(--ofi-cal-muted, #8e8e93);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+#root .ofi-gv-tblmenu__caption.is-small,
+body > .ofi-gv-menu .ofi-gv-tblmenu__caption.is-small { padding-top: 4px; font-size: 10px; }
+
+#root .ofi-gv-tblmenu__swatches,
+body > .ofi-gv-menu .ofi-gv-tblmenu__swatches {
+    display: grid;
+    grid-template-columns: repeat(6, 32px);
+    justify-content: space-between;
+    gap: 8px 0;
+    padding: 2px 10px 8px;
+}
+
+#root .ofi-gv-tblmenu__swatch,
+body > .ofi-gv-menu .ofi-gv-tblmenu__swatch {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px !important;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    transition: box-shadow 120ms ease;
+}
+
+#root .ofi-gv-tblmenu__swatch.is-none,
+body > .ofi-gv-menu .ofi-gv-tblmenu__swatch.is-none {
+    background: #fff;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+#root .ofi-gv-tblmenu__swatch:hover,
+body > .ofi-gv-menu .ofi-gv-tblmenu__swatch:hover { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba(10, 122, 255, 0.35); }
+
+#root .ofi-gv-tblmenu__swatch.is-on,
+body > .ofi-gv-menu .ofi-gv-tblmenu__swatch.is-on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 2.5px #0a7aff; }
+
+#root .ofi-gv-tblmenu__mark,
+body > .ofi-gv-menu .ofi-gv-tblmenu__mark {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+}
+
+#root .ofi-gv-tblmenu__mark.is-on::before,
+body > .ofi-gv-menu .ofi-gv-tblmenu__mark.is-on::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #0a7aff;
+}
+
+#root .ofi-gv-tblmenu__row[aria-checked="true"] .ofi-gv-picker__name,
+body > .ofi-gv-menu .ofi-gv-tblmenu__row[aria-checked="true"] .ofi-gv-picker__name { color: #0a7aff; }
+
+@media (hover: none) {
+    #root .ofi-gv .ofi-gv-tbl__chevron { opacity: 0.7; pointer-events: auto; }
+}
+
+/* Bild, Datei, fehlende Verweise */
+.ofi-gv-editor-image { margin: 6px 0; }
+
+.ofi-gv-editor-image img {
+    display: block;
+    max-width: 100%;
+    max-height: 420px;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.ofi-gv-editor-file { max-width: 440px; margin: 4px 0; }
+
+.ofi-gv-editor-missing {
+    margin: 4px 0;
+    padding: 7px 10px;
+    border: 1px dashed var(--gv-field-border);
+    border-radius: 6px;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+}
+
+.ofi-gv-editor-block.is-checklist { margin: 6px 0; }
+
+#root .ofi-gv .ofi-gv-editor-tail {
+    display: block;
+    width: 100%;
+    margin-top: 2px;
+    padding: 6px 0 6px 30px;
+    border: 0;
+    background: transparent;
+    color: var(--gv-muted);
+    font-size: 12.5px;
+    text-align: left;
+    cursor: text;
+    transition: color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-editor-tail:hover { color: var(--gv-secondary); }
+
+.ofi-gv-editor-empty {
+    padding: 6px 0 4px;
+    color: var(--gv-secondary);
+    font-size: 13px;
+}
+
+.ofi-gv-editor-orphans {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+    padding-left: 28px;
+}
+
+.ofi-gv-editor.is-readonly .ofi-gv-editor-orphans { padding-left: 28px; }
+
+.ofi-gv-editor-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding-left: 28px;
+}
+
+.ofi-gv-editor-foot__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Link-Fenster (Portal) */
+#root .ofi-gv-editor-linkpop__form,
+body > .ofi-gv-editor-linkpop .ofi-gv-editor-linkpop__form { padding: 10px; }
+
+#root .ofi-gv-editor-linkpop__label,
+body > .ofi-gv-editor-linkpop .ofi-gv-editor-linkpop__label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+#root .ofi-gv-editor-linkpop__row,
+body > .ofi-gv-editor-linkpop .ofi-gv-editor-linkpop__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+body > .ofi-gv-editor-linkpop .ofi-gv-editor-linkpop__row .ofi-cal-input {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 13px;
+}
+
+#root .ofi-gv-editor-linkpop__error,
+body > .ofi-gv-editor-linkpop .ofi-gv-editor-linkpop__error {
+    margin-top: 6px;
+    color: var(--ofi-cal-danger, #d70015);
+    font-size: 12px;
+}
+
+/* ── Checklisten ────────────────────────────────────────────────────────── */
+
+.ofi-gv-checklist { min-width: 0; }
+
+.ofi-gv-checklist__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 2px 2px 4px;
+    border-bottom: 1px solid var(--gv-border);
+}
+
+#root .ofi-gv .ofi-gv-checklist__title {
+    flex: 1 1 auto;
+    min-width: 40px;
+    color: var(--gv-text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    outline: none;
+}
+
+#root .ofi-gv .ofi-gv-checklist__title.is-editable {
+    flex: 0 1 auto;
+    margin-left: -4px;
+    padding: 1px 4px;
+    border-radius: 5px;
+    cursor: text;
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ofi-gv-checklist__title.is-editable + .ofi-gv-checklist__count { margin-left: auto; }
+
+/* Leerer Titel: nur ein blasser Platzhalter («Başlık»), nie ein gespeicherter Vorgabetext. */
+#root .ofi-gv .ofi-gv-checklist__title:empty::before {
+    content: attr(data-placeholder);
+    color: var(--gv-muted);
+    font-weight: 500;
+    pointer-events: none;
+}
+
+#root .ofi-gv .ofi-gv-checklist__title.is-editable:hover { background: var(--gv-hover); }
+#root .ofi-gv .ofi-gv-checklist__title.is-editable:focus { background: var(--gv-surface); box-shadow: 0 0 0 1px var(--gv-accent), 0 0 0 4px var(--gv-focus); }
+
+.ofi-gv-checklist__count {
+    flex: none;
+    color: var(--gv-secondary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv-checklist__bar { flex: none; width: 72px; }
+
+.ofi-gv-checklist__items { display: flex; flex-direction: column; }
+
+.ofi-gv-checklist__empty {
+    padding: 8px 2px;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+}
+
+.ofi-gv-checklist-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    min-height: 34px;
+    padding: 7px 4px 7px 2px;
+    border-bottom: 1px solid var(--gv-hairline);
+}
+
+#root .ofi-gv .ofi-gv-checklist-item > .ofi-gv-check { margin-top: 1px; }
+
+#root .ofi-gv .ofi-gv-checklist-item__text {
+    min-width: 0;
+    min-height: 19px;
+    padding: 0 2px;
+    color: var(--gv-text);
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    outline: none;
+    caret-color: var(--gv-accent);
+    transition: color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-checklist-item.is-done .ofi-gv-checklist-item__text {
+    color: var(--gv-secondary);
+    text-decoration: line-through;
+    text-decoration-color: var(--gv-muted);
+}
+
+.ofi-gv-checklist-item__badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 19px;
+    color: var(--gv-secondary);
+}
+
+.ofi-gv-checklist-item__tools {
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 2px 2px 10px;
+    background: var(--gv-surface);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity 140ms ease;
+}
+
+.ofi-gv-checklist-item:hover .ofi-gv-checklist-item__tools,
+.ofi-gv-checklist-item.is-tools .ofi-gv-checklist-item__tools,
+.ofi-gv-checklist-item__tools:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ofi-gv-checklist-item__tools > .ofi-gv-add { margin-right: 2px; }
+
+.ofi-gv-checklist-item__sep {
+    width: 1px;
+    height: 14px;
+    margin: 0 4px;
+    background: var(--gv-border);
+}
+
+@media (hover: none) {
+    .ofi-gv-checklist-item__tools {
+        position: static;
+        grid-column: 2 / -1;
+        flex-wrap: wrap;
+        padding: 0;
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+    }
+}
+
+.ofi-gv-checklist-new {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 3px 4px 3px 4px;
+    color: var(--gv-muted);
+}
+
+.ofi-gv-checklist-new.is-inline { border-bottom: 1px solid var(--gv-hairline); }
+
+.ofi-gv-checklist-new > svg { flex: none; margin-right: 4px; }
+
+#root .ofi-gv input.ofi-gv-checklist-new__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 28px;
+    min-height: 28px;
+    margin-left: -6px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--gv-text);
+    font-size: 13px;
+    box-shadow: none;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+#root .ofi-gv input.ofi-gv-checklist-new__input::placeholder { color: var(--gv-muted); font-style: normal; opacity: 1; }
+#root .ofi-gv input.ofi-gv-checklist-new__input:hover:not(:focus) { border-color: var(--gv-field-border); }
+
+#root .ofi-gv input.ofi-gv-checklist-new__input:focus {
+    border-color: var(--gv-accent);
+    background: var(--gv-surface);
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+/* ── Kommentare ─────────────────────────────────────────────────────────── */
+
+.ofi-gv-comments { display: flex; flex-direction: column; }
+
+.ofi-gv-comments__list { display: flex; flex-direction: column; }
+
+.ofi-gv-comments__loading,
+.ofi-gv-activity__loading {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+}
+
+.ofi-gv-comments__item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-comments__body { min-width: 0; }
+
+.ofi-gv-comments__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 22px;
+}
+
+.ofi-gv-comments__author { font-size: 13px; font-weight: 600; }
+
+.ofi-gv-comments__text {
+    margin-top: 2px;
+    color: var(--gv-text);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.ofi-gv-comments__images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.ofi-gv-comments__images img {
+    display: block;
+    width: 96px;
+    height: 96px;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.ofi-gv-comments__files {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 440px;
+    margin-top: 8px;
+}
+
+.ofi-gv-comments__composer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-top: 1px solid var(--gv-hairline);
+}
+
+#root .ofi-gv textarea.ofi-gv-comments__input {
+    display: block;
+    width: 100%;
+    min-height: 56px;
+    padding: 6px 9px;
+    border: 1px solid var(--gv-field-border);
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    font-size: 13px;
+    line-height: 1.5;
+    resize: none;
+    box-shadow: none;
+    transition: border-color 140ms ease;
+}
+
+#root .ofi-gv textarea.ofi-gv-comments__input::placeholder { color: var(--gv-muted); font-style: normal; opacity: 1; }
+#root .ofi-gv textarea.ofi-gv-comments__input:hover:not(:focus) { border-color: var(--gv-field-border-hover); }
+#root .ofi-gv textarea.ofi-gv-comments__input:focus { border-color: var(--gv-accent); box-shadow: 0 0 0 3px var(--gv-focus); }
+
+.ofi-gv-comments__pending {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ofi-gv-comments__pendingfile {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+    height: 24px;
+    padding: 0 4px 0 8px;
+    border: 1px solid var(--gv-border);
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.ofi-gv-comments__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+@media (max-width: 640px) {
+    .ofi-gv-comments__hint { display: none; }
+}
+
+/* ── Dateien ────────────────────────────────────────────────────────────── */
+
+.ofi-gv-files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+}
+
+.ofi-gv-files-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 22px 16px;
+    border: 1px dashed var(--gv-field-border);
+    border-radius: 8px;
+    color: var(--gv-text);
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.ofi-gv-files-drop:hover { border-color: var(--gv-field-border-hover); }
+.ofi-gv-files-drop.is-over { border-color: var(--gv-accent); background: var(--gv-accent-soft); }
+.ofi-gv-files-drop.is-busy { cursor: progress; }
+.ofi-gv-files-drop:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--gv-focus); }
+
+.ofi-gv-files-drop__icon { display: inline-flex; color: var(--gv-secondary); }
+.ofi-gv-files-drop__text { font-weight: 500; }
+
+.ofi-gv-files-section { margin-top: 8px; }
+.ofi-gv-files-section .ofi-gv-group__head { padding: 6px 0; }
+
+.ofi-gv-files-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.ofi-gv-files-thumb {
+    position: relative;
+    margin: 0;
+    aspect-ratio: 1 / 1;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 8px;
+    background: var(--gv-fill);
+}
+
+.ofi-gv-files-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#root .ofi-gv .ofi-gv-files-thumb__remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--gv-border);
+    border-radius: 5px;
+    background: var(--gv-surface);
+    color: var(--gv-secondary);
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 140ms ease, color 140ms ease;
+}
+
+.ofi-gv-files-thumb:hover .ofi-gv-files-thumb__remove,
+#root .ofi-gv .ofi-gv-files-thumb__remove:focus-visible { opacity: 1; }
+
+#root .ofi-gv .ofi-gv-files-thumb__remove:hover { color: var(--gv-danger); }
+
+@media (hover: none) {
+    #root .ofi-gv .ofi-gv-files-thumb__remove { opacity: 1; }
+}
+
+.ofi-gv-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Datei als Zeile (auch in Kommentaren und im Dateiblock des Editors). */
+.ofi-gv-files-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 4px 6px 4px 10px;
+    border: 1px solid var(--gv-border);
+    border-radius: 8px;
+    background: var(--gv-surface);
+}
+
+.ofi-gv-files-chip__icon { display: inline-flex; flex: none; color: var(--gv-secondary); }
+
+#root .ofi-gv .ofi-gv-files-chip__main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--gv-text);
+    text-decoration: none;
+}
+
+#root .ofi-gv .ofi-gv-files-chip__main:hover .ofi-gv-files-chip__name { color: var(--gv-accent); }
+
+.ofi-gv-files-chip__name {
+    overflow: hidden;
+    font-size: 12.5px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 140ms ease;
+}
+
+.ofi-gv-files-chip__meta {
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+#root .ofi-gv a.ofi-gv-iconbtn { text-decoration: none; }
+
+/* ── Verlauf ────────────────────────────────────────────────────────────── */
+
+.ofi-gv-activity { display: flex; flex-direction: column; }
+
+.ofi-gv-activity__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-activity__row:last-child,
+.ofi-gv-comments__item:last-child { border-bottom: 0; }
+
+
+.ofi-gv-activity__body { min-width: 0; }
+
+.ofi-gv-activity__text {
+    color: var(--gv-text);
+    font-size: 12.5px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.ofi-gv-activity__text b { font-weight: 600; }
+
+/* ── Radien: der Formular-Grundradius trägt !important in einer Lage ────── */
+
+@layer utilities {
+    #root .ofi-gv textarea.ofi-gv-detail-desc.is-editable,
+    #root .ofi-gv textarea.ofi-gv-comments__input,
+    #root .ofi-gv input.ofi-gv-checklist-new__input {
+        border-radius: 6px !important;
+    }
+}
+
+/* ── Dunkel: nur wo die Tokens nicht reichen ────────────────────────────── */
+
+.dark .ofi-gv-editor-image img,
+.dark .ofi-gv-comments__images img { border-color: rgba(255, 255, 255, 0.1); }
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-gv-editor-block__gutter,
+    .ofi-gv-checklist-item__tools,
+    .ofi-gv-files-thumb__remove { transition: none; }
+}

@@ -88,7 +88,7 @@ export const QuotePdfButton = ({ tenderId, tenderNumber, label, variant = 'butto
                     disabled={busy}
                     title={t('common.preview')}
                     aria-label={t('common.preview')}
-                    className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#272f67] hover:text-[#272f67] disabled:cursor-progress disabled:opacity-60 dark:border-white/20 dark:text-white/70 dark:hover:border-white/40 dark:hover:text-white ${
+                    className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#0a7aff] hover:text-[#0a7aff] disabled:cursor-progress disabled:opacity-60 dark:border-white/20 dark:text-white/70 dark:hover:border-white/40 dark:hover:text-white ${
                         label ? 'px-2 py-1' : 'size-7'
                     }`}
                 >

@@ -131,9 +131,9 @@ const TypeGrid = ({ onPick }: { onPick: (type: FormFieldType) => void }) => (
                                 key={type}
                                 type="button"
                                 onClick={() => onPick(type)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-[12px] font-semibold text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-[#eef2fb] hover:text-[#1f2654] dark:border-white/15 dark:bg-transparent dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-[12px] font-semibold text-slate-700 transition-colors hover:border-[#0066e0] hover:bg-[#eef2fb] hover:text-[#0066e0] dark:border-white/15 dark:bg-transparent dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
                             >
-                                <Icon size={14} className="shrink-0 text-[#1f2654] dark:text-amber-400" />
+                                <Icon size={14} className="shrink-0 text-[#0066e0] dark:text-amber-400" />
                                 <span className="min-w-0 truncate">{fieldTypeLabel(type)}</span>
                             </button>
                         );
@@ -172,7 +172,7 @@ const FieldForm = ({
 
     return (
         <div className="space-y-3">
-            <button type="button" className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-[#1f2654] hover:underline dark:text-white/60 dark:hover:text-white" onClick={onChangeType}>
+            <button type="button" className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-[#0066e0] hover:underline dark:text-white/60 dark:hover:text-white" onClick={onChangeType}>
                 <ArrowLeft size={12} />{t('forms.builder.changeType')}
             </button>
 
@@ -196,7 +196,7 @@ const FieldForm = ({
                         type="checkbox"
                         checked={Boolean(field.required)}
                         onChange={(event) => onPatch({ required: event.target.checked })}
-                        className="size-4 accent-[#1f2654]"
+                        className="size-4 accent-[#0066e0]"
                     />
                     {t('forms.builder.requiredHint')}
                 </label>
@@ -216,7 +216,7 @@ const FieldForm = ({
 
             {field.type === 'TEXT' && (
                 <label className="flex items-center gap-2 text-[12.5px] text-slate-700 dark:text-white/80">
-                    <input type="checkbox" checked={Boolean(field.multiline)} onChange={(event) => onPatch({ multiline: event.target.checked })} className="size-4 accent-[#1f2654]" />
+                    <input type="checkbox" checked={Boolean(field.multiline)} onChange={(event) => onPatch({ multiline: event.target.checked })} className="size-4 accent-[#0066e0]" />
                     {t('forms.builder.multiline')}
                 </label>
             )}
@@ -235,7 +235,7 @@ const FieldForm = ({
                                 type="button"
                                 onClick={() => onPatch({ display })}
                                 className={`rounded px-2.5 py-1 text-[12px] font-semibold transition-colors ${(field.display || 'dropdown') === display
-                                    ? 'bg-[#272f67] text-white'
+                                    ? 'bg-[#0a7aff] text-white'
                                     : 'text-slate-600 dark:text-white/70'}`}
                             >
                                 {t(`forms.builder.display.${display}`)}
@@ -271,8 +271,8 @@ const FieldForm = ({
             )}
 
             {/* Bedingung — in der schmalen Spalte untereinander statt nebeneinander */}
-            <div className="space-y-2 rounded-lg border border-dashed border-[#1f2654]/30 bg-[#eef2fb]/40 p-3 dark:border-amber-400/30 dark:bg-amber-500/5">
-                <div className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#1f2654] dark:text-amber-300">
+            <div className="space-y-2 rounded-lg border border-dashed border-[#0066e0]/30 bg-[#eef2fb]/40 p-3 dark:border-amber-400/30 dark:bg-amber-500/5">
+                <div className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#0066e0] dark:text-amber-300">
                     <LuGitBranch size={14} />{t('forms.builder.conditionTitle')}
                 </div>
                 {sources.length === 0 ? (

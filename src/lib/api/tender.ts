@@ -1,4 +1,5 @@
 import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
+import { cachedQuery } from './queryCache';
 import type {
     TenderListItem,
     TenderDetailDto,
@@ -572,8 +573,14 @@ export const tenderApi = {
         customer: { name: string; email: string } | null;
         contacts: Array<{ id: string; name: string; title?: string | null; email: string }>;
     }> => {
-        const res = await apiClient.get(`/tenders/${id}/mail-recipients`);
-        return res.data;
+        // Opened on every focus of the CC field — kept per quote for a minute,
+        // marked stale by any customer/quote write (queryCache).
+        const url = `/tenders/${id}/mail-recipients`;
+        return cachedQuery(url, async () => (await apiClient.get(url)).data, {
+            freshMs: 60_000,
+            staleMs: 10 * 60_000,
+            tags: ['customers', 'tender'],
+        });
     },
 
     /**

@@ -19,6 +19,8 @@ import { Switch } from '@/components/ui-shared/Switch';
 import { DrawingPad } from './DrawingPad';
 import { SignatureField } from './SignatureField';
 import { downloadDataUrl, fileToDataUrl, formatBytes, imageFileToScaledDataUrl } from '../ui';
+import '@/styles/modules/reportEditor.css';
+import '@/styles/modules/checklists.css';
 
 /**
  * ── DIE FELDER EINER CHECKLISTE ─────────────────────────────────────────────

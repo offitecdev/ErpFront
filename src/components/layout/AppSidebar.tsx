@@ -58,15 +58,15 @@ const DOT_ACTIVE = 'bg-transparent';
 /* Icons tragen im Hellmodus das Markennavy statt der geerbten Textfarbe —
    das ist der „kräftiger“-Teil: ein farbiges Icon liest sich neben grauem
    Text sofort als das, was es ist. */
-const ICON_IDLE = 'text-[#272f67] dark:text-[#e6cf9e]/85';
-const ICON_ACTIVE = 'text-[#272f67] dark:text-[#e6cf9e]';
+const ICON_IDLE = 'text-[#0a7aff] dark:text-[#e6cf9e]/85';
+const ICON_ACTIVE = 'text-[#0a7aff] dark:text-[#e6cf9e]';
 const PANEL_BG = 'bg-[#FBFBFA] dark:bg-[#151616]';
 
-/* Desktop rail module button — seit 09.09.2026 eine iPadOS-Kachel: das
-   Zeichen sitzt in einem 56px-Quadrat mit 16px-Ecke, die Beschriftung
-   darunter. Zustände (Ruhe, Hover-Füllung, Marine für das gewählte Modul)
-   stehen in styles/refine.css unter `.ofi-rail-item`, hell wie dunkel. */
-const RAIL_ITEM = 'ofi-rail-item flex w-full flex-col items-center gap-1 px-1 py-1.5 text-center';
+/* Desktop rail module button (large icon + caption). */
+const RAIL_BTN_IDLE = 'text-black/75 hover:bg-black/4 hover:text-[#0066e0] dark:text-white/75 dark:hover:bg-white/6 dark:hover:text-white';
+/* Das gewählte Modul trägt den hellen Ton des Systemblaus (Samet 09.09.2026:
+   «Apple'ın mavi rengini kullan») — eine Kachel in Marine wurde verworfen. */
+const RAIL_BTN_ACTIVE = 'bg-[#e3efff] text-[#0a7aff] dark:!bg-white/10 dark:text-[#e6cf9e] dark:shadow-none';
 
 type AppSidebarProps = {
     /** Pre-filtered by MainLayout: company-category / personal module package
@@ -300,7 +300,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                             onClick={() => { onQuickCreate(qi); setQuickCreateOpen(false); }}
                                             className="flex min-h-11 items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-[#eef1fa] dark:hover:bg-[#232326]"
                                         >
-                                            <QIcon size={19} className={`shrink-0 dark:!text-[#e6cf9e]/85 ${qi.iconClassName || 'text-[#272f67]'}`} />
+                                            <QIcon size={19} className={`shrink-0 dark:!text-[#e6cf9e]/85 ${qi.iconClassName || 'text-[#0a7aff]'}`} />
                                             <span className="truncate text-[14px] font-medium text-black dark:text-white">{qi.label}</span>
                                         </button>
                                     );
@@ -442,14 +442,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                     }}
                                     onMouseEnter={() => { if (touchInputRef.current) return; if (!isSingle) scheduleOpen(section.key); else cancelOpen(); }}
                                     onMouseLeave={cancelOpen}
-                                    className={`${RAIL_ITEM}${active ? ' is-active' : ''}`}
+                                    className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
                                 >
-                                    <span className="ofi-rail-item__tile" aria-hidden="true">
-                                        <Icon size={24} className="shrink-0" />
-                                    </span>
+                                    <Icon size={23} className="shrink-0" />
                                     {/* Nicht 14px: die Beschriftung sitzt in einer 84px breiten
                                         Leiste, dort schneidet schon „Buchhaltung“ bei 12px an. */}
-                                    <span className="ofi-rail-item__label w-full truncate text-[11.5px] font-semibold leading-tight">{t(section.label)}</span>
+                                    <span className="w-full truncate text-[12px] font-semibold leading-tight">{t(section.label)}</span>
                                 </a>
                             );
                         })}
@@ -494,7 +492,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         href={hrefFor(child.key)}
                                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go(child.key); }}
                                         className={`group flex items-center rounded-xl px-3.5 py-3 text-left text-[14px] font-semibold transition-colors duration-150 ${active
-                                            ? 'bg-[#272f67] text-white'
+                                            ? 'bg-[#0a7aff] text-white'
                                             : 'text-[#1d1d1f] hover:bg-black/[0.06] dark:text-white/80 dark:hover:bg-white/8 dark:hover:text-white'}`}
                                     >
                                         {child.icon && <child.icon size={16} className="mr-2.5 shrink-0" />}

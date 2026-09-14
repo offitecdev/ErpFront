@@ -3,6 +3,7 @@ import { LuChevronDown, LuChevronRight } from 'react-icons/lu';
 
 import { t } from '@/i18n/translate';
 import { CONTACT_MARKERS, GREETINGS, splitMailBody } from './mailBodyParts';
+import '@/styles/modules/mailModule.css';
 
 /* DER RUMPF EINER NACHRICHT — aufgeräumt statt als Textwand (08.09.2026).
  *

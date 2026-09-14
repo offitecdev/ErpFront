@@ -1002,7 +1002,8 @@
             "errorPdfOnly": "Sadece PDF dosyası yükleyebilirsiniz.",
             "errorPdfSize": "PDF 5 MB sınırını aşıyor.",
             "successPdfSave": "Antetli kayıt PDF kaydedildi.",
-            "companyNameHint": "Sağ üstteki firma seçiminden gelir: PDF’te her zaman etkin firmanın adı basılır."
+            "companyNameHint": "Sağ üstteki firma seçiminden gelir: PDF’te her zaman etkin firmanın adı basılır.",
+            "tenantAddressHint": "Seçili firmanın kendi adresi var: bu firmanın tüm PDF’lerine bu adres basılır, burada değiştirilemez."
         },
         "mail": {
             "breadcrumb": "Ayarlar › Mail",

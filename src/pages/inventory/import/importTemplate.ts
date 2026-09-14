@@ -1,67 +1,44 @@
 /**
  * ── DIE VORLAGE DES BELEG-IMPORTS ───────────────────────────────────────────
  *
- * Vorgabe Samet (07.09.2026, letzter Stand):
+ * Vorgabe Samet (11.09.2026, letzter Stand):
  *
- *   «Es gibt keine Spaltenauswahl mehr; es ist einfach netto/brutto, Rabatt 1
- *    und Rabatt 2 (freiwillig) — feste Felder, direkt aus der Vorlage wählbar.
- *    Fehlt ein Produktcode, wird einer vergeben; der Produktname gehört dazu —
- *    das ist Standard. Daneben soll man drei weitere Angaben hinzufügen können;
- *    die müssen im PDF sauber dastehen, auch wenn die Liste länger wird.»
- *   «Die Vorlagen und Einstellungen werden gleich am Anfang festgelegt. Was
- *    dort eingestellt ist, bleibt für die folgenden Bestellungen die Vorgabe,
- *    bis man es ändert.»
- *   «Der Import übernimmt nur die eingestellten Angaben; er rechnet nichts vor.»
+ *   «Eine Vorlage hat einen Namen — keinen Lieferanten, keine Rechenart, keine
+ *    Mehrwertsteuer (die steht in den Bestelldetails). Bis zu dreizehn
+ *    Spalten (12+1): der ERP-Code ist fest, steht in den Tabellen, nicht im
+ *    PDF und nicht in der KI-Anfrage. Die Spalten sind anfangs leer; jede
+ *    bekommt einen Namen, eine Art und eine Zuordnung — Produktname und Menge
+ *    sind ueberall Pflicht, sonst zeigt das System einen Fehler; Einzelpreis,
+ *    Nettopreis, Rabatt, Rabatt 2 und Zeilensumme gibt es je einmal. Kein
+ *    Auge mehr. Die Reihenfolge ist frei. Ohne Vorlage gibt es keine
+ *    Tabelle: die Vorlage ist Pflicht.»
+ *   «Die Vorlage mit ihren Spaltennamen geht direkt an das Modell; die
+ *    Bilder sind Tabellen — gelesen wird je Spalte, eine leere Zelle wird
+ *    ‹-›, und jede Spalte steht unter ihrer eigenen Ueberschrift.»
  *
  * ── WAS AN DAS MODELL GEHT ────────────────────────────────────────────────
- * Ausschliesslich SPALTENÜBERSCHRIFTEN, und zwar diese:
- *
- *   code      Produktcode        immer      (fehlt er auf dem Beleg: leer, der
- *                                            Server vergibt beim Speichern einen)
- *   name      Bezeichnung        immer
- *   quantity  Menge              immer
- *   price     Brutto- ODER Nettopreis — was von beidem, sagt `priceIsGross`
- *   discount  Rabatt 1           immer
- *   discount2 Rabatt 2           nur wenn eingeschaltet
- *   x1 … x3   eigene Angaben     0 bis 3
- *
- * Aus dieser Liste baut der Server das Antwortschema (`gptExtract.ts`). Was
- * nicht in der Liste steht, wird nicht gelesen und kostet keine Token — die
- * Vorlage ist damit zugleich die Sparbremse.
+ * Genau die Spalten der Vorlage: Schluessel, NAME, Art und Zuordnung. Der
+ * Server baut daraus das Antwortschema (`gptExtract.ts`); die Zuordnung sagt
+ * ihm, was ein Wert bedeutet (Listenpreis vor Rabatt, Nettopreis danach …).
+ * Der ERP-Code reist nicht mit — er wird beim Speichern vergeben.
  *
  * ── WAS DER IMPORT TUT — UND WAS NICHT ────────────────────────────────────
- * `extractedToDraftRow` ist eine ZUORDNUNG und keine Rechnung. Gerechnet wird
- * erst, wenn jemand den RECHENMODUS einschaltet — und dann dort, wo immer
- * gerechnet wurde: in der Bestelltabelle (`utils/orderRowMode.ts`).
- *
- * ── DIE MENGENSTAFFEL ─────────────────────────────────────────────────────
- * «Die Werte ändern sich je nach Menge, das System muss den passenden nehmen,
- * sobald die Menge gewählt ist.» Das ist ein NACHSCHLAGEN, keine Rechnung:
- * `repriceRow` sucht zu einer geänderten Menge die passende Stufe heraus. Es
- * gewinnt immer die spezifischere Regel, und ein fester Preis schlägt jede
- * Prozentangabe:
- *
- *   1. Staffel des LIEFERANTEN mit festem Stückpreis  → dieser Preis, Ende.
- *   2. Staffel des BELEGS («ab 10 Stk 17.50»)         → dieser Preis, Ende.
- *   3. Staffel des Lieferanten mit Rabatt             → wird Rabatt 1.
- *   4. Keine Stufe erreicht                           → die Zeile bleibt.
- *
- * «Ende» heisst wörtlich: ein Staffelpreis IST der Endpreis, auf ihn fällt kein
- * Rabatt mehr. Alles andere wäre doppelt gerechnet — und genau das ist der
- * Fehler, den man in einer Bestellung nie sieht, weil das Ergebnis plausibel
- * aussieht.
+ * `extractedToDraftRow` ist eine ZUORDNUNG und keine Rechnung: eine Spalte
+ * mit Zuordnung fuellt ihr Feld der Bestellzeile, eine freie Spalte wird eine
+ * eigene Angabe (`extras`). Gerechnet wird nirgends vor.
  */
 
 import { t } from '@/i18n/translate';
 import type {
     AiExtractedRow,
-    AiPriceTier,
     OrderCalcMode,
+    PurchaseOrderTableColumn,
+    PurchaseTemplateDocumentType,
     SupplierCalcConfig,
-    SupplierQtyTier,
     TemplateColumn,
+    TemplateLabel,
 } from '@/types/inventory';
-import { ORDER_MAX_EXTRA_COLUMNS, TEMPLATE_MAX_EXTRA_COLUMNS } from '@/types/inventory';
+import { REQUIRED_TEMPLATE_LABELS, TEMPLATE_LABELS, TEMPLATE_MAX_COLUMNS } from '@/types/inventory';
 import type { DraftOrderRow } from '../types';
 import { parseNum } from '../utils/format';
 import { clampPercent, round2 } from '../utils/orderPricing';
@@ -70,168 +47,251 @@ import { clampPercent, round2 } from '../utils/orderPricing';
    1) DIE VORLAGE
    ═════════════════════════════════════════════════════════════════════════ */
 
-/** Die Vorgabe: netto, Rabatt 2 an, Staffel lesen, keine eigenen Angaben. */
-export const defaultCalcConfig = (vatRate = 0, vatCountry = '', currency = 'CHF'): SupplierCalcConfig => ({
-    // Ohne ausdrueckliche Wahl bleibt eine Vorlage eine manuelle Eingabe.
-    calcMode: 'DIRECT',
-    discount2Enabled: true,
-    extraColumns: [],
-    hiddenColumnKeys: [],
-    withTiers: true,
-    discounts: [],
-    vatRate,
-    vatCountry,
-    currency,
-    qtyTiers: [],
-});
+/** Eine neue Vorlage ist LEER — die Spalten legt der Anwender an. */
+export const defaultCalcConfig = (): SupplierCalcConfig => ({ columns: [] });
 
-/** Freie Schlüssel für eigene Angaben: `x1` … `x3`. */
-export const nextExtraKey = (columns: TemplateColumn[]): string | null => {
-    for (let index = 1; index <= TEMPLATE_MAX_EXTRA_COLUMNS; index += 1) {
-        const key = `x${index}`;
+/** Der naechste freie Schluessel: `c1` … `c12`. Null, wenn die Vorlage voll ist. */
+export const nextColumnKey = (columns: TemplateColumn[]): string | null => {
+    for (let index = 1; index <= TEMPLATE_MAX_COLUMNS; index += 1) {
+        const key = `c${index}`;
         if (!columns.some((column) => column.key === key)) return key;
     }
     return null;
 };
 
-/**
- * DIE SPALTENÜBERSCHRIFTEN, so wie sie an das Modell gehen. Die festen Felder
- * tragen die Beschriftung der Bestelltabelle — dieselbe Sprache, die der
- * Anwender auf dem Bildschirm sieht, und damit auch die, in der er das
- * Ergebnis erwartet.
- */
-/**
- * DIE FELDER, DIE GELESEN WERDEN — je nach Ziel (Vorgabe Samet, 07.09.2026):
- *
- *   BESTELLUNG     Nummer, Bezeichnung, Menge, beide Preise, die Rabatte und
- *                  der Zeilenbetrag; dazu bis zu DREI eigene Angaben.
- *   PREISANFRAGE   NUR Produktcode, Produktname und Menge — «dort findet keine
- *                  Berechnung statt» —, dazu bis zu FÜNF eigene Angaben.
- *
- * Die eigenen Angaben reisen nur mit, wenn sie benannt sind: eine namenlose
- * Spalte sagt dem Modell nichts und kostete trotzdem Token.
- */
-export const templateColumnOptions = (
-    config: SupplierCalcConfig,
-    priceless = false,
-): TemplateColumn[] => {
-    /* DIE DREI, DIE JEDER BELEG TRAEGT — und in einer Preisanfrage die
-       einzigen (Vorgabe Samet, 08.09.2026): «Produktcode, Produktname und
-       Menge.» Fehlt der Code, vergibt ihn der Server beim Speichern
-       (ART-NNNNN), die Spalte darf also leer bleiben.
+/** Die Spalten, die zaehlen: benannt, getrimmt, hoechstens zwoelf. */
+export const templateColumns = (config: SupplierCalcConfig): TemplateColumn[] =>
+    (config.columns ?? [])
+        .filter((column) => column.name.trim())
+        .slice(0, TEMPLATE_MAX_COLUMNS)
+        .map((column) => ({ ...column, name: column.name.trim(), label: column.label ?? null }));
 
-       ⚠ DER WARENEINGANG TRAEGT SIE SEIT DEM 09.09.2026 AUCH (Vorgabe Samet:
-       «beim Wareneingang muessen Produktcode und Produktname in derselben
-       Vorlage liegen»). Vorher bekam er als einzige Spalte die MENGE, und das
-       hatte eine Folge, die man erst beim Einlesen merkte: ohne Code und Name
-       konnte der gelesene Beleg seine Zeile nicht wiederfinden
-       (`importedRowMatches` sucht nach Code, ersatzweise nach Name) — die
-       Werte wurden der REIHE NACH ueber die Bestellzeilen gelegt. Steht der
-       Lieferschein in anderer Reihenfolge als die Bestellung, landete jede
-       Menge auf der falschen Zeile. Darum kennt die Vorlage hier jetzt
-       dieselben Felder wie ueberall; das Ziel entscheidet nicht mehr, WELCHE
-       Felder es gibt, nur noch, was daraus gerechnet wird. */
-    const columns: TemplateColumn[] = [
-        { key: 'code', name: t('inv.columns.serialCode'), type: 'text' },
-        { key: 'name', name: t('inv.columns.productName'), type: 'text' },
-        { key: 'quantity', name: t('inv.columns.quantity'), type: 'number' },
+/** Die freien Spalten — ihre Werte werden als eigene Angaben gespeichert. */
+export const unlabeledColumns = (config: SupplierCalcConfig): TemplateColumn[] =>
+    templateColumns(config).filter((column) => !column.label);
+
+/**
+ * Welche Zuordnungen ein Dokument kennt: eine PREISANFRAGE hat keine Preise,
+ * dort gibt es nur Produktname und Menge.
+ */
+export const labelsForDocument = (documentType: PurchaseTemplateDocumentType): TemplateLabel[] =>
+    (documentType === 'PRICE_REQUEST' ? ['productName', 'quantity'] : [...TEMPLATE_LABELS]);
+
+/** Der Name einer Zuordnung auf dem Bildschirm. */
+export const templateLabelName = (label: TemplateLabel): string => t(`inv.aiImport.label.${label}`);
+
+export type TemplateProblem = 'noColumns' | 'unnamed' | 'missingLabels' | 'duplicateLabel';
+
+/**
+ * Was einer Vorlage fehlt, bevor sie gilt. Leer = sie ist in Ordnung.
+ * Dieselbe Pruefung macht der Server beim Speichern.
+ */
+export const templateProblems = (config: SupplierCalcConfig, documentType: PurchaseTemplateDocumentType): TemplateProblem[] => {
+    const problems: TemplateProblem[] = [];
+    const columns = config.columns ?? [];
+    if (!columns.length) problems.push('noColumns');
+    if (columns.some((column) => !column.name.trim())) problems.push('unnamed');
+    const allowed = new Set<TemplateLabel>(labelsForDocument(documentType));
+    const labels = columns.map((column) => column.label).filter((label): label is TemplateLabel => Boolean(label) && allowed.has(label as TemplateLabel));
+    if (REQUIRED_TEMPLATE_LABELS.some((label) => !labels.includes(label))) problems.push('missingLabels');
+    if (new Set(labels).size !== labels.length) problems.push('duplicateLabel');
+    return problems;
+};
+
+export const templateIsValid = (config: SupplierCalcConfig, documentType: PurchaseTemplateDocumentType): boolean =>
+    templateProblems(config, documentType).length === 0;
+
+/** Der Satz zu einem Mangel — fuer den Toast und den Hinweis in der Tabelle. */
+export const templateProblemText = (problem: TemplateProblem): string => t(
+    problem === 'noColumns' ? 'inv.aiImport.noColumns'
+        : problem === 'unnamed' ? 'inv.aiImport.columnNameRequired'
+            : problem === 'duplicateLabel' ? 'inv.aiImport.labelDuplicate'
+                : 'inv.aiImport.labelRequired',
+);
+
+/**
+ * ── DIE RECHENART BRAUCHT IHRE SCHLÜSSEL (Vorgabe Samet, 14.09.2026) ───────
+ * «Beim Wechsel auf Lieferanten- oder automatische Berechnung müssen
+ *  Produktname, Menge, Einzelpreis, Nettopreis, Rabatt und Zeilensumme in der
+ *  Vorlage zugeordnet sein — fehlt ein Schlüssel, muss es sagen, welcher.»
+ * Die manuelle Eingabe rechnet nichts und braucht darum nichts davon.
+ */
+export const CALC_REQUIRED_LABELS: TemplateLabel[] = ['productName', 'quantity', 'grossPrice', 'netPrice', 'discount', 'total'];
+
+/** Die fehlenden Zuordnungen für eine Rechenart — leer = sie darf rechnen. */
+export const missingCalcLabels = (config: SupplierCalcConfig, mode: OrderCalcMode): TemplateLabel[] => {
+    if (mode === 'DIRECT') return [];
+    const present = new Set(templateColumns(config).map((column) => column.label).filter(Boolean));
+    return CALC_REQUIRED_LABELS.filter((label) => !present.has(label));
+};
+
+/** «Schlüssel fehlt: Einzelpreis, Rabatt» — für Toast und Rechenfenster. */
+export const missingCalcLabelsText = (missing: TemplateLabel[]): string =>
+    t('inv.orders.calcMode.missingKeys', { keys: missing.map(templateLabelName).join(', ') });
+
+/** Prüft eine Rechenart gegen die Vorlage: null = erlaubt, sonst der Fehlersatz. */
+export const calcModeError = (config: SupplierCalcConfig, mode: OrderCalcMode): string | null => {
+    const missing = missingCalcLabels(config, mode);
+    return missing.length ? missingCalcLabelsText(missing) : null;
+};
+
+/**
+ * Die Einstellung einer Vorlage in EINEM Satz — unter dem Namen in der
+ * Vorlagenliste und im Import-Fenster: wie viele Spalten, und welche
+ * Zuordnungen vergeben sind.
+ */
+export const templateSummary = (config: SupplierCalcConfig): string => {
+    const columns = templateColumns(config);
+    if (!columns.length) return t('inv.aiImport.noColumns');
+    const labels = columns
+        .map((column) => column.label)
+        .filter((label): label is TemplateLabel => Boolean(label))
+        .map(templateLabelName);
+    const parts = [t('inv.aiImport.columnCount', { count: columns.length })];
+    if (labels.length) parts.push(labels.join(', '));
+    return parts.join(' · ');
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2) VORLAGE → TABELLE
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/** Die festen Felder der Bestelltabelle — jede Zuordnung zeigt auf eines. */
+export type FixedOrderColumn =
+    | 'name'
+    | 'code'
+    | 'quantity'
+    | 'grossPrice'
+    | 'netPrice'
+    | 'discount'
+    | 'discount2'
+    | 'lineTotal';
+
+/** Ein Spaltenschluessel der Tabelle: ein festes Feld oder eine freie Spalte. */
+export type OrderColumnId = FixedOrderColumn | string;
+
+export const LABEL_TO_COLUMN: Record<TemplateLabel, FixedOrderColumn> = {
+    productName: 'name',
+    quantity: 'quantity',
+    grossPrice: 'grossPrice',
+    netPrice: 'netPrice',
+    discount: 'discount',
+    discount2: 'discount2',
+    total: 'lineTotal',
+};
+
+/** Eine Spalte, wie die Tabelle sie zeichnet. */
+export interface TableColumn {
+    /** Was die Zelle zeigt: ein festes Feld (`name`, `quantity` …) oder der Schluessel der freien Spalte. */
+    id: OrderColumnId;
+    key: string;
+    /** Die Ueberschrift — bei Vorlagenspalten der Name aus der Vorlage. */
+    name: string;
+    type: 'text' | 'number';
+    width?: number;
+    label: TemplateLabel | null;
+    /** Der ERP-Code: fest, nicht aus der Vorlage. */
+    fixed?: boolean;
+}
+
+/**
+ * ── DIE VORLAGE ENTSCHEIDET, WELCHE SPALTEN ES GIBT — UND IN WELCHER
+ *    REIHENFOLGE (Vorgabe Samet, 11.09.2026) ────────────────────────────────
+ * Ganz links der feste ERP-Code, danach die Spalten der Vorlage, so wie sie
+ * dort stehen. Eine GELADENE Bestellung darf eigene Angaben tragen, die die
+ * heutige Vorlage nicht kennt (`loadedExtras`): sie kommen hinten dazu,
+ * damit ein alter Beleg beim Oeffnen keine Angabe verliert. Traegt die
+ * Vorlage eine freie Spalte GLEICHEN NAMENS, ist das dieselbe Spalte — der
+ * Wert wandert unter den Schluessel der Vorlage (siehe `extraKeyAliases`).
+ */
+export const tableColumnsFromTemplate = (
+    config: SupplierCalcConfig,
+    loadedExtras: TemplateColumn[] = [],
+): TableColumn[] => {
+    const columns: TableColumn[] = [
+        { id: 'code', key: 'code', name: t('inv.columns.serialCode'), type: 'text', label: null, fixed: true },
     ];
-    /* ⚠ HIER ENDET DIE PREISANFRAGE. Alles Weitere — beide Preise, die
-       Rabatte, der Zeilenbetrag — ist Rechnung, und die gibt es dort nicht.
-       Die Preisfelder standen bis zum 08.09.2026 versehentlich ueber diesem
-       Ausstieg und reisten darum auch in einer preislosen Anfrage mit: sie
-       kosteten Token und luden das Modell ein, Preise zu erfinden, die auf
-       dem Beleg gar nicht standen. */
-    if (priceless) {
-        for (const extra of namedExtras(config, TEMPLATE_MAX_EXTRA_COLUMNS)) columns.push(extra);
-        return columns;
+    const seenNames = new Set<string>();
+    const seenKeys = new Set<string>();
+    for (const column of templateColumns(config)) {
+        columns.push({
+            id: column.label ? LABEL_TO_COLUMN[column.label] : column.key,
+            key: column.key,
+            name: column.name,
+            type: column.type,
+            width: column.width,
+            label: column.label ?? null,
+        });
+        seenKeys.add(column.key);
+        if (!column.label) seenNames.add(column.name.trim().toLowerCase());
     }
-    // NEBENEINANDER (Vorgabe Samet): der Einzelpreis (Liste) UND der
-    // Nettopreis. Beide werden gelesen; welcher am Ende zählt, entscheidet
-    // die Berechnung, nicht die Vorlage.
-    columns.push({ key: 'priceGross', name: t('inv.orders.columns.grossPrice'), type: 'number' });
-    columns.push({ key: 'priceNet', name: t('inv.orders.columns.netPrice'), type: 'number' });
-    columns.push({ key: 'discount', name: t('inv.orders.columns.discount'), type: 'number' });
-    if (config.discount2Enabled) {
-        columns.push({ key: 'discount2', name: t('inv.orders.columns.discount2'), type: 'number' });
+    for (const extra of loadedExtras) {
+        const name = extra.name.trim();
+        if (!name || seenKeys.has(extra.key) || seenNames.has(name.toLowerCase())) continue;
+        seenKeys.add(extra.key);
+        columns.push({ id: extra.key, key: extra.key, name, type: extra.type, width: extra.width, label: null });
     }
-    /* DER ZEILENBETRAG WIRD MITGELESEN (Vorgabe Samet, 07.09.2026): «Das
-       Modell soll die Zeilensummen gleich mitrechnen und anzeigen, statt sie
-       den Benutzer eintippen zu lassen.» Er steht am Ende, damit die Spalte
-       in der Pruefung rechts liegt — dort, wo sie auch in der Bestelltabelle
-       steht. */
-    columns.push({ key: 'lineTotal', name: t('inv.columns.lineTotal'), type: 'number' });
-    for (const extra of namedExtras(config, ORDER_MAX_EXTRA_COLUMNS)) columns.push(extra);
     return columns;
 };
 
 /**
- * Only visible columns cross the AI boundary. This is intentionally applied
- * here, at the last shared point used by the request, review and row mapping,
- * so a hidden value cannot leak into a prompt or be applied accidentally.
+ * Alter Schluessel → Schluessel der Vorlage, fuer eigene Angaben einer
+ * geladenen Bestellung, deren Spalte in der Vorlage unter demselben Namen
+ * steht. Leer, wenn nichts umzuhaengen ist.
  */
-export const templateColumns = (
-    config: SupplierCalcConfig,
-    priceless = false,
-): TemplateColumn[] => {
-    const hidden = new Set(config.hiddenColumnKeys ?? []);
-    return templateColumnOptions(config, priceless)
-        .filter((column) => !hidden.has(column.key));
+export const extraKeyAliases = (config: SupplierCalcConfig, loadedExtras: TemplateColumn[]): Map<string, string> => {
+    const byName = new Map<string, string>();
+    for (const column of unlabeledColumns(config)) byName.set(column.name.trim().toLowerCase(), column.key);
+    const aliases = new Map<string, string>();
+    for (const extra of loadedExtras) {
+        const target = byName.get(extra.name.trim().toLowerCase());
+        if (target && target !== extra.key) aliases.set(extra.key, target);
+    }
+    return aliases;
 };
 
-/** Die benannten eigenen Angaben, auf die Obergrenze des Ziels geschnitten. */
-const namedExtras = (config: SupplierCalcConfig, max: number): TemplateColumn[] =>
-    (config.extraColumns ?? [])
-        .filter((extra) => extra.name.trim())
-        .slice(0, max)
-        .map((extra) => ({ ...extra, name: extra.name.trim() }));
-
-/**
- * Die Einstellung einer Vorlage in EINEM Satz — er steht unter dem Namen in
- * der Vorlagenliste und im Import-Fenster. Er nennt nur, was gesetzt ist:
- * eine Vorlage ohne Staffel soll nicht «0 Stufen» behaupten.
- */
-export const templateSummary = (entry: SupplierCalcConfig): string => {
-    const parts: string[] = [calcModeLabel(entry.calcMode ?? 'DIRECT')];
-    if (!entry.discount2Enabled) parts.push(t('inv.aiImport.noDiscount2'));
-    const named = (entry.extraColumns ?? []).filter((column) => column.name.trim()).length;
-    if (named) parts.push(t('inv.aiImport.extraCount', { count: named }));
-    const stack = (entry.discounts ?? []).filter((value) => value > 0);
-    if (stack.length) parts.push(stack.map((value) => `${value}%`).join(' + '));
-    if (entry.qtyTiers?.length) parts.push(t('inv.aiImport.tierCount', { count: entry.qtyTiers.length }));
-    if (entry.vatRate > 0) parts.push(`${t('inv.orders.columns.vat')} ${entry.vatRate}%`);
-    return parts.join(' · ');
+/** Die Werte einer Zeile unter die neuen Schluessel haengen. */
+export const remapRowExtras = (row: DraftOrderRow, aliases: Map<string, string>): DraftOrderRow => {
+    if (!aliases.size || !row.extras) return row;
+    const extras: Record<string, string> = {};
+    for (const [key, value] of Object.entries(row.extras)) extras[aliases.get(key) ?? key] = value;
+    return { ...row, extras };
 };
 
 /**
- * WAS BEIM RECHNEN GILT (Vorgabe Samet: «schaltet man den Rechenmodus ein,
- * ändert sich der Bildschirm, und der in der Vorlage gewählte Teil wird aktiv
- * und rechnet danach»).
- *
- * Die drei Möglichkeiten sind dieselben, die es im Haus seit je gibt — sie
- * werden nur nicht mehr nebenbei eingestellt, sondern im Rechenfenster gewählt:
- *
- *   DIRECT   Manuelle Eingabe: es steht, was gelesen wurde. Nichts rechnet.
- *   AUTO     Rabatte fallen auf den Preis; der Nettopreis wird abgeleitet.
- *   SUPPLIER Der Stückpreis steht fest, der Betrag wächst mit der Menge.
+ * ── WAS DAS PDF NICHT ZEIGT ─────────────────────────────────────────────────
+ * Die Bestellung merkt sich beim Speichern, welche festen Spalten die Vorlage
+ * NICHT traegt (`hiddenColumnKeys`), weil das PDF spaeter ohne die Vorlage
+ * gebaut wird. Der ERP-Code steht nie im PDF (Vorgabe Samet, 11.09.2026).
  */
-export const CALC_MODES: OrderCalcMode[] = ['DIRECT', 'AUTO', 'SUPPLIER'];
+export const hiddenKeysForTemplate = (config: SupplierCalcConfig): string[] => {
+    const labels = new Set(templateColumns(config).map((column) => column.label));
+    const hidden = ['code'];
+    if (!labels.has('grossPrice')) hidden.push('priceGross');
+    if (!labels.has('discount') && !labels.has('discount2')) hidden.push('discount');
+    return hidden;
+};
 
-export const calcModeLabel = (mode: OrderCalcMode): string => t(
-    mode === 'AUTO' ? 'inv.orders.calcMode.auto'
-        : mode === 'SUPPLIER' ? 'inv.orders.calcMode.supplier'
-            : 'inv.orders.calcMode.direct',
-);
-
-export const calcModeHint = (mode: OrderCalcMode): string => t(
-    mode === 'AUTO' ? 'inv.aiImport.modeAutoHint'
-        : mode === 'SUPPLIER' ? 'inv.aiImport.modeSupplierHint'
-            : 'inv.aiImport.modeDirectHint',
-);
+/**
+ * ── WAS DAS PDF ALS TITEL SCHREIBT ──────────────────────────────────────────
+ * Die Bestellung merkt sich die Spalten der Vorlage — Name, Zuordnung, Typ,
+ * Reihenfolge — damit das PDF spaeter ohne die Vorlage genau die Tabelle
+ * druckt, die auf dem Bildschirm stand: «GESAMTMENGE», nicht «Menge», und
+ * die Spalten dort, wo die Vorlage sie hatte (Vorgabe Samet, 11.09.2026).
+ */
+export const tableColumnsSnapshot = (config: SupplierCalcConfig): PurchaseOrderTableColumn[] =>
+    templateColumns(config).map((column) => ({
+        key: column.key,
+        name: column.name,
+        label: column.label ?? null,
+        type: column.type === 'number' ? 'number' : 'text',
+    }));
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   2) MENGENSTAFFEL
+   3) ERKANNTE ZEILE → BESTELLZEILE (reine Zuordnung)
    ═════════════════════════════════════════════════════════════════════════ */
+
+let importSeed = 0;
 
 /** Zahl aus einer erkannten Zelle — das Modell liefert Zahlen, aber nicht immer. */
 const num = (value: unknown): number | null => {
@@ -247,161 +307,22 @@ const text = (value: unknown): string => {
     return String(value).trim();
 };
 
-/** Die Staffeln einer erkannten Position, sortiert und von Unsinn befreit. */
-export const rowPriceTiers = (row: AiExtractedRow): AiPriceTier[] => {
-    const raw = row.priceTiers;
-    if (!Array.isArray(raw)) return [];
-    return raw
-        .map((tier) => ({
-            minQuantity: Number((tier as AiPriceTier)?.minQuantity) || 0,
-            unitPrice: Number((tier as AiPriceTier)?.unitPrice) || 0,
-        }))
-        .filter((tier) => tier.minQuantity > 0 && tier.unitPrice > 0)
-        .sort((a, b) => a.minQuantity - b.minQuantity);
-};
-
-/**
- * Die passende Stufe zu einer Menge: die HÖCHSTE, deren Menge erreicht ist.
- * Bei 7 Stück und den Stufen 1 / 5 / 10 gewinnt die 5.
- */
-const matchTier = <T extends { minQuantity: number }>(tiers: T[], quantity: number): T | null => {
-    let best: T | null = null;
-    for (const tier of tiers) {
-        if (quantity + 1e-9 >= tier.minQuantity && (!best || tier.minQuantity >= best.minQuantity)) best = tier;
-    }
-    return best;
-};
-
-export const matchSupplierTier = (tiers: SupplierQtyTier[], quantity: number): SupplierQtyTier | null =>
-    matchTier(tiers ?? [], quantity);
-
-export const matchDocumentTier = (tiers: AiPriceTier[], quantity: number): AiPriceTier | null =>
-    matchTier(tiers ?? [], quantity);
-
-/** Welche Regel den Preis bestimmt hat — die Tabelle zeigt es als Merkzeichen. */
-export type PriceRule = 'base' | 'documentTier' | 'supplierTierPrice' | 'supplierTierDiscount';
-
-export interface ResolvedLine {
-    netPrice: number;
-    discount: number;
-    discount2: number;
-    rule: PriceRule;
-    /** Die Menge, ab der die greifende Stufe gilt (0 = keine Stufe). */
-    tierFrom: number;
-}
-
-export interface PriceInput {
-    netPrice: number | null;
-    discount: number | null;
-    discount2: number | null;
-    priceTiers: AiPriceTier[];
-}
-
-/**
- * DIE STUFE ZU EINER MENGE. Kein Rabattstapel, keine Preisbasis — nur die
- * Frage «gilt für diese Menge ein anderer Preis?».
- */
-export const resolveLinePrice = (
-    input: PriceInput,
-    quantity: number,
-    config: SupplierCalcConfig,
-): ResolvedLine => {
-    const unchanged: ResolvedLine = {
-        netPrice: input.netPrice ?? 0,
-        discount: clampPercent(input.discount ?? 0),
-        discount2: clampPercent(input.discount2 ?? 0),
-        rule: 'base',
-        tierFrom: 0,
-    };
-
-    // 1) Fester Stückpreis aus der Lieferantenstaffel — er schlägt alles.
-    const supplierTier = matchSupplierTier(config.qtyTiers ?? [], quantity);
-    if (supplierTier && supplierTier.unitPrice > 0) {
-        return {
-            netPrice: supplierTier.unitPrice,
-            discount: 0,
-            discount2: 0,
-            rule: 'supplierTierPrice',
-            tierFrom: supplierTier.minQuantity,
-        };
-    }
-
-    // 2) Staffel des Belegs — der Preis, den der Lieferant für diese Menge druckt.
-    const documentTier = matchDocumentTier(input.priceTiers ?? [], quantity);
-    if (documentTier) {
-        return {
-            netPrice: documentTier.unitPrice,
-            discount: 0,
-            discount2: 0,
-            rule: 'documentTier',
-            tierFrom: documentTier.minQuantity,
-        };
-    }
-
-    // 3) Staffelrabatt des Lieferanten — er ersetzt Rabatt 1, der zweite bleibt.
-    if (supplierTier && supplierTier.discount > 0) {
-        return {
-            ...unchanged,
-            discount: supplierTier.discount,
-            rule: 'supplierTierDiscount',
-            tierFrom: supplierTier.minQuantity,
-        };
-    }
-
-    return unchanged;
-};
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   3) ERKANNTE ZEILE → BESTELLZEILE (reine Zuordnung)
-   ═════════════════════════════════════════════════════════════════════════ */
-
-let importSeed = 0;
-
-/** Zahl → Zellentext; 0 und leer werden beide zur leeren Zelle. */
 /**
  * ── 0.00 IST EIN WERT ───────────────────────────────────────────────────────
- * Fehlerbild Samet (08.09.2026): «Das Feld ist auf Dezimal gestellt, darum
- * weist es Werte ab; es muss sie auch dann annehmen, wenn sie 0.00 sind.»
- *
- * Hier stand `value ? String(value) : ''` — und 0 ist in JavaScript falsch.
- * Ein Beleg, auf dem ausdrücklich «0.00» steht (ein Rabatt von null, eine
- * Gratisposition, ein Betrag, der noch offen ist), kam damit als LEERE Zelle
- * an. Zwischen «da steht nichts» und «da steht ausdrücklich null» liegt aber
- * genau der Unterschied, um den es geht.
- *
- * Jetzt entscheidet allein `null`: das ist die leere Zelle. Jede Zahl —
- * auch die 0 — wird geschrieben.
+ * Zwischen «da steht nichts» und «da steht ausdruecklich null» liegt genau
+ * der Unterschied, um den es geht: allein `null` ist die leere Zelle, jede
+ * Zahl — auch die 0 — wird geschrieben.
  */
 const cell = (value: number | null): string => (value === null || Number.isNaN(value) ? '' : String(value));
 
-/**
- * DIE EIGENEN ANGABEN → EIGENE SPALTEN (Vorgabe Samet, 07.09.2026):
- * «Wir nehmen sie als feste Spalten RECHTS NEBEN den Produktnamen — nicht
- *  darunter —, insgesamt drei. Und ihre Reihenfolge muss sich ändern lassen,
- *  die Spaltenüberschriften wandern mit.»
- *
- * Hier entsteht darum nur noch die Zuordnung Schlüssel → Wert. Die
- * ÜBERSCHRIFTEN und ihre REIHENFOLGE stehen in der Vorlage (`extraColumns`) —
- * eine Zeile trägt sie nicht mit sich herum, sonst müsste ein Umstellen der
- * Spalten jede Zeile anfassen. Erst beim Speichern werden beide zu einer Liste
- * mit Namen zusammengelegt (`draftExtras`), damit eine in einem Jahr geöffnete
- * Bestellung ihre Spalten noch benennen kann.
- */
-const extraValues = (row: AiExtractedRow, config: SupplierCalcConfig): Record<string, string> => {
-    const values: Record<string, string> = {};
-    const hidden = new Set(config.hiddenColumnKeys ?? []);
-    for (const column of config.extraColumns ?? []) {
-        if (!column.name.trim() || hidden.has(column.key)) continue;
-        const value = text(row[column.key]);
-        if (value) values[column.key] = value.slice(0, 240);
-    }
-    return values;
-};
+/** Der Betrag einer Zahl — «-45.36 %» Rabatt ist ein Rabatt von 45.36 %. */
+const magnitude = (value: number | null): number | null => (value === null ? null : Math.abs(value));
 
 /**
- * Zeile + Vorlage → die Liste, die GESPEICHERT wird: Schlüssel, Überschrift
- * und Wert, in der Reihenfolge der Vorlage. Leere Spalten fallen weg — eine
- * Bestellung soll keine leeren Überschriften mit sich schleppen.
+ * Zeile + freie Spalten → die Liste, die GESPEICHERT wird: Schluessel,
+ * Ueberschrift und Wert, in der Reihenfolge der Vorlage. Leere Spalten
+ * fallen weg — eine Bestellung soll keine leeren Ueberschriften mit sich
+ * schleppen.
  */
 export const draftExtras = (
     row: DraftOrderRow,
@@ -417,9 +338,9 @@ export const draftExtras = (
     .filter((entry) => entry.value);
 
 /**
- * Umgekehrt: eine geladene Bestellung zurück in Spalten + Werte. Die
- * ÜBERSCHRIFTEN kommen aus der Bestellung selbst, nicht aus der heutigen
- * Vorlage — sonst trüge eine alte Bestellung plötzlich fremde Spaltennamen.
+ * Umgekehrt: eine geladene Bestellung zurueck in Spalten + Werte. Die
+ * UEBERSCHRIFTEN kommen aus der Bestellung selbst, nicht aus der heutigen
+ * Vorlage — sonst truege eine alte Bestellung ploetzlich fremde Spaltennamen.
  */
 export const extrasFromItems = (
     items: Array<{ extras?: Array<{ key: string; name: string; value: string; width?: number }> | null }>,
@@ -437,129 +358,66 @@ export const extrasFromItems = (
         name: entry.name,
         width: entry.width,
         type: 'text' as const,
+        label: null,
     }));
 };
 
 /**
  * Eine erkannte Position in eine Zeile der Bestelltabelle giessen.
  *
- * HIER WIRD NICHT GERECHNET. Jeder Wert kommt aus seinem festen Feld; die
- * Rabatte der Vorlage («bei diesem Lieferanten immer 20 %») füllen die
- * Rabattzellen nur dort, wo der Beleg selbst keinen Rabatt trägt — das ist
- * eine Einstellung, keine Rechnung.
- *
- * DER PRODUKTCODE DARF FEHLEN: er wird beim Speichern vergeben (der Server
- * kennt die Reihe `ART-NNNNN`). Hier bleibt die Zelle leer, statt eine Nummer
- * zu erfinden, die mit einer echten kollidieren könnte.
+ * HIER WIRD NICHT GERECHNET. Jede Spalte mit Zuordnung fuellt ihr Feld; jede
+ * freie Spalte wird eine eigene Angabe. Der ERP-CODE BLEIBT LEER: er wird
+ * beim Speichern vergeben.
  */
-/** Der Betrag einer Zahl — «-45.36 %» Rabatt ist ein Rabatt von 45.36 %. */
-const magnitude = (value: number | null): number | null => (value === null ? null : Math.abs(value));
-
-/** Eine Vorgabe von 0 ist keine Vorgabe: sie lässt die Zelle leer. */
-const blankIfZero = (value: number | null | undefined): number | null => {
-    const percent = clampPercent(value ?? 0);
-    return percent > 0 ? percent : null;
-};
-
 export const extractedToDraftRow = (
     row: AiExtractedRow,
     config: SupplierCalcConfig,
     calcMode: OrderCalcMode = 'DIRECT',
 ): DraftOrderRow => {
-    const visible = (key: string) => !(config.hiddenColumnKeys ?? []).includes(key);
-    const tiers = rowPriceTiers(row);
-    const quantityValue = visible('quantity') ? num(row.quantity) : null;
+    const byLabel = new Map<TemplateLabel, string>();
+    const extras: Record<string, string> = {};
+    for (const column of templateColumns(config)) {
+        if (column.label) { byLabel.set(column.label, column.key); continue; }
+        const value = text(row[column.key]);
+        if (value) extras[column.key] = value.slice(0, 240);
+    }
+    const valueOf = (label: TemplateLabel): unknown => {
+        const key = byLabel.get(label);
+        return key ? row[key] : undefined;
+    };
+
+    const quantityValue = num(valueOf('quantity'));
     const quantity = quantityValue ?? 1;
-
-    /* BEIDE PREISE, jeder in seiner Spalte: der Einzelpreis ist der
-       Ausgangspreis (Rabatte fallen darauf), der Nettopreis der Endpreis.
-       Der Beleg trägt oft nur einen von beiden — dann bleibt die andere Zelle
-       leer, und die Tabelle leitet sie ab, sobald gerechnet wird. */
-    const grossPrice = visible('priceGross') ? num(row.priceGross) : null;
-    const netPrice = visible('priceNet') ? num(row.priceNet) : null;
-
-    /* ── EIN RABATT AUF DEM BELEG STEHT OFT NEGATIV ─────────────────────────
-       Fehlerbild Samet (08.09.2026): «Wenn der Rabatt -45.36 ist, dann ist der
-       Preis der Nettopreis, 42.67.» Der Beleg druckt den Abzug als «-45.36 %»,
-       und genau so kam er auch beim Modell heraus.
-
-       Das war ein STILLER Totalverlust: `clampPercent` schneidet auf 0…100 —
-       -45.36 wurde zu 0, der Nettopreis damit gleich dem Bruttopreis, und die
-       Zeile war um den ganzen Rabatt zu teuer. Sichtbar war davon nichts: zwei
-       gleiche Preise sehen aus wie «diese Position hat eben keinen Rabatt».
-
-       Ein Rabatt hat keine Richtung, nur eine Groesse — der Betrag zaehlt.
-       (`clampPercent` selbst bleibt, wie es ist: es schuetzt auch den
-       Steuersatz, und ein negativer Steuersatz ist wirklich null.) */
-    const documentDiscount = visible('discount') ? magnitude(num(row.discount)) : null;
-    const documentDiscount2 = config.discount2Enabled && visible('discount2') ? magnitude(num(row.discount2)) : null;
+    const grossPrice = num(valueOf('grossPrice'));
+    const netPrice = num(valueOf('netPrice'));
+    /* Ein Rabatt hat keine Richtung, nur eine Groesse — der Beleg druckt ihn
+       oft als «-45.36 %», und `clampPercent` machte daraus still 0. */
+    const discount = magnitude(num(valueOf('discount')));
+    const discount2 = magnitude(num(valueOf('discount2')));
 
     return {
         key: `ai-${importSeed += 1}`,
         itemType: 'PRODUCT',
         articleId: null,
-        code: visible('code') ? text(row.code) : '',
+        code: '',
         serialNumber: '',
-        name: visible('name') ? text(row.name) : '',
+        name: text(valueOf('productName')),
         unit: '',
-        quantity: visible('quantity') ? String(quantity) : '',
+        quantity: quantityValue !== null ? String(quantity) : '',
         grossPrice: cell(grossPrice),
         netPrice: cell(netPrice),
-        /* ── DER BETRAG STEHT SCHON DA (Vorgabe Samet, 07.09.2026) ──────────
-           Frueher blieb die Zelle leer und die Tabelle leitete den Betrag ab;
-           in der manuellen Eingabe hiess das: der Benutzer tippt ihn ab.
-           Jetzt kommt er mit — vom Beleg gelesen oder vom Modell gerechnet —,
-           und fehlt er doch, rechnen wir hier Menge × Nettopreis.
-           Er bleibt nicht stehen, wenn sich die Menge aendert: `patchRowQuantity`
-           rechnet ihn in der Tabelle neu (siehe OrderCreatePage). */
-        lineTotal: visible('lineTotal')
-            ? cell(num(row.lineTotal) ?? (quantityValue !== null && netPrice !== null ? round2(quantity * netPrice) : null))
-            : '',
-        /* Der Rabatt der VORLAGE («bei diesem Lieferanten immer 20 %») füllt
-           nur, was der Beleg offen lässt — und ein Vorgabewert von 0 füllt
-           gar nichts: die Zelle bleibt leer, statt überall eine 0 zu
-           setzen, die niemand eingegeben hat. Steht die 0 dagegen auf dem
-           BELEG, kommt sie durch (siehe `cell`). */
-        discount: visible('discount') ? cell(documentDiscount ?? blankIfZero(config.discounts?.[0])) : '',
-        discount2: visible('discount2') ? cell(documentDiscount2 ?? blankIfZero(config.discounts?.[1])) : '',
+        /* Der Betrag kommt mit — vom Beleg gelesen —, und fehlt er, rechnen
+           wir hier Menge × Nettopreis. `patchRowQuantity` rechnet ihn in der
+           Tabelle neu, wenn sich die Menge aendert. */
+        lineTotal: cell(num(valueOf('total')) ?? (quantityValue !== null && netPrice !== null ? round2(quantity * netPrice) : null)),
+        discount: cell(discount === null ? null : clampPercent(discount)),
+        discount2: cell(discount2 === null ? null : clampPercent(discount2)),
         vatRate: '',
         calcMode,
         receivedQuantity: 0,
         receivedAt: null,
         error: null,
-        priceTiers: visible('priceNet') && tiers.length ? tiers : undefined,
-        extras: extraValues(row, config),
-    };
-};
-
-/**
- * Die Menge einer Zeile hat sich geändert — die passende Stufe nachschlagen.
- * Nur Zeilen mit einer Staffel (Beleg ODER Lieferant) werden angefasst; alles
- * andere bliebe ohnehin gleich und dürfte nicht überschrieben werden.
- */
-export const repriceRow = (row: DraftOrderRow, config: SupplierCalcConfig): DraftOrderRow => {
-    const hasTiers = (row.priceTiers?.length ?? 0) > 0 || (config.qtyTiers?.length ?? 0) > 0;
-    if (!hasTiers) return row;
-    const quantity = parseNum(row.quantity) ?? 0;
-    if (quantity <= 0) return row;
-    const priced = resolveLinePrice(
-        {
-            netPrice: parseNum(row.netPrice) ?? parseNum(row.grossPrice),
-            discount: parseNum(row.discount),
-            discount2: parseNum(row.discount2),
-            priceTiers: row.priceTiers ?? [],
-        },
-        quantity,
-        config,
-    );
-    if (priced.rule === 'base') return row;
-    return {
-        ...row,
-        netPrice: priced.netPrice ? String(priced.netPrice) : row.netPrice,
-        discount: priced.discount ? String(priced.discount) : '',
-        discount2: priced.discount2 ? String(priced.discount2) : '',
-        priceRule: priced.rule,
-        priceTierFrom: priced.tierFrom || undefined,
+        extras,
     };
 };
 
@@ -569,15 +427,14 @@ export const repriceRow = (row: DraftOrderRow, config: SupplierCalcConfig): Draf
 
 export interface ApiFailure {
     title: string;
-    /** Der Wortlaut des Dienstes (OpenAI, Google) — für die Einrichtung. */
+    /** Der Wortlaut des Dienstes (OpenAI) — für die Einrichtung. */
     detail?: string;
 }
 
 /**
  * Die Antwort des Servers trägt `error` (der Satz für den Bildschirm) und
  * manchmal `detail` (die Begründung des fremden Dienstes). Beides gehört
- * getrennt angezeigt: der Satz sagt, was zu tun ist, das Detail sagt dem, der
- * die Einrichtung macht, WARUM.
+ * getrennt angezeigt.
  */
 export const apiFailure = (error: unknown, fallback: string): ApiFailure => {
     const data = (error as { response?: { data?: { error?: string; detail?: string } } })?.response?.data;
@@ -594,14 +451,15 @@ export const apiFailure = (error: unknown, fallback: string): ApiFailure => {
 export const isPdfFile = (file: File): boolean => /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
 export const isImageFile = (file: File): boolean => /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name);
 export const isSheetFile = (file: File): boolean => /\.(xlsx|xls|csv)$/i.test(file.name);
+/** Schon Text: eingefuegte Tabellenzeilen (`.tsv`) oder eingefuegter Text (`.txt`). */
+export const isTextFile = (file: File): boolean => /\.(tsv|txt)$/i.test(file.name);
 
 export const isSupportedImportFile = (file: File): boolean =>
-    isPdfFile(file) || isImageFile(file) || isSheetFile(file);
+    isPdfFile(file) || isImageFile(file) || isSheetFile(file) || isTextFile(file);
 
 /**
- * WELCHES BLATT ZU EINER DATEI GEHOERT (07.09.2026) — die Endung entscheidet,
- * der MIME-Typ faengt den Rest ab. Steht hier und nicht bei den Symbolen
- * selbst, weil `FileGlyphs.tsx` nur noch Bauteile ausliefern soll.
+ * WELCHES BLATT ZU EINER DATEI GEHOERT — die Endung entscheidet, der
+ * MIME-Typ faengt den Rest ab.
  */
 export type GlyphKind = 'pdf' | 'jpg' | 'png' | 'sheet' | 'csv' | 'file';
 
@@ -609,7 +467,7 @@ export const glyphKindForFile = (file: File): GlyphKind => {
     const name = file.name.toLowerCase();
     if (name.endsWith('.pdf')) return 'pdf';
     if (name.endsWith('.csv')) return 'csv';
-    if (name.endsWith('.xlsx') || name.endsWith('.xls')) return 'sheet';
+    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.tsv')) return 'sheet';
     if (name.endsWith('.png')) return 'png';
     if (/\.(jpe?g|webp|heic|heif)$/.test(name)) return 'jpg';
     if (file.type === 'application/pdf') return 'pdf';
@@ -617,24 +475,12 @@ export const glyphKindForFile = (file: File): GlyphKind => {
     return 'file';
 };
 
-/** Datei → reiner Base64-Inhalt (ohne `data:`-Kopf). */
 /**
  * ── DIE LANGE KANTE, DIE OHNEHIN VERWORFEN WIRD ─────────────────────────────
- * Fehlerbild Samet (08.09.2026): «Ich gebe das Papier der KI, es bleibt bei
- * 92 % stehen.» 92 % ist der Schritt, in dem hochgeladen und gewartet wird —
- * und hochgeladen wurde bisher die Aufnahme in voller Groesse.
- *
- * Das ist doppelt umsonst. Die Gegenstelle rechnet ein Bild bei `detail:
- * 'high'` ZUERST auf ein Quadrat von 2048 px herunter, bevor sie es
- * ueberhaupt ansieht; alles darueber wird also verworfen, nachdem wir es
- * bezahlt und hochgeladen haben. Eine Aufnahme mit 4000 px Kantenlaenge
- * reist damit rund viermal so lange, ohne dass das Modell ein Pixel mehr
- * sieht.
- *
- * ⚠ VERKLEINERT WIRD NUR, WAS DARUEBER LIEGT. Ein Beleg mit 1600 px geht
- * unveraendert hinaus — an der Schaerfe, an der die Rappenstellen haengen,
- * wird hier nichts angefasst. Und ein PNG bleibt ein PNG: eine Aufnahme vom
- * Bildschirm besteht aus Text, und JPEG setzte Kanten an jede Ziffer.
+ * Die Gegenstelle rechnet ein Bild bei `detail: 'high'` ZUERST auf ein
+ * Quadrat von 2048 px herunter; alles darueber wird verworfen, nachdem wir
+ * es bezahlt und hochgeladen haben. Verkleinert wird nur, was darueber
+ * liegt; ein PNG bleibt ein PNG.
  */
 const MAX_IMAGE_EDGE = 2048;
 
@@ -646,8 +492,7 @@ export const shrinkImageForUpload = async (file: File): Promise<File> => {
     if (typeof createImageBitmap !== 'function') return file;
 
     try {
-        // `imageOrientation` dreht ein Telefonfoto nach seinem EXIF-Vermerk;
-        // ohne das laege ein Hochformat quer auf der Leinwand.
+        // `imageOrientation` dreht ein Telefonfoto nach seinem EXIF-Vermerk.
         const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
         const longest = Math.max(bitmap.width, bitmap.height);
         if (longest <= MAX_IMAGE_EDGE) { bitmap.close(); return file; }
@@ -688,10 +533,30 @@ export const fileToBase64 = (file: File): Promise<string> => new Promise((resolv
 });
 
 /**
+ * Eine Tabelle als Tabulatortext: je Zeile eine Zeile, die Zellen durch TAB
+ * getrennt, eine leere Zelle bleibt leer. Spalten, die in KEINER Zeile etwas
+ * tragen, fliegen raus, leere Zeilen auch. Die Excel-Datei und die
+ * eingefuegte Tabelle gehen durch dieselbe Muehle.
+ */
+const matrixToTabText = (matrix: ReadonlyArray<ReadonlyArray<unknown>>): string => {
+    const filled = (value: unknown) => value !== null && value !== undefined && String(value).trim() !== '';
+    const width = matrix.reduce((max, row) => Math.max(max, row.length), 0);
+    const usedColumns: number[] = [];
+    for (let column = 0; column < width; column += 1) {
+        if (matrix.some((row) => filled(row[column]))) usedColumns.push(column);
+    }
+    return matrix
+        .map((row) => usedColumns
+            .map((column) => (filled(row[column]) ? String(row[column]).trim() : ''))
+            .join('\t'))
+        .filter((line) => line.replace(/\t/g, '').trim() !== '')
+        .join('\n');
+};
+
+/**
  * TABELLEN GEHEN ALS TEXT, NICHT ALS DATEI. `xlsx` liegt im Browser-Bündel
  * ohnehin schon; eine Tabelle als Tabulatortext ist kürzer als jede erneute
- * Umwandlung auf dem Server — und kürzer heisst hier: billiger.
- * Leere Spalten fliegen raus, damit keine Tabulatorwüste bezahlt wird.
+ * Umwandlung auf dem Server. Leere Spalten fliegen raus.
  */
 export const sheetFileToText = async (file: File): Promise<string> => {
     const XLSX = await import('xlsx');
@@ -706,60 +571,196 @@ export const sheetFileToText = async (file: File): Promise<string> => {
         blankrows: false,
     });
     if (!matrix.length) throw new Error('empty');
-
-    const width = matrix.reduce((max, row) => Math.max(max, row.length), 0);
-    const usedColumns: number[] = [];
-    for (let column = 0; column < width; column += 1) {
-        if (matrix.some((row) => row[column] !== null && row[column] !== undefined && String(row[column]).trim() !== '')) {
-            usedColumns.push(column);
-        }
-    }
-    return matrix
-        .map((row) => usedColumns
-            .map((column) => {
-                const cellValue = row[column];
-                return cellValue === null || cellValue === undefined ? '' : String(cellValue).trim();
-            })
-            .join('\t'))
-        .filter((line) => line.replace(/\t/g, '').trim() !== '')
-        .join('\n');
+    return matrixToTabText(matrix);
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   6) VORSCHAU DER SUMMEN
+   6) AUS DER ZWISCHENABLAGE
    ═════════════════════════════════════════════════════════════════════════ */
 
-export interface PreviewTotals {
-    lines: number;
-    net: number;
-    discountAmount: number;
-    vat: number;
-    grand: number;
+/**
+ * ── EINFUEGEN STATT HOCHLADEN (Vorgabe Samet, 11.09.2026) ───────────────────
+ * «Den Beleg auch aus der Zwischenablage einfuegen — ein Bildschirmfoto oder
+ *  kopierte Zeilen, fuer Bestellung und Preisanfrage.»
+ *
+ * Was eingefuegt wird, wird eine DATEI wie jede andere und nimmt danach
+ * denselben Weg: ein Bildschirmfoto reist als Bild (`images[]`, Rasterlesung),
+ * kopierte Zeilen reisen als Tabulatortext (`text`, Zeile fuer Zeile) —
+ * genau wie eine hochgeladene Excel-Datei.
+ *
+ * DIE REIHENFOLGE ENTSCHEIDET. Excel legt beim Kopieren NEBEN die Zeilen
+ * auch ein Bild der Zellen; naehme man das Bild, muesste das Modell eine
+ * Tabelle abschreiben, deren Text schon exakt daneben liegt. Also: Text mit
+ * TABs zuerst, dann eine HTML-Tabelle (Webshop, Mail), dann Bilder und
+ * Dateien, zuletzt blosser Text (etwa aus einem PDF kopiert).
+ */
+export interface ClipboardContent {
+    files: File[];
+    text: string;
+    html: string;
 }
 
-/**
- * Die Summen — dieselbe Reihenfolge wie in der Bestellung: Zeilenbeträge →
- * Steuersatz auf die Summe → Gesamtbetrag. Ohne Nebenkosten: die trägt die
- * Bestellung selbst, nicht der Beleg.
- */
-export const previewTotals = (rows: DraftOrderRow[], vatRate: number): PreviewTotals => {
-    let net = 0;
-    let gross = 0;
-    for (const row of rows) {
-        const quantity = parseNum(row.quantity) ?? 0;
-        const unit = parseNum(row.netPrice) ?? parseNum(row.grossPrice) ?? 0;
-        const list = parseNum(row.grossPrice) ?? unit;
-        const explicit = parseNum(row.lineTotal);
-        net += explicit && row.calcMode === 'DIRECT' ? explicit : quantity * unit;
-        gross += quantity * list;
+/** Die Zwischenablage eines `paste`-Ereignisses. */
+export const clipboardFromEvent = (data: DataTransfer): ClipboardContent => {
+    const files = Array.from(data.files ?? []);
+    if (!files.length) {
+        for (const item of Array.from(data.items ?? [])) {
+            const file = item.kind === 'file' ? item.getAsFile() : null;
+            if (file) files.push(file);
+        }
     }
-    const netRounded = round2(net);
-    const vat = round2(netRounded * (clampPercent(vatRate) / 100));
-    return {
-        lines: rows.length,
-        net: netRounded,
-        discountAmount: round2(Math.max(0, gross - net)),
-        vat,
-        grand: round2(netRounded + vat),
-    };
+    return { files, text: data.getData('text/plain'), html: data.getData('text/html') };
+};
+
+/**
+ * Die Zwischenablage auf Knopfdruck — fuer das Geraet ohne Tastatur. Der
+ * Browser fragt dafuer um Erlaubnis; wird sie verweigert, wirft das hier.
+ */
+export const readClipboardContent = async (): Promise<ClipboardContent> => {
+    const clipboard = navigator.clipboard;
+    if (clipboard?.read) {
+        const content: ClipboardContent = { files: [], text: '', html: '' };
+        for (const item of await clipboard.read()) {
+            const imageType = item.types.find((type) => type.startsWith('image/'));
+            if (imageType) {
+                const blob = await item.getType(imageType);
+                content.files.push(new File([blob], `image.${imageType.slice('image/'.length)}`, { type: imageType }));
+            }
+            if (!content.text && item.types.includes('text/plain')) {
+                content.text = await (await item.getType('text/plain')).text();
+            }
+            if (!content.html && item.types.includes('text/html')) {
+                content.html = await (await item.getType('text/html')).text();
+            }
+        }
+        return content;
+    }
+    if (clipboard?.readText) return { files: [], text: await clipboard.readText(), html: '' };
+    throw new Error('clipboard-unavailable');
+};
+
+/** Die Taste zum Einfuegen, wie sie auf DIESER Tastatur heisst. */
+export const pasteModifierKey = (): string =>
+    (/Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘' : 'Ctrl');
+
+/**
+ * Kopierte Zeilen → Zellen. Excel setzt eine Zelle, die selbst einen
+ * Zeilenumbruch, einen TAB oder ein «"» traegt, in Anfuehrungszeichen (ein
+ * «""» darin ist ein einzelnes «"»). Ohne diese Lesart zerfiele eine
+ * zweizeilige Beschreibung in zwei Positionen. Schliesst eine Zelle, die mit
+ * «"» beginnt, nicht sauber vor TAB oder Zeilenende («"Deca" Schuetz» von
+ * einer Webseite), gilt sie woertlich.
+ */
+const parseTabRows = (text: string): string[][] => {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let at = 0;
+    for (;;) {
+        let cell: string | null = null;
+        let end = at;
+        if (text[at] === '"') {
+            let scan = at + 1;
+            let value = '';
+            while (scan < text.length) {
+                if (text[scan] === '"' && text[scan + 1] === '"') { value += '"'; scan += 2; continue; }
+                if (text[scan] === '"') {
+                    const next = text[scan + 1];
+                    if (next === undefined || next === '\t' || next === '\n') {
+                        cell = value.replace(/\s+/g, ' ').trim();
+                        end = scan + 1;
+                    }
+                    break;
+                }
+                value += text[scan];
+                scan += 1;
+            }
+        }
+        if (cell === null) {
+            end = at;
+            while (end < text.length && text[end] !== '\t' && text[end] !== '\n') end += 1;
+            cell = text.slice(at, end);
+        }
+        row.push(cell);
+        if (text[end] === '\t') { at = end + 1; continue; }
+        rows.push(row);
+        if (end >= text.length) return rows;
+        row = [];
+        at = end + 1;
+    }
+};
+
+/**
+ * Eine HTML-Tabelle (Webshop, Mail, Word) → Zellen, falls der Text daneben
+ * keine TABs traegt. Die groesste Tabelle gilt — eine Mail steckt ihren
+ * Inhalt gern in eine Rahmentabelle. Eine zusammengefasste Zelle
+ * (`colSpan`) belegt ihre Spalten weiter, sonst rutschte alles rechts davon
+ * nach links. Ein DOMParser-Dokument fuehrt nichts aus und laedt nichts.
+ */
+const htmlTableRows = (html: string): string[][] => {
+    if (!/<table[\s>]/i.test(html) || typeof DOMParser === 'undefined') return [];
+    const tables = Array.from(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('table'));
+    const table = tables.reduce<HTMLTableElement | null>(
+        (best, candidate) => (!best || candidate.rows.length > best.rows.length ? candidate : best),
+        null,
+    );
+    if (!table) return [];
+    for (const lineBreak of Array.from(table.querySelectorAll('br'))) lineBreak.replaceWith(' ');
+    return Array.from(table.rows).map((row) => Array.from(row.cells).flatMap((cell) => [
+        (cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        ...Array.from({ length: Math.max(0, cell.colSpan - 1) }, () => ''),
+    ]));
+};
+
+/** Zeilenenden vereinheitlichen, geschuetzte Leerzeichen zu Leerzeichen, leere Zeilen am Rand weg. */
+const tidyClipboardText = (text: string): string => text
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/^(?:[ \t]*\n)+/, '')
+    .replace(/\s+$/, '');
+
+/** So heisst beim Browser jedes eingefuegte Bildschirmfoto — nichtssagend. */
+const GENERIC_CLIPBOARD_NAME = /^image\.[a-z0-9]+$/i;
+
+const extensionForType = (type: string): string => {
+    const subtype = type.split('/')[1]?.toLowerCase() ?? '';
+    return subtype === 'jpeg' ? 'jpg' : subtype || 'png';
+};
+
+/**
+ * Was aus der Zwischenablage eine Datei fuer den Import wird — leer, wenn
+ * nichts Lesbares darin liegt. `strict` gilt fuer die Bestellseite selbst:
+ * dort oeffnet nur ein Bild, eine Datei, kopierte Zeilen oder mehrzeiliger
+ * Text den Import, ein einzelnes Wort nicht — und Excels Bild einer
+ * einzelnen kopierten Zelle auch nicht.
+ */
+export const clipboardToImportFiles = (content: ClipboardContent, options: { strict?: boolean } = {}): File[] => {
+    const now = new Date();
+    const time = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const named = (labelKey: string, extension: string, suffix = '') => `${t(labelKey)} ${time}${suffix}.${extension}`;
+    const readable = (body: string) => body.trim().length >= 3
+        && (!options.strict || body.includes('\t') || body.split('\n').filter((line) => line.trim()).length >= 2);
+
+    const plain = tidyClipboardText(content.text);
+    const table = matrixToTabText(plain.includes('\t') ? parseTabRows(plain) : htmlTableRows(content.html));
+    if (table && readable(table)) {
+        return [new File([table], named('inv.aiImport.pastedTable', 'tsv'), {
+            type: 'text/tab-separated-values',
+            lastModified: now.getTime(),
+        })];
+    }
+
+    const files = content.files.filter(isSupportedImportFile);
+    const asFiles = () => files.map((file, index) => (isImageFile(file) && (!file.name || GENERIC_CLIPBOARD_NAME.test(file.name))
+        ? new File([file], named('inv.aiImport.pastedImage', extensionForType(file.type), files.length > 1 ? ` (${index + 1})` : ''), {
+            type: file.type,
+            lastModified: now.getTime(),
+        })
+        : file));
+    // Ein Bildschirmfoto oder eine kopierte Datei bringt keinen eigenen Text mit.
+    if (files.length && !plain) return asFiles();
+
+    if (readable(plain)) {
+        return [new File([plain], named('inv.aiImport.pastedText', 'txt'), { type: 'text/plain', lastModified: now.getTime() })];
+    }
+    return files.length && !options.strict ? asFiles() : [];
 };

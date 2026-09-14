@@ -162,7 +162,7 @@ export const TenderProfitabilityPanel = ({
             </div>
 
             {selectedLine && (
-                <div className="rounded-[2px] border border-slate-200 bg-white p-3 ring-1 ring-inset ring-[#1f2654]/[0.04]">
+                <div className="rounded-[2px] border border-slate-200 bg-white p-3 ring-1 ring-inset ring-[#0066e0]/[0.04]">
                     <div className="flex items-baseline gap-2">
                         {selectedLine.label && (
                             <span className="rounded-[2px] bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-500">{selectedLine.label}</span>
@@ -245,10 +245,10 @@ export const TenderProfitabilityPanel = ({
                                     key={row.id}
                                     type="button"
                                     onClick={() => onSelectRow(row.id)}
-                                    className={`flex w-full items-start gap-2.5 rounded-[2px] border px-2.5 py-2.5 text-left ${active ? 'border-[#1f2654]/30 bg-[#1f2654]/[0.04] ring-1 ring-[#1f2654]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
+                                    className={`flex w-full items-start gap-2.5 rounded-[2px] border px-2.5 py-2.5 text-left ${active ? 'border-[#0066e0]/30 bg-[#0066e0]/[0.04] ring-1 ring-[#0066e0]/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
                                 >
                                     {row.label && (
-                                        <span className={`mt-0.5 inline-flex h-5 min-w-[22px] shrink-0 items-center justify-center rounded-[2px] px-1 font-mono text-[10.5px] font-semibold ${active ? 'bg-[#1f2654] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        <span className={`mt-0.5 inline-flex h-5 min-w-[22px] shrink-0 items-center justify-center rounded-[2px] px-1 font-mono text-[10.5px] font-semibold ${active ? 'bg-[#0066e0] text-white' : 'bg-slate-100 text-slate-500'}`}>
                                             {row.label}
                                         </span>
                                     )}

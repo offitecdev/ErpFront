@@ -19,6 +19,7 @@ import { ReportPopup } from './ReportPopup';
 import { appointmentStatusKind, statusLabel } from '../booking/schedule/scheduleShared';
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 import { orderPayloadId } from '../../../utils/projectOrderScope';
+import '@/styles/modules/projectReports.css';
 
 type SheetView = 'overview' | 'field' | 'delivery' | 'signatures' | 'pdf';
 type SlideDir = 'right' | 'left' | 'rise';
@@ -248,11 +249,13 @@ export const AppointmentReportSheet = ({
         }
     };
 
-    /* Eine Zeile "Beschriftung → Wert" in der Sprache des Kalender-Details. */
+    /* Eine Zeile "Beschriftung → Wert" der Auskunftsliste im Kasten
+       (`.ofi-rep-facts`, styles/reportPopup.css): Beschriftung in ihrer
+       festen Spalte, Wert daneben, Haarlinie zwischen den Zeilen. */
     const DetailRow = ({ label, value }: { label: string; value: string }) => (
-        <div className="flex items-baseline gap-2 py-[3px]">
-            <span className="ofi-cal-detail__label">{label}</span>
-            <span className="ofi-cal-detail__value">{value}</span>
+        <div className="ofi-rep-fact">
+            <span className="ofi-rep-fact__label">{label}</span>
+            <span className="ofi-rep-fact__value">{value}</span>
         </div>
     );
 
@@ -325,8 +328,10 @@ export const AppointmentReportSheet = ({
     return (
         <ReportPopup
             open={open}
-            title={`${start.format('DD.MM.YYYY')} · ${start.format('HH:mm')}–${end.format('HH:mm')}`}
-            subtitle={`${viewTitles[view]} · ${statusLabel(kind)}`}
+            /* Wie ein Mac-Fenster: der Titel nennt, WAS offen ist (Termin,
+               Montage-Rapport, …), die Zeile darunter den Termin selbst. */
+            title={viewTitles[view]}
+            subtitle={`${start.format('DD.MM.YYYY')} · ${start.format('HH:mm')}–${end.format('HH:mm')} · ${statusLabel(kind)}`}
             /* Der Ausleser bleibt schmal, der Editor bekommt die volle Breite —
                die Karte folgt der Ansicht (Benutzerwunsch: "gross, aber
                flexibel"). */
@@ -383,11 +388,13 @@ export const AppointmentReportSheet = ({
                                     {statusLabel(kind)}
                                 </span>
                             </div>
-                            <DetailRow label={t('common.date')} value={start.format('DD.MM.YYYY')} />
-                            <DetailRow label={t('projects.schedule.time')} value={`${start.format('HH:mm')} – ${end.format('HH:mm')}`} />
-                            <DetailRow label={t('projects.reportsHub.order')} value={order?.orderNumber || '—'} />
-                            <DetailRow label={t('projects.musteri')} value={project.customer?.companyName || '—'} />
-                            <DetailRow label={t('projects.teknisyen')} value={appointmentTechnicianNames(appointment) || '—'} />
+                            <div className="ofi-rep-facts">
+                                <DetailRow label={t('common.date')} value={start.format('DD.MM.YYYY')} />
+                                <DetailRow label={t('projects.schedule.time')} value={`${start.format('HH:mm')} – ${end.format('HH:mm')}`} />
+                                <DetailRow label={t('projects.reportsHub.order')} value={order?.orderNumber || '—'} />
+                                <DetailRow label={t('projects.musteri')} value={project.customer?.companyName || '—'} />
+                                <DetailRow label={t('projects.teknisyen')} value={appointmentTechnicianNames(appointment) || '—'} />
+                            </div>
                         </section>
 
                         <section>
@@ -445,7 +452,7 @@ export const AppointmentReportSheet = ({
                 )}
 
                 {view === 'delivery' && (
-                    <div className="p-6 sm:p-8">
+                    <div className="ofi-rep-view">
                         <DeliveryChecklistView
                             project={project}
                             order={order}
@@ -456,7 +463,7 @@ export const AppointmentReportSheet = ({
                 )}
 
                 {view === 'signatures' && (
-                    <div className="p-4">
+                    <div className="ofi-rep-view">
                         <AppointmentSignaturesView
                             project={project}
                             appointment={appointment}

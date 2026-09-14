@@ -4,6 +4,7 @@ import { LuSend } from 'react-icons/lu';
 
 import { t } from '@/i18n/translate';
 import type { Recipient } from './RecipientCombo';
+import '@/styles/modules/mailModule.css';
 
 /**
  * BESTÄTIGUNG VOR DEM SENDEN (Vorgabe 18.08.2026).

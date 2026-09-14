@@ -59,7 +59,7 @@
     /* Höhe/Schrift sind bewusst KEINE neuen Zahlen: 40px/14px ist der
        Bedienstandard aus index.css („Form and action-control standard") und
        styles/buttons.css. Wer eines ändert, ändert alle drei. */
-    --ofi-ctl-h: 44px; /* 09.09.2026: 40 → 44 wie --ofi-btn-height */
+    --ofi-ctl-h: 40px;
     --ofi-ctl-font: 14px;
     --ofi-ctl-radius: 10px;
     --ofi-ctl-gap: 8px;
@@ -74,19 +74,19 @@
     --ofi-ctl-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
     --ofi-ctl-surface: #ffffff;
-    /* 09.09.2026, Samet: «filtre kutularının kenarları lacivert kalın olsun,
-       diğerlerine de aynı şey geçerli» — Suche, Filter und ihre CRM-Zwillinge
-       tragen hell eine 2px-Kante in der Hauptfarbe; die Ruhefläche der Suche
-       ist darum Weiss und nicht mehr das Grau (Grau in einem Marinerahmen sah
-       eingedrückt aus). Dunkel behält die 1px-Haarlinie. */
+    /* 09.09.2026, Samet (letzte Fassung): «inputlar ince ve gri olsun,
+       tıklayınca maviyle yansın» — Suche, Filter und ihre CRM-Zwillinge
+       tragen hell eine 1px-Kante in Apples Trenngrau, beim Zeigen eine Stufe
+       dunkler; erst der Fokus bringt das Systemblau (`--ofi-ctl-accent` +
+       Ring). Die 2px-Marinekante davor ist damit abgelöst. */
     --ofi-ctl-surface-rest: #ffffff;
-    --ofi-ctl-border-w: 2px;
-    --ofi-ctl-border: #272f67;
-    --ofi-ctl-border-hover: #1f2654;
+    --ofi-ctl-border-w: 1px;
+    --ofi-ctl-border: #c3c6cd;
+    --ofi-ctl-border-hover: #a6aab3;
     --ofi-ctl-text: #202124;
     --ofi-ctl-muted: #70757a;
-    --ofi-ctl-accent: #272f67;
-    --ofi-ctl-ring: rgba(39, 47, 103, 0.14);
+    --ofi-ctl-accent: #0a7aff;
+    --ofi-ctl-ring: rgba(10, 122, 255, 0.14);
 }
 
 .dark {

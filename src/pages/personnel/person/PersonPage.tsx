@@ -78,7 +78,7 @@ export const PersonPage = () => {
                 <button
                     type="button"
                     onClick={load}
-                    className="rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
+                    className="rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0]"
                 >
                     {t('common.retry')}
                 </button>

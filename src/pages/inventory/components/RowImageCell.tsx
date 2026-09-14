@@ -44,7 +44,7 @@ export const RowImageCell = ({
                 title={value ? t('inv.detail.imageReplace') : t('inv.detail.imageUpload')}
                 className={value
                     ? 'flex size-8 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-white/15 dark:bg-white/5'
-                    : 'flex size-8 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 transition-colors hover:border-[#272f67] hover:text-[#272f67] disabled:opacity-50 dark:border-white/25 dark:text-white/40 dark:hover:border-white/50 dark:hover:text-white'}
+                    : 'flex size-8 items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-400 transition-colors hover:border-[#0a7aff] hover:text-[#0a7aff] disabled:opacity-50 dark:border-white/25 dark:text-white/40 dark:hover:border-white/50 dark:hover:text-white'}
             >
                 {reading
                     ? <Spinner size="sm" />

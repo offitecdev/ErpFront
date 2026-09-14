@@ -147,7 +147,7 @@ export const FormsContextPanel = ({
 
             {sections.includes('forms') && (
                 <SectionCard
-                    title={<span className="inline-flex items-center gap-2"><LuListChecks size={15} className="text-[#1f2654] dark:text-amber-400" />{t('forms.panel.title')} ({submissions.length})</span>}
+                    title={<span className="inline-flex items-center gap-2"><LuListChecks size={15} className="text-[#0066e0] dark:text-amber-400" />{t('forms.panel.title')} ({submissions.length})</span>}
                     action={canCreate ? (
                         <button type="button" className={`${BTN_PRIMARY}${big}`} disabled={creating} onClick={() => setPickerOpen(true)}>
                             <Plus size={14} />{t('forms.panel.new')}
@@ -269,7 +269,7 @@ export const CustomerCell = ({ row }: { row: FormSubmissionRow }) => {
             {row.customerCount > 1 && (
                 <span
                     title={t('forms.links.customerCount', { count: row.customerCount })}
-                    className="shrink-0 rounded bg-[#eef2fb] px-1.5 py-0.5 text-[11px] font-semibold text-[#1f2654] dark:bg-white/10 dark:text-white/80"
+                    className="shrink-0 rounded bg-[#eef2fb] px-1.5 py-0.5 text-[11px] font-semibold text-[#0066e0] dark:bg-white/10 dark:text-white/80"
                 >
                     {row.customerCount}
                 </span>

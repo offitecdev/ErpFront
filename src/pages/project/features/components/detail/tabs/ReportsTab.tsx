@@ -18,6 +18,7 @@ import { AppointmentReportSheet } from '../reports/AppointmentReportSheet';
 import { appointmentStatusKind, statusLabel } from '../booking/schedule/scheduleShared';
 import { orderPayloadId, scopedRecords } from '../../../utils/projectOrderScope';
 import { findAppointmentReport } from '../../../utils/projectAppointments';
+import '@/styles/modules/projectReports.css';
 
 /**
  * The "Rapporte" hub of the project detail screen — rebuilt 18.08.2026 on the

@@ -1,11 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, HashRouter } from 'react-router-dom';
-import ConfigProvider from 'antd/es/config-provider';
-import antdTheme from 'antd/es/theme';
-import { AlertCircle, CheckCircle, XClose as CloseOutlined } from './components/icons/antIconCompat';
+import { AlertCircle, AlertTriangle, Check, InfoCircle, XClose as CloseOutlined } from './components/icons/antIconCompat';
 import { AppRouter } from './routes/AppRouter';
 import { useAuthStore, hasSessionHint } from './store/authStore';
-import { useThemeStore } from './store/themeStore';
 import i18n from './i18n';
 
 const Router = window.location.protocol === 'file:' ? HashRouter : BrowserRouter;
@@ -18,7 +15,9 @@ const ToastIcon = ({ tone }: { tone: 'info' | 'success' | 'warning' | 'error' })
         warning: 'toast-icon-warning',
         error: 'toast-icon-error',
     }[tone];
-    const Icon = tone === 'success' ? CheckCircle : AlertCircle;
+    // Das farbige Symbolquadrat eines Mac-Banners (styles/notifications.css):
+    // Haken / i / Dreieck / Ausrufezeichen in Weiss auf der Systemfarbe.
+    const Icon = { success: Check, info: InfoCircle, warning: AlertTriangle, error: AlertCircle }[tone];
 
     return (
         <span className={`toast-icon-ring ${toneClass}`}>
@@ -43,8 +42,14 @@ const ToastProvider = () => {
 
     return (
         <Suspense fallback={null}>
-            <LazyToaster 
+            <LazyToaster
                 position="top-right"
+                // Ganz in der rechten oberen Ecke, über der Kopfzeile wie ein
+                // macOS-Banner (Samet, 11.09.) — der Wecker sitzt auf derselben
+                // Linie; nur die Mitteilungszentrale bleibt unter der Glocke.
+                offset={{ top: 10, right: 10 }}
+                mobileOffset={{ top: 10, right: 16, left: 16 }}
+                gap={10}
                 duration={2000}
                 closeButton
                 richColors={false}
@@ -56,7 +61,7 @@ const ToastProvider = () => {
                     error: <ToastIcon tone="error" />,
                     close: (
                         <span className="offitec-toast-close-icon">
-                            <CloseOutlined size={16} />
+                            <CloseOutlined size={11} />
                         </span>
                     ),
                 }}
@@ -80,7 +85,6 @@ const ToastProvider = () => {
 
 function App() {
     const fetchProfile = useAuthStore((state) => state.fetchProfile);
-    const isDarkMode = useThemeStore((state) => state.isDarkMode);
     const [, setLanguageVersion] = useState(0);
 
     useEffect(() => {
@@ -130,54 +134,15 @@ function App() {
     }, []);
 
     return (
-        <ConfigProvider
-            theme={{
-                algorithm: isDarkMode ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-                token: {
-                    // Must match --font-body (theme.css) — a bare 'sans-serif'
-                    // here rendered every antd control in Arial.
-                    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-                    borderRadius: 10,
-                    borderRadiusXS: 10,
-                    borderRadiusSM: 10,
-                    borderRadiusLG: 10,
-                    borderRadiusOuter: 10,
-                    colorPrimary: isDarkMode ? '#e6cf9e' : '#272f67',
-                    colorError: '#d30f15',
-                    colorSuccess: '#079455',
-                    colorWarning: '#dc6803',
-                    ...(isDarkMode && {
-                        colorInfo: '#e6cf9e',
-                        colorLink: '#e6cf9e',
-                        colorLinkHover: '#f0dcae',
-                        colorPrimaryBg: 'rgba(230,207,158,0.14)',
-                        colorPrimaryBgHover: 'rgba(230,207,158,0.20)',
-                        colorPrimaryBorder: 'rgba(230,207,158,0.34)',
-                        colorPrimaryHover: '#f0dcae',
-                        colorPrimaryActive: '#d9bd83',
-                        colorBgContainer: '#151616',
-                        colorBgElevated: '#1b1c1c',
-                        colorBgLayout: '#08090a',
-                        colorBorder: 'rgba(255,255,255,0.10)',
-                        colorBorderSecondary: 'rgba(255,255,255,0.07)',
-                        colorText: '#e8e9ec',
-                        colorTextSecondary: '#b0b3bb',
-                        colorTextTertiary: '#888c96',
-                        colorTextQuaternary: '#6b7280',
-                    }),
-                },
-            }}
-        >
-            <Router>
-                <ToastProvider />
-                {/* A language event only needs a normal render so direct t()
-                    calls receive the new strings. Giving the router a changing
-                    key unmounted and rebuilt the entire shell/detail table when
-                    the initial locale chunk arrived, producing a second DOM
-                    insertion, forced layout work and visible footer movement. */}
-                <AppRouter />
-            </Router>
-        </ConfigProvider>
+        <Router>
+            <ToastProvider />
+            {/* A language event only needs a normal render so direct t()
+                calls receive the new strings. Giving the router a changing
+                key unmounted and rebuilt the entire shell/detail table when
+                the initial locale chunk arrived, producing a second DOM
+                insertion, forced layout work and visible footer movement. */}
+            <AppRouter />
+        </Router>
     );
 }
 

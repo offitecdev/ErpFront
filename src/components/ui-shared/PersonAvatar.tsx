@@ -53,7 +53,7 @@ export interface PersonAvatarProps {
 }
 
 const TONE_CLASS: Record<'brand' | 'subtle', string> = {
-    brand: 'bg-[#272f67] font-semibold text-white',
+    brand: 'bg-[#0a7aff] font-semibold text-white',
     subtle: 'border border-slate-200 bg-slate-50 font-semibold text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/70',
 };
 
@@ -86,7 +86,7 @@ export const PersonAvatar = memo(({
             title={label}
             style={{ width: size, height: size, fontSize: Math.max(9, Math.round(size * 0.38)) }}
             className={`inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full ${TONE_CLASS[tone]} ${
-                ring ? 'ring-2 ring-[#d3e3fd] dark:ring-white/20' : ''
+                ring ? 'ring-2 ring-[#e3efff] dark:ring-white/20' : ''
             } ${className}`}
         >
             {shown

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { AlertTriangle, Calendar, File02 as ClipboardList, Plus, Save01 as Save, SearchLg as Search, Trash01 as Trash, X as XIcon } from '@/components/icons/antIconCompat';
+import { AlertTriangle, Calendar, File02 as ClipboardList, Plus, Save01 as Save, Trash01 as Trash, X as XIcon } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui-shared/Button';
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
+import { SearchBox } from '../../components/ui-shared/TableKit';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { maintenanceApi } from '../../lib/api/maintenance';
 import type { CustomerLite, MaintenanceContractDto, MaintenancePeriod, PersonLite } from '../../types/maintenance';
@@ -315,10 +316,7 @@ export const MaintenanceContracts = () => {
                 description={t('auto.musteri_bazli_periyodik_bakim_sozlesmelerini_ve_')}
                 actions={
                     <>
-                        <div className="relative">
-                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('auto.sozlesme_ara')} className="ofi-light-search-input w-[220px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
-                        </div>
+                        <SearchBox value={search} onChange={setSearch} placeholder={t('auto.sozlesme_ara')} />
                         <Button variant="primary" icon={<Plus size={13} />} onClick={() => navigate('/maintenance/contracts/new')}>{t('auto.yeni_sozlesme_olustur')}</Button>
                     </>
                 }

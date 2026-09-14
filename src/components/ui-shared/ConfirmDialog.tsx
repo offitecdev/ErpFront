@@ -72,7 +72,7 @@ export const ConfirmDialog = ({
     if (!open) return null;
 
     /* Die Knöpfe sind die Kalenderpille (`.ofi-cal-btn`) — derselbe Knopf, den
-       das Aufgabenfenster im Fuss trägt. Vorher stand hier `bg-[#272f67]`, und
+       das Aufgabenfenster im Fuss trägt. Vorher stand hier `bg-[#0a7aff]`, und
        das ist in dieser Anwendung nicht eine Farbe, sondern ein ganzer Knopf:
        er zog den orangen Schwall der Seitenknöpfe mit ins Fenster. */
     const confirmClass = tone === 'danger' ? 'is-danger' : 'is-primary';

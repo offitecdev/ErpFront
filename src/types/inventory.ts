@@ -101,6 +101,10 @@ export interface ArticleListItem {
     itemType?: ItemType;
     systemBarcode?: string | null;
     supplierBarcode?: string | null;
+    /** Modellnummer (freiwillig) — die Rolle des alten Produktcodes. */
+    modelNumber?: string | null;
+    /** Seriennummer (freiwillig, je Mandant eindeutig). */
+    serialNumber?: string | null;
     unit: string;
     salePrice?: number;
     baseCost: number;
@@ -135,9 +139,18 @@ export interface ArticleStockInfo {
  */
 export interface ArticleDetail {
     id: string;
+    /** ERP-Code `KAT-UNTER-NNNNN` (Altbestand kann davon abweichen). */
     articleCode: string;
     name: string;
     unit: string;
+    /* Reihenfolge im Detail (10.09.2026): ERP-Code, Bezeichnung,
+       Modellnummer, Seriennummer, Barcode. */
+    modelNumber?: string | null;
+    serialNumber?: string | null;
+    /** Gescannter Lieferantenbarcode — bearbeitbar. */
+    supplierBarcode?: string | null;
+    /** Vom System erzeugter Barcode — nur per Knopf «Barcode erzeugen». */
+    systemBarcode?: string | null;
     /** Biçimli metin (kalın/italik/madde) — sunucuda dar bir beyaz listeden geçer. */
     description?: string | null;
     salePrice: number;
@@ -176,6 +189,9 @@ export interface ArticleDetailPatch {
     articleCode?: string;
     name?: string;
     unit?: string;
+    modelNumber?: string | null;
+    serialNumber?: string | null;
+    supplierBarcode?: string | null;
     salePrice?: number;
     /** Ürün/hizmet anahtarı — detay ekranındaki "Typ" satırı. */
     itemType?: ItemType;
@@ -261,6 +277,8 @@ export interface SearchItem {
     code: string;
     name: string;
     barcode?: string | null;
+    modelNumber?: string | null;
+    serialNumber?: string | null;
     unit?: string;
     salePrice: number;
     baseCost?: number;
@@ -343,6 +361,13 @@ export interface ArticleSupplierRow {
 // tedarikçiyi hareket geçmişine yazar. Backend movementKind alanında türetir.
 export type MovementKind = MovementType | 'DEFINITION';
 
+/**
+ * Herkunft einer Lagerbewegung (10.09.2026): Schnellerfassung (Zugang /
+ * Löschen per Scan), Wareneingang einer Bestellung, Rapport/Projekt, manuell.
+ * Altbestand ohne Herkunft kommt als MANUAL.
+ */
+export type MovementOrigin = 'QUICK_ADD' | 'QUICK_DELETE' | 'ORDER_RECEIPT' | 'REPORT' | 'MANUAL';
+
 export interface MovementListItem {
     id: string;
     transactionDate: string;
@@ -352,9 +377,22 @@ export interface MovementListItem {
     unitCost?: number | null;
     totalCost: number;
     description?: string | null;
-    article?: { articleCode: string; name: string } | null;
+    origin: MovementOrigin;
+    /** Beim Scan gelesener Barcode / Seriennummer des bewegten Geräts. */
+    scannedBarcode?: string | null;
+    serialNumber?: string | null;
+    article?: {
+        articleCode: string;
+        name: string;
+        modelNumber?: string | null;
+        serialNumber?: string | null;
+        supplierBarcode?: string | null;
+        systemBarcode?: string | null;
+    } | null;
     supplier?: { companyName: string } | null;
     employee?: { firstName: string; lastName: string } | null;
+    /** Das betroffene Lager (Ziel beim Zugang, Quelle beim Abgang). */
+    location?: string | null;
 }
 
 export interface MovementListPage {
@@ -374,6 +412,7 @@ export interface MovementListQuery {
     name?: string;
     description?: string;
     type?: MovementKind | '';
+    origin?: MovementOrigin | '';
     dateFrom?: string;
     dateTo?: string;
 }
@@ -401,26 +440,55 @@ export interface BulkArticleItemInput {
     description?: string | null;
     /** Ürün görseli (data URL, en fazla 2 MB) — kartın tek görseli olur. */
     imageUrl?: string | null;
+    modelNumber?: string | null;
+    serialNumber?: string | null;
+    supplierBarcode?: string | null;
 }
 
 /**
- * Schnellerfassung (Foto → Text → Produkt): OHNE Code — den vergibt der
- * Server (`ART-NNNNN`). Sonst dieselben Felder wie eine Sammelzeile.
+ * Schnellerfassung (10.09.2026): OHNE Code — den zieht der Server aus dem
+ * gewählten, freigegebenen Nummernkreis (`KAT-UNTER-NNNNN`). Ein Scan = ein
+ * Stück, darum ist die Menge freiwillig (Standard 1).
  */
 export interface QuickArticleItemInput {
     name: string;
-    quantity: number;
+    quantity?: number;
+    modelNumber?: string | null;
+    serialNumber?: string | null;
+    /** Gescannter Lieferantenbarcode. */
+    barcode?: string | null;
     unit?: string | null;
     purchasePrice?: number;
     salePrice?: number;
-    /** Das Foto als Produktbild (data URL, max. 2 MB) — freiwillig. */
+    supplierId?: string | null;
+    supplierName?: string | null;
+    description?: string | null;
     imageUrl?: string | null;
+}
+
+/** Treffer der Schnellerfassung auf einen gescannten Code. */
+export interface ScanLookupResult {
+    found: boolean;
+    matchedBy?: 'serial' | 'barcode' | 'code';
+    article?: {
+        id: string;
+        articleCode: string;
+        name: string;
+        unit: string;
+        modelNumber?: string | null;
+        serialNumber?: string | null;
+        supplierBarcode?: string | null;
+        systemBarcode?: string | null;
+        totalQuantity: number;
+    };
 }
 
 export interface BulkRowError {
     index: number;
     articleCode: string;
     error: string;
+    /** `CODE_TAKEN` | `SERIAL_TAKEN` | `DUPLICATE_IN_FILE` | `VALUE_TOO_LONG` | `WRITE_FAILED` */
+    code?: string;
 }
 
 export interface BulkArticlesResult {
@@ -442,6 +510,10 @@ export interface BulkMovementItemInput {
     supplierName?: string | null;
     description?: string | null;
     referenceId?: string | null;
+    /** Herkunft (Schnellerfassung setzt QUICK_ADD / QUICK_DELETE); sonst MANUAL. */
+    origin?: MovementOrigin;
+    scannedBarcode?: string | null;
+    serialNumber?: string | null;
 }
 
 export interface BulkMovementsResult {
@@ -620,6 +692,16 @@ export interface PurchaseOrderFee {
     amount: number;
 }
 
+/** Eine Spalte der Vorlage, wie die Bestellung sie sich merkt. */
+export interface PurchaseOrderTableColumn {
+    key: string;
+    /** Der Name aus der Vorlage — im PDF der Spaltentitel. */
+    name: string;
+    /** Die Rolle in der Bestellzeile; null = freie Spalte (eigene Angabe). */
+    label: TemplateLabel | null;
+    type: 'text' | 'number';
+}
+
 export interface PurchaseOrderRow {
     id: string;
     tenantId: string;
@@ -649,6 +731,14 @@ export interface PurchaseOrderRow {
      * die Werte selbst bleiben an den Positionen stehen.
      */
     hiddenColumnKeys?: string[] | null;
+    /**
+     * DIE SPALTEN DER VORLAGE, mit der die Bestellung erfasst wurde — in ihrer
+     * Reihenfolge, mit Zuordnung und Namen (Vorgabe Samet, 11.09.2026: «tabloda
+     * böyleyse PDF'e de böyle aktarılmalı»). Das PDF schreibt diese Namen als
+     * Spaltentitel («GESAMTMENGE» statt «Menge») und stellt die Spalten so auf.
+     * Fehlt der Schnappschuss (alte Bestellung), nimmt das PDF seine eigenen Titel.
+     */
+    tableColumns?: PurchaseOrderTableColumn[] | null;
     status: PurchaseOrderStatus;
     supplierId?: string | null;
     supplierName: string;
@@ -680,6 +770,8 @@ export interface PurchaseOrderRow {
     revision: number;
     emailSentAt?: string | null;
     emailRecipient?: string | null;
+    /** Das Häkchen «Mail manuell gesendet» hat die Mail als gesendet markiert. */
+    emailSentManually?: boolean;
     stockedAt?: string | null;
     createdByEmpId?: string | null;
     createdAt: string;
@@ -752,6 +844,8 @@ export interface CreatePurchaseOrderInput {
     coverLetter?: string | null;
     /** Was die Vorlage ausgeblendet hatte — fährt mit, damit das PDF es weiss. */
     hiddenColumnKeys?: string[] | null;
+    /** Die Spalten der Vorlage (Name + Reihenfolge) — das PDF trägt genau diese Titel. */
+    tableColumns?: PurchaseOrderTableColumn[] | null;
     /** Giriş yolları: DRAFT (fiyat talebi taslağı), ORDER_DRAFT (sipariş taslağı),
      *  PRICE_REQUEST, PENDING (doğrudan onaylanmış sipariş). */
     status?: Extract<PurchaseOrderStatus, 'DRAFT' | 'ORDER_DRAFT' | 'PRICE_REQUEST' | 'PENDING'>;
@@ -776,6 +870,8 @@ export interface UpdatePurchaseOrderInput {
     coverLetter?: string | null;
     /** Was die Vorlage ausgeblendet hatte — fährt mit, damit das PDF es weiss. */
     hiddenColumnKeys?: string[] | null;
+    /** Die Spalten der Vorlage (Name + Reihenfolge) — das PDF trägt genau diese Titel. */
+    tableColumns?: PurchaseOrderTableColumn[] | null;
     supplierId?: string | null;
     supplierName?: string;
     supplierEmail?: string | null;
@@ -802,6 +898,26 @@ export interface PurchaseOrderTextTemplate {
     updatedAt: string;
 }
 
+/** Ein Mail-Entwurf aus dem Mailfenster der Auftragsseite (je Auftrag). */
+export interface PurchaseOrderMailDraft {
+    id: string;
+    orderId: string;
+    toEmail: string | null;
+    ccEmails: string[];
+    subject: string;
+    message: string | null;
+    createdBy?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PurchaseOrderMailDraftInput {
+    toEmail: string | null;
+    ccEmails: string[];
+    subject: string;
+    message: string;
+}
+
 export interface PurchaseOrderTextTemplatePage {
     items: PurchaseOrderTextTemplate[];
     total: number;
@@ -824,6 +940,8 @@ export interface ReceivePurchaseOrderInput {
     lines?: ReceivePurchaseOrderLine[];
     /** "Mal kabulü tamamla": kalan TÜM satırlar aktarılır, sipariş COMPLETED olur. */
     complete?: boolean;
+    /** Nummernkreis für Zeilen ohne Produktcode — der Artikel entsteht erst im Wareneingang. */
+    codeSchemeId?: string;
 }
 
 export interface ReceivePurchaseOrderResult {
@@ -869,25 +987,21 @@ export interface AiImportStatus {
     /** Wie viele Spalten hoechstens an das Modell gehen. */
     maxColumns: number;
     minColumns: number;
-}
-
-/** Mengenstaffel einer Position, so wie sie auf dem Beleg steht. */
-export interface AiPriceTier {
-    minQuantity: number;
-    unitPrice: number;
+    /** Die Zuordnungen, die der Server kennt. */
+    labels?: string[];
 }
 
 /**
  * Eine erkannte Position. Die Schluessel sind die Spaltenschluessel der
- * Vorlage (`c1` …) plus `priceTiers` — welche dabei sind, entscheidet die
- * Anfrage, darum ein offener Datensatz.
+ * Vorlage (`c1` …) — welche dabei sind, entscheidet die Anfrage, darum ein
+ * offener Datensatz.
  *
  * `sourceLine` ist KEINE Spalte, sondern der ZEILENANKER: die gedruckte Zeile
  * des Belegs, aus der diese Position stammt. Das Modell schreibt sie ab, bevor
  * es sie zerlegt — daher weiss man zu jedem Wert, aus welcher Zeile er kommt
  * (Vorgabe Samet 08.09.2026: die Zuordnung geschieht Zeile fuer Zeile).
  */
-export type AiExtractedRow = Record<string, string | number | AiPriceTier[] | null | undefined>;
+export type AiExtractedRow = Record<string, string | number | null | undefined>;
 
 /** Kopfdaten des Belegs (Lieferant, Nummer, Waehrung, Steuersatz). */
 export interface AiDocumentHeader {
@@ -939,7 +1053,24 @@ export interface AiExtractResponse {
      * dem Blatt vergleichen. Bei Excel und PDF ist es null: die kommen schon
      * als Text.
      */
-    transcript: { header: string | null; lines: string[] } | null;
+    transcript: {
+        header: string | null;
+        lines: string[];
+        /**
+         * Nur beim Bild (seit 11.09.2026, zweite Runde): das RASTER je
+         * Aufnahme — alle gedruckten Spalten, null = leere Zelle — und
+         * welche davon welcher Vorlagenspalte zugeordnet wurde
+         * (Vorlagenschluessel → Index in `headers`, null = nicht gefunden).
+         */
+        pages?: Array<{
+            index: number;
+            headers: string[];
+            rows: Array<Array<string | null>>;
+            mapping: Record<string, number | null>;
+        }>;
+    } | null;
+    /** Vorlagenspalten (Schluessel), die auf keiner Aufnahme gefunden wurden — nur beim Bild. */
+    missingColumns?: string[];
     usage: AiUsage;
     text: {
         rawChars: number;
@@ -967,101 +1098,57 @@ export interface AiExtractInput {
     /** Lets goods receipt omit supplier/product identity that is already known. */
     documentType?: PurchaseTemplateDocumentType;
     language: string;
-    /** DIE SPALTENUEBERSCHRIFTEN — 4 bis 8. Mehr geht nicht an das Modell. */
+    /** DIE SPALTEN DER VORLAGE — Name, Art und Zuordnung; hoechstens zwoelf. */
     columns: TemplateColumn[];
-    withTiers: boolean;
 }
 
 /**
- * MENGENSTAFFEL DES LIEFERANTEN: ab `minQuantity` gilt `discount` (Prozent)
- * oder `unitPrice` (fester Stueckpreis). Es gewinnt immer die HOECHSTE Stufe,
- * deren Menge erreicht ist.
- */
-export interface SupplierQtyTier {
-    minQuantity: number;
-    discount: number;
-    unitPrice: number;
-}
-
-/**
- * EINE EIGENE SPALTE DER VORLAGE (Vorgabe Samet, 07.09.2026):
- * «Neben den festen Feldern soll man drei weitere Angaben hinzufuegen koennen;
- *  die muessen im PDF sauber dastehen, auch wenn die Liste laenger wird.»
+ * ── DIE VORLAGE (Stand 11.09.2026, Vorgabe Samet) ───────────────────────────
+ * «Es gibt einen Vorlagennamen, aber keinen Lieferanten und keine Rechenart
+ *  mehr; auch keine Mehrwertsteuer — die steht in den Bestelldetails. Bis zu
+ *  dreizehn Spalten (12+1): eine davon ist der ERP-Code, fest, in den
+ *  Tabellen, aber nicht im PDF und nicht in der KI-Anfrage. Jede Spalte
+ *  bekommt einen Namen, eine Art und eine Zuordnung; Produktname und Menge
+ *  sind Pflicht, die uebrigen Zuordnungen gibt es je einmal. Ohne Vorlage
+ *  gibt es keine Tabelle.»
  *
- * `name` ist der Name, den der Anwender vergibt, und zugleich das, was dem
- * Modell gesagt wird («hol mir die Spalte ‹Herstellernummer›»). `key` ist der
- * stabile Bezug dahinter (`x1` … `x3`), damit eine Umbenennung nichts zerreisst.
+ * Die Vorlage ist damit NUR NOCH ihre Spaltenliste. `key` ist der stabile
+ * Bezug (`c1` … `c12`), `name` das, was der Anwender sieht UND was dem Modell
+ * als Spaltenueberschrift gesagt wird, `label` die Rolle in der Bestellzeile
+ * (null = eine freie Spalte, deren Wert als eigene Angabe gespeichert wird).
  */
+export const TEMPLATE_LABELS = ['productName', 'quantity', 'grossPrice', 'netPrice', 'discount', 'discount2', 'total'] as const;
+export type TemplateLabel = (typeof TEMPLATE_LABELS)[number];
+/** Ohne diese beiden laesst sich aus dem Gelesenen keine Bestellzeile machen. */
+export const REQUIRED_TEMPLATE_LABELS: TemplateLabel[] = ['productName', 'quantity'];
+/** Zwoelf Spalten — plus den festen ERP-Code, der nicht in der Vorlage steht. */
+export const TEMPLATE_MAX_COLUMNS = 12;
+
 export interface TemplateColumn {
     key: string;
     name: string;
     type: 'text' | 'number';
+    /** Die Rolle in der Bestellzeile; null = freie Spalte. */
+    label?: TemplateLabel | null;
     /** Relative screen width; PDF export scales the same proportion onto A4. */
     width?: number;
 }
 
-/**
- * DIE FESTEN FELDER (Vorgabe Samet): «Es gibt keine Spaltenauswahl mehr; es ist
- * einfach netto/brutto, Rabatt 1 und Rabatt 2 (freiwillig). Fehlt ein
- * Produktcode, wird einer vergeben; der Produktname gehoert dazu — das ist
- * Standard.»
- *
- * Diese sechs Schluessel gehen bei JEDER Vorlage an das Modell (Rabatt 2 nur,
- * wenn er eingeschaltet ist). Sie sind zugleich die Feldnamen im Antwortschema.
- */
-export const FIXED_COLUMN_KEYS = ['code', 'name', 'quantity', 'priceGross', 'priceNet', 'discount', 'discount2'] as const;
-
-/** Hoechstens drei eigene Angaben — mehr passt im PDF nicht sauber unter die Zeile. */
-/**
- * ── WIE VIELE EIGENE ANGABEN (Vorgabe Samet, 07.09.2026) ────────────────────
- * «Für neue Bestellungen höchstens 3 Felder, für Preisanfragen 5.»
- *
- * Die VORLAGE darf so viele tragen, wie das grosszügigere der beiden Ziele
- * braucht — sonst liesse sich eine Vorlage, die für Preisanfragen gedacht ist,
- * gar nicht erst anlegen. Beim LESEN wird dann auf das Ziel zugeschnitten:
- * `templateColumns(config, priceless)` gibt einer Bestellung drei und einer
- * Preisanfrage fünf.
- */
-export const TEMPLATE_MAX_EXTRA_COLUMNS = 5;
-/** Was eine BESTELLUNG von den eigenen Angaben liest. */
-export const ORDER_MAX_EXTRA_COLUMNS = 3;
-
-/**
- * Die Vorlage in einem Objekt — genau das, was gespeichert wird.
- *
- * Es gibt hier KEINE Zuordnung mehr: die Felder sind fest. Die Vorlage speichert
- * jedoch ihre Vorgabe fuer Rechenart und MwSt; in der Bestellung kann beides
- * weiterhin bewusst uebersteuert werden.
- */
-export interface SupplierCalcConfig {
-    /** Rechenart, die beim Oeffnen/Anwenden der Vorlage vorgeschlagen wird. */
-    calcMode: OrderCalcMode;
-    /** Rabatt 2 ist freiwillig. Aus = er geht gar nicht erst an das Modell. */
-    discount2Enabled: boolean;
-    /** Bis zu drei eigene Angaben; sie stehen im PDF unter dem Produktnamen. */
-    extraColumns: TemplateColumn[];
-    /** Columns hidden here are excluded from the AI schema and downstream merge. */
-    hiddenColumnKeys?: string[];
-    /** Mengenstaffel des Belegs mitlesen. */
-    withTiers: boolean;
-    /** Gestaffelte Rabatte in Prozent — nacheinander, nicht addiert. */
-    discounts: number[];
-    vatRate: number;
-    vatCountry: string;
-    currency: string;
-    qtyTiers: SupplierQtyTier[];
+/** Die Vorlage in einem Objekt — genau das, was gespeichert wird. */
+export interface OrderTemplateConfig {
+    columns: TemplateColumn[];
 }
+/** Der alte Name lebt in den Seiten weiter; die Gestalt ist die neue. */
+export type SupplierCalcConfig = OrderTemplateConfig;
 
 export interface SupplierOrderTemplate {
     id: string;
+    /** Seit dem 11.09.2026 immer null — eine Vorlage gehoert keinem Lieferanten. */
     supplierId: string | null;
     supplierName: string;
     title: string;
     documentType: PurchaseTemplateDocumentType;
-    /**
-     * Die Vorgabe. Ohne Lieferant (`supplierId: null`) ist das die ALLGEMEINE
-     * Vorlage — die, mit der eine neu hinzugefuegte Zeile («+») rechnet.
-     */
+    /** Die Vorgabe ihrer Dokumentart — die, die beim Oeffnen gilt. */
     isDefault: boolean;
     usageCount: number;
     config: SupplierCalcConfig;

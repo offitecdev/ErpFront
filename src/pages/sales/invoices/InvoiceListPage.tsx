@@ -37,6 +37,7 @@ import {
     invoiceRecipient,
     statusLabel,
 } from './invoiceShared';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── RECHNUNGSLISTE (`/sales/invoices`) ───────────────────────────────────────
@@ -153,15 +154,17 @@ export const InvoiceListPage = () => {
     const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    /* `silent`: nach einer eigenen Änderung wird die Liste im Hintergrund
+       abgeglichen — ohne Ladezustand, die Zeile zeigt die Änderung schon. */
+    const load = useCallback(async (options: { silent?: boolean } = {}) => {
+        if (!options.silent) setLoading(true);
         try {
             const list = await billingApi.listInvoices(category ? { category } : {});
             setInvoices(list);
         } catch (e) {
-            toast.error(apiError(e, t('invoices.loadError')));
+            if (!options.silent) toast.error(apiError(e, t('invoices.loadError')));
         } finally {
-            setLoading(false);
+            if (!options.silent) setLoading(false);
         }
     }, [category]);
 
@@ -318,7 +321,16 @@ export const InvoiceListPage = () => {
      * Zahlungseingang ist ein Datum, kein blosses Etikett; jeder andere Status
      * löscht es serverseitig wieder.
      */
+    /* OPTIMISTISCH (14.09.2026): die Zeile zeigt den neuen Status sofort, der
+       Server bestätigt dahinter. Auf dem Produktivrechner wartete der Klick
+       sonst die Schreibanfrage UND das Neuladen der ganzen Liste ab. Scheitert
+       die Anfrage, kommt die alte Zeile zurück und die Meldung erklärt warum. */
     const setStatusOf = async (invoice: InvoiceDto, next: InvoiceStatus, paidAt?: string | null) => {
+        const before = invoice;
+        setInvoices((rows) => rows.map((row) => (row.id === invoice.id
+            ? { ...row, status: next, paidAt: next === 'PAID' ? (paidAt ?? row.paidAt ?? null) : null }
+            : row)));
+        if (next === 'CANCELLED' && previewInvoice?.id === invoice.id) closePreview();
         setBusyId(invoice.id);
         try {
             await billingApi.updateStatus(invoice.id, next, paidAt ?? null);
@@ -327,9 +339,9 @@ export const InvoiceListPage = () => {
                     : next === 'CANCELLED' ? t('invoices.cancelled')
                         : t('invoices.reopened'),
             );
-            if (next === 'CANCELLED' && previewInvoice?.id === invoice.id) closePreview();
-            await load();
+            void load({ silent: true });
         } catch (e) {
+            setInvoices((rows) => rows.map((row) => (row.id === before.id ? before : row)));
             toast.error(apiError(e, t('billing.invoiceError')));
         } finally {
             setBusyId(null);
@@ -340,14 +352,24 @@ export const InvoiceListPage = () => {
        darauf): der Weg einer Korrektur ist immer erst stornieren, dann
        entfernen — die Nummernserie wird nie zurückgedreht. */
     const remove = async (invoice: InvoiceDto) => {
+        // Optimistisch wie der Statuswechsel: die Zeile verschwindet sofort und
+        // kehrt an ihren Platz zurück, wenn der Server ablehnt.
+        const index = invoices.findIndex((row) => row.id === invoice.id);
+        setInvoices((rows) => rows.filter((row) => row.id !== invoice.id));
+        if (previewInvoice?.id === invoice.id) closePreview();
+        setSelectedId(null);
         setBusyId(invoice.id);
         try {
             await billingApi.deleteInvoice(invoice.id);
             toast.success(t('billing.deleted'));
-            if (previewInvoice?.id === invoice.id) closePreview();
-            setSelectedId(null);
-            await load();
+            void load({ silent: true });
         } catch (e) {
+            setInvoices((rows) => {
+                if (rows.some((row) => row.id === invoice.id)) return rows;
+                const restored = [...rows];
+                restored.splice(index < 0 ? restored.length : Math.min(index, restored.length), 0, invoice);
+                return restored;
+            });
             toast.error(apiError(e, t('billing.invoiceError')));
         } finally {
             setBusyId(null);
@@ -380,7 +402,7 @@ export const InvoiceListPage = () => {
                             aria-haspopup="menu"
                             aria-expanded={menuOpen}
                             onClick={() => setMenuOpen((on) => !on)}
-                            className="ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
+                            className="ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#0066e0]"
                         >
                             <Plus size={14} />
                             {t('invoices.create')}
@@ -597,7 +619,7 @@ export const InvoiceListPage = () => {
                                                 <div className="min-w-0">
                                                     <button
                                                         type="button"
-                                                        className="block max-w-full truncate text-left font-mono text-[12px] font-semibold text-[#272f67] hover:underline dark:text-white/80"
+                                                        className="block max-w-full truncate text-left font-mono text-[12px] font-semibold text-[#0a7aff] hover:underline dark:text-white/80"
                                                         title={invoice.project ? t('invoices.openProject') : t('invoices.openOrder')}
                                                         onClick={(event) => { event.stopPropagation(); navigate(reference.to as string); }}
                                                     >

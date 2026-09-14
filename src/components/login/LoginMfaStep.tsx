@@ -7,7 +7,7 @@ import { LoginStoreDialog } from './LoginStoreDialog';
 import { LoginWordmark } from './LoginWordmark';
 
 /**
- * ── ZWEITE HÄLFTE DER ANMELDUNG (29.09.2026) ────────────────────────────────
+ * ── ZWEITE HÄLFTE DER ANMELDUNG (09.09.2026) ────────────────────────────────
  *
  * Kennwort und E-Mail stimmen — jetzt fehlt der sechsstellige Code aus der
  * Authenticator-App auf dem Telefon (Aegis). Der Code wird nicht verschickt:

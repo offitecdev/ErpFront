@@ -89,7 +89,7 @@ export const TasksPage = () => {
                     <button
                         type="button"
                         onClick={() => setQuickOpen(true)}
-                        className="ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
+                        className="ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#0066e0]"
                     >
                         <Plus size={14} />
                         {t('crm.tasks.newTask')}

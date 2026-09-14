@@ -176,7 +176,7 @@ export const RoleEditorPage = () => {
                                 disabled={readOnly || isPurser}
                                 onChange={(event) => setRoleName(event.target.value)}
                                 placeholder={t('settings.roles.roleNamePlaceholder')}
-                                className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#272f67] disabled:bg-slate-50 disabled:text-slate-400 dark:border-white/15 dark:bg-transparent dark:text-white"
+                                className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#0a7aff] disabled:bg-slate-50 disabled:text-slate-400 dark:border-white/15 dark:bg-transparent dark:text-white"
                             />
                         </Labelled>
                         <span className="pb-1 text-[12px] text-slate-500 dark:text-white/55">
@@ -211,7 +211,7 @@ export const RoleEditorPage = () => {
                             checked={readOnly ? true : canSwitchTenant}
                             disabled={readOnly}
                             onChange={(event) => setCanSwitchTenant(event.target.checked)}
-                            className="mt-0.5 accent-[#272f67]"
+                            className="mt-0.5 accent-[#0a7aff]"
                         />
                         <span className="flex min-w-0 flex-col gap-0.5">
                             <span className="text-[12.5px] font-semibold text-slate-800 dark:text-white/85">

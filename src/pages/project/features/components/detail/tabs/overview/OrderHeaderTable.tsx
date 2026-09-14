@@ -7,6 +7,7 @@ import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 
 import { OrderNotifications, type OrderNotification } from './OrderNotifications';
 import { OverviewCard } from './OverviewCard';
+import '@/styles/modules/projectDetail.css';
 
 const day = (value?: string | null) => (value ? dayjs(value).format('DD.MM.YYYY') : '-');
 

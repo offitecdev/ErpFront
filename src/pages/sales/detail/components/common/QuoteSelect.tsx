@@ -97,7 +97,7 @@ export const QuoteSelect = ({
                 disabled={disabled}
                 onClick={() => (open ? setOpen(false) : openList())}
                 onKeyDown={onTriggerKeyDown}
-                className={`${QUOTE_CONTROL_CLASS} flex items-center justify-between gap-2 ${open ? 'border-[#1f2654] ring-2 ring-[#1f2654]/15' : ''}`}
+                className={`${QUOTE_CONTROL_CLASS} flex items-center justify-between gap-2 ${open ? 'border-[#0066e0] ring-2 ring-[#0066e0]/15' : ''}`}
             >
                 <span className={`min-w-0 flex-1 truncate text-left ${selected ? '' : 'font-normal text-slate-400'}`}>
                     {label}

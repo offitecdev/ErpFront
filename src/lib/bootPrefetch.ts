@@ -16,6 +16,9 @@ type PrefetchBag = {
     permissions?: Promise<Response>;
     tenants?: Promise<Response>;
     tender?: { id: string; res: Promise<Response> };
+    /** Route data keyed by the exact URL `getShared` will ask for (see
+        index.html). `tenant` is the X-Tenant-Id the request went out with. */
+    gets?: Record<string, { tenant: string; res: Promise<Response> }>;
 };
 
 const bag = (): PrefetchBag | undefined =>
@@ -39,7 +42,20 @@ export const takePrefetched = <T>(key: 'me' | 'permissions' | 'tenants'): Promis
     return claim<T>(res);
 };
 
-export const takePrefetchedTender = <T>(id: string): Promise<T | null> => {
+/**
+ * A route GET the document started at parse time. Returns `null` synchronously
+ * when there is none for this URL and tenant — the caller then goes to the
+ * network without having waited for anything.
+ */
+export const takePrefetchedGet = <T>(tenant: string, url: string): Promise<T | null> | null => {
+    const gets = bag()?.gets;
+    const entry = gets?.[url];
+    if (!entry || entry.tenant !== tenant) return null;
+    delete gets![url];
+    return claim<T>(entry.res);
+};
+
+export const takePrefetchedTender =<T>(id: string): Promise<T | null> => {
     const current = bag();
     const entry = current?.tender;
     if (!entry || entry.id !== id) return Promise.resolve(null);

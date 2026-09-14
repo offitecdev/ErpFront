@@ -5,6 +5,7 @@ import type { DeliveryResponseItem, DeliveryStatus } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
 
 import { answeredCount, STATUS_ORDER, statusLabelKey, type ReportChecklist } from './checklistModel';
+import '@/styles/modules/handover.css';
 
 /**
  * "Checkliste ausfüllen" — das saubere Ausfüll-Popup (Benutzerwunsch).

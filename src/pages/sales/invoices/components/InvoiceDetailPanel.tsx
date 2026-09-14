@@ -24,6 +24,7 @@ import {
     statusLabel,
     statusVariant,
 } from '../invoiceShared';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── DAS RECHNUNGSBLATT ───────────────────────────────────────────────────────

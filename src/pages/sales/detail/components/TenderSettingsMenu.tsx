@@ -70,8 +70,8 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({
                 aria-expanded={open}
                 className={`ofi-quote-iconbtn inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent transition-colors ${
                     open
-                        ? 'bg-slate-100 text-[#1f2654]'
-                        : 'text-slate-500 hover:bg-slate-100 hover:text-[#1f2654]'
+                        ? 'bg-slate-100 text-[#0066e0]'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-[#0066e0]'
                 }`}
             >
                 <Settings size={16} />

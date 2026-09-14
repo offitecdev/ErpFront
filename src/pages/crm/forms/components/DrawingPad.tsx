@@ -165,7 +165,7 @@ export const DrawingPad = ({
                                             type="button"
                                             aria-label={`${candidate}px`}
                                             onClick={() => setWidth(candidate)}
-                                            className={`flex size-8 items-center justify-center rounded-md border ${width === candidate ? 'border-[#1f2654] bg-[#eef2fb] dark:bg-white/10' : 'border-slate-200 dark:border-white/15'}`}
+                                            className={`flex size-8 items-center justify-center rounded-md border ${width === candidate ? 'border-[#0066e0] bg-[#eef2fb] dark:bg-white/10' : 'border-slate-200 dark:border-white/15'}`}
                                         >
                                             <span className="rounded-full bg-slate-800 dark:bg-white" style={{ width: candidate + 2, height: candidate + 2 }} />
                                         </button>
@@ -175,7 +175,7 @@ export const DrawingPad = ({
                                     type="button"
                                     onClick={() => setEraser((current) => !current)}
                                     aria-pressed={eraser}
-                                    className={`${BTN_SECONDARY} ${eraser ? '!border-[#1f2654] !text-[#1f2654]' : ''}`}
+                                    className={`${BTN_SECONDARY} ${eraser ? '!border-[#0066e0] !text-[#0066e0]' : ''}`}
                                 >
                                     <LuEraser size={14} />{t('forms.drawing.eraser')}
                                 </button>

@@ -281,8 +281,8 @@ export const MontageReportDetail = () => {
                                         onClick={() => void openFieldTab(tab)}
                                         className={`inline-flex min-h-9 items-center gap-1.5 rounded-[3px] px-3 text-[12.5px] font-semibold transition-colors ${
                                             fieldTab === tab
-                                                ? 'bg-[#1f2654] text-white dark:bg-amber-500'
-                                                : 'border border-slate-200 bg-white text-slate-600 hover:border-[#1f2654] dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-amber-500'
+                                                ? 'bg-[#0066e0] text-white dark:bg-amber-500'
+                                                : 'border border-slate-200 bg-white text-slate-600 hover:border-[#0066e0] dark:border-white/15 dark:bg-white/5 dark:text-slate-300 dark:hover:border-amber-500'
                                         }`}
                                     >
                                         {icon}{label}
@@ -293,7 +293,7 @@ export const MontageReportDetail = () => {
                             {fieldTab === 'work' && <SnapshotView snapshot={snapshot} />}
                             {fieldTab !== 'work' && resourcesLoading && (
                                 <div className="flex h-32 items-center justify-center gap-2 text-[12.5px] text-slate-500">
-                                    <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-t-amber-500" />
+                                    <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0] dark:border-t-amber-500" />
                                     {t('common.loading')}
                                 </div>
                             )}
@@ -405,7 +405,7 @@ export const MontageReportDetail = () => {
                         die Handschrift des Montage-Panels. Nur die Kante folgt
                         jetzt der Anwendung — `rounded-[3px]` war scharf. */}
                     <section role="dialog" aria-modal="true" className="ofi-pop relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden">
-                        <header className="flex items-center justify-between bg-[#1f2654] px-4 py-3 text-white dark:bg-amber-500">
+                        <header className="flex items-center justify-between bg-[#0066e0] px-4 py-3 text-white dark:bg-amber-500">
                             <div>
                                 <div className="text-[14px] font-semibold">{t('montage.pdfPreview')}</div>
                                 <div className="text-[11.5px] text-white/70">{title}</div>
@@ -417,7 +417,7 @@ export const MontageReportDetail = () => {
                         <div className="min-h-0 flex flex-1 bg-white">
                             {pdfLoading || !pdfUrl ? (
                                 <div className="flex flex-1 items-center justify-center gap-2 text-[13px] text-slate-500">
-                                    <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654]" />
+                                    <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0]" />
                                     PDF hazırlanıyor…
                                 </div>
                             ) : (

@@ -1,0 +1,666 @@
+/* =========================================================
+   Offitec — SCHNELLERFASSUNG PER BARCODE (10.09.2026)
+
+   Vorgabe Samet: schlicht und klar, macOS/SwiftUI — Kategorie →
+   Unterkategorie → Modus, dann je Gerät ein Scan; dezente
+   Apple-Bewegungen (Ein-/Ausblenden, sanftes Schieben beim
+   Schrittwechsel, ein kurzer Spring beim Erkennen).
+
+   Das Fenster (`.ofi-qe`) trägt `.ofi-pop`, also die Mac-
+   Fensterhülle aus styles/appleModal.css: dort werden die
+   `--ofi-cal-*`-Token auf die Fensterpalette (`--ofi-win-*`)
+   umgehängt — hier wird NUR aus diesen Token gemalt, der
+   Dunkelmodus ist derselbe Variablentausch.
+
+   Kein `px-*` und keine `h-9`-Klassen auf den Knöpfen: sonst
+   greift die gemeinsame Knopfregel (buttons.css / lagerApple.css)
+   und macht aus der Zeilenliste Druckknöpfe.
+
+   Ladereihenfolge (main.tsx): … quickAdd.css → DIESE DATEI →
+   buttons.css. Sie steht ausserhalb jeder `@layer`.
+   ========================================================= */
+
+/* ── Fenster ───────────────────────────────────────────────────────────── */
+.ofi-qe-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 720;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.22);
+}
+.dark .ofi-qe-scrim { background: rgba(0, 0, 0, 0.5); }
+.ofi-qe-scrim.is-phone { padding: 0; background: transparent; }
+
+.ofi-qe {
+    display: flex;
+    flex-direction: column;
+    width: min(880px, 100%);
+    height: min(720px, 100dvh - 32px);
+    overflow: hidden;
+    font-family: var(--la-font, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    animation: ofi-qe-window 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+.ofi-qe.is-phone {
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+}
+@keyframes ofi-qe-window {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Kopf: Zurück · Titel · Segment · Schliessen ─────────────────────────── */
+.ofi-qe__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 8px 10px 8px 12px;
+    border-bottom: 1px solid var(--ofi-cal-line, var(--ofi-cal-border-soft));
+}
+.ofi-qe__back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ofi-cal-accent);
+    cursor: pointer;
+    transition: background-color 120ms ease, opacity 160ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ofi-qe__back:hover { background: var(--ofi-cal-hover); }
+.ofi-qe__back:active { transform: scale(0.94); }
+.ofi-qe__back.is-hidden { opacity: 0; pointer-events: none; transform: translateX(-6px); }
+.ofi-qe__titles { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.ofi-qe__title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ofi-cal-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ofi-qe__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+}
+.ofi-qe__crumbs svg { width: 11px; height: 11px; opacity: 0.6; }
+.ofi-qe__count {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+}
+
+/* Mac-Segment: Zugang | Löschen — 5 %-Schiene, weisses Plättchen. */
+.ofi-qe-seg {
+    display: inline-flex;
+    flex: none;
+    padding: 2px;
+    border-radius: 7px;
+    background: var(--ofi-cal-fill, rgba(0, 0, 0, 0.05));
+}
+.ofi-qe-seg__btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+    transition: color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+.ofi-qe-seg__btn svg { width: 12px; height: 12px; }
+.ofi-qe-seg__btn.is-on {
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.ofi-qe-seg__btn.is-on.is-danger { color: var(--ofi-cal-danger, #d70015); }
+
+/* ── Rumpf ─────────────────────────────────────────────────────────────── */
+.ofi-qe__body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+/* Kein Hereingleiten mehr (11.09.2026, Samet): ein Schritt steht einfach da,
+   wie ein Fensterinhalt am Mac — das Fenster selbst blendet kurz ein, sonst
+   bewegt sich nichts. */
+.ofi-qe__step { padding: 18px 20px 20px; }
+.ofi-qe.is-phone .ofi-qe__step { padding: 14px 14px 18px; }
+
+.ofi-qe__caption {
+    margin: 0 0 8px 2px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+}
+.ofi-qe__caption + .ofi-qe-list { margin-bottom: 18px; }
+
+/* SwiftUI-Liste: eingerückte Gruppe, Haarlinien, Chevron rechts. */
+.ofi-qe-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    overflow: hidden;
+}
+.ofi-qe-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 46px;
+    padding: 8px 12px 8px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: transparent;
+    text-align: left;
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+    transition: background-color 120ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ofi-qe-row:last-child { border-bottom: 0; }
+.ofi-qe-row:hover { background: var(--ofi-cal-hover); }
+.ofi-qe-row:active { transform: scale(0.992); background: var(--ofi-cal-fill, rgba(0, 0, 0, 0.05)); }
+.ofi-qe-row:disabled { cursor: default; opacity: 0.5; }
+.ofi-qe-row__code {
+    flex: none;
+    min-width: 44px;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-accent);
+}
+.ofi-qe-row__text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.ofi-qe-row__name { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-qe-row__hint { font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-qe-row__meta { flex: none; font-size: 12px; color: var(--ofi-cal-muted); font-variant-numeric: tabular-nums; }
+.ofi-qe-row > svg:last-child { flex: none; color: var(--ofi-cal-faint, #a1a1a6); }
+.ofi-qe-row.is-on .ofi-qe-row__name { color: var(--ofi-cal-accent); }
+.ofi-qe-row.is-on > svg:last-child { color: var(--ofi-cal-accent); }
+
+.ofi-qe__empty {
+    margin: 0;
+    padding: 18px 14px;
+    border: 1px dashed var(--ofi-cal-border);
+    border-radius: 10px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ofi-cal-muted);
+    text-align: center;
+}
+
+/* ── Scan-Schritt: Kamera links, Ergebnis rechts ───────────────────────── */
+.ofi-qe__scan {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 860px) {
+    .ofi-qe__scan { grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr); }
+}
+.ofi-qe.is-phone .ofi-qe__scan { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+
+/* Der nächste ERP-Code — gross und ruhig, das Versprechen des Kreises. */
+.ofi-qe__next {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 14px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    margin-bottom: 14px;
+}
+.ofi-qe__next-label { font-size: 11.5px; font-weight: 500; color: var(--ofi-cal-muted); }
+.ofi-qe__next-code {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ofi-cal-text);
+    font-variant-numeric: tabular-nums;
+    transition: opacity 160ms ease;
+}
+.ofi-qe__next-code.is-fresh { animation: ofi-qe-fresh 420ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes ofi-qe-fresh {
+    0% { opacity: 0.2; transform: translateY(4px); }
+    100% { opacity: 1; transform: none; }
+}
+
+.ofi-qe__cam {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    max-height: 340px;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #101214;
+}
+.ofi-qe.is-phone .ofi-qe__cam { aspect-ratio: 4 / 3; max-height: 40dvh; }
+.ofi-qe__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ofi-qe__cam-idle {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 12.5px;
+    text-align: center;
+    padding: 20px;
+}
+.ofi-qe__cam-idle svg { width: 26px; height: 26px; opacity: 0.8; }
+/* Rahmen + wandernde Linie, wie beim iOS-Scanner. */
+.ofi-qe__reticle {
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    top: 26%;
+    bottom: 26%;
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.32);
+    pointer-events: none;
+}
+.ofi-qe__reticle::before,
+.ofi-qe__reticle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    -webkit-mask: linear-gradient(#000 0 0) top left / 22px 22px no-repeat,
+        linear-gradient(#000 0 0) top right / 22px 22px no-repeat,
+        linear-gradient(#000 0 0) bottom left / 22px 22px no-repeat,
+        linear-gradient(#000 0 0) bottom right / 22px 22px no-repeat;
+    mask: linear-gradient(#000 0 0) top left / 22px 22px no-repeat,
+        linear-gradient(#000 0 0) top right / 22px 22px no-repeat,
+        linear-gradient(#000 0 0) bottom left / 22px 22px no-repeat,
+        linear-gradient(#000 0 0) bottom right / 22px 22px no-repeat;
+}
+.ofi-qe__reticle::after {
+    inset: 0 10px;
+    border: 0;
+    -webkit-mask: none;
+    mask: none;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--ofi-cal-accent);
+    box-shadow: 0 0 10px var(--ofi-cal-accent);
+    animation: ofi-qe-sweep 1.8s ease-in-out infinite;
+}
+.ofi-qe__cam.is-paused .ofi-qe__reticle::after { animation-play-state: paused; opacity: 0.35; }
+@keyframes ofi-qe-sweep {
+    0%, 100% { top: 6%; }
+    50% { top: calc(94% - 2px); }
+}
+.ofi-qe__cam-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+}
+.ofi-qe__cam-note { margin: 0; font-size: 12px; color: var(--ofi-cal-muted); line-height: 1.45; }
+
+/* Feld für Handscanner / Tastatur — die Tastatur-Schnittstelle des Scanners. */
+.ofi-qe__scanfield {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    margin-top: 10px;
+    padding: 0 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px;
+    background: var(--ofi-cal-surface);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-qe__scanfield:focus-within { border-color: var(--ofi-cal-accent); box-shadow: 0 0 0 3px var(--ofi-field-ring, rgba(10, 122, 255, 0.3)); }
+.ofi-qe__scanfield svg { flex: none; color: var(--ofi-cal-muted); }
+.ofi-qe__scanfield input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    outline: none;
+}
+.ofi-qe__scanfield input::placeholder { font-family: inherit; color: var(--ofi-cal-faint, #a1a1a6); }
+
+/* ── Ergebnis: gefundener Artikel oder das Formular ─────────────────────── */
+.ofi-qe__pane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ofi-qe-card {
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    overflow: hidden;
+    animation: ofi-qe-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes ofi-qe-pop {
+    from { opacity: 0; transform: scale(0.965); }
+    to { opacity: 1; transform: none; }
+}
+.ofi-qe-card__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+.ofi-qe-card__head svg { width: 13px; height: 13px; color: var(--ofi-cal-success, #1f8a3b); }
+.ofi-qe-card.is-danger .ofi-qe-card__head svg { color: var(--ofi-cal-danger, #d70015); }
+.ofi-qe-card.is-warn .ofi-qe-card__head svg { color: var(--ofi-cal-warning, #b25000); }
+.ofi-qe-card__body { padding: 6px 12px 10px; }
+.ofi-qe-kv { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 4px 0; }
+.ofi-qe-kv dt { font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-qe-kv dd {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-qe-kv dd.is-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12.5px; }
+.ofi-qe-kv dd.is-name { font-weight: 600; font-size: 14px; white-space: normal; }
+.ofi-qe-card__foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+}
+
+/* Felder des Formulars: Beschriftung oben, 34px Feld, Haarlinie. */
+.ofi-qe-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.ofi-qe-field__label { font-size: 12px; font-weight: 500; color: var(--ofi-cal-muted); }
+.ofi-qe-field__label small { font-weight: 400; opacity: 0.7; }
+.ofi-qe-field input {
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px;
+    background: var(--ofi-cal-surface);
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-qe-field input.is-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
+.ofi-qe-field input:focus { border-color: var(--ofi-cal-accent); box-shadow: 0 0 0 3px var(--ofi-field-ring, rgba(10, 122, 255, 0.3)); }
+.ofi-qe-field input::placeholder { color: var(--ofi-cal-faint, #a1a1a6); }
+.ofi-qe-field input.is-locked { background: var(--ofi-cal-fill, rgba(0, 0, 0, 0.04)); color: var(--ofi-cal-muted); }
+
+/* Knöpfe: 34px Mac-Druckknopf; `is-primary` = das eine Blau; `is-next` mit Pfeil. */
+.ofi-qe-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px;
+    background: var(--ofi-cal-surface);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease, opacity 140ms ease;
+}
+.ofi-qe-btn svg { width: 14px; height: 14px; flex: none; }
+.ofi-qe-btn:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+.ofi-qe-btn:active:not(:disabled) { transform: scale(0.97); }
+.ofi-qe-btn:disabled { opacity: 0.45; cursor: default; }
+.ofi-qe-btn.is-primary {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent, #fff);
+    font-weight: 600;
+}
+.ofi-qe-btn.is-primary:hover:not(:disabled) { background: var(--ofi-cal-accent-hover, #0066e0); border-color: var(--ofi-cal-accent-hover, #0066e0); }
+.ofi-qe-btn.is-danger { color: var(--ofi-cal-danger, #d70015); }
+.ofi-qe-btn.is-danger.is-primary { background: var(--ofi-cal-danger, #d70015); border-color: var(--ofi-cal-danger, #d70015); color: #fff; }
+.ofi-qe-btn.is-next { padding-right: 10px; }
+.ofi-qe-btn.is-quiet { border-color: transparent; box-shadow: none; background: transparent; color: var(--ofi-cal-accent); }
+.ofi-qe-btn.is-quiet:hover:not(:disabled) { background: var(--ofi-cal-accent-soft); }
+.ofi-qe-btn.is-block { width: 100%; }
+.ofi-qe__error {
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid rgba(215, 0, 21, 0.25);
+    border-radius: 6px;
+    background: rgba(215, 0, 21, 0.05);
+    font-size: 12.5px;
+    color: var(--ofi-cal-danger, #d70015);
+}
+.ofi-qe__spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: ofi-qe-spin 700ms linear infinite;
+}
+@keyframes ofi-qe-spin { to { transform: rotate(360deg); } }
+
+/* ── Sitzungsliste am Fuss ─────────────────────────────────────────────── */
+.ofi-qe__log { margin-top: 18px; }
+.ofi-qe-logrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    font-size: 12.5px;
+}
+.ofi-qe-logrow:last-child { border-bottom: 0; }
+.ofi-qe-logrow.is-new { animation: ofi-qe-logrow 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes ofi-qe-logrow {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+}
+.ofi-qe-logrow__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--ofi-cal-success, #1f8a3b);
+}
+.ofi-qe-logrow__mark svg { width: 12px; height: 12px; }
+.ofi-qe-logrow.is-new .ofi-qe-logrow__mark { animation: ofi-qe-tick 380ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes ofi-qe-tick {
+    from { transform: scale(0.4); }
+    to { transform: scale(1); }
+}
+.ofi-qe-logrow.is-out .ofi-qe-logrow__mark { background: var(--ofi-cal-danger, #d70015); }
+.ofi-qe-logrow.is-error .ofi-qe-logrow__mark { background: var(--ofi-cal-warning, #b25000); }
+.ofi-qe-logrow__text { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.ofi-qe-logrow__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ofi-cal-text); }
+.ofi-qe-logrow__code { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-qe-logrow__kind {
+    flex: none;
+    padding: 1px 7px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Fuss ──────────────────────────────────────────────────────────────── */
+.ofi-qe__foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--ofi-cal-line, var(--ofi-cal-border-soft));
+}
+.ofi-qe.is-phone .ofi-qe__foot { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+.ofi-qe.is-phone .ofi-qe__foot .ofi-qe-btn { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-qe, .ofi-qe__step, .ofi-qe-card, .ofi-qe-logrow, .ofi-qe__next-code, .ofi-qe-logrow__mark { animation: none !important; }
+    .ofi-qe__reticle::after { animation: none; }
+}
+/* Kein Leser arbeitet (weder nativ noch ZXing): der Hinweis wird zur Warnung. */
+.ofi-qe__cam-note.is-warn { color: var(--ofi-cal-warning, #b25000); font-weight: 500; }
+/* Zwillinge im Formular: dieselbe Liste, nur kompakter, +1 in Blau. */
+.ofi-qe-matches { margin-bottom: 10px; }
+.ofi-qe-matches .ofi-qe-row { min-height: 40px; padding: 6px 10px 6px 12px; }
+.ofi-qe-row__meta.is-book { color: var(--ofi-cal-accent); font-weight: 600; }
+.ofi-qe-matches .ofi-qe-row > svg:last-child { color: var(--ofi-cal-accent); }
+/* Der aktuelle Artikel («Gleiches Modell»): derselbe Kasten wie der nächste
+   Code, nur mit blauer Kante — hier landet jeder Scan. */
+.ofi-qe__next.is-anchor { border-color: var(--ofi-cal-accent); box-shadow: 0 0 0 1px var(--ofi-cal-accent) inset; }
+.ofi-qe__next.is-anchor .ofi-qe__next-code { color: var(--ofi-cal-accent); }
+.ofi-qe__anchor-name { font-size: 13px; font-weight: 500; color: var(--ofi-cal-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-qe__anchor-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.ofi-qe__anchor-hint { font-size: 11.5px; line-height: 1.4; color: var(--ofi-cal-muted); }
+.ofi-qe__anchor-row .ofi-qe-btn { height: 28px; padding: 0 8px; font-size: 12px; flex: none; }
+
+/* ── Zugang buchen — EIN Artikel (11.09.2026) ─────────────────────────────
+   Dieselbe Hülle, nur klein: das Fenster ist so hoch wie sein Inhalt. */
+.ofi-qe.is-mini {
+    width: min(440px, 100%);
+    height: auto;
+    max-height: calc(100dvh - 32px);
+}
+.ofi-qe.is-mini .ofi-qe__body { flex: 0 1 auto; }
+.ofi-qe.is-mini .ofi-qe__step { padding: 16px 16px 18px; }
+.ofi-qe-stockin__facts { margin: 0 0 12px; }
+.ofi-qe-stockin__qty { margin-bottom: 4px; }
+.ofi-qe-stockin__after { font-size: 12px; color: var(--ofi-cal-muted); font-variant-numeric: tabular-nums; }
+
+/* ── Mengenfeld mit Mac-Stepper ──────────────────────────────────────────
+   34px-Feld, rechts der zweigeteilte NSStepper: zwei 20px-Pfeile mit einer
+   Haarlinie dazwischen. Der Fokusring liegt um das Ganze. */
+.ofi-qe-stepper {
+    display: inline-flex;
+    align-items: stretch;
+    height: 34px;
+    width: max-content;
+    max-width: 100%;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px;
+    background: var(--ofi-cal-surface);
+    overflow: hidden;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-qe-stepper:focus-within { border-color: var(--ofi-cal-accent); box-shadow: 0 0 0 3px var(--ofi-field-ring, rgba(10, 122, 255, 0.3)); }
+.ofi-qe-stepper.is-disabled { opacity: 0.55; }
+/* Das Feld selbst: die Feld-Regel der Schnellerfassung (`.ofi-qe-field input`)
+   gäbe ihm Rahmen und Höhe — hier trägt der Rahmen der Stepper. */
+.ofi-qe-field .ofi-qe-stepper input,
+.ofi-qe-stepper input {
+    width: 76px;
+    height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ofi-cal-text);
+    outline: none;
+}
+.ofi-qe-stepper input::selection { background: var(--ofi-cal-accent); color: #fff; }
+.ofi-qe-stepper__unit {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px 0 0;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+    user-select: none;
+}
+.ofi-qe-stepper__arrows {
+    display: flex;
+    flex-direction: column;
+    width: 22px;
+    border-left: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-fill, rgba(0, 0, 0, 0.035));
+}
+.ofi-qe-stepper__arrows button {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.ofi-qe-stepper__arrows button + button { border-top: 1px solid var(--ofi-cal-border); }
+.ofi-qe-stepper__arrows button svg { width: 11px; height: 11px; }
+.ofi-qe-stepper__arrows button:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+/* Gedrückt = das Blau, wie der NSStepper beim Halten. */
+.ofi-qe-stepper__arrows button:active:not(:disabled) { background: var(--ofi-cal-accent); color: #fff; }
+.ofi-qe-stepper__arrows button:disabled { color: var(--ofi-cal-faint, #a1a1a6); cursor: default; }
+
+/* ── «Artikel festlegen» unter der Modellwahl (11.09.2026) ─────────────── */
+.ofi-qe-define { margin-top: 4px; }
+.ofi-qe-define .ofi-qe-card__body { padding-top: 12px; }
+.ofi-qe-define__hint { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--ofi-cal-muted); }
+.ofi-qe-define .ofi-qe-matches { margin-top: 2px; }
+/* Menge je Scan in der Anker-Karte: Beschriftung links, Stepper rechts. */
+.ofi-qe__anchor-row.is-qty { margin-top: 8px; }

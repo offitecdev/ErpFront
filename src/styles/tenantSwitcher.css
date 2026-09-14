@@ -104,7 +104,7 @@ body > :not(#root) .ofi-tsw-mono {
     align-items: center;
     justify-content: center;
     border-radius: 9px;
-    background: var(--ofi-tsw-tone, #07145c);
+    background: var(--ofi-tsw-tone, #0052b8);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -119,7 +119,7 @@ body > :not(#root) .ofi-tsw-mono--lg {
     font-size: 15px;
 }
 /* Im Dunkeln hebt jede Hausfarbe um denselben Betrag an: das Marken-Navy
-   (#07145c) stand auf dem fast schwarzen Grund als schwarzes Loch, alle
+   (#0052b8) stand auf dem fast schwarzen Grund als schwarzes Loch, alle
    anderen Töne waren eine Spur zu satt. Ein Filter statt einer zweiten
    Farbtafel — so bleibt es EINE Liste von Tönen, und die weisse Schrift
    darauf bleibt weiss (heller als Weiss gibt es nicht). */

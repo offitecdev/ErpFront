@@ -15,7 +15,7 @@ export const SubTabs = <T extends string>({
                 onClick={() => onSelectTab(tab.key)}
                 className={`rounded px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
                     activeTab === tab.key
-                        ? 'bg-[#272f67] text-white shadow-sm'
+                        ? 'bg-[#0a7aff] text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-950 dark:text-white dark:hover:text-white'
                 }`}
             >

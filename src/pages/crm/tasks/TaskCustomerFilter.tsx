@@ -77,7 +77,7 @@ export const TaskCustomerFilter = ({ values, onChange }: {
                                 setOpen(false);
                                 setAllOpen(true);
                             }}
-                            className="ofi-option-action flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[12px] font-medium text-[#1f2654] transition-colors dark:text-white/80"
+                            className="ofi-option-action flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[12px] font-medium text-[#0066e0] transition-colors dark:text-white/80"
                         >
                             <ListIcon size={12} />
                             <span className="truncate">{t('crm.quick.customerPickTitle')}</span>

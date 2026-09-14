@@ -17,7 +17,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
         >
             <div className="flex flex-col items-center gap-3">
                 <span
-                    className="size-7 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#272f67] dark:border-white/15 dark:border-t-[#e6cf9e]"
+                    className="size-7 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#0a7aff] dark:border-white/15 dark:border-t-[#e6cf9e]"
                     aria-hidden="true"
                 />
                 {label && <span className="text-sm font-medium text-slate-500 dark:text-slate-300">{label}</span>}

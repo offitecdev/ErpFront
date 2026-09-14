@@ -47,7 +47,7 @@ export const ItGate = ({ children }: { children: ReactNode }) => {
         <div className="flex w-full justify-center pt-16">
             <form onSubmit={verify} className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-white/15 dark:bg-slate-900">
                 <div className="mb-4 flex items-center gap-3">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-[#272f67]/10 text-[#272f67] dark:bg-white/10 dark:text-white">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-[#0a7aff]/10 text-[#0a7aff] dark:bg-white/10 dark:text-white">
                         <Lock size={16} />
                     </span>
                     <div>

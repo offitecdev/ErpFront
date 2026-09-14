@@ -152,7 +152,7 @@ export const TaskDetailPage = () => {
                     {participant || canManage ? (
                         <div className="flex shrink-0 items-center gap-2">
                             {!done && (
-                                <button type="button" disabled={busy} onClick={() => void setStatus('DONE')} className="ofi-btn-brand inline-flex h-9 items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 text-[12.5px] font-semibold text-white hover:bg-[#1f2654] disabled:opacity-60">
+                                <button type="button" disabled={busy} onClick={() => void setStatus('DONE')} className="ofi-btn-brand inline-flex h-9 items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 text-[12.5px] font-semibold text-white hover:bg-[#0066e0] disabled:opacity-60">
                                     <Check size={14} />
                                     {t('crm.tasks.markDone')}
                                 </button>
@@ -254,7 +254,7 @@ export const TaskDetailPage = () => {
                                 type="button"
                                 disabled={savingNote || (!noteText.trim() && noteImages.length === 0)}
                                 onClick={() => void addNote()}
-                                className="ofi-btn-brand inline-flex h-9 items-center gap-1.5 rounded-md bg-[#272f67] px-4 text-[12.5px] font-semibold text-white hover:bg-[#1f2654] disabled:opacity-50"
+                                className="ofi-btn-brand inline-flex h-9 items-center gap-1.5 rounded-md bg-[#0a7aff] px-4 text-[12.5px] font-semibold text-white hover:bg-[#0066e0] disabled:opacity-50"
                             >
                                 {savingNote ? t('common.saving') : t('crm.tasks.addNote')}
                             </button>

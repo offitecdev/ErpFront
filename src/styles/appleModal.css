@@ -67,12 +67,12 @@
     --ofi-win-fill-hover: rgba(0, 0, 0, 0.08);
     /* Marine statt Systemblau (09.09.2026, gleiche Vorgabe wie auf der
        Offerte); dunkel bleibt das helle Blau lesbar. */
-    --ofi-win-accent: #272f67;
-    --ofi-win-accent-hover: #1f2654;
+    --ofi-win-accent: #0a7aff;
+    --ofi-win-accent-hover: #0066e0;
     --ofi-win-on-accent: #ffffff;
-    --ofi-win-accent-soft: rgba(39, 47, 103, 0.1);
-    --ofi-win-accent-tint: rgba(39, 47, 103, 0.06);
-    --ofi-win-focus: rgba(39, 47, 103, 0.3);
+    --ofi-win-accent-soft: rgba(10, 122, 255, 0.1);
+    --ofi-win-accent-tint: rgba(10, 122, 255, 0.06);
+    --ofi-win-focus: rgba(10, 122, 255, 0.3);
     --ofi-win-danger: #d70015;
     --ofi-win-danger-soft: rgba(215, 0, 21, 0.08);
     --ofi-win-success: #1f8a3b;
@@ -831,4 +831,162 @@ body > :not(#root) .ofi-tp-addline { height: var(--ofi-win-control-h); border-co
     letter-spacing: -0.005em;
     text-transform: none;
     color: var(--ofi-win-text);
+}
+
+
+/* ── 12. Kalender-Fenster: Erstellen und Auskunft (10.09.2026) ─────────────
+   Samet: «die Kalender-Modals … so aufgeräumt und professionell wie ein
+   natives macOS-Programm». Die Bauteile bleiben (CreatePopup, DetailPopup);
+   hier nur das Kleid. Die schwebende Karte IST die Portalwurzel, darum der
+   Träger `:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root))`
+   (siehe Abschnitt 6). */
+
+/* Art-Reiter (Termin | Besprechung | Aufgabe): die Mac-Segmentleiste. */
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tabs {
+    display: inline-flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    border-radius: 7px;
+    background: var(--ofi-win-fill);
+    padding: 2px;
+}
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tab {
+    height: 24px;
+    padding: 0 12px;
+    border-radius: 5px !important;
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--ofi-win-text);
+    -webkit-text-fill-color: var(--ofi-win-text);
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tab:hover { background: var(--ofi-win-hover); }
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tab.is-active {
+    background: var(--ofi-win-surface);
+    font-weight: 500;
+    color: var(--ofi-win-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.dark :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tab.is-active { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+
+/* Schritttitel «1/4 Kunde & Projekt»: Satzschrift, die Zahl als kleiner Kasten. */
+.ofi-float-card .ofi-cal-steptitle { gap: 8px; padding-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--ofi-win-text); }
+.ofi-float-card .ofi-cal-steptitle__num {
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: var(--ofi-win-fill);
+    color: var(--ofi-win-secondary);
+}
+/* Die Schrittpunkte im Fuss: ein iOS-Seitenregler — gleich grosse Punkte,
+   der aktuelle im Systemblau, nichts wird länger. */
+.ofi-float-card .ofi-cal-stepdot { width: 6px; height: 6px; background: var(--ofi-win-field-border); transition: background-color 120ms ease; }
+.ofi-float-card .ofi-cal-stepdot.is-done { background: var(--ofi-win-muted); }
+.ofi-float-card .ofi-cal-stepdot.is-active { width: 6px; background: var(--ofi-win-accent); }
+.ofi-float-card .ofi-cal-scopeline { border-radius: var(--ofi-win-control-radius); background: var(--ofi-win-fill); font-weight: 500; }
+
+/* Gesperrte Felder («Zuerst Kunde wählen»): weiss mit Haarlinie und stiller
+   Schrift — keine gestrichelte Kante, keine graue Wanne. */
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) input:disabled[class*="border-dashed"] {
+    height: var(--ofi-win-control-h);
+    border: 1px solid var(--ofi-win-hairline);
+    border-radius: var(--ofi-win-control-radius) !important;
+    background: var(--ofi-win-surface-2);
+    padding: 0 10px;
+    font-family: var(--ofi-win-font);
+    font-size: 13px;
+    color: var(--ofi-win-muted);
+    cursor: default;
+}
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) input:disabled[class*="border-dashed"]::placeholder { color: var(--ofi-win-muted); }
+/* Ein noch leeres Pflichtfeld: dieselbe Haarlinie wie jedes Feld, kein
+   Strichmuster — Fokusring und Platzhalter sagen genug. */
+@layer utilities {
+    /* Tailwinds `!border-dashed` ist selbst wichtig UND geschichtet — nur ein
+       wichtiges Deklarat in derselben Lage, später, schlägt es. */
+    :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) [class*="border-dashed"]:not(:disabled) {
+        border-style: solid !important;
+        border-color: var(--ofi-win-field-border) !important;
+    }
+}
+.ofi-float-card .ofi-cal-emptyline { border-style: solid; border-color: var(--ofi-win-hairline); background: var(--ofi-win-surface-2); color: var(--ofi-win-secondary); }
+
+/* Die Zeichenreihe der Auskunftskarte (Angaben · Unterlagen · Einsatzplan):
+   28px-Quadrate mit Haarlinie statt 32px-Kreise; das gewählte im Systemblau;
+   die Zahl dahinter ein kleiner grauer Kasten, kein roter Alarm; der Name des
+   Blattes in Satzschrift. */
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__marks { gap: 6px; border-bottom-color: var(--ofi-win-hairline); padding-bottom: 10px; }
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__mark {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--ofi-win-field-border) !important;
+    border-radius: var(--ofi-win-control-radius) !important;
+    background: var(--ofi-win-field);
+    box-shadow: var(--ofi-win-btn-shadow);
+    color: var(--ofi-win-secondary) !important;
+}
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__mark:hover { background: var(--ofi-win-hover); color: var(--ofi-win-text) !important; }
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__mark.is-active {
+    border-color: var(--ofi-win-accent) !important;
+    background: var(--ofi-win-accent);
+    color: var(--ofi-win-on-accent) !important;
+}
+:is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__mark svg { width: 14px; height: 14px; }
+.ofi-float-card .ofi-newtask__markdot {
+    right: -5px;
+    top: -5px;
+    min-width: 15px;
+    height: 15px;
+    border: 1.5px solid var(--ofi-win-surface);
+    border-radius: 5px;
+    background: var(--ofi-win-secondary);
+    padding: 0 3px;
+    font-size: 9px;
+    font-weight: 600;
+    color: #fff;
+}
+.ofi-float-card .ofi-newtask__marklabel {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+/* Die Angabenkästen: 8px-Kante, Haarlinie; Beschriftung 12px in Satzschrift
+   (Abschnitt 8 setzt die Farbe), der Wert 13px. */
+.ofi-float-card .ofi-cal-detailcol { border-color: var(--ofi-win-border); border-radius: 8px; padding: 8px 12px 10px; }
+.ofi-float-card .ofi-cal-detailbody__sub { font-size: 12.5px; font-weight: 500; color: var(--ofi-win-secondary); }
+.ofi-float-card .ofi-cal-detailrow { padding: 4px 0; }
+.ofi-float-card .ofi-cal-contact { border-top-color: var(--ofi-win-hairline); }
+.ofi-float-card .ofi-cal-person__avatar { border: 1px solid var(--ofi-win-border); border-radius: 6px; background: var(--ofi-win-surface); color: var(--ofi-win-secondary); }
+.ofi-float-card .ofi-cal-chiptag { border-radius: 5px; border-color: var(--ofi-win-border); font-size: 12px; }
+
+/* ── 13. PDF-Vorschau als Fenster (components/pdf/PdfPreviewSheet) ──────── */
+.ofi-tp-dialog__body.ofi-pdfwin { padding: 12px 16px 16px; }
+.ofi-pdfwin__frame {
+    display: flex;
+    height: min(74vh, 780px);
+    min-height: 320px;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface-2);
+}
+.ofi-pdfwin__paper { width: 100%; min-height: 0; flex: 1; border: 0; background: var(--ofi-win-surface-2); }
+.ofi-pdfwin__note { display: flex; flex: 1; align-items: center; justify-content: center; font-size: 13px; color: var(--ofi-win-secondary); }
+@media (max-width: 640px) {
+    .ofi-tp-dialog__body.ofi-pdfwin { padding: 10px; }
+    .ofi-pdfwin__frame { height: min(70vh, 640px); }
+}
+@layer utilities {
+    :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tab { border-radius: 5px !important; }
+    :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-tabs { border-radius: 7px !important; }
+    :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__mark { border-radius: var(--ofi-win-control-radius) !important; }
+    :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-newtask__markdot { border-radius: 5px !important; }
+    :is(.ofi-float-card):is(#root *, body > :not(#root) *, body > :not(#root)) .ofi-cal-detailcol { border-radius: 8px !important; }
+    :is(.ofi-tp-dialog):is(#root *, body > :not(#root) *) .ofi-pdfwin__frame { border-radius: 8px !important; }
 }

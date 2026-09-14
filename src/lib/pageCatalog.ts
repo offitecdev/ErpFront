@@ -123,6 +123,15 @@ export const PAGE_MODULES: CatalogModule[] = [
             { key: 'inventory.suppliers', path: '/inventory/suppliers', labelKey: 'nav.suppliers', maxLevel: 2 },
         ],
     },
+    {
+        // Görevler (13.09.2026): 1 Teammitglied · 2 Leitung · 3 Leitung mit Löschen
+        // (Serverkopie: Erp_Backend/src/shared/pageCatalog.ts).
+        key: 'tasks',
+        labelKey: 'nav.tasksModule',
+        pages: [
+            { key: 'tasks.workspace', path: '/tasks', labelKey: 'nav.tasksWorkspace', maxLevel: 3 },
+        ],
+    },
 ];
 
 export const ALL_PAGES: CatalogPage[] = PAGE_MODULES.flatMap((moduleDef) => moduleDef.pages);

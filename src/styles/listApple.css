@@ -53,25 +53,19 @@
     --la-control-radius: 6px;
     --la-font: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-    /* Die gemeinsame Werkzeugzeile (styles/controls.css) liest ihre Masse aus
-       Variablen — hier werden sie umgestimmt statt überschrieben: 32px statt
-       40px (das Mass eines Mac-Suchfeldes), 6px-Ecke, weisses Feld mit
-       Haarlinie statt grauer Kapsel, Systemblau als Ring. */
-    --ofi-ctl-h: 32px;
-    --ofi-ctl-radius: var(--la-control-radius);
-    --ofi-ctl-font: 13px;
-    --ofi-ctl-pad: 10px;
-    --ofi-ctl-lead: 32px;
-    --ofi-ctl-search-w: 260px;
-    --ofi-ctl-filter-w: 176px;
-    --ofi-ctl-surface: var(--la-surface);
-    --ofi-ctl-surface-rest: var(--la-surface);
-    --ofi-ctl-border: var(--la-field-border);
-    --ofi-ctl-border-hover: var(--la-field-border-hover);
-    --ofi-ctl-text: var(--la-text);
-    --ofi-ctl-muted: var(--la-muted);
-    --ofi-ctl-accent: var(--la-accent);
-    --ofi-ctl-ring: var(--la-focus);
+    /* HIER STAND, was Samet am 09.09.2026 zweimal beanstandet hat.
+       Die gemeinsame Werkzeugzeile (styles/controls.css) liest ihre Masse aus
+       `--ofi-ctl-*`; dieses Kleid hat die Variablen nicht überschrieben,
+       sondern UMGESTIMMT: 32px statt 44px, 13px Schrift, 6px-Ecke, graue
+       Haarlinie statt der 2px-Marinekante, Systemblau (#0a7aff) als Ring.
+       Auf JEDER CRM-Seite kam damit das Mac-Mass heraus und nicht das
+       Hausmass — die Kundenliste war der Ort, an dem es aufgefallen ist
+       («filtre kutularının kenarları lacivert olsun», «butonlar daha büyük»).
+       Die Umstimmung ist ersatzlos gestrichen: Suche, Filter und die Felder
+       der Filterzeile stehen jetzt überall auf denselben Werten aus
+       controls.css. Das übrige Kleid (Haarlinien der Tafeln, Schrift, Zeilen)
+       bleibt. Wer hier wieder ein `--ofi-ctl-*` setzt, dreht die Werkzeugzeile
+       der halben Anwendung mit — nicht tun. */
 
     /* Die Kalender-Farbwerte, auf denen die Zeitleisten (Kommunikation,
        Anfragen, Aktivitäten) und das Aufgabenbrett stehen. */
@@ -121,8 +115,6 @@
     --la-success: #30d158;
     --la-warning: #ffb340;
     --la-btn-shadow: none;
-    --ofi-ctl-surface: #161719;
-    --ofi-ctl-surface-rest: #161719;
     --ofi-cal-accent-hover: #5c9fff;
     --ofi-btn-tint-fill: rgba(255, 255, 255, 0.08);
 }
@@ -157,7 +149,7 @@ html #root .ofi-list-apple :where(.text-slate-700, .text-slate-800, .text-slate-
 /* Knöpfe des Kopfes und der Werkzeugzeile: 28px-Druckknöpfe mit Haarlinie,
    6px-Ecke, weiss. Die Hauptknöpfe (`.ofi-btn-brand`, `.ant-btn-primary`,
    `.ofi-crm-btn.is-primary`) tragen das eine Systemblau. */
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn) {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios) {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -176,22 +168,22 @@ html #root .ofi-list-apple :where(.text-slate-700, .text-slate-800, .text-slate-
     white-space: nowrap;
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn) svg {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios) svg {
     width: 13px;
     height: 13px;
 }
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(:disabled):hover {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(:disabled):hover {
     background: var(--la-hover) !important;
 }
 /* Die Spezifität WIEDERHOLT die :not()-Kette der allgemeinen Knopfregel —
    sonst verlöre der blaue Hauptknopf gegen das weisse Grundkleid. */
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn) {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios) {
     border-color: transparent !important;
     background: var(--la-accent) !important;
     color: #fff !important;
     -webkit-text-fill-color: #fff !important;
 }
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(:disabled):hover {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(:disabled):hover {
     background: color-mix(in srgb, var(--la-accent) 88%, #000) !important;
 }
 #root .ofi-list-apple .ofi-crm-btn.is-quiet {
@@ -399,29 +391,37 @@ html #root .ofi-list-apple :where(.text-slate-700, .text-slate-800, .text-slate-
 /* Die Filterzeile unter den Beschriftungen: 26px-Felder mit Haarlinie. */
 #root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] > th {
     height: auto;
-    padding: 6px 10px 8px !important;
+    padding: 8px 10px 10px !important;
     border-top: 0 !important;
     border-bottom: 1px solid var(--la-border) !important;
     background: var(--la-surface) !important;
 }
 #root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] > th:first-child { padding-left: 16px !important; }
+/* Die Felder der Filterzeile standen hier auf 26px mit grauer Haarlinie und
+   haben damit controls.css § 7 überstimmt (dieser Selektor wiegt schwerer und
+   das Kleid wird ausserdem NACHGELADEN, kommt also später). Sie lesen jetzt
+   dieselben Werte wie Suche und Filter darüber — 44px, 2px Marine, 10px-Ecke,
+   Marine-Fokusring (Samet 09.09.2026: «tablo içindeki filtre kutularının
+   kenarları da lacivert olsun»). Nur Grund und Schriftfarbe bleiben aus dem
+   Kleid, damit die Zeile im Dunkelmodus nicht heraussticht. */
 #root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select) {
-    height: 26px !important;
-    min-height: 26px !important;
-    padding: 0 8px !important;
-    border: 1px solid var(--la-field-border) !important;
+    height: var(--ofi-ctl-h) !important;
+    min-height: var(--ofi-ctl-h) !important;
+    padding: 0 10px !important;
+    border: var(--ofi-ctl-border-w) solid var(--ofi-ctl-border) !important;
+    border-radius: var(--ofi-ctl-radius) !important;
     background: var(--la-surface) !important;
     color: var(--la-text) !important;
-    font-size: 12.5px !important;
+    font-size: var(--ofi-ctl-font) !important;
     font-weight: 400;
     box-shadow: none !important;
     transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-#root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select)::placeholder { color: var(--la-muted); }
-#root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select):hover { border-color: var(--la-field-border-hover) !important; }
+#root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select)::placeholder { color: var(--ofi-ctl-muted); }
+#root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select):hover { border-color: var(--ofi-ctl-border-hover) !important; }
 #root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select):focus {
-    border-color: var(--la-accent) !important;
-    box-shadow: 0 0 0 3px var(--la-focus) !important;
+    border-color: var(--ofi-ctl-accent) !important;
+    box-shadow: 0 0 0 3px var(--ofi-ctl-ring) !important;
     outline: none;
 }
 

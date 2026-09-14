@@ -6,6 +6,7 @@ import type { FormSubmissionDto } from '@/lib/api/forms';
 import { linkedCustomerLine } from '../ui';
 import { ChecklistWindow } from './ChecklistWindow';
 import { FormFillView, type FormFillHandle, type FormFillState } from './FormFillView';
+import '@/styles/modules/checklists.css';
 
 /**
  * ── DIE CHECKLISTE ALS FENSTER ──────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ArrowRight, Building03, Calendar, Clock, User01, X } from '@/components/icons/antIconCompat';
 import { notificationApi } from '../../lib/api/notifications';
 import { meetingApi, meetingParticipantName, type MeetingActivityDto } from '../../lib/api/meetings';
-import { onIdle } from '../../lib/utils/onIdle';
+import { afterPageSettled } from '../../lib/utils/onIdle';
 
 interface AlertRow {
     icon: React.ReactNode;
@@ -87,13 +87,15 @@ export const GlobalAlertStack: React.FC<GlobalAlertStackProps> = ({ onCountChang
     // offer data is loaded by CRM pages when those pages are actually opened.
     useEffect(() => {
         let cancelled = false;
-        const cancelIdle = onIdle(() => {
+        // After the page's own data — an idle callback fired during its network
+        // wait and went out ahead of it (measured 14.09.2026).
+        const cancelIdle = afterPageSettled(() => {
             if (cancelled) return;
             meetingApi
                 .list(dayjs().subtract(1, 'hour').toISOString(), dayjs().add(24, 'hour').toISOString())
                 .then((rows) => !cancelled && setMeetings(Array.isArray(rows) ? rows : []))
                 .catch(() => undefined);
-        }, 4000);
+        });
         return () => {
             cancelled = true;
             cancelIdle();

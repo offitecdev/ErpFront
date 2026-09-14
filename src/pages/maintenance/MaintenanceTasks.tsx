@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import DatePicker from 'antd/es/date-picker';
 import AntSelect from 'antd/es/select';
+import { AntdTheme } from '../../components/ui-shared/AntdTheme';
 import { AlertTriangle, Calendar, CheckCircle, FilterLines, Plus, Save01 as Save, Send01 as Send, Trash01 as Trash, User01 as UserIcon, XClose } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
@@ -209,6 +210,7 @@ const TechnicianRoster = ({
     };
 
     return (
+        <AntdTheme>
         <div className="rounded-lg border border-slate-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
                 <span className="text-[12px] font-semibold text-slate-700">{t('auto.teknisyen_ekibi')}</span>
@@ -262,6 +264,7 @@ const TechnicianRoster = ({
                 })}
             </div>
         </div>
+        </AntdTheme>
     );
 };
 
@@ -347,8 +350,8 @@ const MaintenanceWorkspace = () => {
                         aria-current={view === tab.key ? 'page' : undefined}
                         onClick={() => changeView(tab.key)}
                         className={`ofi-quote-tab relative -mb-px inline-flex items-center rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${view === tab.key
-                            ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                            : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                            ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#0066e0]'
+                            : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#0066e0] dark:text-white/70'
                         }`}
                     >
                         {tab.label}
@@ -446,6 +449,7 @@ const MaintenanceTaskList = () => {
     const approvals = approvedOptions(tasks);
 
     return (
+        <AntdTheme>
         <div>
             <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
                 <DatePicker.RangePicker
@@ -562,6 +566,7 @@ const MaintenanceTaskList = () => {
                 )}
             </Card>
         </div>
+        </AntdTheme>
     );
 };
 

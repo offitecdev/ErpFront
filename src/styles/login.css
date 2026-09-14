@@ -5,7 +5,7 @@
    Token-Variablen selbst (.ofi-login__qr-layer).
 
    Palette (aus dem Logo):
-     navy   #1a2361 / deep #0b1340
+     navy   #0066e0 / deep #0b1340
      ice    #9fc7f5
      red    #e63329 (Akzent) — Fehler #d92d20
    Dunkelmodus folgt dark.css: warmes Anthrazit + Gold #e6cf9e.
@@ -27,7 +27,7 @@
        Variable. */
     --ofi-serif: "Times New Roman", Times, serif;
 
-    --lg-navy: #1a2361;
+    --lg-navy: #0066e0;
     --lg-navy-deep: #0b1340;
     --lg-navy-hover: #232e7d;
     --lg-red: #e63329;
@@ -461,7 +461,7 @@ body > :not(#root) .ofi-btn-apple.is-loading .ofi-btn-apple__label { opacity: 0.
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: #1f2654;
+    background: #0066e0;
     box-shadow: 0 6px 18px rgba(31, 38, 84, 0.22);
 }
 
@@ -1830,4 +1830,115 @@ body > :not(#root) .ofi-login__store-close {
     .ofi-login__notif-panel { transition-duration: 0.01s; }
     /* Der Ring springt dann von Sekunde zu Sekunde, statt zu gleiten. */
     .ofi-login__mfa-ring-fill { transition: none; }
+}
+
+/* ---- Update-Karte unten rechts (13.09.2026) — die kleine macOS-Mitteilung ----
+   Ersetzt die Glocke mit Mitteilungsliste (LoginUpdateCard.tsx). Die grosse
+   Fassung ist das Blatt nach der Anmeldung (updateWindow.css). */
+.ofi-login-upd {
+    position: fixed;
+    right: 18px;
+    /* über der Fusszeile mit dem Copyright */
+    bottom: 52px;
+    z-index: 20;
+    width: min(340px, calc(100vw - 36px));
+    padding: 12px 12px 12px 14px;
+    border: 0.5px solid var(--lg-border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--lg-surface) 86%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.14);
+    color: var(--lg-text);
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 260ms ease, transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.ofi-login-upd.is-visible {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+.ofi-login-upd__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ofi-login-upd__app {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: #0a7aff;
+    color: #fff;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(10, 122, 255, 0.28);
+}
+.ofi-login-upd__meta {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    line-height: 1.25;
+}
+.ofi-login-upd__eyebrow {
+    color: var(--lg-sub);
+    font-size: 11.5px;
+}
+.ofi-login-upd__title {
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+.ofi-login-upd__close {
+    display: inline-flex;
+    flex: none;
+    align-self: flex-start;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(120, 120, 128, 0.14);
+    color: var(--lg-sub);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+.ofi-login-upd__close:hover { background: rgba(120, 120, 128, 0.24); color: var(--lg-text); }
+.ofi-login-upd__close:focus-visible { outline: 2px solid #0a7aff; outline-offset: 2px; }
+.ofi-login-upd__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 0 46px;
+    padding: 0;
+    list-style: none;
+}
+.ofi-login-upd__row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px 4px 6px;
+    border-radius: 999px;
+    background: rgba(10, 122, 255, 0.08);
+    color: #0a7aff;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+.ofi-login-upd__icon { display: inline-flex; }
+.ofi-login-upd__intro {
+    margin: 8px 0 0 46px;
+    color: var(--lg-sub);
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+.dark .ofi-login-upd { box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 12px 32px rgba(0, 0, 0, 0.5); }
+.dark .ofi-login-upd__row { background: rgba(59, 141, 255, 0.16); color: #6ea8ff; }
+@media (prefers-reduced-motion: reduce) {
+    .ofi-login-upd { transition: opacity 200ms ease; transform: none; }
 }

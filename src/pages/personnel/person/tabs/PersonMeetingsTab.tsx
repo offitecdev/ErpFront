@@ -88,7 +88,7 @@ export const PersonMeetingsTab = ({ meetings }: { meetings: PersonMeeting[] }) =
                         </td>
                         <td>
                             <Chip className={meeting.isOwner
-                                ? 'bg-[#eef2fb] text-[#1f2654] ring-[#c9d5f0] dark:bg-white/10 dark:text-white/80 dark:ring-white/15'
+                                ? 'bg-[#eef2fb] text-[#0066e0] ring-[#c9d5f0] dark:bg-white/10 dark:text-white/80 dark:ring-white/15'
                                 : 'bg-slate-50 text-slate-500 ring-slate-200 dark:bg-white/5 dark:text-white/55 dark:ring-white/10'}>
                                 {meeting.isOwner ? t('personnel.person.owner') : t('personnel.person.participant')}
                             </Chip>

@@ -18,6 +18,7 @@ import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 import { money } from '../../utils/projectFormatters';
 import { ProjectStatusChip } from './tabs/overview/overviewChips';
 import { calculateTotals } from '../../utils/projectTotals';
+import '@/styles/modules/projectDetail.css';
 
 const LazyProjectSettingsMenu = lazy(() =>
     import('./ProjectSettingsMenu').then((module) => ({ default: module.ProjectSettingsMenu })),

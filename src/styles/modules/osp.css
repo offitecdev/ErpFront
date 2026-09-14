@@ -1,0 +1,716 @@
+/* osp — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ═══════════════ OSP-MODUL (/sales/osp) ═══════════════
+   Die Offertanfragen der Offitec Selection Platform. Aufgeräumt am 05.09.2026
+   (Benutzerwunsch "das sieht unordentlich aus"): die Seite trägt jetzt das
+   gemeinsame Listenkleid (InventoryListHeader + SectionCard + TableKit) statt
+   einer eigenen dunklen Rautenleiste — nur die Zellenbausteine unten sind
+   eigen. Die dazugehörigen Regeln der Leiste sind mit ihr entfallen.
+   Gemalt wird aus den `--ofi-cal-*`-Marken; der Dunkelmodus ist derselbe
+   Variablentausch. */
+
+.ofi-osp-page { min-width: 0; }
+.ofi-osp-spin { animation: ofi-osp-rotate 900ms linear infinite; }
+/* KEINE Mindestbreite (05.09.2026): die automatische Spaltenaufteilung teilt
+   genau die Kartenbreite auf. Mit einer Mindestbreite lief die Tabelle aus der
+   Karte hinaus, die Statuspille legte sich über die Nachbarspalte und der
+   Knopf ganz rechts wurde abgeschnitten. */
+.ofi-osp-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.ofi-osp-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    border-bottom: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface-2);
+    padding: 13px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-table td {
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    padding: 14px 16px;
+    /* Jede Zelle ist ein kleiner Stapel (Hauptzeile + Beizeilen) — der Stapel
+       beginnt oben, sonst tanzen die Hauptzeilen einer Zeile auf und ab. */
+    vertical-align: top;
+    font-size: 13.5px;
+    color: var(--ofi-cal-text);
+}
+/* Nichts in einer Zelle darf breiter werden als die Spalte. */
+.ofi-osp-table td > * { max-width: 100%; }
+/* Der Stapel einer Zelle ist EIN Kind: auf dem Telefon wird die Zelle zur
+   Flex-Zeile (Etikett links, Wert rechts) — mehrere Kinder stünden dort
+   nebeneinander statt untereinander. */
+.ofi-osp-stack { display: block; min-width: 0; }
+.ofi-osp-ref { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; font-weight: 700; color: #0a7aff; }
+.dark .ofi-osp-ref { color: rgba(255, 255, 255, 0.88); }
+.ofi-osp-docid {
+    margin-left: 7px;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-requester { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.ofi-osp-sub {
+    display: block;
+    padding-top: 2px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--ofi-cal-muted);
+    overflow-wrap: anywhere;
+}
+.ofi-osp-sub.is-inline { display: inline; padding-top: 0; }
+.ofi-osp-sub.is-error {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-top: 5px;
+    color: #d32026;
+    font-weight: 600;
+}
+/* Ueberarbeitet: ein Hinweis, keine Warnung - das Datenblatt ist neu, die
+   Anfrage aber weiterhin in Ordnung. */
+.ofi-osp-sub.is-revised {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-top: 5px;
+    color: #b45309;
+    font-weight: 600;
+}
+.dark .ofi-osp-sub.is-revised { color: #fcd34d; }
+/* Kontotyp + Herkunft stehen als eine ruhige Zeile unter der Person. */
+.ofi-osp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 5px; }
+.ofi-osp-tag {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-model {
+    display: block;
+    padding-top: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    overflow-wrap: anywhere;
+}
+
+.ofi-osp-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 11px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.ofi-osp-chip.is-chiller { background: #e8f0fe; color: #1a56db; }
+.ofi-osp-chip.is-heatpump { background: #fdeee2; color: #c2410c; }
+.ofi-osp-chip.is-drycooler { background: #e7f6ef; color: #0f766e; }
+.dark .ofi-osp-chip.is-chiller { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+.dark .ofi-osp-chip.is-heatpump { background: rgba(249, 115, 22, 0.18); color: #fdba74; }
+.dark .ofi-osp-chip.is-drycooler { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+
+.ofi-osp-select {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    padding: 0 8px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+}
+.ofi-osp-select:hover { border-color: #94a3b8; }
+.ofi-osp-select:focus { border-color: #0a7aff; outline: 2px solid rgba(10, 122, 255, 0.1); }
+/* Zuständigkeit: Verkauf UND Projektleitung, je ein eigenes Feld mit eigener
+   Beschriftung (bis 05.09.2026 EIN Feld mit umschaltbarer Rolle). */
+.ofi-osp-peoplecell { min-width: 0; }
+.ofi-osp-person { display: block; min-width: 0; }
+.ofi-osp-person + .ofi-osp-person { margin-top: 7px; }
+.ofi-osp-person__label {
+    display: block;
+    padding-bottom: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ofi-cal-muted);
+}
+
+/* Der Status kommt automatisch aus dem OSP-/Offertenablauf. Die ruhige Pille
+   zeigt ihn nur an; eine zweite Feldkante oder ein Auswahlpfeil gehören hier
+   deshalb nicht hin. */
+.ofi-osp-status {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    padding: 8px 13px;
+    font-size: 12.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+/* Ohne Punkt vor der Beschriftung (Vorgabe 19.09.2026): die Pille traegt ihre
+   Farbe schon selbst — der Punkt sagte dasselbe ein zweites Mal. */
+.ofi-osp-status__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ofi-osp-statushead,
+.ofi-osp-statuscell { text-align: center !important; }
+.ofi-osp-statuscell,
+.ofi-osp-actioncell { vertical-align: middle !important; }
+.ofi-osp-status.is-listed { background: #eef1f6; color: #43506c; }
+.ofi-osp-status.is-in_offer { background: #fff4e0; color: #b45309; }
+.ofi-osp-status.is-sent { background: #e8f0fe; color: #1e40af; }
+.ofi-osp-status.is-approved { background: #e7f6ef; color: #15803d; }
+/* Zurueckgezogen: ausgegraut, nicht alarmiert - es ist kein Fehler, sondern
+   eine Entscheidung der anfragenden Person. */
+.ofi-osp-status.is-withdrawn { background: #f1f2f4; color: #7c8598; }
+.dark .ofi-osp-status.is-listed { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+.dark .ofi-osp-status.is-in_offer { background: rgba(245, 158, 11, 0.16); color: #fcd34d; }
+.dark .ofi-osp-status.is-sent { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+.dark .ofi-osp-status.is-approved { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+.dark .ofi-osp-status.is-withdrawn { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+
+/* Kopfleiste der Seite: Abgleich + Einstellungen. */
+#root .ofi-osp-toolbtn,
+body > :not(#root) .ofi-osp-toolbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    padding: 0 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-osp-toolbtn:hover:not(:disabled),
+body > :not(#root) .ofi-osp-toolbtn:hover:not(:disabled) { border-color: #94a3b8; background: var(--ofi-cal-hover); }
+#root .ofi-osp-toolbtn:disabled,
+body > :not(#root) .ofi-osp-toolbtn:disabled { opacity: 0.5; }
+
+.ofi-osp-actionhead,
+.ofi-osp-actioncell { text-align: center !important; }
+.ofi-osp-actioncell { white-space: nowrap; }
+#root .ofi-osp-import-btn,
+body > :not(#root) .ofi-osp-import-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 142px;
+    min-height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: #0a7aff;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(10, 122, 255, 0.14);
+    transition: background-color 130ms ease, transform 130ms ease, box-shadow 130ms ease;
+}
+#root .ofi-osp-import-btn:hover:not(:disabled),
+body > :not(#root) .ofi-osp-import-btn:hover:not(:disabled) {
+    background: #0066e0;
+    box-shadow: 0 6px 14px rgba(10, 122, 255, 0.2);
+}
+#root .ofi-osp-import-btn:disabled,
+body > :not(#root) .ofi-osp-import-btn:disabled { opacity: 0.55; }
+#root .ofi-osp-import-btn.is-open,
+body > :not(#root) .ofi-osp-import-btn.is-open {
+    background: transparent;
+    border: 1px solid var(--ofi-cal-border);
+    color: #0a7aff;
+    box-shadow: none;
+}
+#root .ofi-osp-import-btn.is-open:hover,
+body > :not(#root) .ofi-osp-import-btn.is-open:hover { background: var(--ofi-cal-hover); }
+.dark .ofi-osp-import-btn.is-open { color: rgba(255, 255, 255, 0.85); }
+
+.ofi-osp-creating {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: grid;
+    place-items: center;
+    background: rgba(15, 23, 42, 0.28);
+    padding: 24px;
+    backdrop-filter: blur(3px);
+}
+.ofi-osp-creating__card {
+    display: flex;
+    min-width: min(360px, calc(100vw - 48px));
+    align-items: center;
+    gap: 15px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 16px;
+    background: var(--ofi-cal-surface);
+    padding: 22px 24px;
+    color: var(--ofi-cal-text);
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+}
+.ofi-osp-creating__spinner {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    flex: none;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(10, 122, 255, 0.1);
+    color: #0a7aff;
+}
+.ofi-osp-creating__spinner svg { animation: ofi-osp-rotate 900ms linear infinite; }
+.ofi-osp-creating__title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.dark .ofi-osp-creating { background: rgba(0, 0, 0, 0.5); }
+.dark .ofi-osp-creating__spinner { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.9); }
+
+/* ── ZWEI REITER: ANFRAGEN | AKTIVITÄT (§1c, 20.09.2026) ─────────────────────
+   Links steht, was jemand bestellt hat, rechts, was jemand bloss rechnet. Der
+   Unterschied ist kein Anzeigedetail — der Aktivitätsstrom ist ausdrücklich
+   KEINE Anfrage —, also sind es zwei Reiter und nicht ein Filter. */
+.ofi-osp-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-bottom: 1px solid var(--ofi-cal-border);
+    padding-bottom: 0;
+}
+#root .ofi-osp-tab,
+body > :not(#root) .ofi-osp-tab {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-osp-tab:hover,
+body > :not(#root) .ofi-osp-tab:hover { color: #0a7aff; background: transparent; }
+#root .ofi-osp-tab.is-on,
+body > :not(#root) .ofi-osp-tab.is-on {
+    border-bottom-color: #0a7aff;
+    color: #0a7aff;
+}
+.dark .ofi-osp-tab:hover,
+.dark .ofi-osp-tab.is-on { color: #fff; }
+.dark .ofi-osp-tab.is-on { border-bottom-color: rgba(255, 255, 255, 0.7); }
+
+/* Der Vorgang im Aktivitätsstrom: NEU (berechnet, ins Projekt gelegt) oder
+   ÄNDERUNG an einem Beleg, den wir schon kennen. */
+.ofi-osp-chip.is-new { background: #e7f6ef; color: #0f766e; }
+.ofi-osp-chip.is-update { background: #fdeee2; color: #c2410c; }
+.dark .ofi-osp-chip.is-new { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+.dark .ofi-osp-chip.is-update { background: rgba(249, 115, 22, 0.18); color: #fdba74; }
+
+/* ── DIE ANGEFRAGTEN EINHEITEN ───────────────────────────────────────────────
+   Eine Anfrage ist ein PROJEKT und hält mehrere Einheiten (§1). Sie stehen
+   untereinander, jede mit ihrem eigenen Datenblatt — genau die Aufteilung, die
+   die Offerte danach bekommt: eine Position je Einheit. */
+.ofi-osp-unitcell { vertical-align: top !important; }
+.ofi-osp-units { display: flex; flex-direction: column; gap: 4px; }
+.ofi-osp-unit {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+.ofi-osp-unit__text { display: flex; min-width: 0; flex-direction: column; }
+.ofi-osp-unit__text .ofi-osp-model { padding-top: 0; }
+/* Eine Einheit ohne Datenblatt rutscht nicht nach links: der Platz der Kachel
+   bleibt stehen, damit die Namen untereinander fluchten. */
+.ofi-osp-unit__nosheet { display: inline-block; width: 40px; flex: none; }
+
+/* Das Datenblatt: NUR das Zeichen (Vorgabe 19.09.2026 — "die Spalte darf
+   schmaler sein"). Vorher stand hier der Dateiname, den die OSP vergibt: eine
+   Kennnummer, die niemandem etwas sagt und der Spalte die halbe Tabelle
+   wegnahm. Ein ruhiger Verweis, kein Handlungsknopf wie "Offerte erstellen" —
+   die Aufschrift "OSP PDF" steht im Titel. */
+.ofi-osp-dochead,
+.ofi-osp-doccell { width: 1%; white-space: nowrap; text-align: center !important; }
+.ofi-osp-doccell { vertical-align: middle !important; }
+#root .ofi-osp-sheetbtn,
+body > :not(#root) .ofi-osp-sheetbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    /* Die Trefferflaeche ist groesser als das Zeichen: das Blatt wird
+       angeklickt, nicht nur angeschaut (Vorgabe 19.09.2026). */
+    padding: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    color: #0a7aff;
+    transition: background-color 130ms ease, transform 130ms ease;
+}
+#root .ofi-osp-sheetbtn:hover,
+body > :not(#root) .ofi-osp-sheetbtn:hover { background: var(--ofi-cal-hover); }
+#root .ofi-osp-sheetbtn svg,
+body > :not(#root) .ofi-osp-sheetbtn svg { flex: none; }
+.dark .ofi-osp-sheetbtn { color: rgba(255, 255, 255, 0.86); }
+
+/* ── DIE UNTERLAGEN HOLEN, UND DIE ANGABEN LESEN (21.09.2026) ────────────────
+   Zwei ruhige Knöpfe, kein Handlungsknopf: „Dokumente holen" gilt dem ganzen
+   PROJEKT (eine Anfrage hat mehrere Datenblätter), das Blatt-Zeichen daneben
+   öffnet die lesbare Fassung EINER Einheit. */
+#root .ofi-osp-fetchbtn,
+body > :not(#root) .ofi-osp-fetchbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    align-self: flex-start;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: transparent;
+    padding: 3px 10px 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-osp-fetchbtn:hover:not(:disabled),
+body > :not(#root) .ofi-osp-fetchbtn:hover:not(:disabled) {
+    border-color: #94a3b8;
+    background: var(--ofi-cal-hover);
+    color: #0a7aff;
+}
+#root .ofi-osp-fetchbtn:disabled,
+body > :not(#root) .ofi-osp-fetchbtn:disabled { opacity: 0.55; }
+.dark .ofi-osp-fetchbtn:hover:not(:disabled) { color: #fff; }
+
+#root .ofi-osp-mdbtn,
+body > :not(#root) .ofi-osp-mdbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    padding: 4px;
+    color: var(--ofi-cal-muted);
+    transition: background-color 130ms ease, color 130ms ease;
+}
+#root .ofi-osp-mdbtn:hover,
+body > :not(#root) .ofi-osp-mdbtn:hover { background: var(--ofi-cal-hover); color: #0a7aff; }
+.dark .ofi-osp-mdbtn:hover { color: #fff; }
+
+/* ── DAS BLATT ALS TEXT ──────────────────────────────────────────────────────
+   Die Markdown-Fassung im Fenster: oben die Produktangaben als Tabelle,
+   darunter das Blatt Abschnitt für Abschnitt. Ruhig gesetzt — es wird gelesen,
+   nicht bedient. */
+.ofi-osp-md { max-height: 62vh; overflow-y: auto; padding-right: 4px; }
+.ofi-osp-md__h1 {
+    margin: 0 0 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0a7aff;
+}
+.dark .ofi-osp-md__h1 { color: #fff; }
+.ofi-osp-md__h2 {
+    margin: 18px 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-md__table { width: 100%; margin: 6px 0 14px; border-collapse: collapse; font-size: 12.5px; }
+.ofi-osp-md__table th {
+    border-bottom: 1px solid var(--ofi-cal-border);
+    padding: 5px 8px 5px 0;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-md__table td { border-bottom: 1px solid var(--ofi-cal-border); padding: 5px 8px 5px 0; }
+.ofi-osp-md__table td:first-child { width: 42%; color: var(--ofi-cal-muted); }
+.ofi-osp-md__list { margin: 0 0 12px; font-size: 12.5px; }
+.ofi-osp-md__list > div { display: flex; gap: 10px; padding: 3px 0; }
+.ofi-osp-md__list dt { min-width: 42%; color: var(--ofi-cal-muted); }
+.ofi-osp-md__list dd { margin: 0; }
+.ofi-osp-md__text { margin: 0 0 8px; font-size: 12.5px; line-height: 1.55; }
+.ofi-osp-md__note {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 0;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-md__origin {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 14px 0 0;
+    border-top: 1px solid var(--ofi-cal-border);
+    padding-top: 8px;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+}
+
+/* Warum kein Datenblatt da ist — als Dreieck neben dem Zeichen; der ganze
+   Satz steht im Titel, damit die Spalte schmal bleibt. */
+.ofi-osp-sheeterr {
+    display: inline-flex;
+    margin-left: 3px;
+    vertical-align: middle;
+    color: #dc2626;
+}
+.dark .ofi-osp-sheeterr { color: #fca5a5; }
+
+/* Auf der Offerte trägt dieselbe Kachel wieder ihre Aufschrift: dort steht sie
+   in einer Zeile mit Platz, nicht in einer Tabellenspalte. */
+#root .ofi-quote-card .ofi-osp-sheetbtn,
+body > :not(#root) .ofi-quote-card .ofi-osp-sheetbtn {
+    border: 1px solid var(--ofi-cal-border);
+    padding: 5px 10px 5px 6px;
+}
+#root .ofi-quote-card .ofi-osp-sheetbtn:hover,
+body > :not(#root) .ofi-quote-card .ofi-osp-sheetbtn:hover {
+    transform: none;
+    border-color: #94a3b8;
+    background: var(--ofi-cal-hover);
+    opacity: 1;
+}
+
+/* Aktionsspalte: die Offerte links, der Löschknopf rechts daneben. */
+.ofi-osp-actions { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+#root .ofi-osp-rowdel,
+body > :not(#root) .ofi-osp-rowdel {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease;
+}
+#root .ofi-osp-rowdel:hover:not(:disabled),
+body > :not(#root) .ofi-osp-rowdel:hover:not(:disabled) {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+    color: #dc2626;
+}
+#root .ofi-osp-rowdel:disabled,
+body > :not(#root) .ofi-osp-rowdel:disabled { opacity: 0.45; }
+.dark .ofi-osp-rowdel:hover:not(:disabled) { color: #fca5a5; }
+
+/* ── Import-Fenster (portalisiert — deshalb OHNE #root-Präfix) ─────────── */
+.ofi-osp-import__modes { display: flex; gap: 8px; margin: 4px 0 12px; }
+.ofi-osp-import__mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: transparent;
+    padding: 7px 15px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.ofi-osp-import__mode.is-on { border-color: #0a7aff; background: #0a7aff; color: #fff; }
+.ofi-osp-import__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 12px;
+    margin: 6px 0 10px;
+}
+.ofi-osp-import__wide { grid-column: 1 / -1; }
+.ofi-osp-import__person { margin: 8px 0 4px; max-width: 340px; }
+.ofi-osp-import__textarea { min-height: 76px; resize: vertical; padding: 9px 11px; line-height: 1.5; }
+.ofi-osp-import__crm { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.ofi-osp-import__customer-combo { position: relative; }
+.ofi-osp-import__customer-combo .ofi-cal-input { padding-left: 36px; padding-right: 36px; }
+.ofi-osp-import__search-icon {
+    position: absolute;
+    z-index: 2;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ofi-cal-muted);
+    pointer-events: none;
+}
+.ofi-osp-import__customer-clear {
+    position: absolute;
+    z-index: 2;
+    right: 7px;
+    top: 50%;
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    transform: translateY(-50%);
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-import__customer-clear:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+.ofi-osp-import__results {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 5px);
+    right: 0;
+    left: 0;
+    display: flex;
+    max-height: 190px;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    padding: 5px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+}
+.ofi-osp-import__result { border: 0; border-radius: 8px; background: transparent; padding: 8px 11px; text-align: left; font-size: 12.5px; }
+.ofi-osp-import__muted { padding: 8px 3px; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-osp-import__chosen {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    padding: 9px 13px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-osp-import__chosen button {
+    display: inline-flex;
+    border: 0;
+    background: transparent;
+    padding: 3px;
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+}
+.ofi-osp-import__preview {
+    margin: 10px 0 6px;
+    border: 1px dashed var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface-2);
+    padding: 11px 13px;
+}
+.ofi-osp-import__previewlabel {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-osp-import__preview pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ofi-cal-text);
+}
+
+/* ── Einstellungsreiter (Verkauf → OSP) ────────────────────────────────── */
+.ofi-osp-settings { display: flex; max-width: 880px; flex-direction: column; gap: 14px; }
+.ofi-osp-settings__tenants { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+#root .ofi-osp-settings__tenant,
+body > :not(#root) .ofi-osp-settings__tenant {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    background: transparent;
+    padding: 7px 15px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+#root .ofi-osp-settings__tenant.is-on,
+body > :not(#root) .ofi-osp-settings__tenant.is-on { border-color: #0a7aff; background: rgba(10, 122, 255, 0.08); }
+.dark .ofi-osp-settings__tenant.is-on { border-color: rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.1); }
+#root .ofi-osp-settings__tenant:disabled,
+body > :not(#root) .ofi-osp-settings__tenant:disabled { cursor: default; opacity: 0.8; }
+.ofi-osp-settings__check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    color: #fff;
+}
+.ofi-osp-settings__check.is-on { border-color: #0a7aff; background: #0a7aff; }
+.dark .ofi-osp-settings__check.is-on { border-color: rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.85); color: #0a7aff; }
+.ofi-osp-settings__field { display: block; margin-top: 12px; }
+.ofi-osp-settings__field > span { display: block; margin-bottom: 4px; font-size: 11.5px; font-weight: 600; color: var(--ofi-cal-muted); }
+.ofi-osp-settings__field input {
+    width: 100%;
+    height: 38px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+}
+.ofi-osp-settings__field input:focus { outline: none; border-color: var(--ofi-cal-accent); }
+.ofi-osp-settings__clear { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-osp-settings__actions { display: flex; justify-content: flex-end; }

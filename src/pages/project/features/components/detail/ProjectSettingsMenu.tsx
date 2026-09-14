@@ -17,6 +17,7 @@ import {
 } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
+import '@/styles/modules/projectDetail.css';
 
 /** Onay için birebir yazılması gereken sözcük — her dilde AYNI (kod gibi). */
 const CONFIRM_WORD = 'DELETE';

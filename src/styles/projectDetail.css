@@ -1,0 +1,645 @@
+/* Project detail only (pages/project/ProjectDetail.tsx) — the same native-macOS
+   look the quote detail got on 09.09.2026 (styles/tenderDetail.css), asked for
+   the project page on 10.09.2026: «proje detayları da teklif detayları gibi
+   olsun — daha temiz Apple görünümü».
+
+   What that means here, in one list:
+     · flat white panels, ONE 10% hairline, 10px corner, no shadow, no tint,
+       no icon tiles in card heads;
+     · 28px bordered push buttons with a 6px corner, ONE solid blue primary;
+     · the workflow tabs as a small segmented control (no 4px gradient bar);
+     · tables: 34px grey caption row, 40px rows, hairline column rules,
+       tabular numerals, resize grips that only light up while grabbed;
+     · chips are small bordered badges with a coloured dot, never pills;
+     · the content sits DIRECTLY on the white canvas — the bordered stage
+       frame is gone, a card in a card was the busiest thing on the page.
+
+   Mechanics: the page already paints from the calendar tokens (`--ofi-cal-*`,
+   see the `.ofi-prj-*`, `.ofi-inv-*`, `.ofi-rep-*` blocks in index.css). This
+   file defines the quote palette (`--quote-*`) on the page and RE-POINTS the
+   calendar tokens at it, so every existing rule repaints on its own and dark
+   mode stays the same variable swap. Rules below only touch shape and size.
+
+   Specificity: `#root .ofi-prj-page.ofi-prj-apple …` beats the `#root .x`
+   rules of index.css and the app-wide button standard (styles/buttons.css,
+   loaded last, so `!important` where that file or index.css carries it); the
+   flattened radius utilities need `@layer utilities` ([[radius-utilities-flattened]]). */
+.ofi-prj-page.ofi-prj-apple {
+    --quote-canvas: #ffffff;
+    --quote-surface: #fff;
+    --quote-text: #1d1d1f;
+    --quote-secondary: #6e6e73;
+    --quote-muted: #a1a1a6;
+    --quote-border: rgba(0, 0, 0, 0.1);
+    --quote-hairline: rgba(0, 0, 0, 0.07);
+    --quote-field-border: #c3c6cd;
+    --quote-field: #fff;
+    --quote-hover: rgba(0, 0, 0, 0.03);
+    --quote-fill: rgba(0, 0, 0, 0.045);
+    --quote-fill-hover: rgba(0, 0, 0, 0.08);
+    --quote-accent: #0a7aff;
+    --quote-accent-soft: rgba(10, 122, 255, 0.09);
+    --quote-accent-tint: rgba(10, 122, 255, 0.05);
+    --quote-focus: rgba(10, 122, 255, 0.3);
+    --quote-danger: #d70015;
+    --quote-success: #1f8a3b;
+    --quote-warning: #b25000;
+    --quote-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
+    --quote-radius: 10px;
+    --quote-control-radius: 6px;
+    --quote-font: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    /* The calendar tokens the existing blocks paint from, re-pointed. */
+    --ofi-cal-surface: var(--quote-surface);
+    --ofi-cal-surface-2: var(--quote-surface);
+    --ofi-cal-surface-3: var(--quote-surface);
+    --ofi-cal-hover: var(--quote-hover);
+    --ofi-cal-border: var(--quote-border);
+    --ofi-cal-border-soft: var(--quote-hairline);
+    --ofi-cal-line: var(--quote-hairline);
+    --ofi-cal-text: var(--quote-text);
+    --ofi-cal-text-2: var(--quote-text);
+    --ofi-cal-muted: var(--quote-secondary);
+    --ofi-cal-faint: var(--quote-muted);
+    --ofi-cal-accent: var(--quote-accent);
+    --ofi-cal-accent-hover: color-mix(in srgb, var(--quote-accent) 88%, #000);
+    --ofi-cal-on-accent: #fff;
+    --ofi-cal-accent-soft: var(--quote-accent-soft);
+    --ofi-cal-accent-tint: var(--quote-accent-tint);
+    --ofi-cal-tab-active-bg: var(--quote-fill);
+    --ofi-cal-tab-active-text: var(--quote-text);
+    --ofi-cal-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --ofi-cal-shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.1);
+    --ofi-cal-danger: var(--quote-danger);
+    /* The app-wide button hover paints this over every button. */
+    --ofi-btn-tint-fill: rgba(0, 0, 0, 0.05);
+    --ofi-field-focus: var(--quote-accent);
+    --ofi-field-ring: var(--quote-focus);
+
+    min-width: 0;
+    padding-bottom: 32px;
+    color: var(--quote-text);
+    background: var(--quote-canvas);
+    font-family: var(--quote-font);
+    font-feature-settings: 'cv11', 'calt';
+    -webkit-font-smoothing: antialiased;
+}
+
+.dark .ofi-prj-page.ofi-prj-apple {
+    --quote-canvas: #0f1113;
+    --quote-surface: #1c1c1e;
+    --quote-text: #f5f5f7;
+    --quote-secondary: #a1a1a6;
+    --quote-muted: #6e6e73;
+    --quote-border: rgba(255, 255, 255, 0.1);
+    --quote-hairline: rgba(255, 255, 255, 0.08);
+    --quote-field-border: rgba(255, 255, 255, 0.16);
+    --quote-field: #161719;
+    --quote-hover: rgba(255, 255, 255, 0.04);
+    --quote-fill: rgba(255, 255, 255, 0.07);
+    --quote-fill-hover: rgba(255, 255, 255, 0.12);
+    --quote-accent: #3b8dff;
+    --quote-accent-soft: rgba(59, 141, 255, 0.16);
+    --quote-accent-tint: rgba(59, 141, 255, 0.08);
+    --quote-focus: rgba(59, 141, 255, 0.4);
+    --quote-danger: #ff453a;
+    --quote-success: #30d158;
+    --quote-warning: #ffb340;
+    --quote-btn-shadow: none;
+    --ofi-cal-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    --ofi-cal-shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.45);
+    --ofi-btn-tint-fill: rgba(255, 255, 255, 0.08);
+}
+
+#root .ofi-prj-page.ofi-prj-apple :where(h1, h2, h3, h4, p, span, label, input, button, select, textarea, td, th, dt, dd) {
+    font-family: var(--quote-font);
+}
+
+/* Legacy Tailwind greys inside the tabs, mapped onto the palette. */
+html #root .ofi-prj-page.ofi-prj-apple :where(.text-slate-400) { color: var(--quote-muted) !important; }
+html #root .ofi-prj-page.ofi-prj-apple :where(.text-slate-500, .text-slate-600) { color: var(--quote-secondary) !important; }
+html #root .ofi-prj-page.ofi-prj-apple :where(.text-slate-700, .text-slate-800, .text-slate-900) { color: var(--quote-text) !important; }
+
+/* ═══ header ═════════════════════════════════════════════════════════════ */
+.ofi-prj-apple .ofi-prj-head { gap: 12px; padding: 2px 0 10px; }
+@media (min-width: 1024px) { .ofi-prj-apple .ofi-prj-head { gap: 16px; } }
+
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-head__num {
+    font-family: var(--quote-font);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+    color: var(--quote-text);
+}
+.ofi-prj-apple .ofi-prj-head__sub { gap: 4px 8px; padding-top: 2px; font-size: 12.5px; color: var(--quote-secondary); }
+
+/* Info + gear beside the number: 26px bordered squares, the way a Mac window
+   keeps its small helper buttons. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-glyph {
+    width: 26px;
+    height: 26px;
+    border: 1px solid transparent;
+    border-radius: var(--quote-control-radius) !important;
+    color: var(--quote-secondary);
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-glyph:hover:not(:disabled) { background: var(--quote-fill); color: var(--quote-text); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-glyph.is-active { background: var(--quote-fill); color: var(--quote-text); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-glyph svg { width: 15px; height: 15px; }
+.ofi-prj-apple .ofi-prj-head__id { gap: 4px; }
+.ofi-prj-apple .ofi-prj-head__num { padding-right: 6px; }
+
+.ofi-prj-apple .ofi-prj-head__state { font-size: 12.5px; font-weight: 500; }
+.ofi-prj-apple .ofi-prj-head__state.is-done { color: var(--quote-success); }
+.ofi-prj-apple .ofi-prj-head__state.is-closed { color: var(--quote-danger); }
+
+/* ═══ push buttons — 28px, 6px corner, hairline; one solid blue ══════════ */
+#root .ofi-prj-page.ofi-prj-apple :is(
+    .ofi-prj-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-addon-pdf-btn,
+    .ofi-prj-bell,
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    .ofi-btn-danger,
+    button[class*="px-"]
+):not(:is(.ofi-prj-tab, .ofi-cal-page *, .ofi-prj-glyph, .ofi-inv-glyph, .ant-btn-link, .ant-btn-text, [class~="rounded-full"], .ofi-col-grip, .ofi-rep-doc, .ofi-rep-card)) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding-inline: 10px !important;
+    padding-block: 0 !important;
+    border: 1px solid var(--quote-field-border) !important;
+    border-radius: var(--quote-control-radius) !important;
+    background: var(--quote-field) !important;
+    background-image: none !important;
+    color: var(--quote-text) !important;
+    -webkit-text-fill-color: var(--quote-text);
+    box-shadow: var(--quote-btn-shadow) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0;
+    white-space: nowrap;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-btn, .ofi-inv-btn, .ofi-ordconf-btn, .ofi-addon-pdf-btn, .ofi-prj-bell, .ant-btn, .ofi-cta, .ofi-btn-brand, button[class*="px-"]) svg { width: 13px; height: 13px; flex: none; }
+#root .ofi-prj-page.ofi-prj-apple :is(
+    .ofi-prj-btn,
+    .ofi-inv-btn,
+    .ofi-ordconf-btn,
+    .ofi-addon-pdf-btn,
+    .ofi-prj-bell,
+    .ant-btn,
+    .ofi-cta,
+    .ofi-btn-brand,
+    button[class*="px-"]
+):not(:is(.ofi-prj-tab, .ofi-cal-page *, .ofi-prj-glyph, .ofi-inv-glyph, .ant-btn-link, .ant-btn-text)):hover:not(:disabled) {
+    background: var(--quote-hover) !important;
+    border-color: var(--quote-field-border) !important;
+    color: var(--quote-text) !important;
+    -webkit-text-fill-color: var(--quote-text);
+    box-shadow: var(--quote-btn-shadow) !important;
+}
+/* THE ONE BLUE: the primary action of the page (Projekt abschliessen), the
+   create button of a card and AntD's primary. */
+#root .ofi-prj-page.ofi-prj-apple :is(
+    .ofi-prj-btn.is-primary,
+    .ofi-inv-btn.is-primary,
+    .ant-btn-primary,
+    .ofi-cta,
+    .ofi-btn-brand
+):not(:is(.ofi-cal-page *, .ant-btn-link, .ant-btn-text)),
+#root .ofi-prj-page.ofi-prj-apple :is(
+    .ofi-prj-btn.is-primary,
+    .ofi-inv-btn.is-primary,
+    .ant-btn-primary,
+    .ofi-cta,
+    .ofi-btn-brand
+):not(:is(.ofi-cal-page *, .ant-btn-link, .ant-btn-text)):hover:not(:disabled) {
+    border-color: transparent !important;
+    background: var(--quote-accent) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff;
+}
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-btn.is-primary, .ofi-inv-btn.is-primary, .ant-btn-primary, .ofi-cta, .ofi-btn-brand):not(:is(.ofi-cal-page *)):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--quote-accent) 88%, #000) !important;
+}
+/* Buttons whose colour says which document comes out: the order confirmation
+   (blue text) and the add-on PDF (amber text) — bordered, white, no gradient. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-ordconf-btn { color: var(--quote-accent) !important; -webkit-text-fill-color: var(--quote-accent); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-ordconf-btn:hover:not(:disabled) { color: var(--quote-accent) !important; -webkit-text-fill-color: var(--quote-accent); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-addon-pdf-btn { color: var(--quote-warning) !important; -webkit-text-fill-color: var(--quote-warning); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-addon-pdf-btn:hover:not(:disabled) { color: var(--quote-warning) !important; -webkit-text-fill-color: var(--quote-warning); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-addon-pdf-btn.is-icon { width: 26px; height: 26px !important; min-height: 26px !important; padding: 0 !important; }
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-inv-btn.is-danger, .ofi-btn-danger) { color: var(--quote-danger) !important; -webkit-text-fill-color: var(--quote-danger); }
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-btn, .ofi-inv-btn, .ofi-ordconf-btn, .ofi-addon-pdf-btn, .ofi-prj-bell, .ant-btn):disabled {
+    cursor: not-allowed;
+    opacity: 1;
+    border-color: var(--quote-border) !important;
+    color: var(--quote-muted) !important;
+    -webkit-text-fill-color: var(--quote-muted);
+    background: var(--quote-surface) !important;
+}
+#root .ofi-prj-page.ofi-prj-apple button:focus-visible { outline: 3px solid var(--quote-focus) !important; outline-offset: 1px; }
+
+/* The bell: the same push button with its count as a small grey capsule. */
+.ofi-prj-apple .ofi-prj-bell__count {
+    height: 16px;
+    min-width: 16px;
+    border-radius: 5px;
+    background: var(--quote-fill);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--quote-secondary);
+}
+.ofi-prj-apple .ofi-prj-bell__count.is-hot { color: var(--quote-text); }
+
+/* The "Öffnen ›" text link in a card head stays a text link — smaller. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-card__link { height: 24px; font-size: 12px; font-weight: 500; color: var(--quote-accent); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-card__link:hover { background: var(--quote-accent-tint); }
+
+/* Row glyphs (invoice list, requests): 26px, 6px corner. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-glyph {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--quote-control-radius) !important;
+    color: var(--quote-secondary);
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-glyph:hover:not(:disabled) { background: var(--quote-fill); color: var(--quote-text); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-glyph.is-danger:hover:not(:disabled) { color: var(--quote-danger); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-glyph svg { width: 14px; height: 14px; }
+
+/* ═══ chips: bordered badge with a dot, never a pill ═════════════════════ */
+.ofi-prj-apple :is(.ofi-prj-state, .ofi-prj-tag, .ofi-inv-state, .ofi-inv-kind, .ofi-rep-tag, .ofi-inv-chip) {
+    --chip-dot: var(--quote-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--quote-border);
+    border-radius: 5px;
+    background: var(--quote-surface);
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: 0;
+    color: var(--quote-secondary);
+}
+.ofi-prj-apple :is(.ofi-prj-state, .ofi-prj-tag, .ofi-inv-state, .ofi-rep-tag)::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--chip-dot);
+}
+.ofi-prj-apple .ofi-inv-state__ring { display: none; }
+.ofi-prj-apple .ofi-prj-tag { padding: 0 6px; font-size: 10.5px; line-height: 1.5; }
+.ofi-prj-apple :is(.ofi-prj-state.is-green, .ofi-inv-state.is-paid, .ofi-rep-tag.is-signed) { --chip-dot: var(--quote-success); }
+.ofi-prj-apple :is(.ofi-prj-state.is-blue, .ofi-prj-tag.is-main, .ofi-rep-tag.is-open, .ofi-inv-kind) { --chip-dot: var(--quote-accent); }
+.ofi-prj-apple :is(.ofi-prj-state.is-amber, .ofi-prj-tag.is-addon, .ofi-inv-state.is-open) { --chip-dot: var(--quote-warning); }
+.ofi-prj-apple :is(.ofi-prj-state.is-red, .ofi-prj-tag.is-alert) { --chip-dot: var(--quote-danger); }
+.ofi-prj-apple .ofi-inv-chip { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--quote-text); background: var(--quote-fill); border-color: transparent; }
+.ofi-prj-apple .ofi-inv-btn.is-primary .ofi-inv-chip { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.ofi-prj-apple .ofi-prj-dot { background: var(--quote-danger); }
+
+/* ═══ order selector: a bordered popup button ════════════════════════════ */
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-order {
+    gap: 10px;
+    border: 1px solid var(--quote-field-border);
+    border-radius: var(--quote-control-radius) !important;
+    background: var(--quote-field);
+    padding: 3px 8px 3px 10px;
+    box-shadow: var(--quote-btn-shadow);
+    transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-order:hover { background: var(--quote-hover); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-order.is-open,
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-order[aria-expanded='true'] {
+    border-color: var(--quote-accent);
+    background: var(--quote-field);
+    box-shadow: 0 0 0 3px var(--quote-focus);
+}
+.ofi-prj-apple .ofi-prj-order__mark { width: 22px; height: 22px; border-radius: 5px; background: transparent; color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-prj-order__mark.is-addon { background: transparent; color: var(--quote-warning); }
+.ofi-prj-apple .ofi-prj-order__mark svg { width: 15px; height: 15px; }
+.ofi-prj-apple .ofi-prj-order__num { font-size: 13px; font-weight: 600; }
+.ofi-prj-apple .ofi-prj-order__meta { font-size: 11px; color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-prj-order__sum { border-left: 1px solid var(--quote-hairline); padding: 0 4px 0 12px; }
+.ofi-prj-apple .ofi-prj-order__amount { font-size: 13px; font-weight: 600; }
+.ofi-prj-apple .ofi-prj-order__label { font-size: 10.5px; letter-spacing: 0; color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-prj-order__chev { color: var(--quote-secondary); }
+
+/* Its menu: the quote's popup window. */
+.ofi-prj-apple .ofi-prj-menu { border: 1px solid var(--quote-border); border-radius: var(--quote-radius); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.dark .ofi-prj-apple .ofi-prj-menu { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); }
+.ofi-prj-apple .ofi-prj-menu__head { padding: 10px 14px 6px; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--quote-secondary); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-menu__link { font-size: 12px; font-weight: 500; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-menu__row { border-radius: 6px !important; padding: 6px 8px; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-menu__row:hover { background: var(--quote-fill); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-menu__row.is-selected { background: var(--quote-accent-soft); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-menu__foot { border-top: 1px solid var(--quote-hairline); padding: 10px 14px; font-size: 12.5px; font-weight: 500; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-menu__foot:hover:not(:disabled) { background: var(--quote-hover); }
+
+/* ═══ workflow tabs: a Mac segmented control ═════════════════════════════ */
+.ofi-prj-apple .ofi-prj-tabs {
+    min-width: 0;
+    margin: 2px 0 14px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.ofi-prj-apple .ofi-prj-tabs__rail {
+    display: flex;
+    width: fit-content;
+    min-width: max-content;
+    align-items: center;
+    gap: 1px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--quote-fill);
+}
+.ofi-prj-apple .ofi-prj-tabs__item { position: relative; flex: none; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 24px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    color: var(--quote-text);
+    -webkit-text-fill-color: var(--quote-text);
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.4;
+    white-space: nowrap;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab::before,
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab::after { content: none !important; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab:hover:not(.is-active) { background: transparent; color: var(--quote-text); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab.is-active {
+    background: var(--quote-surface);
+    font-weight: 500;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.dark #root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab.is-active { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab svg { width: 13px; height: 13px; color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-prj-tabs__badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--quote-border);
+    border-radius: 5px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--quote-danger);
+}
+.ofi-prj-apple .ofi-prj-tabs__menu {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    min-width: 13rem;
+    overflow: hidden;
+    border: 1px solid var(--quote-border);
+    border-radius: var(--quote-radius);
+    background: var(--quote-surface);
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tabs__menuItem {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 12.5px;
+    color: var(--quote-text);
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tabs__menuItem:hover,
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-tabs__menuItem.is-active { background: var(--quote-fill); }
+
+/* ═══ the stage: no frame — the cards ARE the panels ═════════════════════ */
+.ofi-prj-apple .ofi-prj-stage {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+}
+@media (min-width: 768px) { .ofi-prj-apple .ofi-prj-stage { padding: 0; } }
+.ofi-prj-apple .ofi-prj-overview { gap: 14px; }
+.ofi-prj-apple .ofi-prj-grid,
+.ofi-prj-apple .ofi-prj-col { gap: 14px; }
+
+/* ═══ panels: one hairline, one corner, nothing else ═════════════════════ */
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-card, .ofi-inv-card, .ofi-rep-lane, .ofi-dlv-card, [data-ui-card], .ofi-prj-stage .border-slate-200) {
+    border: 1px solid var(--quote-border) !important;
+    background: var(--quote-surface) !important;
+    box-shadow: none !important;
+}
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-card__head, .ofi-inv-card__head, [data-ui-card-header], .ofi-rep-lane__head, .ofi-dlv-card__head) {
+    min-height: 44px;
+    gap: 12px;
+    border-bottom: 1px solid var(--quote-hairline) !important;
+    background: var(--quote-surface) !important;
+    padding: 10px 16px !important;
+}
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-card__title, .ofi-inv-card__title, [data-ui-card-header] h3, .ofi-rep-lane__title) {
+    font-family: var(--quote-font) !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    color: var(--quote-text) !important;
+}
+#root .ofi-prj-page.ofi-prj-apple [data-ui-card-header] p { font-size: 12.5px; color: var(--quote-secondary) !important; }
+/* No icon tiles in a card head (the quote dropped them too). */
+#root .ofi-prj-page.ofi-prj-apple [data-ui-card-header] .size-8 { display: none; }
+#root .ofi-prj-page.ofi-prj-apple :is(.ofi-inv-card__title, .ofi-prj-card__title) > svg { display: none; }
+/* Tinted header strips (costs: "Verwendete Materialien") go white. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-stage [class*="bg-slate-50"] { background: var(--quote-surface) !important; border-color: var(--quote-hairline) !important; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-stage :is(.border-slate-100, .border-slate-200, .dark\:border-white\/10) { border-color: var(--quote-hairline) !important; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-stage .border-slate-200.rounded-lg { border-color: var(--quote-border) !important; }
+
+/* Reports hub: tiles and agenda cards on the same hairline. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-rep-doc { border-color: var(--quote-border); border-radius: var(--quote-radius) !important; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-rep-doc:hover:not(:disabled) { background: var(--quote-hover); box-shadow: none; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-rep-card { border-radius: 8px !important; }
+.ofi-prj-apple .ofi-rep-level { padding: 0 2px; font-size: 12.5px; font-weight: 600; letter-spacing: -0.005em; text-transform: none; color: var(--quote-text); }
+
+/* Empty states get a panel of their own, so they never float on the canvas. */
+.ofi-prj-apple .ofi-prj-stage div.py-10.text-center {
+    border: 1px solid var(--quote-border);
+    border-radius: var(--quote-radius);
+    background: var(--quote-surface);
+    padding: 40px 24px;
+}
+.ofi-prj-apple .ofi-prj-stage .ant-empty .size-12 { border: 1px solid var(--quote-border); border-radius: var(--quote-radius); background: var(--quote-surface); color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-prj-stage .ant-empty h3 { font-size: 13.5px; font-weight: 600; color: var(--quote-text); }
+.ofi-prj-apple .ofi-prj-stage .ant-empty p { font-size: 12.5px; color: var(--quote-secondary); }
+
+/* Loading placeholders in the palette. */
+.ofi-prj-apple .ofi-prj-stage .bg-slate-100,
+.ofi-prj-apple .ofi-prj-stage .bg-slate-50 { background: var(--quote-fill) !important; }
+
+/* ═══ tables: caption row, 40px rows, hairline column rules ══════════════ */
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] {
+    --quote-grid-line: var(--quote-hairline);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--quote-text);
+}
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] th {
+    height: 34px;
+    padding: 0 12px;
+    border-top: 0;
+    border-bottom: 1px solid var(--quote-border);
+    background: var(--quote-surface);
+    color: var(--quote-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.3;
+    text-transform: none;
+    vertical-align: middle;
+}
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] td {
+    height: 40px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--quote-hairline);
+    color: var(--quote-text);
+    line-height: 1.4;
+}
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] :is(th, td):first-child { padding-left: 16px; }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] :is(th, td):last-child { padding-right: 16px; }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tbody tr:last-child td { border-bottom-color: transparent; }
+/* Column rules, as on the quote table — except on the label/value lists of
+   the overview (`data-prj-kv`), where a rule down the middle would split one
+   fact in two. */
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table]:not([data-prj-kv]) thead th + th,
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table]:not([data-prj-kv]) tbody td + td,
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table]:not([data-prj-kv]) tfoot td + td {
+    border-left: 1px solid var(--quote-hairline);
+}
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] td[style*="border-right"] { border-right-color: var(--quote-hairline) !important; }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tbody tr.is-link:hover td { background: var(--quote-hover); }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tbody tr.is-link:focus-visible { outline: 2px solid var(--quote-accent); outline-offset: -2px; }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tbody tr.is-link:focus-visible td { background: var(--quote-accent-tint); }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tbody tr:not(.is-link):hover td { background: transparent; }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] td.ofi-prj-key { color: var(--quote-secondary); }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tbody tr.is-link:hover td.ofi-prj-key { color: var(--quote-text); }
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tr.is-current td { background: var(--quote-accent-tint); }
+/* Total rows (costs: "Gesamt"): a quiet fill, figures in text ink. */
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tfoot tr,
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] tfoot td,
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-total td {
+    background: var(--quote-fill) !important;
+    color: var(--quote-text) !important;
+    font-weight: 600;
+}
+#root .ofi-prj-page.ofi-prj-apple table[data-inv-table] :is(.font-mono, .ofi-prj-mono, .ofi-inv-num, .ofi-prj-num) { font-family: var(--quote-font); font-variant-numeric: tabular-nums; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-prj-mono { font-family: var(--quote-font); font-weight: 600; }
+.ofi-prj-apple .ofi-prj-num { font-weight: 600; }
+.ofi-prj-apple .ofi-prj-num.is-billed,
+.ofi-prj-apple .ofi-inv-num.is-billed { color: var(--quote-success); }
+.ofi-prj-apple .ofi-inv-num.is-open { color: var(--quote-warning); }
+.ofi-prj-apple .ofi-prj-sub { font-size: 11px; color: var(--quote-secondary); }
+.ofi-prj-apple :is(.ofi-prj-empty, .ofi-inv-empty, .ofi-rep-empty) { padding: 24px 16px; font-size: 12.5px; color: var(--quote-secondary); }
+
+/* Resize grips: the column rule is the marker at rest, blue while grabbed. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-col-grip::before {
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    margin-left: 0;
+    border-radius: 0;
+    background: transparent;
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-col-grip:hover::before,
+#root .ofi-prj-page.ofi-prj-apple th[data-resize-active] .ofi-col-grip::before {
+    width: 2px;
+    margin-left: -1px;
+    background: var(--quote-accent);
+    opacity: 1;
+}
+
+/* Inline inputs in a table (billing amounts): bordered on hover, ring on focus. */
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-input {
+    height: 26px;
+    min-height: 26px;
+    border: 1px solid transparent;
+    border-radius: 5px !important;
+    background: transparent;
+    padding: 2px 6px;
+    font-size: 13px;
+    color: var(--quote-text);
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-input:hover:not(:disabled) { border-color: var(--quote-field-border); background: var(--quote-field); }
+#root .ofi-prj-page.ofi-prj-apple .ofi-inv-input:focus { border-color: var(--quote-accent); background: var(--quote-field); box-shadow: 0 0 0 3px var(--quote-focus); outline: none; }
+
+/* ═══ overview bits ══════════════════════════════════════════════════════ */
+.ofi-prj-apple .ofi-prj-facts { gap: 12px 24px; padding: 13px 16px 15px; }
+.ofi-prj-apple .ofi-prj-facts__label { padding-bottom: 2px; font-size: 12px; color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-prj-facts__value { font-size: 13px; }
+.ofi-prj-apple .ofi-prj-facts__value.is-empty { color: var(--quote-muted); }
+.ofi-prj-apple .ofi-prj-contact { gap: 6px 20px; padding: 0 2px 2px; }
+.ofi-prj-apple .ofi-prj-contact__text { font-size: 12.5px; }
+.ofi-prj-apple .ofi-prj-contact__icon { color: var(--quote-muted); }
+
+/* The one coloured surface stays — as a quiet amber wash, not a block. */
+.ofi-prj-apple .ofi-prj-pending { border-top: 1px solid var(--quote-hairline); background: rgba(255, 159, 10, 0.08); padding: 10px 16px 11px; }
+.dark .ofi-prj-apple .ofi-prj-pending { background: rgba(255, 159, 10, 0.1); }
+.ofi-prj-apple .ofi-prj-pending__title,
+.ofi-prj-apple .ofi-prj-pending__sum { color: var(--quote-warning); }
+.ofi-prj-apple .ofi-prj-pending__hint { color: var(--quote-secondary); }
+
+/* Notifications window: the same panel. */
+.ofi-prj-apple .ofi-prj-notes { border: 1px solid var(--quote-border); border-radius: var(--quote-radius); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+.ofi-prj-apple .ofi-prj-notes__head { background: var(--quote-surface); border-bottom-color: var(--quote-hairline); }
+.ofi-prj-apple .ofi-prj-notes__mark { border-radius: 6px; }
+
+/* Invoice-kit rows (add-on requests, invoice groups). */
+.ofi-prj-apple .ofi-inv-row { border-bottom: 1px solid var(--quote-hairline); }
+.ofi-prj-apple .ofi-inv-row__title { font-size: 13px; }
+.ofi-prj-apple .ofi-inv-row__meta,
+.ofi-prj-apple .ofi-inv-row__note { font-size: 12px; color: var(--quote-secondary); }
+.ofi-prj-apple .ofi-inv-field__label { font-size: 12px; color: var(--quote-secondary); }
+
+/* ═══ radii — the utilities layer carries !important ═════════════════════ */
+@layer utilities {
+    #root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-card, .ofi-inv-card, .ofi-rep-lane, .ofi-dlv-card, [data-ui-card], .ofi-prj-stage .border-slate-200.rounded-lg, .ofi-prj-stage .rounded-xl.border, .ofi-prj-notes) { border-radius: var(--quote-radius) !important; }
+    #root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-btn, .ofi-inv-btn, .ofi-ordconf-btn, .ofi-addon-pdf-btn, .ofi-prj-bell, .ant-btn, .ofi-cta, .ofi-btn-brand, .ofi-prj-glyph, .ofi-inv-glyph, .ofi-prj-order, .ofi-prj-tab):not(.ofi-cal-page *) { border-radius: var(--quote-control-radius) !important; }
+    #root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-state, .ofi-prj-tag, .ofi-inv-state, .ofi-inv-kind, .ofi-rep-tag, .ofi-inv-chip, .ofi-prj-tabs__badge) { border-radius: 5px !important; }
+    #root .ofi-prj-page.ofi-prj-apple .ofi-prj-tabs__rail { border-radius: 8px !important; }
+    #root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-stage .rounded-md, .ofi-prj-stage .rounded) { border-radius: 6px !important; }
+}
+
+@media (max-width: 640px) {
+    #root .ofi-prj-page.ofi-prj-apple :is(.ofi-prj-card__head, .ofi-inv-card__head, [data-ui-card-header]) { padding: 10px 14px !important; flex-wrap: wrap; }
+    #root .ofi-prj-page.ofi-prj-apple .ofi-prj-tab { padding: 0 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-prj-page.ofi-prj-apple *,
+    #root .ofi-prj-page.ofi-prj-apple *::before,
+    #root .ofi-prj-page.ofi-prj-apple *::after { transition: none !important; }
+}

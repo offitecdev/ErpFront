@@ -54,7 +54,7 @@ export class PaneErrorBoundary extends React.Component<PaneErrorBoundaryProps, P
                     <button
                         type="button"
                         onClick={() => this.setState({ error: null })}
-                        className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-[13px] font-semibold text-slate-700 shadow-xs transition-colors hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:bg-white/14"
+                        className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-[13px] font-semibold text-slate-700 shadow-xs transition-colors hover:bg-[#e3efff] hover:text-[#0066e0] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:bg-white/14"
                     >
                         {t('nav.paneErrorRetry', { defaultValue: 'Tekrar dene' })}
                     </button>

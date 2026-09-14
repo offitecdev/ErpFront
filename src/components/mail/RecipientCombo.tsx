@@ -5,6 +5,7 @@ import { t } from '@/i18n/translate';
 import { mailMessagesApi, type AddressBookEntry } from '@/lib/api/mail';
 import { ComboCell, type ComboOption } from '@/pages/inventory/components/ComboCell';
 import { CustomerPickerModal } from '@/pages/crm/components/CustomerPickerModal';
+import '@/styles/modules/mailModule.css';
 
 /**
  * EMPFÄNGERFELD des Schreiben-Fensters (Vorgabe 18.08.2026).

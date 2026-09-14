@@ -44,6 +44,7 @@ import {
     isoToday,
     round2,
 } from './invoiceShared';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── DIREKTRECHNUNG (`/sales/invoices/new/direct`) ────────────────────────────

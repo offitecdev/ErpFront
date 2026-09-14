@@ -1,22 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowUp, Check, CheckCircle, ChevronDown, List, Plus, RefreshCcw01, Settings01, SquareDivide, Trash01, Zap } from '@/components/icons/antIconCompat';
+import { AlertTriangle, ArrowUp, Check, CheckCircle, ChevronDown, Plus, RefreshCcw01, Settings01, SquareDivide, Trash01, Zap } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingDots } from '@/components/ui-shared/Loader';
 import { BotLoadingPanel } from '@/components/ui-shared/OffitecBot';
 import { t } from '@/i18n/translate';
 import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
+import type { CodeScheme } from '@/lib/api/articleCodes';
 import { useAuthStore } from '@/store/authStore';
 import { usePurchaseTemplateStore } from '@/store/purchaseTemplateStore';
-import type { ArticleListItem, ItemType, OrderCalcMode, PurchaseOrderItemInput, PurchaseOrderRow, SupplierCalcConfig, SupplierOrderTemplate } from '@/types/inventory';
+import type { ArticleListItem, ItemType, OrderCalcMode, PurchaseOrderItemInput, PurchaseOrderRow, SupplierCalcConfig, SupplierOrderTemplate, TemplateColumn } from '@/types/inventory';
 import { ArticleComboCell } from './components/ArticleComboCell';
 import { ArticlePickerModal } from './components/ArticlePickerModal';
 import { OrderFlowSteps } from './components/OrderFlowSteps';
-import { CalcModePopup } from './import/CalcModePopup';
 import { SupplierImportDialog } from './import/SupplierImportDialog';
 import { TemplateManagerPopup } from './import/TemplateManagerPopup';
-import { calcModeLabel, defaultCalcConfig, draftExtras, templateColumns } from './import/importTemplate';
+import { CalcModeCard } from './components/CalcModeCard';
+import { SchemePickDialog } from './components/SchemePickDialog';
+import {
+    calcModeError,
+    defaultCalcConfig,
+    draftExtras,
+    extraKeyAliases,
+    extrasFromItems,
+    hiddenKeysForTemplate,
+    remapRowExtras,
+    tableColumnsFromTemplate,
+    tableColumnsSnapshot,
+    templateProblemText,
+    templateProblems,
+    type OrderColumnId,
+} from './import/importTemplate';
 import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from './components/primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
@@ -31,14 +46,6 @@ import {
     rowDiffersFromOrigin,
     transitionRowMode,
 } from './utils/orderRowMode';
-import { ColumnOrderPopup } from './components/ColumnOrderPopup';
-import {
-    orderColumnIdsFromTemplate,
-    readStoredOrderColumns,
-    resolveOrderColumns,
-    writeStoredOrderColumns,
-    type OrderColumnId,
-} from './utils/orderColumns';
 import { ORDER_STATUS_META, canReceiveGoods, canRevertReceipt, stageIndexOf } from './utils/orderStatus';
 import '@/styles/purchaseImport.css';
 import '@/styles/orderDetails.css';
@@ -150,10 +157,28 @@ export const OrderReceivePage = () => {
     const [note, setNote] = useState<string | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [calcMode, setCalcMode] = useState<OrderCalcMode>('DIRECT');
+    /* Die Rechenart ist zurück (Vorgabe Samet, 14.09.2026) — dieselbe Karte
+       wie in der Bestellmaske. Eingelagerte Zeilen rechnen nicht mehr um:
+       ihre Buchungen sind mit ihrem Preis geschrieben. */
+    const [calcOpen, setCalcOpen] = useState(false);
+    const [calcError, setCalcError] = useState<string | null>(null);
+    /* Zeilen ohne Produktcode bekommen ihren ERP-Code erst beim Einlagern —
+       der Server fragt nach dem Nummernkreis (SCHEME_REQUIRED), die Seite
+       merkt sich die offene Einlagerung und setzt nach der Wahl dort fort. */
+    const [codeScheme, setCodeScheme] = useState<CodeScheme | null>(null);
+    const [schemeAsk, setSchemeAsk] = useState<{ targetKeys: string[] | null; complete: boolean; noteText: (processed: number) => string } | null>(null);
     const templateDocumentType = 'GOODS_RECEIPT' as const;
     const preferredTemplateId = usePurchaseTemplateStore((state) => state.selected.GOODS_RECEIPT);
     const selectPreferredTemplate = usePurchaseTemplateStore((state) => state.select);
     const [aiConfig, setAiConfig] = useState<SupplierCalcConfig>(() => defaultCalcConfig());
+    const aiConfigRef = useRef<SupplierCalcConfig>(defaultCalcConfig());
+    const loadedExtrasRef = useRef<TemplateColumn[]>([]);
+    /** Eigene Angaben der Bestellung unter die Schluessel der Vorlage haengen. */
+    const remapLoadedExtras = (config: SupplierCalcConfig, extras: TemplateColumn[]) => {
+        const aliases = extraKeyAliases(config, extras);
+        if (!aliases.size) return;
+        setRows((current) => current.map((row) => remapRowExtras(row, aliases)));
+    };
     const [calcTemplates, setCalcTemplates] = useState<SupplierOrderTemplate[]>([]);
     const [activeTemplate, setActiveTemplate] = useState<SupplierOrderTemplate | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
@@ -162,7 +187,6 @@ export const OrderReceivePage = () => {
     const [templatesOpen, setTemplatesOpen] = useState(false);
     const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
     const [aiOpen, setAiOpen] = useState(false);
-    const [calcPopupOpen, setCalcPopupOpen] = useState(false);
     const [allPickerRowKey, setAllPickerRowKey] = useState<string | null>(null);
     const [focusRowKey, setFocusRowKey] = useState<string | null>(null);
     /* ── DIE RÜCKFRAGE IST EIN STREIFEN, KEIN FENSTER (08.09.2026) ──────────
@@ -177,6 +201,7 @@ export const OrderReceivePage = () => {
     const adoptOrder = (row: PurchaseOrderRow) => {
         setOrder(row);
         setRows(row.items.map(rowFromItem));
+        remapLoadedExtras(aiConfigRef.current, extrasFromItems(row.items));
         setCalcMode(row.items[0]?.calcMode === 'AUTO' || row.items[0]?.calcMode === 'SUPPLIER'
             ? row.items[0].calcMode
             : 'DIRECT');
@@ -198,32 +223,25 @@ export const OrderReceivePage = () => {
         return () => { cancelled = true; };
     }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    /* Goods-receipt templates have their own namespace. Supplier-specific
-       defaults still win over the general default, exactly as in orders. */
+    /* Der Wareneingang hat seine eigene Vorlagenliste (GOODS_RECEIPT). Eine
+       Vorlage gehoert keinem Lieferanten mehr (11.09.2026): es gilt die von
+       Hand gewaehlte, sonst die Vorgabe, sonst die erste. */
     useEffect(() => {
         if (!order) return;
         let cancelled = false;
-        purchaseOrdersApi.listSupplierTemplates(order.supplierId, templateDocumentType)
+        purchaseOrdersApi.listSupplierTemplates(null, templateDocumentType)
             .then((items) => {
                 if (cancelled) return;
                 setCalcTemplates(items);
                 const chosen = items.find((entry) => entry.id === (activeTemplateId ?? preferredTemplateId));
-                const forSupplier = order.supplierId
-                    ? items.find((entry) => entry.supplierId === order.supplierId && entry.isDefault)
-                    : undefined;
-                const general = items.find((entry) => !entry.supplierId && entry.isDefault);
-                const active = chosen ?? forSupplier ?? general ?? items[0] ?? null;
+                const general = items.find((entry) => entry.isDefault);
+                const active = chosen ?? general ?? items[0] ?? null;
                 setActiveTemplate(active);
                 const nextConfig = active?.config ?? defaultCalcConfig();
                 setAiConfig(nextConfig);
+                remapLoadedExtras(nextConfig, loadedExtrasRef.current);
                 if (active && active.id !== preferredTemplateId) {
                     selectPreferredTemplate(templateDocumentType, active.id);
-                }
-                if (activeTemplateId !== null) {
-                    const nextMode = nextConfig.calcMode ?? 'DIRECT';
-                    setCalcMode(nextMode);
-                    setRows((current) => current.map((row) => transitionRowMode(row, nextMode)));
-                    setDirty(true);
                 }
             })
             .catch(() => {
@@ -234,7 +252,7 @@ export const OrderReceivePage = () => {
                 }
             });
         return () => { cancelled = true; };
-    }, [order?.supplierId, activeTemplateId, preferredTemplateId, templateTick]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [order?.id, activeTemplateId, preferredTemplateId, templateTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const remainingOf = (row: DraftOrderRow) =>
         Math.max(0, (parseNum(row.quantity) ?? 0) - row.receivedQuantity);
@@ -263,14 +281,6 @@ export const OrderReceivePage = () => {
     };
 
 
-    /* EINE Rechenart fuer die ganze Bestellung — genau wie im Editor
-       (Vorgabe Samet, 07.09.2026): eine Zeile kann sich nicht mehr abkoppeln. */
-    const changeCalcMode = (next: OrderCalcMode) => {
-        setRows((current) => current.map((row) => transitionRowMode(row, next)));
-        setCalcMode(next);
-        setDirty(true);
-    };
-
     /** Fiyat kutusunun yanındaki geri çağır düğmesi (editörle aynı). */
     const recallButton = (row: DraftOrderRow, changed: boolean) => (
         <button
@@ -279,7 +289,7 @@ export const OrderReceivePage = () => {
             onClick={() => recallRowPrice(row)}
             title={t('inv.orders.calcMode.recallPrice')}
             aria-label={t('inv.orders.calcMode.recallPrice')}
-            className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] disabled:invisible dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0066e0] disabled:invisible dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
         >
             <RefreshCcw01 size={13} />
         </button>
@@ -423,6 +433,48 @@ export const OrderReceivePage = () => {
         }
     };
 
+    /* ── DIE VORLAGE IST DIE TABELLE, AUCH HIER (11.09.2026) ────────────────
+       Ganz links der feste ERP-Code, dann die Spalten der Vorlage in ihrer
+       Reihenfolge. Die eigenen Angaben, die die Bestellung selbst traegt,
+       kommen hinten dazu, wenn die Vorlage sie nicht kennt. Ohne gueltige
+       Vorlage gibt es keine Tabelle. */
+    const loadedExtraColumns = useMemo(() => extrasFromItems(order?.items ?? []), [order]);
+    const templateFaults = useMemo(
+        () => (activeTemplate ? templateProblems(aiConfig, templateDocumentType) : ['noColumns' as const]),
+        [activeTemplate, aiConfig],
+    );
+    const templateReady = templateFaults.length === 0;
+    const calcModeProblem = calcModeError(aiConfig, calcMode);
+    const applyCalcMode = (next: OrderCalcMode) => {
+        const problem = calcModeError(aiConfig, next);
+        if (problem) {
+            setCalcError(problem);
+            toast.error(problem);
+            return;
+        }
+        setCalcError(null);
+        const movable = (row: DraftOrderRow) => row.receivedQuantity <= 0;
+        if (next === calcMode && rows.every((row) => !movable(row) || row.calcMode === next)) return;
+        setCalcMode(next);
+        setRows((current) => current.map((row) => (movable(row) ? transitionRowMode(row, next) : row)));
+        setDirty(true);
+    };
+    const tableColumns = useMemo(
+        () => (templateReady ? tableColumnsFromTemplate(aiConfig, loadedExtraColumns) : []),
+        [templateReady, aiConfig, loadedExtraColumns],
+    );
+    /** Die freien Spalten — ihre Werte werden als eigene Angaben gespeichert. */
+    const extraColumns = useMemo(
+        () => tableColumns
+            .filter((column) => !column.label && !column.fixed)
+            .map((column) => ({ key: column.key, name: column.name, type: column.type, width: column.width, label: null })),
+        [tableColumns],
+    );
+    /* Bestellung und Vorlage kommen beide asynchron — wer als Zweiter ankommt,
+       haengt die eigenen Angaben unter die Schluessel der Vorlage um. */
+    useEffect(() => { aiConfigRef.current = aiConfig; }, [aiConfig]);
+    useEffect(() => { loadedExtrasRef.current = loadedExtraColumns; }, [loadedExtraColumns]);
+
     // ── Kaydetme (editörün akışıyla aynı: önce yeni/çakışan ürünler) ─────────
     const rowToItem = (row: DraftOrderRow, articleId?: string): PurchaseOrderItemInput => {
         const figures = draftRowFigures(row);
@@ -451,9 +503,9 @@ export const OrderReceivePage = () => {
             calcMode: row.calcMode,
             receivedQuantity: row.receivedQuantity,
             receivedAt: row.receivedAt,
-            // Visibility controls AI input/application only. Saving a receipt
-            // must not erase extra values that were already stored on the order.
-            extras: draftExtras(row, aiConfig.extraColumns ?? []),
+            // Die freien Spalten der Vorlage — plus die, die die Bestellung
+            // selbst mitbringt — reisen mit ihren Ueberschriften.
+            extras: draftExtras(row, extraColumns),
             ...(row.calcMode === 'DIRECT' ? { directCopy: true, lineTotal: figures.lineTotal } : {}),
         };
     };
@@ -468,33 +520,18 @@ export const OrderReceivePage = () => {
             toast.error(t('inv.orders.receive.lastRow'));
             return null;
         }
-        // Yeni/çakışan kodlu satırlar önce ürün listesine yazılır (dosya kazanır).
-        // Tek toplu çağrı (malzeme/ürün birleşmesi 2026-08-14).
-        const createdIds = new Map<string, string>();
-        {
-            const newRows = filledRows.filter((row) => !row.articleId && row.code.trim());
-            if (newRows.length && canCreateArticles) {
-                const result = await inventoryApi.bulkCreateArticles(newRows.map((row) => ({
-                    articleCode: row.code.trim(),
-                    name: row.name.trim(),
-                    quantity: 0,
-                    purchasePrice: draftRowFigures(row).netUnitPrice,
-                    supplierId: order.supplierId ?? null,
-                    supplierName: order.supplierId ? null : order.supplierName,
-                    unit: row.unit || null,
-                })), undefined, { overwrite: true });
-                result.created.forEach((created) => {
-                    const row = newRows.find((candidate) => !createdIds.has(candidate.key)
-                        && candidate.code.trim().toLowerCase() === created.articleCode.toLowerCase());
-                    if (row) createdIds.set(row.key, created.id);
-                });
-            }
-        }
+        /* KEIN ARTIKEL BEIM SPEICHERN (Vorgabe Samet, 14.09.2026): «Bevor es in
+           den Wareneingang übertragen ist, kommt nichts in die Produkte.» Das
+           Speichern schreibt nur die Zeilen der Bestellung; den Artikel legt
+           erst das Einlagern an (`/receive`). */
         const updated = await purchaseOrdersApi.update(orderId, {
-            items: filledRows.map((row) => rowToItem(row, createdIds.get(row.key))),
+            items: filledRows.map((row) => rowToItem(row)),
             // Dieselbe Regel wie in der Bestellmaske: die Bestellung merkt sich,
-            // was die Vorlage ausblendet, damit das PDF es später noch weiss.
-            hiddenColumnKeys: aiConfig.hiddenColumnKeys ?? [],
+            // was die Vorlage nicht traegt, damit das PDF es später noch weiss.
+            hiddenColumnKeys: hiddenKeysForTemplate(aiConfig),
+            // Und die Spalten der Vorlage selbst: das PDF schreibt ihre Namen
+            // als Titel und haelt ihre Reihenfolge (Vorgabe Samet, 11.09.2026).
+            tableColumns: tableColumnsSnapshot(aiConfig),
         });
         setOrder(updated);
         setDirty(false);
@@ -555,8 +592,14 @@ export const OrderReceivePage = () => {
         targetKeys: string[] | null,
         complete: boolean,
         noteText: (processed: number) => string,
+        scheme: CodeScheme | null = codeScheme,
     ) => {
         if (!orderId) return;
+        if (calcModeProblem) {
+            setCalcError(calcModeProblem);
+            toast.error(calcModeProblem);
+            return;
+        }
         setBusy('receive');
         try {
             // İndeksler kaydetmeden ÖNCE hesaplanır (kayıt sırayı korur).
@@ -565,12 +608,20 @@ export const OrderReceivePage = () => {
                 : [];
             const persisted = await persistRows();
             if (!persisted) return;
-            const result = await purchaseOrdersApi.receive(orderId, complete ? { complete: true } : { lines: indexes.map((index) => ({ index })) });
+            const result = await purchaseOrdersApi.receive(orderId, {
+                ...(complete ? { complete: true } : { lines: indexes.map((index) => ({ index })) }),
+                ...(scheme ? { codeSchemeId: scheme.id } : {}),
+            });
             adoptOrder(result.order);
             setNote(noteText(result.processedCount));
             if (result.errors.length) toast.error(result.errors.map((entry) => entry.error).join(' · '));
             if (result.order.status === 'COMPLETED') toast.success(t('inv.orders.receive.completed'));
         } catch (err) {
+            // Zeilen ohne Produktcode: erst den Nummernkreis wählen, dann weiter.
+            if ((err as { response?: { data?: { code?: string } } })?.response?.data?.code === 'SCHEME_REQUIRED') {
+                setSchemeAsk({ targetKeys, complete, noteText });
+                return;
+            }
             toast.error(errorText(err));
         } finally {
             setBusy(null);
@@ -601,65 +652,19 @@ export const OrderReceivePage = () => {
         allTitle: t('inv.productPicker.allTitle'),
     };
 
-    /* ── DIE REIHENFOLGE DER SPALTEN, AUCH HIER ─────────────────────────────
-       Der Wareneingang hatte bis zum 09.09.2026 eine fest verdrahtete Tabelle:
-       Name, Nummer, Menge, Preise, Rabatte, Betrag — nicht zu verstellen, und
-       die eigenen Angaben der Vorlage erschienen ueberhaupt nicht. Jetzt gilt
-       dieselbe EINE Liste wie in der Bestellmaske (`utils/orderColumns.ts`),
-       nur mit eigenem Platz im Browser: oben in der Liste = links in der
-       Tabelle, feste Felder und eigene Angaben gemischt. Verwaltet wird sie
-       in der Liste links neben der Tabelle, nicht in einem Fenster. */
-    const extraColumns = useMemo(
-        () => (aiConfig.extraColumns ?? []).filter((column) => column.name.trim()),
-        [aiConfig.extraColumns],
+    const columnOrder = useMemo(() => tableColumns.map((column) => column.id), [tableColumns]);
+    const columnById = useMemo(
+        () => new Map(tableColumns.map((column) => [column.id, column])),
+        [tableColumns],
     );
-    const [storedColumnOrder, setStoredColumnOrder] = useState<OrderColumnId[] | null>(
-        () => readStoredOrderColumns('receipt'),
-    );
-    /* ── DIE VORLAGE SCHREIBT VOR, WAS ÜBERHAUPT DASTEHT ────────────────────
-       Vorgabe Samet (09.09.2026): «Drücken wir auf unsichtbar, muss die Spalte
-       unsichtbar werden — direkt auf die Tabelle angewendet.» Das Auge in der
-       Vorlage hielt den Wert bis dahin nur aus dem Beleg-Import heraus; die
-       Spalte stand weiter in der Tabelle, und man sah dem Häkchen seine
-       Wirkung nicht an. Jetzt ist die Vorlage die Liste der Spalten, und die
-       gespeicherte Reihenfolge ordnet nur noch, was davon übrig bleibt.
-
-       ⚠ ES WIRD NICHTS GELÖSCHT, nur nicht gezeichnet. Eine ausgeblendete
-       Spalte behält ihren Wert im Datensatz (`rowToItem` schickt ihn weiter) —
-       sonst nähme ein Klick aufs Auge einem schon eingelagerten Beleg still
-       seine Preise weg, und zurückholen könnte man sie nicht. */
-    const templateVisible = useMemo(
-        () => orderColumnIdsFromTemplate(templateColumns(aiConfig)),
-        [aiConfig],
-    );
-    const columnOrder = useMemo(
-        () => resolveOrderColumns(storedColumnOrder, extraColumns, false)
-            .filter((id) => templateVisible.has(id)),
-        [storedColumnOrder, extraColumns, templateVisible],
-    );
-    const changeColumnOrder = (next: OrderColumnId[]) => {
-        setStoredColumnOrder(next);
-        writeStoredOrderColumns(next, 'receipt');
-    };
-    const resetColumnOrder = () => {
-        setStoredColumnOrder(null);
-        writeStoredOrderColumns(null, 'receipt');
-    };
     const extraByKey = useMemo(
-        () => new Map(extraColumns.map((column) => [column.key, column])),
-        [extraColumns],
+        () => new Map(tableColumns.filter((column) => !column.label && !column.fixed).map((column) => [column.id, column])),
+        [tableColumns],
     );
-    /* Die Spaltenliste ist ein FENSTER, mittig über der Seite (Vorgabe Samet,
-       09.09.2026: «Sütun pop up olarak çıksın, ortada»). Am selben Tag stand
-       sie kurz als Leiste links neben der Tabelle; die Leiste nahm der breiten
-       Tabelle dauerhaft Platz weg, obwohl man die Reihenfolge selten anfasst.
-       Ein Fenster kostet nur, solange es offen ist — und es ist dasselbe, das
-       die Bestellmaske benutzt. */
-    const [columnOrderOpen, setColumnOrderOpen] = useState(false);
 
     // Sichtbare Spalten + (für Berechtigte) das Kästchen links + die Zeilenspalte rechts.
     const columnCount = columnOrder.length + (allowed ? 2 : 1);
-    const tableMinWidth = 1000 + extraColumns.length * 120;
+    const tableMinWidth = 240 + tableColumns.length * 120;
     // Sürüklenebilir sütunlar; ad sütununun genişliği yoktur, kalanı o emer.
     // (Kanca erken `return`'den ÖNCE çağrılmalı.)
     const grid = useColumnWidths({
@@ -667,8 +672,10 @@ export const OrderReceivePage = () => {
         defaults: {
             code: 128, quantity: 88, grossPrice: 104, netPrice: 104,
             discount: 88, discount2: 88, lineTotal: 120, send: 80,
-            // Die eigenen Spalten tragen feste Schlüssel, damit eine
-            // gespeicherte Breite ihre Umbenennung überlebt (wie im Editor).
+            // Die freien Spalten tragen feste Schlüssel (`c1` … `c12`); `x1` …
+            // `x5` sind die Schluessel aelterer Bestellungen.
+            c1: 120, c2: 120, c3: 120, c4: 120, c5: 120, c6: 120,
+            c7: 120, c8: 120, c9: 120, c10: 120, c11: 120, c12: 120,
             x1: 120, x2: 120, x3: 120, x4: 120, x5: 120,
         },
         minPx: 40,
@@ -680,26 +687,18 @@ export const OrderReceivePage = () => {
        Schlüssel nach Überschrift, Ausrichtung, Breite und Inhalt. Feste
        Felder und eigene Angaben beantworten dieselben vier Fragen — genau
        deshalb dürfen sie sich mischen. */
+    /** Die Überschrift — der Name, den die Vorlage der Spalte gibt. */
     const columnLabel = (id: OrderColumnId): string => {
-        const extra = extraByKey.get(id);
-        if (extra) return extra.name;
-        switch (id) {
-            case 'name': return kindLabels.name;
-            case 'code': return kindLabels.code;
-            case 'quantity': return t('inv.columns.quantity');
-            case 'grossPrice': return t('inv.orders.columns.grossPrice');
-            case 'netPrice': return t('inv.orders.columns.netPrice');
-            case 'discount': return t('inv.orders.columns.discount');
-            case 'discount2': return t('inv.orders.columns.discount2');
-            case 'lineTotal': return t('inv.columns.lineTotal');
-            default: return id;
-        }
+        const column = columnById.get(id);
+        if (column) return column.fixed ? kindLabels.code : column.name;
+        return id;
     };
 
+    /** Zahlen rechts, Text links — nach der Art, die die Vorlage vergibt. */
     const columnAlign = (id: OrderColumnId): 'left' | 'right' => {
-        const extra = extraByKey.get(id);
-        if (extra) return extra.type === 'number' ? 'right' : 'left';
-        return id === 'name' || id === 'code' ? 'left' : 'right';
+        const column = columnById.get(id);
+        if (column?.fixed || id === 'name') return 'left';
+        return column?.type === 'number' || (column?.label && column.label !== 'productName') ? 'right' : 'left';
     };
 
     /** Der Name trägt KEINE Breite: er saugt auf, was übrig bleibt. */
@@ -777,7 +776,9 @@ export const OrderReceivePage = () => {
                         onChange={(event) => patchRow(row.key, { code: event.target.value })}
                         // Seri kod katalogda varsa o ürün satırın üzerine yazılır.
                         onBlur={(event) => void applySerialCodeMatch(row.key, event.target.value)}
-                        className={`${CELL_INPUT_CLASS} font-mono ${row.name.trim() && !row.code.trim() ? '!border-red-400' : ''}`}
+                        /* Leer ist erlaubt: der ERP-Code kommt beim Einlagern
+                           aus dem Nummernkreis. */
+                        className={`${CELL_INPUT_CLASS} font-mono`}
                     />
                 ) : (
                     <span className="block truncate font-mono text-[12.5px] text-slate-500 dark:text-white/60">{row.code || '—'}</span>
@@ -996,25 +997,27 @@ export const OrderReceivePage = () => {
                         {note ?? t('inv.orders.receive.hint')}
                     </span>
                     <span className="text-slate-400 dark:text-white/40">
-                        {t('inv.orders.receive.progress', { done: receivedCount, total: rows.length })}
+                        {/* Ohne gültige Vorlage zeigt die Seite 0 Positionen (14.09.2026). */}
+                        {t('inv.orders.receive.progress', templateReady
+                            ? { done: receivedCount, total: rows.length }
+                            : { done: 0, total: 0 })}
                     </span>
                 </span>
 
                 {/* ÜRÜN/MALZEME SEÇİCİSİ YOKTUR: tür siparişten devralınır. */}
                 {allowed && (
                 <span className="flex flex-wrap items-center justify-end gap-2">
-                    {/* ── DER LISTENKNOPF ────────────────────────────────────
-                        Er öffnet die Spaltenliste als Fenster mittig über der
-                        Seite — derselbe Knopf und dasselbe Fenster wie in der
-                        Bestellmaske. */}
+                    {/* BERECHNUNG (14.09.2026) — dieselbe Karte wie in der Bestellmaske. */}
                     <button
                         type="button"
-                        onClick={() => setColumnOrderOpen(true)}
-                        title={t('inv.orders.columnOrder.title')}
-                        aria-label={t('inv.orders.columnOrder.title')}
-                        className="ofi-poi-icon"
+                        onClick={() => { setCalcError(calcModeProblem); setCalcOpen(true); }}
+                        title={t('inv.orders.calcMode.title')}
+                        aria-label={t('inv.orders.calcMode.title')}
+                        disabled={!templateReady}
+                        className={`ofi-ord-calcbtn is-compact${calcOpen ? ' is-on' : ''}${calcModeProblem && templateReady ? ' is-warn' : ''}`}
                     >
-                        <List size={17} />
+                        <SquareDivide size={15} />
+                        <span>{t(calcMode === 'AUTO' ? 'inv.orders.calcMode.auto' : calcMode === 'SUPPLIER' ? 'inv.orders.calcMode.supplier' : 'inv.orders.calcMode.direct')}</span>
                     </button>
                     {/* HESAP KİPİ — TEK AÇILIR LİSTE (kullanıcı isteği 2026-08-02, üç
                         düğme yerine). Varsayılan DOĞRUDAN GİRİŞtir. Liste TÜM satırlara
@@ -1026,7 +1029,7 @@ export const OrderReceivePage = () => {
                             onClick={() => setTemplateMenuOpen((current) => !current)}
                         >
                             <Settings01 size={14} />
-                            {activeTemplate?.title ?? t('inv.aiImport.templateFallback')}
+                            {activeTemplate?.title ?? t('inv.aiImport.templateNone')}
                             <ChevronDown size={13} />
                         </button>
                         {templateMenuOpen && (
@@ -1058,7 +1061,7 @@ export const OrderReceivePage = () => {
                                             {activeTemplate?.id === template.id ? <Check size={14} /> : <span style={{ width: 14 }} />}
                                             <span>
                                                 {template.title}
-                                                <small>{template.supplierName || t('inv.aiImport.templatesAllSuppliers')}</small>
+                                                <small>{t('inv.aiImport.columnCount', { count: template.config.columns.length })}</small>
                                             </span>
                                         </button>
                                     ))}
@@ -1073,14 +1076,11 @@ export const OrderReceivePage = () => {
                     </span>
                     <button
                         type="button"
-                        className={`ofi-poi-icon${calcMode !== 'DIRECT' ? ' is-on' : ''}`}
-                        onClick={() => setCalcPopupOpen(true)}
-                        title={`${t('inv.aiImport.calcTitle')}: ${calcModeLabel(calcMode)}`}
-                        aria-label={t('inv.aiImport.calcTitle')}
+                        className="ofi-poi-launch is-alive"
+                        disabled={!templateReady}
+                        title={templateReady ? undefined : t('inv.aiImport.templateRequiredTitle')}
+                        onClick={() => setAiOpen(true)}
                     >
-                        <SquareDivide size={17} />
-                    </button>
-                    <button type="button" className="ofi-poi-launch is-alive" onClick={() => setAiOpen(true)}>
                         <Zap size={14} />
                         {t('inv.aiImport.importButton')}
                     </button>
@@ -1088,6 +1088,20 @@ export const OrderReceivePage = () => {
                 )}
             </div>
 
+            {/* OHNE VORLAGE KEINE TABELLE (Vorgabe Samet, 11.09.2026) — auch
+                im Wareneingang: der Hinweis und der Weg zur Vorlage. */}
+            {!templateReady ? (
+                <SectionCard title={t('inv.orders.receive.sectionTitle', { count: 0 })}>
+                    <div className="ofi-ord-need">
+                        <AlertTriangle size={22} />
+                        <b>{t('inv.aiImport.templateRequiredTitle')}</b>
+                        <span>{activeTemplate ? templateProblemText(templateFaults[0]) : t('inv.aiImport.templateRequiredHint')}</span>
+                        <button type="button" className="ofi-ord-done" onClick={() => { setOpenTemplateId(activeTemplate?.id ?? null); setTemplatesOpen(true); }}>
+                            {t(activeTemplate ? 'inv.aiImport.templateFixButton' : 'inv.aiImport.templateCreateButton')}
+                        </button>
+                    </div>
+                </SectionCard>
+            ) : (
             <SectionCard title={t('inv.orders.receive.sectionTitle', { count: rows.length })}>
                 <div className="overflow-x-auto">
                     {/* Satırlar mal kabulde daha FERAH (kullanıcı isteği): yükseklik
@@ -1280,6 +1294,7 @@ export const OrderReceivePage = () => {
                 </div>
                 )}
             </SectionCard>
+            )}
 
             {!allowed && order.status !== 'COMPLETED' && (
                 <p className="text-[12px] text-slate-400 dark:text-white/50">{t('inv.orders.receive.notReady')}</p>
@@ -1295,30 +1310,12 @@ export const OrderReceivePage = () => {
                 template={activeTemplate}
                 onApply={applyAiRows}
                 calcMode={calcMode}
-                goodsReceipt
-            />
-            <ColumnOrderPopup
-                open={columnOrderOpen}
-                order={columnOrder}
-                labelOf={columnLabel}
-                isExtra={(id) => extraByKey.has(id)}
-                onChange={changeColumnOrder}
-                onReset={resetColumnOrder}
-                onClose={() => setColumnOrderOpen(false)}
-            />
-            <CalcModePopup
-                open={calcPopupOpen}
-                onClose={() => setCalcPopupOpen(false)}
-                mode={calcMode}
-                onPick={(next) => changeCalcMode(next)}
-                config={aiConfig}
-                templateTitle={activeTemplate?.title ?? t('inv.aiImport.templateFallback')}
+                documentType="GOODS_RECEIPT"
             />
             <TemplateManagerPopup
                 open={templatesOpen}
                 onClose={() => { setTemplatesOpen(false); setOpenTemplateId(null); }}
                 openTemplateId={openTemplateId}
-                initialSupplier={{ id: order.supplierId ?? null, name: order.supplierName }}
                 documentType="GOODS_RECEIPT"
                 onSaved={(templateId) => {
                     if (templateId) {
@@ -1334,6 +1331,26 @@ export const OrderReceivePage = () => {
                 onClose={() => setAllPickerRowKey(null)}
                 onPick={(article) => { if (allPickerRowKey) onProductPicked(allPickerRowKey, article); }}
                 title={kindLabels.allTitle}
+            />
+
+            <CalcModeCard
+                open={calcOpen}
+                onClose={() => { setCalcOpen(false); setCalcError(null); }}
+                mode={calcMode}
+                config={aiConfig}
+                onApply={applyCalcMode}
+                error={calcError}
+            />
+
+            <SchemePickDialog
+                open={Boolean(schemeAsk)}
+                onClose={() => setSchemeAsk(null)}
+                onPick={(scheme) => {
+                    const pending = schemeAsk;
+                    setCodeScheme(scheme);
+                    setSchemeAsk(null);
+                    if (pending) void runReceive(pending.targetKeys, pending.complete, pending.noteText, scheme);
+                }}
             />
         </div>
     );

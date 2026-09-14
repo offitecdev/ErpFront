@@ -8,6 +8,7 @@ import { t } from '@/i18n/translate';
 import { ospApi, type OspDocumentDto, type OspUnitDto } from '@/lib/api/osp';
 import { changeSummary } from '@/pages/sales/osp/ospChanges';
 import { OspDatasheetSheet } from '@/pages/sales/osp/OspDatasheetSheet';
+import '@/styles/modules/osp.css';
 
 /**
  * ── HERKUNFT AUS DER OSP (19.09.2026) ────────────────────────────────────────
@@ -177,7 +178,7 @@ export const OspOriginCard = ({ tenderId }: { tenderId: string }) => {
                 NUR, wenn es etwas zu warnen gibt. */}
             <div className="ofi-osp-origin flex items-center gap-x-3 overflow-x-auto px-4 py-2 [scrollbar-width:thin]">
                 <OspMark size={24} variant="tile" className="shrink-0" />
-                <span className="shrink-0 text-[13px] font-semibold tracking-[0.01em] text-[#1f2654]">
+                <span className="shrink-0 text-[13px] font-semibold tracking-[0.01em] text-[#0066e0]">
                     {t('osp.origin.title')}
                 </span>
                 <span className="shrink-0 font-mono text-[12.5px] font-semibold text-slate-600">{doc.reference}</span>

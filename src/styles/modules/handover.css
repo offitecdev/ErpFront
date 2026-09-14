@@ -1,0 +1,220 @@
+/* handover — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+.ofi-dlv-card {
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+}
+.ofi-dlv-card__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+    padding: 8px 10px 8px 14px;
+}
+.ofi-dlv-card__icon {
+    display: flex;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+.ofi-dlv-card__title {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-dlv-card__count {
+    flex: none;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-muted);
+}
+.ofi-dlv-card__count.is-done { background: #e6f4ea; color: #137333; }
+.dark .ofi-dlv-card__count.is-done { background: rgba(52, 168, 83, 0.18); color: #81c995; }
+.ofi-dlv-card__actions { display: flex; flex: none; align-items: center; gap: 2px; }
+.ofi-dlv-card__body { padding: 14px; }
+
+/* Die Papierkörbe sind bewusst GROSS (Vorgabe) — Tablet-tauglich. */
+#root .ofi-dlv-iconbtn,
+body > :not(#root) .ofi-dlv-iconbtn {
+    display: flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 100ms ease, color 100ms ease;
+}
+#root .ofi-dlv-iconbtn:hover,
+body > :not(#root) .ofi-dlv-iconbtn:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-dlv-iconbtn.is-danger:hover,
+body > :not(#root) .ofi-dlv-iconbtn.is-danger:hover { background: #fce8e6; color: #c5221f; }
+#root .ofi-dlv-iconbtn:disabled,
+body > :not(#root) .ofi-dlv-iconbtn:disabled { opacity: 0.32; cursor: not-allowed; }
+#root .ofi-dlv-iconbtn:disabled:hover,
+body > :not(#root) .ofi-dlv-iconbtn:disabled:hover { background: transparent; color: var(--ofi-cal-muted); }
+.dark .ofi-dlv-iconbtn.is-danger:hover { background: rgba(217, 48, 37, 0.22); color: #f28b82; }
+
+/* ── Kontrollpunkte in der Karte (Leseansicht, Klick öffnet das Ausfüllen) ── */
+.ofi-dlv-items { display: flex; flex-direction: column; }
+#root .ofi-dlv-item,
+body > :not(#root) .ofi-dlv-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 9px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 100ms ease;
+}
+.ofi-dlv-item + .ofi-dlv-item { border-top: 1px solid var(--ofi-cal-line); }
+#root .ofi-dlv-item:hover,
+body > :not(#root) .ofi-dlv-item:hover { background: var(--ofi-cal-hover); }
+.ofi-dlv-item__main { min-width: 0; flex: 1; }
+.ofi-dlv-item__label { display: block; font-size: 13px; color: var(--ofi-cal-text); }
+/* Die Beschreibung steht DIREKT UNTER dem Punkt (Vorgabe). */
+.ofi-dlv-item__desc { display: block; padding-top: 2px; font-size: 11.5px; line-height: 1.45; color: var(--ofi-cal-muted); }
+
+.ofi-dlv-status {
+    flex: none;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+.ofi-dlv-status.is-yes { background: #e6f4ea; color: #137333; }
+.ofi-dlv-status.is-no { background: #fce8e6; color: #c5221f; }
+.ofi-dlv-status.is-na { background: var(--ofi-cal-hover); color: var(--ofi-cal-muted); }
+.ofi-dlv-status.is-open { background: transparent; color: var(--ofi-cal-faint); box-shadow: inset 0 0 0 1px var(--ofi-cal-border-soft); }
+.dark .ofi-dlv-status.is-yes { background: rgba(52, 168, 83, 0.18); color: #81c995; }
+.dark .ofi-dlv-status.is-no { background: rgba(217, 48, 37, 0.2); color: #f28b82; }
+
+/* ── Der EINE "+"-Knopf: immer unter der letzten Liste ──────────────────── */
+#root .ofi-dlv-add,
+body > :not(#root) .ofi-dlv-add {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px dashed var(--ofi-cal-border);
+    border-radius: 12px !important;
+    background: transparent;
+    padding: 13px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-accent);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-dlv-add:hover,
+body > :not(#root) .ofi-dlv-add:hover { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+#root .ofi-dlv-add.is-inline,
+body > :not(#root) .ofi-dlv-add.is-inline { padding: 9px; font-size: 12.5px; }
+
+/* Noch keine Liste im Rapport. */
+.ofi-dlv-blank {
+    border-radius: 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+    padding: 26px 16px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Bearbeiten-Popup ───────────────────────────────────────────────────── */
+.ofi-dlv-editlist { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.ofi-dlv-editrow {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    padding: 10px;
+}
+.ofi-dlv-editrow > .ofi-tp-ordinal { margin-top: 6px; }
+.ofi-dlv-editrow__main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 6px; }
+.ofi-dlv-editrow__opt {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+    cursor: pointer;
+}
+.ofi-dlv-editrow > .ofi-dlv-iconbtn { margin-top: 1px; }
+
+/* ── Ausfüll-Popup ──────────────────────────────────────────────────────── */
+.ofi-dlv-filllist { display: flex; flex-direction: column; gap: 8px; }
+.ofi-dlv-fillrow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.ofi-dlv-fillrow__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ofi-dlv-fillrow__label { min-width: 0; flex: 1; font-size: 13.5px; font-weight: 500; color: var(--ofi-cal-text); }
+/* Beschreibung DIREKT UNTER dem Punkt, volle Breite. */
+.ofi-dlv-fillrow__desc { width: 100%; }
+
+.ofi-dlv-seg { display: inline-flex; flex: none; overflow: hidden; border-radius: 999px; background: var(--ofi-cal-hover); padding: 3px; gap: 2px; }
+#root .ofi-dlv-seg__btn,
+body > :not(#root) .ofi-dlv-seg__btn {
+    min-width: 58px;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: background-color 100ms ease, color 100ms ease;
+}
+#root .ofi-dlv-seg__btn:hover,
+body > :not(#root) .ofi-dlv-seg__btn:hover { color: var(--ofi-cal-text); }
+#root .ofi-dlv-seg__btn.is-on.is-yes,
+body > :not(#root) .ofi-dlv-seg__btn.is-on.is-yes { background: #137333; color: #fff; }
+#root .ofi-dlv-seg__btn.is-on.is-no,
+body > :not(#root) .ofi-dlv-seg__btn.is-on.is-no { background: #c5221f; color: #fff; }
+#root .ofi-dlv-seg__btn.is-on.is-na,
+body > :not(#root) .ofi-dlv-seg__btn.is-on.is-na { background: var(--ofi-cal-muted); color: #fff; }

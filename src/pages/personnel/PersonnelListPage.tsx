@@ -42,7 +42,7 @@ export const PersonnelListPage = () => {
                     <button
                         type="button"
                         onClick={() => setCreateOpen(true)}
-                        className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
+                        className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0]"
                     >
                         <Plus size={14} />
                         {t('personnel.list.add')}
@@ -151,7 +151,7 @@ export const PersonnelListPage = () => {
                                             event.stopPropagation();
                                             setQrPerson(person);
                                         }}
-                                        className="inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] dark:hover:bg-white/10 dark:hover:text-white"
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0066e0] dark:hover:bg-white/10 dark:hover:text-white"
                                     >
                                         <QrCode01 size={14} />
                                     </button>

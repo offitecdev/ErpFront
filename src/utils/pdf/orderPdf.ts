@@ -1,42 +1,38 @@
 /**
  * ── SATIN ALMA SİPARİŞİ PDF ŞABLONU ─────────────────────────────────────────
- * `tenderPdfModern.ts`'in sipariş uyarlaması. Antet (logo + dalga + iletişim),
- * alt bilgi bandı, kapak bilgi kartı ve tablo dili teklif şablonuyla birebirdir;
- * içerik farkları:
- *  - Alıcı blok müşteri değil TEDARİKÇİdir; bilgi kartı sipariş no / tarih /
- *    sipariş adı / tedarikçi satırlarını taşır.
- *  - Gönderici TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — gün içinde
- *    üç satıra bölünmüştü, geri alındı): "Offitec GmbH, Ceres Tower -
- *    Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa sarılmaz, puntosu küçülür.
- *  - Kapak KARTI teklif belgesindeki DAR TABLONUN aynısıdır (78 mm, 5.6 mm
- *    satır): Bestellung / Besteller / Datum / Angebots-Nr / Projekt / EMPFÄNGER /
- *    Lieferant. Alıcı adı sağdaki adres bloğunda DEĞİL bu kartta durur; DURUM
- *    SATIRI YOKTUR (kısa süre denendi, kullanıcı isteğiyle kaldırıldı).
- *    `tenderPdfModern` + `priceRequestPdf` ile birlikte güncellenir.
- *  - Giriş metni TAM BİR TİCARİ ÖN YAZIDIR (AB + Liefertermin ricası, AGB
- *    bağlantısı, imza bloğu — kullanıcı isteği 2026-08-21); kapak sayfasının
- *    kalan alt kısmı boş bırakılır (footerNote yazılmaz — kullanıcı isteği).
- *  - Satırlar düz listedir (hiyerarşi / ara toplam / görsel / QR fatura yok);
- *    kolonlar sipariş tablosuyla (OrderSheet kalem tablosu) aynıdır: Pos,
- *    Açıklama (seri no ikinci satırda), Seri Kod, Miktar, Brüt Fiyat, Net Fiyat,
- *    İndirim, KDV, Tutar. Seri kod / brüt fiyat / indirim / KDV kolonları
- *    YALNIZCA siparişte gerçekten varsa çizilir — yoksa açıklama sütunu o
- *    genişliği kullanır.
- *  - Satırda üç indirim olabilir; hepsi TEK sütunda ALT ALTA yazılır (10% /
- *    5% …) — bileşik oran gösterilmez (kullanıcı isteği).
- *  - Genel toplam en altta bantta gösterilir; KDV ya da ek ücret varsa
- *    net → ek ücretler → KDV → toplam dökümü eklenir.
- *  - EK ÜCRETLER (nakliye, ambalaj…) kalem değildir: toplam bloğunda adıyla ve
- *    tutarıyla tek tek listelenir ve genel toplama net olarak girer.
+ * Tedarikçiye giden sipariş belgesi (Bestellung). Twin von `priceRequestPdf.ts`
+ * — Masse und Toene gemeinsam ändern.
+ *
+ * DAS BLATT NACH DER REFERENZ (Vorgabe Samet, 11.09.2026: «fiyat teklifi talebi
+ * ve sipariş de bu tasarımda olsun — sadece daha temiz; karttaki veriler ve
+ * tenant adresleri olduğu gibi kalsın»):
+ *  - Briefkopf: Logo, Welle, Kontaktzeile in feinem Grau.
+ *  - Links die hellgraue, abgerundete KARTE: Bestellung / Besteller / Datum /
+ *    Ihre Angebots-Nr. / Projekt / EMPFÄNGER / Lieferant — Empfänger in der
+ *    Karte, nicht im Adressblock; kein Status (Entscheide vom 02.08.2026).
+ *    Rechts der Absender DES MANDANTEN klein und grau (`companySenderLine`:
+ *    `usePdfSettings()` legt Name und eigene Adresse des aktiven Mandanten
+ *    über die Firmendaten), darunter der Lieferant mit seiner Adresse.
+ *  - Titel «Bestellung BE-2026-004» und das volle Anschreiben (AB +
+ *    Liefertermin, AGB, Gruss — 2026-08-21). Bleibt darunter genug Platz,
+ *    beginnt die Tabelle gleich dort, sonst auf der nächsten Seite.
+ *  - Tabelle offen: Titel in kleinen grauen Grossbuchstaben, nur Haarlinien.
+ *    Spalten: Pos, Beschreibung (Serien-Nr. darunter), eigene Spalten, Menge,
+ *    Einzelpreis, Nettopreis, Rabatt (bis drei ÜBEREINANDER), MwSt, Betrag —
+ *    Einzelpreis / Rabatt / MwSt nur, wenn die Bestellung sie hat und die
+ *    Vorlage sie nicht ausblendet.
+ *  - Summen als Karte in derselben Sprache wie die Angabenkarte: Brutto,
+ *    Rabatt, Netto, Zusatzkosten (einzeln mit Namen), MwSt, GESAMT.
+ *  - Im Fuss der Absender und «Bestellung BE-… · Seite n von m».
  */
 import { jsPDF } from 'jspdf';
 import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from './addressBlock';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { PurchaseOrderRow } from '../../types/inventory';
+import { resolveSupplierPdfColumns, type SupplierPdfColumn } from './supplierPdfColumns';
 
-import arialBoldUrl from '../../assets/fonts/ARIALBD.ttf?url';
-import arialRegularUrl from '../../assets/fonts/ARIAL.ttf?url';
-import arialItalicUrl from '../../assets/fonts/ARIALI.ttf?url';
+import liberationBoldUrl from '../../assets/fonts/LiberationSans-Bold.ttf?url';
+import liberationRegularUrl from '../../assets/fonts/LiberationSans-Regular.ttf?url';
 import offitecLogoUrl from '../../assets/images/offitec.png?url';
 import headerWaveUrl from '../../assets/images/header-wave.svg?url';
 
@@ -52,7 +48,6 @@ interface OrderPdfStrings {
     supplier: string;
     greeting: string;
     intro: string;
-    colPos: string;
     colDesc: string;
     colCode: string;
     colQty: string;
@@ -66,7 +61,6 @@ interface OrderPdfStrings {
     netSubtotal: string;
     vat: string;
     grandTotal: string;
-    vatIdLabel: string;
     pageWord: string;
     pageOf: string;
     serialShort: string;
@@ -88,7 +82,6 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         supplier: 'Tedarikçi',
         greeting: 'Sayın Yetkili,',
         intro: 'Siparişimizi bilgilerinize sunarız. Sipariş edilen pozisyonlara, miktarlara ve spesifikasyonlara ilişkin ayrıntılı bilgileri lütfen aşağıdaki siparişten veya ekli belgeden alınız.\n\nSizden yazılı bir sipariş onayı (AB) ile bağlayıcı veya öngörülen teslim tarihinin bildirilmesini rica ederiz. Tek tek pozisyonların sipariş edildiği şekilde teslim edilememesi ya da fiyat, miktar, spesifikasyon veya teslim tarihi bakımından sapmaların bulunması hâlinde, siparişin ifasından önce tarafımıza bilgi verilmesini rica ederiz.\n\nTarafınızdan aksi yönde bir geri bildirim almadığımız sürece, siparişin siparişimizde belirtilen koşullarla yerine getirileceğini varsayarız.\n\nBu siparişe ilişkin tüm yazışmalarda lütfen sipariş numaramızı belirtiniz.\n\nGenel İşlem Koşullarımız (AGB) siparişimizin ayrılmaz bir parçasıdır ve sözleşme ilişkisi için geçerlidir. Güncel AGB\'ye https://offitec.ch/agb adresinden ulaşabilirsiniz. Tedarikçinin aykırı veya farklı koşulları, yalnızca açıkça ve yazılı olarak onayladığımız takdirde geçerlidir.\n\nİlginiz için teşekkür eder, sorunsuz bir süreç dileriz.\n\nSaygılarımızla\nOffiTec Ekibi',
-        colPos: 'Pos',
         colDesc: 'Ürün / Malzeme',
         colCode: 'Seri Kod',
         colQty: 'Miktar',
@@ -102,7 +95,6 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         netSubtotal: 'Ara Toplam (Net)',
         vat: 'KDV',
         grandTotal: 'TOPLAM',
-        vatIdLabel: 'Vergi No',
         pageWord: 'Sayfa',
         pageOf: '/',
         serialShort: 'Seri No',
@@ -122,7 +114,6 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         supplier: 'Lieferant',
         greeting: 'Sehr geehrte Damen und Herren',
         intro: 'Hiermit erhalten Sie unsere Bestellung. Die detaillierten Angaben zu den bestellten Positionen, Mengen und Spezifikationen entnehmen Sie bitte der nachfolgenden Bestellung bzw. dem beigefügten Dokument.\n\nWir bitten Sie um eine schriftliche Auftragsbestätigung (AB) sowie um Mitteilung des verbindlichen bzw. voraussichtlichen Liefertermins. Sollten einzelne Positionen nicht wie bestellt lieferbar sein oder Abweichungen bezüglich Preis, Menge, Spezifikation oder Liefertermin bestehen, bitten wir um entsprechende Mitteilung vor Ausführung der Bestellung.\n\nSofern wir von Ihnen keine anderslautende Rückmeldung erhalten, gehen wir davon aus, dass die Bestellung zu den in unserer Bestellung aufgeführten Konditionen ausgeführt wird.\n\nBitte geben Sie bei sämtlicher Korrespondenz zu dieser Bestellung unsere Bestellnummer an.\n\nUnsere Allgemeinen Geschäftsbedingungen (AGB) sind Bestandteil unserer Bestellung und gelten für das Vertragsverhältnis. Die jeweils gültigen AGB finden Sie unter https://offitec.ch/agb. Entgegenstehende oder abweichende Geschäftsbedingungen des Lieferanten gelten nur, wenn wir diesen ausdrücklich und schriftlich zugestimmt haben.\n\nWir danken Ihnen für die Bearbeitung und freuen uns auf eine reibungslose Abwicklung.\n\nFreundliche Grüsse\nDas OffiTec Team',
-        colPos: 'Pos',
         colDesc: 'Produkt / Material',
         colCode: 'Seriencode',
         colQty: 'Menge',
@@ -136,7 +127,6 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         netSubtotal: 'Zwischensumme (Netto)',
         vat: 'MwSt',
         grandTotal: 'GESAMT',
-        vatIdLabel: 'MWST-Nr.',
         pageWord: 'Seite',
         pageOf: 'von',
         serialShort: 'Serien-Nr.',
@@ -152,7 +142,6 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         supplier: 'Supplier',
         greeting: 'Dear Sir or Madam,',
         intro: 'Please find our purchase order enclosed. For detailed information on the ordered positions, quantities and specifications, please refer to the following order or the attached document.\n\nWe kindly ask you for a written order confirmation as well as notification of the binding or expected delivery date. Should individual positions not be available as ordered, or should there be any deviations regarding price, quantity, specification or delivery date, please inform us before executing the order.\n\nUnless we receive notice to the contrary from you, we assume that the order will be executed under the conditions stated in our purchase order.\n\nPlease quote our order number in all correspondence relating to this order.\n\nOur General Terms and Conditions (GTC) form an integral part of our order and govern the contractual relationship. The current version is available at https://offitec.ch/agb. Conflicting or deviating terms of the supplier apply only if we have expressly agreed to them in writing.\n\nThank you for processing our order — we look forward to a smooth handling.\n\nKind regards\nThe OffiTec Team',
-        colPos: 'Pos',
         colDesc: 'Product / Material',
         colCode: 'Serial Code',
         colQty: 'Quantity',
@@ -166,7 +155,6 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         netSubtotal: 'Subtotal (Net)',
         vat: 'VAT',
         grandTotal: 'TOTAL',
-        vatIdLabel: 'VAT No.',
         pageWord: 'Page',
         pageOf: 'of',
         serialShort: 'Serial No.',
@@ -174,7 +162,7 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
     },
 };
 
-// ── Sayfa geometrisi (A4, mm) — teklif şablonuyla birebir ────────────────────
+// ── Sayfa geometrisi (A4, mm) — priceRequestPdf ile birebir ──────────────────
 /* Die Raender sind seit dem 09.09.2026 zwei Millimeter schmaler (Vorgabe
    Samet: «margini azaltin, ama sigmali ve duezguen durmali»): 12 statt 14 mm
    links, 198 statt 196 mm rechts — vier Millimeter mehr fuer die Tabelle,
@@ -182,33 +170,42 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
 const ML = 12;
 const MR = 198;
 const CONTENT_W = MR - ML;
+const PT_MM = 25.4 / 72;
 
+/* Briefkopf nach der Referenz (11.09.2026): Logo und Welle etwas kleiner, die
+   Kontaktzeile hoeher — die Karte beginnt gleich darunter. */
 const LOGO_X = ML;
-const LOGO_Y = 10;
-const LOGO_H = 14;
+const LOGO_Y = 8.2;
+const LOGO_H = 11.6;
 const LOGO_MAX_W = 50;
 
-const CONTENT_TOP_FIRST = 44;
-const CONTENT_TOP_REST = 38;
-const CONTENT_BOTTOM = 266;
+/** Oberkante der Karte (Seite 1) und des Tabellenkopfs (Folgeseiten). */
+const CONTENT_TOP_FIRST = 31.4;
+const CONTENT_TOP_REST = 36;
+/** Unterste Zeilenkante — der Fuss liegt tiefer (Linie bei 288 mm). */
+const CONTENT_BOTTOM = 278;
 /**
- * ÖN YAZI (Anschreiben) kapak sayfasının son bloğudur ve sayfa taşırmamalıdır:
- * blok kart/adres bloğunun altında (~110 mm) başlar ve EN GEÇ bu çizgide biter.
+ * ÖN YAZI (Anschreiben) sayfa taşırmamalıdır: EN GEÇ bu çizgide biter.
  * Satır tavanı SABİT DEĞİLDİR: kalan boşluğa kaç satır sığıyorsa o kadar
  * basılır, fazlası sessizce kırpılır (standart ön yazı ~25 satırdır ve sığar).
  */
-const COVER_LETTER_BOTTOM = 266;
-/** Ön yazının satır yüksekliği: 10 pt × 1.35 satır aralığı (mm). */
-const COVER_LETTER_LH = 10 * 0.3528 * 1.35;
+const COVER_LETTER_BOTTOM = CONTENT_BOTTOM;
+/** So viel Platz muss unter dem Anschreiben bleiben, damit die Tabelle auf Seite 1 beginnt. */
+const TABLE_START_MIN = 70;
+/** Von der letzten Zeile des Anschreibens bis zum Tabellenkopf. */
+const TABLE_GAP = 7;
 
-// Tablo hizalama noktaları. Pos/açıklama sabit; kalan sütunlar SAĞDAN SOLA
-// sabit genişliklerle yerleşir, böylece çizilmeyen bir sütunun (seri kod, brüt
-// fiyat, indirim, KDV) genişliği açıklama sütununa kalır.
-const C_POS_X = ML + 1.5;
-// Die Pos-Spalte braucht acht Millimeter (zwei Ziffern und ihr Titel), nicht
-// dreizehn — der Rest gehoert seit dem 09.09.2026 der Tabelle.
-const C_DESC = ML + 8;
-const C_PRICE_R = MR - 1;
+/* Die Tabelle nach der Referenz (11.09.2026): OFFEN — kein Rahmen, kein
+   getoenter Kopf, keine senkrechten Linien. Pos ohne Titel 1.9 mm vom Rand,
+   4.2 mm Luft zwischen zwei Spalten, der Betrag endet 1.9 mm vor dem rechten
+   Rand. */
+const C_POS_X = ML + 1.9;
+const C_DESC = ML + 7.9;
+const C_PRICE_R = MR - 1.9;
+/* Der Produktname steht in NORMALER Schrift (Vorgabe Samet, 11.09.2026: «die
+   Namen sind viel zu fett und nehmen zu viel Platz») — er hebt sich durch
+   den dunkleren Ton von den eigenen Spalten ab, nicht durch Fett. */
+const NAME_STYLE = 'normal' as const;
 
 // Es gibt KEINE festen Spaltenbreiten mehr (09.09.2026): `buildTableLayout`
 // misst Titel und Werte und teilt das Blatt danach auf — siehe dort.
@@ -227,34 +224,34 @@ const C_PRICE_R = MR - 1;
  * Namen — dort, wo sie vorher alle standen. Lieber eine Angabe eine Zeile
  * tiefer als ein Produktname, von dem drei Buchstaben übrig sind.
  */
-const DESC_MIN_W = 22;
+const DESC_MIN_W = 28;
+/** Bis hierhin waechst die Beschreibung, BEVOR die Titel in eine Zeile kommen (Referenz: 60 mm). */
+const DESC_FLOOR_W = 60;
 
-interface TableLayout {
-    descEnd: number;
-    /** Linke Kanten der gezeichneten eigenen Spalten (sie sind linksbündig). */
-    extraX: number[];
-    /** Proportional aus der Vorlage auf die verfuegbare A4-Breite skaliert. */
-    extraWidths: number[];
-    /** Seri kod sütununun SOL kenarı (sola yaslı metin); null → çizilmez. */
-    codeX: number | null;
-    qtyR: number;
-    /** null → sütun çizilmez. */
-    grossR: number | null;
-    netR: number;
-    discR: number | null;
-    vatR: number | null;
-    priceR: number;
-    wCode: number;
-    wQty: number;
-    wGross: number;
-    wNet: number;
-    wDisc: number;
-    wVat: number;
-    wPrice: number;
+/** Eine gezeichnete Spalte: ihre Rolle, ihre linke Kante, ihr Mass. */
+interface LayoutCell {
+    column: SupplierPdfColumn;
+    /** Linke Kante (mm). */
+    x: number;
+    /** Breite SAMT dem Abstand `GAP` zur naechsten Spalte. */
+    width: number;
+    /** Zahlen (Menge, Preise, eine rein numerische eigene Spalte) stehen rechtsbuendig. */
+    align: 'left' | 'right';
 }
 
-/** Komşuya 2 mm nefes payı bırakılır (metin sığdırma genişlikleri). */
-const GAP = 2;
+interface TableLayout {
+    /** Alle Spalten von links nach rechts — in der Reihenfolge der Vorlage. */
+    cells: LayoutCell[];
+    /** Linke Kante und rechtes Ende der Beschreibung (Produktname). */
+    descX: number;
+    descEnd: number;
+    /** Die EINE Schrift der Tabelle (pt) und ihr Zeilenabstand (mm). */
+    fs: number;
+    lh: number;
+}
+
+/** Luft zwischen zwei Spalten (Referenz: 2.1 mm Innenabstand auf jeder Seite). */
+const GAP = 4.2;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DIE SPALTEN RICHTEN SICH NACH IHREM INHALT (Vorgabe Samet, 09.09.2026)
@@ -300,11 +297,65 @@ const widestWord = (doc: jsPDF, text: string, style: 'normal' | 'bold', size: nu
 const fullWidth = (doc: jsPDF, text: string, style: 'normal' | 'bold', size: number): number => {
     doc.setFont(FONT, style);
     doc.setFontSize(size);
-    return doc.getTextWidth(text);
+    // Der Nullbreiten-Trenner aus `breakableCode` ist im Druck unsichtbar —
+    // gemessen als Glyphe waere er eine ganze Breite (die Spalte wuchs dadurch
+    // auf 40 mm statt 26).
+    return doc.getTextWidth(text.replace(/\u200b/g, ''));
 };
 
-/** Eine spacelose Zeichenkette (Code) an ihren Trennzeichen teilen, damit sie umbrechen kann. */
-const breakableCode = (code: string): string => code.replace(/([-_/.])/g, '$1\u200b');
+/* Spaltentitel stehen in GROSSBUCHSTABEN, leicht gesperrt (Referenz): ihre
+   Breite ist die der Glyphen plus `CAPTION_SPACING` je Zeichen. */
+const captionWidth = (doc: jsPDF, text: string, size: number): number => {
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(size);
+    return doc.getTextWidth(text) + CAPTION_SPACING * text.length;
+};
+
+/* ── EIN TITEL BRICHT AN SEINER FUGE, MIT TRENNSTRICH (Referenz-PDF) ────────
+   «PRODUKTTYP-» / «NUMMER», «GESAMT-» / «MENGE»: so schmal wie ihre Werte
+   duerfen die Spalten werden — der Titel folgt. Die Fuge findet sich an
+   einem weichen Trennzeichen, einem Bindestrich oder vor einem bekannten
+   Grundwort (`CAPTION_TAILS`); ein Wort ohne Fuge bleibt ganz. */
+const CAPTION_TAILS = [
+    'BESCHREIBUNG', 'BEZEICHNUNG', 'NUMMER', 'MENGE', 'LÄNGE', 'BREITE', 'HÖHE', 'TIEFE',
+    'GEWICHT', 'ANZAHL', 'EINHEIT', 'BETRAG', 'RABATT', 'GRÖSSE', 'KLASSE', 'GRUPPE',
+    'TERMIN', 'STÜCK', 'PREIS', 'DATUM', 'FARBE', 'SUMME', 'NAME', 'TEXT', 'WERT', 'ZEIT',
+    'CODE', 'TYP', 'ART', 'NR',
+];
+const captionPieces = (word: string): string[] => {
+    const explicit = word.split(/[\u00ad-]+/).filter(Boolean);
+    if (explicit.length > 1) return explicit;
+    const upper = word.toUpperCase();
+    if (upper.length < 9) return [word];
+    for (const tail of CAPTION_TAILS) {
+        if (upper.endsWith(tail) && upper.length - tail.length >= 4) {
+            const head = word.slice(0, word.length - tail.length);
+            return [...captionPieces(head), word.slice(word.length - tail.length)];
+        }
+    }
+    return [word];
+};
+
+/** Das schmalste Mass eines Titels: sein breitestes Wort — oder, bei einem
+    zusammengesetzten Wort, sein breitestes Glied samt Trennstrich. */
+const widestCaptionWord = (doc: jsPDF, text: string, size: number): number =>
+    Math.max(0, ...text.split(/\s+/).filter(Boolean).map((word) => {
+        const pieces = captionPieces(word);
+        if (pieces.length === 1) return captionWidth(doc, word, size);
+        return Math.max(...pieces.map((piece, index) => captionWidth(doc, piece + (index < pieces.length - 1 ? '-' : ''), size)));
+    }));
+
+/**
+ * Eine spacelose Zeichenkette (Code) an ihren Trennzeichen teilen, damit sie
+ * umbrechen kann. Eine lange Kette OHNE Trennzeichen («HMIP6DDB0NA0WNAN00»)
+ * bekommt alle sechs Zeichen einen Umbruchpunkt — das ist kein Wort, das man
+ * zerschneidet, sondern eine Nummer, die man in Gruppen liest. Ein echtes
+ * Wort (ohne Ziffer) bleibt ganz. Genutzt wird der Punkt nur, wenn die
+ * Spalte sonst der Beschreibung den Platz naehme (siehe `buildTableLayout`).
+ */
+const breakableCode = (code: string): string => code
+    .replace(/([-_/.])/g, '$1\u200b')
+    .replace(/(?=[A-Za-z0-9]{12,})(?=[A-Za-z]*\d)[A-Za-z0-9]{12,}/g, (run) => run.replace(/(.{6})(?=.)/g, '$1\u200b'));
 
 type ColumnKind = 'code' | 'qty' | 'gross' | 'net' | 'disc' | 'vat' | 'price' | string;
 
@@ -312,7 +363,7 @@ interface MeasuredColumn {
     kind: ColumnKind;
     /** Ohne dieses Mass bricht ein Wort in der Mitte. */
     min: number;
-    /** Mit diesem Mass steht alles in einer Zeile. */
+    /** Mit diesem Mass steht alles in einer Zeile (Titel und laengster Wert). */
     full: number;
     align: 'left' | 'right';
 }
@@ -323,162 +374,171 @@ const measureColumn = (
     header: string,
     values: string[],
     align: 'left' | 'right',
+    fs: number,
     valueStyle: 'normal' | 'bold' = 'normal',
-    valueSize = FS_BASE,
 ): MeasuredColumn => {
-    // Der Titel darf in `headCell` bis FS_HEADER_MIN fallen, wenn ein
-    // einzelnes Wort sonst nicht passt — also ist DAS sein Mindestmass.
-    const headMin = widestWord(doc, header, 'bold', FS_HEADER_MIN);
-    const headFull = fullWidth(doc, header, 'bold', FS_HEADER);
-    const valueMin = Math.max(0, ...values.map((value) => widestWord(doc, value, valueStyle, valueSize)));
-    const valueFull = Math.max(0, ...values.map((value) => fullWidth(doc, value, valueStyle, valueSize)));
+    const headSize = HEAD_FS;
+    const headMin = widestCaptionWord(doc, header, headSize);
+    const headFull = captionWidth(doc, header, headSize);
+    const valueMin = Math.max(0, ...values.map((value) => widestWord(doc, value, valueStyle, fs)));
+    const valueFull = Math.max(0, ...values.map((value) => fullWidth(doc, value, valueStyle, fs)));
     /* Eine Zahl ist EIN Wort: «CHF 9.514,96» darf nicht an seinem Leerzeichen
        gemessen werden, sonst bekommt die Betragsspalte nur Platz fuer die
-       Ziffern und die Waehrung schrumpft. Rechtsbuendige Spalten sind Zahlen. */
+       Ziffern. Rechtsbuendige Spalten sind Zahlen. */
     const valueNeed = align === 'right' ? valueFull : valueMin;
     // Drei Prozent Luft: `splitTextToSize` misst einen Hauch strenger als
     // `getTextWidth` und hackte sonst den letzten Buchstaben ab.
+    const min = Math.max(headMin, valueNeed) * 1.03 + GAP;
     return {
         kind,
-        min: Math.max(headMin, valueNeed) * 1.03 + GAP,
-        full: Math.max(headFull, valueFull) + GAP,
+        min,
+        full: Math.max(min, Math.max(headFull, valueFull) * 1.03 + GAP),
         align,
     };
 };
 
+/** Hebt jede Spalte anteilig Richtung `caps[i]`, soweit `spare` reicht; gibt den Rest zurueck. */
+const growToward = (widths: number[], caps: number[], spare: number): number => {
+    const needs = widths.map((width, index) => Math.max(0, caps[index] - width));
+    const needSum = needs.reduce((sum, need) => sum + need, 0);
+    if (needSum <= 0 || spare <= 0) return Math.max(0, spare);
+    const share = Math.min(1, spare / needSum);
+    needs.forEach((need, index) => { widths[index] += need * share; });
+    return spare - needSum * share;
+};
+
+/* DIE SPALTEN KOMMEN AUS DER VORLAGE (`resolveSupplierPdfColumns`, Vorgabe
+   Samet 11.09.2026): ihre Reihenfolge ist die der Liste, ihre Titel die
+   Namen der Vorlage («GESAMTMENGE», nicht «Menge»). Gemessen wird wie oben
+   beschrieben; die Beschreibung nimmt, was uebrig bleibt — wo immer die
+   Vorlage sie hingestellt hat. */
 const buildTableLayout = (
     doc: jsPDF,
     order: PurchaseOrderRow,
-    L: OrderPdfStrings,
+    columns: SupplierPdfColumn[],
     fmt: (value: number) => string,
-    hasCode: boolean,
-    hasGross: boolean,
-    hasDiscount: boolean,
-    hasVat: boolean,
-    extraCols: Array<{ key: string; name: string; width?: number }> = []
 ): TableLayout => {
     const items = order.items ?? [];
+    const names = items.map((item) => (item.name || '').trim());
     const totalVatRate = order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : null;
+    const desc = columns.find((column) => column.kind === 'desc');
+    const others = columns.filter((column) => column.kind !== 'desc');
+    // Der Betrag endet an `C_PRICE_R` — sein eigener Abstand faellt dort weg.
+    const room = C_PRICE_R + GAP - C_DESC;
+    const aligns = others.map((column): 'left' | 'right' => (
+        column.kind === 'extra'
+            ? (columnIsNumeric(items.map((item) => extraRaw(item, column.key))) ? 'right' : 'left')
+            : 'right'
+    ));
 
     /* ── Was in jeder Spalte stehen wird — genau die Texte, die `drawRow` druckt ─ */
-    const columns: MeasuredColumn[] = [];
-    extraCols.forEach((column) => {
-        columns.push(measureColumn(doc, column.key, column.name,
-            items.map((item) => extraValue(item, column.key) || '—'), 'left', 'normal', FS_BASE - 0.4));
-    });
-    if (hasCode) {
-        columns.push(measureColumn(doc, 'code', L.colCode,
-            items.map((item) => breakableCode((item.code || '').trim()) || '—'), 'left', 'normal', FS_BASE - 0.4));
-    }
-    columns.push(measureColumn(doc, 'qty', L.colQty, items.map((item) => fmtQty(item.quantity || 0)), 'right'));
-    if (hasGross) {
-        columns.push(measureColumn(doc, 'gross', L.colGrossPrice,
-            items.map((item) => ((item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—')), 'right'));
-    }
-    columns.push(measureColumn(doc, 'net', L.colNetPrice, items.map((item) => {
-        const shown = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
-        return shown > 0 ? fmtUnitPrice(shown) : '—';
-    }), 'right'));
-    if (hasDiscount) {
-        columns.push(measureColumn(doc, 'disc', L.colDiscount,
-            items.flatMap((item) => discountLines(item)).concat('—'), 'right'));
-    }
-    if (hasVat) {
-        columns.push(measureColumn(doc, 'vat', L.colVat, items.map((item) => fmtPercent(item.vatRate || 0)), 'right'));
-    }
-    columns.push(measureColumn(doc, 'price', L.colPrice, items.map((item) => {
-        const lineVat = totalVatRate === null ? (item.lineVat || 0) : (item.lineTotal || 0) * (totalVatRate / 100);
-        return fmt(Math.round(((item.lineTotal || 0) + lineVat) * 100) / 100);
-    }), 'right', 'bold'));
-
-    /* ── Verteilen: erst die Mindestmasse, dann den Rest nach Bedarf ────────── */
-    const descMin = Math.max(
+    const valuesOf = (column: SupplierPdfColumn, align: 'left' | 'right'): string[] => {
+        switch (column.kind) {
+            case 'extra':
+                return align === 'right'
+                    ? items.map((item) => extraRaw(item, column.key) || '—')
+                    : items.map((item) => extraValue(item, column.key) || '—');
+            case 'qty':
+                return items.map((item) => fmtQty(item.quantity || 0));
+            case 'gross':
+                return items.map((item) => ((item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—'));
+            case 'net':
+                return items.map((item) => {
+                    const shown = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
+                    return shown > 0 ? fmtUnitPrice(shown) : '—';
+                });
+            case 'disc':
+                return items.flatMap((item) => discountLines(item)).concat('—');
+            case 'vat':
+                return items.map((item) => fmtPercent(item.vatRate || 0));
+            default:
+                return items.map((item) => {
+                    const lineVat = totalVatRate === null ? (item.lineVat || 0) : (item.lineTotal || 0) * (totalVatRate / 100);
+                    return fmt(Math.round(((item.lineTotal || 0) + lineVat) * 100) / 100);
+                });
+        }
+    };
+    const measureAll = (fs: number): MeasuredColumn[] =>
+        others.map((column, index) => measureColumn(doc, column.key, column.caption, valuesOf(column, aligns[index]), aligns[index], fs));
+    const descMinFor = (fs: number): number => Math.max(
         DESC_MIN_W,
-        widestWord(doc, L.colDesc, 'bold', FS_HEADER) + GAP,
-        ...items.map((item) => widestWord(doc, (item.name || '').trim(), 'bold', FS_TITLE) + GAP),
+        widestCaptionWord(doc, desc?.caption ?? '', HEAD_FS) * 1.03 + GAP,
+        ...names.map((name) => widestWord(doc, name, NAME_STYLE, fs) * 1.03 + GAP),
     );
-    const room = C_PRICE_R - C_DESC;
-    const minSum = columns.reduce((sum, column) => sum + column.min, 0);
-    // Die Beschreibung will ihre volle Breite selten — 60 mm reichen fuer die
-    // meisten Namen in zwei Zeilen; darueber hinaus gibt sie ab.
-    const descWish = Math.max(descMin, 60);
-    const wishSum = columns.reduce((sum, column) => sum + column.full, 0) + descWish;
+    const minSumOf = (measured: MeasuredColumn[]) => measured.reduce((sum, column) => sum + column.min, 0);
+
+    /* ── Die Schrift: die groesste Stufe, bei der jede Spalte ihr Mindestmass
+       bekommt. Sie gilt fuer die GANZE Tabelle — Titel, Namen, Werte. ─────── */
+    let fs = TABLE_SIZES[TABLE_SIZES.length - 1];
+    for (const size of TABLE_SIZES) {
+        if (minSumOf(measureAll(size)) + descMinFor(size) <= room) { fs = size; break; }
+    }
+    const measured = measureAll(fs);
+    const descMin = descMinFor(fs);
+    const minSum = minSumOf(measured);
+
     let widths: number[];
     let descW: number;
-    if (minSum + descMin >= room) {
-        /* Selbst die Mindestmasse passen nicht (fuenf breite eigene Spalten
-           neben einem langen Produktwort). Dann gibt ZUERST die Beschreibung
-           nach — bis auf ihr hartes Minimum, dort bricht ein langes Wort eben
-           doch —, und erst danach die TEXTSPALTEN (eigene Angaben, Code),
-           anteilig. Die Zahlenspalten geben nie nach: eine Zahl kann weder
-           umbrechen noch kleiner werden, ohne falsch auszusehen. */
+    if (minSum + descMin > room) {
+        /* Selbst die kleinste Stufe traegt die Mindestmasse nicht (sechs
+           breite eigene Spalten neben einem langen Produktwort). Dann gibt
+           ZUERST die Beschreibung nach — bis auf ihr hartes Minimum —, und erst
+           danach die TEXTSPALTEN (eigene Angaben), anteilig. Die
+           Zahlenspalten geben nie nach. */
         descW = Math.max(DESC_MIN_W, room - minSum);
         const deficit = Math.max(0, minSum + descW - room);
-        const textMin = columns.reduce((sum, column) => sum + (column.align === 'left' ? column.min : 0), 0);
+        const textMin = measured.reduce((sum, column) => sum + (column.align === 'left' ? column.min : 0), 0);
         const textScale = textMin > 0 ? Math.max(0.5, (textMin - deficit) / textMin) : 1;
-        widths = columns.map((column) => (column.align === 'left' ? column.min * textScale : column.min));
-    } else if (wishSum <= room) {
-        // Alles passt in einer Zeile — die Beschreibung nimmt den Ueberschuss.
-        widths = columns.map((column) => column.full);
-        descW = room - widths.reduce((sum, width) => sum + width, 0);
+        widths = measured.map((column) => (column.align === 'left' ? column.min * textScale : column.min));
     } else {
-        // Der Normalfall: jede bekommt ihr Minimum, der Rest wird nach dem
-        // Fehlenden (voll − minimum) verteilt, die Beschreibung zaehlt mit.
-        const spare = room - minSum - descMin;
-        const needs = columns.map((column) => column.full - column.min);
-        const descNeed = descWish - descMin;
-        const needSum = needs.reduce((sum, need) => sum + need, 0) + descNeed;
-        widths = columns.map((column, index) => column.min + (needSum > 0 ? spare * (needs[index] / needSum) : 0));
-        descW = descMin + (needSum > 0 ? spare * (descNeed / needSum) : spare);
+        /* Der Rest wird in einer festen REIHENFOLGE verteilt — sie haelt die
+           Tabelle im Gleichgewicht (Vorgabe Samet, 11.09.2026):
+             1. die Beschreibung bis `DESC_FLOOR_W` — sie ist die Hauptspalte:
+                ein Name in sieben Zeilen neben zwei 40-mm-Codespalten war
+                genau das Bild, das nicht mehr vorkommen soll;
+             2. jeder Titel in EINE Zeile;
+             3. jeder Wert in eine Zeile («Kablo kanalları» nicht umbrochen
+                neben einem Namen, der ohnehin zwei Zeilen braucht);
+             4. was dann noch bleibt, bekommt die Beschreibung. */
+        /* Reihenfolge nach der Referenz (Vorgabe Samet, 11.09.2026, dritte
+           Runde: «die Spalten muessen sich so teilen wie dort» — nachgemessen:
+           Beschreibung 60 mm, Produkttypnummer 26 mm bei 34 mm langen Codes):
+             1. jede Spalte ihr Mindestmass (breitestes Wort bzw. Titel-Glied);
+             2. die Beschreibung bis `DESC_FLOOR_W` (60 mm wie im Referenzblatt);
+             3. der Rest an die Spalten, IM VERHAELTNIS dessen, was ihnen bis
+                zur einen Zeile fehlt (Titel + laengster Wert) — ein langer
+                Code bricht dann in seiner Spalte um, ein Titel an seiner Fuge
+                («PRODUKTTYP-» / «NUMMER», siehe `splitCaption`);
+             4. was danach noch bleibt, bekommt die Beschreibung. */
+        widths = measured.map((column) => column.min);
+        let spare = room - minSum - descMin;
+        const descFull = Math.max(descMin, ...names.map((name) => fullWidth(doc, name, NAME_STYLE, fs) * 1.03 + GAP));
+        const floorGrow = Math.min(spare, Math.max(0, Math.min(DESC_FLOOR_W, descFull) - descMin));
+        spare -= floorGrow;
+        spare = growToward(widths, measured.map((column) => column.full), spare);
+        descW = descMin + floorGrow + spare;
     }
 
-    /* ── Von links nach rechts aufstellen ──────────────────────────────────── */
-    let x = C_DESC + descW;
-    const descEnd = x - GAP;
-    const extraX: number[] = [];
-    const extraWidths: number[] = [];
-    let codeX: number | null = null;
-    let wCode = 0;
-    let qtyR = 0; let wQty = 0;
-    let grossR: number | null = null; let wGross = 0;
-    let netR = 0; let wNet = 0;
-    let discR: number | null = null; let wDisc = 0;
-    let vatR: number | null = null; let wVat = 0;
-    let wPrice = 0;
-    columns.forEach((column, index) => {
-        const width = widths[index];
-        switch (column.kind) {
-            case 'code': codeX = x; wCode = width - GAP; break;
-            case 'qty': qtyR = x + width - GAP; wQty = width - GAP; break;
-            case 'gross': grossR = x + width - GAP; wGross = width - GAP; break;
-            case 'net': netR = x + width - GAP; wNet = width - GAP; break;
-            case 'disc': discR = x + width - GAP; wDisc = width - GAP; break;
-            case 'vat': vatR = x + width - GAP; wVat = width - GAP; break;
-            case 'price': wPrice = width - GAP; break;
-            default: extraX.push(x); extraWidths.push(width); break;
+    /* ── Von links nach rechts aufstellen — in der Reihenfolge der Vorlage ── */
+    const cells: LayoutCell[] = [];
+    let x = C_DESC;
+    let descX = C_DESC;
+    let descEnd = C_DESC + descW - GAP;
+    let position = 0;
+    for (const column of columns) {
+        if (column.kind === 'desc') {
+            descX = x;
+            descEnd = x + descW - GAP;
+            cells.push({ column, x, width: descW, align: 'left' });
+            x += descW;
+            continue;
         }
+        const width = widths[position];
+        cells.push({ column, x, width, align: aligns[position] });
         x += width;
-    });
-
-    return {
-        descEnd,
-        extraX,
-        extraWidths,
-        codeX,
-        qtyR,
-        grossR,
-        netR,
-        discR,
-        vatR,
-        priceR: C_PRICE_R,
-        wCode,
-        wQty,
-        wGross,
-        wNet,
-        wDisc,
-        wVat,
-        wPrice,
-    };
+        position += 1;
+    }
+    return { cells, descX, descEnd, fs, lh: fs * LH_RATIO };
 };
 
 /** Siparişte hiç seri kod / brüt fiyat / indirim / KDV var mı. */
@@ -497,8 +557,6 @@ const buildTableLayout = (
 const orderHiddenKeys = (order: PurchaseOrderRow): Set<string> =>
     new Set(order.hiddenColumnKeys ?? []);
 
-const orderHasCode = (order: PurchaseOrderRow): boolean =>
-    order.items.some((item) => Boolean((item.code || '').trim()));
 const orderHasGross = (order: PurchaseOrderRow): boolean =>
     order.items.some((item) => (item.grossPrice || 0) > 0);
 const orderHasDiscount = (order: PurchaseOrderRow): boolean =>
@@ -516,44 +574,93 @@ const discountLines = (item: PurchaseOrderRow['items'][number]): string[] =>
         .filter((value) => (value || 0) > 0)
         .map((value) => fmtPercent(value || 0));
 
-const HEAD_H = 9;
-const HEAD_GAP = 2;
-const ROW_PAD = 3;
-const FIRST_BASELINE = 5.8;
-const ROW_MIN_H = 11;
-const MIN_ROW_START = 16;
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAS BLATT NACH DER REFERENZ (Vorgabe Samet, 11.09.2026)
 
-const FS_BASE = 9;
-const FS_TITLE = 10;
-const FS_POS = 8.2;
-const FS_HEADER = 8.4;
-const LH_TITLE = 4.7;
-const LH_BODY = 4.4;
-/** İndirim sütununda alt alta yazılan yüzdelerin satır aralığı. */
-const DISC_LH = 4.2;
+   «Bunun aynısı — sadece pdf'i daha temiz yapmak.»
 
-const COLOR_TEXT = [30, 32, 40] as const;
-const COLOR_MUTED = [120, 126, 140] as const;
-const COLOR_LABEL = [88, 95, 114] as const;
-const COLOR_NAVY = [31, 42, 84] as const;
-const COLOR_RED = [211, 32, 38] as const;
-const COLOR_NAVY_SOFT = [104, 116, 158] as const;
-const COLOR_HAIRLINE = [226, 229, 237] as const;
-const COLOR_HEAD_BG = [238, 241, 247] as const;
-const COLOR_ZEBRA = [249, 250, 252] as const;
-const COLOR_CARD_BG = [248, 249, 252] as const;
-const COLOR_CARD_BORDER = [226, 230, 238] as const;
+     · EINE Schrift fuer die ganze Tabelle (8 pt; passt sie nicht, wird die
+       GANZE Tabelle eine Stufe kleiner — `TABLE_SIZES`, nie eine Zelle).
+     · Spaltentitel klein (5.6 pt), grau, gesperrt, in Grossbuchstaben; die
+       Pos-Spalte hat keinen Titel.
+     · Kein Rahmen, kein getoenter Kopf, keine senkrechten Linien: Zeilen nur
+       durch Haarlinien getrennt, unter Kopf und Tabelle eine dunklere Linie.
+     · Angaben und Summen je in einer hellgrauen, abgerundeten Karte.
+
+   DIE ZWEI SCHRIFTEN DER TABELLE (Vorgabe Samet, 11.09.2026, als CSS notiert):
+     Spaltentitel    Liberation Sans Regular · 5.6 pt · UPPERCASE · letter-spacing 0.35px · #8E8E92
+     Normaler Text   Liberation Sans Regular · 8 pt · ohne Umwandlung · letter-spacing 0 · #1D1D1F
+   8 pt ist DIE Groesse; `TABLE_SIZES` geht nur tiefer, wenn eine Tabelle
+   (sechs eigene Spalten neben allen Preisen) sonst nicht aufs Blatt passt.
+   ═════════════════════════════════════════════════════════════════════════ */
+const TABLE_SIZES = [8, 7.4, 6.8];
+/** Spaltentitel: immer 5.6 pt. */
+const HEAD_FS = 5.6;
+const PX_MM = 25.4 / 96;
+/** Sperrung der Spaltentitel je Zeichen: 0.35 px. */
+const CAPTION_SPACING = 0.35 * PX_MM;
+/** Zeilenabstand zweizeiliger Titel in mm je pt (5.6 pt → 2.4 mm). */
+const CAPTION_LH = 0.425;
+/** Zeilenabstand in mm je pt Schrift (8 pt → 4.1 mm, Faktor 1.45). */
+const LH_RATIO = 0.51;
+/** Ober- und Unterlaenge in mm je pt — setzen erste Grundlinie und Zeilenhoehe. */
+const CAP_RATIO = 0.254;
+const DESCENT_RATIO = 0.078;
+const ROW_PAD_T = 3.9;
+const ROW_PAD_B = 3.75;
+const MIN_ROW_START = 14;
+/** Tabellenkopf: vom oberen Rand bis zur Oberlaenge, von der letzten Titelzeile bis zur Linie. */
+const HEAD_PAD_T = 1.6;
+const HEAD_PAD_B = 3;
+/** Luecke zwischen Produktname und Seriennummer darunter. */
+const META_GAP = 0.8;
+/** Die Pos-Nummer steht eine Spur kleiner als die Tabelle. */
+const POS_RATIO = 0.925;
+const HAIRLINE_W = 0.26;
+
+const FS_LETTER = 8.4;
+const LETTER_LHF = 1.45;
+const FS_FOOTER = 5.25;
+
+/* Die Karte oben links (Referenz): hellgrau, abgerundet, 83.6 mm breit — die
+   Summenkarte unten rechts hat dieselben Masse. */
+const CARD_W = 83.6;
+const CARD_RADIUS = 3;
+const CARD_PAD = 2.4;
+const CARD_ROW_H = 7.4;
+const CARD_BASELINE = 4.37;
+const CARD_INSET = 4.1;
+const CARD_LABEL_FS = 7.6;
+const CARD_VALUE_FS = 8.2;
+const CARD_VALUE_LH = 3.6;
+/** Linke Kante des Absender- und Lieferantenblocks rechts. */
+const ADDR_X = ML + 94;
+
+const COLOR_NAVY = [22, 32, 92] as const;
+const COLOR_TEXT = [29, 29, 31] as const;
+const COLOR_TEXT_2 = [72, 72, 74] as const;
+const COLOR_CAPTION = [110, 110, 115] as const;
+const COLOR_MUTED = [142, 142, 147] as const;
+/** Spaltentitel: #8E8E92. */
+const COLOR_COLUMN_HEAD = [142, 142, 146] as const;
+const COLOR_POS = [161, 161, 166] as const;
+const COLOR_SENDER = [154, 154, 160] as const;
+const COLOR_HAIRLINE = [239, 239, 242] as const;
+const COLOR_RULE = [210, 210, 215] as const;
+const COLOR_DIVIDER = [229, 229, 234] as const;
+const COLOR_CARD_FILL = [245, 245, 247] as const;
+const COLOR_CARD_EDGE = [235, 235, 239] as const;
+const COLOR_CARD_LINE = [231, 231, 236] as const;
 
 const CONTACT_PHONE = '+41 56 556 24 68';
 const CONTACT_EMAIL = 'info@offitec.ch';
 const CONTACT_WEB = 'www.offitec.ch';
-const FOOTER_BIC = 'RAIFCH22XXX';
-const FOOTER_VAT = 'CHE-201.098.592';
-const FOOTER_IBAN = 'CH50 8080 8005 5315 3585 1';
 
 // ── Fontlar / logo / dalga (teklif şablonundaki yükleyicilerle aynı) ─────────
-const FONT = 'Arial';
-let fontFiles: { regular: string; bold: string; italic: string } | null = null;
+/* Liberation Sans (SIL OFL, die Lizenz liegt neben den Dateien) — Vorgabe
+   Samet, 11.09.2026. Dieselben Laufweiten wie Arial: keine Spalte verschiebt sich. */
+const FONT = 'LiberationSans';
+let fontFiles: { regular: string; bold: string } | null = null;
 
 const bufferToBase64 = (buffer: ArrayBuffer) => {
     let binary = '';
@@ -564,23 +671,16 @@ const bufferToBase64 = (buffer: ArrayBuffer) => {
 
 async function registerFonts(doc: jsPDF) {
     if (!fontFiles) {
-        const [regular, bold, italic] = await Promise.all([
-            fetch(arialRegularUrl).then((r) => r.arrayBuffer()),
-            fetch(arialBoldUrl).then((r) => r.arrayBuffer()),
-            fetch(arialItalicUrl).then((r) => r.arrayBuffer()),
+        const [regular, bold] = await Promise.all([
+            fetch(liberationRegularUrl).then((r) => r.arrayBuffer()),
+            fetch(liberationBoldUrl).then((r) => r.arrayBuffer()),
         ]);
-        fontFiles = {
-            regular: bufferToBase64(regular),
-            bold: bufferToBase64(bold),
-            italic: bufferToBase64(italic),
-        };
+        fontFiles = { regular: bufferToBase64(regular), bold: bufferToBase64(bold) };
     }
-    doc.addFileToVFS('Arial-Regular.ttf', fontFiles.regular);
-    doc.addFileToVFS('Arial-Bold.ttf', fontFiles.bold);
-    doc.addFileToVFS('Arial-Italic.ttf', fontFiles.italic);
-    doc.addFont('Arial-Regular.ttf', FONT, 'normal');
-    doc.addFont('Arial-Bold.ttf', FONT, 'bold');
-    doc.addFont('Arial-Italic.ttf', FONT, 'italic');
+    doc.addFileToVFS('LiberationSans-Regular.ttf', fontFiles.regular);
+    doc.addFileToVFS('LiberationSans-Bold.ttf', fontFiles.bold);
+    doc.addFont('LiberationSans-Regular.ttf', FONT, 'normal');
+    doc.addFont('LiberationSans-Bold.ttf', FONT, 'bold');
     doc.setFont(FONT, 'normal');
 }
 
@@ -602,9 +702,10 @@ async function loadLogo(doc: jsPDF): Promise<{ dataUrl: string; w: number; h: nu
     }
 }
 
-const WAVE_W = 146;
-const WAVE_H = 28;
-const WAVE_CENTER_Y = LOGO_Y + LOGO_H / 2 - 3;
+/* Die Welle der Referenz: dasselbe Bild auf 0.875 verkleinert, am rechten Rand. */
+const WAVE_W = 127.8;
+const WAVE_H = 24.6;
+const WAVE_TOP = 3.2;
 const WAVE_RASTER_DPI = 400;
 const WAVE_VIEW = '0 0 1460 280';
 
@@ -656,8 +757,9 @@ const fmtMoneyForCurrency = (currency: string) => (v: number) =>
 const fmtUnitPrice = (v: number) =>
     new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(v || 0);
 
+/* Mengen ohne leere Nachkommastellen — «2», «2,5» (Referenz). */
 const fmtQty = (v: number) =>
-    new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+    new Intl.NumberFormat('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v || 0);
 
 const fmtPercent = (v: number) =>
     `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(v || 0)}%`;
@@ -674,6 +776,28 @@ const fmtDateShort = (iso?: string | null) => {
     return `${dd}.${mm}.${yy}`;
 };
 
+const oneLine = (value: string) => String(value || '').replace(/\s+/g, ' ').trim();
+
+/* Grossbuchstaben nach der Sprache des WORTES, nicht nur des Dokuments: ein
+   tuerkisches i wird İ («BİRİM»), ein deutsches bleibt I («EINHEIT»). Die
+   Spaltennamen tippt der Benutzer in der Vorlage — sie verraten ihre Sprache
+   an ı/ğ/ş bzw. ä/ß/ei/ch/ck; sonst gilt die Sprache des Dokuments. */
+const captionLocale = (label: string, lang: OrderPdfLang): string => {
+    if (/[ıİğĞşŞ]/.test(label)) return 'tr-TR';
+    if (/ß|ä|ei|ie|eu|ch|ck|tz/i.test(label)) return 'de-CH';
+    return lang === 'tr' ? 'tr-TR' : lang === 'de' ? 'de-CH' : 'en-GB';
+};
+
+/* Eine eigene Spalte, in der NUR Zahlen stehen («0,00», «1'250», «12.5»),
+   steht rechtsbuendig; eine Null ist so blass wie ein fehlender Wert. */
+const NUMBER_RE = /^[-+]?(?:\d{1,3}(?:[.'\u2019 ]\d{3})+|\d+)(?:[.,]\d+)?$/;
+const isNumberText = (value: string) => NUMBER_RE.test(value.trim());
+const isZeroText = (value: string) => isNumberText(value) && !/[1-9]/.test(value);
+const columnIsNumeric = (values: string[]) => {
+    const filled = values.map((value) => value.trim()).filter(Boolean);
+    return filled.length > 0 && filled.every(isNumberText);
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ANA GİRİŞ NOKTALARI
 // ─────────────────────────────────────────────────────────────────────────────
@@ -685,41 +809,65 @@ export async function buildOrderPdfBytes(
 ): Promise<Uint8Array> {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     await registerFonts(doc);
+    // Jede Zeile setzt ihre Sperrung selbst (0 Tc) — sonst erbte der Text nach
+    // einem gesperrten Spaltentitel dessen Sperrung.
+    doc.setCharSpace(0);
     const logo = await loadLogo(doc);
     const wave = await loadHeaderWave(WAVE_W, WAVE_H);
     const fmt = fmtMoneyForCurrency(order.currency || settings.currency);
     const L = I18N[lang];
+    // Die Tabelle traegt ihre Titel in Grossbuchstaben (Referenz).
+    const upper = (label: string) => label.toLocaleUpperCase(captionLocale(label, lang));
 
-    // ── SAYFA 1: Kapak (alt kısmı bilinçli olarak boş bırakılır) ─────────────
-    drawCoverPage(doc, order, settings, L);
+    // ── Seite 1: Karte, Adressen, Titel, Anschreiben ─────────────────────────
+    const letterEnd = drawCoverPage(doc, order, settings, L);
 
-    // ── SAYFA 2+: Sipariş satırları ──────────────────────────────────────────
-    // Kolon düzeni siparişin kendisine göre kurulur: seri kod / brüt fiyat /
-    // indirim / KDV yoksa o sütunlar hiç çizilmez.
-    /* Die eigenen Spalten der Bestellung — Überschrift und Reihenfolge stehen
-       an den Positionen selbst, damit ein altes Dokument seine eigenen Namen
-       behält (siehe `normalizePurchaseOrderExtras` auf dem Server). */
+    // ── Sipariş satırları ────────────────────────────────────────────────────
+    // Kolon düzeni siparişin kendisine göre kurulur: brüt fiyat / indirim /
+    // KDV yoksa o sütunlar hiç çizilmez.
+    /* DIE SPALTEN DER VORLAGE (Vorgabe Samet, 11.09.2026): Titel = die Namen
+       der Vorlage, Reihenfolge = die der Vorlage; eigene Spalten stehen, wo
+       die Vorlage sie hatte. Feste Spalten ohne Vorlagenspalte (Nettopreis,
+       MwSt, Betrag) stehen an ihrem herkoemmlichen Platz mit dem Titel des
+       Dokuments. DER ERP-CODE STEHT NIE IM PDF: er ist eine Hausnummer, keine
+       Angabe fuer den Lieferanten. Kopf, Masse und Zeilen lesen DIESELBE Liste. */
     const hidden = orderHiddenKeys(order);
-    const extraCols = orderExtraColumns(order, hidden);
-    const layout = buildTableLayout(
-        doc,
-        order,
-        L,
-        fmt,
-        orderHasCode(order) && !hidden.has('code'),
-        orderHasGross(order) && !hidden.has('priceGross'),
-        orderHasDiscount(order) && !hidden.has('discount'),
-        orderHasVat(order),
-        extraCols
-    );
-    doc.addPage();
-    const st: TableState = { y: 0, rowIdx: 0 };
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout, extraCols);
+    const columns = resolveSupplierPdfColumns(order, {
+        captions: {
+            desc: L.colDesc,
+            qty: L.colQty,
+            gross: L.colGrossPrice,
+            net: L.colNetPrice,
+            disc: L.colDiscount,
+            vat: L.colVat,
+            price: L.colPrice,
+        },
+        fixed: [
+            'qty',
+            ...(orderHasGross(order) && !hidden.has('priceGross') ? ['gross' as const] : []),
+            'net',
+            ...(orderHasDiscount(order) && !hidden.has('discount') ? ['disc' as const] : []),
+            ...(orderHasVat(order) ? ['vat' as const] : []),
+            'price',
+        ],
+        hidden: new Set([...hidden, 'code']),
+        maxExtras: PDF_MAX_EXTRA_COLUMNS,
+    }).map((column) => ({ ...column, caption: upper(column.caption) }));
+    const layout = buildTableLayout(doc, order, columns, fmt);
+    // Bleibt unter dem Anschreiben genug Platz, beginnt die Tabelle dort;
+    // das volle Standard-Anschreiben fuellt Seite 1, dann steht sie auf Seite 2.
+    const st: TableState = { y: 0 };
+    if (CONTENT_BOTTOM - letterEnd >= TABLE_START_MIN) {
+        st.y = drawTableHeader(doc, letterEnd + TABLE_GAP, layout);
+    } else {
+        doc.addPage();
+        st.y = drawTableHeader(doc, CONTENT_TOP_REST, layout);
+    }
 
     order.items.forEach((item, index) => {
-        const h = measureRow(doc, item, L, layout, extraCols);
+        const h = measureRow(doc, item, L, layout);
         if (st.y + h > CONTENT_BOTTOM || CONTENT_BOTTOM - st.y < MIN_ROW_START) {
-            newTablePage(doc, st, L, layout, extraCols);
+            newTablePage(doc, st, layout);
         }
         st.y = drawRow(
             doc,
@@ -728,14 +876,12 @@ export async function buildOrderPdfBytes(
             st.y,
             Math.min(h, CONTENT_BOTTOM - st.y),
             fmt,
-            st.rowIdx,
             L,
             layout,
-            extraCols,
             order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : null,
         );
-        st.rowIdx++;
     });
+    closeTable(doc, st.y);
 
     // ── Toplamlar (en altta) ─────────────────────────────────────────────────
     const hasGrossRow = (order.totalGross || 0) > (order.totalNet || 0) + 0.005;
@@ -743,13 +889,14 @@ export async function buildOrderPdfBytes(
     // Ek ücretler (nakliye, ambalaj…): her biri toplam bloğunda kendi satırını
     // alır, bu yüzden blok yüksekliğine de girer.
     const fees = (order.additionalFees ?? []).filter((fee) => (fee?.name || '').trim() || fee?.amount);
-    const totalsBlockHeight = 24 + (hasGrossRow ? 16 : 0) + (hasVatRow ? 16 : 0) + fees.length * 8.2;
+    const totalRows = (hasGrossRow ? 2 : 0) + (hasVatRow || fees.length ? 1 : 0) + fees.length + (hasVatRow ? 1 : 0);
+    const totalsBlockHeight = 6 + totalsHeight(totalRows);
     let y = st.y;
     if (y + totalsBlockHeight > CONTENT_BOTTOM) {
         doc.addPage();
-        y = CONTENT_TOP_REST + 4;
+        y = CONTENT_TOP_REST;
     } else {
-        y += 9;
+        y += 6;
     }
     drawTotals(doc, y, order, fmt, L, hasGrossRow, hasVatRow, fees);
 
@@ -758,7 +905,7 @@ export async function buildOrderPdfBytes(
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         drawPageHeader(doc, logo, wave, settings);
-        drawPageFooter(doc, i, pageCount, L);
+        drawPageFooter(doc, i, pageCount, L, order, settings);
     }
 
     return new Uint8Array(doc.output('arraybuffer'));
@@ -774,50 +921,43 @@ export async function exportOrderPdf(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ANTET & ALT BİLGİ — teklif şablonuyla birebir
+// ANTET & ALT BİLGİ — priceRequestPdf ile birebir
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ContactIcon = 'phone' | 'mail' | 'web';
 
-function drawContactIcon(doc: jsPDF, kind: ContactIcon, x: number, top: number, s: number) {
-    doc.setDrawColor(...COLOR_NAVY);
-    doc.setFillColor(...COLOR_NAVY);
-    doc.setLineWidth(0.26);
+/** Breite der Kontaktsymbole (mm) — feine graue Umrisse wie in der Referenz. */
+const CONTACT_ICON_W: Record<ContactIcon, number> = { phone: 1.25, mail: 2.4, web: 2.3 };
+
+function drawContactIcon(doc: jsPDF, kind: ContactIcon, x: number, midY: number) {
+    doc.setDrawColor(...COLOR_MUTED);
+    doc.setLineWidth(0.2);
     if (kind === 'phone') {
-        const w = s * 0.62;
-        const bx = x + (s - w) / 2;
-        doc.roundedRect(bx, top, w, s, 0.35, 0.35, 'F');
-        doc.setFillColor(255, 255, 255);
-        doc.rect(bx + 0.22, top + 0.42, w - 0.44, s - 1.2, 'F');
-        doc.setFillColor(...COLOR_NAVY);
+        const w = CONTACT_ICON_W.phone;
+        const h = 2.5;
+        const top = midY - h / 2;
+        doc.roundedRect(x, top, w, h, 0.3, 0.3, 'S');
+        doc.line(x + w / 2 - 0.15, top + h - 0.45, x + w / 2 + 0.15, top + h - 0.45);
     } else if (kind === 'mail') {
-        const h = s * 0.74;
-        const ty = top + (s - h) / 2;
-        doc.rect(x, ty, s, h, 'S');
-        doc.line(x, ty, x + s / 2, ty + h * 0.55);
-        doc.line(x + s, ty, x + s / 2, ty + h * 0.55);
+        const w = CONTACT_ICON_W.mail;
+        const h = 1.75;
+        const top = midY - h / 2;
+        doc.roundedRect(x, top, w, h, 0.25, 0.25, 'S');
+        doc.line(x + 0.15, top + 0.25, x + w / 2, top + h * 0.57);
+        doc.line(x + w - 0.15, top + 0.25, x + w / 2, top + h * 0.57);
     } else {
-        const r = s / 2;
-        doc.circle(x + r, top + r, r, 'S');
-        doc.ellipse(x + r, top + r, r * 0.44, r, 'S');
-        doc.line(x, top + r, x + s, top + r);
+        const r = CONTACT_ICON_W.web / 2;
+        doc.circle(x + r, midY, r, 'S');
+        doc.ellipse(x + r, midY, r * 0.44, r, 'S');
+        doc.line(x, midY, x + 2 * r, midY);
     }
 }
 
 function drawHeaderWave(doc: jsPDF, wave: string | null) {
     if (!wave) return;
     try {
-        doc.addImage(
-            wave, 'PNG',
-            MR - WAVE_W, WAVE_CENTER_Y - WAVE_H / 2, WAVE_W, WAVE_H,
-            'offitec-header-wave', 'FAST'
-        );
+        doc.addImage(wave, 'PNG', MR - WAVE_W, WAVE_TOP, WAVE_W, WAVE_H, 'offitec-header-wave', 'FAST');
     } catch { /* şerit çizilemezse antet logo + iletişim satırı olarak kalır */ }
-}
-
-function drawHairline(doc: jsPDF, y: number, tone: readonly [number, number, number], thickness = 0.2) {
-    doc.setFillColor(tone[0], tone[1], tone[2]);
-    doc.rect(ML, y - thickness / 2, CONTENT_W, thickness, 'F');
 }
 
 function drawPageHeader(
@@ -832,17 +972,18 @@ function drawPageHeader(
         } catch { /* logo yüklenemezse antet metin-only kalır */ }
     } else {
         doc.setFont(FONT, 'bold');
-        doc.setFontSize(15);
+        doc.setFontSize(13);
         doc.setTextColor(...COLOR_NAVY);
-        doc.text(s.companyName, ML, 19);
+        doc.text(s.companyName, ML, 16.5);
     }
 
     drawHeaderWave(doc, wave);
 
-    const baseline = 32;
-    const ICON = 2.9;
-    const ICON_GAP = 1.5;
-    const ITEM_GAP = 6;
+    // Kontaktzeile: 7 pt grau, rechtsbuendig; die Symbole mittig auf der Zeile.
+    const baseline = 26.5;
+    const midY = 25.85;
+    const ICON_GAP = 2;
+    const ITEM_GAP = 7.3;
     const items: Array<{ icon: ContactIcon; text: string }> = [
         { icon: 'phone', text: CONTACT_PHONE },
         { icon: 'mail', text: CONTACT_EMAIL },
@@ -850,63 +991,149 @@ function drawPageHeader(
     ];
 
     doc.setFont(FONT, 'normal');
-    doc.setFontSize(8);
-    const widths = items.map((it) => ICON + ICON_GAP + doc.getTextWidth(it.text));
+    doc.setFontSize(7);
+    const widths = items.map((it) => CONTACT_ICON_W[it.icon] + ICON_GAP + doc.getTextWidth(it.text));
     const totalW = widths.reduce((a, b) => a + b, 0) + ITEM_GAP * (items.length - 1);
 
     let x = MR - totalW;
     items.forEach((it, i) => {
-        drawContactIcon(doc, it.icon, x, baseline - 2.6, ICON);
+        drawContactIcon(doc, it.icon, x, midY);
         doc.setFont(FONT, 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(...COLOR_LABEL);
-        doc.text(it.text, x + ICON + ICON_GAP, baseline);
+        doc.setFontSize(7);
+        doc.setTextColor(...COLOR_CAPTION);
+        doc.text(it.text, x + CONTACT_ICON_W[it.icon] + ICON_GAP, baseline);
         x += (widths[i] ?? 0) + ITEM_GAP;
     });
 }
 
-function drawPageFooter(doc: jsPDF, page: number, total: number, L: OrderPdfStrings) {
-    const textY = 274.5;
+/**
+ * Der Fuss nach der Referenz: eine Haarlinie, links der Absender DES MANDANTEN
+ * (Name · Adresse — die fest eingetragene Schweizer Bankverbindung ist weg,
+ * sie stimmte fuer den tuerkischen Mandanten nie), rechts Dokument und Seite.
+ */
+function drawPageFooter(
+    doc: jsPDF,
+    page: number,
+    total: number,
+    L: OrderPdfStrings,
+    order: PurchaseOrderRow,
+    s: PdfCompanySettings,
+) {
+    doc.setFillColor(...COLOR_DIVIDER);
+    doc.rect(ML, 288.13, CONTENT_W, 0.27, 'F');
+    const textY = 291.85;
     doc.setFont(FONT, 'normal');
-    doc.setFontSize(7.8);
-    doc.setTextColor(...COLOR_NAVY);
-    const details = `BIC: ${FOOTER_BIC}     ${L.vatIdLabel}: ${FOOTER_VAT}     IBAN: ${FOOTER_IBAN}`;
-    doc.text(details, ML, textY);
-
-    doc.setFontSize(7.2);
-    doc.setTextColor(...COLOR_NAVY_SOFT);
-    doc.text(`${L.pageWord} ${page} ${L.pageOf} ${total}`, MR, textY, { align: 'right' });
-
-    drawHairline(doc, 278.5, COLOR_NAVY, 0.4);
+    doc.setFontSize(FS_FOOTER);
+    doc.setTextColor(...COLOR_MUTED);
+    const right = `${L.docTitle} ${order.referenceNumber}  ·  ${L.pageWord} ${page} ${L.pageOf} ${total}`;
+    doc.text(right, MR, textY, { align: 'right' });
+    const rightW = doc.getTextWidth(right);
+    drawFittedSingleLine(doc, companySenderLine(s, '  ·  '), ML, textY, CONTENT_W - rightW - 8, FS_FOOTER, 4.4);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SAYFA 1 — Kapak: bilgi kartı (sol) + gönderici satırı & tedarikçi (sağ)
+// SAYFA 1 — Karte (links), Absender & Lieferant (rechts), Titel, Anschreiben
 // ─────────────────────────────────────────────────────────────────────────────
 
-function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings, L: OrderPdfStrings) {
-    const y0 = CONTENT_TOP_FIRST;
+type CardRow = [label: string, value: string, emphasize: boolean];
 
-    // ── Sol: sipariş bilgi kartı — TEKLİF PDF'İYLE AYNI DAR TABLO ────────────
-    // Kullanıcı isteği 2026-08-02 (son tur): kart teklif belgesindeki kadar DAR
-    // ve sıkışık satırlı olacak. Ölçüler `tenderPdfModern.drawCoverPage` ile
-    // BİREBİR aynıdır — 78 mm genişlik, 5.6 mm satır, 7 pt etiket, sağa yaslı
-    // kalın değer; üçü birlikte güncellenmelidir (teklif + sipariş + talep).
-    // SATIRLAR SARILMAZ: her değer tek satırdır, sığmazsa puntosu küçülür. Proje
-    // adı için kullanılan 2 satıra sarma kaldırıldı (kart artık dar bir tablo).
-    const cardX = ML;
-    const cardW = 78;
-    const rowH = 5.6;
+/**
+ * Die Angabenkarte (Referenz): hellgrau, abgerundet; Beschriftung grau links,
+ * Wert rechts, alle Werte in EINER Groesse — ein zu langer Wert bricht um,
+ * statt kleiner zu werden. Gibt die Unterkante zurueck.
+ */
+function drawInfoCard(doc: jsPDF, x: number, top: number, rows: CardRow[]): number {
+    const measured = rows.map(([label, value, emphasize]) => {
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(CARD_LABEL_FS);
+        const labelW = doc.getTextWidth(label);
+        doc.setFont(FONT, emphasize ? 'bold' : 'normal');
+        doc.setFontSize(CARD_VALUE_FS);
+        const lines = doc.splitTextToSize(value, CARD_W - CARD_INSET * 2 - labelW - 4) as string[];
+        return { label, lines, emphasize, h: CARD_ROW_H + (lines.length - 1) * CARD_VALUE_LH };
+    });
+    const height = CARD_PAD * 2 + measured.reduce((sum, row) => sum + row.h, 0);
+    doc.setFillColor(...COLOR_CARD_FILL);
+    doc.setDrawColor(...COLOR_CARD_EDGE);
+    doc.setLineWidth(HAIRLINE_W);
+    doc.roundedRect(x, top, CARD_W, height, CARD_RADIUS, CARD_RADIUS, 'FD');
 
-    // Kartta ADRES YOKTUR: adlar tek satır olarak girer, adres yalnızca sağdaki
-    // alıcı bloğunda görünür. Serbest metindeki satır sonları boşluğa iner.
-    const oneLine = (value: string) => String(value || '').replace(/\s+/g, ' ').trim();
+    let y = top + CARD_PAD;
+    measured.forEach((row, index) => {
+        const base = y + CARD_BASELINE;
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(CARD_LABEL_FS);
+        doc.setTextColor(...COLOR_CAPTION);
+        doc.text(row.label, x + CARD_INSET, base);
+        doc.setFont(FONT, row.emphasize ? 'bold' : 'normal');
+        doc.setFontSize(CARD_VALUE_FS);
+        if (row.emphasize) doc.setTextColor(...COLOR_NAVY);
+        else doc.setTextColor(...COLOR_TEXT);
+        row.lines.forEach((line, lineIdx) => doc.text(line, x + CARD_W - CARD_INSET, base + lineIdx * CARD_VALUE_LH, { align: 'right' }));
+        y += row.h;
+        if (index < measured.length - 1) {
+            doc.setFillColor(...COLOR_CARD_LINE);
+            doc.rect(x + CARD_INSET, y - HAIRLINE_W / 2, CARD_W - CARD_INSET * 2, HAIRLINE_W, 'F');
+        }
+    });
+    return top + height;
+}
 
-    // ALICI ADI (Empfänger) KARTTADIR — sağdaki adres bloğunda değil (kullanıcı
-    // isteği 2026-08-02). DURUM SATIRI YOKTUR: kısa süre denendi ve kaldırıldı
-    // (kullanıcı isteği) — sipariş durumu iç bilgidir, tedarikçiye giden belgede
-    // yeri yok. Boş alanlar satır açmaz (`filter`).
-    const rows: Array<[string, string, boolean]> = ([
+/**
+ * Rechts oben: der Absender — der AKTIVE MANDANT mit Name und Adresse (hat er
+ * eine eigene, legt `usePdfSettings()` sie ueber die Firmendaten) — klein und
+ * grau; er darf in eine zweite Zeile umbrechen, erst eine dritte macht ihn
+ * kleiner. Darunter eine Haarlinie und der Lieferant mit seiner Adresse
+ * (Strasse / PLZ Ort, jede Zeile fuer sich). Gibt die Unterkante zurueck.
+ */
+function drawSenderAndSupplier(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings): number {
+    const top = CONTENT_TOP_FIRST;
+    const addrW = MR - ADDR_X;
+    const sender = companySenderLine(s, ' · ');
+    doc.setFont(FONT, 'normal');
+    doc.setTextColor(...COLOR_SENDER);
+    let size = 6.3;
+    let senderLines: string[];
+    do {
+        doc.setFontSize(size);
+        senderLines = doc.splitTextToSize(sender, addrW) as string[];
+        size = Math.round((size - 0.2) * 10) / 10;
+    } while (senderLines.length > 2 && size >= 5.2);
+    senderLines.slice(0, 2).forEach((line, index) => doc.text(line, ADDR_X, top + 2.5 + index * 2.9));
+    doc.setFillColor(...COLOR_DIVIDER);
+    doc.rect(ADDR_X, top + 8.07, addrW, 0.27, 'F');
+
+    let y = top + 15.45;
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...COLOR_TEXT);
+    const nameLines = doc.splitTextToSize(order.supplierName || '', addrW) as string[];
+    nameLines.forEach((line, index) => doc.text(line, ADDR_X, y + index * 4.4));
+    y += (Math.max(1, nameLines.length) - 1) * 4.4;
+    // Alıcı adı kartta; sağ blokta e-posta yok (2026-08-02 kararları geçerli).
+    if (order.supplierAddress) {
+        doc.setFont(FONT, 'normal');
+        doc.setTextColor(...COLOR_TEXT_2);
+        y = drawAddressBlockLines(doc, order.supplierAddress, ADDR_X, y + 5.3, addrW, 8.4, 4.24) - 4.24;
+    }
+    return y + 1.5;
+}
+
+/** Der Titel: Dokument fett in Navy, die Nummer normal daneben. */
+function drawDocTitle(doc: jsPDF, title: string, number: string, y: number) {
+    doc.setFont(FONT, 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(...COLOR_NAVY);
+    doc.text(title, ML, y);
+    const numberX = ML + doc.getTextWidth(`${title} `);
+    doc.setFont(FONT, 'normal');
+    doc.setTextColor(...COLOR_TEXT);
+    doc.text(number, numberX, y);
+}
+
+/** Seite 1 bis zum Anschreiben; gibt die Grundlinie seiner letzten Zeile zurueck. */
+function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings, L: OrderPdfStrings): number {
+    const rows = ([
         [L.orderNumber, order.referenceNumber, true],
         [L.orderedBy, oneLine(order.orderedByName || ''), false],
         [L.orderDate, fmtDateShort(order.createdAt), false],
@@ -914,175 +1141,61 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
         [L.project, oneLine(order.projectName || ''), false],
         [L.recipient, oneLine(order.recipientName || ''), false],
         [L.supplier, oneLine(order.supplierName), false],
-    ] as Array<[string, string, boolean]>).filter(([, value]) => value.trim().length > 0);
+    ] as CardRow[]).filter(([, value]) => value.trim().length > 0);
+    const cardBottom = drawInfoCard(doc, ML, CONTENT_TOP_FIRST, rows);
+    const addrBottom = drawSenderAndSupplier(doc, order, s);
 
-    const cardY = y0 - 4;
-    const cardH = rows.length * rowH + 2.4;
+    const titleY = Math.max(cardBottom, addrBottom) + 12;
+    drawDocTitle(doc, L.docTitle, order.referenceNumber, titleY);
 
-    doc.setFillColor(...COLOR_CARD_BG);
-    doc.setDrawColor(...COLOR_CARD_BORDER);
-    doc.setLineWidth(0.25);
-    doc.rect(cardX, cardY, cardW, cardH, 'FD');
-
-    doc.setFillColor(...COLOR_RED);
-    doc.rect(cardX, cardY, 1.2, cardH * 0.32, 'F');
-    doc.setFillColor(...COLOR_NAVY);
-    doc.rect(cardX, cardY + cardH * 0.32, 1.2, cardH * 0.44, 'F');
-    doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(cardX, cardY + cardH * 0.76, 1.2, cardH * 0.24, 'F');
-
-    let ry = cardY + 1.2;
-    rows.forEach(([label, value, emphasize], idx) => {
-        const base = ry + rowH / 2 + 1.15;
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(...COLOR_LABEL);
-        doc.text(label, cardX + 3.5, base);
-        doc.setFont(FONT, 'bold');
-        // Değer, ETİKETİN bıraktığı boşluğa sığdırılır (dar kartta çakışmasın).
-        const labelW = doc.getTextWidth(label);
-        const valueMaxW = cardW - 7 - labelW - 2;
-        doc.setFontSize(emphasize ? 8.6 : 7.8);
-        fitFontSize(doc, value, valueMaxW, emphasize ? 8.6 : 7.8, 5.6);
-        if (emphasize) doc.setTextColor(...COLOR_NAVY);
-        else doc.setTextColor(...COLOR_TEXT);
-        doc.text(value, cardX + cardW - 3.5, base, { align: 'right' });
-        ry += rowH;
-        if (idx < rows.length - 1) {
-            doc.setDrawColor(...COLOR_HAIRLINE);
-            doc.setLineWidth(0.12);
-            doc.line(cardX + 3.5, ry + 0.3, cardX + cardW - 3.5, ry + 0.3);
-        }
-    });
-
-    // ── Sağ: TEK SATIR gönderici + tedarikçi (alıcı) bloğu ───────────────────
-    const addrX = 112;
-    const addrW = MR - addrX;
-    // GÖNDERİCİ TEK SATIRDIR (kullanıcı isteği 2026-08-02, son tur — arada üç
-    // satıra bölünmüştü, geri alındı): "Offitec GmbH, Ceres Tower -
-    // Hohenrainstrasse 24, 4133 Pratteln". Sığmazsa SARILMAZ, puntosu küçülür
-    // (`companySenderLine` + `drawFittedSingleLine`) — teklif belgesiyle aynı.
-    const sender = companySenderLine(s);
-    doc.setFont(FONT, 'normal');
-    doc.setTextColor(...COLOR_MUTED);
-    drawFittedSingleLine(doc, sender, addrX, y0, addrW, 7.5, 5.8);
-    doc.setDrawColor(...COLOR_HAIRLINE);
-    doc.setLineWidth(0.2);
-    doc.line(addrX, y0 + 1.6, MR, y0 + 1.6);
-
-    let addrY = y0 + 8;
-    doc.setTextColor(...COLOR_TEXT);
-    doc.setFont(FONT, 'bold');
-    doc.setFontSize(10.5);
-    const nameLines = doc.splitTextToSize(order.supplierName, addrW);
-    doc.text(nameLines, addrX, addrY);
-    addrY += nameLines.length * 5;
-    // ALICI ADI BURADA DEĞİL KARTTA durur (kullanıcı isteği 2026-08-02, son tur:
-    // "adresin üstünde değil, kartta — Status'ün altında"). Sağ blok yalnızca
-    // firma adı + adrestir.
-    // Tedarikçi adresi (snapshot) — firma adının hemen altında, mektup bloğu gibi.
-    // Snapshot bileşenlerden kurulmuş EN FAZLA 2 satırdır; burada yalnızca blok
-    // genişliğine sığdırılır ve taşarsa 3. satıra izin verilir.
-    if (order.supplierAddress) {
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(10);
-        addrY = drawAddressBlockLines(doc, order.supplierAddress, addrX, addrY, addrW, 10, 4.9);
-    }
-    // ALICI BLOĞUNDA E-POSTA YOKTUR (kullanıcı isteği 2026-08-02): firma adının
-    // altında YALNIZCA adres durur — mektup adresi gibi. Tedarikçinin e-postası
-    // zaten mailin alıcısıdır, belgeye basılmasına gerek yok.
-
-    // ── Başlık + kısa kırmızı vurgu + resmî hitap + giriş metni ──────────────
-    let yTitle = Math.max(addrY, cardY + cardH) + 16;
-    doc.setFont(FONT, 'bold');
-    doc.setFontSize(16.5);
-    doc.setTextColor(...COLOR_NAVY);
-    doc.text(`${L.docTitle} ${order.referenceNumber}`, ML, yTitle);
-    doc.setDrawColor(...COLOR_RED);
-    doc.setLineWidth(0.8);
-    doc.line(ML, yTitle + 2.6, ML + 14, yTitle + 2.6);
-
-    yTitle += 12;
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(...COLOR_TEXT);
-    // ── ÖN YAZI (ANSCHREIBEN) ────────────────────────────────────────────────
-    // Siparişe kendi metni yazılmışsa hitap + giriş metninin YERİNE o basılır
-    // (satır sonları korunur, boş satır paragraf boşluğu olur). Alan boşsa
-    // buradaki STANDART METİN basılır — varsayılan metin belgede yaşar, kayıtta
-    // değil (kullanıcı isteği 2026-08-02), bu yüzden dil değiştirildiğinde
-    // dokunulmamış siparişler de doğru dilde çıkar.
-    // Siparişin kendi metni de standart metin de AYNI yoldan basılır: standart
-    // metin artık çok paragraflı TAM bir ticari ön yazıdır (hitap `greeting` +
-    // gövde/imza `intro` — kullanıcı isteği 2026-08-21) ve arayüzdeki
+    // ÖN YAZI (Anschreiben): siparişin kendi metni, yoksa standart metin — ikisi
+    // de AYNI yoldan basılır (2026-08-21); arayüzdeki
     // `inv.orders.coverLetter.defaultText` yer tutucusuyla birlikte güncellenir.
+    const y = titleY + 7.9;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(FS_LETTER);
+    doc.setTextColor(...COLOR_TEXT_2);
     const coverLetter = (order.coverLetter || '').trim() || `${L.greeting}\n\n${L.intro}`;
-    // Kapak sayfası taşmasın: kalan boşluğa sığan satır sayısı kadar basılır,
-    // fazlası sessizce kırpılır.
-    const maxLines = Math.max(4, Math.floor((COVER_LETTER_BOTTOM - yTitle) / COVER_LETTER_LH));
+    // Sayfa taşmasın: kalan boşluğa sığan satır kadar basılır.
+    const letterLh = FS_LETTER * PT_MM * LETTER_LHF;
+    const maxLines = Math.max(4, Math.floor((COVER_LETTER_BOTTOM - y) / letterLh) + 1);
     const coverLines = coverLetter
         .split('\n')
         .flatMap((line) => (line.trim() ? (doc.splitTextToSize(line, CONTENT_W) as string[]) : ['']))
         .slice(0, maxLines);
-    doc.text(coverLines, ML, yTitle, { lineHeightFactor: 1.35 });
-
-    // Kapak sayfasının alt kısmı bilinçli olarak boş bırakılır (kullanıcı isteği):
-    // teklifteki footerNote bloğu burada YOKTUR.
+    doc.text(coverLines, ML, y, { lineHeightFactor: LETTER_LHF });
+    return y + (coverLines.length - 1) * letterLh;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SAYFA 2+ — Tablo başlığı & düz satırlar
+// TABELLE — Kopf, düz satırlar, Schlusslinie
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface TableState { y: number; rowIdx: number }
+interface TableState { y: number }
 
-function newTablePage(
-    doc: jsPDF,
-    st: TableState,
-    L: OrderPdfStrings,
-    layout: TableLayout,
-    extraCols: Array<{ key: string; name: string }> = [],
-) {
+function newTablePage(doc: jsPDF, st: TableState, layout: TableLayout) {
     doc.addPage();
-    st.rowIdx = 0;
-    st.y = drawTableHeader(doc, CONTENT_TOP_REST, L, layout, extraCols);
+    st.y = drawTableHeader(doc, CONTENT_TOP_REST, layout);
 }
-
-/** Die festen Spalten, die sich ausblenden lassen — jede freie gibt einer eigenen Platz. */
-const HIDEABLE_FIXED_KEYS = ['code', 'priceGross', 'discount'] as const;
 
 /**
- * Die eigenen Spalten einer Bestellung: Schlüssel + Überschrift, in der
- * Reihenfolge, in der sie an den Positionen stehen. Ausgeblendete fallen weg.
- *
- * Wie viele: drei — plus eine je AUSGEBLENDETER fester Spalte (Vorgabe Samet,
- * 09.09.2026: «blenden wir den Einzelpreis aus, steigt die Zahl der eigenen
- * Spalten»). Die Drei waren nie ein Prinzip, sondern ein Blatt-Mass; faellt
- * eine feste Spalte weg, ist ihr Platz frei. Dieselbe Rechnung macht der
- * Vorlagen-Dialog (`CalcPanel`) — beide muessen dasselbe zaehlen.
+ * Wie viele freie Spalten das Blatt neben den festen traegt. Die Vorlage darf
+ * zwoelf haben (11.09.2026) — auf A4 hochkant sind sechs das Ende der
+ * Lesbarkeit; was darueber liegt, bleibt in der Tabelle und im Excel.
  */
-function orderExtraColumns(
-    order: PurchaseOrderRow,
-    hidden: Set<string> = new Set(),
-): Array<{ key: string; name: string; width: number }> {
-    const seen = new Map<string, { name: string; width: number }>();
-    for (const item of order.items ?? []) {
-        for (const entry of item.extras ?? []) {
-            if (entry?.key && entry?.name && !hidden.has(entry.key) && !seen.has(entry.key)) {
-                seen.set(entry.key, { name: String(entry.name), width: entry.width ?? 120 });
-            }
-        }
-    }
-    const freed = HIDEABLE_FIXED_KEYS.filter((key) => hidden.has(key)).length;
-    return [...seen.entries()].slice(0, 3 + freed).map(([key, entry]) => ({ key, ...entry }));
-}
+const PDF_MAX_EXTRA_COLUMNS = 6;
 
-/** Der Wert einer eigenen Spalte an einer Position ('' = nichts eingetragen). */
-function extraValue(item: OrderItem, key: string): string {
+/** Der rohe Wert einer eigenen Spalte an einer Position ('' = nichts eingetragen). */
+function extraRaw(item: OrderItem, key: string): string {
     for (const entry of item.extras ?? []) {
         if (entry?.key === key) return String(entry.value ?? '').trim();
     }
     return '';
+}
+
+/** Derselbe Wert mit Umbruchpunkten fuer lange Nummern (`breakableCode`) — `cellLines` entfernt sie. */
+function extraValue(item: OrderItem, key: string): string {
+    return breakableCode(extraRaw(item, key));
 }
 
 /**
@@ -1090,97 +1203,99 @@ function extraValue(item: OrderItem, key: string): string {
  * «Im PDF werden manche Spaltentitel winzig, andere riesig — so nicht. Wenn
  *  es sein muss, untereinander; die Tabelle darf wachsen.»
  *
- * Bis heute drueckte `fitFontSize` jeden Titel in seine Spalte: «Nettopreis»
- * in 19 mm wurde 6 pt, «Menge» daneben blieb 8.4 pt — zwei Groessen in einer
- * Zeile. Jetzt haben ALLE Titel dieselbe Schrift; wer nicht in seine Spalte
- * passt, bekommt eine zweite Zeile, und der Kopf wird so hoch wie sein
- * laengster Titel. Nur ein einzelnes Wort, das selbst allein nicht passt,
- * wird noch verkleinert — aber nie unter `FS_HEADER_MIN`, damit es lesbar
- * bleibt. Der Kopf gibt seine Hoehe zurueck; wer ihn zeichnet, rechnet
- * damit weiter (`newTablePage` tut das schon).
+ * ALLE Titel haben dieselbe Schrift (`HEAD_FS`, 5.6 pt); wer
+ * nicht in seine Spalte passt, bekommt eine zweite Zeile, und der Kopf wird so
+ * hoch wie sein laengster Titel — alle haengen an der UNTERKANTE. Nur ein
+ * einzelnes Wort, das selbst allein nicht passt, wird noch verkleinert —
+ * hoechstens um 1 pt (`headerSizeFor`) und fuer alle gleich. Die Zeilen packt
+ * `splitCaption` selbst, weil die Sperrung mitgemessen werden muss.
  */
-const FS_HEADER_MIN = 7;
-const HEAD_LH = 3.6;
-const HEAD_PAD = 2.4;
+type HeadCell = { lines: string[]; x: number; align: 'left' | 'right' };
 
-type HeadCell = { lines: string[]; x: number; align: 'left' | 'right'; size: number };
-
-/** Zeilen eines Titels bei einer Schriftgroesse — und ob dabei ein Wort zerhackt wurde. */
-function splitHeader(doc: jsPDF, label: string, width: number, size: number): { lines: string[]; chopped: boolean } {
-    doc.setFont(FONT, 'bold');
-    doc.setFontSize(size);
-    const words = label.split(/\s+/).filter(Boolean);
-    const lines = doc.splitTextToSize(label, width) as string[];
-    /* `splitTextToSize` zerhackt ein zu langes Wort in Stuecke, die einzeln
-       «passen» — an den Zeilen allein sieht man das nicht. Ein zerhacktes Wort
-       verraet sich daran, dass es MEHR Zeilen als Woerter gibt. */
-    return { lines, chopped: lines.length > words.length };
+/** Zeilen eines Titels bei einer Schriftgroesse — und ob dabei ein Wort nicht passte. */
+function splitCaption(doc: jsPDF, label: string, width: number, size: number): { lines: string[]; chopped: boolean } {
+    const lines: string[] = [];
+    let line = '';
+    let chopped = false;
+    const fits = (text: string) => captionWidth(doc, text, size) <= width;
+    for (const word of label.split(/\s+/).filter(Boolean)) {
+        const joined = line ? `${line} ${word}` : word;
+        if (fits(joined)) { line = joined; continue; }
+        const pieces = captionPieces(word);
+        if (pieces.length === 1) {
+            if (!fits(word)) chopped = true;
+            if (line) lines.push(line);
+            line = word;
+            continue;
+        }
+        /* Ein zusammengesetztes Wort bricht an seiner Fuge («PRODUKTTYP-» /
+           «NUMMER»); was in eine Zeile passt, bleibt ohne Trennstrich zusammen. */
+        if (line) lines.push(line);
+        let run = '';
+        pieces.forEach((piece, index) => {
+            const last = index === pieces.length - 1;
+            const trial = run + piece;
+            if (fits(trial + (last ? '' : '-'))) { run = trial; return; }
+            if (run) lines.push(`${run}-`);
+            if (!fits(piece + (last ? '' : '-'))) chopped = true;
+            run = piece;
+        });
+        line = run;
+    }
+    if (line) lines.push(line);
+    return { lines, chopped };
 }
 
-/** Die kleinste Schrift, mit der der Titel ohne zerhacktes Wort in die Spalte geht. */
-function headerSizeFor(doc: jsPDF, label: string, maxW: number): number {
+/** Die kleinste Schrift, mit der der Titel ohne zu breites Wort in die Spalte geht. */
+function headerSizeFor(doc: jsPDF, label: string, maxW: number, base: number): number {
     const width = Math.max(4, maxW);
-    let size = FS_HEADER;
-    while (size > FS_HEADER_MIN && splitHeader(doc, label, width, size).chopped) size -= 0.2;
+    const floor = Math.max(4.6, base - 1);
+    let size = base;
+    while (size > floor && splitCaption(doc, label, width, size).chopped) size -= 0.2;
     return size;
 }
 
-function headCell(doc: jsPDF, label: string, x: number, maxW: number, align: 'left' | 'right', size: number): HeadCell {
-    const { lines } = splitHeader(doc, label, Math.max(4, maxW), size);
-    doc.setFontSize(FS_HEADER);
-    return { lines, x, align, size };
-}
-
-function drawTableHeader(
-    doc: jsPDF,
-    y: number,
-    L: OrderPdfStrings,
-    layout: TableLayout,
-    extraCols: Array<{ key: string; name: string }> = []
-): number {
-    /* EINE Schrift fuer die ganze Kopfzeile (Vorgabe Samet: «manche Titel
-       winzig, andere riesig — so nicht»): jede Zelle sagt, was sie mindestens
-       braucht, und die kleinste Antwort gilt fuer alle. Meist ist das FS_HEADER
-       selbst — verkleinert wird nur, wenn ein Wort allein nicht in seine
-       Spalte geht, und dann fuer alle gleich. */
-    const specs: Array<[string, number, number, 'left' | 'right']> = [
-        [L.colPos, C_POS_X, C_DESC - C_POS_X - 1, 'left'],
-        [L.colDesc, C_DESC, layout.descEnd - C_DESC, 'left'],
-        ...layout.extraX.map((x, index): [string, number, number, 'left' | 'right'] =>
-            [extraCols[index]?.name ?? '', x, layout.extraWidths[index] - GAP, 'left']),
-        ...(layout.codeX !== null ? [[L.colCode, layout.codeX, layout.wCode, 'left'] as [string, number, number, 'left' | 'right']] : []),
-        [L.colQty, layout.qtyR, layout.wQty, 'right'],
-        ...(layout.grossR !== null ? [[L.colGrossPrice, layout.grossR, layout.wGross, 'right'] as [string, number, number, 'left' | 'right']] : []),
-        [L.colNetPrice, layout.netR, layout.wNet, 'right'],
-        ...(layout.discR !== null ? [[L.colDiscount, layout.discR, layout.wDisc, 'right'] as [string, number, number, 'left' | 'right']] : []),
-        ...(layout.vatR !== null ? [[L.colVat, layout.vatR, layout.wVat, 'right'] as [string, number, number, 'left' | 'right']] : []),
-        [L.colPrice, layout.priceR, layout.wPrice, 'right'],
-    ];
-    const rowSize = Math.min(FS_HEADER, ...specs.map(([label, , maxW]) => headerSizeFor(doc, label, maxW)));
-    const cells: HeadCell[] = specs.map(([label, x, maxW, align]) => headCell(doc, label, x, maxW, align, rowSize));
+function drawTableHeader(doc: jsPDF, y: number, layout: TableLayout): number {
+    // Die Pos-Spalte hat keinen Titel (Referenz). Rechtsbuendige Titel stehen
+    // mit ihrer RECHTEN Kante auf der Kante ihrer Zahlen. Die Titel sind die
+    // Namen der Vorlage, in ihrer Reihenfolge.
+    type Spec = [string, number, number, 'left' | 'right'];
+    const specs: Spec[] = layout.cells.map((cell): Spec => {
+        const width = cell.width - GAP;
+        return [cell.column.caption, cell.align === 'right' ? cell.x + width : cell.x, width, cell.align];
+    });
+    const base = HEAD_FS;
+    const rowSize = Math.min(base, ...specs.map(([label, , maxW]) => headerSizeFor(doc, label, maxW, base)));
+    const cells: HeadCell[] = specs.map(([label, x, maxW, align]) =>
+        ({ lines: splitCaption(doc, label, Math.max(4, maxW), rowSize).lines, x, align }));
     const lineCount = Math.max(1, ...cells.map((cell) => cell.lines.length));
-    const headH = Math.max(HEAD_H, HEAD_PAD * 2 + lineCount * HEAD_LH);
+    const headLh = rowSize * CAPTION_LH;
+    const bottom = y + HEAD_PAD_T + rowSize * CAP_RATIO + (lineCount - 1) * headLh;
 
-    doc.setFillColor(...COLOR_HEAD_BG);
-    doc.rect(ML, y, CONTENT_W, headH, 'F');
-    doc.setFillColor(...COLOR_NAVY_SOFT);
-    doc.rect(ML, y + headH - 0.35, CONTENT_W, 0.35, 'F');
-
-    doc.setFont(FONT, 'bold');
-    doc.setTextColor(...COLOR_NAVY);
-    // Alle Titel haengen an der UNTERKANTE: ein einzeiliger neben einem
-    // zweizeiligen steht auf derselben Grundlinie wie dessen letzte Zeile.
-    const bottom = y + headH - HEAD_PAD - 0.6;
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(rowSize);
+    doc.setTextColor(...COLOR_COLUMN_HEAD);
     for (const cell of cells) {
-        doc.setFontSize(cell.size);
         cell.lines.forEach((line, index) => {
-            const ly = bottom - (cell.lines.length - 1 - index) * HEAD_LH;
-            doc.text(line, cell.x, ly, cell.align === 'right' ? { align: 'right' } : undefined);
+            const ly = bottom - (cell.lines.length - 1 - index) * headLh;
+            const lx = cell.align === 'right' ? cell.x - captionWidth(doc, line, rowSize) + CAPTION_SPACING : cell.x;
+            doc.text(line, lx, ly, { charSpace: CAPTION_SPACING });
         });
     }
-    doc.setFontSize(FS_HEADER);
+    const ruleY = bottom + HEAD_PAD_B;
+    drawRule(doc, ruleY, COLOR_RULE);
+    return ruleY;
+}
 
-    return y + headH + HEAD_GAP;
+/** Eine Linie ueber die ganze Breite: Haarlinie zwischen Zeilen, Linie unter Kopf und Tabelle. */
+function drawRule(doc: jsPDF, y: number, tone: readonly [number, number, number]) {
+    doc.setFillColor(tone[0], tone[1], tone[2]);
+    doc.rect(ML, y - HAIRLINE_W / 2, CONTENT_W, HAIRLINE_W, 'F');
+}
+
+/** Das Ende der Tabelle: die letzte Haarlinie wird zur dunkleren Schlusslinie (Referenz). */
+function closeTable(doc: jsPDF, bottom: number) {
+    drawRule(doc, bottom, COLOR_RULE);
 }
 
 function fitFontSize(doc: jsPDF, text: string, maxW: number, base: number, min = 6.4): number {
@@ -1215,20 +1330,20 @@ function drawFittedRight(
     maxW: number,
     baseY: number,
     style: 'normal' | 'bold',
-    base = FS_BASE
+    base: number
 ) {
     doc.setFont(FONT, style);
     fitFontSize(doc, text, maxW, base);
     doc.text(text, rightX, baseY, { align: 'right' });
-    doc.setFontSize(FS_BASE);
+    doc.setFontSize(base);
 }
 
 type OrderItem = PurchaseOrderRow['items'][number];
 
 /**
- * Açıklama hücresi: ürün adı (kalın) + seri no ikinci satırda (soluk). Seri KOD
- * ve indirim dökümü artık kendi sütunlarında durur (kod sütunu / alt alta
- * yazılan indirim yüzdeleri).
+ * Açıklama hücresi: ürün adı (tablonun TEK puntosunda) + seri no ikinci
+ * satırda (soluk). Seri KOD ve indirimler kendi sütunlarında durur — nichts
+ * wandert unter den Produktnamen (Vorgabe Samet, 09.09.2026).
  */
 function buildRowLines(
     doc: jsPDF,
@@ -1236,36 +1351,19 @@ function buildRowLines(
     L: OrderPdfStrings,
     layout: TableLayout,
 ): { title: string[]; meta: string[] } {
-    const descW = layout.descEnd - C_DESC;
-    doc.setFont(FONT, 'bold');
-    doc.setFontSize(FS_TITLE);
+    const descW = layout.descEnd - layout.descX;
+    doc.setFont(FONT, NAME_STYLE);
+    doc.setFontSize(layout.fs);
     const title = doc.splitTextToSize((item.name || '').trim(), descW) as string[];
-
-    /* Die zweite Zeile unter dem Namen. Sie trägt zweierlei, und beides sieht
-       gleich aus, sobald es gedruckt ist:
-         · die SERIENNUMMER einer von Hand erfassten Zeile — sie bekommt ihre
-           Beschriftung («Serien-Nr.: …»), sonst wüsste niemand, was da steht;
-         · die EIGENEN ANGABEN aus dem Beleg-Import (07.09.2026) — die bringen
-           ihre Beschriftungen schon mit («Herstellernummer: 4711 · Farbe: RAL
-           9010»), und ein zweites «Serien-Nr.:» davor wäre schlicht falsch.
-       Unterschieden wird am Doppelpunkt: er steht nur in der zweiten Form.
-       `splitTextToSize` bricht die Zeile ohnehin um, und `measureRow` macht die
-       Zeile dafür höher — die Liste darf also länger werden. */
-    /* Unter dem Namen steht nur noch die SERIENNUMMER einer von Hand
-       erfassten Zeile. Was frueher hier landete, weil es in seine Spalte nicht
-       passte — ueberzaehlige eigene Angaben, ein zu langer Code —, landet nicht
-       mehr hier: die Spalten sind seit dem 09.09.2026 so breit, wie ihr Inhalt
-       es braucht, und ihre Zellen brechen um (Vorgabe Samet: «versuch NIE, den
-       Code unter den Produktnamen zu schieben — was wo ist, bleibt wo es ist»). */
+    /* Unter dem Namen steht nur die SERIENNUMMER einer von Hand erfassten
+       Zeile; bringt sie ihre Beschriftung schon mit (Doppelpunkt), kommt kein
+       zweites «Serien-Nr.:» davor. */
     const serial = (item.serialNumber || '').trim();
-    const metaParts = [
-        serial ? (serial.includes(':') ? serial : `${L.serialShort}: ${serial}`) : '',
-    ].filter(Boolean);
     let meta: string[] = [];
-    if (metaParts.length) {
+    if (serial) {
         doc.setFont(FONT, 'normal');
-        doc.setFontSize(FS_BASE - 0.4);
-        meta = doc.splitTextToSize(metaParts.join('  ·  '), descW) as string[];
+        doc.setFontSize(layout.fs * 0.92);
+        meta = doc.splitTextToSize(serial.includes(':') ? serial : `${L.serialShort}: ${serial}`, descW) as string[];
     }
     return { title, meta };
 }
@@ -1279,36 +1377,43 @@ function buildRowLines(
 function cellLines(doc: jsPDF, text: string, maxW: number, size: number): string[] {
     doc.setFont(FONT, 'normal');
     doc.setFontSize(size);
-    const lines = doc.splitTextToSize(text || '—', Math.max(4, maxW)) as string[];
-    return lines.map((line) => line.replace(/\u200b/g, ''));
+    const width = Math.max(4, maxW);
+    /* Selbst gepackt, nicht `splitTextToSize`: das kennt nur das Leerzeichen
+       als Umbruch und hackte eine Nummer an ihrem Nullbreiten-Trenner NICHT,
+       sondern irgendwo («TM171ASCTB2 | 7»). Woerter trennt ein Leerzeichen,
+       Glieder einer Nummer der Trenner — der im Druck verschwindet. */
+    const lines: string[] = [];
+    let line = '';
+    for (const word of (text || '—').split(/\s+/).filter(Boolean)) {
+        word.split('\u200b').filter(Boolean).forEach((part, index) => {
+            const candidate = line + (index === 0 && line ? ' ' : '') + part;
+            if (!line || doc.getTextWidth(candidate) <= width) { line = candidate; return; }
+            lines.push(line);
+            line = part;
+        });
+    }
+    if (line) lines.push(line);
+    // Ein Glied, das allein nicht passt, wird als letzter Ausweg zerteilt.
+    return lines.flatMap((entry) => (doc.getTextWidth(entry) <= width ? [entry] : (doc.splitTextToSize(entry, width) as string[])));
 }
 
-function measureRow(
-    doc: jsPDF,
-    item: OrderItem,
-    L: OrderPdfStrings,
-    layout: TableLayout,
-    extraCols: Array<{ key: string; name: string }> = []
-): number {
+/** Hoehe der Beschreibungszelle ab der ersten Grundlinie (Name + Seriennummer). */
+function descBlockH(title: string[], meta: string[], layout: TableLayout): number {
+    return (title.length - 1) * layout.lh + (meta.length ? META_GAP + meta.length * layout.lh * 0.92 : 0);
+}
+
+function measureRow(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: TableLayout): number {
     const { title, meta } = buildRowLines(doc, item, L, layout);
-    const descH = title.length * LH_TITLE + (meta.length ? meta.length * LH_BODY + 1 : 0);
-    // Die eigenen Spalten und der Code brechen in ihrer Spalte um — die
-    // hoechste Zelle bestimmt die Zeile.
-    const extraH = Math.max(0, ...layout.extraX.map((_, position) => {
-        const column = extraCols[position];
-        if (!column) return 0;
-        return cellLines(doc, extraValue(item, column.key), layout.extraWidths[position] - GAP, FS_BASE - 0.4).length * LH_BODY;
-    }));
-    const codeH = layout.codeX === null
-        ? 0
-        : cellLines(doc, breakableCode((item.code || '').trim()), layout.wCode, FS_BASE - 0.4).length * LH_BODY;
-    const contentH = Math.max(descH, extraH, codeH);
-    // Sayısal sütunların yüksekliği: indirim sütununda ALT ALTA yazılan yüzdeler
-    // (en fazla üç) satırı büyütebilir. BİRİM SATIRI YOKTUR (kullanıcı isteği
-    // 2026-08-21: "adet vs. yazmasın") — miktar çıplak sayıdır.
-    const stackedDiscounts = layout.discR === null ? 0 : Math.max(0, discountLines(item).length - 1);
-    const numericsH = FIRST_BASELINE - 2 + stackedDiscounts * DISC_LH;
-    return Math.max(ROW_MIN_H, Math.max(contentH, numericsH) + ROW_PAD * 2);
+    // Die eigenen Textspalten brechen in ihrer Spalte um, die Rabatte stehen
+    // ALT ALTA — die hoechste Zelle bestimmt die Zeile. Alle Zellen teilen
+    // EINE Grundlinie; eine Zahl bricht nicht um. Birim satırı yok (2026-08-21).
+    const cellLineCounts = layout.cells.map((cell) => {
+        if (cell.column.kind === 'disc') return Math.max(1, discountLines(item).length);
+        if (cell.column.kind !== 'extra' || cell.align === 'right') return 1;
+        return cellLines(doc, extraValue(item, cell.column.key), cell.width - GAP, layout.fs).length;
+    });
+    const belowFirst = Math.max(descBlockH(title, meta, layout), (Math.max(1, ...cellLineCounts) - 1) * layout.lh);
+    return ROW_PAD_T + ROW_PAD_B + layout.fs * (CAP_RATIO + DESCENT_RATIO) + belowFirst;
 }
 
 function drawRow(
@@ -1318,114 +1423,123 @@ function drawRow(
     y: number,
     rowH: number,
     fmt: (v: number) => string,
-    rowIdx: number,
     L: OrderPdfStrings,
     layout: TableLayout,
-    extraCols: Array<{ key: string; name: string }> = [],
     totalVatRate: number | null = null,
 ): number {
-    if (rowIdx % 2 === 1) {
-        doc.setFillColor(...COLOR_ZEBRA);
-        doc.rect(ML, y, CONTENT_W, rowH, 'F');
-    }
-
+    const { fs, lh } = layout;
     const { title, meta } = buildRowLines(doc, item, L, layout);
-    const baseY = y + FIRST_BASELINE;
+    const baseY = y + ROW_PAD_T + fs * CAP_RATIO;
 
-    // Pos numarası: düz sıra numarası (1, 2, 3…).
+    // Pos: schlichte Nummer, blass, eine Spur kleiner.
     doc.setFont(FONT, 'normal');
-    fitFontSize(doc, String(index + 1), C_DESC - C_POS_X - 1, FS_POS, 5.8);
-    doc.setTextColor(...COLOR_TEXT);
+    doc.setFontSize(fs * POS_RATIO);
+    doc.setTextColor(...COLOR_POS);
     doc.text(String(index + 1), C_POS_X, baseY);
-    doc.setFontSize(FS_BASE);
+    doc.setFontSize(fs);
 
-    let cy = baseY;
-    doc.setFont(FONT, 'bold');
-    doc.setFontSize(FS_TITLE);
-    doc.setTextColor(...COLOR_TEXT);
-    for (const line of title) {
-        doc.text(line, C_DESC, cy);
-        cy += LH_TITLE;
-    }
-    if (meta.length) {
-        cy += 1;
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(FS_BASE - 0.4);
-        doc.setTextColor(...COLOR_LABEL);
-        for (const line of meta) {
-            doc.text(line, C_DESC, cy);
-            cy += LH_BODY;
+    // Sayısal sütunlar: miktar, brüt, net, indirim(ler), KDV, tutar (İNDİRİMLİ
+    // NET + satır KDV'si). Alle in derselben Schrift, nichts fett: Menge und
+    // Betrag dunkel, die Preise eine Stufe weicher, «—» blass.
+    const tone = (value: number) => {
+        if (value > 0) doc.setTextColor(...COLOR_TEXT_2);
+        else doc.setTextColor(...COLOR_MUTED);
+    };
+
+    for (const cell of layout.cells) {
+        const width = cell.width - GAP;
+        const right = cell.x + width;
+        switch (cell.column.kind) {
+            case 'desc': {
+                let cy = baseY;
+                doc.setFont(FONT, NAME_STYLE);
+                doc.setTextColor(...COLOR_TEXT);
+                for (const line of title) {
+                    doc.text(line, cell.x, cy);
+                    cy += lh;
+                }
+                if (meta.length) {
+                    cy += META_GAP - lh + lh * 0.92;
+                    doc.setFont(FONT, 'normal');
+                    doc.setFontSize(fs * 0.92);
+                    doc.setTextColor(...COLOR_CAPTION);
+                    for (const line of meta) {
+                        doc.text(line, cell.x, cy);
+                        cy += lh * 0.92;
+                    }
+                    doc.setFontSize(fs);
+                }
+                break;
+            }
+            case 'extra': {
+                // Eigene Spalten: eine Stufe weicher im Ton; eine leere Zelle oder
+                // eine Null steht blass. Zahlen stehen rechtsbuendig und brechen nicht um.
+                const raw = extraRaw(item, cell.column.key);
+                if (!raw || isZeroText(raw)) doc.setTextColor(...COLOR_MUTED);
+                else doc.setTextColor(...COLOR_TEXT_2);
+                if (cell.align === 'right') {
+                    drawFittedRight(doc, raw || '—', right, width, baseY, 'normal', fs);
+                    break;
+                }
+                cellLines(doc, extraValue(item, cell.column.key), width, fs)
+                    .forEach((line, lineIdx) => doc.text(line, cell.x, baseY + lineIdx * lh));
+                break;
+            }
+            case 'qty':
+                doc.setTextColor(...COLOR_TEXT);
+                drawFittedRight(doc, fmtQty(item.quantity || 0), right, width, baseY, 'normal', fs);
+                break;
+            case 'gross':
+                tone(item.grossPrice || 0);
+                drawFittedRight(doc, (item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—', right, width, baseY, 'normal', fs);
+                break;
+            case 'net': {
+                // Net fiyat sütununda TEDARİKÇİ LİSTESİNDEKİ fiyat görünür (varsa).
+                const shownNet = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
+                tone(shownNet);
+                drawFittedRight(doc, shownNet > 0 ? fmtUnitPrice(shownNet) : '—', right, width, baseY, 'normal', fs);
+                break;
+            }
+            case 'disc': {
+                const discounts = discountLines(item);
+                tone(discounts.length);
+                (discounts.length ? discounts : ['—']).forEach((line, lineIdx) => {
+                    drawFittedRight(doc, line, right, width, baseY + lineIdx * lh, 'normal', fs);
+                });
+                break;
+            }
+            case 'vat':
+                tone(item.vatRate || 0);
+                drawFittedRight(doc, fmtPercent(item.vatRate || 0), right, width, baseY, 'normal', fs);
+                break;
+            default: {
+                const lineVat = totalVatRate === null
+                    ? (item.lineVat || 0)
+                    : (item.lineTotal || 0) * (totalVatRate / 100);
+                const payableTotal = Math.round(((item.lineTotal || 0) + lineVat) * 100) / 100;
+                doc.setTextColor(...COLOR_TEXT);
+                drawFittedRight(doc, fmt(payableTotal), right, width, baseY, 'normal', fs);
+                break;
+            }
         }
-        doc.setTextColor(...COLOR_TEXT);
     }
-
-    // Die eigenen Spalten — linksbündig neben dem Namen, in der Reihenfolge,
-    // die die Vorlage vorgibt. Zu langer Text bricht in seiner Spalte UM;
-    // `measureRow` hat die Zeile dafür schon hoch genug gemacht.
-    layout.extraX.forEach((x, position) => {
-        const column = extraCols[position];
-        if (!column) return;
-        doc.setTextColor(...COLOR_LABEL);
-        cellLines(doc, extraValue(item, column.key), layout.extraWidths[position] - GAP, FS_BASE - 0.4)
-            .forEach((line, lineIdx) => doc.text(line, x, baseY + lineIdx * LH_BODY));
-        doc.setFontSize(FS_BASE);
-        doc.setTextColor(...COLOR_TEXT);
-    });
-
-    // Seri kod sütunu (sola yaslı, soluk) — ekrandaki sipariş tablosuyla aynı.
-    // Auch er bricht um, statt kleiner zu werden oder unter den Namen zu gehen.
-    if (layout.codeX !== null) {
-        doc.setTextColor(...COLOR_LABEL);
-        cellLines(doc, breakableCode((item.code || '').trim()), layout.wCode, FS_BASE - 0.4)
-            .forEach((line, lineIdx) => doc.text(line, layout.codeX!, baseY + lineIdx * LH_BODY));
-        doc.setFontSize(FS_BASE);
-        doc.setTextColor(...COLOR_TEXT);
-    }
-
-    // Sayısal sütunlar: miktar, brüt fiyat, net fiyat, indirim(ler), KDV, tutar.
-    // Tutar İNDİRİMLİ NET satır tutarıdır (`lineTotal`). Miktarın altına BİRİM
-    // YAZILMAZ (kullanıcı isteği 2026-08-21: "adet vs. yazmasın").
-    doc.setFont(FONT, 'normal');
-    doc.setFontSize(FS_BASE);
-    drawFittedRight(doc, fmtQty(item.quantity || 0), layout.qtyR, layout.wQty, baseY, 'normal');
-    if (layout.grossR !== null) {
-        drawFittedRight(doc, (item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—', layout.grossR, layout.wGross, baseY, 'normal');
-    }
-    // Net fiyat sütununda TEDARİKÇİ LİSTESİNDEKİ fiyat görünür (varsa);
-    // tutarlar yine hesabın tam duyarlıklı tabanıyla hesaplanmıştır.
-    const shownNet = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
-    drawFittedRight(doc, shownNet > 0 ? fmtUnitPrice(shownNet) : '—', layout.netR, layout.wNet, baseY, 'normal');
-    // İndirim, İndirim 2 ve İndirim 3 aynı sütunda ALT ALTA yazılır.
-    const discR = layout.discR;
-    if (discR !== null) {
-        const discounts = discountLines(item);
-        if (!discounts.length) {
-            drawFittedRight(doc, '—', discR, layout.wDisc, baseY, 'normal');
-        } else {
-            discounts.forEach((line, lineIdx) => {
-                drawFittedRight(doc, line, discR, layout.wDisc, baseY + lineIdx * DISC_LH, 'normal');
-            });
-        }
-    }
-    if (layout.vatR !== null) {
-        drawFittedRight(doc, fmtPercent(item.vatRate || 0), layout.vatR, layout.wVat, baseY, 'normal');
-    }
-    const lineVat = totalVatRate === null
-        ? (item.lineVat || 0)
-        : (item.lineTotal || 0) * (totalVatRate / 100);
-    const payableTotal = Math.round(((item.lineTotal || 0) + lineVat) * 100) / 100;
-    drawFittedRight(doc, fmt(payableTotal), layout.priceR, layout.wPrice, baseY, 'bold');
     doc.setFont(FONT, 'normal');
 
-    doc.setDrawColor(...COLOR_HAIRLINE);
-    doc.setLineWidth(0.15);
-    doc.line(ML, y + rowH, MR, y + rowH);
+    drawRule(doc, y + rowH, COLOR_HAIRLINE);
     return y + rowH;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOPLAMLAR — sağa yaslı blok; genel toplam yumuşak bantta (en altta)
+// TOPLAMLAR — eine Karte rechts unter der Tabelle, das Total fett in Navy
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Hoehe einer Summenzeile und des Totals (mm) — `buildOrderPdfBytes` rechnet damit. */
+const TOTAL_ROW_H = CARD_ROW_H;
+const GRAND_ROW_H = 9;
+const FS_GRAND = 9.6;
+
+/** Hoehe der Summenkarte bei `rowCount` Zeilen ueber dem Total. */
+const totalsHeight = (rowCount: number): number => CARD_PAD * 2 + rowCount * TOTAL_ROW_H + GRAND_ROW_H;
 
 function drawTotals(
     doc: jsPDF,
@@ -1437,62 +1551,57 @@ function drawTotals(
     hasVatRow: boolean,
     fees: Array<{ name: string; amount: number }>
 ) {
-    const blockX = 116;
-    const labelX = blockX + 4;
-    const valueX = C_PRICE_R;
-
-    const totalRow = (label: string, value: string) => {
-        doc.setDrawColor(...COLOR_HAIRLINE);
-        doc.setLineWidth(0.15);
-        doc.line(blockX, y, MR, y);
-        y += 5.4;
-        doc.setFont(FONT, 'normal');
-        doc.setFontSize(FS_BASE);
-        doc.setTextColor(...COLOR_LABEL);
-        doc.text(label, labelX, y);
-        doc.setFont(FONT, 'bold');
-        doc.setTextColor(...COLOR_TEXT);
-        doc.text(value, valueX, y, { align: 'right' });
-        y += 2.8;
-    };
-
+    /* Die Summen als KARTE — dieselbe Sprache wie die Angabenkarte oben
+       (Referenz, 11.09.2026): hellgrau, abgerundet, Beschriftung grau links,
+       Betrag rechts, eingerueckte Haarlinien; das Total fett in Navy. Die
+       Rechnung selbst ist unveraendert. */
+    const x = MR - CARD_W;
+    const rows: Array<[string, string]> = [];
     // Brüt/net farkı varsa indirim dökümünü göster.
     if (hasGrossRow) {
-        totalRow(L.gross, fmt(order.totalGross));
-        totalRow(L.discount, `− ${fmt(Math.max(0, order.totalGross - order.totalNet))}`);
+        rows.push([L.gross, fmt(order.totalGross)]);
+        rows.push([L.discount, `− ${fmt(Math.max(0, order.totalGross - order.totalNet))}`]);
     }
-    // KDV ya da ek ücret varsa net ara toplam yazılır; hiçbiri yoksa şablon
-    // eskisi gibi net tutarı doğrudan genel toplam olarak gösterir.
+    // KDV ya da ek ücret varsa net ara toplam; ek ücretler adıyla tek tek.
     const feesTotal = Math.round(fees.reduce((sum, fee) => sum + (Number(fee.amount) || 0), 0) * 100) / 100;
     if (hasVatRow || fees.length) {
-        totalRow(L.netSubtotal, fmt(order.totalNet));
+        rows.push([L.netSubtotal, fmt(order.totalNet)]);
     }
-    // Ek ücretler: her biri kendi adıyla, net ara toplamın hemen altında.
-    // Uzun ad etiket alanına sığdırılır (tutar sütunu asla ezilmez).
     for (const fee of fees) {
-        const label = clampText(doc, fee.name, valueX - labelX - 26, FS_BASE);
-        totalRow(label, fmt(Number(fee.amount) || 0));
+        rows.push([clampText(doc, fee.name, CARD_W - CARD_INSET * 2 - 30, CARD_LABEL_FS), fmt(Number(fee.amount) || 0)]);
     }
     if (hasVatRow) {
-        // KDV sipariş düzeyinde tek oransa etikete oran da yazılır ("MwSt 8.1%").
         const rate = order.vatMode === 'TOTAL' ? (order.orderVatRate || 0) : 0;
-        totalRow(rate > 0 ? `${L.vat} ${fmtPercent(rate)}` : L.vat, fmt(order.totalVat || 0));
+        rows.push([rate > 0 ? `${L.vat} ${fmtPercent(rate)}` : L.vat, fmt(order.totalVat || 0)]);
     }
-    // Genel toplam İKİ ONDALIĞA yuvarlanır (kullanıcı isteği 2026-08-02):
-    // bileşenler ayrı ayrı yuvarlansa da toplamları kayan nokta artığı taşıyabilir.
+    // Genel toplam İKİ ONDALIĞA yuvarlanır (2026-08-02).
     const grandTotal = Math.round((order.totalNet + feesTotal + (hasVatRow ? (order.totalVat || 0) : 0)) * 100) / 100;
 
-    y += 1;
-    const bandH = 12;
-    doc.setFillColor(...COLOR_HEAD_BG);
-    doc.rect(blockX, y, MR - blockX, bandH, 'F');
-    doc.setFillColor(...COLOR_NAVY);
-    doc.rect(blockX, y, 1.2, bandH, 'F');
+    doc.setFillColor(...COLOR_CARD_FILL);
+    doc.setDrawColor(...COLOR_CARD_EDGE);
+    doc.setLineWidth(HAIRLINE_W);
+    doc.roundedRect(x, y, CARD_W, totalsHeight(rows.length), CARD_RADIUS, CARD_RADIUS, 'FD');
+
+    let cy = y + CARD_PAD;
+    for (const [label, value] of rows) {
+        const base = cy + CARD_BASELINE;
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(CARD_LABEL_FS);
+        doc.setTextColor(...COLOR_CAPTION);
+        doc.text(label, x + CARD_INSET, base);
+        doc.setFontSize(CARD_VALUE_FS);
+        doc.setTextColor(...COLOR_TEXT);
+        doc.text(value, x + CARD_W - CARD_INSET, base, { align: 'right' });
+        cy += TOTAL_ROW_H;
+        doc.setFillColor(...COLOR_CARD_LINE);
+        doc.rect(x + CARD_INSET, cy - HAIRLINE_W / 2, CARD_W - CARD_INSET * 2, HAIRLINE_W, 'F');
+    }
+    const base = cy + GRAND_ROW_H / 2 + 1.3;
     doc.setFont(FONT, 'bold');
-    doc.setFontSize(12.5);
+    doc.setFontSize(FS_GRAND);
     doc.setTextColor(...COLOR_NAVY);
-    doc.text(L.grandTotal, labelX, y + bandH / 2 + 1.8);
-    doc.text(fmt(grandTotal), valueX, y + bandH / 2 + 1.8, { align: 'right' });
+    doc.text(L.grandTotal, x + CARD_INSET, base);
+    doc.text(fmt(grandTotal), x + CARD_W - CARD_INSET, base, { align: 'right' });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

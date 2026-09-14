@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, SearchLg } from '@/components/icons/antIconCompat';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── DAS AUSWAHLFELD DER RECHNUNGSSEITEN ──────────────────────────────────────

@@ -1002,7 +1002,8 @@
             "errorPdfOnly": "Es können nur PDF-Dateien hochgeladen werden.",
             "errorPdfSize": "PDF überschreitet die 5-MB-Grenze.",
             "successPdfSave": "Briefkopf-PDF gespeichert.",
-            "companyNameHint": "Wird aus der Firmenauswahl oben rechts übernommen: gedruckt wird immer der Name des aktiven Mandanten."
+            "companyNameHint": "Wird aus der Firmenauswahl oben rechts übernommen: gedruckt wird immer der Name des aktiven Mandanten.",
+            "tenantAddressHint": "Die gewählte Firma hat eine eigene Adresse: sie steht auf all ihren PDFs und ist hier nicht änderbar."
         },
         "mail": {
             "breadcrumb": "Einstellungen › E-Mail",

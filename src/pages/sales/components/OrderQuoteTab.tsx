@@ -22,6 +22,7 @@ import { money, numberFmt } from '@/pages/project/features/utils/projectFormatte
 import type { MyOrderDetailDto } from '@/types/billing';
 
 import { QuotePdfButton } from './QuotePdfButton';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * Teklif ekranındaki dipnotun salt okunur eşi: ara toplam, SIRAYLA uygulanan
@@ -137,7 +138,7 @@ export const OrderQuoteTab = ({ order }: { order: MyOrderDetailDto }) => {
     const CostRow = ({ label, value, strong }: { label: string; value?: number | null; strong?: boolean }) => (
         <div className={`flex items-center justify-between ${strong ? 'mt-2 border-t border-slate-100 pt-2 dark:border-white/10' : ''}`}>
             <span className={strong ? 'font-semibold text-secondary' : 'text-tertiary'}>{label}</span>
-            <span className={`font-mono tabular-nums ${strong ? 'font-semibold text-[#272f67] dark:text-white' : 'font-medium text-primary'}`}>
+            <span className={`font-mono tabular-nums ${strong ? 'font-semibold text-[#0a7aff] dark:text-white' : 'font-medium text-primary'}`}>
                 {money(Number(value) || 0)}
             </span>
         </div>
@@ -160,7 +161,7 @@ export const OrderQuoteTab = ({ order }: { order: MyOrderDetailDto }) => {
                         <button
                             type="button"
                             onClick={() => navigate(`/sales/quotes/${tender.id}`)}
-                            className="font-mono text-[12px] font-semibold text-[#272f67] underline-offset-2 hover:underline dark:text-sky-300"
+                            className="font-mono text-[12px] font-semibold text-[#0a7aff] underline-offset-2 hover:underline dark:text-sky-300"
                         >
                             {tender.tenderNumber}
                         </button>

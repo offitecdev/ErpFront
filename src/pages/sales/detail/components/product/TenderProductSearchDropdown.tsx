@@ -12,6 +12,34 @@ import { resolveTypedArticleIndex } from '../../utils/tenderProduct.utils';
 const DROPDOWN_PAGE_SIZE = 10;
 // A full first page plus the two action rows, without scrolling.
 const PANEL_HEIGHT_ESTIMATE = 430;
+// Pause after the last keystroke before the catalogue is asked. Was 300 ms;
+// with 150–200 ms network on top, the list trailed the typing by half a
+// second on production (measured 14.09.2026). Rows for the new text are shown
+// provisionally at once (see provisionalItems), so the wait only decides how
+// often the server is asked.
+const SEARCH_DEBOUNCE_MS = 120;
+
+const foldText = (value: string) => value.toLocaleLowerCase('tr').normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+
+/**
+ * Rows to show for `search` BEFORE the catalogue has answered: the answer for
+ * the longest already-answered start of the text, narrowed here. Only a
+ * readout — the list does not count as answered (Enter still waits), since the
+ * server also matches fields this filter does not see.
+ */
+const provisionalItems = (search: string): ArticleQuickPick[] | null => {
+    const folded = foldText(search);
+    for (let length = search.length - 1; length >= 1; length -= 1) {
+        const prefix = search.slice(0, length).trim();
+        if (!prefix) break;
+        const cached = inventoryApi.peekArticlesQuickPick({ page: 1, pageSize: DROPDOWN_PAGE_SIZE, search: prefix });
+        if (!cached) continue;
+        return cached.value.items.filter((article) =>
+            foldText(article.name ?? '').includes(folded)
+            || foldText(article.articleCode ?? '').includes(folded));
+    }
+    return null;
+};
 
 /**
  * One row of the list. The two action rows are ordinary options: the arrow
@@ -221,18 +249,20 @@ export const TenderProductSearchDropdown = ({
     }, [anchorEl]);
 
     // Debounced fetch: first page loads immediately on open, then every
-    // keystroke re-queries the server 300ms after typing stops.
+    // keystroke re-queries the server SEARCH_DEBOUNCE_MS after typing stops.
+    // A text answered within the last minute is served from the client cache
+    // without asking; an older answer (or a narrowed shorter one) is shown at
+    // once and replaced by the fresh one.
     //
     // The very first query of a cell skips the debounce even when it already
     // carries text — there is no earlier keystroke to wait for, and a name that
-    // was PASTED in would otherwise still be unresolved 300ms later, i.e. exactly
-    // when Enter arrives.
+    // was PASTED in would otherwise still be unresolved after the debounce, i.e.
+    // exactly when Enter arrives.
     useEffect(() => {
         const normalizedSearch = search.trim();
         if (pendingConfirmRef.current !== null && pendingConfirmRef.current !== normalizedSearch) {
             pendingConfirmRef.current = null;
         }
-        const debounce = firstFetchRef.current ? 0 : (normalizedSearch ? 300 : 0);
         let cancelled = false;
         // The answer is in: show it, and carry out an Enter that was waiting
         // for exactly this text.
@@ -249,6 +279,20 @@ export const TenderProductSearchDropdown = ({
             const index = defaultOptionIndex(fresh, nextItems.length, normalizedSearch, latestRef.current.currentName);
             if (index >= 0) act(fresh.options[index], normalizedSearch);
         };
+        const params = { page: 1, pageSize: DROPDOWN_PAGE_SIZE, search: normalizedSearch || undefined };
+        const cached = inventoryApi.peekArticlesQuickPick(params);
+        if (cached?.fresh) {
+            firstFetchRef.current = false;
+            setLoading(false);
+            settle(cached.value.items);
+            return undefined;
+        }
+        const provisional = cached?.value.items ?? (normalizedSearch ? provisionalItems(normalizedSearch) : null);
+        if (provisional) {
+            setItems(provisional);
+            setArrowIndex(-1);
+        }
+        const debounce = firstFetchRef.current || cached ? 0 : (normalizedSearch ? SEARCH_DEBOUNCE_MS : 0);
         const id = setTimeout(() => {
             firstFetchRef.current = false;
             setLoading(true);
@@ -256,11 +300,7 @@ export const TenderProductSearchDropdown = ({
                 // Lean feed: only the fields that end up on the quote line, so
                 // selecting still needs no second request but the response no
                 // longer carries stock levels, barcodes or category.
-                .articlesQuickPick({
-                    page: 1,
-                    pageSize: DROPDOWN_PAGE_SIZE,
-                    search: normalizedSearch || undefined,
-                })
+                .articlesQuickPick(params, { mustBeFresh: true })
                 .then((res) => { if (!cancelled) settle(res.items); })
                 .catch(() => { if (!cancelled) settle([]); })
                 .finally(() => { if (!cancelled) setLoading(false); });

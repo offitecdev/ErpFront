@@ -19,6 +19,7 @@ import { apiError, FIELD_INPUT_CLASS, fmtMoney, isoToday, round2 } from '@/pages
 import { DocumentWorkspace } from '@/components/sales-document/DocumentWorkspace';
 import { documentLineStarted, documentLineValid, documentNumber, emptyDocumentLine, type DocumentLine } from '@/components/sales-document/documentLines';
 import type { AddonEditorParent } from './addonEditorRoute';
+import '@/styles/modules/invoicePages.css';
 
 const loadedLines = (doc: AddonOrderDocumentDto): DocumentLine[] => [
     ...doc.lines.materials.filter((line) => line.own).map((line) => ({

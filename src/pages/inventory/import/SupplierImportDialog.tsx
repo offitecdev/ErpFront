@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 
 import {
-    AlertTriangle, ArrowLeft, Camera01, Check, CheckCircle, Image01, Percent01,
+    AlertTriangle, ArrowLeft, Camera01, Check, CheckCircle, Clipboard, Image01,
     Plus, Scan, Settings01, Trash01, X, Zap,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
@@ -11,15 +11,16 @@ import i18n from '@/i18n';
 import { purchaseOrdersApi } from '@/lib/api/inventory';
 import type {
     AiExtractResponse, AiExtractedRow, AiImportStatus, OrderCalcMode,
-    SupplierCalcConfig, SupplierOrderTemplate,
+    PurchaseTemplateDocumentType, SupplierCalcConfig, SupplierOrderTemplate,
 } from '@/types/inventory';
 import '@/styles/purchaseImport.css';
 
 import type { DraftOrderRow } from '../types';
 import { FileDeck, FileGlyph, ReadingDial } from './FileGlyphs';
 import {
-    apiFailure, extractedToDraftRow, fileToBase64, glyphKindForFile, isImageFile, isPdfFile,
-    isSheetFile, isSupportedImportFile, sheetFileToText, shrinkImageForUpload,
+    apiFailure, clipboardFromEvent, clipboardToImportFiles, extractedToDraftRow, fileToBase64,
+    glyphKindForFile, isImageFile, isPdfFile, isSheetFile, isSupportedImportFile, isTextFile,
+    pasteModifierKey, readClipboardContent, sheetFileToText, shrinkImageForUpload,
     templateColumns, templateSummary,
 } from './importTemplate';
 
@@ -76,20 +77,30 @@ export interface SupplierImportDialogProps {
     onApply: (rows: DraftOrderRow[], config: SupplierCalcConfig) => void;
     /** Die Rechenart, die auf der Seite gerade laeuft — die neuen Zeilen tragen sie. */
     calcMode: OrderCalcMode;
-    /** FIYAT TALEBİ: fiyatsız — es werden nur Kimlik und Menge gelesen. */
-    priceless?: boolean;
-    /** Goods receipt uses its own template and keeps existing product identity. */
-    goodsReceipt?: boolean;
+    /**
+     * Bestellung, Preisanfrage oder Wareneingang. WELCHE Spalten gelesen
+     * werden, sagt allein die Vorlage; das Ziel entscheidet nur, ob der
+     * Server Kopfdaten des Belegs mitliest (im Wareneingang nicht — der
+     * Lieferant ist laengst bekannt).
+     */
+    documentType?: PurchaseTemplateDocumentType;
+    /**
+     * Was auf der Bestellseite schon eingefuegt wurde (Strg+V ausserhalb
+     * eines Feldes, siehe `usePasteToImport`): das Fenster oeffnet damit,
+     * statt leer.
+     */
+    initialFiles?: File[];
 }
 
 const SupplierImportDialogContent = ({
-    open, onClose, config, template, onApply, priceless, calcMode, goodsReceipt = false,
+    open, onClose, config, template, onApply, calcMode, documentType = 'ORDER', initialFiles,
 }: SupplierImportDialogProps) => {
+    const goodsReceipt = documentType === 'GOODS_RECEIPT';
     const [phase, setPhase] = useState<Phase>('file');
     const [step, setStep] = useState(0);
     const [status, setStatus] = useState<AiImportStatus | null>(null);
     const [error, setError] = useState<{ title: string; detail?: string } | null>(null);
-    const [files, setFiles] = useState<File[]>([]);
+    const [files, setFiles] = useState<File[]>(() => initialFiles ?? []);
     const [dragOver, setDragOver] = useState(false);
     const [addMenuOpen, setAddMenuOpen] = useState(false);
     const [cameraOpen, setCameraOpen] = useState(false);
@@ -149,16 +160,13 @@ const SupplierImportDialogContent = ({
         return () => window.clearInterval(timer);
     }, [phase, step]);
 
-    /* DIE SPALTENÜBERSCHRIFTEN — das Einzige, was an das Modell geht.
-       IM FIYAT TALEBİ WIRD KEIN PREIS ERFASST, also holt der Beleg auch keinen:
-       Preis und Rabatte bleiben draussen. Das spart Token und verhindert
-       Preise in einem preislosen Beleg. */
-    const columns = useMemo(
-        () => templateColumns(config, priceless),
-        [config, priceless],
-    );
+    /* DIE SPALTEN DER VORLAGE — Name, Art und Zuordnung — sind das Einzige,
+       was an das Modell geht (Vorgabe Samet, 11.09.2026: «wir geben dem
+       Modell die Vorlage mit den Spaltennamen direkt mit»). Der ERP-Code
+       steht nicht darin. */
+    const columns = useMemo(() => templateColumns(config), [config]);
 
-    const pickFiles = (picked: File[]) => {
+    const pickFiles = useCallback((picked: File[]) => {
         const supported = picked.filter(isSupportedImportFile);
         if (!supported.length) {
             toast.error(t('inv.aiImport.badFileType'));
@@ -175,7 +183,7 @@ const SupplierImportDialogContent = ({
             setFiles([supported[0]!]);
         }
         setAddMenuOpen(false);
-    };
+    }, []);
 
     const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const picked = Array.from(event.target.files ?? []);
@@ -188,6 +196,38 @@ const SupplierImportDialogContent = ({
         setDragOver(false);
         const picked = Array.from(event.dataTransfer.files ?? []);
         if (picked.length) pickFiles(picked);
+    };
+
+    /* ── AUS DER ZWISCHENABLAGE (Vorgabe Samet, 11.09.2026) ────────────────
+       «Den Beleg auch einfuegen koennen — Bildschirmfoto oder kopierte
+       Zeilen.» Solange das Fenster eine Datei erwartet, gehoert jedes
+       Strg+V ihm: ein Bildschirmfoto kommt als weitere Seite dazu (bis
+       sechs), kopierte Zeilen ersetzen die Auswahl. Beim Pruefen nicht —
+       dort wird in Felder getippt —, und nicht bei offener Kamera. */
+    useEffect(() => {
+        if (phase !== 'file' || cameraOpen) return undefined;
+        const onPaste = (event: ClipboardEvent) => {
+            if (!event.clipboardData) return;
+            event.preventDefault();
+            const pasted = clipboardToImportFiles(clipboardFromEvent(event.clipboardData));
+            if (pasted.length) pickFiles(pasted);
+            else toast.error(t('inv.aiImport.pasteEmpty'));
+        };
+        window.addEventListener('paste', onPaste);
+        return () => window.removeEventListener('paste', onPaste);
+    }, [phase, cameraOpen, pickFiles]);
+
+    /* Dasselbe auf Knopfdruck, fuer das Tablet ohne Tastatur. Verweigert der
+       Browser den Zugriff, bleibt der Weg ueber die Tasten. */
+    const pasteFromClipboard = async () => {
+        setAddMenuOpen(false);
+        try {
+            const pasted = clipboardToImportFiles(await readClipboardContent());
+            if (pasted.length) pickFiles(pasted);
+            else toast.error(t('inv.aiImport.pasteEmpty'));
+        } catch {
+            toast.error(t('inv.aiImport.pasteDenied', { keys: `${pasteModifierKey()} + V` }));
+        }
     };
 
     /* A live camera remains mounted after a capture. The user can therefore
@@ -288,20 +328,20 @@ const SupplierImportDialogContent = ({
                 }
                 : isSheetFile(firstFile)
                     ? { text: await sheetFileToText(firstFile) }
-                    : { data: await fileToBase64(await shrinkImageForUpload(firstFile)) };
+                    /* Eingefuegte Zeilen und eingefuegter Text sind schon
+                       Text — sie nehmen den Weg der Tabelle. */
+                    : isTextFile(firstFile)
+                        ? { text: await firstFile.text() }
+                        : { data: await fileToBase64(await shrinkImageForUpload(firstFile)) };
             setStep(1);
 
             const result = await purchaseOrdersApi.aiExtract({
                 ...payload,
                 fileName: firstFile.name,
                 mimeType: firstFile.type || undefined,
-                documentType: goodsReceipt ? 'GOODS_RECEIPT' : priceless ? 'PRICE_REQUEST' : 'ORDER',
+                documentType,
                 language: (i18n.resolvedLanguage || i18n.language || 'de').slice(0, 2),
-                columns,
-                withTiers: Boolean(config.withTiers)
-                    && !priceless
-                    && columns.some((column) => column.key === 'quantity')
-                    && columns.some((column) => column.key === 'priceNet'),
+                columns: columns.map(({ key, name, type, label }) => ({ key, name, type, label: label ?? null })),
             });
             setStep(2);
 
@@ -325,8 +365,11 @@ const SupplierImportDialogContent = ({
     const draftRows = useMemo(
         () => rows.filter((row) => row.enabled).map((row) => {
             const draft = extractedToDraftRow(row.data, config, calcMode);
+            /* Im Wareneingang zaehlt die Menge so, wie sie auf dem
+               Lieferschein steht — leer bleibt leer, statt zur 1 zu werden. */
+            const quantityKey = columns.find((column) => column.label === 'quantity')?.key;
             return goodsReceipt
-                ? { ...draft, quantity: columns.some((column) => column.key === 'quantity') ? cellValue(row.data.quantity) : '' }
+                ? { ...draft, quantity: quantityKey ? cellValue(row.data[quantityKey]) : '' }
                 : draft;
         }),
         [rows, config, calcMode, goodsReceipt, columns],
@@ -345,6 +388,14 @@ const SupplierImportDialogContent = ({
         if (!target || !rows.length || target === rows.length) return null;
         return { target, got: rows.length };
     })();
+
+    /* Vorlagenspalten, die der Server auf dem Blatt nicht gefunden hat
+       (Fehlerbild Samet, 11.09.2026: «eine Spalte hat sie gar nicht
+       gesehen»). Sie bleiben leer — und das steht dann da, statt still
+       eine leere Spalte zu zeigen. */
+    const missingNames = (extraction?.missingColumns ?? [])
+        .map((key) => columns.find((column) => column.key === key)?.name)
+        .filter((name): name is string => Boolean(name));
 
     const apply = () => {
         onApply(draftRows, config);
@@ -412,6 +463,10 @@ const SupplierImportDialogContent = ({
                         <Image01 size={16} />
                         <span>{t('inv.quickAdd.pickImage')}</span>
                     </button>
+                    <button type="button" onClick={() => void pasteFromClipboard()}>
+                        <Clipboard size={16} />
+                        <span>{t('inv.aiImport.pasteFromClipboard')}</span>
+                    </button>
                 </span>
             )}
         </span>
@@ -467,6 +522,15 @@ const SupplierImportDialogContent = ({
                             </div>
                         </div>
                     )}
+                    {missingNames.length > 0 && (
+                        <div className="ofi-poi-error" role="alert" style={{ marginBottom: 12 }}>
+                            <AlertTriangle size={15} />
+                            <div>
+                                <b>{t('inv.aiImport.missingColumns', { names: missingNames.map((name) => `«${name}»`).join(', ') })}</b>
+                                <span>{t('inv.aiImport.missingColumnsHint')}</span>
+                            </div>
+                        </div>
+                    )}
                     <div className="ofi-poi-usage" style={{ marginBottom: 12 }}>
                         <span className={`ofi-poi-badge${shortfall ? ' is-warn' : ' is-accent'}`}>
                             {shortfall ? <AlertTriangle size={11} /> : <CheckCircle size={11} />}
@@ -482,7 +546,8 @@ const SupplierImportDialogContent = ({
                                 <b>{extraction.engine === 'gpt-vision' ? t('inv.aiImport.engineModelVision')
                                     : extraction.engine === 'ocr-space' ? t('inv.aiImport.engineVision')
                                         : extraction.engine === 'pdf-text' ? t('inv.aiImport.enginePdf')
-                                            : t('inv.aiImport.engineSheet')}</b>
+                                            : files[0] && /\.txt$/i.test(files[0].name) ? t('inv.aiImport.engineText')
+                                                : t('inv.aiImport.engineSheet')}</b>
                             </span>
                         )}
                         {extraction && <span className="ofi-poi-badge">{t('inv.aiImport.modelLabel')}<b>{extraction.model}</b></span>}
@@ -532,7 +597,6 @@ const SupplierImportDialogContent = ({
                                                                 : entry)))}
                                                             inputMode={numeric ? 'decimal' : undefined}
                                                         />
-                                                        {column.key === 'quantity' && tierFlag(row.data)}
                                                     </span>
                                                 </td>
                                             );
@@ -571,9 +635,10 @@ const SupplierImportDialogContent = ({
                                     <b>{file.name}</b>
                                     <span>
                                         {`${Math.max(1, Math.round(file.size / 1024))} KB · `}
-                                        {isSheetFile(file) ? t('inv.aiImport.routeSheet')
-                                            : isPdfFile(file) ? t('inv.aiImport.routePdf')
-                                                : t('inv.aiImport.routeImage')}
+                                        {isSheetFile(file) || glyphKindForFile(file) === 'sheet' ? t('inv.aiImport.routeSheet')
+                                            : isTextFile(file) ? t('inv.aiImport.routeText')
+                                                : isPdfFile(file) ? t('inv.aiImport.routePdf')
+                                                    : t('inv.aiImport.routeImage')}
                                     </span>
                                 </div>
                                 <button
@@ -602,6 +667,13 @@ const SupplierImportDialogContent = ({
                             <FileDeck />
                             <b>{t('inv.aiImport.dropHint')}</b>
                             <span>{t('inv.aiImport.fileTypes')}</span>
+                            {/* Strg+V gehoert diesem Fenster, solange es eine
+                                Datei erwartet — der Hinweis sagt es. */}
+                            <span className="ofi-poi-pastehint">
+                                {t('inv.aiImport.pasteHint')}
+                                <kbd>{pasteModifierKey()}</kbd>
+                                <kbd>V</kbd>
+                            </span>
                         </button>
                         {imageAdder}
                     </div>
@@ -758,16 +830,4 @@ const cellValue = (value: unknown): string => {
     if (value === null || value === undefined) return '';
     if (Array.isArray(value)) return '';
     return String(value);
-};
-
-/** Merkzeichen, wenn der Beleg zu dieser Position eine Mengenstaffel trägt. */
-const tierFlag = (row: AiExtractedRow) => {
-    const tiers = Array.isArray(row.priceTiers) ? row.priceTiers : [];
-    if (!tiers.length) return null;
-    return (
-        <span className="ofi-poi-tierflag" title={t('inv.aiImport.tierFlagHint')}>
-            <Percent01 size={9} />
-            {tiers.length}
-        </span>
-    );
 };

@@ -6,6 +6,7 @@ import { t } from '@/i18n/translate';
 import { apiClient } from '@/lib/axios';
 import { PopupButton, PopupDialog, PopupEmpty } from '@/components/ui-shared/PopupKit';
 import type { CrmCustomerOption } from '../../types/crm.types';
+import '@/styles/modules/checklists.css';
 
 /**
  * «Kunden wählen» — die grosse Kundenliste in Häppchen von 15 (geblättert,

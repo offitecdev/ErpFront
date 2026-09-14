@@ -95,7 +95,7 @@ export const WeekStrip: React.FC<WeekStripProps> = ({ appointments, tasks, meeti
                 <button
                     type="button"
                     onClick={() => navigate('/calendar')}
-                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-[#07145c] transition-colors hover:bg-[#07145c]/6 dark:text-[#e6cf9e] dark:hover:bg-[#e6cf9e]/10"
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-[#0052b8] transition-colors hover:bg-[#0052b8]/6 dark:text-[#e6cf9e] dark:hover:bg-[#e6cf9e]/10"
                 >
                     {t('crmOverview.week.openCalendar', { defaultValue: 'Takvimi aç' })}
                     <ArrowRight size={14} />
@@ -111,17 +111,17 @@ export const WeekStrip: React.FC<WeekStripProps> = ({ appointments, tasks, meeti
                         onClick={() => navigate('/calendar')}
                         className={`flex min-h-[118px] flex-col rounded-xl border p-2 text-left transition-colors hover:border-[#C9D0DF] ${
                             isToday
-                                ? 'border-[#07145c]/30 bg-[#07145c]/4 dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/6'
+                                ? 'border-[#0052b8]/30 bg-[#0052b8]/4 dark:border-[#e6cf9e]/30 dark:bg-[#e6cf9e]/6'
                                 : 'border-[#E3E7F0] bg-[#F7F8FC] dark:border-white/8 dark:bg-white/4'
                         }`}
                     >
                         <span className="flex items-baseline justify-between">
-                            <span className={`text-[11px] font-semibold uppercase tracking-wide ${isToday ? 'text-[#07145c] dark:text-[#e6cf9e]' : 'text-[#98A0AE]'}`}>
+                            <span className={`text-[11px] font-semibold uppercase tracking-wide ${isToday ? 'text-[#0052b8] dark:text-[#e6cf9e]' : 'text-[#98A0AE]'}`}>
                                 {day.format('ddd')}
                             </span>
                             <span
                                 className={`flex size-6 items-center justify-center rounded-full text-[12px] font-bold tabular-nums ${
-                                    isToday ? 'bg-[#07145c] text-white dark:bg-[#e6cf9e] dark:text-[#151616]' : 'text-[#3F4350] dark:text-[#d9dce3]'
+                                    isToday ? 'bg-[#0052b8] text-white dark:bg-[#e6cf9e] dark:text-[#151616]' : 'text-[#3F4350] dark:text-[#d9dce3]'
                                 }`}
                             >
                                 {day.format('D')}

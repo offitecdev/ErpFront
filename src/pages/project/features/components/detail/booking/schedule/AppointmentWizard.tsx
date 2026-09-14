@@ -254,7 +254,7 @@ export const AppointmentWizard = ({
                         {index > 0 && <span className="h-px w-6 bg-slate-200 dark:bg-white/15" />}
                         <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10.5px] font-bold ${
                             step === key
-                                ? 'bg-[#272f67] text-white'
+                                ? 'bg-[#0a7aff] text-white'
                                 : step > key
                                     ? 'bg-emerald-500 text-white'
                                     : 'bg-slate-100 text-slate-400 dark:bg-white/10'
@@ -276,13 +276,13 @@ export const AppointmentWizard = ({
                     {step === 1 && (
                         <div className="space-y-3">
                             {/* Customer is fixed by the project — shown, not chosen. */}
-                            <div className="flex items-center gap-2.5 rounded-lg border border-[#272f67]/20 bg-[#272f67]/[0.04] px-3 py-2">
-                                <CalendarClock size={15} className="shrink-0 text-[#272f67]" />
+                            <div className="flex items-center gap-2.5 rounded-lg border border-[#0a7aff]/20 bg-[#0a7aff]/[0.04] px-3 py-2">
+                                <CalendarClock size={15} className="shrink-0 text-[#0a7aff]" />
                                 <div className="min-w-0">
-                                    <div className="text-[10px] font-semibold uppercase tracking-wide text-[#272f67]/70">
+                                    <div className="text-[10px] font-semibold uppercase tracking-wide text-[#0a7aff]/70">
                                         {t('projects.schedule.customer')}
                                     </div>
-                                    <div className="truncate text-[12.5px] font-semibold text-[#272f67]">
+                                    <div className="truncate text-[12.5px] font-semibold text-[#0a7aff]">
                                         {project.customer?.companyName || (project as any).projectName || '—'}
                                     </div>
                                 </div>
@@ -314,7 +314,7 @@ export const AppointmentWizard = ({
                                     </span>
                                 </div>
                                 {form.technicianIds.length > 0 && (
-                                    <span className="rounded-full bg-[#272f67]/[0.08] px-2 py-0.5 text-[11px] font-bold text-[#272f67]">
+                                    <span className="rounded-full bg-[#0a7aff]/[0.08] px-2 py-0.5 text-[11px] font-bold text-[#0a7aff]">
                                         {form.technicianIds.length}
                                     </span>
                                 )}
@@ -354,7 +354,7 @@ export const AppointmentWizard = ({
                                                     <tr
                                                         key={tech.id}
                                                         onClick={() => toggleTechnician(tech.id)}
-                                                        className={`cursor-pointer transition-colors ${selected ? 'bg-[#272f67]/[0.05] dark:bg-white/10' : 'hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                                                        className={`cursor-pointer transition-colors ${selected ? 'bg-[#0a7aff]/[0.05] dark:bg-white/10' : 'hover:bg-slate-50 dark:hover:bg-white/5'}`}
                                                     >
                                                         <td>
                                                             <input
@@ -370,7 +370,7 @@ export const AppointmentWizard = ({
                                                         <td className="truncate text-slate-500 dark:text-white/60">{tech.email || '—'}</td>
                                                         <td>
                                                             {isLead && (
-                                                                <span className="inline-block whitespace-nowrap rounded border border-[#272f67]/25 bg-[#272f67]/[0.07] px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-[#272f67] dark:border-white/25 dark:bg-white/10 dark:text-white">
+                                                                <span className="inline-block whitespace-nowrap rounded border border-[#0a7aff]/25 bg-[#0a7aff]/[0.07] px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-[#0a7aff] dark:border-white/25 dark:bg-white/10 dark:text-white">
                                                                     {t('projects.schedule.lead')}
                                                                 </span>
                                                             )}
@@ -394,7 +394,7 @@ export const AppointmentWizard = ({
                         <div className="space-y-3">
                             {/* The tolerance is a fixed rule, so it is stated, not
                                 asked. What is billed past it is the hourly rate. */}
-                            <div className="rounded-md border border-[#272f67]/20 bg-[#272f67]/[0.04] px-3 py-2 text-[12px] text-[#272f67]">
+                            <div className="rounded-md border border-[#0a7aff]/20 bg-[#0a7aff]/[0.04] px-3 py-2 text-[12px] text-[#0a7aff]">
                                 {t('projects.schedule.toleranceFixed', { tolerance: FIXED_TOLERANCE_PERCENT })}
                             </div>
                             <div className="max-w-[220px]">

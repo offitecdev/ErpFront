@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { Check, X as XIcon } from '@/components/icons/antIconCompat';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/taskDeck.css';
+import '@/styles/modules/taskWindow.css';
 
 /**
  * Das Filterfeld der Aufgaben-Filterzeile (19.08.2026) — EIN Bauteil für

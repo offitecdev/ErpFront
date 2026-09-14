@@ -1,0 +1,276 @@
+/* Swift Charts — the look of components/charts/swiftChart.tsx.
+   Flat, hairline, iOS type; the tokens fall back to the window palette so a
+   chart reads the same inside a popup, on the dashboard and on a page that
+   re-points the calendar tokens ([[project-detail-apple-clean]]).
+   Buttons here carry no `px-` class and no listed class, so the app-wide
+   button standard (styles/buttons.css) leaves them alone on purpose. */
+.ofi-swc {
+    --swc-text: #1d1d1f;
+    --swc-secondary: #6e6e73;
+    --swc-muted: #a1a1a6;
+    --swc-hairline: rgba(0, 0, 0, 0.08);
+    --swc-grid: rgba(60, 60, 67, 0.12);
+    --swc-baseline: rgba(60, 60, 67, 0.22);
+    --swc-hover: rgba(0, 0, 0, 0.035);
+    --swc-fill: rgba(120, 120, 128, 0.12);
+    --swc-track: #e5e5ea;
+    --swc-track-ink: rgba(60, 60, 67, 0.18);
+    --swc-surface: #ffffff;
+    --swc-accent: #0a7aff;
+    --swc-focus: rgba(10, 122, 255, 0.3);
+    font-family: var(--font-body, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    font-feature-settings: 'cv11', 'calt', 'tnum';
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    color: var(--swc-text);
+}
+.dark .ofi-swc {
+    --swc-text: #f5f5f7;
+    --swc-secondary: #a1a1a6;
+    --swc-muted: #6e6e73;
+    --swc-hairline: rgba(255, 255, 255, 0.08);
+    --swc-grid: rgba(84, 84, 88, 0.55);
+    --swc-baseline: rgba(84, 84, 88, 0.9);
+    --swc-hover: rgba(255, 255, 255, 0.05);
+    --swc-fill: rgba(120, 120, 128, 0.24);
+    --swc-track: #3a3a3c;
+    --swc-track-ink: rgba(255, 255, 255, 0.28);
+    --swc-surface: #1c1c1e;
+    --swc-accent: #0a84ff;
+    --swc-focus: rgba(10, 132, 255, 0.4);
+}
+
+/* ── ring ─────────────────────────────────────────────────────────────────── */
+.ofi-swc-ring { position: relative; flex: none; }
+.ofi-swc-ring svg { display: block; overflow: visible; }
+.ofi-swc-ring__track { fill: var(--swc-track); }
+.ofi-swc-ring__hatch { stroke: var(--swc-track-ink); }
+.ofi-swc-ring__sector {
+    cursor: pointer;
+    outline: none;
+    transition: opacity 160ms ease;
+}
+.ofi-swc-ring.is-picking .ofi-swc-ring__sector { opacity: 0.28; }
+.ofi-swc-ring.is-picking .ofi-swc-ring__sector.is-active { opacity: 1; }
+.ofi-swc-ring__sector:focus-visible { outline: 2px solid var(--swc-accent); outline-offset: 2px; border-radius: 4px; }
+.ofi-swc-ring__hole {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18%;
+    text-align: center;
+    pointer-events: none;
+}
+.ofi-swc-hole__big {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--swc-text);
+}
+.ofi-swc-hole__big.is-empty { color: var(--swc-muted); }
+.ofi-swc-hole__label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--swc-secondary);
+}
+.ofi-swc-hole__sub { margin-top: 1px; font-size: 11px; color: var(--swc-muted); }
+
+/* ── donut = ring + legend ─────────────────────────────────────────────────── */
+.ofi-swc-donut { display: flex; min-width: 0; gap: 18px; }
+.ofi-swc-donut.is-column { flex-direction: column; align-items: center; }
+.ofi-swc-donut.is-column .ofi-swc-donut__side { width: 100%; }
+.ofi-swc-donut.is-row { flex-wrap: wrap; align-items: center; justify-content: center; gap: 20px 28px; }
+.ofi-swc-donut__side { display: flex; min-width: 0; flex: 1 1 200px; flex-direction: column; gap: 10px; }
+
+/* ── legend ───────────────────────────────────────────────────────────────── */
+.ofi-swc-legend { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.ofi-swc-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 9px;
+    min-height: 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    padding: 4px 8px;
+    text-align: left;
+    font: inherit;
+    color: var(--swc-text);
+    cursor: pointer;
+    transition: background-color 140ms ease, opacity 160ms ease;
+}
+.ofi-swc-row:hover,
+.ofi-swc-row.is-active { background: var(--swc-hover); }
+.ofi-swc-row.is-pinned { background: var(--swc-fill); }
+.ofi-swc-row:focus-visible { outline: 2px solid var(--swc-accent); outline-offset: -2px; }
+.ofi-swc-row.is-void { cursor: default; }
+.ofi-swc-row.is-void .ofi-swc-row__label,
+.ofi-swc-row.is-void .ofi-swc-row__value,
+.ofi-swc-row.is-void .ofi-swc-row__share { color: var(--swc-muted); }
+.ofi-swc-row.is-void .ofi-swc-swatch { background: var(--swc-track) !important; }
+.ofi-swc-swatch {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    border-radius: 2.5px;
+}
+.ofi-swc-row__label {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    color: var(--swc-text);
+}
+.ofi-swc-row__share { flex: none; min-width: 34px; text-align: right; font-size: 12px; color: var(--swc-muted); }
+.ofi-swc-row__value { flex: none; min-width: 32px; text-align: right; font-size: 13px; font-weight: 600; color: var(--swc-text); }
+
+/* ── gauge ────────────────────────────────────────────────────────────────── */
+.ofi-swc-gauge { position: relative; flex: none; }
+.ofi-swc-gauge svg { display: block; }
+.ofi-swc-gauge__track { stroke: var(--swc-track); }
+.ofi-swc-gauge__arc { transition: stroke-dasharray 200ms ease; }
+
+/* ── bars ─────────────────────────────────────────────────────────────────── */
+.ofi-swc-bars { position: relative; }
+.ofi-swc-bars svg { display: block; overflow: visible; }
+.ofi-swc-bars__grid { stroke: var(--swc-grid); stroke-width: 1; }
+.ofi-swc-bars__baseline { stroke: var(--swc-baseline); stroke-width: 1; }
+.ofi-swc-bars__axis { font-size: 11px; fill: var(--swc-secondary); }
+.ofi-swc-bars__bar { transition: opacity 160ms ease; }
+.ofi-swc-bars.is-picking .ofi-swc-bars__bar { opacity: 0.28; }
+.ofi-swc-bars.is-picking .ofi-swc-bars__bar.is-active { opacity: 1; }
+.ofi-swc-bars__rule { stroke: var(--swc-baseline); stroke-width: 1; stroke-dasharray: 3 3; }
+.ofi-swc-bars__hit { cursor: pointer; outline: none; }
+.ofi-swc-bars__hit:focus-visible { outline: 2px solid var(--swc-accent); outline-offset: -2px; }
+.ofi-swc-legendline { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 14px; margin-bottom: 8px; }
+.ofi-swc-legendline span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--swc-secondary); }
+
+/* The annotation: Swift's `.annotation(position: .top)` callout — a small
+   hairline card with the month and one line per series. */
+.ofi-swc-callout {
+    position: absolute;
+    z-index: 5;
+    min-width: 132px;
+    border: 1px solid var(--swc-hairline);
+    border-radius: 8px;
+    background: var(--swc-surface);
+    padding: 7px 10px 8px;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 6px 18px rgba(0, 0, 0, 0.1);
+    pointer-events: none;
+}
+.dark .ofi-swc-callout { box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.5); }
+.ofi-swc-callout__title { font-size: 11px; font-weight: 500; color: var(--swc-secondary); }
+.ofi-swc-callout__row { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12.5px; color: var(--swc-text); }
+.ofi-swc-callout__row .ofi-swc-swatch { width: 8px; height: 8px; }
+.ofi-swc-callout__row b { font-weight: 600; }
+.ofi-swc-callout__row span:last-child { color: var(--swc-secondary); }
+
+/* The pinned month's detail line: a quiet fill, figures in ink. */
+.ofi-swc-detail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
+    margin-top: 10px;
+    border-radius: 8px;
+    background: var(--swc-fill);
+    padding: 8px 12px;
+    font-size: 12.5px;
+    color: var(--swc-secondary);
+}
+.ofi-swc-detail b { font-weight: 600; color: var(--swc-text); }
+
+/* ── split bar ────────────────────────────────────────────────────────────── */
+.ofi-swc-split { display: flex; flex-direction: column; gap: 10px; }
+.ofi-swc-split__bar {
+    display: flex;
+    height: 14px;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 7px;
+    background: transparent;
+}
+.ofi-swc-split__bar.is-empty { background: var(--swc-track); }
+.ofi-swc-split__seg {
+    flex: 0 1 0;
+    min-width: 6px;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    transition: opacity 160ms ease, flex-grow 40ms linear;
+}
+.ofi-swc-split__seg.is-filler { min-width: 0; background: var(--swc-track); cursor: default; }
+.ofi-swc-split.is-picking .ofi-swc-split__seg:not(.is-filler) { opacity: 0.28; }
+.ofi-swc-split.is-picking .ofi-swc-split__seg.is-active { opacity: 1; }
+.ofi-swc-split__seg:focus-visible { outline: 2px solid var(--swc-accent); outline-offset: 1px; }
+.ofi-swc-split__caption { font-size: 12px; color: var(--swc-secondary); }
+.ofi-swc-empty { padding: 4px 0; font-size: 12.5px; color: var(--swc-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-swc *, .ofi-swc *::before, .ofi-swc *::after { transition: none !important; }
+}
+
+/* ── segmented control (scope switch) ─────────────────────────────────────── */
+.ofi-swc-seg {
+    display: inline-flex;
+    max-width: 100%;
+    gap: 2px;
+    border-radius: 7px;
+    background: var(--swc-fill);
+    padding: 2px;
+}
+.ofi-swc-seg__btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 24px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--swc-text);
+    cursor: pointer;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-swc-seg__btn:hover:not(.is-on) { background: var(--swc-hover); }
+.ofi-swc-seg__btn.is-on {
+    background: var(--swc-surface);
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.dark .ofi-swc-seg__btn.is-on { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+.ofi-swc-seg__btn.is-void { color: var(--swc-muted); }
+.ofi-swc-seg__btn:focus-visible { outline: 2px solid var(--swc-accent); outline-offset: -2px; }
+
+/* ── the project's billing dial (overview/OverviewPieCharts.tsx) ──────────── */
+.ofi-prj-dials .ofi-prj-dial { padding: 16px 20px 18px; }
+.ofi-prj-dial__scope {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 8px 0;
+    font-size: 12px;
+    color: var(--swc-secondary);
+}
+.ofi-prj-dial__scope span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--swc-text); }
+@media (max-width: 640px) {
+    .ofi-prj-dials .ofi-prj-dial { padding: 14px 16px 16px; }
+}

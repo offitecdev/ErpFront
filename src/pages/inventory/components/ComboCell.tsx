@@ -176,7 +176,7 @@ export const ComboCell = ({
                                     action.onSelect();
                                     onOpenChange(false);
                                 }}
-                                className="ofi-option-action flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[12px] font-medium text-[#1f2654] transition-colors dark:text-white/80"
+                                className="ofi-option-action flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[12px] font-medium text-[#0066e0] transition-colors dark:text-white/80"
                             >
                                 {action.icon}
                                 <span className="truncate">{action.label}</span>
@@ -196,7 +196,7 @@ export const ComboCell = ({
                         <Fragment key={option.id}>
                         {option.group && option.group !== options[index - 1]?.group && (
                             <>
-                                {index > 0 && <div className="mx-2 mt-1 h-px bg-[#07145c] dark:bg-[#d48f16]" />}
+                                {index > 0 && <div className="mx-2 mt-1 h-px bg-[#0052b8] dark:bg-[#d48f16]" />}
                                 <div className="px-2 pb-0.5 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">
                                     {option.group}
                                 </div>

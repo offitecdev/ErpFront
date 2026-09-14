@@ -78,13 +78,13 @@ export const UploadSettingsPage = () => {
                                         aria-current={active ? 'page' : undefined}
                                         onClick={() => select(key)}
                                         className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-[13px] transition-colors ${active
-                                            ? 'bg-[#eef2fb] font-bold text-[#1f2654] dark:bg-white/10 dark:text-white'
+                                            ? 'bg-[#eef2fb] font-bold text-[#0066e0] dark:bg-white/10 dark:text-white'
                                             : 'font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-white/70 dark:hover:bg-white/5 dark:hover:text-white'}`}
                                     >
                                         <span className="truncate">{t(labelKey)}</span>
                                         {/* Kleiner Punkt: hier lässt sich etwas hochladen. */}
                                         {uploadable && (
-                                            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[#1f2654] dark:bg-white/70" />
+                                            <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[#0066e0] dark:bg-white/70" />
                                         )}
                                     </button>
                                 </li>

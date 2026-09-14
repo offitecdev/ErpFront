@@ -365,7 +365,7 @@ export const CustomerProductDiscounts = ({ customerId }: { customerId: string })
                                                 className={`${CELL_INPUT_CLASS} text-right`}
                                             />
                                         ) : (
-                                            <span className="cursor-text font-mono text-[13px] font-semibold tabular-nums text-[#1f2654] dark:text-sky-300">
+                                            <span className="cursor-text font-mono text-[13px] font-semibold tabular-nums text-[#0066e0] dark:text-sky-300">
                                                 {row.discount}%
                                             </span>
                                         )}

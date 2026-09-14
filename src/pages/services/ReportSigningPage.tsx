@@ -97,7 +97,7 @@ export const ReportSigningPage = () => {
         <div className="min-h-screen bg-slate-100 py-8 px-4">
             <div className="mx-auto max-w-3xl">
                 <div className="mb-4 text-center">
-                    <div className="text-[20px] font-bold text-[#272f67]">offiTec</div>
+                    <div className="text-[20px] font-bold text-[#0a7aff]">offiTec</div>
                     <div className="text-[12px] text-slate-500">Heating · Cooling</div>
                 </div>
 

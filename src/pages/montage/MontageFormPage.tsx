@@ -2,6 +2,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { t } from '@/i18n/translate';
 import { FormFillView } from '@/pages/crm/forms/components/FormFillView';
 import { MontageHeader } from './components/MontageHeader';
+import '@/styles/modules/checklists.css';
 
 /**
  * Checkliste / Formular auf dem Technikerbildschirm (/montage/forms/:id).

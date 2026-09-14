@@ -86,7 +86,7 @@ export const TimeClockPage = () => {
                 <button
                     type="button"
                     onClick={() => setWeekOpen(true)}
-                    className="inline-flex items-center gap-2.5 rounded-2xl bg-[#272f67] px-7 py-4 text-[17px] font-bold text-white transition-colors hover:bg-[#1f2654]"
+                    className="inline-flex items-center gap-2.5 rounded-2xl bg-[#0a7aff] px-7 py-4 text-[17px] font-bold text-white transition-colors hover:bg-[#0066e0]"
                 >
                     <CalendarDate size={20} />
                     {t('personnel.clock.weekButton')}

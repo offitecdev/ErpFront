@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, Edit01, File02 as FileText, Mail01 as Mail, Save01 as Save, SearchLg as Search } from '@/components/icons/antIconCompat';
+import { AlertTriangle, CheckCircle, Edit01, File02 as FileText, Mail01 as Mail, Save01 as Save } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
-import { Field, Input, Textarea } from '../../components/ui-shared/Field';
+import { Field, Textarea } from '../../components/ui-shared/Field';
+import { FilterBar, SearchBox } from '../../components/ui-shared/TableKit';
 import { Button } from '../../components/ui-shared/Button';
 import { ReportsSheet } from '../project/features/components/detail/reports/ReportsSheet';
 import { maintenanceApi } from '../../lib/api/maintenance';
@@ -96,12 +97,9 @@ export const MaintenanceReportsPanel = ({
 
     return (
         <div className="pb-8">
-            <div className="mb-4 flex items-center justify-end">
-                <div className="relative">
-                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t('auto.rapor_ara')} className="ofi-light-search-input w-[240px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
-                </div>
-            </div>
+            <FilterBar className="mb-4">
+                <SearchBox value={search} onChange={(next) => { setSearch(next); setPage(1); }} placeholder={t('auto.rapor_ara')} />
+            </FilterBar>
 
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard

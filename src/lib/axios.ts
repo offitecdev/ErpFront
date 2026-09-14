@@ -1,6 +1,8 @@
 import axios from 'axios';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { takePrefetchedGet } from './bootPrefetch';
+import { netActivity } from './netActivity';
 
 const productionApiUrl = 'https://demo.offitec.ch/backend/api/v1';
 const developmentApiUrl = 'http://localhost:3000/api/v1';
@@ -147,6 +149,9 @@ apiClient.interceptors.request.use(async (config) => {
         config.headers['X-Tenant-Id'] = selectedTenantId;
     }
 
+    // Balanced by the response interceptor below (success and error paths);
+    // utils/onIdle.ts `afterPageSettled` waits for this to fall to zero.
+    netActivity.begin();
     return config;
 });
 
@@ -181,25 +186,72 @@ const refreshSession = async (): Promise<boolean> => {
 // iner. Cevap paylaşıldığı için çağıranlar `response.data`yı MUTATE ETMEMELİ.
 const inFlightGets = new Map<string, Promise<AxiosResponse<unknown>>>();
 
+/* ÖNCEDEN ISITILMIŞ CEVAPLAR (14.09.2026): kullanıcı bir menü satırının
+   üzerine geldiğinde (lib/routeIntent.ts) o sayfanın verisi `primeShared` ile
+   yola çıkar; sayfa açılıp aynı isteği sorduğunda cevap ya gelmiş ya da
+   yoldadır. Tek kullanımlıktır ve kısa ömürlüdür: sayfanın sonraki yenilemeleri
+   (kayıt sonrası, filtre) her zaman ağa gider, bayat veri gösterilmez. */
+const primedGets = new Map<string, { at: number; request: Promise<AxiosResponse<unknown>> }>();
+const PRIMED_TTL_MS = 15_000;
+
+const currentTenantKey = () => sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId') || '';
+const sharedKey = (tenantKey: string, url: string, config?: AxiosRequestConfig) =>
+    `${tenantKey}|${url}|${config?.params ? JSON.stringify(config.params) : ''}`;
+
+const asAxiosResponse = <T>(data: T): AxiosResponse<T> =>
+    ({ data, status: 200, statusText: 'OK', headers: {}, config: { headers: {} } }) as AxiosResponse<T>;
+
 export const getShared = <T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     // Tenant başlığı cevabı değiştirir — anahtarın parçası olmalı.
-    const tenantKey = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId') || '';
-    const key = `${tenantKey}|${url}|${config?.params ? JSON.stringify(config.params) : ''}`;
+    const tenantKey = currentTenantKey();
+    const key = sharedKey(tenantKey, url, config);
 
+    const primed = primedGets.get(key);
     const pending = inFlightGets.get(key);
-    if (pending) return pending as Promise<AxiosResponse<T>>;
+    if (pending) {
+        // A primed request still on its way is claimed by this caller.
+        if (primed?.request === pending) primedGets.delete(key);
+        return pending as Promise<AxiosResponse<T>>;
+    }
 
+    if (primed) {
+        primedGets.delete(key);
+        if (performance.now() - primed.at < PRIMED_TTL_MS) return primed.request as Promise<AxiosResponse<T>>;
+    }
 
-    const request = apiClient.get<T>(url, config).finally(() => {
+    // index.html bu URL'i belge okunurken başlatmış olabilir (bkz. bootPrefetch).
+    const fromDocument = config?.params ? null : takePrefetchedGet<T>(tenantKey, url);
+    const request = (fromDocument
+        ? fromDocument.then((data) => (data !== null ? asAxiosResponse(data) : apiClient.get<T>(url, config)))
+        : apiClient.get<T>(url, config)
+    ).finally(() => {
         inFlightGets.delete(key);
     });
     inFlightGets.set(key, request);
     return request;
 };
 
+/** Starts a `getShared` request now so a page opened shortly after finds it
+    answered (or on its way). Failures are swallowed here — the page's own
+    call sees them. */
+export const primeShared = (url: string, config?: AxiosRequestConfig): void => {
+    const key = sharedKey(currentTenantKey(), url, config);
+    const primed = primedGets.get(key);
+    if (inFlightGets.has(key) || (primed && performance.now() - primed.at < PRIMED_TTL_MS)) return;
+    const request = getShared(url, config);
+    request.catch(() => undefined);
+    // getShared removed its in-flight entry once settled; keep the answer.
+    primedGets.set(key, { at: performance.now(), request });
+};
+
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        netActivity.end();
+        return response;
+    },
     async (error) => {
+        // Only requests that passed the request interceptor carry a config.
+        if (error?.config) netActivity.end();
         const status = error.response?.status;
         const config = error.config || {};
         const url: string = config.url || '';

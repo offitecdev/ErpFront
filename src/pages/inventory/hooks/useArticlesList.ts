@@ -11,7 +11,7 @@ export interface ProductColumnFilters {
 }
 
 export interface ProductSort {
-    by: 'articleCode' | 'name' | 'totalQuantity' | 'salePrice' | 'createdAt';
+    by: 'articleCode' | 'name' | 'modelNumber' | 'serialNumber' | 'barcode' | 'totalQuantity' | 'salePrice' | 'createdAt';
     direction: 'asc' | 'desc';
 }
 
@@ -47,6 +47,11 @@ export const useArticlesList = () => {
     const reload = useCallback((options?: { silent?: boolean }) => {
         silentRef.current = Boolean(options?.silent);
         setReloadTick((tick) => tick + 1);
+    }, []);
+
+    /** Eine Zeile sofort nachziehen (Bestand nach «Zugang buchen»), ohne Neuladen. */
+    const patchItem = useCallback((id: string, patch: Partial<ArticleListItem>) => {
+        setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
     }, []);
 
     /** Satırı BEKLEMEDEN listeden düşürür (silme sonrası anlık kaldırma). */
@@ -96,6 +101,6 @@ export const useArticlesList = () => {
     return {
         items, total, totalPages, page, setPage, loading, error,
         search, setSearch, filters, setFilters,
-        sort, toggleSort, reload, removeItem,
+        sort, toggleSort, reload, removeItem, patchItem,
     };
 };

@@ -82,6 +82,83 @@ const fontPreloadPlugin = () => {
   }
 }
 
+// Deep link into a quote: the detail route's chunk group is not discovered
+// until the entry bundle has been parsed, the router has matched and the
+// dynamic import() runs — measured on the production build, that is ~570 ms
+// before the FIRST of its ~40 files is even requested, and the heading cannot
+// paint until they have all landed. The group is known at build time, so the
+// document can start it at parse time instead, in parallel with the entry
+// bundle. Only the STATIC import graph is preloaded: the page's lazy popups
+// and PDF machinery must stay off the opening path.
+//
+// The quote route test must stay in step with the data prefetch in
+// index.html — both answer "is this document a quote deep link?". Since
+// 14.09.2026 the same mechanism serves the project list and project detail
+// (measured: /projects requested its chunk group only after the profile).
+const ROUTE_PRELOADS: Array<{ path: RegExp; facade: RegExp }> = [
+  { path: /^\/(?:sales\/quotes|crm\/tenders)\/[^/?#]+\/?$/, facade: /pages[\\/]sales[\\/]TenderDetail\.tsx$/ },
+  { path: /^\/projects\/?$/, facade: /pages[\\/]project[\\/]Projects\.tsx$/ },
+  { path: /^\/projects\/[^/?#]+\/?$/, facade: /pages[\\/]project[\\/]ProjectDetail\.tsx$/ },
+]
+
+const quoteRoutePreloadPlugin = () => {
+  let base = '/'
+  return {
+    name: 'offitec:quote-route-preload',
+    apply: 'build' as const,
+    configResolved(config: { base: string }) { base = config.base },
+    transformIndexHtml: {
+      order: 'post' as const,
+      handler: (html: string, ctx: { bundle?: Record<string, any> }) => {
+        const bundle = ctx.bundle
+        // Electron loads over file:// with a relative base and routes behind
+        // the hash; there is no deep-link document to optimise there.
+        if (!bundle || base !== '/') return html
+
+        // Everything the document already asks for is skipped — repeating it
+        // would only add bytes to the HTML.
+        const alreadyInHtml = new Set(
+          [...html.matchAll(/(?:href|src)="([^"]+)"/g)].map((match) => match[1].replace(/^\//, '')),
+        )
+        const groups: Array<{ path: string; scripts: string[]; styles: string[] }> = []
+        for (const route of ROUTE_PRELOADS) {
+          const routeChunk = Object.values(bundle).find(
+            (item) => item?.type === 'chunk' && route.facade.test(String(item.facadeModuleId ?? '')),
+          )
+          if (!routeChunk) continue
+          const scripts: string[] = []
+          const styles: string[] = []
+          const seen = new Set<string>()
+          const visit = (fileName: string) => {
+            if (seen.has(fileName)) return
+            seen.add(fileName)
+            const chunk = bundle[fileName]
+            if (!chunk) return
+            if (!alreadyInHtml.has(fileName)) scripts.push(fileName)
+            for (const css of chunk.viteMetadata?.importedCss ?? []) {
+              if (!alreadyInHtml.has(css) && !styles.includes(css)) styles.push(css)
+            }
+            for (const imported of chunk.imports ?? []) visit(imported)
+          }
+          visit(routeChunk.fileName)
+          if (scripts.length || styles.length) groups.push({ path: route.path.source, scripts, styles })
+        }
+        if (!groups.length) return html
+
+        const snippet = `(function(){
+  var add=function(href,rel,as){var l=document.createElement('link');l.rel=rel;if(as)l.as=as;l.crossOrigin='';l.href=${JSON.stringify(base)}+href;document.head.appendChild(l)};
+  ${JSON.stringify(groups)}.forEach(function(g){
+    if(!new RegExp(g.path).test(location.pathname))return;
+    g.scripts.forEach(function(f){add(f,'modulepreload')});
+    g.styles.forEach(function(f){add(f,'preload','style')});
+  });
+})();`
+        return html.replace('</head>', `  <script>${snippet}</script>\n</head>`)
+      },
+    },
+  }
+}
+
 // Production preloads use the hashed bundle names above. During development
 // there is no final bundle to inspect, so inject equivalent source URLs. Vite
 // serves those files directly and the browser can start the three fonts used
@@ -114,6 +191,11 @@ export default defineConfig(({ mode }) => ({
   // deep routes after a refresh. Electron loads via file:// and needs a
   // relative base. Desktop builds pass `--mode electron`.
   base: mode === 'electron' ? './' : '/',
+  // ZXing (Barcode-Leser der Schnellerfassung) wird nur per dynamischem
+  // import() geladen. Ohne Vorab-Bündelung findet der Dev-Server die
+  // Abhängigkeit erst beim ersten Aufruf und antwortet bis zur nächsten
+  // Optimierung mit 504 «Outdated Optimize Dep» — der Leser bliebe stumm.
+  optimizeDeps: { include: ['@zxing/browser', '@zxing/library'] },
   plugins: [
     responseCompressionPlugin(),
     react(),
@@ -121,6 +203,7 @@ export default defineConfig(({ mode }) => ({
     asyncCssPlugin(),
     fontPreloadPlugin(),
     fontDevPreloadPlugin(),
+    quoteRoutePreloadPlugin(),
   ],
   server: {
     // Hot Module Replacement is on by default so the dev server (`npm run dev`)

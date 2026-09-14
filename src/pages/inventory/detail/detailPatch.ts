@@ -5,6 +5,10 @@ import { parseNum } from '../utils/format';
 export interface DetailDraft {
     articleCode: string;
     name: string;
+    /* Modell, Serie, Lieferantenbarcode (10.09.2026) — alle freiwillig. */
+    modelNumber: string;
+    serialNumber: string;
+    supplierBarcode: string;
     unit: string;
     salePrice: string;
     /** Ürün/hizmet anahtarı — varsayılan PRODUCT, detaydan değiştirilir. */
@@ -16,6 +20,9 @@ export interface DetailDraft {
 export const draftFromDetail = (detail: ArticleDetail): DetailDraft => ({
     articleCode: detail.articleCode,
     name: detail.name,
+    modelNumber: detail.modelNumber ?? '',
+    serialNumber: detail.serialNumber ?? '',
+    supplierBarcode: detail.supplierBarcode ?? '',
     unit: detail.unit,
     salePrice: String(detail.salePrice ?? 0),
     itemType: detail.itemType === 'SERVICE' ? 'SERVICE' : 'PRODUCT',
@@ -42,6 +49,14 @@ export const buildDetailPatch = (
 
     const name = draft.name.trim();
     if (name !== detail.name) patch.name = name;
+
+    // Leer = null: ein geleertes Feld nimmt dem Artikel die Kennung wieder.
+    const modelNumber = draft.modelNumber.trim();
+    if (modelNumber !== (detail.modelNumber ?? '')) patch.modelNumber = modelNumber || null;
+    const serialNumber = draft.serialNumber.trim();
+    if (serialNumber !== (detail.serialNumber ?? '')) patch.serialNumber = serialNumber || null;
+    const supplierBarcode = draft.supplierBarcode.trim();
+    if (supplierBarcode !== (detail.supplierBarcode ?? '')) patch.supplierBarcode = supplierBarcode || null;
 
     const unit = draft.unit.trim();
     if (unit !== detail.unit) patch.unit = unit;

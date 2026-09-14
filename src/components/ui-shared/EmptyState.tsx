@@ -1,5 +1,6 @@
 import React from 'react';
 import Empty from 'antd/es/empty';
+import { AntdTheme } from './AntdTheme';
 
 interface EmptyStateProps {
     icon?: React.ReactNode;
@@ -9,6 +10,7 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description, action }) => (
+    <AntdTheme>
     <div className="px-6 py-10 text-center">
         <Empty
             image={icon ? <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-secondary text-fg-quaternary">{icon}</div> : Empty.PRESENTED_IMAGE_SIMPLE}
@@ -22,4 +24,5 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description
             {action}
         </Empty>
     </div>
+    </AntdTheme>
 );

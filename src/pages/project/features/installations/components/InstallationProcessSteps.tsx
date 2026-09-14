@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { Check } from '@/components/icons/antIconCompat';
+import '@/styles/modules/projectReports.css';
 
 export type ProcessStep = { key: string; label: string; done: boolean };
 
@@ -20,7 +21,7 @@ export const InstallationProcessSteps = ({ steps }: { steps: ProcessStep[] }) =>
                     state === 'done'
                         ? 'bg-emerald-600 text-white'
                         : state === 'current'
-                            ? 'bg-[#272f67] text-white'
+                            ? 'bg-[#0a7aff] text-white'
                             : 'bg-slate-100 text-slate-400';
                 const text =
                     state === 'done'

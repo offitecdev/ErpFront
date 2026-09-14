@@ -97,15 +97,18 @@ export const RemindersPage = () => {
         setFilters((current) => ({ ...current, customerId: picked?.id || '' }));
     };
 
-    /** Schliessen = endgültig löschen; die Zeile verschwindet örtlich. */
+    /** Schliessen = endgültig löschen; die Zeile verschwindet SOFORT
+        (optimistisch, 14.09.2026) — lehnt der Server ab, lädt die Seite neu
+        und die Erinnerung steht wieder da. */
     const dismiss = async (reminder: CrmTaskRow) => {
         if (busyIds.has(reminder.id)) return;
         setBusyIds((current) => new Set(current).add(reminder.id));
+        removeRow((row) => row.id === reminder.id);
         try {
             await crmApi.deleteTask(reminder.id);
-            removeRow((row) => row.id === reminder.id);
         } catch {
             toast.error(t('crm.reminders.dismissError'));
+            reload();
         } finally {
             setBusyIds((current) => { const next = new Set(current); next.delete(reminder.id); return next; });
         }
@@ -119,7 +122,7 @@ export const RemindersPage = () => {
                     <button
                         type="button"
                         onClick={() => setQuickOpen(true)}
-                        className="ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
+                        className="ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#0066e0]"
                     >
                         <Plus size={14} />
                         {t('crm.reminders.newReminder')}
@@ -194,7 +197,7 @@ export const RemindersPage = () => {
                                                 <button
                                                     type="button"
                                                     onClick={() => navigate(reminder.linkUrl!)}
-                                                    className="inline-flex shrink-0 items-center gap-0.5 text-[11.5px] font-semibold text-[#1f2654] underline-offset-2 hover:underline dark:text-sky-300"
+                                                    className="inline-flex shrink-0 items-center gap-0.5 text-[11.5px] font-semibold text-[#0066e0] underline-offset-2 hover:underline dark:text-sky-300"
                                                 >
                                                     {t('crm.reminder.open')}
                                                     <ArrowRight size={11} />

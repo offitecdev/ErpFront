@@ -18,6 +18,7 @@ import { EMPTY_MAIL_FILTERS, MailFilters, type MailFilterValue } from './MailFil
 import { MailList } from './MailList';
 import { MailReader } from './MailReader';
 import { categoryLabel, type MailFolderKey } from './mailShared';
+import '@/styles/modules/mailModule.css';
 
 /* /crm/mail — das FIRMENPOSTFACH im ERP (18.08.2026; umgebaut 08.09.2026).
    Sieht aus wie das Kalender-Modul: weisse Fläche, Hairlines, graue

@@ -12,6 +12,7 @@ import {
 
 import { getShared } from '../../lib/axios';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
+import { Button } from '../../components/ui-shared/Button';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../hooks/useColumnWidths';
@@ -192,38 +193,21 @@ export const CustomerList = () => {
     const pageSafe = Math.min(page, totalPagesSafe);
     const hasFilters = Boolean(debouncedSearch || debouncedColumns.companyName || debouncedColumns.email || statusFilter);
 
-    // Telefon kartında her hücrenin başına kendi sütun adı yazılır
-    // (`data-label`); metin başlıkla AYNI çeviri anahtarından gelir.
-    const colLabel = {
-        phone: t('common.phone'),
-        email: t('common.email'),
-        contact: t('crm.customers.colContact'),
-        status: t('common.status'),
-    };
-
     return (
         <div className="flex w-full flex-col gap-4">
             <InventoryListHeader
                 title={t('nav.customerList')}
                 action={
-                    <button
-                        type="button"
+                    /* Dasselbe Knopfmass wie auf der Offertenliste (Samet
+                       09.09.2026: «tıpkı teklif listesi gibi»): der gemeinsame
+                       Button aus ui-shared statt eines eigenen <button>. */
+                    <Button
+                        variant={showForm ? 'secondary' : 'primary'}
+                        icon={showForm ? <XIcon size={13} /> : <Plus size={13} />}
                         onClick={() => setShowForm(!showForm)}
-                        /* Die Hauptaktion der Seite: gross, iOS-Ecke, MARINE
-                           (Vorgabe 09.09.2026, zweiter Durchgang: «yeni müşteri
-                           butonu da lacivert olacak ve daha büyük olacak»).
-                           Mass, Farbe und Kante stehen vollständig in
-                           `styles/buttons.css` (`.ofi-btn-ios` + `.ofi-btn-brand`
-                           bzw. `.ofi-btn-ios-plain` für den Schliessen-Zustand) —
-                           hier steht KEIN Tailwind-Mass mehr daneben, das
-                           dagegenhält. */
-                        className={showForm
-                            ? 'ofi-btn-ios ofi-btn-ios-plain inline-flex items-center justify-center'
-                            : 'ofi-btn-ios ofi-btn-brand inline-flex items-center justify-center'}
                     >
-                        {showForm ? <XIcon size={20} /> : <Plus size={20} />}
-                        {showForm ?t('common.close') :t('crm.customers.newCustomer')}
-                    </button>
+                        {showForm ? t('common.close') : t('crm.customers.newCustomer')}
+                    </Button>
                 }
             />
 
@@ -295,9 +279,10 @@ export const CustomerList = () => {
             </FilterBar>
 
             <SectionCard title={`${t('nav.customerList')} (${total})`}>
-                {/* `data-list-table`: ferah satır ölçüsü + telefonda kart
-                    görünümü (bkz. index.css "ÜBERSICHTSLISTEN"). */}
-                <table data-inv-table data-list-table data-grid-lines data-unstyled-table className="w-full">
+                {/* Dasselbe Tabellenmass wie die Offertenliste (Samet 09.09.2026):
+                    das gewöhnliche `data-inv-table`, NICHT mehr die luftige
+                    `data-list-table`-Variante (52/66px-Zeilen). */}
+                <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     {/* Firma sütununun genişliği yoktur: kalan yeri o emer. */}
                     <colgroup>
                         <col />
@@ -385,23 +370,23 @@ export const CustomerList = () => {
                                         </div>
                                     </div>
                                 </td>
-                                <td data-label={colLabel.phone}>
+                                <td>
                                     <div className="flex items-center gap-1.5 text-[12.5px] text-slate-700 dark:text-white/80">
                                         <Phone size={11} className="shrink-0 text-slate-400" />
                                         <span className="truncate">{c.mainPhone || <span className="text-slate-300 dark:text-white/30">—</span>}</span>
                                     </div>
                                 </td>
-                                <td data-label={colLabel.email}>
+                                <td>
                                     <div className="flex items-center gap-1.5 text-[12.5px] text-slate-700 dark:text-white/80">
                                         <Mail size={11} className="shrink-0 text-slate-400" />
                                         <span className="truncate">{c.mainEmail || <span className="text-slate-300 dark:text-white/30">—</span>}</span>
                                     </div>
                                 </td>
-                                <td data-label={colLabel.contact} className="truncate text-[12.5px] text-slate-600 dark:text-white/70">
+                                <td className="truncate text-[12.5px] text-slate-600 dark:text-white/70">
                                     {[c.responsibleFirstName, c.responsibleLastName].filter(Boolean).join(' ')
                                         || <span className="text-slate-300 dark:text-white/30">—</span>}
                                 </td>
-                                <td data-label={colLabel.status}>
+                                <td>
                                     <StatusChip variant={getCustomerStatusOption(c.status).variant}>
                                         {getCustomerStatusLabel(c.status)}
                                     </StatusChip>
@@ -410,7 +395,8 @@ export const CustomerList = () => {
                         ))}
                     </tbody>
                 </table>
-                <div className="border-t border-slate-200 dark:border-white/10">
+                {/* Keine Linie über der Seitenzahl (Samet 09.09.2026: «altında çizgi var, kaldır»). */}
+                <div>
                     <Pager
                         page={pageSafe}
                         totalPages={totalPagesSafe}

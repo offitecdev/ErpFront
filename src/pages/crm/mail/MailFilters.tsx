@@ -6,6 +6,7 @@ import { SearchLg } from '@/components/icons/antIconCompat';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { t } from '@/i18n/translate';
 import { mailFiltersApi, type MailFilterKind, type MailFilterOption } from '@/lib/api/mail';
+import '@/styles/modules/mailModule.css';
 
 /* DIE FILTER NEBEN DER SUCHE (13.09.2026, Vorgabe Samet: «oben Filter für
    Kunden, Personal und Projekte — neben die Suchleiste»).

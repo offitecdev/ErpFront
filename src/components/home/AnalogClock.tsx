@@ -50,7 +50,7 @@ export const AnalogClock = ({ brand = 'OFFITEC' }: { brand?: string }) => {
                             y1={y1}
                             x2={x2}
                             y2={y2}
-                            stroke={isHour ? '#272f67' : '#cbd5e1'}
+                            stroke={isHour ? '#0a7aff' : '#cbd5e1'}
                             strokeWidth={isHour ? 2.5 : 1}
                             strokeLinecap="round"
                         />
@@ -66,7 +66,7 @@ export const AnalogClock = ({ brand = 'OFFITEC' }: { brand?: string }) => {
                     fontSize="12"
                     fontWeight="700"
                     letterSpacing="2"
-                    fill="#272f67"
+                    fill="#0a7aff"
                 >
                     {brand}
                 </text>
@@ -118,7 +118,7 @@ export const AnalogClock = ({ brand = 'OFFITEC' }: { brand?: string }) => {
                 />
 
                 {/* Center cap */}
-                <circle cx="100" cy="100" r="5" fill="#272f67" />
+                <circle cx="100" cy="100" r="5" fill="#0a7aff" />
                 <circle cx="100" cy="100" r="2" fill="#ffffff" />
             </svg>
 

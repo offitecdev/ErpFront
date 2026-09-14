@@ -8,7 +8,7 @@ import { getStatusLabel, STATUS_VARIANT } from '../../utils/projectFormatters';
 // saying done *what*, and read as a control rather than a state.
 const CHIP_CLASS: Record<string, string> = {
     active: 'bg-[#059669] text-white border-transparent',
-    approved: 'bg-[#272f67] text-white border-transparent',
+    approved: 'bg-[#0a7aff] text-white border-transparent',
     passive: 'bg-[#64748b] text-white border-transparent',
     info: 'bg-[#3b82f6] text-white border-transparent',
     warning: 'bg-[#f59e0b] text-white border-transparent',

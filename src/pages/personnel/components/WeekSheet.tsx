@@ -73,7 +73,7 @@ export const WeekSheet = ({
                             aria-pressed={isActive}
                             className={`flex min-h-[104px] flex-col items-start justify-between rounded-2xl border-2 px-4 py-3 text-left transition-colors ${
                                 isActive
-                                    ? 'border-[#272f67] bg-[#eef2fb] text-[#1f2654] dark:border-[#f59e0b] dark:bg-[#f59e0b]/10 dark:text-[#fbbf24]'
+                                    ? 'border-[#0a7aff] bg-[#eef2fb] text-[#0066e0] dark:border-[#f59e0b] dark:bg-[#f59e0b]/10 dark:text-[#fbbf24]'
                                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-white/15 dark:bg-transparent dark:text-white/70'
                             }`}
                         >

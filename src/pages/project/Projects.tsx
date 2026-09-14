@@ -10,8 +10,8 @@ import { toast } from 'sonner';
 import { InventoryListHeader } from '../../components/inventory/InventoryListHeader';
 import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, FilterSelect, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../hooks/useColumnWidths';
-import { projectApi, deliveryReportApi } from '../../lib/api/project';
-import { billingApi, myOrdersApi } from '../../lib/api/billing';
+import { projectApi } from '../../lib/api/project';
+import { fetchProjectListBundle, type ProjectListBundle } from '../../lib/api/projectListBundle';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
 import type { ProjectDto, ProjectStatus } from '../../types/project';
 import { ProjectStatusBadge } from './features/components/common/ProjectStatusBadge';
@@ -51,7 +51,7 @@ export const Projects = () => {
     const [loading, setLoading] = useState(true);
     const [flowMap, setFlowMap] = useState<Record<string, ProjectFlow>>({});
     const [addonMap, setAddonMap] = useState<Record<string, number>>({});
-    const flowSourcesRef = useRef<{ orders: Awaited<ReturnType<typeof myOrdersApi.listProjectFlow>>; deliveryReports: Awaited<ReturnType<typeof deliveryReportApi.listProjectFlow>>; invoices: Awaited<ReturnType<typeof billingApi.listProjectFlowInvoices>> } | null>(null);
+    const flowSourcesRef = useRef<Omit<ProjectListBundle, 'projects'> | null>(null);
 
     const [search, setSearch] = useState('');
     // Kolon bazlı filtreler (tablo başlığı altındaki filtre satırı).
@@ -78,14 +78,19 @@ export const Projects = () => {
     const load = async () => {
         setLoading(true);
         try {
-            const [list, sources] = await Promise.all([
-                projectApi.list(),
-                flowSourcesRef.current
-                    ? Promise.resolve(flowSourcesRef.current)
-                    : Promise.all([myOrdersApi.listProjectFlow(), deliveryReportApi.listProjectFlow(), billingApi.listProjectFlowInvoices()]).then(
-                          ([orders, deliveryReports, invoices]) => ({ orders, deliveryReports, invoices }),
-                      ),
-            ]);
+            // İlk açılış dört kaynağı TEK istekte alır (bkz. projectListBundle —
+            // index.html aynı isteği belge okunurken başlatır); sonraki
+            // yenilemeler yalnızca proje listesini tazeler.
+            let list: ProjectDto[];
+            let sources: Omit<ProjectListBundle, 'projects'>;
+            if (flowSourcesRef.current) {
+                list = await projectApi.list();
+                sources = flowSourcesRef.current;
+            } else {
+                const { projects, ...rest } = await fetchProjectListBundle();
+                list = projects;
+                sources = rest;
+            }
             flowSourcesRef.current = sources;
             const map: Record<string, ProjectFlow> = {};
             const addons: Record<string, number> = {};
@@ -324,7 +329,7 @@ export const Projects = () => {
                                     <td data-label={colLabel.report} className="text-right font-mono text-[13px] text-slate-600 dark:text-white/70">{project._count?.reports || 0}</td>
                                     <td data-label={colLabel.appointment}>
                                         {booked ? (
-                                            <span className={`inline-flex items-center gap-1.5 ${dayjs(booked.startTime).isAfter(dayjs()) ? 'text-[#272f67] dark:text-sky-300' : 'text-slate-500 dark:text-white/60'}`}>
+                                            <span className={`inline-flex items-center gap-1.5 ${dayjs(booked.startTime).isAfter(dayjs()) ? 'text-[#0a7aff] dark:text-sky-300' : 'text-slate-500 dark:text-white/60'}`}>
                                                 <CalendarClock size={12} className="shrink-0" />
                                                 <span>
                                                     <span className="block text-[12.5px] font-medium leading-tight">{dayjs(booked.startTime).format('DD.MM.YYYY')}</span>

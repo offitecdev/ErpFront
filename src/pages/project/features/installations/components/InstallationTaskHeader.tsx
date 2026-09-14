@@ -1,4 +1,5 @@
 import { Clock } from '@/components/icons/antIconCompat';
+import '@/styles/modules/projectReports.css';
 
 const TONE_STYLES: Record<string, string> = {
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800',

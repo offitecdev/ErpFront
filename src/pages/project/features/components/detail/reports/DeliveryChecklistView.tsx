@@ -36,6 +36,8 @@ import {
     statusLabelKey,
     type ReportChecklist,
 } from './delivery/checklistModel';
+import '@/styles/modules/handover.css';
+import '@/styles/modules/reportEditor.css';
 
 /**
  * Übergabe-/Abnahme-Rapport — Editor (neu gebaut 19.08.2026, Benutzerwunsch:

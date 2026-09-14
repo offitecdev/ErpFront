@@ -138,7 +138,7 @@ export const AppointmentMailPanel = ({
                                             <tr
                                                 key={appointment.id}
                                                 onClick={() => toggle(appointment.id)}
-                                                className={`cursor-pointer transition-colors ${checked ? 'bg-[#272f67]/[0.05] dark:bg-white/10' : 'hover:bg-slate-50 dark:hover:bg-white/5'}`}
+                                                className={`cursor-pointer transition-colors ${checked ? 'bg-[#0a7aff]/[0.05] dark:bg-white/10' : 'hover:bg-slate-50 dark:hover:bg-white/5'}`}
                                             >
                                                 <td>
                                                     <input

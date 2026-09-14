@@ -1,4 +1,5 @@
 import { apiClient } from '../axios';
+import { cachedQuery, peekQuery } from './queryCache';
 
 /* Company staff directory — the people source of every picker that is not the
    HR module itself (meeting participants, appointment technicians, CC lists).
@@ -25,7 +26,21 @@ const asRows = (payload: unknown): StaffDirectoryRow[] => {
     return Array.isArray(rows) ? (rows as StaffDirectoryRow[]) : [];
 };
 
-export const fetchStaffDirectory = async (): Promise<StaffDirectoryRow[]> => {
+/* Every picker used to fetch this list on open — one 150–200 ms round trip
+   each time on production. It changes rarely, so it is kept for 5 minutes and
+   served at once (stale-while-revalidate, up to 30 minutes old) after that; a
+   write to employees/personnel/roles marks it stale (queryCache tag `staff`). */
+const STAFF_DIRECTORY_KEY = 'staff-directory';
+const STAFF_DIRECTORY_QUERY = { freshMs: 5 * 60_000, staleMs: 30 * 60_000, tags: ['staff'] };
+
+/** The directory if it is already known — lets a picker open with its rows. */
+export const peekStaffDirectory = (): StaffDirectoryRow[] | undefined =>
+    peekQuery<StaffDirectoryRow[]>(STAFF_DIRECTORY_KEY, STAFF_DIRECTORY_QUERY);
+
+export const fetchStaffDirectory = (): Promise<StaffDirectoryRow[]> =>
+    cachedQuery(STAFF_DIRECTORY_KEY, loadStaffDirectory, STAFF_DIRECTORY_QUERY);
+
+const loadStaffDirectory = async (): Promise<StaffDirectoryRow[]> => {
     try {
         const res = await apiClient.get('/employees/directory', { params: { isActive: true } });
         return asRows(res.data);

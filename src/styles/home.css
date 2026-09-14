@@ -1,0 +1,505 @@
+/* Start page (pages/Home.tsx + components/home/*) in the Mac look — 10.09.2026,
+   Samet: «die Startseite so sauber, ordentlich und professionell wie die
+   Angebotsseite — ein echtes macOS/SwiftUI-Programm». The same list as
+   styles/tenderDetail.css: white panels with ONE 10 % hairline and a 10px
+   corner, no shadow, no tint, no watermark glyphs; 28px bordered push
+   buttons with a 6px corner; sentence-case titles; one system blue; the
+   charts in the Swift idiom (components/charts/swiftChart.css).
+
+   Scoped `.ofi-home` — the Home page root carries it. The palette is the
+   window palette of styles/appleModal.css (`--ofi-win-*`) so page, popups
+   and charts read from one table; dark mode is that table's `.dark` row.
+   Buttons here carry no `px-` class, so styles/buttons.css leaves them
+   alone; the radii sit in `@layer utilities` where the flattener lives
+   ([[radius-utilities-flattened]]). */
+
+.ofi-home {
+    --home-radius: 10px;
+    --home-control-radius: 6px;
+    min-width: 0;
+    color: var(--ofi-win-text);
+    font-family: var(--ofi-win-font);
+    font-feature-settings: 'cv11', 'calt';
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── the welcome row ─────────────────────────────────────────────────────── */
+.ofi-home__welcome {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--ofi-win-hairline);
+    padding-bottom: 22px;
+}
+@media (min-width: 1280px) { .ofi-home__welcome { flex-direction: row; align-items: flex-start; } }
+.ofi-home__greet { flex: none; }
+@media (min-width: 1280px) { .ofi-home__greet { width: 272px; } }
+.ofi-home__date { font-size: 12px; font-weight: 500; color: var(--ofi-win-secondary); }
+#root .ofi-home__title {
+    margin-top: 6px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--ofi-win-text);
+}
+#root .ofi-home__title b { font-weight: 600; color: var(--ofi-win-accent); }
+.ofi-home__lead { margin-top: 6px; font-size: 13px; line-height: 1.45; color: var(--ofi-win-secondary); }
+
+/* ── section titles: sentence case, small, with room for one button ──────── */
+.ofi-home-section + .ofi-home-section { margin-top: 28px; }
+.ofi-home-stats > .ofi-home-section:first-child { margin-top: 0; }
+.ofi-home-section__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.ofi-home-h2 {
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-transform: none;
+    color: var(--ofi-win-text);
+}
+
+/* ── the one push button of the page ────────────────────────────────────── */
+#root .ofi-home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    min-height: 28px;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--home-control-radius);
+    background: var(--ofi-win-field);
+    padding: 0 10px;
+    box-shadow: var(--ofi-win-btn-shadow);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--ofi-win-text);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+#root .ofi-home-btn:hover:not(:disabled) { background: var(--ofi-win-hover); border-color: var(--ofi-win-field-border-hover); }
+#root .ofi-home-btn:disabled { color: var(--ofi-win-muted); cursor: default; }
+#root .ofi-home-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ofi-win-focus); }
+#root .ofi-home-btn svg { color: var(--ofi-win-secondary); }
+/* Square glyph button (carousel arrows). */
+#root .ofi-home-glyph {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-win-field-border);
+    border-radius: var(--home-control-radius);
+    background: var(--ofi-win-field);
+    color: var(--ofi-win-secondary);
+    box-shadow: var(--ofi-win-btn-shadow);
+    transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-home-glyph:hover:not(:disabled) { background: var(--ofi-win-hover); color: var(--ofi-win-text); }
+#root .ofi-home-glyph:disabled { border-color: var(--ofi-win-hairline); color: var(--ofi-win-muted); box-shadow: none; cursor: default; }
+
+/* ── the segmented control (Diagramm | Tabelle) ──────────────────────────── */
+.ofi-home-seg {
+    display: inline-flex;
+    gap: 1px;
+    border-radius: 7px;
+    background: var(--ofi-win-fill);
+    padding: 2px;
+}
+#root .ofi-home-seg__btn {
+    height: 24px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--ofi-win-text);
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-home-seg__btn.is-on {
+    background: var(--ofi-win-surface);
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.dark #root .ofi-home-seg__btn.is-on { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+
+/* ── panels ──────────────────────────────────────────────────────────────── */
+.ofi-home-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+}
+.ofi-home-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    border-bottom: 1px solid var(--ofi-win-hairline);
+    padding: 11px 16px 10px;
+}
+.ofi-home-card__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    color: var(--ofi-win-text);
+}
+.ofi-home-card__sub { margin-top: 2px; font-size: 12px; color: var(--ofi-win-secondary); }
+.ofi-home-card__body { flex: 1; min-width: 0; padding: 16px; }
+.ofi-home-error { align-items: center; gap: 10px; padding: 36px 16px; text-align: center; font-size: 13px; color: var(--ofi-win-secondary); }
+.ofi-home-empty {
+    display: flex;
+    height: 200px;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--ofi-win-field-border);
+    border-radius: 8px;
+}
+
+/* ── the overview tiles ──────────────────────────────────────────────────── */
+.ofi-home-tiles {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 1024px) { .ofi-home-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+#root .ofi-home-tile {
+    display: flex;
+    min-height: 98px;
+    min-width: 0;
+    flex-direction: column;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+    padding: 13px 14px 12px;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ofi-win-text);
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-home-tile.is-link { cursor: pointer; }
+#root .ofi-home-tile.is-link:hover { background: var(--ofi-win-hover); }
+#root .ofi-home-tile.is-link:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ofi-win-focus); border-color: var(--ofi-win-accent); }
+.ofi-home-tile__label {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-win-secondary);
+}
+.ofi-home-tile__icon { flex: none; color: var(--ofi-win-muted); }
+.ofi-home-tile.is-link:hover .ofi-home-tile__label { color: var(--ofi-win-accent); }
+.ofi-home-tile.is-link:hover .ofi-home-tile__icon { color: var(--ofi-win-accent); }
+.ofi-home-tile__value {
+    margin-top: 6px;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-win-text);
+}
+.ofi-home-tile.is-red .ofi-home-tile__value { color: var(--ofi-win-danger); }
+.ofi-home-tile__sub {
+    margin-top: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 8px;
+    font-size: 11.5px;
+    color: var(--ofi-win-secondary);
+}
+
+/* ── the picker sheet ────────────────────────────────────────────────────── */
+.ofi-home-pick { display: flex; flex-direction: column; gap: 14px; max-height: min(60vh, 520px); overflow-y: auto; padding-bottom: 6px; }
+.ofi-home-pick__caption { padding: 0 2px 5px; font-size: 12px; font-weight: 600; color: var(--ofi-win-text); }
+.ofi-home-pick__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow: hidden;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+}
+.ofi-home-pick__row { display: flex; align-items: center; gap: 4px; padding-right: 6px; }
+.ofi-home-pick__row + .ofi-home-pick__row { border-top: 1px solid var(--ofi-win-hairline); }
+.ofi-home-pick__row.is-blocked .ofi-home-pick__label,
+.ofi-home-pick__row.is-blocked .ofi-home-pick__value { color: var(--ofi-win-muted); }
+:is(#root, body > :not(#root)) .ofi-home-pick__toggle {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ofi-win-text);
+    transition: background-color 120ms ease;
+}
+:is(#root, body > :not(#root)) .ofi-home-pick__toggle:hover:not(:disabled) { background: var(--ofi-win-hover); }
+:is(#root, body > :not(#root)) .ofi-home-pick__toggle:disabled { cursor: default; }
+:is(#root, body > :not(#root)) .ofi-home-pick__toggle:focus-visible { outline: 2px solid var(--ofi-win-accent); outline-offset: -2px; }
+.ofi-home-pick__label { display: block; font-size: 13px; font-weight: 500; }
+.ofi-home-pick__hint { display: block; padding-top: 1px; font-size: 11.5px; color: var(--ofi-win-secondary); }
+.ofi-home-pick__value { flex: none; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ofi-win-secondary); }
+.ofi-home-pick__order { display: inline-flex; flex: none; align-items: center; gap: 2px; }
+.ofi-home-pick__pos {
+    display: inline-flex;
+    min-width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: var(--ofi-win-fill);
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-win-secondary);
+}
+:is(#root, body > :not(#root)) .ofi-home-pick__move {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--ofi-win-secondary);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+:is(#root, body > :not(#root)) .ofi-home-pick__move:hover:not(:disabled) { background: var(--ofi-win-fill); color: var(--ofi-win-text); }
+:is(#root, body > :not(#root)) .ofi-home-pick__move:disabled { color: var(--ofi-win-muted); opacity: 0.5; cursor: default; }
+.ofi-home-pick__count { font-size: 12px; color: var(--ofi-win-secondary); }
+.ofi-home-pick__count.is-full { color: var(--ofi-win-text); font-weight: 500; }
+
+/* ── the table view of the monthly chart ─────────────────────────────────── */
+.ofi-home-tablewrap { overflow: hidden; border: 1px solid var(--ofi-win-border); border-radius: 8px; }
+#root .ofi-home-table { font-size: 13px; font-variant-numeric: tabular-nums; }
+#root .ofi-home-table th {
+    height: 32px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--ofi-win-border);
+    background: var(--ofi-win-surface);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ofi-win-secondary);
+}
+#root .ofi-home-table td { height: 36px; padding: 0 12px; border-bottom: 1px solid var(--ofi-win-hairline); color: var(--ofi-win-text); }
+#root .ofi-home-table tbody tr:last-child td { border-bottom: 0; }
+#root .ofi-home-table th + th, #root .ofi-home-table td + td { border-left: 1px solid var(--ofi-win-hairline); }
+
+/* ── quick access ────────────────────────────────────────────────────────── */
+.ofi-home-qm { min-width: 0; flex: 1; }
+.ofi-home-qm__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ofi-home-qm__arrows { display: flex; align-items: center; gap: 6px; }
+.ofi-home-qm__track {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+.ofi-home-qm__track::-webkit-scrollbar { display: none; }
+#root .ofi-home-qm__tile {
+    display: flex;
+    width: 210px;
+    height: 124px;
+    flex: none;
+    flex-direction: column;
+    justify-content: space-between;
+    scroll-snap-align: start;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+    padding: 14px;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ofi-win-text);
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-home-qm__tile:hover { background: var(--ofi-win-hover); }
+#root .ofi-home-qm__tile:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ofi-win-focus); border-color: var(--ofi-win-accent); }
+.ofi-home-qm__icon {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 7px;
+    background: var(--ofi-win-surface);
+    color: var(--ofi-win-secondary);
+}
+.ofi-home-qm__tile:hover .ofi-home-qm__icon { color: var(--ofi-win-accent); }
+.ofi-home-qm__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ofi-home-qm__title b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+.ofi-home-qm__title svg { flex: none; color: var(--ofi-win-muted); }
+.ofi-home-qm__tile:hover .ofi-home-qm__title svg { color: var(--ofi-win-accent); }
+.ofi-home-qm__desc {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--ofi-win-secondary);
+}
+.ofi-home-qm__none {
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+    padding: 36px 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ofi-win-secondary);
+}
+
+/* ── the right column: clock and «Anstehend» ─────────────────────────────── */
+.ofi-home__aside { margin-top: 28px; }
+@media (min-width: 1024px) { .ofi-home__aside { width: 300px; flex: none; margin-top: 0; } }
+.ofi-home__clock {
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+    padding: 18px 16px 16px;
+}
+.ofi-home__clock svg { filter: none; }
+.ofi-home-up { margin-top: 20px; }
+.ofi-home-up__list { display: flex; flex-direction: column; gap: 10px; }
+#root .ofi-home-up__card {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+    padding: 11px 12px;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ofi-win-text);
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-home-up__card:hover { background: var(--ofi-win-hover); }
+#root .ofi-home-up__card.is-open { border-color: var(--ofi-win-accent); }
+#root .ofi-home-up__card:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ofi-win-focus); }
+.ofi-home-up__icon {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 7px;
+    color: var(--ofi-win-secondary);
+}
+.ofi-home-up__card.is-open .ofi-home-up__icon { border-color: transparent; background: var(--ofi-win-accent); color: #fff; }
+.ofi-home-up__name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.ofi-home-up__meta { display: block; margin-top: 1px; font-size: 11.5px; color: var(--ofi-win-secondary); }
+.ofi-home-up__chev { flex: none; color: var(--ofi-win-muted); transition: transform 150ms ease; }
+.ofi-home-up__card.is-open .ofi-home-up__chev { transform: rotate(180deg); }
+.ofi-home-up__pop {
+    margin-top: 6px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--home-radius);
+    background: var(--ofi-win-surface);
+    padding: 6px 6px 8px;
+}
+.ofi-home-up__pophead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 6px 6px 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+.ofi-home-up__pophead span { font-weight: 400; color: var(--ofi-win-secondary); }
+#root .ofi-home-up__close {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--ofi-win-secondary);
+}
+#root .ofi-home-up__close:hover { background: var(--ofi-win-fill); color: var(--ofi-win-text); }
+.ofi-home-up__empty { padding: 18px 8px; text-align: center; font-size: 12.5px; color: var(--ofi-win-secondary); }
+.ofi-home-up__rows { display: flex; max-height: 228px; flex-direction: column; gap: 1px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+#root .ofi-home-up__row {
+    display: flex;
+    width: 100%;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    padding: 6px 8px;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ofi-win-text);
+    transition: background-color 120ms ease;
+}
+#root .ofi-home-up__row:hover { background: var(--ofi-win-hover); }
+.ofi-home-up__client { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.ofi-home-up__when { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--ofi-win-secondary); }
+
+/* ── radii the flattener would otherwise take ────────────────────────────── */
+@layer utilities {
+    #root .ofi-home :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock, .ofi-home-qm__none) { border-radius: var(--home-radius) !important; }
+    #root .ofi-home :is(.ofi-home-btn, .ofi-home-glyph) { border-radius: var(--home-control-radius) !important; }
+    #root .ofi-home .ofi-home-seg { border-radius: 7px !important; }
+    #root .ofi-home .ofi-home-seg__btn { border-radius: 5px !important; }
+    :is(#root, body > :not(#root)) .ofi-home-pick__list { border-radius: 8px !important; }
+}
+
+@media (max-width: 640px) {
+    .ofi-home-tile__value { font-size: 22px; }
+    .ofi-home-card__body { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-home *, .ofi-home *::before, .ofi-home *::after { transition: none !important; }
+}

@@ -50,7 +50,7 @@ const FALLBACK_CATALOG: CatalogModuleDto[] = PAGE_MODULES.map((moduleDef) => ({
 }));
 
 const inputClass =
-    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#272f67] disabled:bg-slate-50 disabled:text-slate-400 dark:border-white/15 dark:bg-transparent dark:text-white dark:disabled:bg-white/5';
+    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#0a7aff] disabled:bg-slate-50 disabled:text-slate-400 dark:border-white/15 dark:bg-transparent dark:text-white dark:disabled:bg-white/5';
 
 const readApiError = (error: unknown, fallback: string): string => {
     const message = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
@@ -302,7 +302,7 @@ export const PersonAccessTab = ({
                                                     type="checkbox"
                                                     checked={allowedSet.has(tenant.id)}
                                                     onChange={() => toggleTenant(tenant.id)}
-                                                    className="accent-[#272f67]"
+                                                    className="accent-[#0a7aff]"
                                                 />
                                                 <span className="truncate">{tenant.tenantName}</span>
                                                 {/* Die Heimatfirma ist die, unter der die Person
@@ -344,7 +344,7 @@ export const PersonAccessTab = ({
                                     <span className="flex h-9 items-center">
                                         {person.roleName
                                             ? (
-                                                <Chip className="bg-[#eef2fb] text-[#1f2654] ring-[#c9d5f0] dark:bg-white/10 dark:text-white/80 dark:ring-white/15">
+                                                <Chip className="bg-[#eef2fb] text-[#0066e0] ring-[#c9d5f0] dark:bg-white/10 dark:text-white/80 dark:ring-white/15">
                                                     {person.roleName}
                                                 </Chip>
                                             )

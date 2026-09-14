@@ -322,7 +322,7 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
             type="button"
             onClick={() => setView(id)}
             className={`rounded-[2px] px-3 py-1.5 text-[12.5px] font-semibold transition ${
-                view === id ? 'bg-[#1f2654] text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10'
+                view === id ? 'bg-[#0066e0] text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10'
             }`}
         >
             {label}

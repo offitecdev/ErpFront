@@ -6,6 +6,7 @@ import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { CustomerPickerModal } from '../../components/CustomerPickerModal';
 import { useCustomerLookup } from '../../hooks/useCustomerLookup';
 import type { CrmCustomerOption } from '../../types/crm.types';
+import '@/styles/modules/checklists.css';
 
 /**
  * Das Kundenfeld einer Zeile im Verknüpfungsfenster: ein Suchfeld im Kleid

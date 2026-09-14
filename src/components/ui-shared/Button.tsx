@@ -1,5 +1,6 @@
 import React from 'react';
 import AntButton from 'antd/es/button';
+import { AntdTheme } from './AntdTheme';
 import type { ButtonProps as AntButtonProps } from 'antd/es/button';
 import { cx } from '../../lib/utils/cx';
 
@@ -64,6 +65,7 @@ export const Button: React.FC<ButtonProps> = ({
     const leadingIcon = iconLeading ?? icon;
 
     return (
+        <AntdTheme>
         <AntButton
             {...rest}
             type={type}
@@ -81,5 +83,6 @@ export const Button: React.FC<ButtonProps> = ({
             {children}
             {iconTrailing && <span className="ant-btn-icon" style={{ marginInlineStart: children ? 8 : 0 }}>{iconTrailing}</span>}
         </AntButton>
+        </AntdTheme>
     );
 };

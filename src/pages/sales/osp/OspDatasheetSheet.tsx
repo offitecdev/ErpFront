@@ -5,6 +5,7 @@ import { AlertTriangle, RefreshCcw01 } from '@/components/icons/antIconCompat';
 import { PopupDialog } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import { ospApi, type OspUnitMarkdownDto } from '@/lib/api/osp';
+import '@/styles/modules/osp.css';
 
 /**
  * ── DAS DATENBLATT ALS TEXT (21.09.2026) ─────────────────────────────────────

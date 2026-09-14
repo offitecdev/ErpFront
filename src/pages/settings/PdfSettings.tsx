@@ -7,7 +7,7 @@ import { Card } from '../../components/ui-shared/Card';
 import { Button } from '../../components/ui-shared/Button';
 import { Field, Input, Textarea, Select } from '../../components/ui-shared/Field';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
-import { usePdfSettings, usePdfSettingsStore } from '../../store/pdfSettingsStore';
+import { useActiveTenantHasOwnAddress, usePdfSettings, usePdfSettingsStore } from '../../store/pdfSettingsStore';
 
 import { t } from '@/i18n/translate';
 
@@ -16,6 +16,10 @@ export const PdfSettings = () => {
     // Gedruckt wird der Name des aktiven Mandanten, nicht der gespeicherte —
     // deshalb steht hier genau das im Feld, was auf dem PDF landet.
     const printed = usePdfSettings();
+    // Hat der aktive Mandant eine eigene Adresse, druckt jedes PDF DIESE — die
+    // Felder zeigen sie dann gesperrt, statt die gemeinsame zu bearbeiten.
+    const ownAddress = useActiveTenantHasOwnAddress();
+    const address = ownAddress ? printed : settings;
     const pdfInputRef = useRef<HTMLInputElement>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,20 +73,23 @@ export const PdfSettings = () => {
                             <Field label={t('crm.customers.companyName')} required className="col-span-2" hint={t('settings.pdf.companyNameHint')}>
                                 <Input value={printed.companyName} readOnly />
                             </Field>
+                            {ownAddress && (
+                                <p className="col-span-2 text-[11.5px] text-slate-500">{t('settings.pdf.tenantAddressHint')}</p>
+                            )}
                             <Field label={t('settings.pdf.addressLine1')}>
-                                <Input value={settings.addressLine1} onChange={(e) => setSettings({ addressLine1: e.target.value })} />
+                                <Input value={address.addressLine1} readOnly={ownAddress} onChange={(e) => setSettings({ addressLine1: e.target.value })} />
                             </Field>
                             <Field label={t('settings.pdf.addressLine2')}>
-                                <Input value={settings.addressLine2} onChange={(e) => setSettings({ addressLine2: e.target.value })} />
+                                <Input value={address.addressLine2} readOnly={ownAddress} onChange={(e) => setSettings({ addressLine2: e.target.value })} />
                             </Field>
                             <Field label={t('settings.pdf.postalCode')}>
-                                <Input value={settings.postalCode} onChange={(e) => setSettings({ postalCode: e.target.value })} />
+                                <Input value={address.postalCode} readOnly={ownAddress} onChange={(e) => setSettings({ postalCode: e.target.value })} />
                             </Field>
                             <Field label={t('settings.pdf.city')}>
-                                <Input value={settings.city} onChange={(e) => setSettings({ city: e.target.value })} />
+                                <Input value={address.city} readOnly={ownAddress} onChange={(e) => setSettings({ city: e.target.value })} />
                             </Field>
                             <Field label={t('settings.pdf.country')}>
-                                <Input value={settings.country} onChange={(e) => setSettings({ country: e.target.value.toUpperCase().slice(0, 2) })} maxLength={2} />
+                                <Input value={address.country} readOnly={ownAddress} onChange={(e) => setSettings({ country: e.target.value.toUpperCase().slice(0, 2) })} maxLength={2} />
                             </Field>
                             <Field label={t('common.phone')}>
                                 <Input value={settings.phone ?? ''} onChange={(e) => setSettings({ phone: e.target.value })} />

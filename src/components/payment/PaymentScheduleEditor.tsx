@@ -112,7 +112,7 @@ export const PaymentScheduleEditor = ({
                                     status === 'done'
                                         ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10'
                                         : status === 'next'
-                                            ? 'border-[#1f2654]/30 bg-[#eef2fb] dark:border-white/25 dark:bg-white/10'
+                                            ? 'border-[#0066e0]/30 bg-[#eef2fb] dark:border-white/25 dark:bg-white/10'
                                             : 'border-slate-200 bg-white dark:border-white/15 dark:bg-white/5'
                                 }`}
                             >
@@ -142,7 +142,7 @@ export const PaymentScheduleEditor = ({
                                                     (event.target as HTMLInputElement).blur();
                                                 }
                                             }}
-                                            className="w-14 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-right text-[12.5px] tabular-nums text-slate-800 outline-none transition-colors hover:border-slate-400 focus:border-[#1f2654] dark:border-white/25 dark:bg-white/10 dark:text-white"
+                                            className="w-14 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-right text-[12.5px] tabular-nums text-slate-800 outline-none transition-colors hover:border-slate-400 focus:border-[#0066e0] dark:border-white/25 dark:bg-white/10 dark:text-white"
                                         />
                                         <span className="text-[12px] text-slate-500 dark:text-white/60">%</span>
                                     </span>
@@ -207,7 +207,7 @@ export const PaymentScheduleEditor = ({
                                            Rechnungskleid (`.ofi-inv-plan`), das
                                            JEDES Textfeld des Editors rechts
                                            ausrichtet — ein Satz gehört links. */
-                                        className="ofi-plan-note min-w-0 flex-1 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-[12.5px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#1f2654] dark:border-white/25 dark:bg-white/10 dark:text-white dark:placeholder:text-white/35"
+                                        className="ofi-plan-note min-w-0 flex-1 rounded-[2px] border border-slate-300 bg-white px-1.5 py-0.5 text-[12.5px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#0066e0] dark:border-white/25 dark:bg-white/10 dark:text-white dark:placeholder:text-white/35"
                                     />
                                 )}
                                 <span className="w-24 shrink-0 truncate text-right text-[12px] tabular-nums text-slate-500 dark:text-white/60">
@@ -263,7 +263,7 @@ export const PaymentScheduleEditor = ({
                         type="button"
                         disabled={stages.length >= MAX_PAYMENT_STAGES}
                         onClick={addStage}
-                        className="inline-flex items-center gap-1 rounded-[3px] border border-slate-300 bg-white px-2 py-1 text-[12px] font-medium text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/25 dark:bg-white/10 dark:text-white/80"
+                        className="inline-flex items-center gap-1 rounded-[3px] border border-slate-300 bg-white px-2 py-1 text-[12px] font-medium text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/25 dark:bg-white/10 dark:text-white/80"
                     >
                         <Plus size={13} />
                         {t('tenders.payment_add_stage')}

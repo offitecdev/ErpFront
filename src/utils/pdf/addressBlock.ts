@@ -39,11 +39,16 @@ const clean = (value: string | null | undefined) => String(value || '').replace(
  * + "24") olarak birleşir; boş parçalar atlanır, böylece sarkan virgül/boşluk
  * kalmaz. Parçalar arası ayıraç virgüldür — sokak satırının kendisi tire
  * içerebildiği için tire ayıraç olarak kullanılmaz.
+ *
+ * `nameSeparator` trennt nur den NAMEN von der Adresse: die Lieferanten-PDFs
+ * (Preisanfrage, Bestellung) setzen seit dem 11.09.2026 « · » dazwischen —
+ * «Offitec GmbH · Ceres Tower - Hohenrainstrasse 24, 4133 Pratteln».
  */
-export function companySenderLine(s: CompanyAddressParts): string {
+export function companySenderLine(s: CompanyAddressParts, nameSeparator = ', '): string {
     const street = [clean(s.addressLine1), clean(s.addressLine2)].filter(Boolean).join(' ');
     const town = [clean(s.postalCode), clean(s.city)].filter(Boolean).join(' ');
-    return [clean(s.companyName), street, town].filter(Boolean).join(', ');
+    const address = [street, town].filter(Boolean).join(', ');
+    return [clean(s.companyName), address].filter(Boolean).join(nameSeparator);
 }
 
 /**

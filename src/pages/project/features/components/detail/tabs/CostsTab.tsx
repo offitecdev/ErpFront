@@ -248,7 +248,7 @@ export const CostsTab = memo(({
                                 <td colSpan={3} className="font-bold text-slate-900 dark:text-white">
                                     {t('projects.detail.grandTotal')}
                                 </td>
-                                <td className="text-right font-mono text-[13px] font-bold text-[#272f67] tabular-nums dark:text-white">
+                                <td className="text-right font-mono text-[13px] font-bold text-[#0a7aff] tabular-nums dark:text-white">
                                     {money(totals.total)}
                                 </td>
                             </tr>

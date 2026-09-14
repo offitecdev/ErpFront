@@ -20,6 +20,7 @@ import {
 } from './components/InvoiceFormBits';
 import { PickerField } from './components/PickerField';
 import { apiError, round2 } from './invoiceShared';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── RECHNUNG AUS EINEM AUFTRAG (`/sales/invoices/new/order`) ─────────────────

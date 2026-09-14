@@ -334,11 +334,11 @@ export const ProductUploadSection = () => {
                         onDrop={onDrop}
                         className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-12 transition-colors ${
                             dragOver
-                                ? 'border-[#272f67] bg-[#272f67]/5 dark:border-white/50 dark:bg-white/10'
-                                : 'border-slate-300 hover:border-[#272f67] dark:border-white/20 dark:hover:border-white/40'
+                                ? 'border-[#0a7aff] bg-[#0a7aff]/5 dark:border-white/50 dark:bg-white/10'
+                                : 'border-slate-300 hover:border-[#0a7aff] dark:border-white/20 dark:hover:border-white/40'
                         }`}
                     >
-                        {reading ? <Spinner size="lg" className="text-[#272f67] dark:text-white" /> : <UploadCloud02 size={30} className="text-slate-400 dark:text-white/50" />}
+                        {reading ? <Spinner size="lg" className="text-[#0a7aff] dark:text-white" /> : <UploadCloud02 size={30} className="text-slate-400 dark:text-white/50" />}
                         <span className="text-[13.5px] font-semibold text-slate-700 dark:text-white">
                             {reading ? t('upload.reading') : t('upload.dropzone.title')}
                         </span>
@@ -480,7 +480,7 @@ export const ProductUploadSection = () => {
                                     type="checkbox"
                                     checked={overwrite}
                                     onChange={(event) => setOverwrite(event.target.checked)}
-                                    className="mt-0.5 size-4 shrink-0 accent-[#272f67]"
+                                    className="mt-0.5 size-4 shrink-0 accent-[#0a7aff]"
                                 />
                                 <span>
                                     <span className="block text-[12.5px] font-semibold text-slate-800 dark:text-white">{t('upload.options.overwrite')}</span>
@@ -492,7 +492,7 @@ export const ProductUploadSection = () => {
                                     type="checkbox"
                                     checked={includeGenerated}
                                     onChange={(event) => setIncludeGenerated(event.target.checked)}
-                                    className="mt-0.5 size-4 shrink-0 accent-[#272f67]"
+                                    className="mt-0.5 size-4 shrink-0 accent-[#0a7aff]"
                                 />
                                 <span>
                                     <span className="block text-[12.5px] font-semibold text-slate-800 dark:text-white">
@@ -510,7 +510,7 @@ export const ProductUploadSection = () => {
                                 type="button"
                                 disabled={!selectedRows.length || missingColumns.length > 0}
                                 onClick={() => void start()}
-                                className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <UploadCloud02 size={14} />
                                 {t('upload.start')}
@@ -539,7 +539,7 @@ export const ProductUploadSection = () => {
                             className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10"
                         >
                             <div
-                                className="h-full rounded-full bg-[#272f67] transition-[width] duration-300 dark:bg-white/70"
+                                className="h-full rounded-full bg-[#0a7aff] transition-[width] duration-300 dark:bg-white/70"
                                 style={{ width: `${percent}%` }}
                             />
                         </div>
@@ -585,14 +585,14 @@ export const ProductUploadSection = () => {
                                 <button
                                     type="button"
                                     onClick={() => navigate('/inventory/articles')}
-                                    className="rounded-md bg-[#272f67] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
+                                    className="rounded-md bg-[#0a7aff] px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0]"
                                 >
                                     {t('upload.toProducts')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={reset}
-                                    className="rounded-md border border-slate-300 px-4 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70"
+                                    className="rounded-md border border-slate-300 px-4 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70"
                                 >
                                     {t('upload.newFile')}
                                 </button>

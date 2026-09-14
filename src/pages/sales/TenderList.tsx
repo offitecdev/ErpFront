@@ -389,7 +389,7 @@ export const TenderList = () => {
                                                 {t.ospReference && (
                                                     <OspMark
                                                         size={14}
-                                                        className="shrink-0 text-[#272f67] dark:text-white/85"
+                                                        className="shrink-0 text-[#0a7aff] dark:text-white/85"
                                                         title={`${i18nT('osp.title')} · ${t.ospReference}`}
                                                     />
                                                 )}

@@ -348,14 +348,14 @@ export const DayPopup = ({
                                         </td>
                                         <td className="tabular-nums text-slate-700 dark:text-white/80">
                                             {row.meta}
-                                            <span className="ml-2 font-mono font-bold text-[#272f67] dark:text-white">{money(row.amount)}</span>
+                                            <span className="ml-2 font-mono font-bold text-[#0a7aff] dark:text-white">{money(row.amount)}</span>
                                         </td>
                                     </tr>
                                 ))}
                                 {overtimeRows.length > 0 && (
                                     <tr>
                                         <td className="font-bold text-slate-700 dark:text-white/80">{t('common.total')}</td>
-                                        <td className="font-mono font-bold text-[#272f67] dark:text-white">{money(overtimeTotal)}</td>
+                                        <td className="font-mono font-bold text-[#0a7aff] dark:text-white">{money(overtimeTotal)}</td>
                                     </tr>
                                 )}
                             </tbody>

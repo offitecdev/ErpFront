@@ -6,8 +6,11 @@ import {
     ArrowLeft,
     CheckCircle,
     Edit01,
+    File05,
     FileDownload02,
     Mail01,
+    Plus,
+    Save01,
     Send01,
     ShoppingCart01,
     Trash01,
@@ -21,7 +24,7 @@ import { purchaseOrdersApi } from '@/lib/api/inventory';
 import { isRequestTimeout } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
-import type { PurchaseOrderRow } from '@/types/inventory';
+import type { PurchaseOrderMailDraft, PurchaseOrderRow } from '@/types/inventory';
 // Der CC-Wähler ist das Bauteil aus dem Kalender und bleibt EIN Exemplar: er ist
 // ein SUCHFENSTER wie die Artikel- und Lieferantenwahl, kein Bearbeitungsblatt.
 // Getippt wird die Kopie hier direkt auf der Seite; das Fenster ist der zweite Weg.
@@ -42,6 +45,8 @@ import {
     stageMailState,
     stageOfStatus,
 } from './utils/orderStatus';
+/* Das Mailfenster trägt die Apple-Kiste der Bestelldetails (`.ofi-mail-*`). */
+import '@/styles/orderDetails.css';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DIE BESTELLSEITE (Vorgabe Samet, 08.09.2026)
@@ -104,8 +109,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /* Die Felder der Übersicht tragen KEINEN eigenen Rahmen, solange niemand
    hineinschreibt: die Zeile ist das Feld. Erst Zeiger und Schreibmarke legen
    einen weichen Grund darunter — dieselbe Sprache wie in den Bestelldetails. */
-const FIELD_CLASS = 'h-8 w-full rounded-md border border-transparent bg-transparent px-2 text-[13px] font-normal text-slate-800 outline-none transition-colors hover:bg-slate-50 focus:border-[#272f67]/40 focus:bg-white dark:text-white dark:hover:bg-white/5 dark:focus:border-white/40';
-const MAIL_INPUT_CLASS = 'h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-[13px] font-normal text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white';
+const FIELD_CLASS = 'h-8 w-full rounded-md border border-transparent bg-transparent px-2 text-[13px] font-normal text-slate-800 outline-none transition-colors hover:bg-slate-50 focus:border-[#0a7aff]/40 focus:bg-white dark:text-white dark:hover:bg-white/5 dark:focus:border-white/40';
 
 /** Zahlbetrag der Position: Nettosumme plus die für diese Zeile geltende MwSt. */
 const payableLineTotal = (order: PurchaseOrderRow, item: PurchaseOrderRow['items'][number]): number => {
@@ -274,11 +278,9 @@ export const OrderDetailPage = () => {
        die Anfrage in eine Bestellung, ist es ein anderes Dokument — dann darf
        (und muss) der Vorschlagstext wechseln. */
     const mailSeededFor = useRef<string>('');
-    useEffect(() => {
-        if (!order) return;
-        const seedKey = `${order.id}:${priceRequest ? 'REQ' : 'ORD'}`;
-        if (mailSeededFor.current === seedKey) return;
-        mailSeededFor.current = seedKey;
+    const seedMailFields = (row: PurchaseOrderRow, request: boolean) => {
+        const order = row;
+        const priceRequest = request;
         const base = priceRequest
             ? t('inv.orders.mail.subjectPriceRequest', { number: order.referenceNumber })
             : t('inv.orders.mail.subject', { number: order.referenceNumber });
@@ -298,6 +300,13 @@ export const OrderDetailPage = () => {
             }]
             : []);
         setCcDraft('');
+    };
+    useEffect(() => {
+        if (!order) return;
+        const seedKey = `${order.id}:${priceRequest ? 'REQ' : 'ORD'}`;
+        if (mailSeededFor.current === seedKey) return;
+        mailSeededFor.current = seedKey;
+        seedMailFields(order, priceRequest);
     }, [order, priceRequest]);
 
     const addCcDraft = () => {
@@ -310,6 +319,98 @@ export const OrderDetailPage = () => {
             : [...current, { key, type: 'EMAIL', name: email, email }]));
         setCcDraft('');
         setNotice(null);
+    };
+
+    /* ── ENTWÜRFE (Vorgabe Samet, 14.09.2026: «taslaklar da olacak») ─────────
+       Halbfertige Mails dieses Auftrags. Der aktive Entwurf wird beim
+       Speichern ÜBERSCHRIEBEN, nicht verdoppelt; eine gesendete Mail räumt
+       ihren Entwurf weg. */
+    const [drafts, setDrafts] = useState<PurchaseOrderMailDraft[]>([]);
+    const [draftsState, setDraftsState] = useState<'idle' | 'loading' | 'error'>('idle');
+    const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+    useEffect(() => {
+        if (tab !== 'mail' || !order?.id) return;
+        let cancelled = false;
+        queueMicrotask(() => { if (!cancelled) setDraftsState('loading'); });
+        purchaseOrdersApi.listMailDrafts(order.id)
+            .then((items) => { if (!cancelled) { setDrafts(items); setDraftsState('idle'); } })
+            .catch(() => { if (!cancelled) setDraftsState('error'); });
+        return () => { cancelled = true; };
+    }, [tab, order?.id]);
+
+    const draftInput = () => ({
+        toEmail: mailTo.trim() || null,
+        ccEmails: mailCc.map((person) => person.email).filter((email): email is string => Boolean(email)),
+        subject: mailSubject.trim(),
+        message: mailMessage,
+    });
+
+    const saveMailDraft = async () => {
+        if (!order) return;
+        setBusy('draft');
+        try {
+            const saved = activeDraftId
+                ? await purchaseOrdersApi.updateMailDraft(order.id, activeDraftId, draftInput())
+                : await purchaseOrdersApi.createMailDraft(order.id, draftInput());
+            setActiveDraftId(saved.id);
+            setDrafts((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)]);
+            setDraftsState('idle');
+            toast.success(t('inv.orders.mail.draftSaved'));
+        } catch (err) {
+            toast.error(errorText(err));
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const openMailDraft = (draft: PurchaseOrderMailDraft) => {
+        setActiveDraftId(draft.id);
+        setMailTo(draft.toEmail ?? '');
+        setMailSubject(draft.subject);
+        setMailMessage(draft.message ?? '');
+        setMailCc(draft.ccEmails.map((email) => ({
+            key: personKey('EMAIL', email.toLowerCase()),
+            type: 'EMAIL',
+            name: email,
+            email,
+        })));
+        setCcDraft('');
+    };
+
+    const deleteMailDraft = async (draft: PurchaseOrderMailDraft) => {
+        if (!order) return;
+        try {
+            await purchaseOrdersApi.deleteMailDraft(order.id, draft.id);
+            setDrafts((current) => current.filter((entry) => entry.id !== draft.id));
+            if (activeDraftId === draft.id) setActiveDraftId(null);
+        } catch (err) {
+            toast.error(errorText(err));
+        }
+    };
+
+    /** «Neue Mail»: die Vorschlagstexte des Dokuments, kein Entwurf aktiv. */
+    const newMail = () => {
+        setActiveDraftId(null);
+        if (order) seedMailFields(order, priceRequest);
+    };
+
+    /* ── MAIL MANUELL GESENDET (Vorgabe Samet, 14.09.2026) ────────────────────
+       «Dort steht ein Häkchen ‹Mail manuell gesendet›; ist es gesetzt, ist das
+       Etikett ‹gesendet› genauso aktiv.» Der Server schaltet dabei denselben
+       Status wie eine echte Sendung. Zurücknehmen lässt sich nur ein von Hand
+       gesetztes Häkchen. */
+    const toggleManualSent = async (next: boolean) => {
+        if (!order) return;
+        setBusy('manual');
+        try {
+            const updated = await purchaseOrdersApi.setMailManual(order.id, next, mailTo.trim() || order.supplierEmail || null);
+            setOrder(updated);
+            toast.success(t(next ? 'inv.orders.mail.manualMarked' : 'inv.orders.mail.manualCleared'));
+        } catch (err) {
+            toast.error(errorText(err));
+        } finally {
+            setBusy(null);
+        }
     };
 
     const sendMail = async () => {
@@ -341,6 +442,13 @@ export const OrderDetailPage = () => {
                 const text = t(priceRequest ? 'inv.orders.mail.sentToastPriceRequest' : 'inv.orders.mail.sentToast');
                 toast.success(text);
                 setNotice({ kind: 'ok', text });
+                // Die gesendete Mail braucht ihren Entwurf nicht mehr.
+                if (activeDraftId) {
+                    const sentDraftId = activeDraftId;
+                    setActiveDraftId(null);
+                    setDrafts((current) => current.filter((entry) => entry.id !== sentDraftId));
+                    void purchaseOrdersApi.deleteMailDraft(order.id, sentDraftId).catch(() => undefined);
+                }
                 setTab('overview');
             }
         } catch (err) {
@@ -464,8 +572,9 @@ export const OrderDetailPage = () => {
                 seen.set(entry.key, { key: entry.key, name: entry.name, width: entry.width ?? 120 });
             }
         }));
-        return [...seen.values()].slice(0, priceRequest ? 5 : 3);
-    }, [order, priceRequest]);
+        // Bis zu zwoelf freie Spalten je Vorlage (11.09.2026) — die Tabelle zeigt sie alle.
+        return [...seen.values()].slice(0, 12);
+    }, [order]);
     const itemColumnCount = priceRequest
         ? 3 + detailExtraColumns.length
         : 7 + detailExtraColumns.length + shownExtraDiscounts.length + (showLineVat ? 1 : 0);
@@ -492,7 +601,7 @@ export const OrderDetailPage = () => {
                         <button
                             type="button"
                             onClick={() => navigate('/inventory/orders')}
-                            className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70"
+                            className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70"
                         >
                             {/* Der einzige Zurück-Knopf der Seite, und er steht
                                 nur hier: wo nichts geladen werden konnte, gibt es
@@ -526,7 +635,21 @@ export const OrderDetailPage = () => {
     // Stufen, damit die Leiste zwischen den Stufen nicht ihre Gestalt wechselt.
     // Im Wareneingang gibt es beides nicht: dort wird eingelagert, nicht gesendet.
     const showEdit = canManage && stage !== 'RECEIPT';
-    const showSend = canManage && stage !== 'RECEIPT' && Boolean(order.supplierEmail);
+    /* Das Mailfenster steht IMMER bereit (Vorgabe Samet, 14.09.2026: «direkt
+       ein Mailfenster») — auch ohne hinterlegte Adresse, denn das Häkchen
+       «manuell gesendet» braucht keine. Gesendet wird nur mit seinem Knopf. */
+    const showSend = canManage && stage !== 'RECEIPT';
+    const canSendMail = Boolean(order.supplierEmail);
+    /* Das Häkchen folgt dem Status: gesetzt = die Mail dieser Stufe ist draussen.
+       Setzen geht auf DRAFT (Anfrage) und PENDING (bestätigter Auftrag),
+       entfernen nur, wenn es von Hand gesetzt wurde. */
+    const manualChecked = mailState === 'SENT';
+    const manualLocked = manualChecked
+        ? !order.emailSentManually
+        : !(status === 'DRAFT' || status === 'PENDING');
+    const manualHint = manualChecked
+        ? (order.emailSentManually ? null : t('inv.orders.mail.manualSystemSent'))
+        : (status === 'ORDER_DRAFT' ? t('inv.orders.mail.manualNeedsConfirm') : null);
 
     const primary: { label: string; icon: React.ReactNode; onClick: () => void; busyKey: string } | null = (() => {
         if (!canManage) return null;
@@ -594,6 +717,9 @@ export const OrderDetailPage = () => {
                 : mailState === 'LAST_KNOWN'
                     ? t('inv.orders.flow.mailLastSent')
                     : t('inv.orders.mailNotSent')}
+            {mailState !== 'NOT_SENT' && order.emailSentManually && (
+                <span className="font-normal opacity-80">· {t('inv.orders.mail.manualTag')}</span>
+            )}
             {mailState !== 'NOT_SENT' && order.emailSentAt && (
                 <span className="font-normal opacity-80">· {fmtDateTime(order.emailSentAt)}</span>
             )}
@@ -680,7 +806,7 @@ export const OrderDetailPage = () => {
                                 type="button"
                                 onClick={() => void runAsk()}
                                 className={`flex h-9 items-center rounded-md px-3.5 text-[12.5px] font-semibold text-white transition-colors ${
-                                    DANGER_ASKS.has(ask) ? 'bg-red-600 hover:bg-red-700' : 'bg-[#272f67] hover:bg-[#1f2654]'
+                                    DANGER_ASKS.has(ask) ? 'bg-red-600 hover:bg-red-700' : 'bg-[#0a7aff] hover:bg-[#0066e0]'
                                 }`}
                             >
                                 {t('common.confirm')}
@@ -708,7 +834,7 @@ export const OrderDetailPage = () => {
                                 type="button"
                                 disabled={busy !== null}
                                 onClick={() => void editOrder()}
-                                className="flex h-9 items-center gap-1.5 rounded-md border border-[#272f67]/30 px-3.5 text-[12.5px] font-semibold text-[#272f67] transition-colors hover:bg-[#272f67] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/30 dark:text-white dark:hover:bg-white/15"
+                                className="flex h-9 items-center gap-1.5 rounded-md border border-[#0a7aff]/30 px-3.5 text-[12.5px] font-semibold text-[#0a7aff] transition-colors hover:bg-[#0a7aff] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/30 dark:text-white dark:hover:bg-white/15"
                             >
                                 {busy === 'edit'
                                     ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -722,10 +848,10 @@ export const OrderDetailPage = () => {
                                 type="button"
                                 disabled={busy !== null}
                                 onClick={() => setTab('mail')}
-                                className="flex h-9 items-center gap-1.5 rounded-md border border-[#272f67]/30 px-3.5 text-[12.5px] font-semibold text-[#272f67] transition-colors hover:bg-[#272f67] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/30 dark:text-white dark:hover:bg-white/15"
+                                className="flex h-9 items-center gap-1.5 rounded-md border border-[#0a7aff]/30 px-3.5 text-[12.5px] font-semibold text-[#0a7aff] transition-colors hover:bg-[#0a7aff] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/30 dark:text-white dark:hover:bg-white/15"
                             >
-                                <Send01 size={15} />
-                                {isResend ? t('inv.orders.actions.sendUpdated') : t('inv.orders.actions.send')}
+                                <Mail01 size={15} />
+                                {t('inv.orders.views.mail')}
                             </button>
                         )}
 
@@ -736,7 +862,7 @@ export const OrderDetailPage = () => {
                                 type="button"
                                 disabled={busy !== null}
                                 onClick={primary.onClick}
-                                className="flex h-9 items-center gap-1.5 rounded-md bg-[#272f67] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex h-9 items-center gap-1.5 rounded-md bg-[#0a7aff] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 {busy === primary.busyKey
                                     ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -762,7 +888,7 @@ export const OrderDetailPage = () => {
             {/* ══ DIE ABSCHNITTE ═══════════════════════════════════════════════
                 Übersicht · Positionen · Dokument · E-Mail. Vier Abschnitte
                 DERSELBEN Seite — kein Blatt legt sich mehr über sie. */}
-            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 p-1 dark:border-white/15">
+            <div className="ofi-lager-tabs flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 p-1 dark:border-white/15">
                 {([
                     ['overview', t('inv.orders.views.overview')],
                     ['items', t('inv.orders.sectionEditor', { count: order.itemCount })],
@@ -773,10 +899,11 @@ export const OrderDetailPage = () => {
                         key={key}
                         type="button"
                         onClick={() => setTab(key)}
+                        aria-current={tab === key ? 'page' : undefined}
                         className={`h-8 rounded-md px-3 text-[12.5px] font-semibold transition-colors ${
                             tab === key
-                                ? 'bg-[#272f67] text-white'
-                                : 'text-slate-500 hover:text-[#1f2654] dark:text-white/60 dark:hover:text-white'
+                                ? 'bg-[#0a7aff] text-white'
+                                : 'text-slate-500 hover:text-[#0066e0] dark:text-white/60 dark:hover:text-white'
                         }`}
                     >
                         {label}
@@ -791,7 +918,7 @@ export const OrderDetailPage = () => {
                         disabled={busy !== null}
                         onClick={() => void downloadExcel()}
                         title={t('inv.orders.actions.downloadExcel')}
-                        className="ml-auto flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-semibold text-slate-500 transition-colors hover:text-[#1f2654] disabled:opacity-40 dark:text-white/60 dark:hover:text-white"
+                        className="is-aside ml-auto flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-semibold text-slate-500 transition-colors hover:text-[#0066e0] disabled:opacity-40 dark:text-white/60 dark:hover:text-white"
                     >
                         {busy === 'excel'
                             ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -1031,8 +1158,8 @@ export const OrderDetailPage = () => {
                                     onClick={() => setPdfLang(lang)}
                                     className={`rounded px-2.5 py-1 text-[11.5px] font-semibold uppercase transition-colors ${
                                         pdfLang === lang
-                                            ? 'bg-[#272f67] text-white'
-                                            : 'text-slate-500 hover:text-[#1f2654] dark:text-white/60 dark:hover:text-white'
+                                            ? 'bg-[#0a7aff] text-white'
+                                            : 'text-slate-500 hover:text-[#0066e0] dark:text-white/60 dark:hover:text-white'
                                     }`}
                                 >
                                     {lang}
@@ -1054,85 +1181,159 @@ export const OrderDetailPage = () => {
             )}
 
             {tab === 'mail' && showSend && (
-                <SectionCard title={t('inv.orders.views.mail')}>
-                    <div className="flex flex-col gap-3 p-3.5">
-                        <label className="flex flex-col gap-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
-                            {t('inv.orders.mail.to')}
-                            <input value={mailTo} onChange={(event) => setMailTo(event.target.value)} className={MAIL_INPUT_CLASS} />
-                        </label>
-
-                        {/* KOPIE — auf der Seite getippt: Adresse eingeben, Enter,
-                            fertig. Das Verzeichnis (Personal / Kunden) ist der
-                            zweite Weg und bleibt ein Suchfenster wie überall sonst. */}
-                        <div className="flex flex-col gap-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
-                            {t('inv.orders.mail.cc')}
-                            <span className="flex flex-wrap items-center gap-1.5">
-                                {mailCc.map((person) => (
-                                    <span
-                                        key={person.key}
-                                        title={person.email ?? undefined}
-                                        className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-2.5 pr-1 text-[11.5px] font-medium text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-white/70"
+                /* ══ DAS MAILFENSTER (Vorgabe Samet, 14.09.2026) ══════════════
+                   «Kein automatisches Senden — direkt ein Mailfenster im Stil
+                   von macOS/SwiftUI, mit Entwürfen, und einem Häkchen ‹Mail
+                   manuell gesendet›.» Links die Seitenleiste wie in Mail.app
+                   (neue Mail, Entwürfe), rechts die Nachricht: Werkzeugleiste
+                   oben, Kopfzeilen mit eingerückten Haarlinien, der Text, der
+                   Anhang, und unten der Schalter. Hinaus geht nur, was der
+                   Senden-Knopf schickt. */
+                <div className="ofi-mail">
+                    <aside className="ofi-mail-side">
+                        <button type="button" className="ofi-mail-new" onClick={newMail}>
+                            <Plus size={14} />
+                            {t('inv.orders.mail.newMail')}
+                        </button>
+                        <span className="ofi-mail-cap">
+                            {t('inv.orders.mail.drafts')}
+                            {drafts.length > 0 && <em>{drafts.length}</em>}
+                        </span>
+                        <div className="ofi-mail-list">
+                            {draftsState === 'loading' && !drafts.length && (
+                                <span className="ofi-mail-empty">{t('common.loadingData')}</span>
+                            )}
+                            {draftsState === 'error' && (
+                                <span className="ofi-mail-empty">{t('inv.orders.mail.draftsUnavailable')}</span>
+                            )}
+                            {draftsState === 'idle' && !drafts.length && (
+                                <span className="ofi-mail-empty">{t('inv.orders.mail.draftsEmpty')}</span>
+                            )}
+                            {drafts.map((draft) => (
+                                <div key={draft.id} className={`ofi-mail-item${draft.id === activeDraftId ? ' is-on' : ''}`}>
+                                    <button type="button" onClick={() => openMailDraft(draft)}>
+                                        <b>{draft.subject || t('inv.orders.mail.noSubject')}</b>
+                                        <small>{fmtDateTime(draft.updatedAt)}</small>
+                                        <span>{(draft.message ?? '').replace(/\s+/g, ' ').slice(0, 90)}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ofi-mail-item-x"
+                                        onClick={() => void deleteMailDraft(draft)}
+                                        aria-label={t('inv.orders.mail.deleteDraft')}
+                                        title={t('inv.orders.mail.deleteDraft')}
                                     >
-                                        {person.email || person.name}
-                                        <button
-                                            type="button"
-                                            onClick={() => setMailCc((current) => current.filter((entry) => entry.key !== person.key))}
-                                            aria-label={t('common.delete')}
-                                            className="flex size-4 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-white/15 dark:hover:text-white"
-                                        >
-                                            <X size={10} />
-                                        </button>
-                                    </span>
-                                ))}
-                                <input
-                                    value={ccDraft}
-                                    onChange={(event) => setCcDraft(event.target.value)}
-                                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCcDraft(); } }}
-                                    onBlur={addCcDraft}
-                                    placeholder={t('inv.orders.mail.ccPlaceholder')}
-                                    className="h-7 w-56 rounded-full border border-slate-200 bg-white px-3 text-[11.5px] font-normal text-slate-700 outline-none focus:border-[#1f2654] dark:border-white/20 dark:bg-transparent dark:text-white"
-                                />
+                                        <Trash01 size={13} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </aside>
+
+                    <section className="ofi-mail-compose">
+                        <header className="ofi-mail-bar">
+                            <b>{mailSubject.trim() || t('inv.orders.mail.newMail')}</b>
+                            <span className="ofi-mail-bar-actions">
                                 <button
                                     type="button"
-                                    onClick={() => setCcPickerOpen(true)}
-                                    className="rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-[11.5px] font-semibold text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/50 dark:hover:text-white"
+                                    className="ofi-mail-tool"
+                                    disabled={busy !== null || (!mailSubject.trim() && !mailMessage.trim())}
+                                    onClick={() => void saveMailDraft()}
+                                    title={t('inv.orders.mail.saveDraft')}
                                 >
-                                    {t('inv.orders.mail.ccFromDirectory')}
+                                    {busy === 'draft'
+                                        ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        : <Save01 size={15} />}
+                                    <span>{t('inv.orders.mail.saveDraft')}</span>
                                 </button>
+                                <button
+                                    type="button"
+                                    className="ofi-mail-send"
+                                    disabled={busy !== null || !mailSubject.trim() || !canSendMail}
+                                    onClick={() => void sendMail()}
+                                    title={canSendMail ? undefined : t('inv.orders.flow.mailNoAddress')}
+                                >
+                                    {busy === 'send'
+                                        ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        : <Send01 size={15} />}
+                                    <span>{isResend ? t('inv.orders.actions.sendUpdated') : t('inv.orders.actions.send')}</span>
+                                </button>
+                            </span>
+                        </header>
+
+                        <div className="ofi-mail-fields">
+                            <label className="ofi-mail-field">
+                                <span>{t('inv.orders.mail.to')}</span>
+                                <input
+                                    value={mailTo}
+                                    onChange={(event) => setMailTo(event.target.value)}
+                                    placeholder={canSendMail ? undefined : t('inv.orders.flow.mailNoAddress')}
+                                />
+                            </label>
+                            <div className="ofi-mail-field">
+                                <span>{t('inv.orders.mail.cc')}</span>
+                                <span className="ofi-mail-chips">
+                                    {mailCc.map((person) => (
+                                        <span key={person.key} className="ofi-mail-chip" title={person.email ?? undefined}>
+                                            {person.email || person.name}
+                                            <button
+                                                type="button"
+                                                onClick={() => setMailCc((current) => current.filter((entry) => entry.key !== person.key))}
+                                                aria-label={t('common.delete')}
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </span>
+                                    ))}
+                                    <input
+                                        value={ccDraft}
+                                        onChange={(event) => setCcDraft(event.target.value)}
+                                        onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCcDraft(); } }}
+                                        onBlur={addCcDraft}
+                                        placeholder={t('inv.orders.mail.ccPlaceholder')}
+                                    />
+                                </span>
+                                <button type="button" className="ofi-mail-plus" onClick={() => setCcPickerOpen(true)} title={t('inv.orders.mail.ccFromDirectory')} aria-label={t('inv.orders.mail.ccFromDirectory')}>
+                                    <Plus size={13} />
+                                </button>
+                            </div>
+                            <label className="ofi-mail-field">
+                                <span>{t('inv.orders.mail.subjectLabel')}</span>
+                                <input value={mailSubject} onChange={(event) => setMailSubject(event.target.value)} className="is-subject" />
+                            </label>
+                        </div>
+
+                        <textarea
+                            value={mailMessage}
+                            onChange={(event) => setMailMessage(event.target.value)}
+                            className="ofi-mail-body"
+                            aria-label={t('inv.orders.mail.message')}
+                        />
+
+                        <div className="ofi-mail-attach">
+                            <span className="ofi-mail-file">
+                                <File05 size={16} />
+                                <span>{pdfFileName}</span>
                             </span>
                         </div>
 
-                        <label className="flex flex-col gap-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
-                            {t('inv.orders.mail.subjectLabel')}
-                            <input value={mailSubject} onChange={(event) => setMailSubject(event.target.value)} className={MAIL_INPUT_CLASS} />
-                        </label>
-                        <label className="flex flex-col gap-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
-                            {t('inv.orders.mail.message')}
-                            <textarea
-                                value={mailMessage}
-                                onChange={(event) => setMailMessage(event.target.value)}
-                                rows={9}
-                                className="w-full rounded-md border border-slate-200 bg-white p-2.5 text-[13px] font-normal text-slate-700 focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
-                            />
-                        </label>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-[12px] text-slate-400 dark:text-white/50">
-                                {t('inv.orders.mail.attachmentNote', { name: pdfFileName })}
-                            </span>
-                            <button
-                                type="button"
-                                disabled={busy !== null || !mailSubject.trim()}
-                                onClick={() => void sendMail()}
-                                className="flex h-9 items-center gap-1.5 rounded-md bg-[#272f67] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                {busy === 'send'
-                                    ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                    : <Send01 size={15} />}
-                                {isResend ? t('inv.orders.actions.sendUpdated') : t('inv.orders.actions.send')}
-                            </button>
-                        </div>
-                    </div>
-                </SectionCard>
+                        {/* DAS HÄKCHEN — ein macOS-Schalter mit seinem Satz. */}
+                        <footer className="ofi-mail-foot">
+                            <label className={`ofi-mail-switch${manualLocked ? ' is-locked' : ''}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={manualChecked}
+                                    disabled={manualLocked || busy !== null}
+                                    onChange={(event) => void toggleManualSent(event.target.checked)}
+                                />
+                                <i aria-hidden="true" />
+                                <span>{t('inv.orders.mail.manualSent')}</span>
+                            </label>
+                            {manualHint && <small className="ofi-mail-hint">{manualHint}</small>}
+                            <span className="ofi-mail-state">{mailBadge}</span>
+                        </footer>
+                    </section>
+                </div>
             )}
 
             <PeoplePickerModal

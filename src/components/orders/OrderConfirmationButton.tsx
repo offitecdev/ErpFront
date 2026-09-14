@@ -16,6 +16,7 @@ import {
 import { useTenderTextTemplates } from '@/pages/sales/detail/hooks/useTenderTextTemplates';
 import { richTextToPlain } from '@/pages/sales/detail/utils/markdown.utils';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
+import '@/styles/modules/projectDetail.css';
 
 // Derselbe Editor, mit dem der Einleitungstext der Offerte geschrieben wird —
 // der Text der Bestätigung STARTET dort, also muss er hier dieselbe

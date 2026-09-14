@@ -235,7 +235,7 @@ export const FormsPage = () => {
                 </FilterSlot>
             </CrmFilterBar>
 
-            <SectionCard title={<span className="inline-flex items-center gap-2"><LuListChecks size={15} className="text-[#1f2654] dark:text-amber-400" />{t('nav.crmForms')} ({total})</span>}>
+            <SectionCard title={<span className="inline-flex items-center gap-2"><LuListChecks size={15} className="text-[#0066e0] dark:text-amber-400" />{t('nav.crmForms')} ({total})</span>}>
                 <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                     <colgroup>
                         <col />

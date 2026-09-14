@@ -19,9 +19,11 @@ export const useTenderProductPicker = () => {
     const [pickerTotal, setPickerTotal] = useState(0);
     const [pickerLoading, setPickerLoading] = useState(false);
 
-    // Debounce the search box so we don't fire a request per keystroke.
+    // Debounce the search box so we don't fire a request per keystroke. 150 ms
+    // (was 300): production adds 150–200 ms of network on top, and a search
+    // answered before comes straight from the client cache.
     useEffect(() => {
-        const id = setTimeout(() => setDebouncedSearch(productSearch.trim()), 300);
+        const id = setTimeout(() => setDebouncedSearch(productSearch.trim()), 150);
         return () => clearTimeout(id);
     }, [productSearch]);
 
@@ -39,7 +41,21 @@ export const useTenderProductPicker = () => {
             return;
         }
         let cancelled = false;
-        setPickerLoading(true);
+        const cached = inventoryApi.peekArticlesQuickPick({
+            page: productPickerPage,
+            pageSize: PRODUCT_PICKER_PAGE_SIZE,
+            search: debouncedSearch,
+        });
+        // Known answer: rows at once; a stale one is refreshed right behind it.
+        if (cached) {
+            setPickerItems(cached.value.items);
+            setPickerTotal(cached.value.total);
+            if (cached.fresh) {
+                setPickerLoading(false);
+                return;
+            }
+        }
+        setPickerLoading(!cached);
         inventoryApi
             // Lean feed: the picker lists names and copies name / description /
             // unit / price onto the line. Stock levels, barcodes, category and
@@ -48,7 +64,7 @@ export const useTenderProductPicker = () => {
                 page: productPickerPage,
                 pageSize: PRODUCT_PICKER_PAGE_SIZE,
                 search: debouncedSearch,
-            })
+            }, { mustBeFresh: true })
             .then((res) => {
                 if (cancelled) return;
                 setPickerItems(res.items);

@@ -8,25 +8,25 @@ import type { CrmCustomerOption } from '../types/crm.types';
 import type { ChecklistLinkPreset } from './components/ChecklistLinkDialog';
 
 export const BTN_PRIMARY =
-    'ofi-btn-brand inline-flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50';
+    'ofi-btn-brand inline-flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-50';
 export const BTN_SECONDARY =
-    'inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:bg-transparent dark:text-white/70 dark:hover:text-white';
+    'inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:bg-transparent dark:text-white/70 dark:hover:text-white';
 export const BTN_DANGER_OUTLINE =
     'inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-500/10';
 export const BTN_SUCCESS =
     'inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50';
 /** Kleiner Symbolknopf in Tabellenzeilen. */
 export const BTN_ICON =
-    'inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/70 dark:hover:text-white';
+    'inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:text-white/70 dark:hover:text-white';
 export const BTN_ICON_DANGER =
     'inline-flex size-8 items-center justify-center rounded-md border border-slate-200 text-slate-400 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:hover:bg-red-500/10';
 
 export const INPUT_CLASS =
-    'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-[#1f2654] focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/15 dark:bg-transparent dark:text-white dark:disabled:bg-white/5';
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-[#0066e0] focus:outline-none focus:ring-2 focus:ring-[#0066e0]/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/15 dark:bg-transparent dark:text-white dark:disabled:bg-white/5';
 export const TEXTAREA_CLASS =
-    'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13.5px] leading-relaxed text-slate-800 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-[#1f2654] focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/15 dark:bg-transparent dark:text-white dark:disabled:bg-white/5';
+    'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13.5px] leading-relaxed text-slate-800 placeholder:text-slate-400 transition-colors hover:border-slate-300 focus:border-[#0066e0] focus:outline-none focus:ring-2 focus:ring-[#0066e0]/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/15 dark:bg-transparent dark:text-white dark:disabled:bg-white/5';
 export const SELECT_CLASS =
-    'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 transition-colors hover:border-slate-300 focus:border-[#1f2654] focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 dark:border-white/15 dark:bg-transparent dark:text-white';
+    'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13.5px] text-slate-800 transition-colors hover:border-slate-300 focus:border-[#0066e0] focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-50 dark:border-white/15 dark:bg-transparent dark:text-white';
 export const LABEL_CLASS = 'block text-[12px] font-semibold text-slate-600 dark:text-white/70';
 
 /** Weisse Karte mit dünnem Rand — die Fläche eines Feldes / Abschnitts. */

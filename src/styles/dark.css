@@ -136,14 +136,14 @@ html.dark body,
 }
 /* selected / light-blue backgrounds → subtle neutral */
 .dark .bg-\[\#eef4ff\],
-.dark .bg-\[\#d3e3fd\],
+.dark .bg-\[\#e3efff\],
 .dark .bg-\[\#eaf1fb\],
 .dark .bg-\[\#eef2f6\] { background-color: var(--ofi-d-surface-3) !important; }
 
 /* ── Brand-navy surfaces & primary buttons → white with black text ── */
-.dark .bg-\[\#272f67\],
-.dark .bg-\[\#1f2654\],
-.dark .bg-\[\#1a2361\],
+.dark .bg-\[\#0a7aff\],
+.dark .bg-\[\#0066e0\],
+.dark .bg-\[\#0066e0\],
 .dark .bg-brand-solid,
 .dark .ant-btn-primary {
   background: var(--ofi-button-navy) !important;
@@ -152,9 +152,9 @@ html.dark body,
   -webkit-text-fill-color: #ffffff !important;
   box-shadow: none !important;
 }
-.dark .bg-\[\#272f67\] *,
-.dark .bg-\[\#1f2654\] *,
-.dark .bg-\[\#1a2361\] *,
+.dark .bg-\[\#0a7aff\] *,
+.dark .bg-\[\#0066e0\] *,
+.dark .bg-\[\#0066e0\] *,
 .dark .bg-brand-solid *,
 .dark .ant-btn-primary * {
   color: #ffffff !important;
@@ -168,19 +168,19 @@ html.dark body,
    keine Rückmeldung durch: die Füllung oben ist !important gesetzt und hat
    die Tailwind-Hover-Klasse überstimmt. Reine Farbe, kein Schein.
    Die Leiter: #d48f16 (Ruhe) → #f2bb5c (Hover) → #ffd188 (gedrückt). */
-.dark button[class~="bg-[#272f67]"],
-.dark a[class~="bg-[#272f67]"],
-.dark button[class~="bg-[#1f2654]"],
-.dark button[class~="bg-[#1a2361]"],
+.dark button[class~="bg-[#0a7aff]"],
+.dark a[class~="bg-[#0a7aff]"],
+.dark button[class~="bg-[#0066e0]"],
+.dark button[class~="bg-[#0066e0]"],
 .dark button[class~="bg-brand-solid"],
 .dark .ofi-btn-brand,
 .dark .ant-btn-primary {
   transition: background-color 140ms ease;
 }
-.dark button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):hover,
-.dark a[class~="bg-[#272f67]"]:hover,
-.dark button[class~="bg-[#1f2654]"]:not(:disabled):not([disabled]):hover,
-.dark button[class~="bg-[#1a2361]"]:not(:disabled):not([disabled]):hover,
+.dark button[class~="bg-[#0a7aff]"]:not(:disabled):not([disabled]):hover,
+.dark a[class~="bg-[#0a7aff]"]:hover,
+.dark button[class~="bg-[#0066e0]"]:not(:disabled):not([disabled]):hover,
+.dark button[class~="bg-[#0066e0]"]:not(:disabled):not([disabled]):hover,
 .dark button[class~="bg-brand-solid"]:not(:disabled):not([disabled]):hover,
 .dark .ofi-btn-brand:not(:disabled):not([disabled]):hover,
 .dark .ant-btn-primary:not(:disabled):not([disabled]):hover {
@@ -190,10 +190,10 @@ html.dark body,
   border-color: var(--ofi-button-hover-fill) !important;
   color: #ffffff !important;
 }
-.dark button[class~="bg-[#272f67]"]:not(:disabled):not([disabled]):active,
-.dark a[class~="bg-[#272f67]"]:active,
-.dark button[class~="bg-[#1f2654]"]:not(:disabled):not([disabled]):active,
-.dark button[class~="bg-[#1a2361]"]:not(:disabled):not([disabled]):active,
+.dark button[class~="bg-[#0a7aff]"]:not(:disabled):not([disabled]):active,
+.dark a[class~="bg-[#0a7aff]"]:active,
+.dark button[class~="bg-[#0066e0]"]:not(:disabled):not([disabled]):active,
+.dark button[class~="bg-[#0066e0]"]:not(:disabled):not([disabled]):active,
 .dark button[class~="bg-brand-solid"]:not(:disabled):not([disabled]):active,
 .dark .ofi-btn-brand:not(:disabled):not([disabled]):active,
 .dark .ant-btn-primary:not(:disabled):not([disabled]):active {
@@ -222,10 +222,10 @@ html.dark body,
 .dark .border-rose-200 { border-color: var(--ofi-d-border) !important; }
 .dark .border-slate-300,
 .dark .border-slate-400 { border-color: var(--ofi-d-border-strong) !important; }
-.dark .border-\[\#d3e3fd\] { border-color: var(--ofi-d-border) !important; }
-.dark .border-\[\#272f67\],
-.dark .border-\[\#1f2654\],
-.dark .border-\[\#1a2361\],
+.dark .border-\[\#e3efff\] { border-color: var(--ofi-d-border) !important; }
+.dark .border-\[\#0a7aff\],
+.dark .border-\[\#0066e0\],
+.dark .border-\[\#0066e0\],
 .dark .border-\[\#8ea2ff\] { border-color: var(--ofi-d-wheat-border) !important; }
 /* Coloured card borders (profit/loss panels) → subtle, not exaggerated */
 .dark .border-emerald-300,
@@ -261,18 +261,18 @@ html.dark body,
 /* Brand navy is unreadable on dark — resolve it to plain light text (NOT the
    wheat accent: text should read as text, not as gold decoration). The
    attribute selectors catch every arbitrary-value variant Tailwind emits
-   (`text-[#272f67]/70`, `hover:text-[#272f67]`, …) that the class list misses. */
-.dark .text-\[\#272f67\],
-.dark .text-\[\#1f2654\],
-.dark .text-\[\#1a2361\],
-.dark [class*="text-[#272f67]"],
-.dark [class*="text-[#1f2654]"],
-.dark [class*="text-[#1a2361]"] { color: var(--ofi-d-text) !important; }
+   (`text-[#0a7aff]/70`, `hover:text-[#0a7aff]`, …) that the class list misses. */
+.dark .text-\[\#0a7aff\],
+.dark .text-\[\#0066e0\],
+.dark .text-\[\#0066e0\],
+.dark [class*="text-[#0a7aff]"],
+.dark [class*="text-[#0066e0]"],
+.dark [class*="text-[#0066e0]"] { color: var(--ofi-d-text) !important; }
 /* Navy hairlines / accents (calendar chips, selected rows) → quiet glass lines */
-.dark [class*="border-[#272f67]/"] { border-color: var(--ofi-d-border) !important; }
-.dark [class*="border-l-[#272f67]"] { border-left-color: rgba(255, 255, 255, 0.4) !important; }
-.dark .ring-\[\#272f67\],
-.dark [class*="ring-[#272f67]"] { --tw-ring-color: rgba(255, 255, 255, 0.45) !important; }
+.dark [class*="border-[#0a7aff]/"] { border-color: var(--ofi-d-border) !important; }
+.dark [class*="border-l-[#0a7aff]"] { border-left-color: rgba(255, 255, 255, 0.4) !important; }
+.dark .ring-\[\#0a7aff\],
+.dark [class*="ring-[#0a7aff]"] { --tw-ring-color: rgba(255, 255, 255, 0.45) !important; }
 .dark .text-\[\#64748b\],
 .dark .text-\[\#86868B\] { color: var(--ofi-d-text-3) !important; }
 /* Tailwind v4 emits `divide-*` as `& > :not(:last-child)` (the divider is the
@@ -318,7 +318,7 @@ html.dark body,
 .dark .hover\:bg-slate-50\/80:hover,
 .dark .hover\:bg-slate-100:hover,
 .dark .hover\:bg-\[\#eef4ff\]:hover,
-.dark .hover\:bg-\[\#d3e3fd\]:hover,
+.dark .hover\:bg-\[\#e3efff\]:hover,
 .dark .hover\:bg-rose-50:hover,
 .dark .hover\:bg-rose-50\/40:hover,
 .dark .hover\:bg-white:hover,
@@ -329,8 +329,8 @@ html.dark body,
 .dark .hover\:text-slate-950:hover,
 .dark .hover\:text-slate-900:hover,
 .dark .hover\:text-slate-700:hover,
-.dark .hover\:text-\[\#1f2654\]:hover,
-.dark .hover\:text-\[\#272f67\]:hover { color: var(--ofi-d-text) !important; }
+.dark .hover\:text-\[\#0066e0\]:hover,
+.dark .hover\:text-\[\#0a7aff\]:hover { color: var(--ofi-d-text) !important; }
 
 /* Inputs that brighten to solid white on focus (e.g. the Kommission number
    field): text is remapped to white, so a white focus background makes typing
@@ -339,46 +339,46 @@ html.dark body,
 .dark .focus-within\:bg-white:focus-within { background-color: var(--ofi-d-surface-3) !important; }
 
 /* Wheat-tinted focus and selected states for Tailwind-heavy screens. */
-.dark .focus\:border-\[\#272f67\]:focus,
-.dark .focus\:border-\[\#1f2654\]:focus,
-.dark .focus-within\:border-\[\#1f2654\]:focus-within {
+.dark .focus\:border-\[\#0a7aff\]:focus,
+.dark .focus\:border-\[\#0066e0\]:focus,
+.dark .focus-within\:border-\[\#0066e0\]:focus-within {
   border-color: var(--ofi-d-wheat) !important;
 }
-.dark .focus\:ring-\[\#272f67\]\/10:focus,
-.dark .focus\:ring-\[\#1f2654\]\/10:focus,
-.dark .focus-within\:ring-\[\#1f2654\]\/10:focus-within,
-.dark .ring-\[\#1f2654\]\/10,
-.dark .ring-\[\#1f2654\]\/\[0\.04\] {
+.dark .focus\:ring-\[\#0a7aff\]\/10:focus,
+.dark .focus\:ring-\[\#0066e0\]\/10:focus,
+.dark .focus-within\:ring-\[\#0066e0\]\/10:focus-within,
+.dark .ring-\[\#0066e0\]\/10,
+.dark .ring-\[\#0066e0\]\/\[0\.04\] {
   --tw-ring-color: var(--ofi-d-wheat-soft) !important;
 }
 /* Navy-tinted selected/soft surfaces → translucent glass, not gold. */
-.dark .bg-\[\#272f67\]\/5,
-.dark .bg-\[\#272f67\]\/8,
-.dark .bg-\[\#272f67\]\/10,
-.dark .bg-\[\#272f67\]\/15,
-.dark .bg-\[\#272f67\]\/\[0\.03\],
-.dark .bg-\[\#272f67\]\/\[0\.04\],
-.dark .bg-\[\#272f67\]\/\[0\.05\],
-.dark .bg-\[\#272f67\]\/\[0\.06\],
-.dark .bg-\[\#272f67\]\/\[0\.12\],
-.dark .bg-\[\#1f2654\]\/10,
-.dark .bg-\[\#1f2654\]\/\[0\.04\],
-.dark .bg-\[\#1f2654\]\/\[0\.045\] {
+.dark .bg-\[\#0a7aff\]\/5,
+.dark .bg-\[\#0a7aff\]\/8,
+.dark .bg-\[\#0a7aff\]\/10,
+.dark .bg-\[\#0a7aff\]\/15,
+.dark .bg-\[\#0a7aff\]\/\[0\.03\],
+.dark .bg-\[\#0a7aff\]\/\[0\.04\],
+.dark .bg-\[\#0a7aff\]\/\[0\.05\],
+.dark .bg-\[\#0a7aff\]\/\[0\.06\],
+.dark .bg-\[\#0a7aff\]\/\[0\.12\],
+.dark .bg-\[\#0066e0\]\/10,
+.dark .bg-\[\#0066e0\]\/\[0\.04\],
+.dark .bg-\[\#0066e0\]\/\[0\.045\] {
   background-color: rgba(255, 255, 255, 0.08) !important;
 }
-.dark .hover\:bg-\[\#272f67\]\/15:hover,
-.dark .hover\:bg-\[\#272f67\]\/\[0\.12\]:hover,
+.dark .hover\:bg-\[\#0a7aff\]\/15:hover,
+.dark .hover\:bg-\[\#0a7aff\]\/\[0\.12\]:hover,
 .dark .hover\:bg-\[\#eef4ff\]:hover,
-.dark .hover\:bg-\[\#d3e3fd\]:hover {
+.dark .hover\:bg-\[\#e3efff\]:hover {
   background-color: rgba(255, 255, 255, 0.12) !important;
 }
-.dark .file\:bg-\[\#272f67\]\/10::file-selector-button {
+.dark .file\:bg-\[\#0a7aff\]\/10::file-selector-button {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
-.dark .file\:text-\[\#272f67\]::file-selector-button {
+.dark .file\:text-\[\#0a7aff\]::file-selector-button {
   color: var(--ofi-d-text) !important;
 }
-.dark .hover\:file\:bg-\[\#272f67\]\/15:hover::file-selector-button {
+.dark .hover\:file\:bg-\[\#0a7aff\]\/15:hover::file-selector-button {
   background-color: rgba(255, 255, 255, 0.16) !important;
 }
 
@@ -471,15 +471,15 @@ html.dark body,
 }
 .dark .ant-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn,
 .dark .ant-tabs .ant-tabs-tab:hover {
-  color: #272f67 !important;
+  color: #0a7aff !important;
 }
 .dark .ant-menu-light .ant-menu-item-selected,
 .dark .ant-menu-light .ant-menu-submenu-selected > .ant-menu-submenu-title {
   color: var(--ofi-d-text) !important;
 }
 .dark .ant-tabs .ant-tabs-ink-bar {
-  background: #272f67 !important;
-  border-color: #272f67 !important;
+  background: #0a7aff !important;
+  border-color: #0a7aff !important;
 }
 .dark .ant-slider .ant-slider-track,
 .dark .ant-slider .ant-slider-handle::after,
@@ -557,9 +557,9 @@ html.dark body,
     0 1px 2px rgba(0, 0, 0, 0.4) !important;
 }
 /* Keep the glass pill as-is; only the selected label picks up the wheat accent.
-   Higher specificity than the blanket `text-[#1f2654] → light` flip so only THIS
+   Higher specificity than the blanket `text-[#0066e0] → light` flip so only THIS
    label turns gold. */
-.dark .ofi-addr-toggle .text-\[\#1f2654\] {
+.dark .ofi-addr-toggle .text-\[\#0066e0\] {
   color: var(--ofi-d-wheat) !important;
 }
 /* Frosted content panels (address read-back, bulk-discount rate card): the light
@@ -609,7 +609,7 @@ html.dark body,
 /* Active report tabs keep their light-mode palette in both themes. */
 .dark .ofi-rep-tab.is-active {
   background: #ffffff !important;
-  color: #272f67 !important;
+  color: #0a7aff !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     0 1px 2px rgba(16, 24, 40, 0.12),
@@ -827,19 +827,19 @@ html.dark body,
 .dark .bg-\[\#f1f5fd\] { background-color: var(--ofi-d-surface-2) !important; }
 .dark .hover\:bg-\[\#e9effb\]:hover { background-color: var(--ofi-d-hover) !important; }
 .dark .bg-\[\#e8eefb\] { background-color: var(--ofi-d-hover-strong) !important; }
-/* NOTE: `.bg-[#1f2654]` is deliberately NOT restyled here. The brand-surface
+/* NOTE: `.bg-[#0066e0]` is deliberately NOT restyled here. The brand-surface
    rule near the top of this file already resolves it to a solid gold fill with
    dark text, and that applies app-wide — a second rule down here would win by
    source order and quietly flatten every primary button in the product. */
 
 /* Accent-tinted focus rings: the brand navy ring is invisible on dark, and a
    neutral white ring reads as a glitch next to gold controls. */
-.dark .focus\:ring-\[\#1f2654\]\/15:focus,
-.dark .focus\:ring-\[\#1f2654\]\/10:focus,
-.dark .focus\:ring-\[\#1f2654\]\/20:focus {
+.dark .focus\:ring-\[\#0066e0\]\/15:focus,
+.dark .focus\:ring-\[\#0066e0\]\/10:focus,
+.dark .focus\:ring-\[\#0066e0\]\/20:focus {
   --tw-ring-color: rgba(212, 143, 22, 0.30) !important;
 }
-.dark .focus\:border-\[\#1f2654\]:focus { border-color: var(--ofi-d-wheat) !important; }
+.dark .focus\:border-\[\#0066e0\]:focus { border-color: var(--ofi-d-wheat) !important; }
 
 /* Row hover: one warm step above the row surface, the whole row at once. */
 .dark table[data-tender-detail-table] tbody tr:hover td {
@@ -928,7 +928,7 @@ html.dark body,
    on top, which is what makes the selected tab unmistakable here.
 
    `button.ofi-quote-tab-active` is (0,2,1): one step above the blanket
-   `.dark .text-[#1f2654]` remap (0,2,0) that would otherwise force the label
+   `.dark .text-[#0066e0]` remap (0,2,0) that would otherwise force the label
    white, which is unreadable on gold. */
 .dark button.ofi-quote-tab-active,
 .dark button.ofi-quote-tab-active:hover {
@@ -938,7 +938,7 @@ html.dark body,
   -webkit-text-fill-color: #fbbf24 !important;
 }
 
-/* The count badge sits INSIDE that gold fill, and its own `bg-[#1f2654]` would
+/* The count badge sits INSIDE that gold fill, and its own `bg-[#0066e0]` would
    also resolve to gold — gold on gold, i.e. invisible. Invert it instead. */
 .dark button.ofi-quote-tab-active .ofi-quote-tab-badge {
   background-color: #f59e0b !important;
@@ -965,8 +965,8 @@ html.dark body,
 }
 
 /* ── Popup option rows: customer names, products, select options ──
-   Light mode paints the hovered row brand navy via `hover:bg-[#1f2654]`. That
-   is a hover VARIANT class, so the blanket `.dark .bg-[#1f2654]` remap near the
+   Light mode paints the hovered row brand navy via `hover:bg-[#0066e0]`. That
+   is a hover VARIANT class, so the blanket `.dark .bg-[#0066e0]` remap near the
    top of this file never matched it — these rows stayed navy while every other
    accent surface moved to gold. `[data-active]` covers the keyboard-highlighted
    row in QuoteSelect, which is painted by state rather than by :hover. */
@@ -1039,9 +1039,9 @@ html.dark body,
   color: #fdba74 !important;
 }
 .dark .ofi-rs-plus:hover:not(:disabled) {
-  background: rgba(251, 146, 60, 0.12) !important;
-  border-color: #fb923c !important;
-  color: #fb923c !important;
+  background: rgba(10, 122, 255, 0.14) !important;
+  border-color: #0a7aff !important;
+  color: #5c9fff !important;
 }
 .dark .ofi-rs-pdf,
 .dark .ofi-rs-iconbtn {
@@ -1051,9 +1051,9 @@ html.dark body,
 }
 .dark .ofi-rs-pdf:hover,
 .dark .ofi-rs-iconbtn:hover:not(:disabled) {
-  background: rgba(251, 146, 60, 0.12) !important;
-  border-color: #fb923c !important;
-  color: #fb923c !important;
+  background: rgba(10, 122, 255, 0.14) !important;
+  border-color: #0a7aff !important;
+  color: #5c9fff !important;
 }
 .dark .ofi-rs-pdf-dim {
   background: transparent !important;
@@ -1290,49 +1290,49 @@ html.dark {
 }
 /* Brand-button colours are identical in light and dark mode. */
 .dark {
-  --ofi-button-navy: #272f67;
-  --ofi-button-hover-fill: #c2410c;
+  --ofi-button-navy: #0a7aff;
+  --ofi-button-hover-fill: #0066d6;
 }
 
 .dark :where(
   .ant-btn-primary,
   .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-[#0a7aff]"],
+  a[class~="bg-[#0a7aff]"],
+  button[class~="bg-[#0066e0]"],
+  a[class~="bg-[#0066e0]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
   button[class~="bg-brand-solid"],
   a[class~="bg-brand-solid"]
 ):not(:disabled):not([disabled]),
 .dark :where(
   .ant-btn-primary,
   .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-[#0a7aff]"],
+  a[class~="bg-[#0a7aff]"],
+  button[class~="bg-[#0066e0]"],
+  a[class~="bg-[#0066e0]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
   button[class~="bg-brand-solid"],
   a[class~="bg-brand-solid"]
 ):not(:disabled):not([disabled]):hover,
 .dark :where(
   .ant-btn-primary,
   .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-[#0a7aff]"],
+  a[class~="bg-[#0a7aff]"],
+  button[class~="bg-[#0066e0]"],
+  a[class~="bg-[#0066e0]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
   button[class~="bg-brand-solid"],
   a[class~="bg-brand-solid"]
 ):not(:disabled):not([disabled]):active {
@@ -1345,14 +1345,14 @@ html.dark {
 .dark :where(
   .ant-btn-primary,
   .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-[#0a7aff]"],
+  a[class~="bg-[#0a7aff]"],
+  button[class~="bg-[#0066e0]"],
+  a[class~="bg-[#0066e0]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
   button[class~="bg-brand-solid"],
   a[class~="bg-brand-solid"]
 ):not(:disabled):not([disabled]):hover {
@@ -1362,28 +1362,28 @@ html.dark {
 .dark :where(
   .ant-btn-primary,
   .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-[#0a7aff]"],
+  a[class~="bg-[#0a7aff]"],
+  button[class~="bg-[#0066e0]"],
+  a[class~="bg-[#0066e0]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
   button[class~="bg-brand-solid"],
   a[class~="bg-brand-solid"]
 ) *,
 .dark :where(
   .ant-btn-primary,
   .ofi-btn-brand,
-  button[class~="bg-[#272f67]"],
-  a[class~="bg-[#272f67]"],
-  button[class~="bg-[#1f2654]"],
-  a[class~="bg-[#1f2654]"],
-  button[class~="bg-[#07145c]"],
-  a[class~="bg-[#07145c]"],
-  button[class~="bg-[#0b1a6e]"],
-  a[class~="bg-[#0b1a6e]"],
+  button[class~="bg-[#0a7aff]"],
+  a[class~="bg-[#0a7aff]"],
+  button[class~="bg-[#0066e0]"],
+  a[class~="bg-[#0066e0]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
+  button[class~="bg-[#0052b8]"],
+  a[class~="bg-[#0052b8]"],
   button[class~="bg-brand-solid"],
   a[class~="bg-brand-solid"]
 ) {

@@ -412,9 +412,17 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                                                 type="button"
                                                 className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                                 onClick={async () => {
-                                                    await tenderApi.deleteScheduleSlot(tenderId, slot.id);
+                                                    // Optimistic: the slot disappears at once; the
+                                                    // list is re-read either way, which also brings
+                                                    // it back if the server refused.
                                                     if (editingSlotId === slot.id) resetSlotForm();
-                                                    await loadSlots();
+                                                    setSlots((current) => current.filter((row) => row.id !== slot.id));
+                                                    try {
+                                                        await tenderApi.deleteScheduleSlot(tenderId, slot.id);
+                                                    } catch {
+                                                        toast.error(t('common.deleteFailed'));
+                                                    }
+                                                    void loadSlots();
                                                 }}
                                             >
                                                 <Trash2 size={13} />

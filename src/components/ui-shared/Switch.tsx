@@ -22,7 +22,7 @@ export const Switch = ({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         // Die Farben stehen auf `.ofi-switch` (index.css / dark.css), NICHT als
-        // `bg-[#272f67]`-Utility: die Klasse würde die Markenbutton-Regeln ziehen
+        // `bg-[#0a7aff]`-Utility: die Klasse würde die Markenbutton-Regeln ziehen
         // (Radius 0, Rahmen, Hover-Orange) — der Schalter wurde so zum
         // blauen Kasten ohne Knopf, sobald er eingeschaltet war.
         className="ofi-switch relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"

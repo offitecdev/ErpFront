@@ -107,8 +107,8 @@ const TabBar = ({ tab, onSelect, showAddons, addonCount }: {
                             onClick={() => onSelect(tb.key)}
                             className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                 active
-                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#0066e0]'
+                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#0066e0] dark:text-white/70'
                             }`}
                         >
                             {tb.label}

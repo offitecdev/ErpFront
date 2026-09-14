@@ -1,7 +1,7 @@
-/* Neutral surface ramp tuned to the brand navy #07145c (hue ≈ 231°): cool grays
+/* Neutral surface ramp tuned to the brand navy #0052b8 (hue ≈ 231°): cool grays
    that carry a faint navy undertone so panels and tables sit naturally next to
    brand-colored elements. Shared by the CRM overview and the calendar. */
-export const BRAND_NAVY = '#07145c';
+export const BRAND_NAVY = '#0052b8';
 
 /** Page / section background behind white cards. */
 export const SURFACE_GRAY = '#F2F4F9';

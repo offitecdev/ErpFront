@@ -4,7 +4,6 @@ import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
 import { ClockRewind, FileDownload02 as FileDown, Plus, Save01 as Save, Trash01 as Trash2 } from '@/components/icons/antIconCompat';
-import { Button } from '@/components/ui-shared/Button';
 import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols } from '@/components/ui-shared/TableKit';
 import { SignaturePad } from '@/components/ui-shared/SignaturePad';
 import { PopupDialog, PopupEmpty } from '@/components/ui-shared/PopupKit';
@@ -16,6 +15,12 @@ import type { ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 import { MontageImageUpload } from '@/pages/montage/components/MontageImageUpload';
 
 import { ReportArticlePicker } from './ReportArticlePicker';
+import '@/styles/modules/projectReports.css';
+import '@/styles/modules/reportEditor.css';
+/* Mac-Kleid der Zeit-/Artikelwahl-Fenster (und des Rapport-Fensters, in dem
+   dieser Editor steckt) — auch auf /montage geladen, damit die Fenster dort
+   dieselben sind. */
+import '@/styles/reportPopup.css';
 
 import { appointmentTechnicianNames } from '../../../utils/appointmentPeople';
 import { displayExpenseType, durationFmt, money } from '../../../utils/projectFormatters';
@@ -41,8 +46,8 @@ const cellInput = CELL_INPUT_CLASS;
  * `.ofi-fr-editor` beschränkt, damit dieses Kleid nicht in den Rest der
  * Anwendung ausblutet.
  */
-const IosGroup = ({ title, footer, children }: { title?: ReactNode; footer?: ReactNode; children: ReactNode }) => (
-    <section className="ofi-ios-group">
+const IosGroup = ({ title, footer, className, children }: { title?: ReactNode; footer?: ReactNode; className?: string; children: ReactNode }) => (
+    <section className={`ofi-ios-group${className ? ` ${className}` : ''}`}>
         {title !== undefined && <h3 className="ofi-ios-group__title">{title}</h3>}
         <div className="ofi-ios-card">{children}</div>
         {footer !== undefined && <p className="ofi-ios-group__footer">{footer}</p>}
@@ -572,6 +577,9 @@ export const FieldReportEditorView = ({
      * Aksiyonlar: PDF önizleme + BÜYÜK, YALIN Kaydet simgesi (kullanıcı isteği) —
      * değişiklik yoksa pasif durur. Projektleiter ayrıca Protokoll'ü görür.
      */
+    /* Drei Mac-Druckknöpfe (`.ofi-cal-btn`, Kleid aus styles/appleModal.css
+       im Fenster): Protokoll als Symbolknopf, PDF mit Wort, Speichern als
+       das EINE Blau — mit Wort, nicht mehr als blaues Quadrat (10.09.2026). */
     const actionButtons = (
         <>
             {showLogs && effectiveReport && (
@@ -580,12 +588,20 @@ export const FieldReportEditorView = ({
                     title={t('projects.reportsHub.logs')}
                     aria-label={t('projects.reportsHub.logs')}
                     onClick={() => void openLogs()}
-                    className="ofi-rs-iconbtn inline-flex size-9 items-center justify-center rounded-[3px] border transition-colors"
+                    className="ofi-cal-btn is-icon"
                 >
-                    <ClockRewind size={16} />
+                    <ClockRewind size={15} />
                 </button>
             )}
-            <Button variant="secondary" size="sm" disabled={pdfBusy || !effectiveReport} icon={<FileDown size={13} />} onClick={() => void createPdf()}>{pdfBusy ? '…' : t('projects.pdf_olustur')}</Button>
+            <button
+                type="button"
+                disabled={pdfBusy || !effectiveReport}
+                onClick={() => void createPdf()}
+                className="ofi-cal-btn"
+            >
+                <FileDown size={14} />
+                {pdfBusy ? '…' : t('projects.pdf_olustur')}
+            </button>
             {!disabled && (
                 <button
                     type="button"
@@ -593,11 +609,12 @@ export const FieldReportEditorView = ({
                     aria-label={t('common.save')}
                     disabled={!dirty || saving}
                     onClick={() => void save()}
-                    className="inline-flex size-9 items-center justify-center rounded-[3px] bg-[#272f67] text-white transition-colors hover:bg-[#1f2654] disabled:cursor-default disabled:opacity-30 dark:bg-[#e6cf9e] dark:text-[#151616] dark:hover:bg-[#dfc38a]"
+                    className="ofi-cal-btn is-primary"
                 >
                     {saving
-                        ? <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white dark:border-black/30 dark:border-t-black" />
-                        : <Save size={18} />}
+                        ? <span aria-hidden className="ofi-tp-spinner" />
+                        : <Save size={14} />}
+                    {t('common.save')}
                 </button>
             )}
         </>
@@ -739,7 +756,9 @@ export const FieldReportEditorView = ({
 
             {/* Technische Notizen — eigenes Register, ein einziges grosses Feld. */}
             {tab === 'notes' && (
-                <IosGroup title={t('projects.teknik_notlar')}>
+                /* `is-notes`: im Mac-Kleid des Rapport-Fensters trägt das Feld die
+                   Kante selbst (styles/reportPopup.css). */
+                <IosGroup title={t('projects.teknik_notlar')} className="is-notes">
                     <textarea
                         rows={10}
                         disabled={disabled}

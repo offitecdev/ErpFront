@@ -80,7 +80,7 @@ export const ReportOrderSheet = ({
             <div className="flex min-h-full flex-col px-6 py-7 sm:px-8 sm:py-9 lg:px-10">
                 {loading ? (
                     <div className="flex min-h-64 flex-1 items-center justify-center gap-2 text-[13px] text-slate-500">
-                        <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-t-amber-500" />
+                        <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0] dark:border-t-amber-500" />
                         {t('common.loading')}
                     </div>
                 ) : detail ? (
@@ -99,7 +99,7 @@ export const ReportOrderSheet = ({
                         </dl>
 
                         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]" data-unstyled-table>
-                            <div className="border-b border-slate-200 px-5 py-3 text-[12px] font-bold uppercase tracking-wide text-[#1f2654] dark:border-white/10 dark:text-amber-300">
+                            <div className="border-b border-slate-200 px-5 py-3 text-[12px] font-bold uppercase tracking-wide text-[#0066e0] dark:border-white/10 dark:text-amber-300">
                                 {t('montage.reportPicker.title')}
                             </div>
                             <div className="overflow-x-auto">

@@ -6,6 +6,7 @@ import { FilterBar, Pager, SearchBox, SectionCard, TableStateRow } from '@/compo
 import { t } from '@/i18n/translate';
 import { ospApi, type OspFeedEntryDto, type OspFeedResponse } from '@/lib/api/osp';
 import { useNavigate } from 'react-router-dom';
+import '@/styles/modules/osp.css';
 
 /**
  * ── DER AKTIVITÄTSSTROM (§1c) ────────────────────────────────────────────────

@@ -7,38 +7,30 @@ import { purchaseOrdersApi } from '@/lib/api/inventory';
 import { usePurchaseTemplateStore } from '@/store/purchaseTemplateStore';
 import type { PurchaseTemplateDocumentType, SupplierCalcConfig, SupplierOrderTemplate } from '@/types/inventory';
 import '@/styles/purchaseImport.css';
-/* Die Kiste im Apple-Stil, in der die Vorlage jetzt steht. */
+/* Die Kiste im Apple-Stil, in der die Vorlage steht. */
 import '@/styles/orderDetails.css';
 
-import { SupplierComboCell } from '../components/SupplierComboCell';
-import { CalcPanel } from './CalcPanel';
-import { apiFailure, defaultCalcConfig, templateSummary } from './importTemplate';
+import { TemplateColumnsPanel } from './TemplateColumnsPanel';
+import { apiFailure, defaultCalcConfig, templateProblemText, templateProblems, templateSummary } from './importTemplate';
 
 /**
  * ── MEINE VORLAGEN ──────────────────────────────────────────────────────────
  *
- * Vorgabe Samet (07.09.2026): «Unter Meine Vorlagen legt man Vorlagen an —
- * Vorlage 1, Vorlage 2 —, jede mit einem Rechenbereich, in dem automatische
- * Berechnung, Lieferantenberechnung oder manuelle Eingabe eingestellt wird;
- * manuelle Eingabe ist der Standard. In den eigenen Vorlagen ordnet man die
- * Schlüssel zu. Und es gibt eine allgemeine Vorgabe, die gilt, wenn man auf
- * das Plus drückt.»
+ * Vorgabe Samet (11.09.2026): «Eine Vorlage hat einen Namen — keinen
+ * Lieferanten, keine Rechenart, keine Mehrwertsteuer — und ihre Spalten:
+ * bis zu zwoelf, jede mit Name, Art und Zuordnung. Produktname und Menge
+ * sind Pflicht; fehlt eine, zeigt das System einen Fehler. Die Vorlage ist
+ * Pflicht: ohne sie gibt es keine Tabelle.»
  *
- * Der Aufbau ist links Liste, rechts Bearbeitung — der Weg, den jeder von
- * seinem Mailprogramm kennt. Eine Vorlage OHNE Lieferant ist die allgemeine:
- * sie steht bei jedem Lieferanten in der Auswahl, und die als Vorgabe
- * markierte ist genau die, mit der eine mit «+» hinzugefügte Zeile rechnet.
- *
- * Gespeichert wird erst auf Knopfdruck. Ein Fenster, das im Vorbeigehen die
- * Rechenart aller künftigen Bestellungen umstellt, wäre eine Falle.
+ * Eine Vorlage auf einmal, mit Pfeilen davor und danach; die Reiterreihe
+ * zeigt alle. Gespeichert wird erst auf Knopfdruck, und die gespeicherte
+ * Vorlage gilt danach sofort (sie wird die Vorgabe ihrer Dokumentart).
  */
 
 interface Draft {
     /** Leer = eine neue, noch nicht gespeicherte Vorlage. */
     id: string;
     title: string;
-    supplierId: string | null;
-    supplierName: string;
     isDefault: boolean;
     config: SupplierCalcConfig;
 }
@@ -46,8 +38,6 @@ interface Draft {
 const newDraft = (index: number): Draft => ({
     id: '',
     title: t('inv.aiImport.templateNewName', { index }),
-    supplierId: null,
-    supplierName: '',
     isDefault: false,
     config: defaultCalcConfig(),
 });
@@ -55,14 +45,12 @@ const newDraft = (index: number): Draft => ({
 const toDraft = (template: SupplierOrderTemplate): Draft => ({
     id: template.id,
     title: template.title,
-    supplierId: template.supplierId,
-    supplierName: template.supplierName,
     isDefault: template.isDefault,
     config: template.config,
 });
 
 const TemplateManagerPopupContent = ({
-    open, onClose, onSaved, initialSupplier, openTemplateId, priceless = false, documentType,
+    open, onClose, onSaved, openTemplateId, documentType = 'ORDER',
 }: {
     open: boolean;
     onClose: () => void;
@@ -71,29 +59,19 @@ const TemplateManagerPopupContent = ({
     /**
      * Nach jedem Speichern/Löschen: die Bestellseite lädt ihre Vorgabe neu.
      * Beim SPEICHERN kommt die Kennung der Vorlage mit — die Seite macht sie
-     * damit sofort zur geltenden (Vorgabe Samet, 08.09.2026: «beim Anlegen
-     * einer Vorlage soll sie automatisch angewendet werden»). Beim Löschen
-     * fehlt sie: dann gilt wieder, was der Lieferant vorgibt.
+     * damit sofort zur geltenden. Beim Löschen fehlt sie.
      */
     onSaved?: (templateId?: string) => void;
-    /** Vorbelegter Lieferant für eine neue Vorlage. */
-    initialSupplier?: { id: string | null; name: string };
-    /**
-     * FÜR WELCHES DOKUMENT die Vorlage gerade eingestellt wird. In einer
-     * Preisanfrage trägt sie genau drei feste Felder und keine Rechnung;
-     * in einer Bestellung acht Felder samt Rechenart und Steuersatz.
-     */
-    priceless?: boolean;
-    /** Dedicated list for order, price request or goods receipt. */
+    /** Bestellung, Preisanfrage und Wareneingang haben je eine eigene Liste. */
     documentType?: PurchaseTemplateDocumentType;
 }) => {
-    const resolvedDocumentType: PurchaseTemplateDocumentType = documentType ?? (priceless ? 'PRICE_REQUEST' : 'ORDER');
-    const goodsReceipt = resolvedDocumentType === 'GOODS_RECEIPT';
-    const preferredTemplateId = usePurchaseTemplateStore((state) => state.selected[resolvedDocumentType]);
+    const preferredTemplateId = usePurchaseTemplateStore((state) => state.selected[documentType]);
     const selectPreferredTemplate = usePurchaseTemplateStore((state) => state.select);
     const [templates, setTemplates] = useState<SupplierOrderTemplate[]>([]);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [busy, setBusy] = useState(false);
+    /** Nach einem gescheiterten Speichern zeigt die Liste, was fehlt. */
+    const [showErrors, setShowErrors] = useState(false);
     /** Welche Vorlage gerade dasteht — das Blaettern zaehlt hier. */
     const [index, setIndex] = useState(0);
 
@@ -102,11 +80,12 @@ const TemplateManagerPopupContent = ({
         if (!entry) return;
         setIndex(next);
         setDraft(toDraft(entry));
+        setShowErrors(false);
     };
 
     const reload = async (selectId?: string) => {
         try {
-            const items = await purchaseOrdersApi.listSupplierTemplates(null, resolvedDocumentType);
+            const items = await purchaseOrdersApi.listSupplierTemplates(null, documentType);
             setTemplates(items);
             /* Nach dem Speichern soll die eben gespeicherte dastehen, nach dem
                Loeschen die an ihrer Stelle — sonst blaettert man sich verloren. */
@@ -114,9 +93,12 @@ const TemplateManagerPopupContent = ({
             const at = desired ? items.findIndex((entry) => entry.id === desired) : Math.min(index, items.length - 1);
             const target = at >= 0 ? at : 0;
             setIndex(Math.max(0, target));
-            setDraft(items[target] ? toDraft(items[target]) : null);
+            /* Gibt es noch keine Vorlage, steht gleich eine leere neue da —
+               die Vorlage ist Pflicht, und ein leeres Fenster hilft niemandem. */
+            setDraft(items[target] ? toDraft(items[target]) : newDraft(1));
         } catch {
             setTemplates([]);
+            setDraft(newDraft(1));
         }
     };
 
@@ -125,10 +107,8 @@ const TemplateManagerPopupContent = ({
     }, [open, openTemplateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ── DIE REITERREIHE ──────────────────────────────────────────────────
-       Sie zeigt alle Vorlagen; laeuft sie ueber ihren Platz hinaus, kommen die
-       zwei Pfeile dazu und schieben sie um eine Fensterbreite. Gemessen wird
-       nach jedem Zeichnen UND bei jeder Groessenaenderung — eine schmalere
-       Spalte macht aus «passt» sonst stillschweigend «passt nicht». */
+       Laeuft sie ueber ihren Platz hinaus, kommen die zwei Pfeile dazu und
+       schieben sie um eine Fensterbreite. */
     const tabStrip = useRef<HTMLDivElement>(null);
     const [overflowing, setOverflowing] = useState(false);
 
@@ -154,12 +134,8 @@ const TemplateManagerPopupContent = ({
     };
 
     const startNew = () => {
-        const fresh = newDraft(templates.length + 1);
-        setDraft({
-            ...fresh,
-            supplierId: initialSupplier?.id ?? null,
-            supplierName: initialSupplier?.name ?? '',
-        });
+        setDraft(newDraft(templates.length + 1));
+        setShowErrors(false);
     };
 
     const save = async () => {
@@ -169,15 +145,22 @@ const TemplateManagerPopupContent = ({
             toast.error(t('inv.aiImport.templateNameRequired'));
             return;
         }
+        /* ── DIE PFLICHT (Vorgabe Samet): Produktname und Menge muessen
+           zugeordnet sein, jede Spalte braucht einen Namen, jede Zuordnung
+           gibt es nur einmal. Der Server prueft dasselbe noch einmal. */
+        const problems = templateProblems(draft.config, documentType);
+        if (problems.length) {
+            setShowErrors(true);
+            toast.error(templateProblemText(problems[0]));
+            return;
+        }
         setBusy(true);
         try {
             const payload = {
                 title,
-                supplierId: draft.supplierId,
-                supplierName: draft.supplierName,
                 // Saving makes this template the default for its own document list.
                 isDefault: true,
-                documentType: resolvedDocumentType,
+                documentType,
                 config: draft.config,
             };
             const saved = draft.id
@@ -185,10 +168,10 @@ const TemplateManagerPopupContent = ({
                 : await purchaseOrdersApi.createSupplierTemplate(payload);
             await reload(saved.id);
             /* Die eben gespeicherte Vorlage IST ab jetzt die geltende — sonst
-               legt man eine an, schliesst das Fenster und die Bestellung rechnet
-               weiter mit der alten, ohne dass irgendetwas es sagt. */
+               legt man eine an, schliesst das Fenster und die Bestellung zeigt
+               weiter die alte, ohne dass irgendetwas es sagt. */
             onSaved?.(saved.id);
-            selectPreferredTemplate(resolvedDocumentType, saved.id);
+            selectPreferredTemplate(documentType, saved.id);
             toast.success(t('inv.aiImport.templateApplied', { title: saved.title || title }));
         } catch (error) {
             toast.error(apiFailure(error, t('inv.aiImport.templateSaveFailed')).title);
@@ -203,7 +186,7 @@ const TemplateManagerPopupContent = ({
             await purchaseOrdersApi.deleteSupplierTemplate(template.id);
             if (draft?.id === template.id) setDraft(null);
             await reload();
-            if (preferredTemplateId === template.id) selectPreferredTemplate(resolvedDocumentType, null);
+            if (preferredTemplateId === template.id) selectPreferredTemplate(documentType, null);
             onSaved?.();
         } catch (error) {
             toast.error(apiFailure(error, t('inv.aiImport.templateDeleteFailed')).title);
@@ -231,14 +214,6 @@ const TemplateManagerPopupContent = ({
                 </div>
 
                 <div className="ofi-poi-body">
-                    {/* ── BLÄTTERN, WENN DIE LISTE VOLL WIRD ─────────────────
-                        Vorgabe Samet (07.09.2026): «Wenn die Liste sich füllt,
-                        soll es Pfeile vor und zurück geben.» Die Reiter bleiben
-                        eine Reihe — sie zeigen alle Vorlagen auf einen Blick —,
-                        und sobald sie breiter wird als ihr Platz, erscheinen
-                        links und rechts die zwei Pfeile und schieben sie. Sind
-                        es wenige, sieht man keine: ein Pfeil, der nichts zu tun
-                        hat, ist nur Betrieb. */}
                     {templates.length > 0 && (
                         <div className="ofi-poi-tabrail">
                             {overflowing && (
@@ -267,7 +242,7 @@ const TemplateManagerPopupContent = ({
                                         onClick={() => show(templateIndex)}
                                     >
                                         <span>{template.title}</span>
-                                        <small>{template.supplierName || t('inv.aiImport.templatesAllSuppliers')}</small>
+                                        <small>{t('inv.aiImport.columnCount', { count: template.config.columns.length })}</small>
                                     </button>
                                 ))}
                             </div>
@@ -283,11 +258,6 @@ const TemplateManagerPopupContent = ({
                             )}
                         </div>
                     )}
-                    {/* ── BLÄTTERN (Vorgabe Samet: «die Vorlagen erscheinen, und
-                        durch Klicken geht es vor und zurück») ────────────────
-                        Eine Vorlage auf einmal, mit Pfeilen davor und danach.
-                        Die Liste links ist damit weg: bei drei, vier Vorlagen
-                        war sie eine halbe Bildschirmbreite für nichts. */}
                     <div className="ofi-poi-pager">
                         <button
                             type="button"
@@ -303,11 +273,6 @@ const TemplateManagerPopupContent = ({
                                 {draft ? draft.title || t('inv.aiImport.templateNew') : ''}
                                 {draft?.isDefault && <CheckCircle size={13} />}
                             </b>
-                            {/* Nur noch die Stellung in der Reihe («Vorlage 2 von 5»).
-                                Die erklärenden Sätze — der Untertitel oben, «noch
-                                keine Vorlage gespeichert» und «links wählen oder
-                                oben anlegen» — sind auf Vorgabe Samet (08.09.2026)
-                                fort: die Fläche sagt bereits, was sie ist. */}
                             <span>
                                 {templates.length
                                     ? t('inv.aiImport.templatePosition', { index: index + 1, count: templates.length })
@@ -341,61 +306,27 @@ const TemplateManagerPopupContent = ({
                     </div>
 
                     {draft && (
-                        <>
-                            {/* ── EINE SPRACHE FUER DIE GANZE VORLAGE ─────────
-                                Vorgabe Samet (07.09.2026): «Die Rechenvorlagen
-                                sind ein Durcheinander — einfacher, modularer;
-                                und wo Text und Zahlen eingegeben werden, bitte
-                                im Apple-Stil.» Name, Lieferant und die Vorgabe-
-                                Frage liegen darum in derselben KISTE wie alles
-                                Uebrige (`.ofi-ord-*`, styles/orderDetails.css):
-                                eine Zeile je Sache, Beschriftung links, Wert
-                                rechts. Die graue Platte darunter gibt den Grund,
-                                den die weissen Gruppen brauchen. */}
-                            <div className="ofi-ord-plate">
-                                <span className="ofi-ord-cap">{t('inv.aiImport.templateSaveTitle')}</span>
-                                <div className="ofi-ord-group">
-                                    <label className="ofi-ord-row">
-                                        <span className="ofi-ord-label">{t('inv.aiImport.templateName')}</span>
-                                        <input
-                                            value={draft.title}
-                                            onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                                            placeholder={t('inv.aiImport.templateNamePlaceholder')}
-                                            maxLength={80}
-                                        />
-                                    </label>
-                                    <div className="ofi-ord-row">
-                                        <span className="ofi-ord-label">{t('inv.columns.supplier')}</span>
-                                        {goodsReceipt ? (
-                                            <b className="ml-auto text-[13px] font-semibold text-slate-700 dark:text-white/80">
-                                                {draft.supplierName || t('inv.aiImport.templatesAllSuppliers')}
-                                            </b>
-                                        ) : (
-                                            <span className="ofi-ord-combo">
-                                                <SupplierComboCell
-                                                    value={draft.supplierName}
-                                                    onChange={(next) => setDraft({ ...draft, supplierId: null, supplierName: next })}
-                                                    onSelect={(choice) => setDraft({
-                                                        ...draft,
-                                                        supplierId: choice.supplierId,
-                                                        supplierName: choice.supplierName,
-                                                    })}
-                                                    placeholder={t('inv.aiImport.templatesAllSuppliers')}
-                                                    inputClassName="!h-9 !text-[13px]"
-                                                />
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <CalcPanel
-                                    config={draft.config}
-                                    priceless={priceless}
-                                    goodsReceipt={goodsReceipt}
-                                    onChange={(config) => setDraft({ ...draft, config })}
-                                />
+                        <div className="ofi-ord-plate">
+                            <span className="ofi-ord-cap">{t('inv.aiImport.templateSaveTitle')}</span>
+                            <div className="ofi-ord-group">
+                                <label className="ofi-ord-row">
+                                    <span className="ofi-ord-label">{t('inv.aiImport.templateName')}</span>
+                                    <input
+                                        value={draft.title}
+                                        onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                                        placeholder={t('inv.aiImport.templateNamePlaceholder')}
+                                        maxLength={80}
+                                    />
+                                </label>
                             </div>
-                        </>
+
+                            <TemplateColumnsPanel
+                                config={draft.config}
+                                documentType={documentType}
+                                showErrors={showErrors}
+                                onChange={(config) => setDraft({ ...draft, config })}
+                            />
+                        </div>
                     )}
                 </div>
 

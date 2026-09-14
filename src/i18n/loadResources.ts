@@ -38,11 +38,21 @@ const manualLoaders: Record<SupportedLanguage, () => Promise<{ default: Translat
     de: () => import('./manual.de.json'),
 };
 
+const taskOnboardingLoaders: Record<SupportedLanguage, () => Promise<{ default: TranslationTree }>> = {
+    tr: () => import('./taskOnboarding.tr.json'),
+    en: () => import('./taskOnboarding.en.json'),
+    de: () => import('./taskOnboarding.de.json'),
+};
+
 // Builds the full `translation` namespace bundle for one language by merging the
 // manual overlay over the base locale. Missing `auto.*` entries are formatted
 // on demand by i18next's parseMissingKeyHandler, so a large eager key table does
 // not need to be downloaded, parsed and expanded on every application start.
 export const loadResource = async (language: SupportedLanguage): Promise<TranslationResource> => {
-    const [locale, manual] = await Promise.all([localeLoaders[language](), manualLoaders[language]()]);
-    return mergeTranslations(locale.default, manual.default);
+    const [locale, manual, taskOnboarding] = await Promise.all([
+        localeLoaders[language](),
+        manualLoaders[language](),
+        taskOnboardingLoaders[language](),
+    ]);
+    return mergeTranslations(mergeTranslations(locale.default, manual.default), taskOnboarding.default);
 };

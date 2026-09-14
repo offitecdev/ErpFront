@@ -71,8 +71,8 @@ export const TemplateFieldsTable = ({
                         <td className="text-right font-mono text-[11.5px] text-slate-400">{index + 1}</td>
                         <td>
                             <span className={`flex min-w-0 items-center gap-1.5 ${conditionText ? 'pl-4' : ''}`}>
-                                {conditionText && <LuGitBranch size={11} className="shrink-0 text-[#1f2654] dark:text-amber-400" />}
-                                <span className={`truncate ${isSection ? 'text-[13px] font-bold text-[#1f2654] dark:text-amber-300' : 'font-semibold text-slate-900 dark:text-white'}`}>
+                                {conditionText && <LuGitBranch size={11} className="shrink-0 text-[#0066e0] dark:text-amber-400" />}
+                                <span className={`truncate ${isSection ? 'text-[13px] font-bold text-[#0066e0] dark:text-amber-300' : 'font-semibold text-slate-900 dark:text-white'}`}>
                                     {field.label || <span className="font-normal text-slate-300">{t('forms.builder.unnamedField')}</span>}
                                 </span>
                             </span>
@@ -80,7 +80,7 @@ export const TemplateFieldsTable = ({
                         </td>
                         <td>
                             <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-600 dark:text-white/70">
-                                <Icon size={14} className="shrink-0 text-[#1f2654] dark:text-amber-400" />
+                                <Icon size={14} className="shrink-0 text-[#0066e0] dark:text-amber-400" />
                                 <span className="truncate">{fieldTypeLabel(field.type)}</span>
                             </span>
                         </td>
@@ -93,7 +93,7 @@ export const TemplateFieldsTable = ({
                                     checked={Boolean(field.required)}
                                     onChange={(event) => onToggleRequired(field, event.target.checked)}
                                     aria-label={t('forms.builder.required')}
-                                    className="size-4 accent-[#1f2654]"
+                                    className="size-4 accent-[#0066e0]"
                                 />
                             )}
                         </td>
@@ -120,14 +120,14 @@ export const TemplateFieldsTable = ({
                         <button
                             type="button"
                             onClick={onAdd}
-                            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[12.5px] font-semibold text-[#1f2654] transition-colors hover:bg-[#eef2fb] dark:text-amber-300 dark:hover:bg-white/5"
+                            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[12.5px] font-semibold text-[#0066e0] transition-colors hover:bg-[#eef2fb] dark:text-amber-300 dark:hover:bg-white/5"
                         >
                             <Plus size={14} />{t('forms.builder.addField')}
                         </button>
                         <button
                             type="button"
                             onClick={onAddCheckpoint}
-                            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/60 dark:hover:bg-white/5 dark:hover:text-white"
+                            className="inline-flex items-center gap-1.5 px-3 py-2.5 text-[12.5px] font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-[#0066e0] dark:text-white/60 dark:hover:bg-white/5 dark:hover:text-white"
                         >
                             <LuSquareCheck size={14} />{t('forms.builder.addCheckpoint')}
                         </button>

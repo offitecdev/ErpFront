@@ -4,7 +4,7 @@ import { Mail01, Send01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 const FIELD_CLASS =
-    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#07145c]/40 dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#d48f16]/50';
+    'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors focus:border-[#0052b8]/40 dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#d48f16]/50';
 
 /* Mail step shared by the appointment wizard, the meeting composer and the
    invitation sender (InviteSendPanel): an editable to/subject/body with the CC
@@ -46,7 +46,7 @@ export const MailComposePanel = ({
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-5">
         <div>
             <div className="flex items-center gap-2 text-[13px] font-bold text-slate-800 dark:text-white">
-                <Mail01 size={15} className="text-[#07145c] dark:text-[#d48f16]" />
+                <Mail01 size={15} className="text-[#0052b8] dark:text-[#d48f16]" />
                 {titleText ?? t('calendar.mail.title')}
             </div>
             {hint && <div className="mt-1 text-[11.5px] leading-snug text-slate-500 dark:text-white/50">{hint}</div>}
@@ -88,7 +88,7 @@ export const MailComposePanel = ({
                 value={body}
                 onChange={(event) => onBodyChange(event.target.value)}
                 placeholder={bodyPlaceholder}
-                className="min-h-[160px] w-full flex-1 resize-none rounded-md border border-slate-200 bg-white p-3 text-[13px] leading-relaxed text-slate-800 outline-none transition-colors focus:border-[#07145c]/40 dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#d48f16]/50"
+                className="min-h-[160px] w-full flex-1 resize-none rounded-md border border-slate-200 bg-white p-3 text-[13px] leading-relaxed text-slate-800 outline-none transition-colors focus:border-[#0052b8]/40 dark:border-white/15 dark:bg-white/5 dark:text-white dark:focus:border-[#d48f16]/50"
             />
         </label>
 
@@ -109,7 +109,7 @@ export const MailComposePanel = ({
                 type="button"
                 onClick={onSend}
                 disabled={sending || !(canSend ?? Boolean(to.trim())) || !subject.trim()}
-                className="flex h-9 items-center gap-1.5 rounded-md bg-[#07145c] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0b1a6e] dark:bg-[#d48f16] dark:text-[#151616] dark:hover:bg-[#f2bb5c] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 items-center gap-1.5 rounded-md bg-[#0052b8] px-4 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0052b8] dark:bg-[#d48f16] dark:text-[#151616] dark:hover:bg-[#f2bb5c] disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <Send01 size={14} />
                 {sending ? t('calendar.mail.sending') : (sendLabel ?? t('calendar.mail.send'))}

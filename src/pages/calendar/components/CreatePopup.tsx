@@ -840,7 +840,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                 <p className="ofi-cal-invitehint">{t('calendar.invite.hint')}</p>
                 <button type="button" onClick={() => setSendMailAfter((current) => !current)} className="ofi-cal-mailtoggle">
                     <span className={`ofi-cal-check ${sendMailAfter ? 'is-on' : ''}`}>{sendMailAfter && <Check size={11} />}</span>
-                    <Mail01 size={14} className="text-[#07145c] dark:text-[#d48f16]" />
+                    <Mail01 size={14} className="text-[#0052b8] dark:text-[#d48f16]" />
                     <span className="min-w-0 flex-1 text-left">
                         {t('calendar.wizard.sendMailOption')}
                         <span className="block text-[11px] font-normal text-slate-500 dark:text-white/50">{t('calendar.wizard.sendMailOptionHint')}</span>

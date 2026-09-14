@@ -1,5 +1,5 @@
 import { t } from '@/i18n/translate';
-import type { MovementKind } from '@/types/inventory';
+import type { MovementKind, MovementOrigin } from '@/types/inventory';
 import { ColResizeHandle, Pager, ResizableCols, SectionCard, TableStateRow } from '../components/primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { MOVEMENTS_PAGE_SIZE, useMovementsList } from '../hooks/useMovementsList';
@@ -16,6 +16,14 @@ const KIND_META: Record<string, { labelKey: string; className: string }> = {
 };
 
 const FILTERABLE_KINDS: MovementKind[] = ['IN', 'OUT', 'DEFINITION', 'RETURN', 'ADJUSTMENT', 'TRANSFER'];
+
+const ORIGIN_LABEL: Record<MovementOrigin, string> = {
+    QUICK_ADD: 'inv.origin.quickAdd',
+    QUICK_DELETE: 'inv.origin.quickDelete',
+    ORDER_RECEIPT: 'inv.origin.orderReceipt',
+    REPORT: 'inv.origin.report',
+    MANUAL: 'inv.origin.manual',
+};
 
 /**
  * Tek ürünün stok hareketleri — detay ekranının "Lagerbewegungen" SEKMESİ
@@ -48,7 +56,7 @@ export const ArticleMovementsView = ({
                         value={list.type}
                         onChange={(event) => list.setType(event.target.value as MovementKind | '')}
                         aria-label={t('inv.columns.movementType')}
-                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#0066e0] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
                     >
                         <option value="">{t('inv.movements.allTypes')}</option>
                         {FILTERABLE_KINDS.map((kind) => (
@@ -60,7 +68,7 @@ export const ArticleMovementsView = ({
                         value={list.dateFrom}
                         onChange={(event) => list.setDateFrom(event.target.value)}
                         aria-label={t('inv.movements.dateFrom')}
-                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#0066e0] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
                     />
                     <span className="text-[12px] text-slate-400">—</span>
                     <input
@@ -68,7 +76,7 @@ export const ArticleMovementsView = ({
                         value={list.dateTo}
                         onChange={(event) => list.setDateTo(event.target.value)}
                         aria-label={t('inv.movements.dateTo')}
-                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#1f2654] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
+                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#0066e0] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
                     />
                 </div>
             </div>
@@ -137,7 +145,12 @@ export const ArticleMovementsView = ({
                                             {movement.totalCost ? fmtMoney(movement.totalCost) : '—'}
                                         </td>
                                         <td className="max-w-0 truncate text-[12px] text-slate-500 dark:text-white/60" title={movement.description || undefined}>
-                                            {[movement.supplier?.companyName, movement.description].filter(Boolean).join(' · ') || '—'}
+                                            {/* Herkunft (10.09.2026) voran: Schnellerfassung, Wareneingang, Rapport, manuell. */}
+                                            {[
+                                                movement.origin && movement.origin !== 'MANUAL' ? t(ORIGIN_LABEL[movement.origin]) : null,
+                                                movement.supplier?.companyName,
+                                                movement.description,
+                                            ].filter(Boolean).join(' · ') || '—'}
                                         </td>
                                     </tr>
                                 );

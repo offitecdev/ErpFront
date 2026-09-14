@@ -77,9 +77,33 @@
             ),
           };
         }
+        // Route list data (14.09.2026). Measured on /projects the list request
+        // left only after profile → route chunk → mount, ~500 ms in; started
+        // here it runs alongside the profile. The URL must be exactly the one
+        // getShared asks for: batchUrl(PROJECT_LIST_GETS) in
+        // src/lib/api/projectListBundle.ts — same list, same encoding.
+        var routeTenant = sessionStorage.getItem('selectedTenantId') || localStorage.getItem('selectedTenantId');
+        if (routeTenant && /^\/projects\/?$/.test(location.pathname)) {
+          var projectGets = [
+            '/projects',
+            '/sales-orders/my-orders?view=project-list',
+            '/delivery-reports?view=project-list',
+            '/billing/invoices?view=project-list'
+          ];
+          var projectUrl = '/batch?' + projectGets.map(function (g) { return 'get=' + encodeURIComponent(g); }).join('&');
+          pf.gets = {};
+          pf.gets[projectUrl] = {
+            tenant: routeTenant,
+            res: fetch(api + projectUrl, { credentials: 'same-origin', headers: { 'X-Tenant-Id': routeTenant } })
+          };
+        }
         // Unhandled-rejection guard: consumers may never claim these.
         Object.keys(pf).forEach(function (k) {
           var v = pf[k];
+          if (k === 'gets') {
+            Object.keys(v).forEach(function (u) { v[u].res.catch(function () { }); });
+            return;
+          }
           (v && v.res ? v.res : v).catch(function () { });
         });
       } catch (e) { /* storage/fetch unavailable — the app loads normally */ }

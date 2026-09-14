@@ -31,6 +31,7 @@ import {
     buildFieldSignatureSnapshot,
     buildGeneralSignatureSnapshot,
 } from '../../../projects/utils/signatureSnapshots';
+import '@/styles/modules/projectReports.css';
 
 type SignRow = {
     key: string;
@@ -233,7 +234,7 @@ export const AllSignaturesSheet = ({
             subtitle={project.projectName || undefined}
             onClose={onClose}
         >
-            <div className="ofi-rise-in space-y-3 p-4">
+            <div className="ofi-rise-in ofi-rep-view space-y-3">
                 <SectionCard title={`${t('projects.reportsHub.signaturesSection')} (${rows.length})`}>
                     <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
                         <thead>

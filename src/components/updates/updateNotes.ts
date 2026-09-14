@@ -38,6 +38,12 @@ export type UpdateAccent =
     | 'people'
     | 'inventory'
     | 'project'
+    /* Seit dem 09.09.2026 — die Zeichen des Apple-Fensters (UpdateWindow). */
+    | 'security'
+    | 'orders'
+    | 'ai'
+    | 'design'
+    | 'camera'
     | 'general';
 
 /** Eine hervorgehobene Neuerung — sie bekommt eine eigene Kachel. */
@@ -125,140 +131,29 @@ export interface UpdateNote {
 
 export const UPDATE_NOTES: UpdateNote[] = [
     {
-        id: 'update-2026-08-29',
-        date: '29.08.2026',
-        badge: 'Neue Apps',
-        title: 'Update vom 29.08.2026',
-        intro: 'Ein neuer Kopf mit vier Programmen, ein lebendiger Kalender und im Verkauf nur noch ein einziger Beleg.',
-        appsTitle: 'Die vier Programme im Kopf',
-        apps: [
-            { mark: 'mail', name: 'Postfach', hint: 'Firmenpostfach', to: '/crm/mail' },
-            { mark: 'tasks', name: 'Aufgaben', hint: 'Meine Pendenzen', to: '/crm/tasks' },
-            { mark: 'requests', name: 'Anträge', hint: 'Ferien, Homeoffice, Krankheit', to: '/personnel/requests' },
-            { mark: 'reminders', name: 'Erinnerungen', hint: 'Was heute fällig ist', to: '/crm/reminders' },
-        ],
-        tour: [
-            {
-                accent: 'apps',
-                title: 'Die Schnellzugriffe liegen jetzt hier',
-                text: 'Postfach, Aufgaben, Anträge und Erinnerungen sind aus dem Seitenmenü in den Kopf gezogen. Das Feld klappt beim Darüberfahren auf, jede Kachel trägt ihre eigene Zahl — und der Punkt am Zeichen sagt schon vorher, dass etwas auf Sie wartet.',
-                target: '[data-tour="apps"], [data-tour="apps-panel"]',
-                opensAppsMenu: true,
-                showApps: true,
-            },
-            {
-                accent: 'calendar',
-                title: 'Der Kalender hat seinen eigenen Knopf',
-                text: 'Er steht gleich neben den Apps — ein Griff statt eines Menüwegs, von jeder Seite aus.',
-                target: '[data-tour="calendar"]',
-            },
-            {
-                accent: 'sales',
-                title: 'Schnellzugriffe — und der Weg zurück',
-                text: 'Der Blitz ganz links öffnet in einem Griff, was man oft braucht; neu darunter «Angebot öffnen» — es hat gerade das zuletzt angelegte Angebot in der gewohnten Maske aufgeschlagen, ohne etwas anzulegen. Und weil die Seiten selbst keinen Zurück-Knopf mehr tragen, ist derselbe Blitz jetzt der Zurück-Pfeil. Drücken Sie ihn.',
-                target: '[data-tour="quickback"]',
-                opensSampleQuote: true,
-            },
-        ],
+        /* 13.09.2026 (Vorgabe Samet): «Görev ve sipariş modülleri eklendi» — EIN
+           Blatt nach der Anmeldung (UpdateWindow) und EINE kleine Karte auf der
+           Anmeldeseite (LoginUpdateCard). Die früheren Mitteilungen und das alte
+           Fenster sind entfernt. */
+        id: 'update-2026-09-13',
+        date: '13.09.2026',
+        badge: 'Neue Module',
+        title: 'Update vom 13.09.2026',
+        intro: 'Zwei neue Module: Aufgaben und Bestellungen.',
         highlights: [
             {
-                accent: 'apps',
-                title: 'Vier Programme im Kopf',
-                text: 'Hinter dem Apps-Zeichen in der Kopfleiste liegen Postfach, Aufgaben, Anträge und Erinnerungen. Jede Kachel trägt ihre eigene, echte Zahl vom Server, und der farbige Punkt am Zeichen sagt schon vor dem Öffnen, dass etwas auf Sie wartet.',
+                accent: 'tasks',
+                title: 'Aufgaben',
+                to: '/tasks',
+                text: 'Aufgaben mit Checklisten, Zeitmessung per Start und Pause, Dateien, Kommentaren und Chat. Teammitglieder stellen Aufgabenanträge, die Leitung gibt frei; Rapporte je Person täglich oder wöchentlich als PDF.',
             },
             {
-                accent: 'calendar',
-                title: 'Kalender',
-                to: '/calendar',
-                text: 'Farbige Etiketten geben jedem Termin seine Farbe. Unterlagen und Einsatzplan gehen in einem Zug an das Team, und im Datumsfeld lässt sich das Jahr jetzt direkt wählen.',
-            },
-            {
-                accent: 'sales',
-                title: 'Verkauf',
-                to: '/sales/orders',
-                text: 'Ein Auftrag gilt als bestätigt, sobald er aus der Offerte eröffnet wird — die Auftragsbestätigung geht dabei von selbst an den Kunden. Der frühere rote Verkaufsausdruck ist abgeschafft: es bleibt ein Beleg, das Verkaufs-PDF im dunkelblauen Feld.',
-            },
-            {
-                accent: 'general',
-                title: 'Kopfleiste aufgeräumt',
-                text: 'Die Firmenwahl ist auf ihr farbiges Kürzel geschrumpft — Name, Kategorie und die Wahl selbst stehen im Kopf des Menüs, das sie öffnet. Der Kalender steht als eigener Knopf daneben, und der Weg zurück liegt im Schnellmenü statt auf jeder einzelnen Seite.',
+                accent: 'orders',
+                title: 'Bestellungen',
+                to: '/inventory/orders',
+                text: 'Lieferantenbestellungen von der Preisanfrage bis zur Bestellung — Belege per Foto, PDF oder Einfügen übernehmen und als sauberes PDF an den Lieferanten senden.',
             },
         ],
-        lines: [
-            'Auswertung im Projekt als Ring mit Nabe: beim Darüberfahren wechselt das gefragte Stück die Farbe und nennt seine Quote.',
-            'Personal: Liste, Stempeluhr und Arbeitszeiterfassung stehen als eigene Wege im Menü, und die Rapporte sind durchgehend filterbar.',
-            'Einheitliche Fensterkanten in der ganzen Anwendung — jedes Fenster und jede Auswahlliste trägt dieselbe Rundung wie die Kundensuche im Kalender.',
-            'Verkaufsbelege ohne die Zeile «Verkäufer».',
-        ],
-    },
-    {
-        /* Die Mitteilung vom 18.08.2026 wurde in diese hier ÜBERNOMMEN (Vorgabe
-           Samet, 19.08.2026): beide Tage gingen zusammen live, deshalb steht in
-           der Leiste EINE Mitteilung vom 19.08.2026 — zuerst das Neue dieses
-           Tages, darunter unverändert die Punkte des 18.08.2026. */
-        id: 'update-2026-08-19',
-        date: '19.08.2026',
-        title: 'Update vom 19.08.2026',
-        intro: 'Rapporte, Abrechnung und Projektübersicht im neuen Kleid — mit allem vom 18.08.2026.',
-        lines: [
-            'Rapporte im Projekt neu geordnet: oben die Dokumente (Gesamtrapport, Abnahme-Rapport, Unterschriften), darunter „Laufend" und „Abgeschlossen" nebeneinander als Terminkarten. Geöffnet wird in einem grossen Fenster, das sich verschieben und auf Bildschirmgrösse bringen lässt.',
-            'Zwei Unterschriften je Rapport: Der Techniker unterschreibt direkt im Rapport, der Kunde wie bisher — beide stehen nebeneinander auf dem PDF.',
-            'Checklisten im Übergabe-Rapport: Hinzufügen, Bearbeiten und Ausfüllen laufen je in einem eigenen Fenster, die Beschreibung steht direkt unter dem Kontrollpunkt, und Ja/Nein/N.A. wird mit einem Griff gesetzt.',
-            'Rapport-PDFs aufgeräumt: nummerierte Abschnitte statt gleich aussehender Titel, Datumsangaben durchgehend als 19.08.2026, Notizen in einer ruhigen Karte und klare Schlusstotale.',
-            'Abrechnung erneuert: Rechnungen, Zahlungsplan und Rechnen laufen in schwebenden Fenstern, jedes Feld wird von rechts geschrieben, und die Rechnungsart (Akonto, Zwischen-, Schlussrechnung) ergibt sich von selbst aus dem Prozentsatz.',
-            'Projektübersicht klarer: weisse Karten mit feinen Linien, jede Zeile führt an die Stelle, die sie beschreibt, und die Ringe zeigen beim Überfahren den Anteil, den man gerade sucht.',
-            'Postfach mit Filtern: eine Zeile für Bereich (alle, Kunden, Personal, Kalender), Kunde, Person und Zeitraum — 50 Nachrichten je Seite.',
-            'Firmenpostfach im System: unter CRM → E-Mail wird mit der Firmenadresse geschrieben und gelesen. Empfänger stammen ausschliesslich aus dem System, und Antworten der Kunden laufen beim passenden Kunden ein.',
-            'Termine als echte Einladungen: Ein Termin lässt sich auf Knopfdruck an den Kunden senden — Outlook, Google und Apple tragen ihn direkt ein, das Team steht als Kopie dabei.',
-            'Aufgaben erneuert: ein Brett aus zwei Spalten, Zeitraum von–bis, mehrere Verantwortliche je Aufgabe und Erledigen direkt über eine Karte.',
-            'Terminbereich im Projekt: Er zeigt jetzt genau die Kalenderansicht — dieselben Ansichten und Fenster, beschränkt auf das Projekt und seine Aufträge.',
-            'Profilbilder: Das eigene Bild ersetzt überall den Kreis mit den Initialen — im Personalbereich, in Auswahllisten und bei Terminen.',
-            'Einheitliche Fenster und eine ruhige Ladeanimation beim Start: Projektdetails, Rapporte und Löschabfragen laufen auf derselben Fensterform wie die Angebotsmaske.',
-        ],
-    },
-    {
-        id: 'update-2026-08-17',
-        date: '17.08.2026',
-        title: 'Update vom 17.08.2026',
-        intro: 'Profil, Personal und Berechtigungen erneuert.',
-        lines: [
-            'Profilseite: die eigenen Angaben, Zugang, Aufgaben, Termine, Besprechungen und Ferien liegen jetzt an einer Stelle.',
-            'Personalmodul erneuert: Personalakte je Person, Arbeitszeiten über den persönlichen QR-Code sowie Ferien- und Homeoffice-Anträge mit klarem Weg über Vorgesetzte und Buchhaltung.',
-            'Berechtigungseinstellungen: Rollenvorlagen je Modul und Seite — jede Person erhält genau eine Rolle, und Passwortänderungen laufen neu als Antrag.',
-            'Produktaufnahme: 6107 Zeilen aus der Artikelliste übernommen. Die Bestände starten bei 0 und wachsen über die Lagerbewegungen.',
-        ],
-    },
-    {
-        id: 'update-2026-08-15',
-        date: '15.08.2026',
-        title: 'Update vom 15.08.2026',
-        intro: 'Das neue CRM-Modul ist da.',
-        lines: [
-            'CRM erneuert: Kunden, Kontakte und Kommunikation an einem Ort.',
-            'Angebote lassen sich direkt in den Verkauf übernehmen — aus dem Angebot wird mit einem Schritt ein Auftrag, Positionen und Konditionen wandern mit.',
-            'Allgemeine Aufgaben: Aufgaben und Erinnerungen als eigene Bereiche, mit Fälligkeit und Zuständigkeit.',
-            'Mitteilungen: Hinweise zu Angeboten, Aufgaben und Terminen laufen neu an einer Stelle zusammen.',
-        ],
-    },
-    {
-        id: 'update-2026-08-07',
-        date: '07.08.2026',
-        title: 'Update vom 07.08.2026',
-        intro: 'Liveschaltung: 20:15 Uhr — enthaltene Verbesserungen:',
-        lines: [
-            'Fakturierung erneuert und Rechnungs-PDF hinzugefügt.',
-            'Startseite erneuert.',
-            '„Meine Aufträge" erneuert.',
-            'Allgemeine Codekorrekturen.',
-            'Einige fehlerhafte Formulierungen korrigiert sowie Button- und Hintergrundfarben aktualisiert.',
-        ],
-    },
-    {
-        id: 'prototype-2026-07-24',
-        date: '24.07.2026',
-        title: 'Produktionsprototyp Türkei',
-        intro: 'Der Web-Prototyp der Produktion ist verfügbar.',
-        link: { href: 'https://prototip.offitec.ch/', label: 'Produktionsprototyp ansehen' },
     },
 ];
 

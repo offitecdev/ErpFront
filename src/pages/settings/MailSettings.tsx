@@ -22,6 +22,7 @@ import { SignatureEditor } from './SignatureEditor';
 import { SIGNATURE_IMAGE_TYPES, SIGNATURE_IMAGE_MAX_BYTES, signatureFileToDataUrl } from './signatureImage';
 
 import { t } from '@/i18n/translate';
+import '@/styles/modules/mailModule.css';
 
 /** Server + Postfachadresse, nach derselben Regel wie im Server
     (`mailboxIdentity` in MailController): IMAP-Benutzer, sonst SMTP-Benutzer,

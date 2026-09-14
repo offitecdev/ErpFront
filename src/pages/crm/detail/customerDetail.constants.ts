@@ -22,10 +22,10 @@ export const CUSTOMER_EDITABLE_CLASS =
     'flex min-h-8 w-full cursor-text items-center rounded-[2px] border border-transparent px-2.5 text-left text-[13px] font-medium leading-[1.35] text-slate-800 transition-colors hover:border-slate-300 hover:bg-white dark:text-white/85 dark:hover:border-white/20 dark:hover:bg-white/5';
 
 export const CUSTOMER_CONTROL_CLASS =
-    'h-8 w-full rounded-[2px] border border-slate-300 bg-white px-2.5 text-[13px] leading-[1.35] text-slate-800 outline-none transition-colors focus:border-[#1f2654] focus:ring-1 focus:ring-[#1f2654]/20 dark:border-white/20 dark:bg-white/5 dark:text-white';
+    'h-8 w-full rounded-[2px] border border-slate-300 bg-white px-2.5 text-[13px] leading-[1.35] text-slate-800 outline-none transition-colors focus:border-[#0066e0] focus:ring-1 focus:ring-[#0066e0]/20 dark:border-white/20 dark:bg-white/5 dark:text-white';
 
 /** Marken-Navy — Schriftfarbe der zurückhaltenden Aktionen (z. B. "Verrechnen"). */
-export const CUSTOMER_NAVY = '#1f2654';
+export const CUSTOMER_NAVY = '#0066e0';
 
 /**
  * Das "+" am Fuss der Tabellen (Kontakte, Adressen, Aktivitäten, Notizen).
@@ -34,7 +34,7 @@ export const CUSTOMER_NAVY = '#1f2654';
  * als grau gestrichelter Umriss kaum zu finden. Jetzt ist es eine RICHTIGE
  * Schaltfläche in der Hausfarbe: gefüllt, 32 px statt 24, Glyphe 18 statt 13.
  *
- * Die Farbe kommt nicht von hier, sondern aus der Markenklasse `bg-[#272f67]` —
+ * Die Farbe kommt nicht von hier, sondern aus der Markenklasse `bg-[#0a7aff]` —
  * derselbe Weg wie bei jedem Primärknopf der Anwendung. Damit gibt es die zwei
  * Fassungen geschenkt und immer im Gleichschritt mit dem Rest: Marineblau im
  * hellen Modus, Gold im dunklen (`dark.css` färbt die Klasse um und setzt dort
@@ -42,7 +42,7 @@ export const CUSTOMER_NAVY = '#1f2654';
  * Zeigen und Drücken (siehe index.css / dark.css).
  */
 export const CUSTOMER_ADD_ROW_BUTTON_CLASS =
-    'ofi-btn-brand ofi-add-row-button inline-flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#272f67] text-white shadow-sm';
+    'ofi-btn-brand ofi-add-row-button inline-flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#0a7aff] text-white shadow-sm';
 
 /**
  * Adressarten einer Kundenadresse (`CustomerLocation.kind`). Die Hauptadresse

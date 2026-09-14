@@ -4,6 +4,7 @@ import { t } from '@/i18n/translate';
 import type { FormFieldDef, FormValues } from '@/lib/formFields';
 import { FormRenderer } from '../components/FormRenderer';
 import { ChecklistWindow } from '../components/ChecklistWindow';
+import '@/styles/modules/checklists.css';
 
 /**
  * Vorschau des Vorlagen-Editors — im selben schwebenden Fenster wie eine

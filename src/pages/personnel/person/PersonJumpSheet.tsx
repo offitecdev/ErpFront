@@ -101,7 +101,7 @@ export const PersonJumpSheet = ({
                                     key={target.key}
                                     type="button"
                                     onClick={() => jump(target.to)}
-                                    className="group flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3.5 py-2.5 text-left transition-colors hover:border-[#272f67] hover:bg-slate-50 dark:border-white/15 dark:hover:border-white/40 dark:hover:bg-white/5"
+                                    className="group flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3.5 py-2.5 text-left transition-colors hover:border-[#0a7aff] hover:bg-slate-50 dark:border-white/15 dark:hover:border-white/40 dark:hover:bg-white/5"
                                 >
                                     <span className="min-w-0">
                                         <span className="block truncate text-[13px] font-semibold text-slate-800 dark:text-white">
@@ -115,7 +115,7 @@ export const PersonJumpSheet = ({
                                     </span>
                                     <ArrowRight
                                         size={15}
-                                        className="shrink-0 text-slate-300 transition-colors group-hover:text-[#272f67] dark:text-white/30 dark:group-hover:text-white"
+                                        className="shrink-0 text-slate-300 transition-colors group-hover:text-[#0a7aff] dark:text-white/30 dark:group-hover:text-white"
                                     />
                                 </button>
                             ))}

@@ -143,7 +143,7 @@ export const DateField = ({
                             onClick={() => (view === 'days'
                                 ? setViewMonth((current) => current.subtract(1, 'month'))
                                 : setYearBase((current) => current - 12))}
-                            className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#1f2654] dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
+                            className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0066e0] dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
                         >
                             <ChevronLeft size={14} />
                         </button>
@@ -166,7 +166,7 @@ export const DateField = ({
                             onClick={() => (view === 'days'
                                 ? setViewMonth((current) => current.add(1, 'month'))
                                 : setYearBase((current) => current + 12))}
-                            className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#1f2654] dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
+                            className="flex h-6 w-6 items-center justify-center rounded-[3px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0066e0] dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
                         >
                             <ChevronRight size={14} />
                         </button>
@@ -187,7 +187,7 @@ export const DateField = ({
                                         }}
                                         className={`flex h-8 items-center justify-center rounded-[3px] text-[12.5px] tabular-nums transition-colors ${
                                             isCurrent
-                                                ? 'bg-[#1f2654] font-semibold text-white dark:bg-[#e6cf9e] dark:text-[#140f05]'
+                                                ? 'bg-[#0066e0] font-semibold text-white dark:bg-[#e6cf9e] dark:text-[#140f05]'
                                                 : isDisabled
                                                     ? 'cursor-not-allowed text-slate-200 dark:text-white/15'
                                                     : 'text-slate-700 hover:bg-slate-100 dark:text-white/80 dark:hover:bg-white/10'
@@ -221,13 +221,13 @@ export const DateField = ({
                                     onClick={() => commit(day)}
                                     className={`flex h-7 items-center justify-center rounded-[3px] text-[12px] tabular-nums transition-colors ${
                                         isSelected
-                                            ? 'bg-[#1f2654] font-semibold text-white dark:bg-[#e6cf9e] dark:text-[#140f05]'
+                                            ? 'bg-[#0066e0] font-semibold text-white dark:bg-[#e6cf9e] dark:text-[#140f05]'
                                             : isDisabled
                                                 ? 'cursor-not-allowed text-slate-200 dark:text-white/15'
                                                 : inMonth
                                                     ? 'text-slate-700 hover:bg-slate-100 dark:text-white/80 dark:hover:bg-white/10'
                                                     : 'text-slate-300 hover:bg-slate-50 dark:text-white/30 dark:hover:bg-white/5'
-                                    } ${isToday && !isSelected ? 'font-bold text-[#1f2654] ring-1 ring-inset ring-[#1f2654]/35 dark:text-[#e6cf9e] dark:ring-[#e6cf9e]/40' : ''}`}
+                                    } ${isToday && !isSelected ? 'font-bold text-[#0066e0] ring-1 ring-inset ring-[#0066e0]/35 dark:text-[#e6cf9e] dark:ring-[#e6cf9e]/40' : ''}`}
                                 >
                                     {day.date()}
                                 </button>
@@ -240,7 +240,7 @@ export const DateField = ({
                             type="button"
                             disabled={outOfRange(today)}
                             onClick={() => commit(today)}
-                            className="rounded-[3px] px-2 py-1 text-[12px] font-medium text-[#1f2654] transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#e6cf9e] dark:hover:bg-white/10"
+                            className="rounded-[3px] px-2 py-1 text-[12px] font-medium text-[#0066e0] transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-[#e6cf9e] dark:hover:bg-white/10"
                         >
                             {t('common.today')}
                         </button>

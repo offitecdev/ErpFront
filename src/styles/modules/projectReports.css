@@ -1,0 +1,415 @@
+/* projectReports — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ═══════════════ PROJECT REPORTS HUB (pages/project … detail/tabs/ReportsTab,
+   rebuilt 18.08.2026 — user request: "ongoing and completed side by side as
+   cards, looking like the calendar's appointment view, Google-clean").
+
+   Three levels, in that order: the project-wide DOCUMENT tiles, then the two
+   appointment LANES beside each other, each holding agenda CARDS in the
+   calendar's own language (status rail in Google's event palette, big day
+   number, time as the headline). Everything paints from the `--ofi-cal-*`
+   tokens of the calendar module, so dark mode is the same variable swap and
+   there is no second copy of the colours. */
+
+/* ── level 1: project documents ─────────────────────────────────────────── */
+.ofi-rep-docs {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+#root .ofi-rep-doc {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    background: var(--ofi-cal-surface);
+    padding: 10px 12px;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-rep-doc:hover:not(:disabled) {
+    border-color: var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow-soft);
+}
+#root .ofi-rep-doc:disabled { opacity: 0.55; }
+.ofi-rep-doc__icon {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+.ofi-rep-doc__main { min-width: 0; flex: 1; }
+.ofi-rep-doc__title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-rep-doc__state {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 1px;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── level 2: the two lanes, side by side ───────────────────────────────── */
+.ofi-rep-lanes {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ofi-rep-lane {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+}
+.ofi-rep-lane__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface-2);
+    padding: 9px 14px;
+}
+.ofi-rep-lane__dot { width: 8px; height: 8px; flex: none; border-radius: 999px; }
+.ofi-rep-lane__dot.is-ongoing { background: #039be5; }
+.ofi-rep-lane__dot.is-completed { background: #0b8043; }
+.ofi-rep-lane__title { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-rep-lane__count {
+    flex: none;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-muted);
+}
+.ofi-rep-lane__body {
+    display: flex;
+    min-height: 96px;
+    max-height: 520px;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px;
+}
+
+/* ── level 3: the agenda card ───────────────────────────────────────────── */
+#root .ofi-rep-card {
+    position: relative;
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    gap: 12px;
+    border-radius: 10px;
+    background: transparent;
+    padding: 9px 10px 9px 14px;
+    text-align: left;
+    transition: background 120ms ease;
+}
+#root .ofi-rep-card:hover { background: var(--ofi-cal-hover); }
+/* The status rail — the card's only colour, in the calendar's event palette. */
+.ofi-rep-card__rail {
+    position: absolute;
+    left: 4px;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 999px;
+    background: var(--ofi-cal-faint);
+}
+.ofi-rep-card__rail.is-planned { background: #039be5; }
+.ofi-rep-card__rail.is-ongoing { background: #3f51b5; }
+.ofi-rep-card__rail.is-completed { background: #0b8043; }
+.ofi-rep-card__rail.is-cancelled { background: #bdc1c6; }
+
+.ofi-rep-card__date {
+    display: flex;
+    width: 38px;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 1px;
+}
+.ofi-rep-card__day {
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+}
+.ofi-rep-card__month {
+    padding-top: 1px;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-rep-card__main { min-width: 0; flex: 1; }
+.ofi-rep-card__time {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+}
+.ofi-rep-card.is-cancelled .ofi-rep-card__time { text-decoration: line-through; color: var(--ofi-cal-muted); }
+.ofi-rep-card__meta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 1px;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-rep-card__tags { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 6px; }
+.ofi-rep-card__side { display: flex; flex: none; align-items: center; gap: 2px; }
+
+/* State pills — the document's condition, not the appointment's. */
+.ofi-rep-tag {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.7;
+    white-space: nowrap;
+}
+.ofi-rep-tag.is-signed { background: #e6f4ea; color: #137333; }
+.ofi-rep-tag.is-open { background: #e8f0fe; color: #1967d2; }
+.ofi-rep-tag.is-none { background: var(--ofi-cal-hover); color: var(--ofi-cal-muted); }
+.dark .ofi-rep-tag.is-signed { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+.dark .ofi-rep-tag.is-open { background: rgba(138, 180, 248, 0.18); color: #8ab4f8; }
+
+/* Round glyph button, the calendar's own icon-button language. */
+#root .ofi-rep-glyph {
+    display: flex;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background 120ms ease, color 120ms ease;
+}
+#root .ofi-rep-glyph:hover:not(:disabled) { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+#root .ofi-rep-glyph:disabled { color: var(--ofi-cal-faint); cursor: default; }
+
+.ofi-rep-empty {
+    padding: 22px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── the popup itself (reports/ReportPopup.tsx) ─────────────────────────── */
+/* It is the calendar's floating card; only the head keeps a hairline so a big
+   scrolling work surface never runs into the drag strip. */
+.ofi-rep-popup > .ofi-float-card__grip { border-bottom: 1px solid var(--ofi-cal-border-soft); }
+.ofi-rep-popup .ofi-float-card__body { background: var(--ofi-cal-surface); }
+.ofi-rep-glyph.is-off { color: var(--ofi-cal-faint); cursor: default; }
+.ofi-rep-glyph.is-off:hover { background: transparent; color: var(--ofi-cal-faint); }
+
+/* Overview of the appointment popup: facts left, documents right — the wide
+   card would otherwise stretch every label→value pair across 800px. */
+.ofi-rep-overview {
+    display: grid;
+    gap: 18px 28px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px 20px 20px;
+}
+
+/* Level caption above each group — the hub's two levels named out loud. */
+.ofi-rep-level {
+    padding: 2px 2px 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+/* The popup body is the flex column its views expect (the PDF stage and the
+   editors chain `flex-1` down to fill a maximised card). */
+.ofi-rep-popup > .ofi-float-card__body { display: flex; flex-direction: column; }
+
+/* ── Dokumente des Termins (reports/AppointmentReportSheet.tsx) ───────────
+   Drei feste Spalten: Symbol, Name+Zustand, Knöpfe. LINKSBÜNDIG — alles was
+   die Zeile zu sagen hat, steht am Namen; rechts hängen nur die beiden
+   Dokumentknöpfe, und ihre Spalte bleibt auch in der Zeile ohne Knöpfe frei,
+   damit nichts von Zeile zu Zeile springt.
+
+   Zwei Anläufe brauchte das: erst hingen Plakette und Knöpfe als Flex-Kinder
+   am Text und rutschten je nach Textlänge nach rechts weg; dann stand die
+   Plakette in einer eigenen rechten Spalte — bündig, aber mit einem Loch
+   mitten in der Zeile, und der Benutzer sah wieder eine Verschiebung. Der
+   Zustand gehört an den Namen, nicht an den Rand. */
+.ofi-rep-doclist {
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--ofi-cal-border-soft);
+}
+.ofi-rep-docrow {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 28px minmax(0, 1fr) 84px;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    background: transparent;
+    transition: background-color 100ms ease;
+}
+.ofi-rep-docrow + .ofi-rep-docrow { border-top: 1px solid var(--ofi-cal-border-soft); }
+.ofi-rep-docrow.is-clickable { cursor: pointer; }
+.ofi-rep-docrow.is-clickable:hover { background: var(--ofi-cal-hover); }
+.ofi-rep-docrow__main { min-width: 0; }
+.ofi-rep-docrow__title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+/* Der Zustand steht UNTER dem Namen und beginnt auf derselben Kante — als
+   Plakette am rechten Rand riss er ein Loch in die Zeile und wanderte von
+   Zeile zu Zeile mit (Benutzerhinweis, zweimal: "es verschiebt sich nach
+   rechts"). Ein farbiger Punkt trägt dieselbe Aussage, ohne Fläche. */
+.ofi-rep-docrow__state {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 2px;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-rep-docrow__state::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 999px;
+    background: var(--ofi-cal-faint);
+    vertical-align: 1px;
+}
+.ofi-rep-docrow__state.is-open::before { background: #f9ab00; }
+.ofi-rep-docrow__state.is-done::before { background: #0b8043; }
+/* Die beiden Dokumentknöpfe sitzen als PAAR am rechten Rand — gleicher
+   Abstand, gleiche Größe, eine sichtbare Kante. Als nackte 28px-Glyphe
+   direkt neben der Plakette las sich das als Verzierung, nicht als Knopf. */
+.ofi-rep-docrow__actions { display: flex; justify-content: flex-end; gap: 8px; }
+#root .ofi-rep-docbtn,
+body > :not(#root) .ofi-rep-docbtn {
+    display: flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px !important;
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-rep-docbtn:hover:not(:disabled),
+body > :not(#root) .ofi-rep-docbtn:hover:not(:disabled) {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+#root .ofi-rep-docbtn:disabled,
+body > :not(#root) .ofi-rep-docbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Montage-Rapport-Editor: EINE Fläche statt eines Schachbretts ─────────
+   Die Raster mischen tippbare Zellen mit gerechneten. Mit dem umrandeten
+   Zelleneingabefeld der Anwendung las sich das als „halbe Tabelle gefüllt,
+   halbe leer" (Benutzerhinweis 19.08.2026 zu Material & Kosten). Im Editor
+   liegt das Eingabefeld darum BÜNDIG in der Zelle — gleiche Höhe, gleiche
+   Kante wie ein gerechneter Wert. Der frühere dunkelblaue Fokus-Unterstrich
+   sah wie eine Klammer aus; Fokus ist jetzt neutral und flächig.
+
+   Nachtrag 02.09.2026 (Vorgabe Samet: «die Eingabefelder sollen weiss sein»):
+   bündig heisst seither NICHT mehr unsichtbar. Menge und Betrag tragen
+   dieselbe weisse Fläche mit Haarkante wie jedes andere Feld des Rapports —
+   gleiche Höhe wie ein gerechneter Wert bleibt es trotzdem. */
+.ofi-fr-editor td :is(input:not([type="checkbox"]):not([type="radio"])) {
+    height: 34px !important;
+    border-color: var(--ofi-ios-line) !important;
+    border-width: 1px !important;
+    border-radius: 8px !important;
+    background: var(--ofi-ios-field) !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    box-shadow: none !important;
+}
+.ofi-fr-editor td :is(input:not([type="checkbox"]):not([type="radio"])):hover:not(:disabled) {
+    border-color: var(--ofi-cal-muted) !important;
+}
+.ofi-fr-editor td :is(input:not([type="checkbox"]):not([type="radio"])):focus {
+    border-color: var(--ofi-cal-accent) !important;
+    background: var(--ofi-ios-field) !important;
+    box-shadow: none !important;
+}
+.ofi-fr-editor table[data-inv-table] tbody tr:hover td { background: var(--ofi-cal-hover); }
+/* Eine gerechnete oder gesperrte Zelle trägt exakt dieselbe Zeile wie ein
+   Eingabefeld — sonst stehen die Spalten wieder auf zwei Höhen. */
+.ofi-fr-editor .ofi-fr-cell {
+    display: block;
+    min-height: 34px;
+    /* 34px minus the 2px baseline the input's focus underline occupies. */
+    line-height: 32px;
+    border-bottom: 2px solid transparent;
+    color: var(--ofi-cal-text);
+}
+.ofi-fr-editor .ofi-fr-cell.is-right { text-align: right; }
+.ofi-fr-editor .ofi-fr-cell.is-muted { color: var(--ofi-cal-muted); }
+.ofi-fr-editor .ofi-fr-cell.is-faint { color: var(--ofi-cal-faint); }
+.ofi-fr-editor .ofi-fr-cell.is-num { font-variant-numeric: tabular-nums; }

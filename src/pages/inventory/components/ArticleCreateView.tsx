@@ -220,7 +220,7 @@ export const ArticleCreateView = ({
                 <button
                         type="button"
                         onClick={() => setExcelOpen(true)}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                     >
                         <UploadCloud02 size={13} />
                     {t('inv.excel.importButton')}
@@ -367,7 +367,7 @@ export const ArticleCreateView = ({
                     <button
                         type="button"
                         onClick={() => setRows((current) => [...current, emptyRow()])}
-                        className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
+                        className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/60"
                     >
                         <Plus size={12} />
                         {t(`${copyPrefix}.addRow`)}
@@ -377,7 +377,7 @@ export const ArticleCreateView = ({
                         disabled={saving || !canCreate || !filledRows.length}
                         title={canCreate ? undefined : t(`${copyPrefix}.noPermission`)}
                         onClick={() => void save()}
-                        className="rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-md bg-[#0a7aff] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         {saving ? t('common.loading') : t(`${copyPrefix}.save`, { count: filledRows.length })}
                     </button>

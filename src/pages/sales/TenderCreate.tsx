@@ -87,8 +87,8 @@ export const TenderCreate = () => {
             />
             <div className="flex min-h-[360px] items-center justify-center rounded-md border border-slate-200 bg-white">
                 <div className="w-full max-w-sm rounded-md border border-slate-200 bg-white px-6 py-5 text-center">
-                    <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#1f2654]/10">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654]" />
+                    <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#0066e0]/10">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0]" />
                     </div>
                     <div className="text-[14px] font-semibold text-slate-900">{t('tenders.tender_olusturuluyor')}</div>
                     <div className="mt-1 text-[12px] text-slate-500">{t('tenders.empty_taslak_hazirlaniyor')}</div>

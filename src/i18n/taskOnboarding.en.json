@@ -1,0 +1,53 @@
+{
+  "tasksModule": {
+    "onboarding": {
+      "taskTitle": "Your first task: Explore tasks",
+      "firstBadge": "First task",
+      "welcomeEyebrow": "Before you begin",
+      "welcomeTitle": "Your first task is ready",
+      "welcomeText": "A short walkthrough teaches the task module on the real interface. It is tailored to your role, and this task completes automatically when you finish.",
+      "welcomeAdmin": "Administrator guide: create and assign work, review approvals, people, and reports.",
+      "welcomeMember": "Team guide: your tasks, time tracking, checklists, comments, and completion requests.",
+      "start": "Start guide",
+      "later": "Later",
+      "replay": "Open guide again",
+      "backToTasks": "Back to tasks",
+      "stepCounter": "{{current}} / {{total}}",
+      "next": "Next",
+      "previous": "Back",
+      "finish": "Finish guide",
+      "finishing": "Completing task…",
+      "completedToast": "Your first task is complete. You are ready to begin!",
+      "error": "The guide could not be completed. Please try again.",
+      "admin": {
+        "title": "Administrator task guide",
+        "subtitle": "Learn to manage your team's task flow from start to finish.",
+        "steps": {
+          "create": { "title": "Create and assign a task", "text": "Use New task to set the title, assignees, start and due times, priority, and labels. Administrators can see every task." },
+          "follow": { "title": "Follow progress live", "text": "Board statuses, live timers, and checklist progress show exactly where the team stands." },
+          "approve": { "title": "Review requests", "text": "Approvals lets you accept or reject task proposals, completion requests, and deletion requests with a reason." },
+          "people": { "title": "See results in people and reports", "text": "People shows workload; reports show time, completed work, and team performance." }
+        }
+      },
+      "member": {
+        "title": "Task quick-start guide",
+        "subtitle": "Open assigned work, progress it, and send it for completion.",
+        "steps": {
+          "open": { "title": "Open an assigned task", "text": "The task list only shows work assigned to you or created by you. Open a card to see its description, dates, and assignees." },
+          "track": { "title": "Start and pause", "text": "Press Start when work begins and Pause when you stop. Time is not entered manually; the timer records real working time." },
+          "work": { "title": "Use steps and communication", "text": "Tick checklist items, add a comment when needed, and upload documents from the Files tab." },
+          "complete": { "title": "Request completion", "text": "When the work is done, send a completion request. An administrator reviews and completes it or returns it with an explanation." }
+        }
+      },
+      "demo": {
+        "newTask": "New task",
+        "assignees": "Assignees",
+        "timer": "00:18:42",
+        "approval": "Approval pending",
+        "checklist": "3 / 4 items",
+        "comment": "Add comment",
+        "report": "Weekly report"
+      }
+    }
+  }
+}

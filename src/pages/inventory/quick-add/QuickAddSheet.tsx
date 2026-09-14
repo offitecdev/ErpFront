@@ -1,227 +1,313 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Camera01, Check, Image01, Minus, Plus, X, XClose } from '@/components/icons/antIconCompat';
-import { Spinner } from '@/components/ui-shared/Loader';
-import { UnitSelect } from '@/components/ui-shared/UnitSelect';
+import { ArrowRight, Camera01, Check, ChevronLeft, ChevronRight, Plus, Scan, Trash01, X, XClose } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
+import { articleCodesApi, type CodeCategory, type CodeScheme } from '@/lib/api/articleCodes';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useBackDismiss } from '@/lib/backDismiss';
-import { canvasToProductImage, prepareImage, type PreparedImage } from '@/lib/ocr/imagePrep';
-import {
-    OcrUnavailable,
-    recognizeRegion,
-    recognizeRegionLive,
-    type OcrBox,
-} from '@/lib/ocr/ocrEngine';
-import { snapToKnown } from '@/lib/ocr/textSense';
 import { useCalViewport } from '@/pages/calendar/calendarShared';
 import { useAuthStore } from '@/store/authStore';
-import { useUnitStore } from '@/store/unitStore';
-import type { SearchItem } from '@/types/inventory';
+import type { ScanLookupResult, SearchItem } from '@/types/inventory';
 import { useLanguageTick } from '../hooks/useLanguageTick';
-import { parseNum } from '../utils/format';
+import { QuantityStepper } from '../components/QuantityStepper';
 
 /**
- * SCHNELLERFASSUNG — Foto → Text → Produkt, in einem Fenster (02.09.2026).
+ * SCHNELLERFASSUNG PER BARCODE (10.09.2026) — ersetzt die Foto-/OCR-Erfassung
+ * vom 02.09.2026 vollständig (kein Foto, kein Viereck, kein Hinweistext mehr).
  *
- * Vorgabe Samet: «Foto aufnehmen, der Produktname wird erkannt oder sein
- * Bereich markiert; antippen, Menge eingeben, nächstes Produkt — schnell,
- * mit einem Schliessen-Knopf unten. Codes vergibt das System.»
+ * Vorgabe Samet (Spezifikation «Lager: ERP-Codes, Schnellerfassung,
+ * Lagerbewegungen»):
+ *   Erstdefinition — Kategorie (Klima, Elektro …) → Unterkategorie (PLC,
+ *   TCL …) → Modus «Gleiches Modell» / «Verschiedene Modelle». Danach steht
+ *   der nächste ERP-Code (ELK-PLC-00001) gut sichtbar da; Kategorie,
+ *   Unterkategorie und Modus bleiben für die ganze Sitzung und werden NUR
+ *   über den Zurück-Pfeil links oben gewechselt.
  *
- * Ablauf:
- *   1. Kamera (`<input capture>`) oder Bild — das Foto wird verkleinert; es
- *      wird noch NICHT gelesen und der Produktname bleibt leer.
- *   2. Der Anwender zieht mit Finger oder Stift ein Viereck um den
- *      gewünschten Namen. Ausschliesslich dieser AUSSCHNITT geht über den
- *      eigenen Server an Google Cloud Vision — nie das ganze Foto — und sein
- *      Text landet direkt im Namensfeld; es gibt keine Vorschlagsliste.
- *   3. Der Name wird gegen die Produktliste gesucht: gibt es das Produkt
- *      schon, wird ein EINGANG gebucht statt ein Doppel angelegt (bei
- *      gleichem Namen automatisch, sonst auf Tipp).
- *   4. Menge (grosse −/+), Einheit, «Hinzufügen» — jedes Produkt wird SOFORT
- *      gespeichert und landet im Protokoll; das Foto bleibt für die nächste
- *      Zeile stehen, «Neues Foto» holt das nächste Etikett.
- *   5. «Schliessen» unten beendet; die Liste dahinter lädt neu, wenn etwas
- *      erfasst wurde.
+ *   Je Gerät — die Kamera liest den Barcode (oder ein Handscanner tippt ihn
+ *   ins Feld), dazu Modellnummer, Seriennummer, Bezeichnung. Die MENGE steht
+ *   seit 11.09.2026 als Feld dabei (Nachtrag Samet): vorbelegt mit 1, von
+ *   Hand tippbar oder per Mac-Stepper; nach jeder Buchung wieder 1. Nur der
+ *   stille Scan auf den aktuellen Artikel («Gleiches Modell») bucht weiter
+ *   genau EIN Stück je Etikett. «Gleiches Modell» füllt Modell und
+ *   Bezeichnung nach dem ersten Gerät vor. Nach «Speichern» geht sofort die
+ *   Kamera wieder auf.
  *
- * SELBST MARKIEREN (Nachtrag Samet, gleicher Tag): «Mit dem Finger über den
- * Bereich fahren, dann wird er zu Text — findet die Erkennung nichts, markiere
- * ich selbst, und die anderen Markierungen verschwinden. Und die gewählte
- * Markierung muss sich vergrössern lassen, an Ort und Stelle — kein Fenster,
- * das woanders aufgeht.»
- *   · Ziehen auf dem Foto zieht ein VIERECK auf (Nachtrag Samet: «der
- *     Auswahlbereich soll viereckig sein» — wie in Google Lens, alles
- *     ausserhalb gedimmt); beim Loslassen wird NUR sein Ausschnitt gelesen
- *     (`recognizeRegion` → Cloud Vision) und sein Text wird der Name.
- *   · Der Rahmen trägt acht Griffe (Ecken + Kanten) und lässt sich innen
- *     verschieben; jede Änderung liest den Ausschnitt neu.
- *   · Ein blosser TIPP bleibt folgenlos — erst ab 6px Bewegung wird gezeichnet.
+ *   ARTIKEL ZUERST (11.09.2026, Nachtrag Samet: «im Schnellerfassen direkt
+ *   auf der ersten Seite unter der Modellwahl Modell, Bezeichnung und Code
+ *   eingeben; dann geht der Barcode-Teil NUR für diesen Artikel auf, und
+ *   jeder Scan erhöht seinen Bestand»): «Gleiches Modell» bleibt auf der
+ *   Seite und klappt darunter das Formular auf — Modellnummer, Bezeichnung,
+ *   der nächste ERP-Code liegt schon bei. «Weiter zum Scannen» legt den
+ *   Artikel an (Menge 0 = reine Definition) und macht ihn zum AKTUELLEN
+ *   Artikel; ein Treffer aus dem Lager (gleiches Modell / gleicher Name)
+ *   kann stattdessen gewählt werden. Danach bucht jeder Scan die Menge aus
+ *   dem Stepper (Vorgabe 1) auf genau diesen Artikel und heftet unbekannte
+ *   Etiketten an. Die frühere Zwillingssuche «Bereits im Lager — Zugang
+ *   buchen» im Geräteformular ist weg (Samet: «das ist zu viel»).
  *
- * MITSCHREIBEN (Nachtrag Samet, gleicher Tag): «Beim Markieren soll er von
- * links nach rechts mitschreiben und das Feld dabei laufend leeren; und ein x
- * im Feld, das alles löscht — am Anfang unsichtbar, erst nach einer Auswahl.»
- *   · Sobald aus dem Fingerdruck ein Strich wird, ist das Namensfeld LEER
- *     (`clearInput`) — der alte Name steht nie neben dem neuen.
- *   · Während das Viereck wächst, liest `recognizeRegionLive` seinen Ausschnitt
- *     und setzt den Namen jedes Mal NEU (nie angehängt); der
- *     Text wandert so von links nach rechts mit dem Finger mit. Es ist immer
- *     nur EIN Zwischenstand unterwegs (`liveRef`), Nachzügler werden über
- *     `token` verworfen, und beim Loslassen überschreibt ihn der genaue
- *     Lesegang. Findet der genaue nichts, bleibt der Zwischenstand stehen.
- *   · Das «x» im Feld erscheint erst, wenn etwas drinsteht oder markiert ist,
- *     und räumt beides weg.
+ *   Bereits vorhandener Artikel — trifft der Scan einen Barcode, eine
+ *   Seriennummer oder einen ERP-Code, erscheinen die Details mit dem Pfeil
+ *   «Weiter» direkt daneben; «Weiter» bucht 1 Stück Zugang und öffnet die
+ *   Kamera erneut. Scan → Anzeige → Weiter, ohne weitere Eingaben.
  *
- * NACHDENKEN (Nachtrag Samet, gleicher Tag): «etwas Klügeres, das das System
- * nicht belastet — es soll richtig erraten, was dasteht, ein bisschen wie
- * Google Lens — nimm Google Cloud Vision, tesseract.js raus.» Gelesen wird
- * seither von Vision; die Nachdenk-Schicht darüber sitzt in
- * `lib/ocr/textSense.ts` und kostet keine weitere Anfrage: im Viereck zählt nur die grösste
- * Schrift, sichere Zeichenverwechslungen werden geheilt, und der gelesene
- * Text wird an den Produktkatalog ANGELEGT (`snapToKnown`) — die Trefferliste
- * dafür holt dieses Fenster ohnehin schon. Aus einem schlecht belichteten
- * Etikett wird so der Name, der wirklich im Lager steht.
+ *   Löschen — ein EIGENER Knopf (das Segment oben): derselbe Ablauf, nur
+ *   bucht «Weiter» einen Abgang (OUT, 1 Stück, Herkunft QUICK_DELETE) mit
+ *   Barcode und Seriennummer in der Bewegung. Der Artikelstamm bleibt.
  *
- * Neue Produkte gehen über `POST /inventory/articles/quick` (Nummer
- * `ART-NNNNN` vom Server), Eingänge über `movements/bulk` — beides dieselben
- * Wege wie Tabelle und Lagerseite, nur ohne Codefeld.
- *
- * Zustand, der sich aus anderem Zustand ERGIBT (Vorgabe-Einheit, der
- * automatisch gefundene Zwilling in der Produktliste, die sichtbaren
- * Treffer), wird beim Zeichnen abgeleitet und nicht in Effekten gesetzt.
+ * Gestaltung: macOS/SwiftUI — eingerückte Listen mit Chevron, ein Segment,
+ * 34px-Druckknöpfe, das eine Blau; Schritte gleiten herein (styles/
+ * quickEntry.css). Das Fenster trägt `.ofi-pop`, die Mac-Fensterhülle.
  */
 
-type Phase = 'idle' | 'preparing' | 'ready' | 'failed';
+type Mode = 'in' | 'delete';
+type Step = 'category' | 'scheme' | 'variant' | 'scan';
+type Variant = 'same' | 'different';
+
+type ScanArticle = NonNullable<ScanLookupResult['article']>;
+type ScanState =
+    | { kind: 'idle' }
+    | { kind: 'looking'; code: string }
+    | { kind: 'found'; code: string; article: ScanArticle }
+    | { kind: 'new'; code: string | null }
+    | { kind: 'missing'; code: string };
 
 interface LogEntry {
     key: string;
     name: string;
     code: string;
-    qty: number;
-    unit: string;
-    kind: 'new' | 'in';
+    kind: 'new' | 'in' | 'out';
+    /** Gebuchte Menge — nur gezeigt, wenn nicht 1. */
+    quantity?: number;
     error?: string;
 }
 
-/** Ein Rechteck in ANTEILEN der Bildanzeige (0…1) — unabhängig von Pixeln. */
-type Fraction = { x: number; y: number; w: number; h: number };
-type HandleMode = 'move' | 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
-type Drag =
-    | { kind: 'draw'; id: number; rect: DOMRect; x0: number; y0: number; active: boolean }
-    | { kind: 'frame'; id: number; rect: DOMRect; x0: number; y0: number; mode: HandleMode; origin: Fraction; active: boolean };
+type BarcodeDetectorLike = { detect: (source: CanvasImageSource) => Promise<Array<{ rawValue?: string }>> };
+type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
+const BARCODE_FORMATS = ['code_128', 'code_39', 'code_93', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf', 'codabar', 'qr_code', 'data_matrix'];
+const detectorCtor = (): BarcodeDetectorCtor | undefined =>
+    (window as Window & { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector;
 
-const HANDLES: HandleMode[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-const MAX_MATCHES = 4;
-const SEARCH_DELAY_MS = 320;
-const MIN_QUERY = 2;
-/** Unter dieser Bewegung ist ein Fingerdruck ein Tipp, kein Ziehen. */
-const DRAG_THRESHOLD_PX = 6;
-/** Kleinster Rahmen, der noch gelesen wird. */
-const MIN_FRAME_PX = 8;
-/** Erst ab dieser Breite lohnt ein Zwischenstand unter dem Finger. */
-const LIVE_MIN_PX = 26;
-/* Die Zwischenstände gehen (ohne nativen Erkenner) zu Google Cloud Vision,
-   und Vision rechnet je Bild ab. Zwei Bremsen halten einen Strich deshalb bei
-   zwei, drei Aufrufen statt dreißig: ein Mindestabstand in der Zeit und ein
-   Mindestzuwachs in der Breite — ein Viereck, das sich kaum verändert hat,
-   liest sich ohnehin gleich. */
-const LIVE_GAP_MS = 420;
-const LIVE_GROWTH_PX = 28;
+/** Zwischen zwei Erkennungen — die Kamera liest sonst dreissigmal dasselbe Etikett. */
+const DETECT_GAP_MS = 140;
+/** Zwillingssuche im Formular: ab zwei Zeichen, entprellt. */
+const MATCH_MIN = 2;
+const MATCH_DELAY_MS = 260;
+const MATCH_MAX = 5;
+/** Derselbe Code gleich noch einmal ist das noch nicht weggelegte Etikett, kein zweites Gerät. */
+const REPEAT_GUARD_MS = 2500;
 
-const normalizeName = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
-const pct = (value: number, whole: number) => `${(value / whole) * 100}%`;
-
-const boxToFraction = (box: OcrBox, size: { width: number; height: number }): Fraction => ({
-    x: box.x0 / size.width,
-    y: box.y0 / size.height,
-    w: (box.x1 - box.x0) / size.width,
-    h: (box.y1 - box.y0) / size.height,
-});
-const fractionToBox = (fraction: Fraction, size: { width: number; height: number }): OcrBox => ({
-    x0: fraction.x * size.width,
-    y0: fraction.y * size.height,
-    x1: (fraction.x + fraction.w) * size.width,
-    y1: (fraction.y + fraction.h) * size.height,
-});
-
-/**
- * Das aufgezogene VIERECK, von der Ecke, wo der Finger aufsetzte, zur Ecke,
- * wo er gerade steht (Vorgabe Samet, 02.09.2026: «der Auswahlbereich soll
- * viereckig sein» — wie der Rahmen in Google Lens). Bis zur Kante der Anzeige
- * eingesperrt; eine Mindesthöhe hält den Ausschnitt lesbar, wenn jemand nur
- * waagrecht über eine Zeile streicht.
- */
-const drawnFraction = (rect: DOMRect, x0: number, y0: number, x1: number, y1: number): Fraction => {
-    const ax = clamp((x0 - rect.left) / rect.width, 0, 1);
-    const ay = clamp((y0 - rect.top) / rect.height, 0, 1);
-    const bx = clamp((x1 - rect.left) / rect.width, 0, 1);
-    const by = clamp((y1 - rect.top) / rect.height, 0, 1);
-    const minH = Math.min(1, 32 / rect.height);
-    const width = Math.abs(bx - ax);
-    const height = Math.max(minH, Math.abs(by - ay));
-    const centerY = (ay + by) / 2;
-    return {
-        x: Math.min(ax, bx),
-        y: clamp(centerY - height / 2, 0, 1 - height),
-        w: width,
-        h: height,
-    };
-};
-
-/** Einen Griff (oder den ganzen Rahmen) um dx/dy (Anteile) bewegen. */
-const resizeFraction = (origin: Fraction, mode: HandleMode, dx: number, dy: number, minW: number, minH: number): Fraction => {
-    if (mode === 'move') {
-        return {
-            x: clamp(origin.x + dx, 0, 1 - origin.w),
-            y: clamp(origin.y + dy, 0, 1 - origin.h),
-            w: origin.w,
-            h: origin.h,
-        };
-    }
-    let { x, y, w, h } = origin;
-    const right = origin.x + origin.w;
-    const bottom = origin.y + origin.h;
-    if (mode.includes('e')) w = clamp(origin.w + dx, minW, 1 - origin.x);
-    if (mode.includes('w')) { x = clamp(origin.x + dx, 0, right - minW); w = right - x; }
-    if (mode.includes('s')) h = clamp(origin.h + dy, minH, 1 - origin.y);
-    if (mode.includes('n')) { y = clamp(origin.y + dy, 0, bottom - minH); h = bottom - y; }
-    return { x, y, w, h };
-};
-
-/** Die Fehlermeldung des Servers, wenn er eine geschickt hat. */
 const responseError = (error: unknown): string | null => {
     const data = (error as { response?: { data?: { error?: unknown } } } | null)?.response?.data;
     return typeof data?.error === 'string' && data.error ? data.error : null;
 };
+const responseCode = (error: unknown): string | null => {
+    const data = (error as { response?: { data?: { code?: unknown } } } | null)?.response?.data;
+    return typeof data?.code === 'string' ? data.code : null;
+};
+
+/** Aus «ELK-PLC-00007» den Nachfolger «ELK-PLC-00008» — die Anzeige läuft mit, ohne den Server zu fragen. */
+const bumpCode = (code: string): string => {
+    const match = /^(.*?)(\d+)$/.exec(code);
+    if (!match) return code;
+    const digits = match[2]!;
+    return `${match[1]}${String(Number(digits) + 1).padStart(digits.length, '0')}`;
+};
 
 /**
- * Das Viereck auf dem Foto: Fläche + acht Griffe, alles ausserhalb gedimmt.
- * `look` = 'drawing' (wächst gerade unter dem Finger, ohne Griffe) oder 'set'
- * (der gewählte Ausschnitt: Griffe, innen verschiebbar).
+ * Die Kamera als Barcode-Leser: `getUserMedia` (Rückkamera bevorzugt) und
+ * der native `BarcodeDetector`, wo es ihn gibt (Android, macOS). Wo er FEHLT
+ * oder nicht arbeitet — Chrome/Edge auf Windows kennen ihn gar nicht, Safari
+ * auf dem iPhone ebenso wenig (gefunden 10.09.2026: die Kamera lief, die
+ * Linie wanderte, und nichts wurde je gelesen) — übernimmt ZXing im
+ * Browser (`@zxing/browser`, erst dann nachgeladen). Das Feld darunter bleibt
+ * in jedem Fall der Weg des Handscanners. `paused` hält die Erkennung an,
+ * während ein Treffer angezeigt wird — die Kamera läuft weiter.
  */
-const LassoFrame = ({ fraction, look, busy, onHandleDown, onBodyDown }: {
-    fraction: Fraction;
-    look: 'drawing' | 'set';
-    busy?: boolean;
-    onHandleDown?: (event: React.PointerEvent<HTMLElement>, mode: HandleMode) => void;
-    onBodyDown?: (event: React.PointerEvent<HTMLElement>) => void;
+type ZxingControls = { stop: () => void };
+const useBarcodeCamera = (active: boolean, paused: boolean, onCode: (code: string) => void) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const detectorRef = useRef<BarcodeDetectorLike | null>(null);
+    const zxingRef = useRef<ZxingControls | null>(null);
+    const loopRef = useRef<number | null>(null);
+    /** Der nächste Lesegang — über die Ref, damit `tick` sich nicht selbst nennen muss. */
+    const tickRef = useRef<() => void>(() => undefined);
+    const pausedRef = useRef(paused);
+    const onCodeRef = useRef(onCode);
+    const lastRef = useRef<{ code: string; at: number }>({ code: '', at: 0 });
+    const [running, setRunning] = useState(false);
+    const [starting, setStarting] = useState(false);
+    const [problem, setProblem] = useState<'none' | 'unsupported' | 'denied' | 'failed'>('none');
+    const supported = useMemo(() => Boolean(navigator.mediaDevices?.getUserMedia), []);
+
+    useEffect(() => { pausedRef.current = paused; }, [paused]);
+    useEffect(() => { onCodeRef.current = onCode; }, [onCode]);
+
+    const stop = useCallback(() => {
+        if (loopRef.current !== null) { window.clearTimeout(loopRef.current); loopRef.current = null; }
+        zxingRef.current?.stop();
+        zxingRef.current = null;
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        detectorRef.current = null;
+        if (videoRef.current) { videoRef.current.pause(); videoRef.current.srcObject = null; }
+        setRunning(false);
+    }, []);
+
+    /** Ein gelesener Code — gleich woher: Dublettensperre, dann hinaus. */
+    const deliver = useCallback((raw: string | undefined) => {
+        const code = raw?.trim();
+        if (!code || pausedRef.current) return;
+        const now = Date.now();
+        const last = lastRef.current;
+        if (code !== last.code || now - last.at > REPEAT_GUARD_MS) {
+            lastRef.current = { code, at: now };
+            onCodeRef.current(code);
+        }
+    }, []);
+
+    /**
+     * ZXing statt des nativen Detectors: liest direkt vom <video>, das schon
+     * läuft. Wird nur nachgeladen, wenn es gebraucht wird (eigener Chunk).
+     */
+    const startZxing = useCallback(async () => {
+        const video = videoRef.current;
+        if (!video || !streamRef.current || zxingRef.current) return;
+        try {
+            const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+                import('@zxing/browser'),
+                import('@zxing/library'),
+            ]);
+            if (!streamRef.current || zxingRef.current) return;
+            const hints = new Map();
+            hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+                BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.CODE_93,
+                BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.ITF, BarcodeFormat.CODABAR,
+                BarcodeFormat.QR_CODE, BarcodeFormat.DATA_MATRIX,
+            ]);
+            hints.set(DecodeHintType.TRY_HARDER, true);
+            const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: DETECT_GAP_MS });
+            const controls = await reader.decodeFromVideoElement(video, (result) => {
+                if (result) deliver(result.getText());
+            });
+            zxingRef.current = controls;
+            setProblem('none');
+        } catch (error) {
+            // Sichtbar in der Konsole: ob das Modul fehlte (Vite-Neustart) oder das Video nicht spielte.
+            console.error('[Schnellerfassung] ZXing konnte nicht starten:', error);
+            setProblem('unsupported');
+        }
+    }, [deliver]);
+
+    const tick = useCallback(async () => {
+        loopRef.current = null;
+        const video = videoRef.current;
+        const detector = detectorRef.current;
+        if (!video || !detector || !streamRef.current) return;
+        if (!pausedRef.current && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
+            try {
+                const canvas = canvasRef.current ?? (canvasRef.current = document.createElement('canvas'));
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d', { willReadFrequently: true })?.drawImage(video, 0, 0);
+                const results = await detector.detect(canvas);
+                deliver(results[0]?.rawValue);
+            } catch (error) {
+                /* Einzelne Bilder scheitern, während der Autofokus sich einstellt.
+                   Ein NotSupportedError dagegen heisst: der Detector existiert
+                   nur dem Namen nach — dann liest ab hier ZXing. */
+                if ((error as { name?: string } | null)?.name === 'NotSupportedError') {
+                    detectorRef.current = null;
+                    void startZxing();
+                    return;
+                }
+            }
+        }
+        if (streamRef.current) loopRef.current = window.setTimeout(() => tickRef.current(), DETECT_GAP_MS);
+    }, [deliver, startZxing]);
+    useEffect(() => { tickRef.current = () => { void tick(); }; }, [tick]);
+
+    const start = useCallback(async () => {
+        if (streamRef.current || starting) return;
+        if (!supported) { setProblem('unsupported'); return; }
+        setStarting(true);
+        setProblem('none');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: false,
+            });
+            streamRef.current = stream;
+            const video = videoRef.current;
+            if (!video) { stream.getTracks().forEach((track) => track.stop()); streamRef.current = null; return; }
+            video.srcObject = stream;
+            await video.play();
+            setRunning(true);
+            const Ctor = detectorCtor();
+            if (Ctor) {
+                detectorRef.current = new Ctor({ formats: BARCODE_FORMATS });
+                loopRef.current = window.setTimeout(() => tickRef.current(), DETECT_GAP_MS);
+            } else {
+                // Kein nativer Leser (Windows, iPhone): ZXing übernimmt.
+                void startZxing();
+            }
+        } catch (error) {
+            stop();
+            const name = String((error as { name?: string } | null)?.name || '');
+            setProblem(name === 'NotAllowedError' || name === 'PermissionDeniedError' ? 'denied' : 'failed');
+        } finally {
+            setStarting(false);
+        }
+    }, [starting, startZxing, stop, supported]);
+
+    // Läuft nur, solange der Scan-Schritt offen ist; beim Verlassen geht das Licht aus.
+    useEffect(() => {
+        if (!active) { stop(); return; }
+        const timer = window.setTimeout(() => { void start(); }, 80);
+        return () => { window.clearTimeout(timer); stop(); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active]);
+
+    /** Nach einem Treffer: derselbe Code darf gleich wieder gelten (nächstes, gleiches Etikett). */
+    const forget = useCallback(() => { lastRef.current = { code: '', at: 0 }; }, []);
+
+    return { videoRef, running, starting, problem, start, stop, forget, supported };
+};
+
+/* ── Bausteine ─────────────────────────────────────────────────────────── */
+
+const Row = ({ code, name, hint, meta, on, onClick, disabled }: {
+    code?: string;
+    name: string;
+    hint?: string;
+    meta?: string;
+    on?: boolean;
+    onClick: () => void;
+    disabled?: boolean;
 }) => (
-    <div
-        className={`ofi-qa__lasso is-${look} ${busy ? 'is-busy' : ''}`}
-        style={{ left: pct(fraction.x, 1), top: pct(fraction.y, 1), width: pct(fraction.w, 1), height: pct(fraction.h, 1) }}
-        aria-hidden
-    >
-        {look === 'set' && <div className="ofi-qa__lasso-body" onPointerDown={onBodyDown} />}
-        {look !== 'drawing' && HANDLES.map((mode) => (
-            <span key={mode} className={`ofi-qa__handle is-${mode}`} onPointerDown={(event) => onHandleDown?.(event, mode)} />
-        ))}
+    <button type="button" className={`ofi-qe-row ${on ? 'is-on' : ''}`} onClick={onClick} disabled={disabled}>
+        {code && <span className="ofi-qe-row__code">{code}</span>}
+        <span className="ofi-qe-row__text">
+            <span className="ofi-qe-row__name">{name}</span>
+            {hint && <span className="ofi-qe-row__hint">{hint}</span>}
+        </span>
+        {meta && <span className="ofi-qe-row__meta">{meta}</span>}
+        <ChevronRight size={15} />
+    </button>
+);
+
+const Kv = ({ label, value, mono, name }: { label: string; value: string | number | null | undefined; mono?: boolean; name?: boolean }) => (
+    <div className="ofi-qe-kv">
+        <dt>{label}</dt>
+        <dd className={`${mono ? 'is-mono' : ''} ${name ? 'is-name' : ''}`}>{value === null || value === undefined || value === '' ? '—' : value}</dd>
     </div>
 );
 
 export const QuickAddSheet = ({ open, onClose }: {
     open: boolean;
-    /** Wird mit der Zahl der in dieser Sitzung erfassten Produkte gerufen. */
+    /** Wird mit der Zahl der in dieser Sitzung gebuchten Geräte gerufen. */
     onClose: (added: number) => void;
 }) => {
     useLanguageTick();
@@ -232,95 +318,104 @@ export const QuickAddSheet = ({ open, onClose }: {
     const canCreate = permissions.includes('inventory.articles.create');
     const canTransfer = permissions.includes('inventory.transfer');
 
-    const units = useUnitStore((state) => state.units);
-    const ensureUnits = useUnitStore((state) => state.ensure);
+    /* ── Erstdefinition ─────────────────────────────────────────────────── */
+    const [mode, setMode] = useState<Mode>('in');
+    const [step, setStep] = useState<Step>('category');
+    const [direction, setDirection] = useState<'fwd' | 'back'>('fwd');
+    const [categories, setCategories] = useState<CodeCategory[] | null>(null);
+    const [category, setCategory] = useState<CodeCategory | null>(null);
+    const [scheme, setScheme] = useState<CodeScheme | null>(null);
+    const [variant, setVariant] = useState<Variant | null>(null);
+    const [nextCode, setNextCode] = useState<string>('');
+    const [freshTick, setFreshTick] = useState(0);
 
-    const [phase, setPhase] = useState<Phase>('idle');
-    const [image, setImage] = useState<PreparedImage | null>(null);
-    const [failure, setFailure] = useState<string | null>(null);
-
-    /* Eigener Ausschnitt (Pixel des erkannten Bildes) und der Rahmen, der
-       gerade unter dem Finger wächst oder gezogen wird (Anteile der Anzeige). */
-    const [region, setRegion] = useState<OcrBox | null>(null);
-    /* Der Rahmen unter dem Finger — mit seinem Aussehen, damit die
-       Darstellung nicht den Zieh-Merker lesen muss. */
-    const [draft, setDraft] = useState<{ rect: Fraction; look: 'drawing' | 'set' } | null>(null);
-    const [regionBusy, setRegionBusy] = useState(false);
-    const [regionError, setRegionError] = useState<string | null>(null);
-
+    /* ── je Gerät ───────────────────────────────────────────────────────── */
+    const [scan, setScan] = useState<ScanState>({ kind: 'idle' });
+    const [typed, setTyped] = useState('');
+    const [barcode, setBarcode] = useState('');
+    const [model, setModel] = useState('');
+    const [serial, setSerial] = useState('');
     const [name, setName] = useState('');
-    const [qty, setQty] = useState('1');
-    /** Die ausdrücklich gewählte Einheit; leer = Vorgabe des Mandanten. */
-    const [unitChoice, setUnitChoice] = useState('');
+    /** «Gleiches Modell»: Modell und Bezeichnung des ersten Geräts. */
+    const [remembered, setRemembered] = useState<{ model: string; name: string } | null>(null);
+    /* ZWILLING IM LAGER (Nachtrag Samet 10.09.2026: «ich will unter demselben
+       ERP-Code nur die Menge erhöhen»): im Formular «Artikel festlegen» sucht
+       das Tippen von Modell/Bezeichnung nach dem schon vorhandenen Artikel —
+       ein Tipp macht ihn zum aktuellen Artikel statt einen neuen anzulegen. */
     const [matches, setMatches] = useState<{ query: string; rows: SearchItem[] }>({ query: '', rows: [] });
-    /** Von Hand gewählter Zwilling in der Produktliste. */
-    const [linkedChoice, setLinkedChoice] = useState<SearchItem | null>(null);
-    /** «Stattdessen neu anlegen» — der automatische Zwilling bleibt dann aus. */
-    const [declinedLink, setDeclinedLink] = useState(false);
-    const [attachPhoto, setAttachPhoto] = useState(false);
+    /** Der zuletzt gebuchte/angelegte Artikel — bei «Gleiches Modell» der erste Vorschlag,
+        wenn das nächste Etikett unbekannt ist (gleiches Modell, anderer Barcode). */
+    const [lastArticle, setLastArticle] = useState<{ id: string; code: string; name: string; modelNumber: string | null; unit?: string } | null>(null);
+    /** Menge der nächsten Buchung («Weiter», «Speichern», Zwilling) — nach jeder Buchung wieder 1. */
+    const [quantity, setQuantity] = useState(1);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [log, setLog] = useState<LogEntry[]>([]);
     const [added, setAdded] = useState(0);
 
-    const cameraRef = useRef<HTMLInputElement>(null);
-    const pickerRef = useRef<HTMLInputElement>(null);
+    const scanFieldRef = useRef<HTMLInputElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
-    const pictureRef = useRef<HTMLDivElement>(null);
-    const imageRef = useRef<PreparedImage | null>(null);
-    const jobRef = useRef(0);
-    const dragRef = useRef<Drag | null>(null);
-    /** Der Klick, der auf ein Ziehen folgt, gehört zum Ziehen — nicht zum Rahmen darunter. */
-    const suppressClickRef = useRef(false);
-    /** Der zuletzt AUS DEM BILD gelesene Name — nur er darf an den Katalog angelegt werden. */
-    const ocrNameRef = useRef('');
-    /* Der Strich schreibt MIT: solange er wächst, liest ein schneller Lesegang
-       seinen Ausschnitt und setzt den Namen jedes Mal NEU. Es ist immer nur
-       EIN Lesegang unterwegs; der zuletzt gewünschte Ausschnitt wartet in
-       `next`, alle davor werden übersprungen. `token` verwirft Ergebnisse, die
-       zu spät kommen, `wrote` merkt sich, ob überhaupt etwas mitgeschrieben
-       wurde. */
-    const liveRef = useRef<{ busy: boolean; next: OcrBox | null; token: number; wrote: boolean; timer: number | null; readWidth: number }>({
-        busy: false, next: null, token: 0, wrote: false, timer: null, readWidth: 0,
-    });
+    const lookupRef = useRef(0);
 
     const close = useCallback(() => onClose(added), [onClose, added]);
     useBackDismiss(open, close);
 
-    /* Beim Öffnen: Erkenner vorwärmen, Einheiten holen, Seite hinter dem
-       Fenster stillhalten. Beim Schliessen: alles zurück, Worker freigeben. */
+    /* Beim Öffnen: freigegebene Kreise laden, Seite dahinter stillhalten.
+       Beim Schliessen: alles zurück auf Anfang. */
     useEffect(() => {
         if (!open) return;
-        void ensureUnits();
+        let cancelled = false;
+        articleCodesApi.list({ active: true })
+            .then((rows) => { if (!cancelled) setCategories(rows); })
+            .catch(() => { if (!cancelled) setCategories([]); });
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => {
+            cancelled = true;
             document.body.style.overflow = previousOverflow;
-            jobRef.current += 1;
-            dragRef.current = null;
-            if (liveRef.current.timer !== null) window.clearTimeout(liveRef.current.timer);
-            liveRef.current = { busy: false, next: null, token: liveRef.current.token + 1, wrote: false, timer: null, readWidth: 0 };
-            imageRef.current?.release();
-            imageRef.current = null;
-            setImage(null);
-            setFailure(null);
-            setPhase('idle');
-            setRegion(null);
-            setDraft(null);
-            setRegionBusy(false);
-            setRegionError(null);
+            lookupRef.current += 1;
+            setMode('in');
+            setStep('category');
+            setDirection('fwd');
+            setCategories(null);
+            setCategory(null);
+            setScheme(null);
+            setVariant(null);
+            setNextCode('');
+            setScan({ kind: 'idle' });
+            setTyped('');
+            setBarcode('');
+            setModel('');
+            setSerial('');
             setName('');
-            setQty('1');
+            setRemembered(null);
+            setLastArticle(null);
             setMatches({ query: '', rows: [] });
-            setLinkedChoice(null);
-            setDeclinedLink(false);
+            setQuantity(1);
             setFormError(null);
             setLog([]);
             setAdded(0);
         };
-    }, [open, ensureUnits]);
+    }, [open]);
 
-    /* Escape schliesst — ausser ein Auswahlfenster (Einheiten) liegt darüber. */
+    /* Die Zwillingssuche — nur im Formular «Artikel festlegen»: Modell, sonst
+       Bezeichnung. Das Ergebnis trägt seine Anfrage mit, damit ein verspäteter
+       Treffer nie zu einem anderen Text zeigt. */
+    const defining = mode === 'in' && step === 'variant' && variant === 'same' && !lastArticle;
+    const matchQuery = defining ? (model.trim() || name.trim()) : '';
+    useEffect(() => {
+        if (matchQuery.length < MATCH_MIN) return;
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            inventoryApi.searchItems(matchQuery)
+                .then((rows) => { if (!cancelled) setMatches({ query: matchQuery, rows: rows.slice(0, MATCH_MAX) }); })
+                .catch(() => { if (!cancelled) setMatches({ query: matchQuery, rows: [] }); });
+        }, MATCH_DELAY_MS);
+        return () => { cancelled = true; window.clearTimeout(timer); };
+    }, [matchQuery]);
+    const visibleMatches = matchQuery.length >= MATCH_MIN && matches.query === matchQuery ? matches.rows : [];
+
+    /* Escape schliesst — ausser ein Fenster liegt darüber. */
     useEffect(() => {
         if (!open) return;
         const onKey = (event: KeyboardEvent) => {
@@ -332,430 +427,292 @@ export const QuickAddSheet = ({ open, onClose }: {
         return () => window.removeEventListener('keydown', onKey);
     }, [open, close]);
 
-    /* Name → Suche in der Produktliste (entprellt); das Ergebnis trägt seine
-       Anfrage mit, damit ein veralteter Treffer nie zu einem neuen Namen zeigt.
-
-       Dieselbe Antwort ist auch die «Vorhersage»: stammt der Name aus dem
-       Bild und steht im Katalog etwas, das bis auf ein paar verwechselbare
-       Zeichen gleich lautet, gewinnt der Katalog (siehe lib/ocr/textSense).
-       Das kostet keine zusätzliche Anfrage — die Trefferliste ist ohnehin da. */
-    const query = name.trim();
-    useEffect(() => {
-        if (query.length < MIN_QUERY) return;
-        let cancelled = false;
-        const timer = window.setTimeout(() => {
-            inventoryApi.searchItems(query)
-                .then((rows) => {
-                    if (cancelled) return;
-                    const found = rows.slice(0, MAX_MATCHES);
-                    setMatches({ query, rows: found });
-                    if (ocrNameRef.current !== query) return;
-                    const snapped = snapToKnown(query, found.map((row) => row.name));
-                    if (!snapped) return;
-                    ocrNameRef.current = snapped;
-                    setName(snapped);
-                })
-                .catch(() => { if (!cancelled) setMatches({ query, rows: [] }); });
-        }, SEARCH_DELAY_MS);
-        return () => {
-            cancelled = true;
-            window.clearTimeout(timer);
-        };
-    }, [query]);
-
-    /* ── abgeleiteter Zustand ────────────────────────────────────────────── */
-    const visibleMatches = useMemo(
-        () => (query.length >= MIN_QUERY && matches.query === query ? matches.rows : []),
-        [query, matches],
-    );
-    // Gleicher Name wie ein vorhandenes Produkt → Eingang statt Doppel.
-    const autoLinked = useMemo(() => {
-        if (linkedChoice || declinedLink) return null;
-        const wanted = normalizeName(query);
-        if (!wanted) return null;
-        return visibleMatches.find((row) => normalizeName(row.name) === wanted) ?? null;
-    }, [linkedChoice, declinedLink, query, visibleMatches]);
-    const linked = linkedChoice ?? autoLinked;
-
-    const defaultUnit = useMemo(
-        () => (units.find((row) => row.isDefault) ?? units.find((row) => row.isActive) ?? units[0])?.code ?? '',
-        [units],
-    );
-    const unit = linked?.unit || unitChoice || defaultUnit;
-
-    /* ── Foto vorbereiten; OCR läuft erst für den selbst markierten Bereich. */
-    const takeFile = useCallback(async (file: File | null | undefined) => {
-        if (!file) return;
-        // Ein Lesegang des VORIGEN Fotos darf seinen Namen nicht in das neue tragen.
-        jobRef.current += 1;
-        liveRef.current.token += 1;
-        liveRef.current.next = null;
-        liveRef.current.wrote = false;
-        ocrNameRef.current = '';
+    /* ── Schritte ───────────────────────────────────────────────────────── */
+    const scanning = open && (mode === 'delete' || step === 'scan');
+    const go = (next: Step, dir: 'fwd' | 'back') => { setDirection(dir); setStep(next); };
+    const pickCategory = (row: CodeCategory) => { setCategory(row); setScheme(null); go('scheme', 'fwd'); };
+    const pickScheme = (row: CodeScheme) => { setScheme(row); setNextCode(row.nextCode); go('variant', 'fwd'); };
+    /* «Verschiedene Modelle» geht direkt zur Kamera; «Gleiches Modell» bleibt
+       hier und klappt darunter «Artikel festlegen» auf. */
+    const pickVariant = (row: Variant) => {
+        setVariant(row);
         setFormError(null);
-        setPhase('preparing');
-        setFailure(null);
-        setName('');
-        setRegion(null);
-        setDraft(null);
-        setRegionError(null);
-        setLinkedChoice(null);
-        setDeclinedLink(false);
-        try {
-            const prepared = await prepareImage(file);
-            imageRef.current?.release();
-            imageRef.current = prepared;
-            setImage(prepared);
-            setPhase('ready');
-        } catch {
-            setPhase('failed');
-            setFailure(t('inv.quickAdd.imageFailed'));
-        }
-    }, []);
-
-    const onFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        // Der Wert wird zurückgesetzt, damit dasselbe Foto erneut gewählt
-        // werden kann (sonst feuert `change` beim zweiten Mal nicht).
-        event.target.value = '';
-        void takeFile(file);
+        if (row === 'different') { setRemembered(null); setLastArticle(null); go('scan', 'fwd'); }
+    };
+    const back = () => {
+        setScan({ kind: 'idle' });
+        setFormError(null);
+        if (step === 'scan') go('variant', 'back');
+        else if (step === 'variant') go('scheme', 'back');
+        else if (step === 'scheme') go('category', 'back');
+    };
+    const switchMode = (next: Mode) => {
+        if (next === mode) return;
+        setMode(next);
+        setScan({ kind: 'idle' });
+        setFormError(null);
+        setTyped('');
     };
 
-    /* ── eigenen Ausschnitt lesen ────────────────────────────────────────── */
-    const readRegion = useCallback(async (source: PreparedImage, box: OcrBox) => {
-        const job = ++jobRef.current;
-        // Ab hier zählt nur noch der genaue Text; ein Zwischenstand, der noch
-        // unterwegs ist, darf ihn nicht mehr überschreiben.
-        liveRef.current.token += 1;
-        liveRef.current.next = null;
-        setRegionBusy(true);
-        setRegionError(null);
-        setLinkedChoice(null);
-        setDeclinedLink(false);
+    /* ── Kamera ─────────────────────────────────────────────────────────── */
+    const paused = scan.kind !== 'idle';
+    const focusScanField = () => window.setTimeout(() => scanFieldRef.current?.focus({ preventScroll: true }), 60);
+
+    /** Ein Code ist da — von der Kamera, vom Handscanner oder getippt. */
+    const takeCode = useCallback(async (raw: string) => {
+        const code = raw.trim();
+        if (!code || saving) return;
+        const job = ++lookupRef.current;
         setFormError(null);
+        setScan({ kind: 'looking', code });
         try {
-            const result = await recognizeRegion(source.canvas, box);
-            if (jobRef.current !== job) return;
-            if (!result.text) {
-                // Was der Finger schon mitgeschrieben hat, bleibt stehen — das
-                // ist mehr wert als ein leeres Feld mit einer Fehlermeldung.
-                if (liveRef.current.wrote) return;
-                setName('');
-                setRegionError(t('inv.quickAdd.regionNoText'));
+            const result = await inventoryApi.scanLookup(code);
+            if (lookupRef.current !== job) return;
+            /* «GLEICHES MODELL» = EIN ERP-CODE (Nachtrag Samet 10.09.2026: «unter
+               demselben ERP-Code schnell Geräte mit anderem Barcode»): sobald ein
+               Artikel als AKTUELLER steht, bucht jeder Scan +1 darauf — ein
+               unbekanntes Etikett wird ihm angeheftet, sein eigenes ohnehin. Kein
+               Formular, kein «Weiter». Nur ein Scan, der einen ANDEREN bekannten
+               Artikel trifft, zeigt die Karte zur Bestätigung. */
+            const anchored = mode === 'in' && variant === 'same' && lastArticle;
+            if (anchored && (!result.found || result.article?.id === lastArticle.id)) {
+                await bookOnAnchor(lastArticle, code, !result.found);
                 return;
             }
-            ocrNameRef.current = result.text;
-            setName(result.text);
+            if (result.found && result.article) {
+                setScan({ kind: 'found', code, article: result.article });
+                return;
+            }
+            if (mode === 'delete') {
+                setScan({ kind: 'missing', code });
+                return;
+            }
+            // Neu erfassen: Barcode ist gelesen, Modell/Bezeichnung ggf. vorausgefüllt.
+            setBarcode(code);
+            setModel(variant === 'same' && remembered ? remembered.model : '');
+            setName(variant === 'same' && remembered ? remembered.name : '');
+            setSerial('');
+            setScan({ kind: 'new', code });
+            window.setTimeout(() => {
+                (variant === 'same' && remembered ? scanFieldRef : nameRef).current?.focus?.({ preventScroll: true });
+            }, 80);
         } catch (error) {
-            if (jobRef.current !== job) return;
-            // Ein fehlender Schlüssel ist kein Lesefehler, sondern eine
-            // fehlende Einrichtung — das muss dranstehen, sonst sucht jemand
-            // den Fehler bei seinem Foto.
-            const missing = error instanceof OcrUnavailable
-                && (error.code === 'OCR_NOT_CONFIGURED' || error.code === 'OCR_NOT_ENABLED'
-                    // Altbestand, siehe `SETUP_CODES` in lib/ocr/ocrEngine.ts.
-                    || error.code === 'VISION_NOT_CONFIGURED' || error.code === 'VISION_NOT_ENABLED');
-            setRegionError(t(missing ? 'inv.quickAdd.ocrNotConfigured' : 'inv.quickAdd.ocrFailed'));
-        } finally {
-            if (jobRef.current === job) setRegionBusy(false);
+            if (lookupRef.current !== job) return;
+            setScan({ kind: 'idle' });
+            setFormError(responseError(error) || t('inv.quickEntry.saveFailed'));
         }
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode, remembered, saving, variant, lastArticle]);
 
-    const onNameTyped = (value: string) => {
-        // Getippt heisst: der Name ist jetzt von Hand; die Rahmen lösen sich,
-        // und kein noch laufender Lesegang darf das Getippte überschreiben.
-        jobRef.current += 1;
-        liveRef.current.token += 1;
-        liveRef.current.next = null;
-        liveRef.current.wrote = false;
-        ocrNameRef.current = '';
-        setName(value);
-        setRegion(null);
-        setDraft(null);
-        setRegionBusy(false);
-        setRegionError(null);
-        setLinkedChoice(null);
-        setDeclinedLink(false);
+    /* Destrukturiert — nicht als Objekt gehalten: der Hook gibt auch die
+       Video-Ref zurück, und als Ganzes gelesen sähe die React-Regel darin
+       einen Ref-Zugriff beim Zeichnen. */
+    const {
+        videoRef,
+        running: cameraRunning,
+        starting: cameraStarting,
+        problem: cameraProblem,
+        supported: cameraSupported,
+        start: startCamera,
+        stop: stopCamera,
+        forget: forgetLastCode,
+    } = useBarcodeCamera(scanning, paused, (code) => { void takeCode(code); });
+
+    /** Zurück zur Kamera für das nächste Gerät. */
+    const rearm = useCallback(() => {
+        lookupRef.current += 1;
+        forgetLastCode();
+        setScan({ kind: 'idle' });
+        setTyped('');
+        setQuantity(1);
         setFormError(null);
+        focusScanField();
+    }, [forgetLastCode]);
+
+    const onTypedSubmit = () => {
+        const value = typed.trim();
+        if (!value) return;
+        setTyped('');
+        void takeCode(value);
     };
 
-    const chooseMatch = (row: SearchItem) => {
-        setLinkedChoice(row);
-        setDeclinedLink(false);
+    /** «Ohne Barcode erfassen» — direkt ins Formular. */
+    const startWithoutBarcode = () => {
+        setBarcode('');
+        setModel(variant === 'same' && remembered ? remembered.model : '');
+        setName(variant === 'same' && remembered ? remembered.name : '');
+        setSerial('');
         setFormError(null);
+        setScan({ kind: 'new', code: null });
+        window.setTimeout(() => nameRef.current?.focus({ preventScroll: true }), 80);
     };
 
-    const unlink = () => {
-        setLinkedChoice(null);
-        setDeclinedLink(true);
-    };
+    /* ── Buchen ─────────────────────────────────────────────────────────── */
+    const pushLog = (entry: Omit<LogEntry, 'key'>) =>
+        setLog((current) => [{ key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ...entry }, ...current]);
 
-    /** Die Zwischenstände anhalten und ihre Nachzügler verwerfen — ohne das Feld anzufassen. */
-    const stopLive = () => {
-        const live = liveRef.current;
-        live.token += 1;
-        live.next = null;
-        live.readWidth = 0;
-        if (live.timer !== null) {
-            window.clearTimeout(live.timer);
-            live.timer = null;
-        }
-    };
-
-    /**
-     * Das Feld GANZ leeren und jeden laufenden Lesegang für ungültig erklären.
-     * Zwei Anlässe, derselbe Griff: das «x» im Feld (`dropRegion`, die
-     * Markierung geht mit) und der Beginn eines neuen Strichs — dort soll der
-     * alte Name nicht stehen bleiben, während der neue hereinwandert.
-     */
-    const clearInput = (dropRegion: boolean) => {
-        jobRef.current += 1;
-        stopLive();
-        liveRef.current.wrote = false;
-        ocrNameRef.current = '';
-        setName('');
-        setRegionBusy(false);
-        setRegionError(null);
-        setLinkedChoice(null);
-        setDeclinedLink(false);
-        setFormError(null);
-        if (dropRegion) {
-            setRegion(null);
-            setDraft(null);
-        }
-    };
-
-    const clearSelection = () => clearInput(true);
-
-    /**
-     * Den wartenden Ausschnitt lesen. Nach jedem Lesegang eine kurze Pause —
-     * sie ist die einzige Bremse, die es braucht: mehr als einen Zwischenstand
-     * gleichzeitig gibt es ohnehin nie, und wo der Browser selbst liest, käme
-     * sonst bei jeder Fingerbewegung einer.
-     */
-    const pumpLive = () => {
-        const live = liveRef.current;
-        const source = imageRef.current;
-        if (live.busy || live.timer !== null || !live.next || !source) return;
-        const box = live.next;
-        live.next = null;
-        live.busy = true;
-        live.readWidth = box.x1 - box.x0;
-        const token = live.token;
-        const job = jobRef.current;
-        recognizeRegionLive(source.canvas, box)
-            .then((text) => {
-                if (!text || token !== liveRef.current.token || job !== jobRef.current) return;
-                liveRef.current.wrote = true;
-                ocrNameRef.current = text;
-                setName(text);
-            })
-            .catch(() => { /* ein Zwischenstand darf danebengehen — der Lesegang beim Loslassen entscheidet */ })
-            .finally(() => {
-                const current = liveRef.current;
-                current.busy = false;
-                if (current.timer !== null) window.clearTimeout(current.timer);
-                current.timer = window.setTimeout(() => { liveRef.current.timer = null; pumpLive(); }, LIVE_GAP_MS);
-            });
-    };
-
-    /** Zwischenstand für den Ausschnitt anfordern, der gerade unter dem Finger liegt. */
-    const queueLive = (fraction: Fraction, rect: DOMRect) => {
-        if (!image) return;
-        if (fraction.w * rect.width < LIVE_MIN_PX || fraction.h * rect.height < MIN_FRAME_PX) return;
-        const box = fractionToBox(fraction, image);
-        // Ein Viereck, das seit dem letzten Lesegang kaum gewachsen ist, ergibt
-        // denselben Text — dafür lohnt kein Aufruf.
-        const grown = Math.abs((box.x1 - box.x0) - liveRef.current.readWidth);
-        if (liveRef.current.readWidth > 0 && grown < LIVE_GROWTH_PX) return;
-        liveRef.current.next = box;
-        pumpLive();
-    };
-
-    /* ── Ziehen auf dem Foto: zeichnen, verschieben, vergrössern ─────────── */
-    const busy = phase === 'preparing';
-    const canTrace = Boolean(image) && !busy && !regionBusy;
-
-    const capturePointer = (pointerId: number) => {
-        try { pictureRef.current?.setPointerCapture(pointerId); } catch { /* alte WebViews */ }
-    };
-
-    const onPicturePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (!canTrace || !pictureRef.current) return;
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        // Kein Bildziehen, keine Textauswahl unter der Maus.
-        if (event.pointerType === 'mouse') event.preventDefault();
-        const rect = pictureRef.current.getBoundingClientRect();
-        dragRef.current = {
-            kind: 'draw',
-            id: event.pointerId,
-            rect,
-            x0: event.clientX,
-            y0: event.clientY,
-            active: false,
-        };
-    };
-
-    /** Griff oder Fläche eines bestehenden Rahmens angefasst. */
-    const startFrameDrag = (event: React.PointerEvent<HTMLElement>, mode: HandleMode, origin: Fraction) => {
-        if (!canTrace || !pictureRef.current) return;
-        if (event.pointerType === 'mouse' && event.button !== 0) return;
-        event.stopPropagation();
-        event.preventDefault();
-        dragRef.current = {
-            kind: 'frame',
-            id: event.pointerId,
-            rect: pictureRef.current.getBoundingClientRect(),
-            x0: event.clientX,
-            y0: event.clientY,
-            mode,
-            origin,
-            // Ein Griff zieht sofort; die Fläche erst ab der Schwelle (ein
-            // Tipp darauf soll nichts verschieben).
-            active: mode !== 'move',
-        };
-        if (mode !== 'move') {
-            capturePointer(event.pointerId);
-            // Ein Griff zieht ohne Schwelle los — also hier leeren, nicht erst
-            // in der Bewegung (der Rahmen selbst bleibt, er wird ja verändert).
-            clearInput(false);
-            setDraft({ rect: origin, look: 'set' });
-        }
-    };
-
-    const fractionForDrag = (drag: Drag, clientX: number, clientY: number): Fraction => {
-        if (drag.kind === 'draw') return drawnFraction(drag.rect, drag.x0, drag.y0, clientX, clientY);
-        const dx = (clientX - drag.x0) / drag.rect.width;
-        const dy = (clientY - drag.y0) / drag.rect.height;
-        return resizeFraction(drag.origin, drag.mode, dx, dy, MIN_FRAME_PX / drag.rect.width, MIN_FRAME_PX / drag.rect.height);
-    };
-
-    const onPicturePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-        const drag = dragRef.current;
-        if (!drag || drag.id !== event.pointerId) return;
-        if (!drag.active) {
-            if (Math.hypot(event.clientX - drag.x0, event.clientY - drag.y0) < DRAG_THRESHOLD_PX) return;
-            drag.active = true;
-            capturePointer(event.pointerId);
-            // Jetzt ist es ein Strich, kein Tipp: das Feld wird leer und füllt
-            // sich von hier an mit dem, was unter dem Finger liegt.
-            clearInput(drag.kind === 'draw');
-        }
-        const fraction = fractionForDrag(drag, event.clientX, event.clientY);
-        setDraft({ rect: fraction, look: drag.kind === 'frame' ? 'set' : 'drawing' });
-        // Mitschreiben: was bis hierher überstrichen ist, steht schon im Feld.
-        queueLive(fraction, drag.rect);
-    };
-
-    const onPicturePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-        const drag = dragRef.current;
-        if (!drag || drag.id !== event.pointerId) return;
-        dragRef.current = null;
-        if (!drag.active) return; // ein Tipp — der Rahmen darunter bekommt seinen Klick
-        setDraft(null);
-        suppressClickRef.current = true;
-        window.setTimeout(() => { suppressClickRef.current = false; }, 0);
-        const fraction = fractionForDrag(drag, event.clientX, event.clientY);
-        if (!image || fraction.w * drag.rect.width < MIN_FRAME_PX || fraction.h * drag.rect.height < MIN_FRAME_PX) {
-            stopLive();
-            return;
-        }
-        const box = fractionToBox(fraction, image);
-        setRegion(box);
-        void readRegion(image, box);
-    };
-
-    const onPicturePointerCancel = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (dragRef.current?.id !== event.pointerId) return;
-        dragRef.current = null;
-        stopLive();
-        setDraft(null);
-    };
-
-    const onPictureClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
-        if (!suppressClickRef.current) return;
-        event.stopPropagation();
-        event.preventDefault();
-    };
-
-    /* ── Menge ───────────────────────────────────────────────────────────── */
-    const quantity = parseNum(qty) ?? 0;
-    const stepQty = (delta: number) => {
-        const next = Math.max(0, Math.round(((parseNum(qty) ?? 0) + delta) * 1000) / 1000);
-        setQty(String(next));
-    };
-
-    /* ── Speichern ───────────────────────────────────────────────────────── */
-    const add = async () => {
-        const productName = name.trim();
-        if (!productName) {
-            setFormError(t('inv.quickAdd.nameRequired'));
-            nameRef.current?.focus();
-            return;
-        }
-        if (!(quantity > 0)) {
-            setFormError(t('inv.stock.rowQuantity'));
-            return;
-        }
-        if (linked && !canTransfer) {
-            setFormError(t('inv.stock.noPermission'));
-            return;
-        }
-        if (!linked && !canCreate) {
-            setFormError(t('inv.newProduct.noPermission'));
-            return;
-        }
-
+    /** «Weiter» auf einen erkannten Artikel: Zugang oder Abgang in der eingegebenen Menge. */
+    const bookFound = async () => {
+        if (scan.kind !== 'found') return;
+        if (!canTransfer) { setFormError(t('inv.quickEntry.noPermission')); return; }
+        const { article, code } = scan;
+        if (mode === 'delete' && article.totalQuantity <= 0) { setFormError(t('inv.quickEntry.noStock')); return; }
+        if (mode === 'delete' && quantity > article.totalQuantity) { setFormError(t('inv.quickEntry.tooMuch', { count: article.totalQuantity, unit: article.unit })); return; }
         setSaving(true);
         setFormError(null);
-        const key = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         try {
-            if (linked) {
+            const deleting = mode === 'delete';
+            const tags = [
+                article.supplierBarcode || article.systemBarcode ? `Barcode ${article.supplierBarcode || article.systemBarcode}` : (code !== article.articleCode ? `Barcode ${code}` : null),
+                article.serialNumber ? `SN ${article.serialNumber}` : null,
+            ].filter(Boolean).join(' · ');
+            const result = await inventoryApi.bulkCreateMovements([{
+                articleId: article.id,
+                movementType: deleting ? 'OUT' : 'IN',
+                quantity,
+                origin: deleting ? 'QUICK_DELETE' : 'QUICK_ADD',
+                scannedBarcode: code,
+                serialNumber: article.serialNumber ?? null,
+                description: [t(deleting ? 'inv.quickEntry.deleteNote' : 'inv.quickEntry.logIn'), tags].filter(Boolean).join(' · '),
+            }]);
+            const rowError = result.errors[0]?.error;
+            if (rowError || !result.movements.length) {
+                setFormError(rowError || t('inv.quickEntry.saveFailed'));
+                return;
+            }
+            pushLog({ name: article.name, code: article.articleCode, kind: deleting ? 'out' : 'in', quantity });
+            setAdded((current) => current + 1);
+            if (!deleting) setLastArticle({ id: article.id, code: article.articleCode, name: article.name, modelNumber: article.modelNumber ?? null, unit: article.unit });
+            rearm();
+        } catch (error) {
+            setFormError(responseError(error) || t('inv.quickEntry.saveFailed'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    /**
+     * Ein Scan auf den AKTUELLEN Artikel («Gleiches Modell»): Etikett anheften,
+     * wenn es neu ist, dann die Menge aus dem Stepper (Vorgabe 1) — ohne
+     * Karte, ohne «Weiter». Läuft aus
+     * `takeCode` heraus, darum als Ref, damit die Kamera-Rückrufe stets die
+     * aktuelle Fassung sehen.
+     */
+    const bookOnAnchorRef = useRef<(anchor: NonNullable<typeof lastArticle>, code: string, attach: boolean) => Promise<void>>(async () => undefined);
+    const bookOnAnchor = (anchor: NonNullable<typeof lastArticle>, code: string, attach: boolean) => bookOnAnchorRef.current(anchor, code, attach);
+    useEffect(() => {
+        bookOnAnchorRef.current = async (anchor, code, attach) => {
+            if (!canTransfer) { setScan({ kind: 'idle' }); setFormError(t('inv.quickEntry.noPermission')); return; }
+            setSaving(true);
+            setFormError(null);
+            try {
+                if (attach) {
+                    try { await inventoryApi.addArticleBarcode(anchor.id, code); } catch { /* Beigabe */ }
+                }
                 const result = await inventoryApi.bulkCreateMovements([{
-                    articleId: linked.id,
+                    articleId: anchor.id,
                     movementType: 'IN',
                     quantity,
-                    description: t('inv.quickAdd.movementNote'),
+                    origin: 'QUICK_ADD',
+                    scannedBarcode: code,
+                    description: `${t('inv.quickEntry.logIn')} · Barcode ${code}`,
                 }]);
                 const rowError = result.errors[0]?.error;
                 if (rowError || !result.movements.length) {
-                    setFormError(rowError || t('inv.quickAdd.saveFailed'));
+                    setScan({ kind: 'idle' });
+                    setFormError(rowError || t('inv.quickEntry.saveFailed'));
                     return;
                 }
-                setLog((current) => [{ key, name: linked.name, code: linked.code, qty: quantity, unit, kind: 'in' }, ...current]);
-            } else {
-                let imageUrl: string | undefined;
-                if (attachPhoto && image) {
-                    const dataUrl = canvasToProductImage(image.canvas);
-                    if (dataUrl) imageUrl = dataUrl;
-                }
-                const result = await inventoryApi.quickCreateArticles([{
-                    name: productName,
-                    quantity,
-                    unit: unit || null,
-                    ...(imageUrl ? { imageUrl } : {}),
-                }]);
-                const rowError = result.errors[0]?.error;
-                const created = result.created[0];
-                if (rowError || !created) {
-                    setFormError(rowError || t('inv.quickAdd.saveFailed'));
-                    return;
-                }
-                setLog((current) => [{ key, name: created.name, code: created.articleCode, qty: quantity, unit, kind: 'new' }, ...current]);
+                pushLog({ name: anchor.name, code: anchor.code, kind: 'in', quantity });
+                setAdded((current) => current + 1);
+                rearm();
+            } catch (error) {
+                setScan({ kind: 'idle' });
+                setFormError(responseError(error) || t('inv.quickEntry.saveFailed'));
+            } finally {
+                setSaving(false);
             }
-            setAdded((current) => current + 1);
-            // Bereit für die nächste Zeile — das Foto bleibt stehen.
-            stopLive();
-            liveRef.current.wrote = false;
-            ocrNameRef.current = '';
-            setName('');
-            setRegion(null);
-            setRegionError(null);
-            setQty('1');
-            setLinkedChoice(null);
-            setDeclinedLink(false);
+        };
+    });
+
+    /**
+     * «Weiter zum Scannen» im Formular «Artikel festlegen»: der Artikel wird
+     * JETZT angelegt — Menge 0, reine Definition unter dem nächsten ERP-Code —
+     * und zum aktuellen Artikel; danach bucht jeder Scan auf ihn. Nichts wird
+     * hier schon eingebucht.
+     */
+    const defineAnchor = async () => {
+        if (!scheme) return;
+        if (!canCreate) { setFormError(t('inv.quickEntry.noPermission')); return; }
+        const productName = name.trim();
+        if (!productName) { setFormError(t('inv.quickEntry.nameRequired')); nameRef.current?.focus(); return; }
+        setSaving(true);
+        setFormError(null);
+        try {
+            const result = await inventoryApi.quickCreateArticles(scheme.id, [{
+                name: productName,
+                modelNumber: model.trim() || null,
+                quantity: 0,
+            }]);
+            const rowError = result.errors[0];
+            const created = result.created[0];
+            if (rowError || !created) {
+                setFormError(rowError?.error || t('inv.quickEntry.saveFailed'));
+                return;
+            }
+            pushLog({ name: created.name, code: created.articleCode, kind: 'new' });
+            setLastArticle({ id: created.id, code: created.articleCode, name: created.name, modelNumber: model.trim() || null });
+            setRemembered({ model: model.trim(), name: productName });
+            setNextCode(bumpCode(created.articleCode));
+            setFreshTick((tick) => tick + 1);
+            go('scan', 'fwd');
         } catch (error) {
-            setFormError(responseError(error) || t('inv.quickAdd.saveFailed'));
+            setFormError(responseError(error) || t('inv.quickEntry.saveFailed'));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    /** Treffer aus dem Lager gewählt: KEIN neuer Artikel — er wird der aktuelle. */
+    const pickExistingAnchor = (row: SearchItem) => {
+        setLastArticle({ id: row.id, code: row.code, name: row.name, modelNumber: row.modelNumber ?? null, ...(row.unit ? { unit: row.unit } : {}) });
+        setRemembered({ model: row.modelNumber ?? model.trim(), name: row.name });
+        setFormError(null);
+        go('scan', 'fwd');
+    };
+
+    /** «Speichern» im Formular: Artikel anlegen + Zugang in der eingegebenen Menge. */
+    const saveNew = async () => {
+        if (scan.kind !== 'new' || !scheme) return;
+        if (!canCreate) { setFormError(t('inv.quickEntry.noPermission')); return; }
+        const productName = name.trim();
+        if (!productName) { setFormError(t('inv.quickEntry.nameRequired')); nameRef.current?.focus(); return; }
+        setSaving(true);
+        setFormError(null);
+        try {
+            const result = await inventoryApi.quickCreateArticles(scheme.id, [{
+                name: productName,
+                modelNumber: model.trim() || null,
+                serialNumber: serial.trim() || null,
+                barcode: barcode.trim() || null,
+                quantity,
+            }]);
+            const rowError = result.errors[0];
+            const created = result.created[0];
+            if (rowError || !created) {
+                setFormError(rowError?.code === 'SERIAL_TAKEN' ? t('inv.quickEntry.serialTaken') : (rowError?.error || t('inv.quickEntry.saveFailed')));
+                return;
+            }
+            pushLog({ name: created.name, code: created.articleCode, kind: 'new', quantity });
+            setAdded((current) => current + 1);
+            setLastArticle({ id: created.id, code: created.articleCode, name: created.name, modelNumber: model.trim() || null });
+            setNextCode(bumpCode(created.articleCode));
+            setFreshTick((tick) => tick + 1);
+            if (variant === 'same') setRemembered({ model: model.trim(), name: productName });
+            rearm();
+        } catch (error) {
+            const code = responseCode(error);
+            setFormError(code === 'SERIAL_TAKEN' ? t('inv.quickEntry.serialTaken') : (responseError(error) || t('inv.quickEntry.saveFailed')));
         } finally {
             setSaving(false);
         }
@@ -763,275 +720,414 @@ export const QuickAddSheet = ({ open, onClose }: {
 
     if (!open) return null;
 
-    /* Es gibt nichts mehr herunterzuladen und keine Stufen zu melden: das
-       Gerät schneidet den Ausschnitt aus, der Server liest ihn. Darum ein
-       Balken ohne Prozente und zwei Sätze — Bild vorbereiten, Bereich lesen. */
-    const progressLabel = regionBusy ? t('inv.quickAdd.readingRegion') : t('inv.quickAdd.preparing');
-    const progressBar = (
-        <div className="ofi-qa__bar is-indeterminate">
-            <span />
-        </div>
-    );
+    /* ── Anzeige ────────────────────────────────────────────────────────── */
+    const inDefinition = mode === 'in' && step !== 'scan';
+    const showBack = mode === 'in' && step !== 'category';
+    const crumbs = mode === 'in'
+        ? [category?.name, scheme?.name, variant ? t(variant === 'same' ? 'inv.quickEntry.sameModel' : 'inv.quickEntry.differentModels') : null].filter(Boolean) as string[]
+        : [t('inv.quickEntry.modeDelete')];
 
-    /* Welcher Rahmen liegt auf dem Foto: der wachsende Entwurf, der eigene
-       Ausschnitt, oder die Griffe an einer einzeln angetippten Zeile. */
-    const frame = (() => {
-        if (!image) return null;
-        if (draft) return <LassoFrame fraction={draft.rect} look={draft.look} />;
-        if (region) {
-            const fraction = boxToFraction(region, image);
+    const stepBody = (() => {
+        if (mode === 'in' && step === 'category') {
             return (
-                <LassoFrame
-                    fraction={fraction}
-                    look="set"
-                    busy={regionBusy}
-                    onHandleDown={(event, mode) => startFrameDrag(event, mode, fraction)}
-                    onBodyDown={(event) => startFrameDrag(event, 'move', fraction)}
-                />
+                <>
+                    <p className="ofi-qe__caption">{t('inv.quickEntry.stepCategory')}</p>
+                    {categories === null ? (
+                        <p className="ofi-qe__empty"><span className="ofi-qe__spinner" style={{ display: 'inline-block' }} /></p>
+                    ) : categories.length === 0 ? (
+                        <p className="ofi-qe__empty">{t('inv.quickEntry.noSchemes')}</p>
+                    ) : (
+                        <div className="ofi-qe-list">
+                            {categories.map((row) => (
+                                <Row key={row.id} code={row.code} name={row.name} meta={String(row.schemes.length)} on={category?.id === row.id} onClick={() => pickCategory(row)} />
+                            ))}
+                        </div>
+                    )}
+                </>
             );
         }
-        return null;
+        if (mode === 'in' && step === 'scheme' && category) {
+            return (
+                <>
+                    <p className="ofi-qe__caption">{t('inv.quickEntry.stepScheme')} · {category.name}</p>
+                    <div className="ofi-qe-list">
+                        {category.schemes.map((row) => (
+                            <Row key={row.id} code={row.code} name={row.name} hint={row.nextCode} on={scheme?.id === row.id} onClick={() => pickScheme(row)} />
+                        ))}
+                    </div>
+                </>
+            );
+        }
+        if (mode === 'in' && step === 'variant') {
+            return (
+                <>
+                    <p className="ofi-qe__caption">{t('inv.quickEntry.stepMode')}</p>
+                    <div className="ofi-qe-list">
+                        <Row name={t('inv.quickEntry.sameModel')} hint={t('inv.quickEntry.sameModelHint')} on={variant === 'same'} onClick={() => pickVariant('same')} />
+                        <Row name={t('inv.quickEntry.differentModels')} hint={t('inv.quickEntry.differentModelsHint')} on={variant === 'different'} onClick={() => pickVariant('different')} />
+                    </div>
+
+                    {/* ARTIKEL FESTLEGEN (11.09.2026): unter «Gleiches Modell» — Modell,
+                        Bezeichnung, der nächste ERP-Code liegt bei. «Weiter» legt den
+                        Artikel an; danach gilt jeder Scan ihm. Steht der Artikel schon
+                        (zurück aus dem Scannen), zeigt die Karte ihn nur noch. */}
+                    {variant === 'same' && scheme && (
+                        <div className="ofi-qe-card ofi-qe-define">
+                            <div className="ofi-qe-card__head"><Plus />{t('inv.quickEntry.defineTitle')}</div>
+                            {lastArticle ? (
+                                <>
+                                    <dl className="ofi-qe-card__body">
+                                        <Kv label={t('inv.columns.erpCode')} value={lastArticle.code} mono />
+                                        <Kv label={t('inv.quickEntry.fieldName')} value={lastArticle.name} name />
+                                        <Kv label={t('inv.quickEntry.fieldModel')} value={lastArticle.modelNumber} mono />
+                                    </dl>
+                                    <div className="ofi-qe-card__foot">
+                                        <button type="button" className="ofi-qe-btn" onClick={() => { setLastArticle(null); setRemembered(null); }}>
+                                            {t('inv.quickEntry.anchorChange')}
+                                        </button>
+                                        <button type="button" className="ofi-qe-btn is-primary is-next" autoFocus onClick={() => go('scan', 'fwd')}>
+                                            {t('inv.quickEntry.defineNext')}
+                                            <ArrowRight />
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <form className="ofi-qe-card__body" onSubmit={(event) => { event.preventDefault(); void defineAnchor(); }}>
+                                        {/* Enter in einem der Felder = «Weiter»: ohne Knopf IM Formular schickt der Browser es bei mehreren Feldern nicht ab. */}
+                                        <button type="submit" hidden tabIndex={-1} aria-hidden />
+                                        <div className="ofi-qe-field">
+                                            <label className="ofi-qe-field__label" htmlFor="ofi-qe-define-code">{t('inv.columns.erpCode')}</label>
+                                            <input id="ofi-qe-define-code" className="is-mono is-locked" value={nextCode} readOnly tabIndex={-1} />
+                                        </div>
+                                        <div className="ofi-qe-field">
+                                            <label className="ofi-qe-field__label" htmlFor="ofi-qe-define-model">{t('inv.quickEntry.fieldModel')}</label>
+                                            <input id="ofi-qe-define-model" className="is-mono" value={model} autoComplete="off" autoFocus={!phone} onChange={(event) => setModel(event.target.value)} />
+                                        </div>
+                                        <div className="ofi-qe-field">
+                                            <label className="ofi-qe-field__label" htmlFor="ofi-qe-define-name">{t('inv.quickEntry.fieldName')}</label>
+                                            <input id="ofi-qe-define-name" ref={nameRef} value={name} autoComplete="off" autoCapitalize="sentences" onChange={(event) => setName(event.target.value)} />
+                                        </div>
+                                        {/* Schon im Lager? Die Treffer zu Modell/Bezeichnung — ein Tipp
+                                            nimmt den vorhandenen Artikel statt einen neuen anzulegen. */}
+                                        {visibleMatches.length > 0 && (
+                                            <div className="ofi-qe-field">
+                                                <span className="ofi-qe-field__label">{t('inv.quickEntry.defineExisting')}</span>
+                                                <div className="ofi-qe-list ofi-qe-matches">
+                                                    {visibleMatches.map((row) => (
+                                                        <button key={row.id} type="button" className="ofi-qe-row" disabled={saving} onClick={() => pickExistingAnchor(row)}>
+                                                            <span className="ofi-qe-row__code">{row.code}</span>
+                                                            <span className="ofi-qe-row__text">
+                                                                <span className="ofi-qe-row__name">{row.name}</span>
+                                                                <span className="ofi-qe-row__hint">
+                                                                    {[row.modelNumber, row.stockQuantity !== undefined ? `${row.stockQuantity} ${row.unit ?? ''}`.trim() : null].filter(Boolean).join(' · ') || t('inv.quickEntry.stock')}
+                                                                </span>
+                                                            </span>
+                                                            <ArrowRight size={15} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        <p className="ofi-qe-define__hint">{t('inv.quickEntry.defineHint')}</p>
+                                        {formError && <p className="ofi-qe__error">{formError}</p>}
+                                    </form>
+                                    <div className="ofi-qe-card__foot">
+                                        <button type="button" className="ofi-qe-btn is-primary is-next" disabled={saving || !canCreate} onClick={() => void defineAnchor()}>
+                                            {saving ? <span className="ofi-qe__spinner" /> : null}
+                                            {t('inv.quickEntry.defineNext')}
+                                            <ArrowRight />
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </>
+            );
+        }
+
+        /* ── Scan (Zugang) oder Löschen ─────────────────────────────────── */
+        const cameraNote = cameraProblem === 'unsupported'
+            ? t('inv.quickEntry.cameraUnsupported')
+            : cameraProblem === 'denied'
+                ? t('inv.quickEntry.cameraDenied')
+                : t('inv.quickEntry.scanHint');
+
+        return (
+            <div className="ofi-qe__scan">
+                <div>
+                    {mode === 'in' && scheme && !(variant === 'same' && lastArticle) && (
+                        <div className="ofi-qe__next">
+                            <span className="ofi-qe__next-label">{t('inv.quickEntry.nextCode')}</span>
+                            <span key={freshTick} className={`ofi-qe__next-code ${freshTick ? 'is-fresh' : ''}`}>{nextCode}</span>
+                        </div>
+                    )}
+                    {/* «Gleiches Modell» mit aktuellem Artikel: DER Code, auf den alles
+                        gebucht wird — statt des nächsten freien. */}
+                    {mode === 'in' && variant === 'same' && lastArticle && (
+                        <div className="ofi-qe__next is-anchor">
+                            <span className="ofi-qe__next-label">{t('inv.quickEntry.anchorTitle')}</span>
+                            <span className="ofi-qe__next-code">{lastArticle.code}</span>
+                            <span className="ofi-qe__anchor-name">{lastArticle.name}{lastArticle.modelNumber ? ` · ${lastArticle.modelNumber}` : ''}</span>
+                            {/* Menge je Scan (11.09.2026): 1 vorbelegt, tippbar, Mac-Stepper. */}
+                            <span className="ofi-qe__anchor-row is-qty">
+                                <span className="ofi-qe__anchor-hint">{t('inv.quickEntry.anchorScanQty')}</span>
+                                <QuantityStepper value={quantity} onChange={setQuantity} unit={lastArticle.unit} disabled={saving} />
+                            </span>
+                            <span className="ofi-qe__anchor-row">
+                                <span className="ofi-qe__anchor-hint">
+                                    {t('inv.quickEntry.anchorCount', { count: log.filter((entry) => entry.code === lastArticle.code && !entry.error && entry.kind === 'in').reduce((sum, entry) => sum + (entry.quantity ?? 1), 0) })} · {t('inv.quickEntry.anchorHint')}
+                                </span>
+                                <button type="button" className="ofi-qe-btn is-quiet" onClick={() => { setLastArticle(null); setRemembered(null); }}>
+                                    {t('inv.quickEntry.anchorChange')}
+                                </button>
+                            </span>
+                        </div>
+                    )}
+                    <div className={`ofi-qe__cam ${paused ? 'is-paused' : ''}`}>
+                        <video ref={videoRef} className="ofi-qe__video" playsInline muted autoPlay />
+                        {!cameraRunning && (
+                            <div className="ofi-qe__cam-idle">
+                                <Camera01 />
+                                <span>{cameraStarting ? '…' : cameraNote}</span>
+                                {!cameraStarting && cameraSupported && cameraProblem !== 'denied' && (
+                                    <button type="button" className="ofi-qe-btn" onClick={() => void startCamera()}>
+                                        {t('inv.quickEntry.cameraStart')}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {cameraRunning && <div className="ofi-qe__reticle" aria-hidden />}
+                    </div>
+                    <div className="ofi-qe__scanfield">
+                        <Scan size={15} />
+                        <input
+                            ref={scanFieldRef}
+                            value={typed}
+                            autoFocus={!phone}
+                            autoComplete="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                            placeholder={t('inv.quickEntry.scanManual')}
+                            aria-label={t('inv.quickEntry.scanTitle')}
+                            onChange={(event) => setTyped(event.target.value)}
+                            onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); onTypedSubmit(); } }}
+                        />
+                    </div>
+                    <div className="ofi-qe__cam-tools">
+                        {/* Läuft die Kamera, aber kein Leser arbeitet, MUSS das dastehen —
+                            sonst wandert die Linie und niemand versteht, warum nichts kommt. */}
+                        <p className={`ofi-qe__cam-note ${cameraRunning && cameraProblem === 'unsupported' ? 'is-warn' : ''}`}>
+                            {cameraRunning && cameraProblem === 'unsupported'
+                                ? t('inv.quickEntry.cameraUnsupported')
+                                : mode === 'delete' ? t('inv.quickEntry.deleteHint') : (cameraRunning ? t('inv.quickEntry.scanHint') : '')}
+                        </p>
+                        {cameraRunning && (
+                            <button type="button" className="ofi-qe-btn is-quiet" onClick={stopCamera}>{t('inv.quickEntry.cameraStop')}</button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="ofi-qe__pane">
+                    {scan.kind === 'looking' && (
+                        <div className="ofi-qe-card">
+                            <div className="ofi-qe-card__body" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 12px' }}>
+                                <span className="ofi-qe__spinner" />
+                                <span className="ofi-qe-logrow__code">{scan.code}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {scan.kind === 'found' && (
+                        <div className={`ofi-qe-card ${mode === 'delete' ? 'is-danger' : ''}`}>
+                            <div className="ofi-qe-card__head">
+                                {mode === 'delete' ? <Trash01 /> : <Check />}
+                                {t(mode === 'delete' ? 'inv.quickEntry.foundDelete' : 'inv.quickEntry.found')}
+                            </div>
+                            <dl className="ofi-qe-card__body">
+                                <Kv label={t('inv.columns.erpCode')} value={scan.article.articleCode} mono />
+                                <Kv label={t('inv.quickEntry.fieldName')} value={scan.article.name} name />
+                                <Kv label={t('inv.quickEntry.fieldModel')} value={scan.article.modelNumber} mono />
+                                <Kv label={t('inv.quickEntry.fieldSerial')} value={scan.article.serialNumber} mono />
+                                <Kv label={t('inv.quickEntry.fieldBarcode')} value={scan.article.supplierBarcode || scan.article.systemBarcode} mono />
+                                <Kv label={t('inv.quickEntry.stock')} value={`${scan.article.totalQuantity} ${scan.article.unit}`} mono />
+                            </dl>
+                            {/* Die Menge (11.09.2026): 1 vorbelegt, tippbar, Mac-Stepper daneben. */}
+                            <div className="ofi-qe-field" style={{ margin: '0 12px 10px' }}>
+                                <label className="ofi-qe-field__label" htmlFor="ofi-qe-found-qty">{t('inv.quickEntry.quantity')}</label>
+                                <QuantityStepper id="ofi-qe-found-qty" value={quantity} onChange={setQuantity} unit={scan.article.unit} disabled={saving} onSubmit={() => void bookFound()} />
+                            </div>
+                            {formError && <p className="ofi-qe__error" style={{ margin: '0 12px 10px' }}>{formError}</p>}
+                            <div className="ofi-qe-card__foot">
+                                <button type="button" className="ofi-qe-btn" disabled={saving} onClick={rearm}>{t('common.cancel')}</button>
+                                <button
+                                    type="button"
+                                    className={`ofi-qe-btn is-primary is-next ${mode === 'delete' ? 'is-danger' : ''}`}
+                                    disabled={saving}
+                                    autoFocus
+                                    onClick={() => void bookFound()}
+                                >
+                                    {saving ? <span className="ofi-qe__spinner" /> : null}
+                                    {t('inv.quickEntry.next')}
+                                    <ArrowRight />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {scan.kind === 'missing' && (
+                        <div className="ofi-qe-card is-warn">
+                            <div className="ofi-qe-card__head"><XClose />{t('inv.quickEntry.notFoundDelete')}</div>
+                            <dl className="ofi-qe-card__body">
+                                <Kv label={t('inv.quickEntry.fieldBarcode')} value={scan.code} mono />
+                            </dl>
+                            <div className="ofi-qe-card__foot">
+                                <button type="button" className="ofi-qe-btn is-primary" autoFocus onClick={rearm}>{t('inv.quickEntry.rescan')}</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {scan.kind === 'new' && (
+                        <div className="ofi-qe-card">
+                            <div className="ofi-qe-card__head"><Plus />{scan.code ? t('inv.quickEntry.notFound') : t('inv.quickEntry.noBarcode')}</div>
+                            <form className="ofi-qe-card__body" onSubmit={(event) => { event.preventDefault(); void saveNew(); }}>
+                                {/* Enter = «Speichern» (siehe «Artikel festlegen»). */}
+                                <button type="submit" hidden tabIndex={-1} aria-hidden />
+                                <div className="ofi-qe-field">
+                                    <label className="ofi-qe-field__label" htmlFor="ofi-qe-barcode">{t('inv.quickEntry.fieldBarcode')}</label>
+                                    <input id="ofi-qe-barcode" className="is-mono" value={barcode} autoComplete="off" onChange={(event) => setBarcode(event.target.value)} />
+                                </div>
+                                <div className="ofi-qe-field">
+                                    <label className="ofi-qe-field__label" htmlFor="ofi-qe-model">
+                                        {t('inv.quickEntry.fieldModel')}
+                                        {variant === 'same' && remembered && <small> · {t('inv.quickEntry.sameModel')}</small>}
+                                    </label>
+                                    <input id="ofi-qe-model" className="is-mono" value={model} autoComplete="off" onChange={(event) => setModel(event.target.value)} />
+                                </div>
+                                <div className="ofi-qe-field">
+                                    <label className="ofi-qe-field__label" htmlFor="ofi-qe-serial">{t('inv.quickEntry.fieldSerial')}</label>
+                                    <input id="ofi-qe-serial" className="is-mono" value={serial} autoComplete="off" onChange={(event) => setSerial(event.target.value)} />
+                                </div>
+                                <div className="ofi-qe-field">
+                                    <label className="ofi-qe-field__label" htmlFor="ofi-qe-name">{t('inv.quickEntry.fieldName')}</label>
+                                    <input id="ofi-qe-name" ref={nameRef} value={name} autoComplete="off" autoCapitalize="sentences" onChange={(event) => setName(event.target.value)} />
+                                </div>
+                                <div className="ofi-qe-field">
+                                    <label className="ofi-qe-field__label" htmlFor="ofi-qe-new-qty">{t('inv.quickEntry.quantity')}</label>
+                                    <QuantityStepper id="ofi-qe-new-qty" value={quantity} onChange={setQuantity} disabled={saving} />
+                                </div>
+
+                                {formError && <p className="ofi-qe__error">{formError}</p>}
+                            </form>
+                            <div className="ofi-qe-card__foot">
+                                <button type="button" className="ofi-qe-btn" disabled={saving} onClick={rearm}>{t('common.cancel')}</button>
+                                <button type="button" className="ofi-qe-btn is-primary" disabled={saving} onClick={() => void saveNew()}>
+                                    {saving ? <span className="ofi-qe__spinner" /> : <Check />}
+                                    {t('inv.quickEntry.save')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {scan.kind === 'idle' && (
+                        <>
+                            {formError && <p className="ofi-qe__error">{formError}</p>}
+                            {mode === 'in' && canCreate && (
+                                <button type="button" className="ofi-qe-btn is-block" onClick={startWithoutBarcode}>
+                                    <Plus />
+                                    {t('inv.quickEntry.noBarcode')}
+                                </button>
+                            )}
+                        </>
+                    )}
+
+                    <div className="ofi-qe__log">
+                        <p className="ofi-qe__caption">{t('inv.quickEntry.logTitle')}{log.length ? ` · ${log.length}` : ''}</p>
+                        {log.length ? (
+                            <div className="ofi-qe-list">
+                                {log.map((entry, index) => (
+                                    <div key={entry.key} className={`ofi-qe-logrow ${index === 0 ? 'is-new' : ''} ${entry.kind === 'out' ? 'is-out' : ''} ${entry.error ? 'is-error' : ''}`}>
+                                        <span className="ofi-qe-logrow__mark">{entry.kind === 'out' ? <Trash01 /> : <Check />}</span>
+                                        <span className="ofi-qe-logrow__text">
+                                            <span className="ofi-qe-logrow__name">{entry.name}</span>
+                                            <span className="ofi-qe-logrow__code">{entry.code}</span>
+                                        </span>
+                                        <span className="ofi-qe-logrow__kind">
+                                            {entry.quantity !== undefined && entry.quantity !== 1 ? `${entry.quantity} × ` : ''}
+                                            {t(entry.kind === 'new' ? 'inv.quickEntry.logNew' : entry.kind === 'out' ? 'inv.quickEntry.logOut' : 'inv.quickEntry.logIn')}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="ofi-qe__empty">{t('inv.quickEntry.logEmpty')}</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
     })();
 
     const sheet = (
-        <div className={`ofi-qa-scrim ${phone ? 'is-phone' : ''}`} role="presentation">
+        <div className={`ofi-qe-scrim ${phone ? 'is-phone' : ''}`} role="presentation">
             <section
                 role="dialog"
                 aria-modal="true"
-                aria-label={t('inv.quickAdd.title')}
-                /* `.ofi-compact-modal` ist der AUSSTIEG aus der Regel, die
-                   jedem `section[role=dialog][aria-modal]` in einem Portal
-                   `width: min(100% - 40px, 1280px) !important` aufzwingt
-                   (index.css, ~6203). Ohne ihn wäre dieses Fenster am
-                   Schreibtisch 1280px breit und auf dem Telefon 350 statt
-                   der vollen Schirmbreite — die Zahl im Bauteil wäre wirkungslos. */
-                className={`ofi-qa ofi-pop ofi-compact-modal ${phone ? 'is-phone' : ''}`}
+                aria-label={t('inv.quickEntry.title')}
+                /* `.ofi-compact-modal` = Ausstieg aus der 1280px-Regel für
+                   Portal-Dialoge (index.css, siehe portal-dialog-forced-width). */
+                className={`ofi-qe ofi-pop ofi-compact-modal ${phone ? 'is-phone' : ''}`}
             >
-                <header className="ofi-qa__head">
-                    <span className="ofi-qa__badge" aria-hidden><Camera01 size={20} /></span>
-                    <div className="ofi-qa__titles">
-                        <h2 className="ofi-qa__title">{t('inv.quickAdd.title')}</h2>
-                        <p className="ofi-qa__sub">{t('inv.quickAdd.subtitle')}</p>
+                <header className="ofi-qe__head">
+                    <button
+                        type="button"
+                        className={`ofi-qe__back ${showBack ? '' : 'is-hidden'}`}
+                        aria-label={t('inv.quickEntry.back')}
+                        tabIndex={showBack ? 0 : -1}
+                        onClick={back}
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <div className="ofi-qe__titles">
+                        <h2 className="ofi-qe__title">{t('inv.quickEntry.title')}</h2>
+                        {crumbs.length > 0 && (
+                            <div className="ofi-qe__crumbs">
+                                {crumbs.map((crumb, index) => (
+                                    <span key={`${crumb}-${index}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        {index > 0 && <ChevronRight />}
+                                        {crumb}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    {added > 0 && (
-                        <span className="ofi-qa__count">{t('inv.quickAdd.logTitle', { count: added })}</span>
+                    {added > 0 && <span className="ofi-qe__count">{added}</span>}
+                    {canTransfer && (
+                        <div className="ofi-qe-seg" role="tablist" aria-label={t('inv.quickEntry.title')}>
+                            <button type="button" role="tab" aria-selected={mode === 'in'} className={`ofi-qe-seg__btn ${mode === 'in' ? 'is-on' : ''}`} onClick={() => switchMode('in')}>
+                                <Plus />
+                                {t('inv.quickEntry.modeIn')}
+                            </button>
+                            <button type="button" role="tab" aria-selected={mode === 'delete'} className={`ofi-qe-seg__btn is-danger ${mode === 'delete' ? 'is-on' : ''}`} onClick={() => switchMode('delete')}>
+                                <Trash01 />
+                                {t('inv.quickEntry.modeDelete')}
+                            </button>
+                        </div>
                     )}
-                    <button type="button" className="ofi-float-card__iconbtn" aria-label={t('inv.quickAdd.close')} onClick={close}>
+                    <button type="button" className="ofi-float-card__iconbtn" aria-label={t('inv.quickEntry.close')} onClick={close}>
                         <X size={18} />
                     </button>
                 </header>
 
-                <div className="ofi-qa__body">
-                    {/* ── Foto ──────────────────────────────────────────────── */}
-                    <div className="ofi-qa__stage">
-                        <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={onFileInput} />
-                        <input ref={pickerRef} type="file" accept="image/*" hidden onChange={onFileInput} />
-
-                        <div className="ofi-qa__frame">
-                            {!image && !busy && (
-                                <div className="ofi-qa__idle">
-                                    <button type="button" className="ofi-qa__camera" onClick={() => cameraRef.current?.click()}>
-                                        <Camera01 size={22} />
-                                        {t('inv.quickAdd.takePhoto')}
-                                    </button>
-                                    <button type="button" className="ofi-qa__ghost" onClick={() => pickerRef.current?.click()}>
-                                        <Image01 size={16} />
-                                        {t('inv.quickAdd.pickImage')}
-                                    </button>
-                                    <p>{t('inv.quickAdd.idleHint')}</p>
-                                </div>
-                            )}
-
-                            {!image && busy && (
-                                <div className="ofi-qa__progress is-centered">
-                                    {progressLabel}
-                                    {progressBar}
-                                </div>
-                            )}
-
-                            {image && (
-                                <div
-                                    ref={pictureRef}
-                                    className={`ofi-qa__picture ${canTrace ? 'can-trace' : ''}`}
-                                    aria-label={t('inv.quickAdd.traceHint')}
-                                    onPointerDown={onPicturePointerDown}
-                                    onPointerMove={onPicturePointerMove}
-                                    onPointerUp={onPicturePointerUp}
-                                    onPointerCancel={onPicturePointerCancel}
-                                    onClickCapture={onPictureClickCapture}
-                                >
-                                    <img className="ofi-qa__img" src={image.previewUrl} alt="" draggable={false} />
-                                    {frame}
-                                    {(busy || regionBusy) && (
-                                        <div className="ofi-qa__progress">
-                                            {progressLabel}
-                                            {progressBar}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {(image || phase === 'failed') && (
-                            <div className="ofi-qa__tools">
-                                <button type="button" className="ofi-qa__pill" disabled={busy} onClick={() => cameraRef.current?.click()}>
-                                    <Camera01 size={15} />
-                                    {t('inv.quickAdd.newPhoto')}
-                                </button>
-                                <button type="button" className="ofi-qa__pill" disabled={busy} onClick={() => pickerRef.current?.click()}>
-                                    <Image01 size={15} />
-                                    {t('inv.quickAdd.pickImage')}
-                                </button>
-                            </div>
-                        )}
-                        {failure && <p className="ofi-qa__error" style={{ marginTop: 8 }}>{failure}</p>}
-                        {regionError && <p className="ofi-qa__error" style={{ marginTop: 8 }}>{regionError}</p>}
-                        {image && phase === 'ready' && !failure && (
-                            <p className="ofi-qa__hint">{t('inv.quickAdd.traceHint')}</p>
-                        )}
-                    </div>
-
-                    {/* ── Eingabe ───────────────────────────────────────────── */}
-                    <div className="ofi-qa__form">
-                        <div className="ofi-qa__manual">
-                            <div className="ofi-qa__manual-head">
-                                <label className="ofi-qa__label" htmlFor="ofi-qa-name">{t('inv.columns.productName')}</label>
-                                <span>{t('inv.quickAdd.manualTitle')}</span>
-                            </div>
-                            <div className="ofi-qa__input-wrap">
-                                <input
-                                    id="ofi-qa-name"
-                                    ref={nameRef}
-                                    className="ofi-qa__input"
-                                    value={name}
-                                    placeholder={t('inv.quickAdd.namePlaceholder')}
-                                    autoComplete="off"
-                                    autoCapitalize="sentences"
-                                    onChange={(event) => onNameTyped(event.target.value)}
-                                    onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void add(); } }}
-                                />
-                                {(name || region) && (
-                                    <button
-                                        type="button"
-                                        className="ofi-qa__input-clear"
-                                        aria-label={t('inv.quickAdd.clearInput')}
-                                        title={t('inv.quickAdd.clearInput')}
-                                        onClick={clearSelection}
-                                    >
-                                        <XClose size={17} />
-                                    </button>
-                                )}
-                            </div>
-                            <p className="ofi-qa__hint">{t('inv.quickAdd.manualHint')}</p>
-                            {!linked && <p className="ofi-qa__hint">{t('inv.quickAdd.codeAuto')}</p>}
-                        </div>
-
-                        {linked ? (
-                            <div className="ofi-qa__linked">
-                                <Check size={15} />
-                                <span>
-                                    {t('inv.quickAdd.linkedPrefix')}{' '}
-                                    <strong>{linked.name}</strong>
-                                    {' '}<span className="ofi-qa__match-code">{linked.code}</span>
-                                </span>
-                                <button type="button" className="ofi-qa__link" onClick={unlink}>
-                                    {t('inv.quickAdd.createNewInstead')}
-                                </button>
-                            </div>
-                        ) : visibleMatches.length > 0 && (
-                            <div>
-                                <span className="ofi-qa__label">{t('inv.quickAdd.existingTitle')}</span>
-                                <div className="ofi-qa__matches">
-                                    {visibleMatches.map((row) => (
-                                        <button key={row.id} type="button" className="ofi-qa__match" onClick={() => chooseMatch(row)}>
-                                            <span className="ofi-qa__match-name">{row.name}</span>
-                                            <span className="ofi-qa__match-code">{row.code}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="ofi-qa__qtyrow">
-                            <div>
-                                <label className="ofi-qa__label" htmlFor="ofi-qa-qty">{t('inv.columns.quantity')}</label>
-                                <div className="ofi-qa__stepper">
-                                    <button type="button" className="ofi-qa__step" aria-label="−" onClick={() => stepQty(-1)}>
-                                        <Minus size={18} />
-                                    </button>
-                                    <input
-                                        id="ofi-qa-qty"
-                                        className="ofi-qa__qty"
-                                        inputMode="decimal"
-                                        value={qty}
-                                        onChange={(event) => setQty(event.target.value)}
-                                        onFocus={(event) => event.target.select()}
-                                        onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void add(); } }}
-                                    />
-                                    <button type="button" className="ofi-qa__step" aria-label="+" onClick={() => stepQty(1)}>
-                                        <Plus size={18} />
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="ofi-qa__unit">
-                                <span className="ofi-qa__label">{t('inv.columns.unit')}</span>
-                                <UnitSelect
-                                    value={unit}
-                                    onChange={setUnitChoice}
-                                    disabled={Boolean(linked)}
-                                    ariaLabel={t('inv.columns.unit')}
-                                />
-                            </div>
-                        </div>
-
-                        {!linked && image && (
-                            <label className="ofi-qa__check">
-                                <input type="checkbox" checked={attachPhoto} onChange={(event) => setAttachPhoto(event.target.checked)} />
-                                {t('inv.quickAdd.attachPhoto')}
-                            </label>
-                        )}
-
-                        {formError && <p className="ofi-qa__error">{formError}</p>}
-
-                        <button
-                            type="button"
-                            className={`ofi-qa__add ${linked ? 'is-stock' : ''}`}
-                            disabled={saving || busy || regionBusy}
-                            onClick={() => void add()}
-                        >
-                            {saving ? <Spinner size="sm" /> : <Plus size={18} />}
-                            {linked ? t('inv.quickAdd.addStock') : t('inv.quickAdd.addProduct')}
-                        </button>
-
-                        <div>
-                            <span className="ofi-qa__label">{t('inv.quickAdd.logTitle', { count: log.length })}</span>
-                            {log.length ? (
-                                <ul className="ofi-qa__log">
-                                    {log.map((entry) => (
-                                        <li key={entry.key} className={`ofi-qa__logrow ${entry.error ? 'is-error' : ''}`}>
-                                            {entry.error ? <XClose size={16} /> : <Check size={16} />}
-                                            <span className="ofi-qa__logname">
-                                                {entry.name}
-                                                <small>{entry.code}</small>
-                                                <span className={`ofi-qa__logkind ${entry.kind === 'in' ? 'is-stock' : ''}`}>
-                                                    {entry.kind === 'in' ? t('inv.quickAdd.kindIn') : t('inv.quickAdd.kindNew')}
-                                                </span>
-                                            </span>
-                                            <span className="ofi-qa__logqty">+{entry.qty} {entry.unit}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="ofi-qa__empty">{t('inv.quickAdd.logEmpty')}</p>
-                            )}
-                        </div>
+                <div className="ofi-qe__body">
+                    <div key={`${mode}-${inDefinition ? step : 'scan'}`} className={`ofi-qe__step ${direction === 'back' ? 'is-back' : ''}`}>
+                        {stepBody}
                     </div>
                 </div>
 
-                <footer className="ofi-qa__foot">
-                    <button type="button" className="ofi-qa__close" onClick={close}>
-                        {t('inv.quickAdd.close')}
-                    </button>
+                <footer className="ofi-qe__foot">
+                    <button type="button" className="ofi-qe-btn" onClick={close}>{t('inv.quickEntry.close')}</button>
                 </footer>
             </section>
         </div>

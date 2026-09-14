@@ -40,7 +40,7 @@ export const PrimaryButton = ({
         type={type}
         onClick={onClick}
         disabled={disabled}
-        className={`inline-flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+        className={`inline-flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     >
         {icon}
         {children}
@@ -65,7 +65,7 @@ export const GhostButton = ({
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:bg-transparent dark:text-white/70 dark:hover:text-white ${className}`}
+        className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:bg-transparent dark:text-white/70 dark:hover:text-white ${className}`}
     >
         {icon}
         {children}
@@ -136,8 +136,8 @@ export const PersonnelTopTabs = ({
                             onClick={() => onChange(item.key)}
                             className={`ofi-quote-tab inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                 active
-                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                                    ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#0066e0]'
+                                    : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#0066e0] dark:text-white/70'
                             }`}
                         >
                             <span>{item.label}</span>

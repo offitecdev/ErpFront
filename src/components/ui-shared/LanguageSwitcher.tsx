@@ -41,7 +41,7 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                 aria-expanded={open}
                 onClick={() => setOpen((o) => !o)}
                 className={`ofi-hdr-ctl flex items-center justify-center rounded-full transition-colors ${
-                    open ? 'bg-[#272f67] text-white' : 'text-slate-600 hover:bg-[#d3e3fd]'
+                    open ? 'bg-[#0a7aff] text-white' : 'text-slate-600 hover:bg-[#e3efff]'
                 }`}
             >
                 <MdLanguage size={17} />
@@ -59,14 +59,14 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                             onClick={() => change(lang.code)}
                             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
                                 current.code === lang.code
-                                    ? 'bg-[#eef4ff] text-[#272f67]'
+                                    ? 'bg-[#eef4ff] text-[#0a7aff]'
                                     : 'text-slate-700 hover:bg-slate-50'
                             }`}
                         >
                             <span className="text-base leading-none">{lang.flag}</span>
                             <span className="flex-1 text-left">{lang.nativeName}</span>
                             {current.code === lang.code && (
-                                <Check size={11} color="#272f67" />
+                                <Check size={11} color="#0a7aff" />
                             )}
                         </button>
                     ))}

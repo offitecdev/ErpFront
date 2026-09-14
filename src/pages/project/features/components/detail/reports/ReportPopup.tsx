@@ -3,6 +3,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { FloatingCard } from '@/pages/calendar/components/FloatingCard';
+import '@/styles/modules/projectReports.css';
+/* Das Mac-Kleid der Rapport-Fenster (10.09.2026) — chunk-lokal, lädt NACH
+   index.css/appleModal.css und gewinnt so gegen deren iOS-Regeln. */
+import '@/styles/reportPopup.css';
 
 /**
  * Popup shell of the project-detail Rapporte hub (18.08.2026, user request:

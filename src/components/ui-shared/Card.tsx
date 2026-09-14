@@ -1,5 +1,6 @@
 import React from 'react';
 import AntCard from 'antd/es/card';
+import { AntdTheme } from './AntdTheme';
 import { cx } from '../../lib/utils/cx';
 
 interface CardProps {
@@ -23,6 +24,7 @@ export const Card: React.FC<CardProps> = ({
     bodyClassName = '',
     noPadding,
 }) => (
+    <AntdTheme>
     <AntCard
         data-ui-card
         variant="borderless"
@@ -34,7 +36,7 @@ export const Card: React.FC<CardProps> = ({
         {(title || actions) && (
             <div data-ui-card-header className="flex items-center justify-between gap-3 border-b border-secondary bg-primary px-4 py-4 md:px-6">
                 <div className="flex min-w-0 items-center gap-2.5">
-                    {icon && <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#272f67]">{icon}</span>}
+                    {icon && <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#0a7aff]">{icon}</span>}
                     <div className="min-w-0">
                         {title && <h3 className="ofi-serif truncate text-md font-semibold text-primary">{title}</h3>}
                         {description && <p className="mt-0.5 truncate text-sm text-tertiary">{description}</p>}
@@ -45,4 +47,5 @@ export const Card: React.FC<CardProps> = ({
         )}
         <div data-ui-card-body className={cx(noPadding ? '' :"p-4 md:p-6", bodyClassName)}>{children}</div>
     </AntCard>
+    </AntdTheme>
 );

@@ -1,0 +1,1033 @@
+/* mailModule — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ═══════════════ MAIL / OUTLOOK MODULE (pages/crm/mail, 17.08.2026)
+   Das Postfach im ERP trägt das Kleid des Kalender-Moduls: weisse Flächen,
+   Hairlines, graue Beschriftung, Marineblau als einziger Akzent — es liest
+   ausschliesslich die `--ofi-cal-*`-Tokens (dark.css tauscht sie). Layout:
+   Leiste (Schreiben, Ordner, Konto) · Liste · Lesebereich. Zeilen sind
+   Karten ohne Raster, wie die Referenz-Mailoberfläche. Das Schreiben-Fenster
+   ist eine schwebende Karte (FloatingCard) unten rechts. */
+.ofi-mail-page {
+    /* `relative` trägt den Öffnungs-Splash (`.ofi-area-splash`), der sich
+       beim ersten Öffnen des Postfachs über die Fläche legt. */
+    position: relative;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+}
+/* EINE Reihe (Vorgabe 19.08.2026): Suche · Filter · Abruf/Blätterer. Das
+   Suchfeld war die halbe Zeile breit und hat die Filter nach unten gedrängt —
+   es ist jetzt schmal und gibt die Mitte frei. */
+.ofi-mail-topbar { gap: 10px; flex-wrap: nowrap; }
+.ofi-mail-search { flex: 0 1 250px; min-width: 150px; border-radius: 999px; padding: 7px 12px; }
+#root .ofi-mail-search__clear {
+    display: flex;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    background: transparent;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-mail-search__clear:hover { background: var(--ofi-cal-hover); }
+.ofi-mail-toolbar { display: flex; flex: none; align-items: center; gap: 10px; margin-left: auto; }
+#root .ofi-mail-syncbtn { display: inline-flex; align-items: center; gap: 8px; }
+#root .ofi-mail-syncbtn:disabled { opacity: 0.6; }
+.ofi-mail-spin { animation: ofi-mail-spin 900ms linear infinite; }
+#root .ofi-mail-pager button:disabled { opacity: 0.35; }
+/* Der Zähler sitzt IM Knopfpaar, zwischen den beiden Pfeilen — darum trägt er
+   dieselben Trennlinien wie ein Knopf. Ziffern mit fester Breite, sonst
+   zappelt die Kopfzeile beim Blättern. */
+.ofi-mail-pager__label {
+    display: flex;
+    height: 32px;
+    min-width: 54px;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid var(--ofi-cal-border);
+    border-right: 1px solid var(--ofi-cal-border);
+    padding: 0 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Filterleiste über der Liste (19.08.2026) ──────────────────────
+   Eine schmale Reihe von Knöpfen — sie steht IM Fluss der Seite und nimmt der
+   Liste nur ihre eigene Höhe weg; die Auswahl selbst klappt als schwebendes
+   Fenster nach unten auf (AnchoredPicker) und liegt nur so lange über der
+   Liste, wie sie offen ist. */
+.ofi-mail-filterbar {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+#root .ofi-mail-filterchip {
+    display: inline-flex;
+    height: 30px;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 10px 0 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    max-width: 260px;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-mail-filterchip:hover,
+#root .ofi-mail-filterchip.is-open { background: var(--ofi-cal-hover); }
+#root .ofi-mail-filterchip.is-active {
+    border-color: transparent;
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+}
+.ofi-mail-filterchip__icon { display: flex; flex: none; opacity: 0.8; }
+.ofi-mail-filterchip__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-mail-filterchip__count {
+    display: inline-flex;
+    min-width: 17px;
+    height: 17px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent);
+    padding: 0 5px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-on-accent, #fff);
+}
+.ofi-mail-filterchip__suffix { flex: none; font-size: 11px; font-weight: 500; opacity: 0.7; }
+.ofi-mail-filterchip__caret { flex: none; opacity: 0.55; }
+#root .ofi-mail-filterreset {
+    display: inline-flex;
+    height: 30px;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px !important;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-mail-filterreset:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+
+/* ── Das Klappfenster eines Filters ─────────────────────────────
+   Gleiches Kleid wie das Vorschlagfenster der Schreiben-Karte. Die Färbung der
+   angesteuerten Zeile kommt aus der app-weiten `.ofi-option-row`-Regel — hier
+   steht bewusst KEINE eigene Hover-Farbe.
+
+   DIE FALLE, einmal bezahlt (19.08.2026): das Fenster hängt im PORTAL an
+   `document.body`, also AUSSERHALB von `#root`. Eine mit `#root ` gepanzerte
+   Regel greift dort überhaupt nicht — die Zeilen fielen auf Tailwinds
+   Knopf-Grundwerte zurück (`display: inline-block`, mittige Schrift, keine
+   Polsterung) und standen zweizeilig da. Jede Regel für den Inhalt braucht
+   darum ihren `body > :not(#root)`-Zwilling, wie schon bei `.ofi-cal-btn`. */
+.ofi-quick-pop.ofi-mail-filterpop {
+    /* Menükante aus dem Radienband — siehe Dateiende. */
+    border-radius: var(--ofi-pop-list-radius) !important;
+    border-color: var(--ofi-cal-border-soft) !important;
+    background: var(--ofi-cal-surface) !important;
+    box-shadow: var(--ofi-cal-shadow) !important;
+    padding: 6px;
+}
+.ofi-mail-popsearch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 2px 6px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 9px;
+    background: var(--ofi-cal-surface-2, var(--ofi-cal-hover));
+    padding: 7px 10px;
+}
+.ofi-mail-popsearch:focus-within { border-color: var(--ofi-cal-accent); }
+.ofi-mail-popsearch__icon { flex: none; color: var(--ofi-cal-muted); }
+#root .ofi-mail-popsearch input,
+body > :not(#root) .ofi-mail-popsearch input {
+    width: 100%;
+    min-width: 0;
+    border: 0 !important;
+    background: transparent;
+    padding: 0;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+    box-shadow: none !important;
+}
+#root .ofi-mail-popsearch input:focus,
+body > :not(#root) .ofi-mail-popsearch input:focus { border-color: transparent !important; box-shadow: none !important; }
+.ofi-mail-poplist { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; }
+
+/* Die Zeile: Marke · Beschriftung · Zahl. Die Marke ist eine Spur fester
+   Breite, damit alle Beschriftungen auf EINER Kante beginnen — gewählt oder
+   nicht. */
+#root .ofi-mail-opt,
+body > :not(#root) .ofi-mail-opt {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 11px;
+    border-radius: 9px !important;
+    background: transparent;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    text-align: left;
+    line-height: 18px;
+}
+#root .ofi-mail-opt.has-sub,
+body > :not(#root) .ofi-mail-opt.has-sub { align-items: flex-start; padding-top: 9px; padding-bottom: 9px; }
+
+/* Marke und Haken tragen die GERADE geltende Schriftfarbe — so bleiben sie auf
+   der marineblauen (bzw. orangen) Zeile sichtbar, ohne eine zweite Farbe zu
+   kennen; eine feste Füllung wäre dort unsichtbar. */
+.ofi-mail-opt__mark {
+    display: flex;
+    width: 16px;
+    height: 16px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid currentColor;
+    opacity: 0.4;
+    font-style: normal;
+    transition: opacity 100ms ease;
+}
+.ofi-mail-opt__mark.is-check { border-radius: 4px; }
+.ofi-mail-opt__mark.is-radio { border-radius: 999px; }
+.ofi-mail-opt.has-sub .ofi-mail-opt__mark { margin-top: 1px; }
+.ofi-mail-opt.is-checked .ofi-mail-opt__mark { opacity: 1; }
+.ofi-mail-opt__dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+.ofi-mail-opt__label {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ofi-mail-opt:not(.has-sub) .ofi-mail-opt__label { white-space: nowrap; }
+.ofi-mail-opt.is-checked .ofi-mail-opt__label { font-weight: 700; }
+/* Der Nebensatz einer Bereichszeile: er sagt, was der Bereich zeigt. Als
+   ZWEITES <span> der Zeile bekommt er von `.ofi-option-row` auch auf der
+   gefüllten Zeile automatisch den leiseren Ton. */
+.ofi-mail-opt__sub { font-size: 11px; font-weight: 400; line-height: 15px; color: var(--ofi-cal-muted); white-space: normal; }
+.ofi-mail-opt__hint {
+    min-width: 20px;
+    flex: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ofi-cal-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.ofi-mail-poptitle {
+    padding: 3px 10px 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mail-popempty { padding: 14px 10px; text-align: center; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-mail-popfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    margin-top: 5px;
+    padding: 7px 8px 3px;
+}
+.ofi-mail-popfoot__hint { font-size: 10.5px; line-height: 1.35; color: var(--ofi-cal-muted); }
+#root .ofi-mail-popfoot__clear,
+body > :not(#root) .ofi-mail-popfoot__clear {
+    flex: none;
+    border-radius: 7px !important;
+    background: transparent;
+    padding: 3px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ofi-cal-accent);
+}
+#root .ofi-mail-popfoot__clear:hover,
+body > :not(#root) .ofi-mail-popfoot__clear:hover { background: var(--ofi-cal-accent-soft); }
+.ofi-mail-popdates { display: flex; flex-direction: column; gap: 9px; padding: 2px 4px 2px; }
+.ofi-mail-datefield { display: flex; flex-direction: column; gap: 4px; }
+.ofi-mail-datefield > span { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ofi-cal-muted); }
+#root .ofi-mail-datefield input,
+body > :not(#root) .ofi-mail-datefield input {
+    width: 100%;
+    height: 32px;
+    border: 1px solid var(--ofi-cal-border) !important;
+    border-radius: 8px !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 8px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+}
+
+.ofi-mail-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    min-height: calc(100vh - 150px);
+}
+
+/* ── Leiste ─────────────────────────────────────────────────────────────── */
+.ofi-mail-rail { display: flex; flex-direction: column; gap: 14px; padding-top: 2px; }
+#root .ofi-mail-composebtn { height: 46px; padding: 0 20px 0 16px; font-size: 13.5px; }
+.ofi-mail-folders { display: flex; flex-direction: column; gap: 2px; padding-right: 8px; }
+#root .ofi-mail-folder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 34px;
+    border-radius: 0 999px 999px 0 !important;
+    background: transparent;
+    padding: 0 12px 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    text-align: left;
+    transition: background-color 120ms ease;
+}
+#root .ofi-mail-folder:hover { background: var(--ofi-cal-hover); }
+#root .ofi-mail-folder.is-active { background: var(--ofi-cal-tab-active-bg); color: var(--ofi-cal-tab-active-text); font-weight: 700; }
+#root .ofi-mail-folder.has-unread { font-weight: 700; }
+.ofi-mail-folder__icon { display: flex; flex: none; color: inherit; opacity: 0.85; }
+.ofi-mail-folder__label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-mail-folder__count { flex: none; font-size: 11.5px; font-weight: 700; color: inherit; }
+
+.ofi-mail-account {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-right: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 12px 12px 10px;
+    font-size: 12px;
+    color: var(--ofi-cal-text);
+}
+.ofi-mail-account.is-muted { color: var(--ofi-cal-muted); }
+.ofi-mail-account.is-warn { border-color: rgba(185, 28, 28, 0.35); }
+.ofi-mail-account__head { display: flex; align-items: center; gap: 8px; }
+.ofi-mail-account__title { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 700; }
+.ofi-mail-account__ok { color: #0b8043; }
+/* Das Fragezeichen neben der Postfachadresse trägt die Hausfarbe von Outlook
+   — es verweist genau dorthin («für ältere Post: Outlook»). */
+#root .ofi-mail-account__info {
+    display: flex;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    background: transparent;
+    color: #0078d4;
+    transition: background-color 120ms ease;
+}
+#root .ofi-mail-account__info:hover { background: rgba(0, 120, 212, 0.14); }
+.ofi-mail-infopop { display: flex; flex-direction: column; gap: 10px; padding: 8px 8px 6px; }
+/* Die Wahl des Fensters in den Mail-Einstellungen — zwei Schalter, einer an. */
+.ofi-mail-windowpick { display: inline-flex; overflow: hidden; border-radius: 999px; border: 1px solid var(--ofi-cal-border); }
+#root .ofi-mail-windowpick button {
+    height: 34px;
+    border-radius: 0 !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 16px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-mail-windowpick button + button { border-left: 1px solid var(--ofi-cal-border); }
+#root .ofi-mail-windowpick button:hover { background: var(--ofi-cal-hover); }
+#root .ofi-mail-windowpick button.is-active { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+
+/* Der zitierte Verlauf unter einer Antwort: zugeklappt eine Zeile, offen je
+   Vorgänger ein eingerückter Block mit seiner Kopfzeile. */
+.ofi-mail-quotes { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+#root .ofi-mail-quotes__toggle {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px !important;
+    background: var(--ofi-cal-hover);
+    padding: 4px 12px 4px 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-mail-quotes__toggle:hover { color: var(--ofi-cal-text); }
+.ofi-mail-quote { border-left: 2px solid var(--ofi-cal-border); padding: 2px 0 2px 12px; }
+.ofi-mail-quote__head { padding-bottom: 3px; font-size: 11.5px; font-weight: 700; color: var(--ofi-cal-muted); }
+.ofi-mail-quote__text { white-space: pre-wrap; font-size: 12.5px; line-height: 1.55; color: var(--ofi-cal-muted); }
+.ofi-mail-quote__text.is-signature { border-left: 2px solid var(--ofi-cal-border); padding-left: 12px; }
+.ofi-mail-infopop p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ofi-cal-text); }
+#root .ofi-mail-outlookbtn,
+body > :not(#root) .ofi-mail-outlookbtn {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 9px !important;
+    background: #0078d4;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+    text-decoration: none;
+}
+#root .ofi-mail-outlookbtn:hover,
+body > :not(#root) .ofi-mail-outlookbtn:hover { background: #106ebe; text-decoration: none; }
+.ofi-mail-account__bad { color: var(--ofi-cal-danger); }
+.ofi-mail-account__mailbox { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-mail-account__text { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--ofi-cal-muted); }
+.ofi-mail-account__meta { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--ofi-cal-muted); }
+.ofi-mail-account__meta.is-warn { color: var(--ofi-cal-danger); }
+.ofi-mail-account__summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-mail-account__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; }
+#root .ofi-mail-account__actions .ofi-cal-btn { height: 30px; padding: 0 10px; font-size: 12px; }
+#root .ofi-mail-account__cta { align-self: flex-start; height: 32px; margin-top: 4px; }
+.ofi-mail-account__confirm { display: flex; flex-direction: column; gap: 4px; }
+.ofi-mail-account__link { font-size: 12px; font-weight: 600; color: var(--ofi-cal-accent); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Liste + Lesebereich ────────────────────────────────────────────────── */
+.ofi-mail-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+}
+.ofi-mail-list {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    border-right: 1px solid var(--ofi-cal-border-soft);
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+}
+.ofi-mail-list__rows { display: flex; flex-direction: column; transition: opacity 120ms ease; }
+.ofi-mail-list__rows.is-loading { opacity: 0.55; }
+#root .ofi-mail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    border-radius: 0 !important;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: transparent;
+    padding: 10px 14px 9px 14px;
+    text-align: left;
+    color: var(--ofi-cal-text);
+    transition: background-color 100ms ease;
+    /* Die Zeile ist ein `div` mit `role="button"`, damit sie sich ziehen
+       laesst (siehe MailList.tsx) — Zeiger und Auswahlsperre kamen vorher vom
+       `<button>` und stehen deshalb jetzt hier. */
+    cursor: pointer;
+    user-select: none;
+}
+#root .ofi-mail-row:hover { background: var(--ofi-cal-hover); }
+#root .ofi-mail-row.is-active { background: var(--ofi-cal-tab-active-bg); }
+#root .ofi-mail-row.is-active::before { content: none; }
+.ofi-mail-row.is-skeleton { pointer-events: none; }
+.ofi-mail-row__avatar {
+    display: flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 2px;
+}
+.ofi-mail-row__avatar.is-large { width: 40px; height: 40px; font-size: 16px; margin-top: 0; }
+.ofi-mail-row__avatar.is-skeleton { background: var(--ofi-cal-hover); }
+.ofi-mail-row__main { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.ofi-mail-row__top { display: flex; align-items: baseline; gap: 8px; }
+.ofi-mail-row__from { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.ofi-mail-row.is-unread .ofi-mail-row__from,
+.ofi-mail-row.is-unread .ofi-mail-row__subject-text { font-weight: 700; }
+.ofi-mail-row.is-unread .ofi-mail-row__date { color: var(--ofi-cal-accent); font-weight: 700; }
+.ofi-mail-row__dir { margin-right: 4px; font-weight: 400; color: var(--ofi-cal-muted); }
+.ofi-mail-row__meta { display: flex; flex: none; align-items: center; gap: 6px; }
+.ofi-mail-row__clip { color: var(--ofi-cal-muted); }
+.ofi-mail-row__date { font-size: 11.5px; color: var(--ofi-cal-muted); white-space: nowrap; }
+.ofi-mail-row__subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.ofi-mail-row__subject-text { color: var(--ofi-cal-text); }
+.ofi-mail-row__preview { color: var(--ofi-cal-muted); }
+.ofi-mail-row__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 3px; }
+.ofi-mail-tag {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ofi-mail-tag.is-customer { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+.ofi-mail-tag.is-customer.is-manual { box-shadow: inset 0 0 0 1px var(--ofi-cal-accent-soft); }
+.ofi-mail-tag.is-none { background: transparent; box-shadow: inset 0 0 0 1px var(--ofi-cal-border); color: var(--ofi-cal-muted); font-weight: 500; }
+/* Interne Post (Kollegin/Kollege als Gegenstelle, Kalendermeldung ans Team):
+   ein eigener, ruhiger Merker — die Klasse wurde bisher gesetzt, hatte aber
+   kein Kleid und fiel als farbloser Text aus der Reihe. */
+.ofi-mail-tag.is-internal { background: rgba(11, 128, 67, 0.12); color: #0b8043; }
+.ofi-mail-tag.is-entity { background: rgba(3, 155, 229, 0.12); color: #0277bd; }
+.ofi-mail-tag.is-erp { background: var(--ofi-cal-hover); color: var(--ofi-cal-muted); font-weight: 700; letter-spacing: 0.04em; }
+.ofi-mail-tag.is-owner { background: rgba(142, 36, 170, 0.1); color: #8e24aa; }
+.ofi-mail-tag.is-ghost { background: transparent; color: var(--ofi-cal-muted); font-weight: 500; }
+.ofi-mail-tag__sub { font-weight: 400; opacity: 0.85; }
+#root button.ofi-mail-tag,
+#root a.ofi-mail-tag { border-radius: 999px !important; height: auto; text-decoration: none; }
+#root .ofi-mail-tag.is-click:hover { filter: brightness(0.94); text-decoration: none; }
+#root .ofi-mail-tag.is-none.is-click:hover { background: var(--ofi-cal-hover); }
+
+.ofi-mail-list__skeleton { display: flex; flex-direction: column; }
+.ofi-mail-empty {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 48px 24px;
+    text-align: center;
+}
+.ofi-mail-empty__title { font-size: 15px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-mail-empty__text { max-width: 320px; margin: 0 0 6px; font-size: 12.5px; line-height: 1.5; color: var(--ofi-cal-muted); }
+
+.ofi-mail-reader {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+    padding: 12px 24px 28px;
+    color: var(--ofi-cal-text);
+}
+.ofi-mail-reader.is-loading { opacity: 0.6; }
+.ofi-mail-reader.is-empty { align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--ofi-cal-muted); }
+.ofi-mail-reader__emptyicon { color: var(--ofi-cal-faint); }
+.ofi-mail-reader__bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; }
+.ofi-mail-reader__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+#root .ofi-mail-reader__actions .ofi-cal-btn { height: 32px; padding: 0 12px; font-size: 12.5px; text-decoration: none; }
+.ofi-mail-reader__icons { display: flex; align-items: center; gap: 2px; }
+.ofi-mail-reader__subject { margin: 4px 0 14px; font-size: 21px; font-weight: 500; line-height: 1.3; letter-spacing: -0.01em; color: var(--ofi-cal-text); }
+.ofi-mail-reader__from { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--ofi-cal-border-soft); }
+.ofi-mail-reader__fromtext { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+.ofi-mail-reader__fromline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.ofi-mail-reader__fromname { font-size: 13.5px; font-weight: 700; }
+.ofi-mail-reader__fromaddr { font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-mail-reader__date { margin-left: auto; font-size: 12px; color: var(--ofi-cal-muted); white-space: nowrap; }
+.ofi-mail-reader__to { font-size: 12px; color: var(--ofi-cal-muted); overflow-wrap: anywhere; }
+.ofi-mail-reader__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 6px; }
+.ofi-mail-reader__matchhint { font-size: 11px; color: var(--ofi-cal-muted); }
+.ofi-mail-reader__body {
+    padding: 18px 0 8px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.ofi-mail-reader__nobody { color: var(--ofi-cal-muted); font-style: italic; }
+
+.ofi-mail-linkpanel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+    border-radius: 10px;
+    background: var(--ofi-cal-surface-2);
+    padding: 12px 14px;
+}
+.ofi-mail-linkpanel__title { font-size: 12.5px; font-weight: 700; }
+.ofi-mail-linkpanel__combo { max-width: 480px; }
+.ofi-mail-linkpanel__suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-mail-linkpanel__check { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.ofi-mail-linkpanel__check input { accent-color: var(--ofi-cal-accent); }
+.ofi-mail-linkpanel__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+#root .ofi-mail-linkpanel__actions .ofi-cal-btn { height: 32px; font-size: 12.5px; }
+
+.ofi-mail-attachments { margin-top: 12px; border-top: 1px solid var(--ofi-cal-border-soft); padding-top: 12px; }
+.ofi-mail-attachments__title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
+.ofi-mail-attachments__hint { margin-left: 4px; font-size: 11px; font-weight: 400; color: var(--ofi-cal-muted); }
+.ofi-mail-attachments__loading, .ofi-mail-attachments__error { padding-top: 6px; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-mail-attachments__error { color: var(--ofi-cal-danger); }
+.ofi-mail-attachments__list { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; }
+.ofi-mail-attachment {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 4px 6px 4px 12px;
+    font-size: 12.5px;
+}
+.ofi-mail-attachment__name { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ofi-mail-attachment__size { font-size: 11px; color: var(--ofi-cal-muted); }
+
+/* ── Schreiben-Fenster (FloatingCard-Inhalt, Body-Portal → body > :not(#root)) ─ */
+.ofi-mailc__body { padding: 0; }
+.ofi-mailc__row { position: relative; display: flex; align-items: center; gap: 10px; min-height: 40px; border-bottom: 1px solid var(--ofi-cal-border-soft); }
+.ofi-mailc__label { flex: none; width: 56px; font-size: 12.5px; color: var(--ofi-cal-muted); }
+.ofi-mailc__control { position: relative; display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; }
+body > :not(#root) .ofi-mailc__input,
+#root .ofi-mailc__input {
+    width: 100%;
+    min-height: 0;
+    height: 32px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 13.5px;
+    color: var(--ofi-cal-text);
+    outline: none;
+    box-shadow: none;
+}
+body > :not(#root) .ofi-mailc__cclink,
+#root .ofi-mailc__cclink { flex: none; border-radius: 4px !important; background: transparent; padding: 2px 6px; font-size: 12px; font-weight: 600; color: var(--ofi-cal-muted); }
+body > :not(#root) .ofi-mailc__cclink:hover,
+#root .ofi-mailc__cclink:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+.ofi-mailc__suggest {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 2px);
+    left: 0;
+    display: flex;
+    min-width: 260px;
+    max-width: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    box-shadow: var(--ofi-cal-shadow-soft);
+}
+body > :not(#root) .ofi-mailc__suggest button,
+#root .ofi-mailc__suggest button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 6px 12px;
+    text-align: left;
+}
+body > :not(#root) .ofi-mailc__suggest button:hover,
+#root .ofi-mailc__suggest button:hover { background: var(--ofi-cal-hover); }
+.ofi-mailc__suggest-name { font-size: 12.5px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-mailc__suggest-addr { font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-mailc__entity { display: flex; align-items: center; gap: 6px; padding: 6px 0 0; font-size: 11.5px; color: var(--ofi-cal-muted); }
+body > :not(#root) .ofi-mailc__textarea,
+#root .ofi-mailc__textarea {
+    width: 100%;
+    min-height: 200px;
+    resize: vertical;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 12px 0 8px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ofi-cal-text);
+    outline: none;
+    box-shadow: none;
+}
+.ofi-mailc__attachments { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
+.ofi-mailc__chip {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+    background: var(--ofi-cal-hover);
+    padding: 3px 4px 3px 8px;
+    font-size: 12px;
+    color: var(--ofi-cal-text);
+}
+.ofi-mailc__chip-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ofi-mailc__chip-size { font-size: 11px; color: var(--ofi-cal-muted); }
+body > :not(#root) .ofi-mailc__chip button,
+#root .ofi-mailc__chip button { display: flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 999px !important; background: transparent; color: var(--ofi-cal-muted); }
+body > :not(#root) .ofi-mailc__chip button:hover,
+#root .ofi-mailc__chip button:hover { background: rgba(0, 0, 0, 0.08); color: var(--ofi-cal-text); }
+.ofi-mailc__footer { display: flex; align-items: center; gap: 6px; }
+.ofi-mailc__hint { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--ofi-cal-muted); }
+
+/* Firmenpostfach-Karte in der Leiste: nur die Adresse (Vorgabe 19.08.2026). */
+.ofi-mail-account__servericon { flex: none; color: var(--ofi-cal-muted); }
+.ofi-mail-account__note { margin: 2px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--ofi-cal-muted); }
+/* Post einer registrierten Person (kein Kundenbezug): eigener Ton, damit
+   "Ohne Kunde" nicht wie unerledigte Arbeit aussieht. */
+.ofi-mail-tag.is-internal { background: rgba(15, 118, 110, 0.12); color: var(--ofi-cal-task); }
+
+/* ── POSTFACH-KATEGORIEN & PAPIERKORB (08.09.2026) ─────────────────────────
+   Links unter Posteingang/Postausgang/Papierkorb: die Kategorien-Leiste.
+   Runder +, rollende Liste, ziehbare Reihenfolge; Nachrichten kommen per
+   Ziehen oder im Sammelmodus (farbiger Rand) hinein. */
+.ofi-mail-catsection { display: flex; min-height: 0; flex-direction: column; gap: 4px; padding-right: 8px; }
+.ofi-mail-catsection__head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 2px 12px; }
+.ofi-mail-catsection__title {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ofi-cal-muted);
+}
+/* Der RUNDE Hinzufügen-Knopf — in der Überschrift, ausserhalb der Liste. */
+#root .ofi-mail-catadd {
+    display: flex;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+#root .ofi-mail-catadd:hover { background: var(--ofi-cal-hover); }
+/* Die Liste rollt; die Reihenfolge wird mit der Maus gezogen. */
+.ofi-mail-cats { display: flex; min-height: 0; flex-direction: column; gap: 2px; overflow-y: auto; max-height: calc(100vh - 330px); }
+.ofi-mail-cat {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-radius: 0 999px 999px 0;
+    padding-right: 4px;
+    cursor: grab;
+    transition: background-color 100ms ease, box-shadow 100ms ease;
+}
+.ofi-mail-cat:hover { background: var(--ofi-cal-hover); }
+.ofi-mail-cat.is-active { background: var(--ofi-cal-tab-active-bg); }
+.ofi-mail-cat.is-active .ofi-mail-cat__label { color: var(--ofi-cal-tab-active-text); font-weight: 700; }
+.ofi-mail-cat.is-assigning { box-shadow: inset 0 0 0 1.5px var(--ofi-cal-accent); }
+/* Eine Nachricht (oder Zeile) schwebt darüber. */
+.ofi-mail-cat.is-dropover { box-shadow: inset 0 0 0 2px var(--ofi-cal-accent); background: var(--ofi-cal-accent-soft); }
+#root .ofi-mail-cat__main {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    border-radius: 0 999px 999px 0 !important;
+    background: transparent;
+    padding: 7px 6px 7px 14px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+}
+.ofi-mail-cat__dot { width: 10px; height: 10px; flex: none; border-radius: 999px; }
+.ofi-mail-cat__label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-mail-cat__count { flex: none; font-size: 11.5px; font-weight: 700; color: var(--ofi-cal-muted); }
+/* Zeilen-Aktionen (Sammeln, Löschen) erst beim Überfahren. */
+.ofi-mail-cat__actions { display: none; flex: none; align-items: center; gap: 1px; }
+.ofi-mail-cat:hover .ofi-mail-cat__actions, .ofi-mail-cat.is-assigning .ofi-mail-cat__actions { display: flex; }
+#root .ofi-mail-cat__action {
+    display: flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-mail-cat__action:hover { background: rgba(0, 0, 0, 0.08); color: var(--ofi-cal-text); }
+#root .ofi-mail-cat__action.is-danger:hover { color: var(--ofi-cal-danger); }
+
+/* Art-Menü am + (Portal!) und Anlegen-Fenster (PopupCard, ebenfalls Portal). */
+body > :not(#root) .ofi-mail-catmenu,
+#root .ofi-mail-catmenu { display: flex; flex-direction: column; gap: 2px; padding: 6px; }
+body > :not(#root) .ofi-mail-catmenu__row,
+#root .ofi-mail-catmenu__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px !important;
+    background: transparent;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+}
+body > :not(#root) .ofi-mail-catpick,
+#root .ofi-mail-catpick { display: flex; min-height: 0; flex-direction: column; gap: 10px; }
+body > :not(#root) .ofi-mail-catpick__search,
+#root .ofi-mail-catpick__search { border-radius: 999px; padding: 7px 12px; }
+body > :not(#root) .ofi-mail-catpick__list,
+#root .ofi-mail-catpick__list { display: flex; min-height: 120px; max-height: 320px; flex-direction: column; gap: 2px; overflow-y: auto; }
+body > :not(#root) .ofi-mail-catpick__row,
+#root .ofi-mail-catpick__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px !important;
+    background: transparent;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--ofi-cal-text);
+}
+body > :not(#root) .ofi-mail-catpick__icon,
+#root .ofi-mail-catpick__icon { display: flex; flex: none; color: var(--ofi-cal-muted); }
+body > :not(#root) .ofi-mail-catpick__main,
+#root .ofi-mail-catpick__main { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+body > :not(#root) .ofi-mail-catpick__label,
+#root .ofi-mail-catpick__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+body > :not(#root) .ofi-mail-catpick__sub,
+#root .ofi-mail-catpick__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--ofi-cal-muted); }
+
+/* Liste + Sammelmodus-Balken teilen sich die linke Spalte des Splits. */
+.ofi-mail-listwrap { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--ofi-cal-border-soft); }
+.ofi-mail-listwrap .ofi-mail-list { flex: 1; border-right: 0; }
+.ofi-mail-assignbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 2px solid var(--ofi-cat-color, var(--ofi-cal-accent));
+    background: var(--ofi-cal-surface-soft, var(--ofi-cal-hover));
+    padding: 8px 14px;
+}
+.ofi-mail-assignbar__dot { width: 10px; height: 10px; flex: none; border-radius: 999px; }
+.ofi-mail-assignbar__text { display: flex; min-width: 0; flex: 1; flex-direction: column; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-mail-assignbar__text b { font-size: 12.5px; color: var(--ofi-cal-text); }
+#root .ofi-mail-assignbar__done { flex: none; }
+/* Sammelmodus: der Klick wählt statt zu öffnen; Zugeordnetes trägt den Rand
+   in der Farbe der Kategorie. */
+#root .ofi-mail-row.is-picking { cursor: copy; }
+#root .ofi-mail-row.is-assigned { box-shadow: inset 3px 0 0 var(--ofi-cat-color, var(--ofi-cal-accent)), inset 0 0 0 1.5px var(--ofi-cat-color, var(--ofi-cal-accent)); }
+#root .ofi-mail-row.is-assigned .ofi-mail-row__avatar { background: var(--ofi-cat-color, var(--ofi-cal-accent)) !important; }
+
+/* Kategorie-Chip in Liste und Lesebereich. */
+.ofi-mail-tag.is-category { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+.ofi-mail-tag__catdot { width: 7px; height: 7px; flex: none; border-radius: 999px; margin-right: 4px; }
+/* Das Kreuz am Chip nimmt die Nachricht aus der Kategorie. Es sitzt IM Chip,
+   ganz rechts, und bleibt blass, bis der Zeiger darauf steht — es ist die
+   Nebenhandlung, der Name der Kategorie ist die Hauptsache. */
+#root .ofi-mail-tag__x {
+    display: inline-flex;
+    width: 14px;
+    height: 14px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    margin: 0 -4px 0 1px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    color: inherit;
+    opacity: 0.5;
+    cursor: pointer;
+}
+#root .ofi-mail-tag__x:hover { background: var(--ofi-cal-border); opacity: 1; }
+
+/* ── Der RUMPF im Lesebereich (08.09.2026): Formatierung statt Textwand ────
+   `ofi-mail-html` zeigt das bereinigte HTML der Nachricht (fett, Listen,
+   Tabellen, Zitate); `ofi-mail-plain` den Text älterer Nachrichten. */
+.ofi-mail-plain { white-space: pre-wrap; }
+/* `white-space: normal` MUSS hier stehen: der Lesebereich ringsum steht auf
+   pre-wrap (für reinen Text), und im HTML zählte sonst jeder Zeilenumbruch
+   des Quelltexts als Leerzeile. */
+.ofi-mail-html { font-size: 13px; line-height: 1.6; color: var(--ofi-cal-text); overflow-wrap: break-word; white-space: normal; }
+.ofi-mail-html p, .ofi-mail-html div { margin: 0 0 8px; }
+.ofi-mail-html p:last-child, .ofi-mail-html div:last-child { margin-bottom: 0; }
+.ofi-mail-html b, .ofi-mail-html strong { font-weight: 700; }
+.ofi-mail-html ul, .ofi-mail-html ol { margin: 0 0 10px; padding-left: 22px; }
+.ofi-mail-html ul { list-style: disc; }
+.ofi-mail-html ol { list-style: decimal; }
+.ofi-mail-html li { margin: 2px 0; }
+.ofi-mail-html h1, .ofi-mail-html h2, .ofi-mail-html h3, .ofi-mail-html h4 { margin: 12px 0 6px; font-weight: 700; }
+.ofi-mail-html h1 { font-size: 16px; }
+.ofi-mail-html h2 { font-size: 15px; }
+.ofi-mail-html h3, .ofi-mail-html h4 { font-size: 13.5px; }
+.ofi-mail-html a { color: var(--ofi-cal-accent); text-decoration: underline; text-underline-offset: 2px; }
+.ofi-mail-html blockquote {
+    margin: 8px 0;
+    border-left: 2px solid var(--ofi-cal-border);
+    padding: 2px 0 2px 12px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mail-html hr { margin: 10px 0; border: 0; border-top: 1px solid var(--ofi-cal-border-soft); }
+.ofi-mail-html pre { margin: 0 0 10px; overflow-x: auto; border-radius: 8px; background: var(--ofi-cal-hover); padding: 8px 10px; font-size: 12px; }
+/* Tabellen aus Outlook/Word: Hairlines statt mitgeschickter Rahmen. */
+.ofi-mail-html table { margin: 0 0 10px; max-width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ofi-mail-html td, .ofi-mail-html th { border: 1px solid var(--ofi-cal-border-soft); padding: 4px 8px; vertical-align: top; }
+.ofi-mail-html th { background: var(--ofi-cal-hover); font-weight: 700; text-align: left; }
+/* Der zitierte Verlauf übernimmt die gedämpfte Farbe des Zitatblocks. */
+.ofi-mail-quote__text.ofi-mail-html { white-space: normal; color: var(--ofi-cal-muted); }
+
+/* ── Empfängerfeld des Schreiben-Fensters (18.08.2026) ─────────────────────
+   Vorschläge kommen nur aus dem System (Kunden, Ansprechpartner, registrierte
+   Personen), Bedienung wie die Produktzelle. Gewählte Adressen stehen als
+   Chips ÜBER dem Feld; das Panel bekommt hier ein eigenes, runderes Kleid —
+   die Produktzelle im Lager behält ihres (`panelClassName`, opt-in). */
+.ofi-mailc__row.is-recipients { align-items: flex-start; padding: 6px 0; }
+.ofi-mailc__row.is-recipients .ofi-mailc__label { padding-top: 9px; }
+.ofi-mailc__recipients { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.ofi-mailc__chips { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 2px; }
+.ofi-mailc__recipient {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: baseline;
+    gap: 6px;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    padding: 3px 4px 3px 10px;
+    font-size: 12px;
+    color: var(--ofi-cal-accent);
+}
+.ofi-mailc__recipient-name { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ofi-mailc__recipient-mail { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.75; }
+body > :not(#root) .ofi-mailc__recipient button,
+#root .ofi-mailc__recipient button {
+    display: flex;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    background: transparent;
+    color: inherit;
+    opacity: 0.7;
+}
+body > :not(#root) .ofi-mailc__recipient button:hover,
+#root .ofi-mailc__recipient button:hover { background: rgba(0, 0, 0, 0.1); opacity: 1; }
+
+/* Das Vorschlag-Panel: weicher, runder, mit ruhigem Schatten — Tailwinds
+   `rounded-md`/Rahmen der geteilten Komponente werden hier überschrieben. */
+.ofi-quick-pop.ofi-mail-pop {
+    /* Menükante aus dem Radienband — siehe Dateiende. */
+    border-radius: var(--ofi-pop-list-radius) !important;
+    border-color: var(--ofi-cal-border-soft) !important;
+    background: var(--ofi-cal-surface) !important;
+    box-shadow: var(--ofi-cal-shadow) !important;
+    padding: 4px;
+}
+.ofi-quick-pop.ofi-mail-pop .ofi-option-row {
+    border-radius: 9px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+/* Die Gruppentrennung der geteilten Zelle ist ein satter Marinestrich; im
+   Mailfenster genügt eine feine Linie. */
+.ofi-quick-pop.ofi-mail-pop .h-px { background: var(--ofi-cal-border-soft) !important; }
+.ofi-quick-pop.ofi-mail-pop .uppercase { color: var(--ofi-cal-muted); letter-spacing: 0.06em; }
+.ofi-mailconfirm-card__head { padding: 12px 14px 8px; }
+.ofi-mailconfirm-card__title { font-size: 14px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-mailconfirm-card__subtitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 1px;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mailconfirm__group { display: flex; flex-direction: column; gap: 4px; }
+.ofi-mailconfirm__grouphead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mailconfirm__count {
+    display: inline-flex;
+    min-width: 18px;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    padding: 0 6px;
+    font-size: 10.5px;
+    color: var(--ofi-cal-accent);
+}
+.ofi-mailconfirm__list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ofi-mailconfirm__row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    border-radius: 8px;
+    background: var(--ofi-cal-surface-2);
+    padding: 7px 10px;
+}
+.ofi-mailconfirm__name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-mailconfirm__sub { font-weight: 400; color: var(--ofi-cal-muted); }
+.ofi-mailconfirm__mail { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--ofi-cal-muted); }
+.ofi-mailconfirm__cc {
+    flex: none;
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mailconfirm__empty { margin: 0; font-size: 12.5px; color: var(--ofi-cal-danger); }
+.ofi-mailconfirm__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    padding: 10px 14px;
+}
+#root .ofi-mailconfirm__footer .ofi-cal-btn,
+body > :not(#root) .ofi-mailconfirm__footer .ofi-cal-btn { height: 34px; font-size: 12.5px; }

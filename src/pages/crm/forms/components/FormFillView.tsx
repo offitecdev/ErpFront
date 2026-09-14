@@ -10,6 +10,8 @@ import { LoadingPanel } from '@/components/ui-shared/Loader';
 import { FormRenderer } from './FormRenderer';
 import { ChecklistLinkDialog, type ChecklistTarget } from './ChecklistLinkDialog';
 import { apiErrorMessage, fmtDate, fmtDateTime, linkedCustomerLine, presetsFromLinks } from '../ui';
+import '@/styles/modules/reportEditor.css';
+import '@/styles/modules/checklists.css';
 
 /**
  * ── EINE CHECKLISTE ANSEHEN / AUSFÜLLEN ─────────────────────────────────────

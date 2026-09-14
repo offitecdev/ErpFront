@@ -5,6 +5,7 @@ import { InventoryListHeader } from '@/components/inventory/InventoryListHeader'
 import { t } from '@/i18n/translate';
 
 import { GemMark } from './GemMark';
+import '@/styles/modules/invoicePages.css';
 
 /**
  * ── BAUTEILE DER BEIDEN ERFASSUNGSSEITEN ─────────────────────────────────────
@@ -163,7 +164,7 @@ export const InvoiceModeSwitch = <T extends string>({
 const NEUTRAL_BTN =
     'flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10';
 const BRAND_BTN =
-    'ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#272f67] px-4 py-2.5 text-[12.5px] font-semibold text-white hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50';
+    'ofi-btn-brand flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-4 py-2.5 text-[12.5px] font-semibold text-white hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Fussleiste eines Schritts: links zurück (auf dem ersten Schritt heisst das

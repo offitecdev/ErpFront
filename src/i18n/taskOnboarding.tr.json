@@ -1,0 +1,53 @@
+{
+  "tasksModule": {
+    "onboarding": {
+      "taskTitle": "İlk görevin: Görevleri keşfet",
+      "firstBadge": "İlk görev",
+      "welcomeEyebrow": "Başlamadan önce",
+      "welcomeTitle": "İlk görevin hazır",
+      "welcomeText": "Görevler modülünü gerçek ekran üzerinde kısa bir turla öğreneceksin. Rehber rolüne göre hazırlandı ve bitirdiğinde bu görev otomatik tamamlanacak.",
+      "welcomeAdmin": "Administrator rehberi: görev oluşturma, atama, onaylar, kişiler ve raporlar.",
+      "welcomeMember": "Ekip rehberi: kendi görevlerin, zaman takibi, kontrol listesi, yorumlar ve tamamlama isteği.",
+      "start": "Rehberi başlat",
+      "later": "Daha sonra",
+      "replay": "Rehberi tekrar aç",
+      "backToTasks": "Görevlere dön",
+      "stepCounter": "{{current}} / {{total}}",
+      "next": "Sonraki",
+      "previous": "Geri",
+      "finish": "Rehberi bitir",
+      "finishing": "Görev tamamlanıyor…",
+      "completedToast": "İlk görevin tamamlandı. Artık başlayabilirsin!",
+      "error": "Rehber tamamlanamadı. Lütfen tekrar dene.",
+      "admin": {
+        "title": "Administrator görev rehberi",
+        "subtitle": "Ekibin görev akışını baştan sona yönetmeyi öğren.",
+        "steps": {
+          "create": { "title": "Görevi oluştur ve ata", "text": "Yeni görev ile başlık, sorumlular, başlangıç-bitiş zamanı, öncelik ve etiketleri belirle. Administrator tüm görevlere erişebilir." },
+          "follow": { "title": "İlerlemeyi canlı takip et", "text": "Pano durumları, çalışan zaman sayaçları ve kontrol listesi ilerlemesi ekibin nerede olduğunu gösterir." },
+          "approve": { "title": "Tamamlama isteklerini değerlendir", "text": "Onaylar sayfasında ekip üyelerinin görev önerilerini, tamamlama ve silme isteklerini kabul edebilir veya gerekçeyle reddedebilirsin." },
+          "people": { "title": "Kişiler ve raporlarla sonucu gör", "text": "Kişiler görünümü iş yükünü; raporlar ise süreleri, tamamlanan işleri ve ekip performansını gösterir." }
+        }
+      },
+      "member": {
+        "title": "Görevler hızlı başlangıç rehberi",
+        "subtitle": "Sana atanan işi aç, ilerlet ve tamamlanmak üzere gönder.",
+        "steps": {
+          "open": { "title": "Sana atanan görevi aç", "text": "Görevler listesinde yalnız görebildiğin ve sana atanan işler bulunur. Kartı açarak açıklama, tarih ve sorumluları gör." },
+          "track": { "title": "Başlat ve duraklat", "text": "Çalışmaya başladığında Başlat'a, ara verdiğinde Duraklat'a bas. Süre elle yazılmaz; sayaç gerçek çalışma zamanını kaydeder." },
+          "work": { "title": "Adımları ve iletişimi kullan", "text": "Kontrol listesi maddelerini işaretle; gerektiğinde yorum ekle ve Dosyalar sekmesinden belge yükle." },
+          "complete": { "title": "Tamamlama isteği gönder", "text": "İş bitince Tamamlama isteği gönder. Administrator kontrol edip görevi tamamlar veya açıklamayla geri gönderir." }
+        }
+      },
+      "demo": {
+        "newTask": "Yeni görev",
+        "assignees": "Sorumlular",
+        "timer": "00:18:42",
+        "approval": "Onay bekliyor",
+        "checklist": "3 / 4 madde",
+        "comment": "Yorum ekle",
+        "report": "Haftalık rapor"
+      }
+    }
+  }
+}

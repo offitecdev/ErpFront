@@ -128,7 +128,7 @@ export const TenderLogsPanel = ({
                 onClick={() => documentInputRef.current?.click()}
                 disabled={documentSaving}
                 title={t('tenders.attachments_hint')}
-                className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-50"
             >
                 <Plus size={13} />
                 {t('tenders.attachments_add')}
@@ -164,7 +164,7 @@ export const TenderLogsPanel = ({
             <section data-ui-card className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 md:px-7">
                     <span className="flex items-center gap-2 text-[14px] font-semibold text-slate-900">
-                        <History size={16} className="text-[#1f2654]" />
+                        <History size={16} className="text-[#0066e0]" />
                         {t('tenders.loglar_notlar_ekler')}
                     </span>
                     <span className="text-[12px] tabular-nums text-slate-500">{timelineItems.length}</span>
@@ -180,7 +180,7 @@ export const TenderLogsPanel = ({
                                     onChange={(event) => onNoteTextChange(event.target.value)}
                                     rows={1}
                                     placeholder={t('tenders.note_birak')}
-                                    className="h-9 min-w-0 flex-1 resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] leading-[18px] text-slate-900 shadow-sm outline-none focus:border-[#1f2654] focus:ring-2 focus:ring-[#1f2654]/10"
+                                    className="h-9 min-w-0 flex-1 resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] leading-[18px] text-slate-900 shadow-sm outline-none focus:border-[#0066e0] focus:ring-2 focus:ring-[#0066e0]/10"
                                 />
                                 <Button
                                     size="sm"
@@ -267,7 +267,7 @@ export const TenderLogsPanel = ({
             >
                 <div className="ofi-pop__rule flex items-center justify-between gap-3 border-b px-4 py-3">
                     <span className="flex min-w-0 items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#1f2654]">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#0066e0]">
                             <History size={14} />
                         </span>
                         <span className="min-w-0">
@@ -324,7 +324,7 @@ export const TenderLogsPanel = ({
                                     value={noteText}
                                     onChange={(event) => onNoteTextChange(event.target.value)}
                                     rows={3}
-                                    className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-900 outline-none transition-colors hover:border-slate-300 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
+                                    className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-900 outline-none transition-colors hover:border-slate-300 hover:bg-white focus:border-[#0066e0] focus:bg-white focus:ring-2 focus:ring-[#0066e0]/10"
                                 />
                                 {/* Auch hier hängen die Dateien UNTER der Notiz:
                                     "+" plus die Namen des Gewählten. */}

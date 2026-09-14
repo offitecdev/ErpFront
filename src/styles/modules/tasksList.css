@@ -1,0 +1,333 @@
+/* =========================================================
+   Offitec — GÖREVLER: LISTE UND FREIGABEN (13.09.2026)
+
+   Blatt der Seiten /tasks und /tasks/approvals. Grundformen
+   (Tafel, Zeile, Kreis, Marken, Knöpfe) stehen im Grundblatt
+   tasksModule.css; hier nur, was diese zwei Seiten dazu tun.
+
+     .ofi-gv-list-*       Liste: Zeile, Gruppen, Menü, Fenster
+     .ofi-gv-approvals-*  Freigabe-Karten
+
+   Menü und Aufgabenfenster hängen im Portal ausserhalb von
+   #root: ihre Regeln tragen den Zwilling `body > :not(#root)`
+   und lesen die Fenstermarken `--ofi-cal-*` (dort umgebogen),
+   nie die `--gv-*` der Seite. Farbe nur als Schrift/Punkt,
+   keine getönten Flächen; Bewegung nur als Farbübergang.
+   ========================================================= */
+
+/* ── Liste ──────────────────────────────────────────────────────────────── */
+
+#root .ofi-gv .ofi-gv-list-body {
+    overflow: hidden;
+    transition: opacity 140ms ease;
+}
+
+/* Filterwechsel: die alten Zeilen bleiben stehen, nur leiser. */
+#root .ofi-gv .ofi-gv-list-body.is-fetching { opacity: 0.55; }
+
+#root .ofi-gv .ofi-gv-list-group + .ofi-gv-list-group > .ofi-gv-group__head {
+    border-top: 1px solid var(--gv-hairline);
+}
+
+#root .ofi-gv .ofi-gv-list-group + .ofi-gv-list-group { margin-top: 0; }
+
+#root .ofi-gv .ofi-gv-list-title {
+    min-width: 0;
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#root .ofi-gv .ofi-gv-list-title:focus-visible {
+    outline: none;
+    border-radius: 4px;
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+#root .ofi-gv .ofi-gv-list-time {
+    gap: 5px;
+    color: var(--gv-secondary);
+    font-size: 12px;
+}
+
+#root .ofi-gv .ofi-gv-list-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--gv-hairline);
+}
+
+/* ── Zeilenmenü (Portal) ────────────────────────────────────────────────── */
+
+#root .ofi-gv-list-menu__list,
+body > :not(#root) .ofi-gv-list-menu__list {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#root .ofi-gv-list-menu__item,
+body > :not(#root) .ofi-gv-list-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-text, #1d1d1f);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+#root .ofi-gv-list-menu__icon,
+body > :not(#root) .ofi-gv-list-menu__icon {
+    display: inline-flex;
+    flex: none;
+    justify-content: center;
+    width: 16px;
+    color: var(--ofi-cal-muted, #6e6e73);
+}
+
+#root .ofi-gv-list-menu__label,
+body > :not(#root) .ofi-gv-list-menu__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#root .ofi-gv-list-menu__item.is-danger,
+#root .ofi-gv-list-menu__item.is-danger .ofi-gv-list-menu__icon,
+body > :not(#root) .ofi-gv-list-menu__item.is-danger,
+body > :not(#root) .ofi-gv-list-menu__item.is-danger .ofi-gv-list-menu__icon {
+    color: var(--ofi-win-danger, #d70015);
+}
+
+#root .ofi-gv-list-menu__sep,
+body > :not(#root) .ofi-gv-list-menu__sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+#root .ofi-gv-list-menu__caption,
+body > :not(#root) .ofi-gv-list-menu__caption {
+    padding: 4px 8px 2px 32px;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+/* ── Aufgabenfenster «Yeni görev / Görevi düzenle» (Portal) ────────────── */
+
+#root .ofi-gv-list-sheet,
+body > :not(#root) .ofi-gv-list-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ofi-cal-text, #1d1d1f);
+}
+
+/* Mac-Formular: Wort rechtsbündig links, Feld rechts daneben. Das Wort sitzt
+   in einem Kasten von Feldhöhe und steht so auf der Mittellinie der ersten
+   Feldzeile — bei Eingabe, Datum, Schalter und Chips gleich (14.09.2026,
+   Samet: «Bayrak yanındakiyle aynı hizada değil»). Ein Fehlertext darunter
+   verschiebt das Wort nicht. */
+#root .ofi-gv-list-sheet__row,
+body > :not(#root) .ofi-gv-list-sheet__row {
+    --sheet-control-h: var(--ofi-win-control-h, 34px);
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+}
+
+#root .ofi-gv-list-sheet__label,
+body > :not(#root) .ofi-gv-list-sheet__label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    min-height: var(--sheet-control-h);
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 12.5px;
+    line-height: 1.2;
+    text-align: right;
+}
+
+#root .ofi-gv-list-sheet__value,
+body > :not(#root) .ofi-gv-list-sheet__value {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+#root .ofi-gv-list-sheet__inline,
+body > :not(#root) .ofi-gv-list-sheet__inline,
+#root .ofi-gv-list-sheet__chips,
+body > :not(#root) .ofi-gv-list-sheet__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--sheet-control-h, 34px);
+}
+
+#root .ofi-gv-list-sheet__field,
+body > :not(#root) .ofi-gv-list-sheet__field {
+    flex: 1 1 240px;
+    min-width: 0;
+}
+
+#root .ofi-gv-list-sheet__priority,
+body > :not(#root) .ofi-gv-list-sheet__priority { width: 180px; max-width: 100%; }
+
+#root .ofi-gv-list-sheet__error,
+body > :not(#root) .ofi-gv-list-sheet__error {
+    color: var(--ofi-win-danger, #d70015);
+    font-size: 12px;
+}
+
+#root .ofi-gv-list-sheet__skeleton,
+body > :not(#root) .ofi-gv-list-sheet__skeleton {
+    height: 28px;
+    border-radius: 6px;
+}
+
+/* Zugewiesene Person im Fenster: dieselbe Marke wie ein Etikett, mit Bild. */
+#root .ofi-gv-list-person,
+body > :not(#root) .ofi-gv-list-person {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 200px;
+    height: 22px;
+    padding: 0 5px 0 3px;
+    border: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.1));
+    border-radius: 5px;
+    color: var(--ofi-cal-text, #1d1d1f);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#root .ofi-gv-list-person__name,
+body > :not(#root) .ofi-gv-list-person__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Die Etikettenmarke liest `--la-*`, die es im Portal nicht gibt — im Fenster
+   malt sie darum aus den Fenstermarken, OHNE eigene weisse Fläche (14.09.2026:
+   im Dunkeln stand sie als weisser Kasten im Fenster). */
+body > :not(#root) .ofi-gv-list-sheet .ofi-gv-label {
+    border-color: var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.1));
+    background: transparent;
+    color: var(--ofi-cal-text, #1d1d1f);
+}
+
+@media (max-width: 520px) {
+    #root .ofi-gv-list-sheet__row,
+    body > :not(#root) .ofi-gv-list-sheet__row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    #root .ofi-gv-list-sheet__label,
+    body > :not(#root) .ofi-gv-list-sheet__label {
+        justify-content: flex-start;
+        min-height: 0;
+        text-align: left;
+    }
+}
+
+/* ── Freigaben ──────────────────────────────────────────────────────────── */
+
+#root .ofi-gv .ofi-gv-approvals-subtitle { margin: 0; }
+
+#root .ofi-gv .ofi-gv-approvals-section__list > * + * {
+    border-top: 1px solid var(--gv-hairline);
+}
+
+#root .ofi-gv .ofi-gv-approvals-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    padding: 12px;
+}
+
+#root .ofi-gv .ofi-gv-approvals-card__main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+#root .ofi-gv .ofi-gv-approvals-card__title {
+    overflow: hidden;
+    color: var(--gv-text);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#root .ofi-gv .ofi-gv-approvals-card__title:hover { color: var(--gv-accent); }
+
+#root .ofi-gv .ofi-gv-approvals-card__meta {
+    color: var(--gv-secondary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+#root .ofi-gv .ofi-gv-approvals-quote {
+    margin: 6px 0 0;
+    padding: 2px 0 2px 10px;
+    border-left: 2px solid var(--gv-border);
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+#root .ofi-gv .ofi-gv-approvals-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 6px;
+    color: var(--gv-secondary);
+    font-size: 12px;
+}
+
+#root .ofi-gv .ofi-gv-approvals-warning > svg {
+    flex: none;
+    margin-top: 1px;
+    color: var(--gv-warning);
+}
+
+#root .ofi-gv .ofi-gv-approvals-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+#root .ofi-gv .ofi-gv-approvals-card__spacer { flex: 1 1 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-gv .ofi-gv-list-body { transition: none; }
+}

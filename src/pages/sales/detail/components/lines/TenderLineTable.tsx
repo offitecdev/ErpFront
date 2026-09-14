@@ -487,9 +487,9 @@ export const TenderLineTable = ({
                             // collapses the description is visibly "on".
                             className={`ofi-quote-lines__expand ofi-btn-plain flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
                                 isExpanded
-                                    ? 'bg-[#1f2654]/10 text-[#1f2654]'
+                                    ? 'bg-[#0066e0]/10 text-[#0066e0]'
                                     : visibleLongDescription
-                                        ? 'text-[#1f2654] hover:bg-[#1f2654]/10'
+                                        ? 'text-[#0066e0] hover:bg-[#0066e0]/10'
                                         : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500'
                             }`}
                         >
@@ -582,7 +582,7 @@ export const TenderLineTable = ({
                                         <span
                                             aria-hidden
                                             className={`ofi-quote-lines__position-label text-[12.5px] font-semibold tabular-nums transition-opacity ${
-                                                row.kind === 'TITLE' ? 'text-[#1f2654]' : 'text-slate-500'
+                                                row.kind === 'TITLE' ? 'text-[#0066e0]' : 'text-slate-500'
                                             } ${showSelection ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'}`}
                                         >
                                             {row.label}
@@ -640,7 +640,7 @@ export const TenderLineTable = ({
                                                     autoFocus={autoFocusRowId === row.id}
                                                 />
                                             ) : (
-                                                <div className={`whitespace-normal break-words ${row.kind === 'TITLE' ?"text-[14px] font-semibold text-[#1f2654]" :"text-[13px] font-medium text-slate-900"}`}>
+                                                <div className={`whitespace-normal break-words ${row.kind === 'TITLE' ?"text-[14px] font-semibold text-[#0066e0]" :"text-[13px] font-medium text-slate-900"}`}>
                                                     {position.shortDescription}
                                                 </div>
                                             )
@@ -665,7 +665,7 @@ export const TenderLineTable = ({
                                         navCol="unit"
                                         registerCell={registerCell}
                                         onArrowNav={handleArrowNav}
-                                        className="h-7 w-full min-w-0 rounded-[3px] border border-solid border-transparent bg-transparent px-2 text-right text-[12.5px] text-slate-700 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-200 hover:bg-white focus:border-[#1f2654] focus:bg-white focus:ring-2 focus:ring-[#1f2654]/10"
+                                        className="h-7 w-full min-w-0 rounded-[3px] border border-solid border-transparent bg-transparent px-2 text-right text-[12.5px] text-slate-700 outline-none transition-[border-color,background-color,box-shadow] duration-150 hover:border-slate-200 hover:bg-white focus:border-[#0066e0] focus:bg-white focus:ring-2 focus:ring-[#0066e0]/10"
                                     />
                                 ) : (
                                     <span className="block truncate py-1 text-right text-[12.5px] text-slate-500">{isProduct ? position.unit : ''}</span>
@@ -699,7 +699,7 @@ export const TenderLineTable = ({
                                         basePx={13}
                                         shrink={false}
                                         scrollbar="thin"
-                                        className="ofi-quote-lines__amount py-0.5 text-right font-bold tabular-nums text-[#1f2654]"
+                                        className="ofi-quote-lines__amount py-0.5 text-right font-bold tabular-nums text-[#0066e0]"
                                     />
                                 ) : null}
                             </td>

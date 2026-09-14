@@ -22,6 +22,7 @@ import {
     LogOut01 as LogoutOutlined,
     Menu02 as MenuOutlined,
     Package as InboxOutlined,
+    ListChecks as TasksModuleIcon,
     Plus as PlusOutlined,
     Settings01 as SettingOutlined,
     Truck01 as CarOutlined,
@@ -43,7 +44,7 @@ import { useModuleAccess } from '../../lib/useEnabledModules';
 import { useGuardedNavigate } from '../../store/navGuardStore';
 import { useBackNavTracker } from '../../lib/backNav';
 import { hrefFor, isModifiedClick } from '../../lib/navLink';
-import { SlidePanel } from './SlidePanel';
+import { NotificationCenter } from './NotificationCenter';
 import { AppSidebar, SIDEBAR_RAIL_WIDTH, type QuickCreateItem } from './AppSidebar';
 import { QuickBackButton, PaneBackButton } from './QuickBackButton';
 import { RequestsAppsMenu } from './RequestsAppsMenu';
@@ -55,15 +56,15 @@ import { SecondaryPane } from './SecondaryPane';
 import { PrimaryPane } from './PrimaryPane';
 import { PaneErrorBoundary } from './PaneErrorBoundary';
 import { NOTIFICATIONS_CHANGED_EVENT, notificationApi, type NotificationDto } from '../../lib/api/notifications';
+import { fetchHeaderCounts } from '../../lib/api/headerCounts';
+import { afterPageSettled } from '../../lib/utils/onIdle';
 import { LanguageSwitcher } from '../ui-shared/LanguageSwitcher';
 import { InstallAppButton } from '../ui-shared/InstallAppButton';
 import { PersonAvatar } from '../ui-shared/PersonAvatar';
-import { SkeletonBar } from '../ui-shared/Loader';
 import { MailComposeHost } from '../mail/MailComposeHost';
 import { WhatsNewHost } from '../updates/WhatsNewHost';
 import { OutlookMark } from '../icons/OutlookMark';
 import { TaskMark } from '../icons/TaskMark';
-import { notificationText } from '../../lib/notificationText';
 import { SAMPLE_QUOTE_ITEM_ID, newestQuotePath } from '../updates/sampleQuote';
 
 const LazyReminderToasts = React.lazy(() =>
@@ -95,6 +96,8 @@ type MenuLeaf = {
     label: string;
     permission?: string;
     module?: string;
+    /** Nur für die Administratorrolle (`Role.isSystemAdmin`). */
+    adminOnly?: boolean;
     /** Eigenes Zeichen vor dem Namen (siehe AppSidebar). */
     icon?: (props: { size?: number; className?: string }) => React.JSX.Element;
 };
@@ -260,6 +263,24 @@ const MENU_SECTIONS: MenuSection[] = [
             { key: '/inventory/stock', label: 'nav.stock', permission: 'inventory.view' },
             { key: '/inventory/orders', label: 'nav.inventoryOrders', permission: 'inventory.view' },
             { key: '/inventory/suppliers', label: 'nav.suppliers', permission: 'inventory.view' },
+        ],
+    },
+    {
+        // Görevler (13.09.2026): eigenständiges Aufgabenmodul — die Seiten der Leitung
+        // (Freigaben, Kişiler) stehen in den Reitern des Moduls, nicht hier: das
+        // Rollenpaket gibt Seiten frei, keine Stufen (siehe visibleMenuSections).
+        type: 'group',
+        key: 'tasksModule',
+        label: 'nav.tasksModule',
+        icon: TasksModuleIcon,
+        items: [
+            { key: '/tasks', label: 'nav.tasksModuleList', permission: 'tasks.view' },
+            // 13.09.2026 (Samet): Administratorrolle sieht alles, alle anderen nur Görevler + Sohbet.
+            { key: '/tasks/board', label: 'nav.tasksModuleBoard', permission: 'tasks.view', adminOnly: true },
+            { key: '/tasks/approvals', label: 'nav.tasksModuleApprovals', permission: 'tasks.view', adminOnly: true },
+            { key: '/tasks/people', label: 'nav.tasksModulePeople', permission: 'tasks.view', adminOnly: true },
+            { key: '/tasks/chat', label: 'nav.tasksModuleChat', permission: 'tasks.view' },
+            { key: '/tasks/reports', label: 'nav.tasksModuleReports', permission: 'tasks.view', adminOnly: true },
         ],
     },
     {
@@ -482,6 +503,17 @@ const MODULE_LAUNCHER_ITEMS: ModuleLauncherItem[] = [
         permission: 'inventory.view',
     },
     {
+        id: 'tasksModule',
+        label: 'nav.tasksModule',
+        path: '/tasks',
+        icon: TasksModuleIcon,
+        group: 'nav.moduleGroups.tasks',
+        cardClassName: 'border-blue-200/60 bg-blue-50/70 text-blue-950 shadow-blue-900/5 hover:bg-blue-100/80',
+        iconClassName: 'text-blue-600',
+        keywords: 'gorevler gorev pano kontrol listesi sayac tasks board checklist aufgaben',
+        permission: 'tasks.view',
+    },
+    {
         id: 'maintenance',
         label: 'nav.maintenance',
         path: '/maintenance',
@@ -533,7 +565,7 @@ const MainLayoutInner: React.FC = () => {
     // Liste kommt mit Suchbegriff und Scrollhöhe zurück (lib/backNav.ts).
     useBackNavTracker();
 
-    const { user, logout, permissions, pageAccess, tenants, selectedTenantId } = useAuthStore();
+    const { user, logout, permissions, pageAccess, tenants, selectedTenantId, isSystemAdmin } = useAuthStore();
     const { splitMode, isSplit, secondaryPath, secondaryCurrentPath, exitSplit, openSecondary } = useSplitView();
     const { isDarkMode, toggleTheme } = useThemeStore();
 
@@ -595,6 +627,7 @@ const MainLayoutInner: React.FC = () => {
                     ? isModuleKeyEnabled(item.module, enabledModules)
                     : sectionEnabled;
                 if (!visible) return [];
+                if (item.adminOnly && !isSystemAdmin) return [];
                 // Seitenrechte der Rolle (17.08.2026): steht die Seite im
                 // Katalog und gibt die Rolle sie nicht frei, verschwindet der
                 // Eintrag. Seiten ausserhalb des Katalogs bleiben unberührt.
@@ -613,7 +646,7 @@ const MainLayoutInner: React.FC = () => {
             if (!items.length) return [];
             return [{ ...section, items }];
         });
-    }, [projectModuleEnabled, enabledModules, packageModules, pageAccess, isTechnicianWorkspace]);
+    }, [projectModuleEnabled, enabledModules, packageModules, pageAccess, isTechnicianWorkspace, isSystemAdmin]);
     /* Seitenwächter (17.08.2026): eine gesperrte Seite darf auch über die
        Adresszeile nicht aufgehen. Ohne Regeln (leere Karte) greift nichts —
        siehe lib/pageAccess.ts. Der Server bleibt die eigentliche Schranke.
@@ -755,11 +788,21 @@ const MainLayoutInner: React.FC = () => {
 
     useEffect(() => {
         if (!isNotificationPanelOpen) return;
+        let cancelled = false;
         setNotificationsLoading(true);
+        // Erst lesen, DANN auf dem Server als gelesen stempeln: die Zentrale
+        // zeigt die blauen Punkte, mit denen sie aufging; das Abzeichen an der
+        // Glocke fällt trotzdem sofort.
         notificationApi.list({ limit: 40 })
-            .then(setNotifications)
-            .catch(() => setNotifications([]))
-            .finally(() => setNotificationsLoading(false));
+            .then((rows) => { if (!cancelled) setNotifications(rows); })
+            .catch(() => { if (!cancelled) setNotifications([]); })
+            .finally(() => {
+                if (cancelled) return;
+                setNotificationsLoading(false);
+                void notificationApi.markAllRead().catch(() => undefined);
+                setUnreadCount(0);
+            });
+        return () => { cancelled = true; };
     }, [isNotificationPanelOpen]);
 
     useEffect(() => {
@@ -779,11 +822,18 @@ const MainLayoutInner: React.FC = () => {
                 .then(setUnreadCount)
                 .catch(() => undefined);
         };
-        const timer = window.setTimeout(refresh, 8000);
+        // The first figure rides along with the apps menu's counters — one
+        // request for every header badge (lib/api/headerCounts), sent once
+        // the page's own data is in.
+        const cancelSettled = afterPageSettled(() => {
+            fetchHeaderCounts(useAuthStore.getState().permissions.includes('crm.customers.view'))
+                .then((counts) => { if (counts.unreadNotifications !== undefined) setUnreadCount(counts.unreadNotifications); })
+                .catch(() => undefined);
+        });
         // Der Wecker rechts meldet frische Benachrichtigungen — die Glocke zählt nach.
         window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
         return () => {
-            window.clearTimeout(timer);
+            cancelSettled();
             window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
         };
     }, [user?.id, selectedTenantId]);
@@ -1058,7 +1108,7 @@ const MainLayoutInner: React.FC = () => {
                             type="button"
                             aria-label={t('common.close')}
                             onClick={() => setIsMobileSidebarOpen(false)}
-                            className="flex size-10 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-[#d3e3fd]"
+                            className="flex size-10 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-[#e3efff]"
                         >
                             <CloseOutlined size={18} />
                         </button>
@@ -1099,7 +1149,7 @@ const MainLayoutInner: React.FC = () => {
                                 aria-label={t('nav.sidebarOpen')}
                                 aria-pressed={isMobileSidebarOpen}
                                 onClick={() => setIsMobileSidebarOpen((open) => !open)}
-                                className={`ofi-hdr-ctl ml-1 flex shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd] ${useNativeTouchDrawer ? '' : 'lg:hidden'}`}
+                                className={`ofi-hdr-ctl ml-1 flex shrink-0 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#e3efff] ${useNativeTouchDrawer ? '' : 'lg:hidden'}`}
                             >
                                 <MenuOutlined size={18} />
                             </button>}
@@ -1204,7 +1254,7 @@ const MainLayoutInner: React.FC = () => {
                                    nicht mehr auseinanderlaufen. */
                                 className={`ofi-hdr-ctl ofi-hdr-ctl--wide ofi-glass-ctl inline-flex select-none items-center gap-2 px-3.5 text-[13px] font-semibold transition-colors ${
                                     location.pathname.startsWith('/calendar')
-                                        ? 'is-current text-[#272f67] dark:text-[#e6cf9e]'
+                                        ? 'is-current text-[#0a7aff] dark:text-[#e6cf9e]'
                                         : 'text-slate-700 dark:text-slate-100'
                                 }`}
                                 aria-label={t('nav.calendar')}
@@ -1216,13 +1266,8 @@ const MainLayoutInner: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={async () => {
-                                setIsNotificationPanelOpen(true);
-                                await notificationApi.markAllRead().catch(() => { });
-                                setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
-                                setUnreadCount(0);
-                            }}
-                            className="ofi-hdr-ctl relative flex items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#d3e3fd] dark:hover:bg-white/10"
+                            onClick={() => setIsNotificationPanelOpen((value) => !value)}
+                            className="ofi-hdr-ctl relative flex items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#e3efff] dark:hover:bg-white/10"
                             aria-label={t('nav.notifications')}
                         >
                             <BellOutlined size={16} />
@@ -1236,12 +1281,12 @@ const MainLayoutInner: React.FC = () => {
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                                className="ofi-hdr-ctl flex items-center justify-center rounded-full transition-colors hover:bg-[#d3e3fd]"
+                                className="ofi-hdr-ctl flex items-center justify-center rounded-full transition-colors hover:bg-[#e3efff]"
                             >
                                 {user ? (
                                     <PersonAvatar id={user.id} name={userName || user.email} size={32} className="ofi-nosize" />
                                 ) : (
-                                    <div className="ofi-nosize flex size-8 items-center justify-center rounded-full bg-[#272f67] text-[12px] font-semibold text-white ring-2 ring-[#d3e3fd]">
+                                    <div className="ofi-nosize flex size-8 items-center justify-center rounded-full bg-[#0a7aff] text-[12px] font-semibold text-white ring-2 ring-[#e3efff]">
                                         <UserOutlined style={{ fontSize: 14 }} />
                                     </div>
                                 )}
@@ -1357,7 +1402,7 @@ const MainLayoutInner: React.FC = () => {
                                     disabled={!canSwapPanes}
                                     title={t('nav.swapPanes')}
                                     aria-label={t('nav.swapPanes')}
-                                    className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#d3e3fd] hover:text-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
+                                    className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#e3efff] hover:text-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
                                 >
                                     <SwapOutlined size={14} />
                                 </button>
@@ -1367,7 +1412,7 @@ const MainLayoutInner: React.FC = () => {
                                     onClick={handleExitSplit}
                                     title={t('nav.closeSplitView')}
                                     aria-label={t('nav.closeSplitView')}
-                                    className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
+                                    className="flex size-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition-colors hover:bg-[#e3efff] hover:text-[#0066e0] dark:border-white/15 dark:bg-[#1c1d1f] dark:text-white/80 dark:hover:bg-white/10"
                                 >
                                     <CloseOutlined size={14} />
                                 </button>
@@ -1389,101 +1434,38 @@ const MainLayoutInner: React.FC = () => {
                 </main>
             </div>
 
-            {/* Bildirimler Panel — schmaler als die 520px der Vorgabe
-                (Nutzerwunsch 19.08.2026): darin stehen kurze Meldungen, keine
-                Formulare, und in voller Breite lag der Text als dünne Zeile in
-                einer halbleeren Fläche. Der Weg dahin: 520 → 380 → 300 → 272 →
-                228 → 280px (19.08.2026). ACHTUNG: bis 228px war KEINE dieser
-                Zahlen wirksam — eine Regel in index.css zwang jedem Fenster im
-                Portal 1280px auf; siehe den Kommentar in SlidePanel.tsx. 280px
-                trägt den Titel meist auf einer Zeile und die Meldung auf zwei.
-                Die Zeilen darin sind auf Meldungsmass geschrumpft und malen aus
-                den `--ofi-cal-*`-Tokens (`.ofi-notif-*` in index.css). */}
-            <SlidePanel
+            {/* Die Mitteilungszentrale (10.09.2026): eine 420px-Karte unter der
+                Glocke im Mac-Kleid — Tagesgruppen, Symbolquadrate, relative
+                Zeit. Das 280px-Seitenpanel (SlidePanel) davor ist abgelöst;
+                die Zeilen malen aus styles/notifications.css (`.ofi-nc-*`). */}
+            <NotificationCenter
                 open={isNotificationPanelOpen}
                 onClose={() => setIsNotificationPanelOpen(false)}
-                title={t('nav.notifications')}
-                subtitle={t('nav.notificationsSub')}
-                width={280}
-            >
-                <div>
-                    <div className="ofi-notif-tools">
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                await notificationApi.markAllRead();
-                                setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
-                                setUnreadCount(0);
-                            }}
-                        >
-                            {t('nav.markAllRead')}
-                        </button>
-                    </div>
-                    {notificationsLoading ? (
-                        <div className="ofi-notif-list">
-                            {Array.from({ length: 4 }).map((_, index) => (
-                                <div key={index} className="ofi-notif-skel">
-                                    <SkeletonBar width="62%" className="h-2.5 rounded-full" delayMs={index * 90} />
-                                    <SkeletonBar width="88%" className="h-2 rounded-full" delayMs={index * 90 + 45} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : notifications.length === 0 ? (
-                        <div className="ofi-notif-empty">
-                            {t('nav.noNotifications')}
-                        </div>
-                    ) : (
-                        <div className="ofi-notif-list">
-                            {notifications.map((notification) => {
-                                // Sprachneutrale Bausteine → Satz in der Sprache der Person.
-                                const text = notificationText(notification);
-                                return (
-                                <button
-                                    key={notification.id}
-                                    type="button"
-                                    // Ungelesene Zeilen tragen einen leichten Markenton — sonst
-                                    // bleibt die Spalte weiss und ruhig.
-                                    className={`ofi-notif-row${notification.isRead ? '' : ' is-unread'}`}
-                                    onClick={async () => {
-                                        // Freigabe-Anfragen (Aufgaben) bleiben ungelesen, bis auf der
-                                        // Aufgabenseite entschieden ist — der Server antwortet 409, solange
-                                        // die Aufgabe wartet; ist sie erledigt oder weg, geht es durch.
-                                        if (!notification.isRead) {
-                                            const read = await notificationApi.markRead(notification.id).then(() => true).catch(() => false);
-                                            if (read) {
-                                                setNotifications((rows) => rows.map((row) => row.id === notification.id ? { ...row, isRead: true } : row));
-                                                setUnreadCount((count) => Math.max(0, count - 1));
-                                            }
-                                        }
-                                        if (notification.linkUrl) {
-                                            setIsNotificationPanelOpen(false);
-                                            guardedNavigate(notification.linkUrl);
-                                        }
-                                    }}
-                                >
-                                    <span className="ofi-notif-dot" aria-hidden="true" />
-                                    <div className="min-w-0">
-                                        <p className="ofi-notif-title">{text.title}</p>
-                                        <p className="ofi-notif-msg" title={text.message}>{text.message}</p>
-                                        {/* "Öffnen" — die Zeile führt direkt zum Beleg / Projekt. */}
-                                        {notification.linkUrl && (
-                                            <span className="ofi-notif-open">
-                                                {t('notify.open')} →
-                                            </span>
-                                        )}
-                                    </div>
-                                    {/* Kurzdatum (Tag.Monat) — in einer 280px-Spalte ist das
-                                        volle Datum eine halbe Zeile; das ganze steht im Titel. */}
-                                    <span className="ofi-notif-date" title={new Date(notification.createdAt).toLocaleString(activeLocale)}>
-                                        {new Date(notification.createdAt).toLocaleDateString(activeLocale, { day: '2-digit', month: '2-digit' })}
-                                    </span>
-                                </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </SlidePanel>
+                notifications={notifications}
+                loading={notificationsLoading}
+                locale={activeLocale}
+                onMarkAllRead={() => {
+                    void notificationApi.markAllRead().catch(() => undefined);
+                    setNotifications((rows) => rows.map((row) => ({ ...row, isRead: true })));
+                    setUnreadCount(0);
+                }}
+                onOpen={async (notification) => {
+                    // Freigabe-Anfragen (Aufgaben) bleiben ungelesen, bis auf der
+                    // Aufgabenseite entschieden ist — der Server antwortet 409, solange
+                    // die Aufgabe wartet; ist sie erledigt oder weg, geht es durch.
+                    if (!notification.isRead) {
+                        const read = await notificationApi.markRead(notification.id).then(() => true).catch(() => false);
+                        if (read) {
+                            setNotifications((rows) => rows.map((row) => row.id === notification.id ? { ...row, isRead: true } : row));
+                            setUnreadCount((count) => Math.max(0, count - 1));
+                        }
+                    }
+                    if (notification.linkUrl) {
+                        setIsNotificationPanelOpen(false);
+                        guardedNavigate(notification.linkUrl);
+                    }
+                }}
+            />
         </div>
     );
 };

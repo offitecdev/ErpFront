@@ -6,6 +6,7 @@ import { PopupActions, PopupButton, PopupDialog, PopupField } from '@/components
 import { t } from '@/i18n/translate';
 
 import { newRowId, type ReportChecklist } from './checklistModel';
+import '@/styles/modules/handover.css';
 
 export type EditableCheck = {
     id: string;

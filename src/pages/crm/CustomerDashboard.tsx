@@ -426,14 +426,10 @@ export const CustomerDashboard = () => {
                     /* Kein Zurück-Knopf mehr: der Weg in die Kundenliste liegt
                        im Blitz ganz vorn in der Kopfleiste, der auf jeder
                        Unterseite zum Pfeil wird (QuickBackButton). */
-                    /* Gross, iOS-Ecke — und DEUTLICH (Vorgabe Samet 09.09.2026,
-                       zweiter Durchgang: «müşteri detaylarındaki sil butonu da
-                       belirgin olsun»). Marine war er schon und ging in einer
-                       Seite unter, die ohnehin marine ist; darum trägt er jetzt
-                       die Warnfarbe des Hauses — dieselbe, die im Fenster
-                       darunter bestätigt. Das Fenster bleibt die eigentliche
-                       Sicherheitsfrage: dieser Knopf löscht nichts, er fragt. */
-                    <Button variant="danger" className="ofi-btn-ios" icon={<TrashIcon size={18} />} onClick={() => setConfirmDelete(true)}>{i18nT('common.delete')}</Button>
+                    /* Normales Knopfmass (Samet 09.09.2026: «büyük boyutları kaldır»).
+                       Warnfarbe, weil er ein Löschen einleitet; die eigentliche
+                       Sicherheitsfrage stellt das Fenster darunter. */
+                    <Button variant="danger" icon={<TrashIcon size={14} />} onClick={() => setConfirmDelete(true)}>{i18nT('common.delete')}</Button>
                 }
             />
 
@@ -451,14 +447,14 @@ export const CustomerDashboard = () => {
                                 onClick={() => selectCustomerTab(tab.id)}
                                 className={`ofi-quote-tab -mb-px inline-flex items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                     active
-                                        ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                        : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                                        ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#0066e0]'
+                                        : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#0066e0] dark:text-white/70'
                                 }`}
                             >
                                 {tab.label}
                                 {tab.count !== undefined && (
                                     <span className={`ofi-quote-tab-badge inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums ${
-                                        active ? 'bg-[#1f2654] text-white' : 'bg-slate-100 text-slate-500'
+                                        active ? 'bg-[#0066e0] text-white' : 'bg-slate-100 text-slate-500'
                                     }`}>
                                         {tab.count}
                                     </span>
@@ -615,9 +611,14 @@ export const CustomerDashboard = () => {
                 onClose={() => !deleting && setConfirmDelete(false)}
                 width="sm"
                 footer={
+                    /* KEIN `.ofi-btn-ios` hier: die 52px sind das Mass der
+                       SEITE. In einem Fenster gilt das Fenstermass
+                       (styles/appleModal.css, 34px) — sonst stünden in einer
+                       kleinen Sicherheitsfrage zwei Knöpfe, die höher sind als
+                       die Frage selbst. */
                     <>
-                        <Button variant="secondary" className="ofi-btn-ios" onClick={() => setConfirmDelete(false)} disabled={deleting}>{i18nT('common.cancel')}</Button>
-                        <Button variant="danger" className="ofi-btn-ios" loading={deleting} icon={<TrashIcon size={16} />} onClick={handleDelete}>{i18nT('crm.delete_customer')}</Button>
+                        <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={deleting}>{i18nT('common.cancel')}</Button>
+                        <Button variant="danger" loading={deleting} icon={<TrashIcon size={16} />} onClick={handleDelete}>{i18nT('crm.delete_customer')}</Button>
                     </>
                 }
             >

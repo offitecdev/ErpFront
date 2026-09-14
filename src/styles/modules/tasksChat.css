@@ -1,0 +1,887 @@
+/* =========================================================
+   Offitec — GÖREVLER / TASKS-MODUL: SOHBET (13.09.2026)
+
+   Wie «Nachrichten» auf dem Mac, im Kleid des Moduls: EINE Tafel
+   mit zwei Spalten (Räume 300px | Raum), Haarlinien statt Flächen,
+   kleine Schrift. Eigene Blasen in der leisen Akzentfläche, fremde
+   neutral grau — keine Verläufe, keine Schatten, keine Pillen.
+   Unter 1024px eine Spalte: Liste ODER Raum.
+
+   Die Tafel füllt die Höhe unter der Modulleiste; es rollt nur die
+   Nachrichtenliste (und die Raumliste), nie die Seite.
+
+   Seitenregeln unter `.ofi-gv`; Inhalte von Fenstern (Portale
+   ausserhalb von #root) mit Zwilling `body > :not(#root)` und ohne
+   `--gv-*` (dort nicht geerbt).
+   ========================================================= */
+
+/* ── 1. Tafel ─────────────────────────────────────────────────────────── */
+
+.ofi-gv .ofi-gv-chat {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    height: calc(100vh - 210px);
+    height: calc(100dvh - 210px);
+    min-height: 480px;
+    overflow: hidden;
+}
+
+.ofi-gv-chat__rooms {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-right: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-chat__pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* ── 2. Raumliste ─────────────────────────────────────────────────────── */
+
+.ofi-gv-chat-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: none;
+    margin: 10px 10px 6px;
+}
+
+.ofi-gv-chat-search__icon {
+    position: absolute;
+    left: 9px;
+    color: var(--gv-muted);
+    pointer-events: none;
+}
+
+#root .ofi-gv .ofi-gv-chat-search__input {
+    width: 100%;
+    height: 28px;
+    padding: 0 26px;
+    border: 1px solid var(--gv-field-border);
+    border-radius: var(--gv-control-radius);
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    font-size: 12.5px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-search__input::placeholder { color: var(--gv-muted); }
+#root .ofi-gv .ofi-gv-chat-search__input::-webkit-search-cancel-button { display: none; }
+
+#root .ofi-gv .ofi-gv-chat-search__input:hover { border-color: var(--gv-field-border-hover); }
+
+#root .ofi-gv .ofi-gv-chat-search__input:focus {
+    border-color: var(--gv-accent);
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+#root .ofi-gv .ofi-gv-chat-search__clear {
+    position: absolute;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--gv-fill);
+    color: var(--gv-secondary);
+    cursor: pointer;
+    transition: color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-search__clear:hover { color: var(--gv-text); }
+
+.ofi-gv-chat__roomlist {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1px;
+    min-height: 0;
+    padding: 2px 6px 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#root .ofi-gv .ofi-gv-chat-room {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    color: var(--gv-text);
+    text-decoration: none;
+    transition: background-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-room:hover { background: var(--gv-hover); }
+#root .ofi-gv .ofi-gv-chat-room.is-active { background: var(--gv-accent-soft); }
+
+#root .ofi-gv .ofi-gv-chat-room:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--gv-focus);
+}
+
+.ofi-gv-chat-room__main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ofi-gv-chat-room__top,
+.ofi-gv-chat-room__bottom {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.ofi-gv-chat-room__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.ofi-gv-chat-room__time {
+    flex: none;
+    color: var(--gv-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv-chat-room__preview {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-secondary);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.ofi-gv-chat-room.is-unread .ofi-gv-chat-room__preview { color: var(--gv-text); }
+
+.ofi-gv-chat-room__tasks {
+    color: var(--gv-muted);
+    font-size: 11.5px;
+}
+
+.ofi-gv-chat-listnote {
+    padding: 18px 12px;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+    text-align: center;
+}
+
+/* Neutrale Raumkachel (Liste 36px, Kopf 32px). */
+.ofi-gv-chat-tile {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: var(--gv-fill);
+    color: var(--gv-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.ofi-gv-chat-tile.is-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 11.5px;
+}
+
+/* ── 3. Raumkopf und verknüpfte Aufgaben ──────────────────────────────── */
+
+.ofi-gv-chat-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 8px 10px 8px 14px;
+    border-bottom: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-chat-head__main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#root .ofi-gv .ofi-gv-chat-head__name {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-text);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.ofi-gv-chat-head__caption {
+    min-height: 15px;
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    line-height: 1.35;
+}
+
+.ofi-gv-chat-head__tools {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+}
+
+.ofi-gv-chat-head__avatars {
+    display: inline-flex;
+    margin-right: 8px;
+}
+
+.ofi-gv-chat-tasks {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--gv-hairline);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.ofi-gv-chat-taskchip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    max-width: 300px;
+    height: 22px;
+    border: 1px solid var(--gv-border);
+    border-radius: 5px;
+    background: var(--gv-surface);
+    font-size: 12px;
+}
+
+#root .ofi-gv .ofi-gv-chat-taskchip__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    height: 100%;
+    padding: 0 7px;
+    color: var(--gv-text);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 140ms ease;
+}
+
+#root .ofi-gv a.ofi-gv-chat-taskchip__link:hover { color: var(--gv-accent); }
+#root .ofi-gv .ofi-gv-chat-taskchip__link.is-static { color: var(--gv-secondary); cursor: default; }
+
+.ofi-gv-chat-taskchip__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#root .ofi-gv .ofi-gv-chat-taskchip__remove,
+#root .ofi-gv .ofi-gv-chat-pending__remove {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-right: 2px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--gv-muted);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-taskchip__remove:hover:not(:disabled),
+#root .ofi-gv .ofi-gv-chat-pending__remove:hover:not(:disabled) {
+    background: var(--gv-fill);
+    color: var(--gv-text);
+}
+
+#root .ofi-gv .ofi-gv-chat-taskchip__remove:disabled,
+#root .ofi-gv .ofi-gv-chat-pending__remove:disabled { opacity: 0.4; cursor: default; }
+
+/* Zustandspunkt einer Aufgabe — auch in Fenstern (daher mit Rückfallwerten). */
+.ofi-gv-chat-dot {
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--gv-muted, #a1a1a6);
+}
+
+.ofi-gv-chat-dot.is-progress { background: var(--gv-accent, #0a7aff); }
+.ofi-gv-chat-dot.is-review { background: var(--gv-warning, #b25000); }
+.ofi-gv-chat-dot.is-done { background: var(--gv-success, #1f8a3b); }
+.ofi-gv-chat-dot.is-alert { background: var(--gv-danger, #d70015); }
+
+/* ── 4. Nachrichtenverlauf ────────────────────────────────────────────── */
+
+.ofi-gv-chat-thread {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.ofi-gv-chat-thread__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 10px 16px 12px;
+    overflow-y: auto;
+    /* Die Bildlaufführung rechnet selbst (useChatScroll). */
+    overflow-anchor: none;
+    overscroll-behavior: contain;
+}
+
+.ofi-gv-chat-thread__older {
+    display: flex;
+    justify-content: center;
+    padding: 2px 0 6px;
+}
+
+.ofi-gv-chat-thread__empty { padding-top: 64px; }
+
+.ofi-gv-chat-thread__jump {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    z-index: 2;
+    transform: translateX(-50%);
+}
+
+.ofi-gv-chat-thread__skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 16px;
+}
+
+.ofi-gv-chat-thread__skeletonrow { display: flex; }
+.ofi-gv-chat-thread__skeletonrow.is-own { justify-content: flex-end; }
+
+.ofi-gv-chat-day {
+    margin: 14px 0 6px;
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.ofi-gv-chat-thread__scroll > .ofi-gv-chat-day:first-child { margin-top: 2px; }
+
+.ofi-gv-chat-system {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 5px;
+    max-width: 80%;
+    margin: 8px auto;
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.ofi-gv-chat-system > svg {
+    flex: none;
+    margin-top: 2px;
+    color: var(--gv-muted);
+}
+
+.ofi-gv-chat-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.ofi-gv-chat-msg.is-first { margin-top: 10px; }
+.ofi-gv-chat-msg.is-own { justify-content: flex-end; }
+
+.ofi-gv-chat-msg__col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    max-width: min(72%, 560px);
+}
+
+.ofi-gv-chat-msg.is-own .ofi-gv-chat-msg__col { align-items: flex-end; }
+
+.ofi-gv-chat-msg__name {
+    margin: 0 0 2px 2px;
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 14px;
+}
+
+.ofi-gv-chat-msg__line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.ofi-gv-chat-msg.is-own .ofi-gv-chat-msg__line { flex-direction: row-reverse; }
+
+.ofi-gv-chat-bubble {
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 10px;
+    border-radius: 12px;
+    background: var(--gv-fill);
+    color: var(--gv-text);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.ofi-gv-chat-msg.is-own .ofi-gv-chat-bubble { background: var(--gv-accent-soft); }
+
+/* Nur Bilder/Dateien: keine Blase um die Vorschau. */
+.ofi-gv-chat-msg .ofi-gv-chat-bubble.is-media {
+    padding: 0;
+    background: transparent;
+}
+
+.ofi-gv-chat-bubble__text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.ofi-gv-chat-bubble__text + .ofi-gv-chat-atts { margin-top: 6px; }
+
+#root .ofi-gv .ofi-gv-chat-msg__delete {
+    flex: none;
+    opacity: 0;
+    transition: opacity 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-msg__line:hover .ofi-gv-chat-msg__delete,
+#root .ofi-gv .ofi-gv-chat-msg__delete:focus-visible { opacity: 1; }
+
+@media (hover: none) {
+    #root .ofi-gv .ofi-gv-chat-msg__delete { opacity: 1; }
+}
+
+.ofi-gv-chat-msg__time {
+    margin: 3px 4px 0;
+    color: var(--gv-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Dateien einer Nachricht. */
+.ofi-gv-chat-atts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    max-width: 100%;
+}
+
+.ofi-gv-chat-msg.is-own .ofi-gv-chat-atts { align-items: flex-end; }
+
+.ofi-gv-chat-atts__images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 100%;
+}
+
+.ofi-gv-chat-msg.is-own .ofi-gv-chat-atts__images { justify-content: flex-end; }
+
+#root .ofi-gv .ofi-gv-chat-atts__image {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 10px;
+    background: var(--gv-fill);
+    line-height: 0;
+}
+
+/* Fester Rahmen: Nachladen des Bildes verschiebt den Verlauf nicht. */
+.ofi-gv-chat-atts__image img {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    height: 150px;
+    object-fit: cover;
+}
+
+#root .ofi-gv .ofi-gv-chat-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 240px;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--gv-border);
+    border-radius: 8px;
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    text-decoration: none;
+    transition: border-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-file:hover { border-color: var(--gv-field-border-hover); }
+
+.ofi-gv-chat-file__icon {
+    display: inline-flex;
+    flex: none;
+    color: var(--gv-secondary);
+}
+
+.ofi-gv-chat-file__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ofi-gv-chat-file__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.ofi-gv-chat-file__size {
+    color: var(--gv-secondary);
+    font-size: 11.5px;
+}
+
+.ofi-gv-chat-file__download {
+    flex: none;
+    color: var(--gv-muted);
+}
+
+/* ── 5. Eingabe ───────────────────────────────────────────────────────── */
+
+.ofi-gv-chat-composer {
+    flex: none;
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-chat-composer__files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.ofi-gv-chat-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 260px;
+    height: 24px;
+    padding: 0 2px 0 7px;
+    border: 1px solid var(--gv-border);
+    border-radius: 5px;
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    font-size: 12px;
+}
+
+.ofi-gv-chat-pending > svg { flex: none; color: var(--gv-secondary); }
+
+.ofi-gv-chat-pending__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv-chat-pending__size {
+    flex: none;
+    color: var(--gv-muted);
+    font-size: 11px;
+}
+
+.ofi-gv-chat-composer__row {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+#root .ofi-gv .ofi-gv-chat-composer__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 28px;
+    min-height: 28px;
+    max-height: 120px;
+    padding: 4px 9px;
+    border: 1px solid var(--gv-field-border);
+    border-radius: 6px;
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    font-size: 13px;
+    line-height: 18px;
+    overflow-y: auto;
+    resize: none;
+    outline: none;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-chat-composer__input::placeholder { color: var(--gv-muted); }
+#root .ofi-gv .ofi-gv-chat-composer__input:hover { border-color: var(--gv-field-border-hover); }
+
+#root .ofi-gv .ofi-gv-chat-composer__input:focus {
+    border-color: var(--gv-accent);
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+#root .ofi-gv .ofi-gv-chat-composer__send {
+    flex: none;
+    width: 36px;
+    padding: 0;
+}
+
+/* ── 6. Hinweise, Ladeplatzhalter ─────────────────────────────────────── */
+
+.ofi-gv-chat-notice {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    padding: 16px;
+}
+
+.ofi-gv-chat-notice__icon {
+    display: block;
+    margin: 0 auto 10px;
+    color: var(--gv-muted);
+}
+
+#root .ofi-gv .ofi-gv-chat-linkbtn {
+    display: inline-flex;
+    margin-top: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--gv-accent);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.ofi-gv-chat-skeleton-tile {
+    height: 36px;
+    border-radius: 6px;
+}
+
+.ofi-gv-chat-skeleton-line {
+    height: 10px;
+    border-radius: 4px;
+}
+
+.ofi-gv-chat-skeleton-bubble {
+    height: 30px;
+    border-radius: 12px;
+}
+
+/* ── 7. Fenster (Portale): «Yeni oda», Teilnehmende, Menü ─────────────── */
+
+#root .ofi-gv-chat-chips,
+body > :not(#root) .ofi-gv-chat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+#root .ofi-gv-chat-chip,
+body > :not(#root) .ofi-gv-chat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 240px;
+    height: 24px;
+    padding: 0 2px 0 4px;
+    border: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.1));
+    border-radius: 5px;
+    background: var(--ofi-cal-surface, #fff);
+    color: var(--ofi-cal-text, #1d1d1f);
+    font-size: 12px;
+}
+
+#root .ofi-gv-chat-chip > .ofi-gv-chat-dot,
+body > :not(#root) .ofi-gv-chat-chip > .ofi-gv-chat-dot { margin-left: 3px; }
+
+#root .ofi-gv-chat-chip__label,
+body > :not(#root) .ofi-gv-chat-chip__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#root .ofi-gv-chat-chip__remove,
+body > :not(#root) .ofi-gv-chat-chip__remove {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ofi-cal-muted, #6e6e73);
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv-chat-chip__remove:hover,
+body > :not(#root) .ofi-gv-chat-chip__remove:hover {
+    background: var(--ofi-cal-hover, rgba(0, 0, 0, 0.05));
+    color: var(--ofi-cal-text, #1d1d1f);
+}
+
+#root .ofi-gv-chat-results,
+body > :not(#root) .ofi-gv-chat-results {
+    max-height: 180px;
+    margin-top: 6px;
+    padding: 3px;
+    overflow-y: auto;
+    border: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.1));
+    border-radius: 6px;
+    background: var(--ofi-cal-surface, #fff);
+}
+
+#root .ofi-gv-chat-results__add,
+body > :not(#root) .ofi-gv-chat-results__add {
+    flex: none;
+    color: var(--ofi-cal-muted, #6e6e73);
+}
+
+#root .ofi-gv-chat-members,
+body > :not(#root) .ofi-gv-chat-members {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#root .ofi-gv-chat-members__row,
+body > :not(#root) .ofi-gv-chat-members__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 0;
+    border-top: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+#root .ofi-gv-chat-members__row:first-child,
+body > :not(#root) .ofi-gv-chat-members__row:first-child { border-top: 0; }
+
+#root .ofi-gv-chat-members__main,
+body > :not(#root) .ofi-gv-chat-members__main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+}
+
+#root .ofi-gv-chat-members__name,
+body > :not(#root) .ofi-gv-chat-members__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-text, #1d1d1f);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#root .ofi-gv-chat-members__title,
+body > :not(#root) .ofi-gv-chat-members__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+}
+
+#root .ofi-gv-chat-members__tag,
+body > :not(#root) .ofi-gv-chat-members__tag {
+    flex: none;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+}
+
+#root .ofi-gv-chat-menu__sep,
+body > :not(#root) .ofi-gv-chat-menu__sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+#root .ofi-gv-chat-menu__danger,
+#root .ofi-gv-chat-menu__danger svg,
+body > :not(#root) .ofi-gv-chat-menu__danger,
+body > :not(#root) .ofi-gv-chat-menu__danger svg {
+    color: var(--ofi-cal-danger, #d70015);
+}
+
+/* ── 8. Telefon/Tablet: eine Spalte ───────────────────────────────────── */
+
+@media (max-width: 1023px) {
+    .ofi-gv .ofi-gv-chat {
+        grid-template-columns: minmax(0, 1fr);
+        height: calc(100vh - 190px);
+        height: calc(100dvh - 190px);
+        min-height: 420px;
+    }
+
+    .ofi-gv-chat__rooms { border-right: 0; }
+
+    .ofi-gv-chat-head { padding-left: 6px; }
+    .ofi-gv-chat-head__avatars { display: none; }
+    .ofi-gv-chat-thread__scroll { padding: 8px 10px 10px; }
+    .ofi-gv-chat-msg__col { max-width: 84%; }
+}

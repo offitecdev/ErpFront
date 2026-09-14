@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import { ConfirmDialog } from '@/components/ui-shared/ConfirmDialog';
 import { Switch } from '@/components/ui-shared/Switch';
 import { TableStateRow } from '@/components/ui-shared/TableKit';
+import '@/styles/modules/moduleSettings.css';
 
 /**
  * LAGER → EINHEITEN: die Mengeneinheiten des Mandanten — Stück, Meter,

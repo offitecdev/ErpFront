@@ -15,6 +15,8 @@ import { TaskFilesPane } from './TaskFilesPane';
 import { TaskStepsEditor, type TaskStepDraft } from './TaskStepsEditor';
 import { TaskTenderCombo, type TaskTenderPick } from './TaskTenderCombo';
 import { spanToIso } from './taskSchedule';
+import '@/styles/modules/taskDeck.css';
+import '@/styles/modules/taskWindow.css';
 
 /**
  * "Neue Aufgabe" — ein KLEINES, ruhiges Fenster (Vorgabe 19.08.2026: einfacher

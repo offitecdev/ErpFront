@@ -79,7 +79,7 @@ export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, ordered
                 <button
                     type="button"
                     onClick={() => navigate('/sales/quotes')}
-                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-[#07145c] transition-colors hover:bg-[#07145c]/6 dark:text-[#e6cf9e] dark:hover:bg-[#e6cf9e]/10"
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-[#0052b8] transition-colors hover:bg-[#0052b8]/6 dark:text-[#e6cf9e] dark:hover:bg-[#e6cf9e]/10"
                 >
                     {t('crmOverview.followUp.allOffers', { defaultValue: 'Tüm teklifler' })}
                     <ArrowRight size={14} />
@@ -160,7 +160,7 @@ export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, ordered
                                     )}
                                 </p>
                             </div>
-                            <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#07145c] dark:text-[#e6cf9e]">
+                            <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#0052b8] dark:text-[#e6cf9e]">
                                 {tender.grandTotal ? formatMoney(tender.grandTotal, toCurrencyCode(tender.currency)) : '—'}
                             </span>
                         </div>

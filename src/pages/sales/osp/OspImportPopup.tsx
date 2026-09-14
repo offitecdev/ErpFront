@@ -9,6 +9,7 @@ import { buildOspDescription } from './ospDescription';
 import type { StaffDirectoryRow } from '@/lib/api/directory';
 import { apiClient } from '@/lib/axios';
 import { useAuthStore } from '@/store/authStore';
+import '@/styles/modules/osp.css';
 
 /**
  * ── OFFERTE AUS OSP ERZEUGEN (Import-Fenster, 04.09.2026) ────────────────────

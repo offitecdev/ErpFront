@@ -1,6 +1,7 @@
 import React from 'react';
 import AntInput from 'antd/es/input';
 import AntSelect from 'antd/es/select';
+import { AntdTheme } from './AntdTheme';
 
 import { t } from '@/i18n/translate';
 
@@ -98,6 +99,7 @@ export const Input: React.FC<SharedInputProps> = ({
 
     if (type === 'password') {
         return (
+            <AntdTheme>
             <AntInput.Password
                 {...(rest as any)}
                 id={id}
@@ -111,10 +113,12 @@ export const Input: React.FC<SharedInputProps> = ({
                 size={antSizeMap[size] || 'middle'}
                 className={className}
             />
+            </AntdTheme>
         );
     }
 
     return (
+        <AntdTheme>
         <AntInput
             {...(rest as any)}
             id={id}
@@ -131,6 +135,7 @@ export const Input: React.FC<SharedInputProps> = ({
             min={min}
             max={max}
         />
+        </AntdTheme>
     );
 };
 
@@ -148,6 +153,7 @@ export const Textarea: React.FC<SharedTextareaProps> = ({
     id,
     ...rest
 }) => (
+    <AntdTheme>
     <AntInput.TextArea
         {...(rest as any)}
         id={id}
@@ -162,6 +168,7 @@ export const Textarea: React.FC<SharedTextareaProps> = ({
         size={antSizeMap[size] || 'middle'}
         className={className}
     />
+    </AntdTheme>
 );
 
 type SharedSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size' | 'value' | 'defaultValue' | 'onChange'> & {
@@ -219,6 +226,7 @@ export const Select: React.FC<SharedSelectProps> = ({
     const defaultSelectedValue = defaultValue === undefined || defaultValue === null || defaultValue === '' ? undefined : String(defaultValue);
 
     return (
+        <AntdTheme>
         <AntSelect
             id={id}
             aria-label={ariaLabel ?? title ?? name ?? placeholder}
@@ -242,5 +250,6 @@ export const Select: React.FC<SharedSelectProps> = ({
                 String(option?.label ?? '').toLocaleLowerCase('tr-TR').includes(input.toLocaleLowerCase('tr-TR')) : undefined}
             allowClear
         />
+        </AntdTheme>
     );
 };

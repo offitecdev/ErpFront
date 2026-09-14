@@ -1,0 +1,53 @@
+{
+  "tasksModule": {
+    "onboarding": {
+      "taskTitle": "Ihre erste Aufgabe: Aufgaben kennenlernen",
+      "firstBadge": "Erste Aufgabe",
+      "welcomeEyebrow": "Bevor Sie beginnen",
+      "welcomeTitle": "Ihre erste Aufgabe ist bereit",
+      "welcomeText": "In einem kurzen Rundgang lernen Sie das Aufgabenmodul direkt an der echten Oberfläche kennen. Der Leitfaden ist auf Ihre Rolle zugeschnitten; am Ende wird diese Aufgabe automatisch erledigt.",
+      "welcomeAdmin": "Administrator-Leitfaden: Aufgaben anlegen, zuweisen, Anträge prüfen sowie Personen und Berichte auswerten.",
+      "welcomeMember": "Team-Leitfaden: eigene Aufgaben, Zeiterfassung, Checklisten, Kommentare und Abschlussanträge.",
+      "start": "Leitfaden starten",
+      "later": "Später",
+      "replay": "Leitfaden erneut öffnen",
+      "backToTasks": "Zurück zu den Aufgaben",
+      "stepCounter": "{{current}} / {{total}}",
+      "next": "Weiter",
+      "previous": "Zurück",
+      "finish": "Leitfaden abschliessen",
+      "finishing": "Aufgabe wird abgeschlossen …",
+      "completedToast": "Ihre erste Aufgabe ist erledigt. Sie können loslegen!",
+      "error": "Der Leitfaden konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+      "admin": {
+        "title": "Aufgaben-Leitfaden für Administratoren",
+        "subtitle": "Lernen Sie, den Aufgabenfluss Ihres Teams vollständig zu steuern.",
+        "steps": {
+          "create": { "title": "Aufgabe anlegen und zuweisen", "text": "Mit Neue Aufgabe legen Sie Titel, Verantwortliche, Start und Ende, Priorität und Etiketten fest. Administratoren können alle Aufgaben einsehen." },
+          "follow": { "title": "Fortschritt live verfolgen", "text": "Board-Status, laufende Zeiterfassungen und der Checklistenfortschritt zeigen, wo das Team gerade steht." },
+          "approve": { "title": "Anträge beurteilen", "text": "Unter Freigaben können Sie Aufgabenvorschläge sowie Abschluss- und Löschanträge annehmen oder mit einer Begründung ablehnen." },
+          "people": { "title": "Ergebnis über Personen und Berichte sehen", "text": "Personen zeigt die Arbeitslast; Berichte zeigen Zeiten, erledigte Arbeiten und die Leistung des Teams." }
+        }
+      },
+      "member": {
+        "title": "Schnellstart für Aufgaben",
+        "subtitle": "Öffnen Sie Ihre Aufgabe, bearbeiten Sie sie und reichen Sie den Abschluss ein.",
+        "steps": {
+          "open": { "title": "Zugewiesene Aufgabe öffnen", "text": "In der Aufgabenliste sehen Sie nur Aufgaben, die für Sie bestimmt oder von Ihnen angelegt sind. Öffnen Sie die Karte für Beschreibung, Termine und Verantwortliche." },
+          "track": { "title": "Starten und pausieren", "text": "Drücken Sie beim Arbeitsbeginn Start und bei einer Unterbrechung Pause. Zeiten werden nicht von Hand eingetragen; der Zähler erfasst die echte Arbeitszeit." },
+          "work": { "title": "Schritte und Kommunikation nutzen", "text": "Haken Sie Checklistenpunkte ab, schreiben Sie bei Bedarf einen Kommentar und laden Sie Unterlagen im Reiter Dateien hoch." },
+          "complete": { "title": "Abschluss beantragen", "text": "Wenn die Arbeit fertig ist, senden Sie den Abschlussantrag. Die Administration prüft und erledigt die Aufgabe oder gibt sie mit einer Erklärung zurück." }
+        }
+      },
+      "demo": {
+        "newTask": "Neue Aufgabe",
+        "assignees": "Verantwortliche",
+        "timer": "00:18:42",
+        "approval": "Freigabe ausstehend",
+        "checklist": "3 / 4 Punkte",
+        "comment": "Kommentar hinzufügen",
+        "report": "Wochenbericht"
+      }
+    }
+  }
+}

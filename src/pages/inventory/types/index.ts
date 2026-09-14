@@ -111,15 +111,6 @@ export interface DraftOrderRow {
     receivedAt: string | null;
     error?: string | null;
 
-    // ── BELEG-IMPORT: MENGENSTAFFEL (07.09.2026) ────────────────────────────
-    // Vorgabe Samet: «Die Werte ändern sich je nach Menge, das System muss den
-    // passenden nehmen, sobald die Menge gewählt ist.» Damit das auch NACH dem
-    // Import noch stimmt, reist die Staffel des Belegs an der Zeile mit: ändert
-    // jemand in der Tabelle die Menge, sucht `repriceRow` denselben Weg noch
-    // einmal. Nur der Import füllt diese drei Felder; gespeichert werden sie
-    // nicht (die Bestellung trägt am Ende feste Preise).
-    /** Staffelpreise des Belegs: ab welcher Menge welcher Stückpreis. */
-    priceTiers?: Array<{ minQuantity: number; unitPrice: number }>;
     /**
      * DIE EIGENEN SPALTEN (07.09.2026): Schlüssel → Wert. Die ÜBERSCHRIFTEN und
      * ihre REIHENFOLGE stehen nicht hier, sondern in der aktiven Vorlage — sonst
@@ -127,10 +118,6 @@ export interface DraftOrderRow {
      * beide zu einer Liste mit Namen zusammengelegt (`PurchaseOrderItem.extras`).
      */
     extras?: Record<string, string>;
-    /** Welche Regel den Preis bestimmt hat — die Tabelle zeigt ein Merkzeichen. */
-    priceRule?: 'base' | 'documentTier' | 'supplierTierPrice' | 'supplierTierDiscount' | 'configDiscount';
-    /** Die Menge, ab der die greifende Stufe gilt (für den Hinweistext). */
-    priceTierFrom?: number;
 }
 
 /**

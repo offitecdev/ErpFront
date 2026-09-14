@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -12,9 +12,10 @@ import { UnitSelect } from '@/components/ui-shared/UnitSelect';
 // ve aynı PDF/görüntüleme hattından geçer.
 import { RichTextMarkdownEditor } from '@/pages/sales/detail/components/RichTextMarkdownEditor';
 import { t } from '@/i18n/translate';
+import { articleCodesApi, type CodeCategory } from '@/lib/api/articleCodes';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
-import type { BulkArticleItemInput } from '@/types/inventory';
+import type { BulkArticleItemInput, QuickArticleItemInput } from '@/types/inventory';
 import { ArticleImagePanel } from '../detail/ArticleImagePanel';
 import { useLanguageTick } from '../hooks/useLanguageTick';
 import type { SupplierChoice } from '../types';
@@ -33,8 +34,12 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
 );
 
 interface SingleDraft {
+    /** Nur im Handeingabe-Weg (kein freigegebener Nummernkreis). */
     articleCode: string;
     name: string;
+    modelNumber: string;
+    serialNumber: string;
+    supplierBarcode: string;
     unit: string;
     salePrice: string;
     purchasePrice: string;
@@ -45,15 +50,21 @@ interface SingleDraft {
 }
 
 /**
- * TEKLİ ürün / malzeme ekleme sayfası — "Ürün Ekle" artık buraya gelir; toplu
- * tablo ayrı sayfada yaşar (".../bulk-new"). Ekran, ürün DETAY sayfasıyla aynı
- * düzendedir (solda etiket/değer tablosu, sağda görsel): kullanıcı detayda
- * gördüğü kartın aynısını burada doldurur. Farkı, kayıt olmadan önce stok
- * bilgisi de girilebilmesidir: başlangıç stoğu + alış fiyatı + tedarikçi,
- * toplu uçla AYNI yoldan (giriş hareketi + parti + bakiye) yazılır.
+ * TEKLİ ürün ekleme sayfası — "Ürün Ekle" buraya gelir; toplu tablo ayrı
+ * sayfada yaşar (".../bulk-new"). Ekran, ürün DETAY sayfasıyla aynı düzendedir
+ * (solda etiket/değer tablosu, sağda görsel).
  *
- * Teklif ekranındaki "yeni ürün" bağlantısı `?name=` ile gelir; ad alanı
- * önceden doldurulur.
+ * ERP-CODE (10.09.2026): Der Code wird nicht mehr getippt, sondern aus einem
+ * von der IT FREIGEGEBENEN Nummernkreis vergeben — Kategorie und
+ * Unterkategorie wählen, der nächste Code steht daneben, gezogen wird er beim
+ * Speichern (`/articles/quick`, derselbe Weg wie die Schnellerfassung, mit
+ * der eingegebenen Anfangsmenge). Gibt es (noch) keinen freigegebenen Kreis,
+ * bleibt der Handeingabe-Weg über `/articles/bulk` — mit Hinweis, wo die IT
+ * Kreise freigibt.
+ *
+ * Reihenfolge der Felder wie im Detail: ERP-Code, Bezeichnung, Modellnummer,
+ * Seriennummer, Barcode. Teklif ekranındaki "yeni ürün" bağlantısı `?name=`
+ * ile gelir; ad alanı önceden doldurulur.
  */
 export const ArticleSingleCreateView = ({
     copyPrefix,
@@ -73,6 +84,9 @@ export const ArticleSingleCreateView = ({
     const [draft, setDraft] = useState<SingleDraft>(() => ({
         articleCode: '',
         name: searchParams.get('name')?.trim() ?? '',
+        modelNumber: '',
+        serialNumber: '',
+        supplierBarcode: '',
         unit: '',
         salePrice: '',
         purchasePrice: '',
@@ -85,9 +99,26 @@ export const ArticleSingleCreateView = ({
     const [image, setImage] = useState<string | null | undefined>(undefined);
     const [saving, setSaving] = useState(false);
 
+    /* Nummernkreise: nur freigegebene. `null` = noch nicht geladen. */
+    const [categories, setCategories] = useState<CodeCategory[] | null>(null);
+    const [categoryId, setCategoryId] = useState('');
+    const [schemeId, setSchemeId] = useState('');
+    const [manualCode, setManualCode] = useState(false);
+    useEffect(() => {
+        let cancelled = false;
+        articleCodesApi.list({ active: true })
+            .then((rows) => { if (!cancelled) setCategories(rows); })
+            .catch(() => { if (!cancelled) setCategories([]); });
+        return () => { cancelled = true; };
+    }, []);
+    const category = useMemo(() => categories?.find((row) => row.id === categoryId) ?? null, [categories, categoryId]);
+    const scheme = useMemo(() => category?.schemes.find((row) => row.id === schemeId) ?? null, [category, schemeId]);
+    const hasSchemes = Boolean(categories && categories.length);
+    const useScheme = hasSchemes && !manualCode;
+
     const edit = (patch: Partial<SingleDraft>) => setDraft((current) => ({ ...current, ...patch }));
 
-    const codeLabel = t('inv.columns.serialCode');
+    const codeLabel = t('inv.columns.erpCode');
     const nameLabel = t('inv.columns.productName');
 
     const field = (key: keyof SingleDraft, extraClass = '', placeholder = '') => ({
@@ -102,14 +133,22 @@ export const ArticleSingleCreateView = ({
     };
 
     const save = async () => {
-        const articleCode = draft.articleCode.trim();
         const name = draft.name.trim();
-        if (!articleCode || !name) {
+        if (!name) {
             toast.error(t(`${copyPrefix}.missingRequired`));
             return;
         }
-        const payload: BulkArticleItemInput = {
-            articleCode,
+        if (useScheme && !scheme) {
+            toast.error(t(`${copyPrefix}.codeSchemeRequired`));
+            return;
+        }
+        const articleCode = draft.articleCode.trim();
+        if (!useScheme && !articleCode) {
+            toast.error(t(`${copyPrefix}.missingRequired`));
+            return;
+        }
+
+        const shared = {
             name,
             unit: draft.unit.trim() || null,
             salePrice: parseNum(draft.salePrice) ?? 0,
@@ -118,28 +157,34 @@ export const ArticleSingleCreateView = ({
             supplierId: draft.supplierId,
             supplierName: draft.supplierId ? null : (draft.supplierName.trim() || null),
             description: draft.description.trim() ? draft.description : null,
+            modelNumber: draft.modelNumber.trim() || null,
+            serialNumber: draft.serialNumber.trim() || null,
             ...(typeof image === 'string' ? { imageUrl: image } : {}),
         };
 
         setSaving(true);
         try {
-            // Tekli kayıt da toplu uçtan gider: ürün + tanım/giriş hareketi +
-            // parti + bakiye tek istekte, toplu tabloyla birebir aynı kurallarla.
-            // Yeni kayıt her zaman ÜRÜN doğar; hizmete çevirme detay ekranındadır.
-            const result = await inventoryApi.bulkCreateArticles([payload]);
-            const rowError = result.errors[0]?.error;
+            // Beide Wege laufen durch denselben Rumpf (Artikel + Bewegung +
+            // Partie + Bestand in einem Zug); der Kreis-Weg zieht nur den Code.
+            const result = useScheme && scheme
+                ? await inventoryApi.quickCreateArticles(scheme.id, [{ ...shared, barcode: draft.supplierBarcode.trim() || null } satisfies QuickArticleItemInput])
+                : await inventoryApi.bulkCreateArticles([{ ...shared, articleCode, supplierBarcode: draft.supplierBarcode.trim() || null } satisfies BulkArticleItemInput]);
+            const rowError = result.errors[0];
             if (rowError || !result.created.length) {
-                toast.error(rowError || t(`${copyPrefix}.saveFailed`));
+                toast.error(rowError?.code === 'SERIAL_TAKEN' ? t('inv.detail.serialTaken') : (rowError?.error || t(`${copyPrefix}.saveFailed`)));
                 return;
             }
             toast.success(t(`${copyPrefix}.saved`, { name }));
             navigate(`${detailRoot}/${result.created[0].id}`);
-        } catch (error: any) {
-            toast.error(error?.response?.data?.error || t(`${copyPrefix}.saveFailed`));
+        } catch (error: unknown) {
+            const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+            toast.error(message || t(`${copyPrefix}.saveFailed`));
         } finally {
             setSaving(false);
         }
     };
+
+    const selectClass = `${CELL_INPUT_CLASS} max-w-[14rem]`;
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -151,7 +196,7 @@ export const ArticleSingleCreateView = ({
                         disabled={saving || !canCreate}
                         title={canCreate ? undefined : t(`${copyPrefix}.noPermission`)}
                         onClick={() => void save()}
-                        className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         {saving ? <Spinner size="sm" /> : <CheckCircle size={14} />}
                         {t('common.save')}
@@ -161,17 +206,76 @@ export const ArticleSingleCreateView = ({
 
             {/* Detayla aynı iki sütun: solda alan tablosu, sağda görsel. */}
             <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-                {/* Kart başlığı "Ürün detayı" DEMEZ (kullanıcı isteği 2026-08-07 —
-                    oluşturma ekranında kafa karıştırıyordu): yazılan ad canlı
-                    olarak başlığa düşer; ad boşken sayfa başlığı görünür. */}
                 <SectionCard title={draft.name.trim() || t(`${copyPrefix}.title`)}>
-                    <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                    <table data-inv-table data-grid-lines data-unstyled-table data-lager-form className="w-full">
                         <tbody>
                             <Row label={codeLabel}>
-                                <input aria-label={codeLabel} {...field('articleCode', 'font-mono max-w-xs', codeLabel)} />
+                                {useScheme ? (
+                                    <div className="flex flex-wrap items-center gap-2 py-0.5">
+                                        <select
+                                            aria-label={t(`${copyPrefix}.codeCategory`)}
+                                            value={categoryId}
+                                            onChange={(event) => { setCategoryId(event.target.value); setSchemeId(''); }}
+                                            className={selectClass}
+                                        >
+                                            <option value="">{t(`${copyPrefix}.pickCategory`)}</option>
+                                            {categories?.map((row) => (
+                                                <option key={row.id} value={row.id}>{row.code} · {row.name}</option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            aria-label={t(`${copyPrefix}.codeSub`)}
+                                            value={schemeId}
+                                            disabled={!category}
+                                            onChange={(event) => setSchemeId(event.target.value)}
+                                            className={selectClass}
+                                        >
+                                            <option value="">{t(`${copyPrefix}.pickSub`)}</option>
+                                            {category?.schemes.map((row) => (
+                                                <option key={row.id} value={row.id}>{row.code} · {row.name}</option>
+                                            ))}
+                                        </select>
+                                        {scheme && (
+                                            <span className="font-mono text-[13px] font-semibold text-slate-800 dark:text-white">
+                                                {t(`${copyPrefix}.codeNext`, { code: scheme.nextCode })}
+                                            </span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setManualCode(true)}
+                                            className="text-[12px] text-slate-500 underline-offset-2 hover:underline dark:text-white/60"
+                                        >
+                                            {t(`${copyPrefix}.codeManual`)}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap items-center gap-2 py-0.5">
+                                        <input aria-label={codeLabel} {...field('articleCode', 'font-mono max-w-xs', codeLabel)} />
+                                        {hasSchemes ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setManualCode(false)}
+                                                className="text-[12px] text-slate-500 underline-offset-2 hover:underline dark:text-white/60"
+                                            >
+                                                {t(`${copyPrefix}.codeFromScheme`)}
+                                            </button>
+                                        ) : categories !== null && (
+                                            <span className="text-[12px] text-slate-500 dark:text-white/60">{t(`${copyPrefix}.codeNoSchemes`)}</span>
+                                        )}
+                                    </div>
+                                )}
                             </Row>
                             <Row label={nameLabel}>
                                 <input aria-label={nameLabel} {...field('name', 'max-w-md', nameLabel)} />
+                            </Row>
+                            <Row label={t('inv.columns.modelNumber')}>
+                                <input aria-label={t('inv.columns.modelNumber')} {...field('modelNumber', 'font-mono max-w-xs')} />
+                            </Row>
+                            <Row label={t('inv.columns.serialNumber')}>
+                                <input aria-label={t('inv.columns.serialNumber')} {...field('serialNumber', 'font-mono max-w-xs')} />
+                            </Row>
+                            <Row label={t('inv.columns.barcode')}>
+                                <input aria-label={t('inv.detail.barcodeSupplier')} {...field('supplierBarcode', 'font-mono max-w-xs', t('inv.detail.barcodeSupplier'))} />
                             </Row>
                             <Row label={t('inv.columns.unit')}>
                                 <UnitSelect
@@ -183,9 +287,6 @@ export const ArticleSingleCreateView = ({
                             <Row label={t('inv.columns.salePrice')}>
                                 <input inputMode="decimal" aria-label={t('inv.columns.salePrice')} {...field('salePrice', 'font-mono max-w-[10rem]', '0.00')} />
                             </Row>
-                            {/* Stok bilgisi: kayıtla birlikte GİRİŞ hareketi yazılır
-                                (0 bırakılırsa yalnızca tanım hareketi). Açıklayıcı
-                                alt metin KALDIRILDI (kullanıcı isteği 2026-08-07). */}
                             <Row label={t(`${copyPrefix}.initialStock`)}>
                                 <input inputMode="decimal" aria-label={t(`${copyPrefix}.initialStock`)} {...field('quantity', 'font-mono max-w-[10rem]', '0')} />
                             </Row>

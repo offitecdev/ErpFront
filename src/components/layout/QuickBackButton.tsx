@@ -40,8 +40,8 @@ import type { QuickCreateItem } from './AppSidebar';
    „+“): Grösse und Kante kommen aus `.ofi-header-icon-button` (index.css),
    `.ofi-hdr-ctl` hält die eine Bedienhöhe der Leiste. */
 const SHELL = 'ofi-header-icon-button ofi-hdr-ctl inline-flex items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200';
-const SHELL_IDLE = 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white';
-const SHELL_OPEN = 'border-[#272f67] bg-[#272f67] text-white shadow-lg';
+const SHELL_IDLE = 'border-slate-200/90 bg-white text-[#0a7aff] hover:border-[#e3efff] hover:bg-[#e3efff] hover:text-[#0066e0] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white';
+const SHELL_OPEN = 'border-[#0a7aff] bg-[#0a7aff] text-white shadow-lg';
 
 /** Blitz und Pfeil übereinander — das Stück, das sich verwandelt. */
 const MorphGlyph = () => (

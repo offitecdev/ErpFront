@@ -200,8 +200,8 @@ export const WorkspaceTabLauncher: React.FC<{ className?: string }> = ({ classNa
                 title={t('nav.workspaceTabs.add')}
                 onClick={() => setIsMenuOpen((open) => !open)}
                 className={`ofi-header-icon-button ofi-workspace-launcher inline-flex size-12 items-center justify-center rounded-full border shadow-xs transition-[background-color,color,box-shadow,border-color] duration-200 ${isMenuOpen
-                    ? 'border-[#272f67] bg-[#272f67] text-white shadow-lg'
-                    : 'border-slate-200/90 bg-white text-[#272f67] hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
+                    ? 'border-[#0a7aff] bg-[#0a7aff] text-white shadow-lg'
+                    : 'border-slate-200/90 bg-white text-[#0a7aff] hover:border-[#e3efff] hover:bg-[#e3efff] hover:text-[#0066e0] dark:border-white/15 dark:bg-white/8 dark:text-white/85 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
                     }`}
             >
                 <PlusIcon style={{ fontSize: 24 }} />
@@ -222,7 +222,7 @@ export const WorkspaceTabLauncher: React.FC<{ className?: string }> = ({ classNa
                                     href={hrefFor(item.path)}
                                     onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); setIsMenuOpen(false); openTab(item); }}
                                     className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition-colors ${isOpen
-                                        ? 'bg-[#d3e3fd] text-[#1f2654] dark:bg-white/12 dark:text-white'
+                                        ? 'bg-[#e3efff] text-[#0066e0] dark:bg-white/12 dark:text-white'
                                         : 'text-slate-700 hover:bg-slate-100 dark:text-white/85 dark:hover:bg-white/10 dark:hover:text-white'
                                         }`}
                                 >
@@ -288,8 +288,8 @@ export const WorkspaceTabStrip: React.FC = () => {
                         onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); navigate(tab.path); }}
                         title={t(tab.labelKey)}
                         className={`workspace-tab group inline-flex h-10 max-w-[190px] shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13px] font-semibold transition-colors ${isActive
-                            ? 'border-[#272f67] bg-[#272f67] text-white'
-                            : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#d3e3fd] hover:bg-[#d3e3fd] hover:text-[#1f2654] dark:border-white/15 dark:bg-white/8 dark:text-white/80 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
+                            ? 'border-[#0a7aff] bg-[#0a7aff] text-white'
+                            : 'border-slate-200/90 bg-white text-slate-700 hover:border-[#e3efff] hover:bg-[#e3efff] hover:text-[#0066e0] dark:border-white/15 dark:bg-white/8 dark:text-white/80 dark:hover:border-white/25 dark:hover:bg-white/14 dark:hover:text-white'
                             }`}
                     >
                         <span className="min-w-0 truncate">{t(tab.labelKey)}</span>

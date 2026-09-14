@@ -651,6 +651,28 @@ export const TenderDetail = () => {
         }
     }, [id, isCreatingTender, fetchDetail]);
 
+    /* Was der Arbeitsbereich unter den Reitern zeichnet — die Positionstabelle
+       mit ihren Feldern je Zelle, der Zahlungsplan, die Rentabilität — ist ein
+       Vielfaches des DOM über ihm. In EINER Übergabe gerendert hielt er den
+       Kopf der Offerte (Nummer, Kundschaft, Adresse, Status, Knöpfe) so lange
+       zurück, bis auch die letzte Zelle stand: eine einzige lange Aufgabe, und
+       genau das, woraus Lighthouse Total Blocking Time und Largest Contentful
+       Paint bildet.
+
+       Der Arbeitsbereich zieht darum eine Bildfolge später ein. Der Kopf steht
+       damit in der ersten Übergabe auf dem Schirm, der Rest in der zweiten.
+       ÜBER ihm bewegt sich nichts, also verschiebt das auch nichts (CLS). */
+    const [workspaceMounted, setWorkspaceMounted] = useState(false);
+    useEffect(() => {
+        if (workspaceMounted) return;
+        // Zwei Bilder: das erste übergibt den Kopf, das zweite zeichnet ihn,
+        // erst danach darf die Tabelle die Hauptleitung wieder belegen.
+        let frame = requestAnimationFrame(() => {
+            frame = requestAnimationFrame(() => setWorkspaceMounted(true));
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [workspaceMounted]);
+
     const tree = useMemo(() => buildTree(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const simpleRows = useMemo(() => buildSimpleTenderLines(localPositions, fallbackTaxRate), [localPositions, fallbackTaxRate]);
     const displayRows = simpleRows;
@@ -1252,7 +1274,7 @@ export const TenderDetail = () => {
             // Karte — Name, Adresse und E-Mail stehen an der Offerte selbst.
             disabled={!tender.customerId && !tender.customerName}
             title={tender.customerId || tender.customerName ? t('tenders.customer_details') : undefined}
-            className={`${QUOTE_READONLY_CLASS} justify-between gap-2 transition-colors enabled:hover:border-[#1f2654] disabled:cursor-default`}
+            className={`${QUOTE_READONLY_CLASS} justify-between gap-2 transition-colors enabled:hover:border-[#0066e0] disabled:cursor-default`}
         >
             <span className="min-w-0 py-1">{renderDetailLines(customerLines)}</span>
             {(tender.customerId || tender.customerName) && <User01Icon size={13} className="shrink-0 text-slate-400" />}
@@ -1638,7 +1660,7 @@ export const TenderDetail = () => {
                 <button
                     type="button"
                     onClick={() => void handlePreviewDocument(document)}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-[2px] border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#1f2654] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1f2654]/10"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-[2px] border border-slate-200 bg-white px-2 py-1.5 text-left text-[12px] font-medium text-slate-700 transition-colors hover:border-[#0066e0] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0066e0]/10"
                     title={document.fileName}
                 >
                     <span className={`${mediaClass} flex shrink-0 flex-col items-center justify-center rounded border ${pdf ?"border-rose-200 bg-rose-50 text-rose-700" :"border-slate-200 bg-slate-50 text-slate-500"}`}>
@@ -1651,7 +1673,7 @@ export const TenderDetail = () => {
                     type="button"
                     onClick={() => void handleDownloadDocument(document)}
                     title={t('common.download')}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#1f2654] hover:bg-[#1f2654] hover:text-white"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-slate-200 bg-white text-slate-600 transition-colors hover:border-[#0066e0] hover:bg-[#0066e0] hover:text-white"
                 >
                     <FileDown size={14} />
                 </button>
@@ -1843,7 +1865,11 @@ export const TenderDetail = () => {
                 onOpenSettingsTab={openSettingsTab}
             />
 
-            {workspaceTab === 'lines' ? (
+            {!workspaceMounted ? (
+                /* Platzhalter für genau eine Bildfolge (siehe workspaceMounted
+                   oben). Er hält die Höhe, damit der Sprung ausbleibt. */
+                <div className="ofi-quote-panel-skeleton h-72" aria-hidden />
+            ) : workspaceTab === 'lines' ? (
                 <div className="grid grid-cols-1 gap-3">
                     <div className="min-w-0">
                         <Card

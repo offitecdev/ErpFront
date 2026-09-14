@@ -3,6 +3,7 @@ import type { ProjectStatus } from '@/types/project';
 import { getStatusLabel, STATUS_VARIANT } from '../../../../utils/projectFormatters';
 import { deliveryStateLabel, technicalStateLabel } from './overviewShared';
 import type { DeliveryState, TechnicalState } from './overviewShared';
+import '@/styles/modules/projectDetail.css';
 
 export type ChipTone = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger';
 

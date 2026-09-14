@@ -439,7 +439,7 @@ const DayRows = ({
                                     aria-label={t('common.edit')}
                                     title={t('common.edit')}
                                     onClick={() => onEdit(day)}
-                                    className="inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#1f2654] dark:hover:bg-white/10 dark:hover:text-white"
+                                    className="inline-flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0066e0] dark:hover:bg-white/10 dark:hover:text-white"
                                 >
                                     <Edit01 size={13} />
                                 </button>

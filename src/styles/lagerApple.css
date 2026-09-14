@@ -1,0 +1,583 @@
+/* =========================================================
+   Offitec — DAS LAGER IM KLEID DER OFFERTE (10.09.2026)
+
+   Vorgabe Samet: «stok modülü de aynı şekilde değiştirin» — nach der
+   Projektseite (styles/projectDetail.css) und den Listen (listApple.css)
+   bekommt das Lager denselben nativen Mac-Look: Haarlinien, 10px-Tafeln,
+   28px-Druckknöpfe mit 6px-Ecke, EIN Systemblau, Inter, kleine Schrift,
+   keine Pillen, keine Tönungen.
+
+   Dieses Blatt hängt an `.ofi-list-apple.ofi-lager` (AppleLagerSkin, an
+   den `/inventory/*`-Routen über `lagerPage`) und ergänzt listApple.css um
+   das, was NUR das Lager hat:
+     1. Knöpfe AUSSERHALB des Kopfes (Werkzeugzeilen der Lagerseite, der
+        Bestellmaske, des Wareneingangs, Kartenfüsse) und die Symbolknöpfe
+        des Bestellflusses (`.ofi-ord-*`, `.ofi-poi-*`)
+     2. das Ein/Aus-Segment (`.ofi-togglegroup`) und die Reiter der
+        Auftragsseite
+     3. die Stufen der Lieferantenbestellung (`.ofi-flowsteps`)
+     4. Statusmarken (Tailwind-Pillen), Hinweisstreifen, Auswahlkarten
+     5. Formulare: Produkt anlegen/Detail (`.ofi-cell-input`), die Felder
+        der Auftragsdetails, Zelleneingaben der Bestelltabellen
+   Palette und Grundformen (Tafel, Tabelle, Kopf, Suche, Blätterer) kommen
+   unverändert aus listApple.css — `--la-*`.
+
+   Spezifität wie dort: `#root .ofi-list-apple.ofi-lager …` (+ `!important`
+   gegen buttons.css/controls.css/index.css), Radien in `@layer utilities`.
+   ========================================================= */
+
+/* ── 1. Druckknöpfe überall auf der Seite ─────────────────────────────────
+   listApple.css kleidet nur die Knöpfe des Kopfes und der Werkzeugzeile. Im
+   Lager stehen Knöpfe auch in eigenen Zeilen (Excel-Import, Produkt
+   hinzufügen), im Fuss einer Tafel und in der Handlungsleiste der
+   Auftragsseite — alle dieselbe Form. Ausgenommen: Suche/Filter (40px,
+   controls.css), Reiter, Zeilensymbole in Zellen, die Pillen und Punkte der
+   Bestelldetails, Menüeinträge. */
+#root .ofi-list-apple.ofi-lager :is(
+    button[class*="px-"],
+    button[class*="h-9"],
+    button[class*="h-8"],
+    button[class*="h-10"],
+    .ofi-btn-brand,
+    .ofi-qa-launch,
+    .ofi-poi-launch,
+    .ofi-poi-ghost,
+    .ofi-poi-add,
+    .ofi-ord-done,
+    .ofi-ord-bin,
+    .ofi-ord-ask > button,
+    .ant-btn
+):not(:is(
+    .ofi-nosize, .ofi-btn-plain, .ofi-search__clear, .ofi-filter, .ofi-col-grip,
+    .ofi-quote-tab, .ofi-togglegroup__btn, .ofi-flowsteps *, [role="tablist"] *,
+    .ofi-ord-dot, .ofi-ord-visibility, .ofi-ord-x, .ofi-ord-action, .ofi-ord-pick,
+    .ofi-ord-pills *, .ofi-poi-menu *, .ofi-lager-tabs *, .ant-btn-link, .ant-btn-text,
+    td *, th *, [class~="rounded-full"], .ofi-qa-launch.is-phone
+)) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--la-field-border) !important;
+    background: var(--la-surface) !important;
+    background-image: none !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+    box-shadow: var(--la-btn-shadow) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0;
+    white-space: nowrap;
+    transform: none !important;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-list-apple.ofi-lager :is(
+    button[class*="px-"], button[class*="h-9"], button[class*="h-8"], button[class*="h-10"],
+    .ofi-btn-brand, .ofi-qa-launch, .ofi-poi-launch, .ofi-poi-ghost, .ofi-poi-add,
+    .ofi-ord-done, .ofi-ord-bin, .ofi-ord-ask > button, .ant-btn
+):not(:is(
+    .ofi-nosize, .ofi-btn-plain, .ofi-search__clear, .ofi-filter, .ofi-col-grip,
+    .ofi-quote-tab, .ofi-togglegroup__btn, .ofi-flowsteps *, [role="tablist"] *,
+    .ofi-ord-dot, .ofi-ord-visibility, .ofi-ord-x, .ofi-ord-action, .ofi-ord-pick,
+    .ofi-ord-pills *, .ofi-poi-menu *, .ofi-lager-tabs *, .ant-btn-link, .ant-btn-text,
+    td *, th *, [class~="rounded-full"], .ofi-qa-launch.is-phone
+)):not(:disabled):hover {
+    background: var(--la-hover) !important;
+    border-color: var(--la-field-border-hover) !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+}
+#root .ofi-list-apple.ofi-lager :is(
+    button[class*="px-"], button[class*="h-9"], button[class*="h-8"], button[class*="h-10"],
+    .ofi-btn-brand, .ofi-qa-launch, .ofi-poi-launch, .ofi-poi-ghost, .ofi-poi-add,
+    .ofi-ord-done, .ofi-ord-bin, .ofi-ord-ask > button, .ant-btn
+) svg { width: 13px; height: 13px; flex: none; }
+
+/* DAS EINE BLAU — die Haupthandlung jeder Seite: Produkt hinzufügen, Neuer
+   Auftrag, Speichern, Beleg importieren, Auftrag bestätigen, Wareneingang
+   abschliessen (die grünen Knöpfe waren eine zweite Hauptfarbe — es gibt
+   nur eine), das Plus im Tabellenfuss. */
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager :is(
+    [class~="bg-[#0a7aff]"],
+    [class~="bg-emerald-600"],
+    .ofi-btn-brand,
+    .ofi-qa-launch,
+    .ofi-poi-launch,
+    .ofi-poi-add,
+    .ofi-ord-done,
+    .ant-btn-primary
+):not(:is(.ofi-qa-launch.is-phone, .ofi-lager-tabs *, .ofi-togglegroup__btn, td *)),
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager :is(
+    [class~="bg-[#0a7aff]"],
+    [class~="bg-emerald-600"],
+    .ofi-btn-brand,
+    .ofi-qa-launch,
+    .ofi-poi-launch,
+    .ofi-poi-add,
+    .ofi-ord-done,
+    .ant-btn-primary
+):not(:is(.ofi-qa-launch.is-phone, .ofi-lager-tabs *, .ofi-togglegroup__btn, td *)):not(:disabled):hover {
+    border-color: transparent !important;
+    background: var(--la-accent) !important;
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+}
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager :is(
+    [class~="bg-[#0a7aff]"], [class~="bg-emerald-600"], .ofi-btn-brand, .ofi-qa-launch,
+    .ofi-poi-launch, .ofi-poi-add, .ofi-ord-done, .ant-btn-primary
+):not(:is(.ofi-qa-launch.is-phone, .ofi-lager-tabs *, .ofi-togglegroup__btn, td *)):not(:disabled):hover {
+    background: color-mix(in srgb, var(--la-accent) 88%, #000) !important;
+}
+/* Der Glanz des Beleg-Import-Knopfs läuft weiter — über Blau statt über
+   Blau-auf-Blau sieht man ihn jetzt sogar besser. Der Kamera-Knopf der
+   Schnellerfassung ist ein Knopf wie jeder andere. */
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager .ofi-qa-launch.is-phone { border-radius: 10px !important; }
+
+/* Rot bleibt dem Löschen — als Schrift auf Weiss, nie als Fläche. */
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager :is(
+    [class~="bg-red-600"],
+    [class~="text-red-600"],
+    [class~="border-red-200"],
+    .ofi-btn-danger
+):is(button):not(td *) {
+    border-color: var(--la-field-border) !important;
+    background: var(--la-surface) !important;
+    color: var(--la-danger) !important;
+    -webkit-text-fill-color: var(--la-danger) !important;
+}
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager :is([class~="bg-red-600"], [class~="text-red-600"], [class~="border-red-200"], .ofi-btn-danger):is(button):not(td *):not(:disabled):hover {
+    background: var(--la-hover) !important;
+    border-color: var(--la-danger) !important;
+}
+/* Blau umrandete Nebenknöpfe (Bearbeiten, Senden, In Auftrag umwandeln als
+   Nebenweg): weiss mit blauer Schrift. */
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager button:is([class~="text-[#0a7aff]"], [class~="border-[#0a7aff]/30"]):not([class~="bg-[#0a7aff]"]):not(td *) {
+    color: var(--la-accent) !important;
+    -webkit-text-fill-color: var(--la-accent) !important;
+}
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager button:is([class~="text-[#0a7aff]"], [class~="border-[#0a7aff]/30"]):not([class~="bg-[#0a7aff]"]):not(td *):not(:disabled):hover {
+    background: var(--la-hover) !important;
+    color: var(--la-accent) !important;
+    -webkit-text-fill-color: var(--la-accent) !important;
+}
+#root .ofi-list-apple.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager.ofi-lager :is(button[class*="px-"], button[class*="h-9"], button[class*="h-8"], .ofi-btn-brand, .ofi-qa-launch, .ofi-poi-launch, .ofi-poi-ghost, .ofi-ord-done, .ofi-ord-bin, .ant-btn):not(td *):disabled {
+    cursor: not-allowed;
+    opacity: 1;
+    border-color: var(--la-border) !important;
+    background: var(--la-surface) !important;
+    color: var(--la-muted) !important;
+    -webkit-text-fill-color: var(--la-muted) !important;
+}
+
+/* Symbolknöpfe des Bestellflusses (Stift, Spaltenliste, Rechnen): 28px,
+   6px-Ecke, Haarlinie; `.is-on` trägt das Blau. Das Plus und der Papierkorb
+   im Tabellenfuss dieselbe Form — das Plus blau, der Korb weiss. */
+#root .ofi-list-apple.ofi-lager :is(.ofi-ord-pencil, .ofi-poi-icon, .ofi-ord-plus) {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--la-field-border);
+    border-radius: var(--la-control-radius) !important;
+    background: var(--la-surface);
+    color: var(--la-secondary);
+    box-shadow: var(--la-btn-shadow);
+    transform: none !important;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-list-apple.ofi-lager :is(.ofi-ord-pencil, .ofi-poi-icon):hover { border-color: var(--la-field-border-hover); background: var(--la-hover); color: var(--la-text); }
+#root .ofi-list-apple.ofi-lager :is(.ofi-ord-pencil, .ofi-poi-icon).is-on,
+#root .ofi-list-apple.ofi-lager :is(.ofi-ord-pencil, .ofi-poi-icon).is-on:hover { border-color: transparent; background: var(--la-accent); color: #fff; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-pencil.is-marked::after { top: -3px; right: -3px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--la-surface); }
+#root .ofi-list-apple.ofi-lager :is(.ofi-ord-pencil, .ofi-poi-icon) svg { width: 14px; height: 14px; }
+/* Der Knopf «Berechnung» neben dem Stift (14.09.2026): dieselbe 28px-Form,
+   dazu die gewählte Art als Wort. */
+#root .ofi-list-apple.ofi-lager .ofi-ord-calcbtn {
+    height: 28px;
+    padding: 0 9px;
+    gap: 5px;
+    border: 1px solid var(--la-field-border);
+    border-radius: var(--la-control-radius) !important;
+    background: var(--la-surface);
+    color: var(--la-secondary);
+    box-shadow: var(--la-btn-shadow);
+    font-size: 12px;
+    transform: none !important;
+}
+#root .ofi-list-apple.ofi-lager .ofi-ord-calcbtn:hover:not(:disabled) { border-color: var(--la-field-border-hover); background: var(--la-hover); color: var(--la-text); }
+#root .ofi-list-apple.ofi-lager .ofi-ord-calcbtn.is-on,
+#root .ofi-list-apple.ofi-lager .ofi-ord-calcbtn.is-on:hover { border-color: transparent; background: var(--la-accent); color: #fff; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-calcbtn svg { width: 14px; height: 14px; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-calcbtn.is-warn::after { width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--la-surface); }
+#root .ofi-list-apple.ofi-lager .ofi-ord-plus { border-color: transparent; background: var(--la-accent); color: #fff; box-shadow: var(--la-btn-shadow); }
+#root .ofi-list-apple.ofi-lager .ofi-ord-plus:hover { background: color-mix(in srgb, var(--la-accent) 88%, #000); transform: none; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-plus svg { width: 15px; height: 15px; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-bin { min-width: 28px; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-bin.is-armed { color: var(--la-danger) !important; -webkit-text-fill-color: var(--la-danger) !important; border-color: var(--la-danger) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-bin > b { font-family: var(--la-font); font-size: 12px; font-weight: 600; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-foot { gap: 8px; padding: 8px 12px; border-top-color: var(--la-hairline); }
+#root .ofi-list-apple.ofi-lager .ofi-ord-ask { font-size: 12.5px; }
+/* Zeilensymbole in Zellen (Papierkorb, Stift): 24px, ohne Rahmen. */
+#root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand) {
+    width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px !important;
+    background: transparent;
+}
+#root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand):hover { background: var(--la-fill); }
+
+/* ── 2. Segmente: Ein/Aus und die Reiter der Auftragsseite ───────────────── */
+#root .ofi-list-apple.ofi-lager .ofi-togglegroup {
+    gap: 1px;
+    padding: 2px;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: var(--la-fill);
+}
+#root .ofi-list-apple.ofi-lager .ofi-togglegroup__btn {
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 12px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+    box-shadow: none !important;
+    font-size: 12.5px !important;
+    font-weight: 400 !important;
+}
+#root .ofi-list-apple.ofi-lager .ofi-togglegroup__btn:hover { background: transparent !important; color: var(--la-text) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-togglegroup__btn.is-on,
+#root .ofi-list-apple.ofi-lager .ofi-togglegroup__btn.is-on:hover {
+    background: var(--la-surface) !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 6%), 0 1px 2px rgb(0 0 0 / 12%) !important;
+    font-weight: 500 !important;
+}
+.dark #root .ofi-list-apple.ofi-lager .ofi-togglegroup__btn.is-on { background: rgba(255, 255, 255, 0.16) !important; box-shadow: none !important; }
+
+/* Die Reiter der Auftragsseite (Details · Positionen · PDF · E-Mail): ein
+   `div.rounded-lg.border.p-1` mit `button.h-8` — dieselbe Schiene. Der
+   Excel-Knopf ganz rechts in derselben Zeile bleibt ein Textknopf. */
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs {
+    gap: 1px;
+    padding: 2px;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: var(--la-fill);
+}
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button {
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 12px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--la-text) !important;
+    -webkit-text-fill-color: var(--la-text) !important;
+    box-shadow: none !important;
+    font-size: 12.5px !important;
+    font-weight: 400 !important;
+}
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button:hover { background: transparent !important; color: var(--la-text) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button[aria-current="page"],
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button[aria-current="page"]:hover {
+    background: var(--la-surface) !important;
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 6%), 0 1px 2px rgb(0 0 0 / 12%) !important;
+    font-weight: 500 !important;
+}
+.dark #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button[aria-current="page"] { background: rgba(255, 255, 255, 0.16) !important; box-shadow: none !important; }
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button.is-aside { margin-left: auto; color: var(--la-secondary) !important; -webkit-text-fill-color: var(--la-secondary) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button.is-aside:hover { color: var(--la-text) !important; -webkit-text-fill-color: var(--la-text) !important; }
+
+/* ── 3. Die Stufen der Lieferantenbestellung ─────────────────────────────
+   Drei Wörter in einer Schiene: die laufende Stufe weiss, erledigte mit
+   grünem Haken, gesperrte grau. Keine Pillen, keine Tönungen. */
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps {
+    gap: 1px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--la-fill);
+}
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step {
+    height: 24px;
+    gap: 6px;
+    padding: 0 10px 0 6px;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+}
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-current {
+    background: var(--la-surface) !important;
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 6%), 0 1px 2px rgb(0 0 0 / 12%);
+}
+.dark #root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-current { background: rgba(255, 255, 255, 0.16) !important; box-shadow: none; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__mark {
+    width: 15px;
+    height: 15px;
+    font-size: 9.5px;
+    font-weight: 600;
+    background: var(--la-muted) !important;
+    color: #fff !important;
+}
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-current .ofi-flowsteps__mark { background: var(--la-accent) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-done .ofi-flowsteps__mark { background: var(--la-success) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-locked .ofi-flowsteps__mark { background: transparent !important; color: var(--la-muted) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__mark svg { width: 10px; height: 10px; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__label { font-size: 12.5px; font-weight: 400; color: var(--la-text) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-current .ofi-flowsteps__label { font-weight: 500; }
+#root .ofi-list-apple.ofi-lager .ofi-flowsteps__step.is-locked .ofi-flowsteps__label { color: var(--la-secondary) !important; }
+
+/* ── 4. Marken, Hinweise, Karten ─────────────────────────────────────────
+   Statuspillen (Tailwind `rounded-full` mit getöntem Grund) werden kleine
+   umrandete Marken; die Schriftfarbe der Klasse bleibt, nur die Fläche geht. */
+#root .ofi-list-apple.ofi-lager span[class~="rounded-full"]:not(.ofi-flowsteps *):not([class*="size-"]):not([class*="animate-spin"]) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--la-border);
+    border-radius: 5px !important;
+    background: var(--la-surface) !important;
+    padding: 1px 7px !important;
+    font-family: var(--la-font) !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    line-height: 1.45;
+}
+/* Hinweisstreifen (Rückfragen, Warnungen, Stand des Wareneingangs): weiss,
+   eine Haarlinie, die Schriftfarbe sagt, was es ist. */
+#root .ofi-list-apple.ofi-lager .flex[class*="rounded-"][class*="border"]:is([class*="bg-slate-50"], [class*="bg-red-50"], [class*="bg-amber-50"], [class*="bg-emerald-50"], [class*="bg-sky-50"], [class*="bg-[#0a7aff]/"]) {
+    border-color: var(--la-border) !important;
+    background: var(--la-surface) !important;
+}
+/* Jede Tailwind-Karte der Seite (Handlungsleiste, Kostenkasten, Auswahl-
+   karten, Bildfeld): eine Haarlinie, kein Schatten. */
+#root .ofi-list-apple.ofi-lager :is(.rounded-xl, .rounded-lg, .rounded-md)[class*="border"]:not(button):not(input):not(select):not(textarea):not([class*="border-b"]):not([class*="border-t"]):not(.ofi-togglegroup):not(.ofi-lager-tabs) {
+    border-color: var(--la-border) !important;
+    box-shadow: none !important;
+}
+#root .ofi-list-apple.ofi-lager :is(.rounded-xl, .rounded-lg)[class*="border"][class*="bg-slate-50"] { background: var(--la-surface) !important; }
+#root .ofi-list-apple.ofi-lager .rounded-xl[class*="border"]:hover { box-shadow: none !important; }
+/* Die Auswahlkarten «Auftrag / Preisanfrage»: Symbol in einem Quadrat, kein
+   getönter Kreis; der Titel darüber in Satzschrift. */
+#root .ofi-list-apple.ofi-lager .rounded-xl[class*="border"] > span[class~="rounded-full"] {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--la-border);
+    border-radius: 10px !important;
+    background: var(--la-surface) !important;
+    color: var(--la-accent) !important;
+}
+#root .ofi-list-apple.ofi-lager span[class~="uppercase"]:not(.ofi-flowsteps *) {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    color: var(--la-secondary) !important;
+}
+/* Selection strip beside the search (products): a bordered field, not a grey box. */
+#root .ofi-list-apple.ofi-lager .ofi-filterbar > .flex[class*="bg-slate-50"] {
+    height: var(--ofi-ctl-h);
+    border: 1px solid var(--la-border) !important;
+    border-radius: var(--la-control-radius) !important;
+    background: var(--la-surface) !important;
+}
+
+/* ── 5. Formulare ─────────────────────────────────────────────────────────
+   Produkt anlegen / Produktdetail: Beschriftung links (12.5px, ruhig), das
+   Feld ein 28px-Mac-Textfeld. Die Filterzeilen der Listen bleiben auf dem
+   Hausmass (controls.css). */
+#root .ofi-list-apple.ofi-lager table[data-inv-table] th[scope="row"] {
+    width: 200px;
+    padding: 9px 12px 9px 16px;
+    background: transparent;
+    color: var(--la-secondary);
+    font-size: 12.5px;
+    font-weight: 400;
+    text-align: left;
+    vertical-align: middle;
+}
+#root .ofi-list-apple.ofi-lager table[data-inv-table] tbody tr:hover > th[scope="row"] { background: var(--la-hover); }
+#root .ofi-list-apple.ofi-lager table[data-lager-form] td .ofi-cell-input,
+#root .ofi-list-apple.ofi-lager table[data-lager-form] td input.ofi-cell-input,
+#root .ofi-list-apple.ofi-lager table[data-lager-form] td select.ofi-cell-input {
+    height: 28px;
+    min-height: 28px !important;
+    padding: 0 9px;
+    border: 1px solid var(--la-field-border) !important;
+    border-radius: var(--la-control-radius) !important;
+    background: var(--la-surface) !important;
+    color: var(--la-text);
+    font-size: 13px;
+    box-shadow: var(--la-btn-shadow);
+}
+#root .ofi-list-apple.ofi-lager table[data-lager-form] td .ofi-cell-input:hover { border-color: var(--la-field-border-hover) !important; }
+#root .ofi-list-apple.ofi-lager table[data-lager-form] td .ofi-cell-input:focus {
+    border-color: var(--la-accent) !important;
+    box-shadow: 0 0 0 3px var(--la-focus) !important;
+    outline: none;
+}
+#root .ofi-list-apple.ofi-lager table[data-lager-form] td .ofi-cell-input.font-mono { font-family: var(--la-font); font-variant-numeric: tabular-nums; }
+/* Freie Felder ausserhalb einer Tabelle (Bewegungsfilter der Produktakte,
+   Mail-Felder der Auftragsseite): dasselbe Feld. */
+#root .ofi-list-apple.ofi-lager :is(input, select)[class*="h-9"][class*="rounded-md"]:not(.ofi-filter):not(.ofi-cell-input) {
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 9px !important;
+    border: 1px solid var(--la-field-border) !important;
+    border-radius: var(--la-control-radius) !important;
+    background: var(--la-surface) !important;
+    color: var(--la-text) !important;
+    font-size: 13px !important;
+    box-shadow: var(--la-btn-shadow) !important;
+}
+#root .ofi-list-apple.ofi-lager :is(input, select)[class*="h-9"][class*="rounded-md"]:not(.ofi-filter):not(.ofi-cell-input):focus {
+    border-color: var(--la-accent) !important;
+    box-shadow: 0 0 0 3px var(--la-focus) !important;
+    outline: none;
+}
+/* Die Felder der Auftragsdetails (Bestelldetails-Karte auf der Auftragsseite):
+   Beschriftung in Satzschrift, das Feld erst beim Zeigen mit Rand. */
+#root .ofi-list-apple.ofi-lager label[class*="border-b"] > span:first-child,
+#root .ofi-list-apple.ofi-lager .flex[class*="border-b"] > span:first-child[class*="w-36"] {
+    width: 160px;
+    font-size: 12.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--la-secondary) !important;
+}
+#root .ofi-list-apple.ofi-lager label[class*="border-b"],
+#root .ofi-list-apple.ofi-lager .flex[class*="border-b"][class*="py-2"] { border-color: var(--la-hairline) !important; }
+#root .ofi-list-apple.ofi-lager label[class*="border-b"] > :is(input, select)[class*="border-transparent"] {
+    height: 28px;
+    border: 1px solid transparent !important;
+    border-radius: var(--la-control-radius) !important;
+    font-size: 13px;
+    color: var(--la-text) !important;
+}
+#root .ofi-list-apple.ofi-lager label[class*="border-b"] > :is(input, select)[class*="border-transparent"]:hover { border-color: var(--la-field-border) !important; background: var(--la-surface) !important; }
+#root .ofi-list-apple.ofi-lager label[class*="border-b"] > :is(input, select)[class*="border-transparent"]:focus {
+    border-color: var(--la-accent) !important;
+    background: var(--la-surface) !important;
+    box-shadow: 0 0 0 3px var(--la-focus);
+    outline: none;
+}
+/* Zelleneingaben der Bestellmaske und des Wareneingangs: wie in der
+   Positionstabelle der Offerte — ohne Rand in Ruhe, Rand beim Zeigen,
+   blauer Ring beim Schreiben. 26px in der 40px-Zeile. */
+#root .ofi-list-apple.ofi-lager table[data-inv-table]:not([data-lager-form]) td :is(input:not([type="checkbox"]), select) {
+    height: 26px !important;
+    min-height: 26px !important;
+    padding: 2px 6px !important;
+    border: 1px solid transparent !important;
+    border-radius: 5px !important;
+    background: transparent !important;
+    color: var(--la-text) !important;
+    font-family: var(--la-font);
+    font-size: 13px !important;
+    font-variant-numeric: tabular-nums;
+    box-shadow: none !important;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-list-apple.ofi-lager table[data-inv-table]:not([data-lager-form]) td :is(input:not([type="checkbox"]), select):hover {
+    border-color: var(--la-field-border) !important;
+    background: var(--la-surface) !important;
+}
+#root .ofi-list-apple.ofi-lager table[data-inv-table]:not([data-lager-form]) td :is(input:not([type="checkbox"]), select):focus {
+    border-color: var(--la-accent) !important;
+    background: var(--la-surface) !important;
+    box-shadow: 0 0 0 3px var(--la-focus) !important;
+    outline: none;
+}
+#root .ofi-list-apple.ofi-lager table[data-inv-table] td .font-mono,
+#root .ofi-list-apple.ofi-lager table[data-inv-table] th .font-mono { font-family: var(--la-font) !important; font-variant-numeric: tabular-nums; }
+#root .ofi-list-apple.ofi-lager .font-mono:not(td *):not(th *) { font-family: var(--la-font) !important; font-variant-numeric: tabular-nums; }
+/* Summen im Fuss der Bestellmaske. */
+#root .ofi-list-apple.ofi-lager :is(.ofi-ord-total, .ofi-ord-sum__parts, .ofi-ord-sum__value) { font-family: var(--la-font); }
+#root .ofi-list-apple.ofi-lager .ofi-ord-sum__value { font-size: 17px; font-weight: 600; letter-spacing: -0.015em; }
+#root .ofi-list-apple.ofi-lager .ofi-ord-total { font-weight: 600; }
+/* Das Bildfeld der Produktakte. */
+#root .ofi-list-apple.ofi-lager .rounded-md[class*="bg-slate-50"][class*="border"] { background: var(--la-surface) !important; border-color: var(--la-border) !important; }
+#root .ofi-list-apple.ofi-lager button[class*="border-dashed"] { border-style: dashed !important; }
+/* Suchergebnisse unter einer Zelle (Kombinationsfeld) behalten ihr Fenster. */
+
+/* ── Radien: `@layer utilities`, weil index.css dort jeden `rounded-*`
+   mit !important niederzwingt. ──────────────────────────────────────────── */
+@layer utilities {
+    #root .ofi-list-apple.ofi-lager :is(
+        button[class*="px-"], button[class*="h-9"], button[class*="h-8"], button[class*="h-10"],
+        .ofi-btn-brand, .ofi-qa-launch, .ofi-poi-launch, .ofi-poi-ghost, .ofi-poi-add,
+        .ofi-ord-done, .ofi-ord-bin, .ofi-ord-ask > button, .ant-btn,
+        .ofi-ord-pencil, .ofi-poi-icon, .ofi-ord-plus
+    ):not(:is(.ofi-nosize, .ofi-filter, .ofi-quote-tab, .ofi-togglegroup__btn, .ofi-flowsteps *, .ofi-lager-tabs *, .ofi-ord-pills *, .ofi-poi-menu *, td *, .ofi-qa-launch.is-phone)) { border-radius: var(--la-control-radius) !important; }
+    #root .ofi-list-apple.ofi-lager :is(.ofi-togglegroup, .ofi-lager-tabs, .ofi-flowsteps) { border-radius: 8px !important; }
+    #root .ofi-list-apple.ofi-lager :is(.ofi-togglegroup__btn, .ofi-lager-tabs > button, .ofi-flowsteps__step) { border-radius: 6px !important; }
+    #root .ofi-list-apple.ofi-lager span[class~="rounded-full"]:not(.ofi-flowsteps *):not([class*="size-"]):not([class*="animate-spin"]) { border-radius: 5px !important; }
+    #root .ofi-list-apple.ofi-lager :is(.rounded-xl, .rounded-lg)[class*="border"]:not(button):not(input):not(select):not([class*="border-b"]):not([class*="border-t"]):not(.ofi-togglegroup):not(.ofi-lager-tabs) { border-radius: var(--la-radius) !important; }
+    #root .ofi-list-apple.ofi-lager .rounded-xl[class*="border"] > span[class~="rounded-full"] { border-radius: 10px !important; }
+    #root .ofi-list-apple.ofi-lager table[data-lager-form] td .ofi-cell-input,
+    #root .ofi-list-apple.ofi-lager :is(input, select)[class*="h-9"][class*="rounded-md"]:not(.ofi-filter),
+    #root .ofi-list-apple.ofi-lager label[class*="border-b"] > :is(input, select),
+    #root .ofi-list-apple.ofi-lager .ofi-filterbar > .flex[class*="bg-slate-50"] { border-radius: var(--la-control-radius) !important; }
+    #root .ofi-list-apple.ofi-lager table[data-inv-table]:not([data-lager-form]) td :is(input:not([type="checkbox"]), select),
+    #root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand) { border-radius: 5px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-list-apple.ofi-lager :is(button, input, td) { transition: none !important; }
+}
+
+/* ── 6. Lagerbewegungen (10.09.2026): Zeitraum, Segmente, Spaltenwahl ─────
+   Die beiden Kalenderfelder tragen die Höhe der Filter (controls.css:
+   40px / 10px), die Schnellwahl und die Typ-/Herkunft-Segmente sind
+   `ToggleGroup`s — sie werden oben (Abschnitt 2) als Mac-Segment gemalt.
+   Die zweite Zeile mit Typ und Herkunft ist bewusst KEIN Filterkasten:
+   zwei beschriftete Segmente, sonst nichts. */
+#root .ofi-list-apple.ofi-lager .ofi-mv-range {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+#root .ofi-list-apple.ofi-lager .ofi-mv-range__field { width: 132px; }
+#root .ofi-list-apple.ofi-lager .ofi-mv-range__dash { color: var(--la-muted); font-size: 12px; }
+#root .ofi-list-apple.ofi-lager .ofi-mv-date {
+    display: flex;
+    height: var(--ofi-ctl-h, 40px);
+    padding: 0 10px 0 12px;
+    border: 1px solid var(--la-field-border);
+    border-radius: var(--ofi-ctl-radius, 10px) !important;
+    background: var(--la-surface);
+    font-size: 13px;
+    color: var(--la-text);
+    box-shadow: var(--la-btn-shadow);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-list-apple.ofi-lager .ofi-mv-date:hover { border-color: var(--la-field-border-hover); }
+#root .ofi-list-apple.ofi-lager .ofi-mv-date:focus-visible { outline: none; border-color: var(--la-accent); box-shadow: 0 0 0 3px var(--la-focus); }
+#root .ofi-list-apple.ofi-lager .ofi-mv-range__clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--la-secondary);
+}
+#root .ofi-list-apple.ofi-lager .ofi-mv-range__clear:hover { background: var(--la-hover); color: var(--la-text); }
+#root .ofi-list-apple.ofi-lager .ofi-mv-segments {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 24px;
+}
+#root .ofi-list-apple.ofi-lager .ofi-mv-segments__group { display: inline-flex; align-items: center; gap: 8px; }
+#root .ofi-list-apple.ofi-lager .ofi-mv-segments__label { font-size: 12px; color: var(--la-secondary); }

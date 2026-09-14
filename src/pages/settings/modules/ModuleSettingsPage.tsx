@@ -6,6 +6,10 @@ import { SalesRemindersSection } from './sections/SalesRemindersSection';
 // Mandanten + die beiden Integrationsschlüssel.
 import { SalesOspSection } from './sections/SalesOspSection';
 import { InventoryUnitsSection } from './sections/InventoryUnitsSection';
+// Code-Einstellungen (10.09.2026): Kategorien + Nummernkreise des ERP-Codes,
+// Freigabe durch die IT.
+import { InventoryCodesSection } from './sections/InventoryCodesSection';
+import '@/styles/modules/moduleSettings.css';
 /* Personal (26.08.2026): Schichtplan, Feiertage und Urlaubsanspruch. Der
    Schichtplan war ein Menüpunkt — er wird einmal im Jahr angefasst und gilt
    fürs ganze Haus, also gehört er hierher und nicht zwischen die Listen. */
@@ -33,13 +37,14 @@ import { PersonnelLeavePolicySection } from './sections/PersonnelLeavePolicySect
  * direkt landet.
  */
 
-type CategoryKey = 'reminders' | 'osp' | 'units' | 'shift' | 'holidays' | 'leavePolicy';
+type CategoryKey = 'reminders' | 'osp' | 'units' | 'codes' | 'shift' | 'holidays' | 'leavePolicy';
 type ModuleKey = 'crm' | 'sales' | 'projects' | 'inventory' | 'personnel' | 'calendar';
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
     reminders: 'settings.modules.catReminders',
     osp: 'settings.modules.catOsp',
     units: 'settings.modules.catUnits',
+    codes: 'settings.modules.catCodes',
     shift: 'settings.modules.catShift',
     holidays: 'settings.modules.catHolidays',
     leavePolicy: 'settings.modules.catLeavePolicy',
@@ -53,7 +58,7 @@ const MODULES: ReadonlyArray<{ key: ModuleKey; labelKey: string; categories: Rea
     { key: 'crm', labelKey: 'nav.crm', categories: [] },
     { key: 'sales', labelKey: 'nav.sales', categories: ['reminders', 'osp'] },
     { key: 'projects', labelKey: 'nav.projects', categories: [] },
-    { key: 'inventory', labelKey: 'nav.inventory', categories: ['units'] },
+    { key: 'inventory', labelKey: 'nav.inventory', categories: ['units', 'codes'] },
     { key: 'personnel', labelKey: 'nav.personnel', categories: ['shift', 'holidays', 'leavePolicy'] },
     { key: 'calendar', labelKey: 'nav.calendar', categories: [] },
 ];
@@ -138,6 +143,7 @@ export const ModuleSettingsPage = () => {
                     )}
 
                     {category === 'units' && <InventoryUnitsSection />}
+                    {category === 'codes' && <InventoryCodesSection />}
                     {category === 'reminders' && <SalesRemindersSection />}
                     {category === 'osp' && <SalesOspSection />}
                     {category === 'shift' && <PersonnelShiftSection />}

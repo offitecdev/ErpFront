@@ -38,6 +38,8 @@ export const SelectMenu = ({
     /** Klasse des Feldes selbst; Vorgabe ist das Formularfeld-Kleid. */
     buttonClassName = 'ofi-cal-input',
     listWidth = 240,
+    /** Zusätzliche Klasse am Aufklappfenster (Portal) — für Module mit eigenem Kleid. */
+    panelClassName,
     /** Etwas, das vor dem Namen der gewählten Zeile steht (z. B. ein Zeichen). */
     prefix,
 }: {
@@ -50,6 +52,7 @@ export const SelectMenu = ({
     className?: string;
     buttonClassName?: string;
     listWidth?: number;
+    panelClassName?: string;
     prefix?: ReactNode;
 }) => {
     const [open, setOpen] = useState(false);
@@ -154,6 +157,7 @@ export const SelectMenu = ({
                 onClose={close}
                 width={listWidth}
                 maxHeight={320}
+                panelClassName={panelClassName}
             >
                 <div role="listbox" aria-label={ariaLabel} className="min-h-0 flex-1 overflow-y-auto py-1">
                     {options.map((option, index) => {
@@ -188,7 +192,7 @@ export const SelectMenu = ({
                                         {option.hint}
                                     </span>
                                 )}
-                                {isSelected && <Check size={13} className="shrink-0 text-[#272f67] dark:text-[#e6cf9e]" />}
+                                {isSelected && <Check size={13} className="shrink-0 text-[#0a7aff] dark:text-[#e6cf9e]" />}
                             </button>
                         );
                     })}

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import {
     FileCheck02 as FileCheck,
-    SearchLg as Search,
     FileDownload02 as DownloadIcon,
     X as XIcon,
 } from '@/components/icons/antIconCompat';
@@ -13,6 +12,7 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { Input } from '../../components/ui-shared/Field';
+import { SearchBox } from '../../components/ui-shared/TableKit';
 import { ReportsSheet } from '../project/features/components/detail/reports/ReportsSheet';
 import { projectApi, deliveryReportApi, type ServiceReportDto, type DeliveryReportDto } from '../../lib/api/project';
 import type { ProjectDto } from '../../types/project';
@@ -218,7 +218,7 @@ export const ServiceReports = () => {
             type="button"
             onClick={() => setView(id)}
             className={`rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition ${
-                view === id ? 'bg-[#272f67] text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10'
+                view === id ? 'bg-[#0a7aff] text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-white dark:hover:bg-white/10'
             }`}
         >
             {label}
@@ -251,16 +251,13 @@ export const ServiceReports = () => {
             {view === 'field' && (
                 <Card title={t('services.tabField')} icon={<FileCheck size={14} />} noPadding>
                     <form
-                        className="flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-slate-100 px-3 py-3 [scrollbar-width:thin]"
+                        className="ofi-filterbar px-3 py-3"
                         onSubmit={(event) => {
                             event.preventDefault();
                             void load(search);
                         }}
                     >
-                        <div className="relative shrink-0">
-                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('projects.flow.searchPlaceholder')} className="ofi-light-search-input w-[260px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
-                        </div>
+                        <SearchBox value={search} onChange={setSearch} placeholder={t('projects.flow.searchPlaceholder')} />
                         <Button type="submit" variant="secondary" size="sm" className="shrink-0">{t('auto.uygula')}</Button>
                         <Button type="button" variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => { setSearch(''); void load(''); }} className="shrink-0">{t('common.clear')}</Button>
                     </form>

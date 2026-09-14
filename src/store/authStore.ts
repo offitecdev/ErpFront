@@ -37,6 +37,22 @@ export interface TenantOption {
      * AN-2026-40001). 0 = bloksuz. Modül kategorisinden bağımsızdır.
      */
     companyNumber?: number;
+    /**
+     * Şirketin kendi adresi — PDF gönderici satırı ve QR fatura alacaklısı.
+     * null/undefined = PDF ayarlarındaki ortak adres basılır.
+     */
+    companyAddress?: TenantCompanyAddress | null;
+}
+
+export interface TenantCompanyAddress {
+    /** Sokak/bina ("Maltepe Serbest Bölgesi, Sarmaşık Sok."). */
+    addressLine1: string;
+    /** Kapı no ("No:2 A"). */
+    addressLine2: string;
+    postalCode: string;
+    city: string;
+    /** ISO-2; boş = PDF ayarlarındaki ülke. */
+    country: string;
 }
 
 // Tokens live exclusively in HttpOnly cookies set by the server — JavaScript

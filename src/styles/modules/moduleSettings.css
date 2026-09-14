@@ -1,0 +1,401 @@
+/* moduleSettings — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ════════════════════════════════════════════════════════════════════════
+   MODULEINSTELLUNGEN — Google-sauber (19.08.2026)
+   ════════════════════════════════════════════════════════════════════════
+
+   Benutzerwunsch: "die Moduleinstellungen näher an Googles Gestaltung —
+   sauber und viel moderner, wie der Projektkalender".
+
+   Wie der Kalender, der Rapport-Hub und die Projektübersicht malt dieser
+   Block AUSSCHLIESSLICH aus den `--ofi-cal-*`-Tokens: weisse Fläche, graue
+   Haarlinien, ruhiges Grau für Text, das Markenblau (im Dunkeln Weizen) als
+   EINZIGER Akzent. Der Dunkelmodus ist damit derselbe Variablentausch und
+   keine zweite Kopie der Regeln.
+
+   Die Selektoren tragen `#root`, wo app-weite Knopf- und Radius-Regeln sonst
+   gewinnen würden — eine nackte Klasse verlöre gegen sie.
+
+   RADIEN wie in der Projektübersicht: Flächen 8px, Zeilen und Reiter 6px. */
+
+.ofi-mset-page {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ── Kopf: Titel und eine Zeile, die sagt, was hier geht ────────────────── */
+.ofi-mset-head { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.ofi-mset-head__title {
+    font-family: var(--font-body);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    color: var(--ofi-cal-text);
+}
+
+/* ── Die Einstellungsart als Reiterband ─────────────────────────────────
+   Googles Reiter: kein Kasten, keine Füllung — der Name steht da, und unter
+   dem gewählten liegt ein 2px-Strich in der Akzentfarbe. */
+.ofi-mset-tabs {
+    display: flex;
+    min-width: 0;
+    flex: none;
+    align-items: stretch;
+    gap: 4px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+}
+#root .ofi-mset-tab {
+    position: relative;
+    flex: none;
+    border: 0;
+    border-radius: 6px 6px 0 0 !important;
+    background: transparent;
+    padding: 0 14px;
+    height: 40px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-mset-tab:hover { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-mset-tab.is-active { color: var(--ofi-cal-accent); font-weight: 600; }
+#root .ofi-mset-tab.is-active::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--ofi-cal-accent);
+}
+
+/* ── Der Rumpf: links die Module, rechts Reiterband und Inhalt ───────────
+   Die linke Liste steht IMMER; das Reiterband gehoert dem gewaehlten Modul und
+   sitzt darum RECHTS, ueber dem Inhalt — nicht ueber der ganzen Seite. */
+.ofi-mset-body { display: grid; min-width: 0; gap: 20px; }
+.ofi-mset-main { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+
+.ofi-mset-rail { display: flex; gap: 4px; overflow-x: auto; }
+/* Googles Navigationszeile: volle Pille, ruhiger Ton, Akzent nur beim
+   Gewählten — und die Zeile darf sich nicht bewegen, wenn man sie überfährt. */
+#root .ofi-mset-railrow {
+    display: flex;
+    flex: none;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 0 12px;
+    height: 36px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-mset-railrow:hover { background: var(--ofi-cal-hover); }
+#root .ofi-mset-railrow.is-active {
+    background: var(--ofi-cal-accent-soft);
+    color: var(--ofi-cal-accent);
+    font-weight: 600;
+}
+.ofi-mset-railrow__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Der Punkt sagt: hier gibt es zu dieser Art etwas einzustellen. */
+.ofi-mset-railrow__dot {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--ofi-cal-faint);
+}
+#root .ofi-mset-railrow.is-active .ofi-mset-railrow__dot { background: var(--ofi-cal-accent); }
+
+/* ── Die Karte, in der der Inhalt steht ─────────────────────────────────── */
+.ofi-mset-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    background: var(--ofi-cal-surface);
+}
+.ofi-mset-card__head {
+    display: flex;
+    min-width: 0;
+    min-height: 46px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    padding: 10px 16px;
+}
+.ofi-mset-card__title {
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--ofi-cal-text);
+}
+.ofi-mset-card__body { min-width: 0; }
+.ofi-mset-card__foot {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    padding: 12px 16px;
+}
+.ofi-mset-card__scroll { min-width: 0; overflow-x: auto; }
+.ofi-mset-empty {
+    padding: 56px 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Tabellen IN der Karte ──────────────────────────────────────────────
+   Dieselbe Sprache wie die Übersichtstabellen der Projektseite: keine
+   senkrechten Gitterlinien, kein getönter Kopfstreifen, keine Zebrastreifen.
+   Ordnung tragen Haarlinie, Abstand und Gewicht. Die Basisregeln
+   (`:where(table[data-inv-table])`) haben Spezifität 0 — eine Klasse genügt
+   zum Übermalen. */
+.ofi-mset-card table[data-inv-table] { font-size: 13px; }
+/* KEIN gefuellter Kopfstreifen. Die Tabellen tragen dafuer zusaetzlich
+   `data-unstyled-table`: die app-weite Regel `main table thead { background:
+   … !important }` faerbt sonst einen dunkelblauen Balken ueber die Spalten-
+   ueberschriften, und gegen ihr `!important` kaeme hier keine Klasse an. Genau
+   deshalb tragen die Uebersichtstabellen der Projektseite dasselbe Attribut. */
+.ofi-mset-card table[data-inv-table] thead { background: transparent; }
+.ofi-mset-card table[data-inv-table] th {
+    height: 38px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: transparent;
+    padding: 0 16px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--ofi-cal-muted);
+}
+.ofi-mset-card table[data-inv-table] td {
+    height: 48px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    padding: 0 16px;
+    color: var(--ofi-cal-text);
+}
+.ofi-mset-card table[data-inv-table] tbody tr:last-child td { border-bottom-color: transparent; }
+.ofi-mset-card table[data-inv-table] tbody tr { transition: background-color 120ms ease; }
+.ofi-mset-card table[data-inv-table] tbody tr:hover td { background: var(--ofi-cal-hover); }
+
+/* Eine STILLGELEGTE Zeile tritt zurück, verschwindet aber nicht: sie steht ja
+   noch auf bestehenden Artikeln. */
+.ofi-mset-card table[data-inv-table] tbody tr.is-muted td:not(.ofi-mset-actions) { opacity: 0.55; }
+
+/* Felder in der Zeile: rahmenlos, bis man sie anfasst — Googles ruhige
+   Bearbeitung an Ort und Stelle statt einer Wand aus Eingabekästen. */
+#root .ofi-mset-inline {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 6px !important;
+    background: transparent;
+    padding: 5px 8px;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-mset-inline:hover:not(:disabled) { border-color: var(--ofi-cal-border); }
+#root .ofi-mset-inline:focus {
+    border-color: var(--ofi-cal-accent) !important;
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 0 0 1px var(--ofi-cal-accent) !important;
+    outline: none;
+}
+#root .ofi-mset-inline:disabled { border-color: transparent; background: transparent; color: var(--ofi-cal-muted); }
+#root .ofi-mset-inline.is-code { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; }
+
+/* Die Vorgabe-Marke: ein Häkchen-Knopf, kein Radiopunkt — er sagt zugleich,
+   dass er anklickbar ist. */
+#root .ofi-mset-mark {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-mset-mark:hover:not(:disabled) { background: var(--ofi-cal-hover); color: var(--ofi-cal-muted); }
+#root .ofi-mset-mark.is-on { color: var(--ofi-cal-accent); }
+#root .ofi-mset-mark.is-on:hover:not(:disabled) { background: var(--ofi-cal-accent-tint); }
+#root .ofi-mset-mark:disabled { cursor: default; }
+
+/* ── Die Liste und ihre Auswertung nebeneinander ────────────────────────
+   Links die Einheiten selbst, rechts — schmal — die Zusammenfassung zu der
+   Einheit, auf der man steht. Auf schmalen Schirmen stehen sie untereinander. */
+.ofi-mset-split { display: grid; min-width: 0; gap: 16px; align-items: start; }
+/* Die schmale Spalte rechts: erst die Auswertung zur gewaehlten Zeile, darunter
+   die Stelle, an der eine eigene Einheit entsteht. */
+.ofi-mset-side { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+/* Im Fuss/Rumpf einer schmalen Karte stehen die Felder untereinander und
+   nehmen die ganze Breite — nebeneinander waeren sie hier zu eng. */
+.ofi-mset-newform { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 14px 16px; }
+#root .ofi-mset-newform .ofi-mset-newfield { width: 100%; }
+#root .ofi-mset-newform .ofi-mset-primary { width: 100%; justify-content: center; }
+
+/* Die gewaehlte Zeile der Liste — sie sagt, worueber die Karte daneben redet. */
+.ofi-mset-card table[data-inv-table] tbody tr.is-pick { cursor: pointer; }
+.ofi-mset-card table[data-inv-table] tbody tr.is-picked td { background: var(--ofi-cal-accent-tint); }
+.ofi-mset-card table[data-inv-table] tbody tr.is-picked:hover td { background: var(--ofi-cal-accent-soft); }
+
+/* Zusammenfassungstabelle wie auf der Projektuebersicht: Beschriftung links,
+   Zahl rechts, kein Kopfstreifen, keine senkrechten Linien. */
+.ofi-mset-card table[data-inv-table][data-unstyled-table] td { height: 40px; }
+.ofi-mset-card table[data-inv-table] td.ofi-mset-key { color: var(--ofi-cal-muted); }
+.ofi-mset-sum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+.ofi-mset-sum.is-zero { font-weight: 500; color: var(--ofi-cal-faint); }
+.ofi-mset-sum__unit { margin-left: 4px; font-size: 11px; font-weight: 500; color: var(--ofi-cal-muted); }
+.ofi-mset-sum__head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+.ofi-mset-sum__code {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-mset-sum__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+}
+
+.ofi-mset-actions { text-align: right; white-space: nowrap; }
+#root .ofi-mset-iconbtn {
+    display: inline-flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-mset-iconbtn:hover:not(:disabled) { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-mset-iconbtn.is-danger:hover:not(:disabled) { background: rgba(185, 28, 28, 0.1); color: var(--ofi-cal-danger); }
+#root .ofi-mset-iconbtn:disabled { color: var(--ofi-cal-faint); cursor: default; }
+
+/* Die Zeile, in der eine eigene Einheit entsteht — sie steht im Fuss der
+   Karte und sieht aus wie eine Zeile der Tabelle, nicht wie ein Formular. */
+#root .ofi-mset-newfield {
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px !important;
+    background: var(--ofi-cal-surface);
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-mset-newfield::placeholder { color: var(--ofi-cal-faint); }
+#root .ofi-mset-newfield:focus {
+    border-color: var(--ofi-cal-accent) !important;
+    box-shadow: 0 0 0 1px var(--ofi-cal-accent) !important;
+    outline: none;
+}
+#root .ofi-mset-newfield.is-code { width: 7rem; font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; }
+#root .ofi-mset-newfield.is-name { width: 15rem; }
+
+/* Googles gefüllter Knopf: eine Farbe, kein Rahmen, kein Verlauf. */
+#root .ofi-mset-primary {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 6px !important;
+    background: var(--ofi-cal-accent);
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-on-accent);
+    transition: background-color 120ms ease, opacity 120ms ease;
+}
+#root .ofi-mset-primary:hover:not(:disabled) { background: var(--ofi-cal-accent-hover); }
+#root .ofi-mset-primary:disabled { opacity: 0.4; cursor: default; }
+
+.ofi-mset-hint { font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-codes .ofi-mset-card__foot { flex-wrap: nowrap; }
+.ofi-codes .ofi-mset-card__foot .ofi-mset-newfield.is-name { min-width: 0; flex: 1; width: auto; }
+/* Stand «Vorbereitet» / «Freigegeben»: ein umrandetes Abzeichen, keine Tönung. */
+.ofi-codes-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+}
+.ofi-codes-status.is-active { color: var(--ofi-cal-success, #1f8a3b); border-color: rgba(31, 138, 59, 0.35); }
+/* Der IT-Knopf: 28px-Druckknopf, freigeben = das eine Blau. */
+#root .ofi-codes-gate {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px !important;
+    background: var(--ofi-cal-surface);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    white-space: nowrap;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-codes-gate:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+#root .ofi-codes-gate.is-primary { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent, #fff); font-weight: 600; }
+#root .ofi-codes-gate.is-primary:hover:not(:disabled) { background: var(--ofi-cal-accent-hover, #0066e0); }
+#root .ofi-codes-gate:disabled { opacity: 0.45; }

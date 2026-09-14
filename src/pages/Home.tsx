@@ -25,6 +25,10 @@ import { QuickMenuCarousel, type QuickMenuTile } from '../components/home/QuickM
 import { DashboardStats } from '../components/home/DashboardStats';
 import { UpcomingSection } from '../components/home/UpcomingSection';
 
+// The Mac look of the start page (10.09.2026) — chunk-local, like the quote
+// and project pages carry their own sheet.
+import '../styles/home.css';
+
 type Tile = {
     key: string;
     labelKey: string;
@@ -93,25 +97,19 @@ export const Home = () => {
     };
 
     return (
-        <div className="w-full lg:flex lg:items-start lg:gap-8">
+        <div className="ofi-home w-full lg:flex lg:items-start lg:gap-7">
           <div className="min-w-0 flex-1">
             {/* Welcome row: greeting left, the swipeable quick-menu boxes beside it.
                 `ofi-rise` (styles/refine.css) lässt Gruss und Kacheln beim
                 Öffnen kurz aufsteigen — gestaffelt wie beim Anmelden. */}
-            <div className="ofi-rise mb-8 flex flex-col gap-6 border-b border-[#EAEAEC] pb-6 dark:border-white/10 xl:flex-row xl:items-start">
-                <div className="shrink-0 xl:w-[280px]">
-                    <p className="text-[12px] font-medium uppercase tracking-wider text-[#98A0AE] dark:text-[#8f95a1]">
-                        {dayjs().format('dddd, DD MMMM YYYY')}
-                    </p>
-                    {/* Begrüssung in der Titelschrift — wie der Titel der
-                        Anmeldeseite, mit der die Sitzung begonnen hat. */}
-                    <h1 className="ofi-home-greeting ofi-serif mt-1.5 text-[23px] font-semibold tracking-tight text-[#1A1A1A] dark:text-white">
+            <div className="ofi-rise ofi-home__welcome">
+                <div className="ofi-home__greet">
+                    <p className="ofi-home__date">{dayjs().format('dddd, DD. MMMM YYYY')}</p>
+                    <h1 className="ofi-home__title">
                         {t(greetingKey, { defaultValue: greetingDefaults[greetingKey] })},{' '}
-                        {/* The name pops: a step larger, in the signature navy (light
-                            step of the same ramp in dark mode for contrast). */}
-                        <span className="font-bold text-[#272f67] dark:text-[#9faae8]">{firstName}</span>
+                        <b>{firstName}</b>
                     </h1>
-                    <p className="mt-1.5 text-[14px] text-[#6B7280] dark:text-[#c4c9d2]">
+                    <p className="ofi-home__lead">
                         {t('home.subtitle', { defaultValue: 'Hızlı erişim ile çalışmana kaldığın yerden devam et.' })}
                     </p>
                 </div>
@@ -125,9 +123,8 @@ export const Home = () => {
           </div>
 
           {/* Right column: analog clock + Anstehend cards (Montagen · Besprechungen · Lieferungen) */}
-          <aside className="ofi-rise ofi-rise-2 mt-8 space-y-6 lg:mt-0 lg:w-80 lg:shrink-0">
-            {/* Background-tinted "surface" card — the reference's non-white card variant */}
-            <div className="rounded-xl border border-[#E7E8EC] bg-[#F4F5F7] p-5 dark:border-white/10 dark:bg-[#151616]">
+          <aside className="ofi-rise ofi-rise-2 ofi-home__aside">
+            <div className="ofi-home__clock">
                 <AnalogClock />
             </div>
             <UpcomingSection />

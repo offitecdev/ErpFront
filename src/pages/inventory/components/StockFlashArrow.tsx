@@ -7,7 +7,7 @@
 export type ArrowMode = 'import' | 'save';
 
 const MODE_COLOR: Record<ArrowMode, string> = {
-    import: '#272f67',
+    import: '#0a7aff',
     save: '#d30f15',
 };
 

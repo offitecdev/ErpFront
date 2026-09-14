@@ -377,7 +377,7 @@ export const StockPage = () => {
                     <button
                         type="button"
                         onClick={() => navigate('/inventory/stock/movements')}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                     >
                         <ClockRewind size={14} />
                         {t('inv.stock.movementsButton')}
@@ -399,7 +399,7 @@ export const StockPage = () => {
                     <button
                         type="button"
                         onClick={() => setExcelOpen(true)}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                     >
                         <UploadCloud02 size={13} />
                         {t('inv.excel.importButton')}
@@ -407,7 +407,7 @@ export const StockPage = () => {
                     <button
                         type="button"
                         onClick={addRow}
-                        className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654]"
+                        className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0]"
                     >
                         <Plus size={13} />
                         {t('inv.stock.addProduct')}
@@ -575,7 +575,7 @@ export const StockPage = () => {
                             <button
                                 type="button"
                                 onClick={addRow}
-                                className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/60"
+                                className="flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/60"
                             >
                                 <Plus size={12} />
                                 {t('inv.bulkProducts.addRow')}
@@ -585,7 +585,7 @@ export const StockPage = () => {
                                 disabled={saving || !canTransfer || !filledRows.length}
                                 title={canTransfer ? undefined : t('inv.stock.noPermission')}
                                 onClick={() => void save()}
-                                className="rounded-md bg-[#272f67] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="rounded-md bg-[#0a7aff] px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 {saving
                                     ? t('common.loading')

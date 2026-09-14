@@ -5,6 +5,7 @@ import { Plus, Trash01 as Trash } from '@/components/icons/antIconCompat';
 import { PopupActions, PopupButton, PopupDialog, PopupField } from '@/components/ui-shared/PopupKit';
 import { checklistApi, type ChecklistTemplateDto } from '@/lib/api/project';
 import { t } from '@/i18n/translate';
+import '@/styles/modules/handover.css';
 
 const newId = () => Math.random().toString(36).slice(2, 10);
 

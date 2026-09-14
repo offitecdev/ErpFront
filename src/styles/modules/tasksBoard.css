@@ -1,0 +1,532 @@
+/* =========================================================
+   Offitec — GÖREVLER / TASKS-MODUL: CANLI, KİŞİLER, AYARLAR
+   (13.09.2026)
+
+   Liegt auf dem Grundblatt tasksModule.css (Tokens `--gv-*`,
+   Tafeln, Knöpfe, Marken). Alles hier unter `.ofi-gv-live-*`, `.ofi-gv-board-menu*`,
+   `.ofi-gv-people-*` und `.ofi-gv-settings*`.
+
+   Sprache: Mac-Fenster — Tafeln weiss mit Haarlinie und 10px,
+   keine Schatten, keine getönten Flächen. «Canlı» (seit 13.09.:
+   keine Kanban-Tafel mehr, nichts zu ziehen) = eine Zeile je Person
+   mit Streifen des Tages. Nichts bewegt sich beim Überfahren — nur
+   Farben blenden (140ms).
+
+   Portale (Abbild, Menüs, Fenster) hängen unter <body> ausserhalb
+   von #root: ihre Regeln tragen den Zwilling
+   `#root .x, body > :not(#root) .x` und lesen keine `--gv-*`.
+   ========================================================= */
+
+/* ── CANLI: Werkzeugzeile ───────────────────────────────────────────────── */
+
+.ofi-gv .ofi-gv-live-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+    min-height: 28px;
+    margin-bottom: 12px;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+}
+
+.ofi-gv .ofi-gv-live-toolbar__day {
+    color: var(--gv-text);
+    font-weight: 600;
+}
+
+.ofi-gv .ofi-gv-live-toolbar__stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-gv .ofi-gv-live-toolbar__sync {
+    margin-left: auto;
+    color: var(--gv-muted);
+    font-size: 11.5px;
+    transition: color 140ms ease;
+}
+
+.ofi-gv .ofi-gv-live-toolbar__sync.is-busy { color: var(--gv-secondary); }
+
+/* ── CANLI: eine ruhige Tabelle, eine Zeile je Person ────────────────────── */
+
+.ofi-gv .ofi-gv-live-table { overflow: hidden; }
+
+.ofi-gv .ofi-gv-live-head,
+.ofi-gv .ofi-gv-live-row__main {
+    display: grid;
+    grid-template-columns: minmax(160px, 220px) 110px minmax(0, 1fr) 76px 20px;
+    column-gap: 14px;
+    align-items: center;
+    padding: 0 14px;
+}
+
+.ofi-gv .ofi-gv-live-head {
+    height: 32px;
+    border-bottom: 1px solid var(--gv-hairline);
+    color: var(--gv-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.ofi-gv .ofi-gv-live-head .is-right { text-align: right; }
+
+.ofi-gv .ofi-gv-live-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ofi-gv .ofi-gv-live-row + .ofi-gv-live-row { border-top: 1px solid var(--gv-hairline); }
+
+.ofi-gv .ofi-gv-live-row__main {
+    min-height: 48px;
+    outline: none;
+    transition: background-color 140ms ease;
+}
+
+.ofi-gv .ofi-gv-live-row__main.is-expandable { cursor: pointer; }
+.ofi-gv .ofi-gv-live-row__main.is-expandable:hover { background: var(--gv-hover); }
+.ofi-gv .ofi-gv-live-row__main:focus-visible { box-shadow: inset 0 0 0 2px var(--gv-focus); }
+
+.ofi-gv .ofi-gv-live-row__who {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.ofi-gv .ofi-gv-live-row__dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--gv-surface);
+    border-radius: 999px;
+    background: #34c759;
+}
+
+.ofi-gv .ofi-gv-live-row__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ofi-gv .ofi-gv-live-row.is-quiet .ofi-gv-live-row__name { color: var(--gv-secondary); font-weight: 500; }
+
+.ofi-gv .ofi-gv-live-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gv-muted);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ofi-gv .ofi-gv-live-state.is-working { color: var(--gv-text); }
+.ofi-gv .ofi-gv-live-state .ofi-gv-clock { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.ofi-gv .ofi-gv-live-row__task {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+#root .ofi-gv .ofi-gv-live-row__title,
+#root .ofi-gv .ofi-gv-live-work__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-text);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-live-row__title:hover,
+#root .ofi-gv .ofi-gv-live-work__title:hover { color: var(--gv-accent); }
+
+.ofi-gv .ofi-gv-live-row__labels {
+    flex: none;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-muted);
+    font-size: 11.5px;
+}
+
+.ofi-gv .ofi-gv-live-row__hint {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gv-muted);
+    font-size: 12.5px;
+}
+
+.ofi-gv .ofi-gv-live-row__total {
+    color: var(--gv-text);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.ofi-gv .ofi-gv-live-row.is-quiet .ofi-gv-live-row__total { color: var(--gv-muted); font-weight: 500; }
+
+.ofi-gv .ofi-gv-live-row__chevron {
+    display: inline-flex;
+    justify-content: center;
+    color: var(--gv-muted);
+    transition: transform 140ms ease;
+}
+
+.ofi-gv .ofi-gv-live-row.is-open .ofi-gv-live-row__chevron { transform: rotate(180deg); }
+
+/* Aufgaben des Tages (aufgeklappt) */
+.ofi-gv .ofi-gv-live-work {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 2px 14px 10px calc(14px + 28px + 10px);
+    list-style: none;
+}
+
+.ofi-gv .ofi-gv-live-work__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 26px;
+    color: var(--gv-secondary);
+    font-size: 12.5px;
+}
+
+.ofi-gv .ofi-gv-live-work__mark {
+    display: inline-flex;
+    flex: none;
+    justify-content: center;
+    width: 14px;
+    color: var(--gv-success);
+}
+
+.ofi-gv .ofi-gv-live-work__item.is-live .ofi-gv-live-work__title { font-weight: 600; }
+
+.ofi-gv .ofi-gv-live-work__ms {
+    flex: none;
+    margin-left: auto;
+    padding-left: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    .ofi-gv .ofi-gv-live-head { display: none; }
+    .ofi-gv .ofi-gv-live-row__main {
+        grid-template-columns: minmax(0, 1fr) auto 20px;
+        row-gap: 4px;
+        padding: 8px 12px;
+    }
+    .ofi-gv .ofi-gv-live-row__who { grid-column: 1; grid-row: 1; }
+    .ofi-gv .ofi-gv-live-row__total { grid-column: 2; grid-row: 1; }
+    .ofi-gv .ofi-gv-live-row__chevron { grid-column: 3; grid-row: 1; }
+    .ofi-gv .ofi-gv-live-row__state { grid-column: 1; grid-row: 2; }
+    .ofi-gv .ofi-gv-live-row__task { grid-column: 1 / -1; grid-row: 3; }
+    .ofi-gv .ofi-gv-live-work { padding-left: 12px; }
+    .ofi-gv .ofi-gv-live-toolbar__sync { margin-left: 0; }
+}
+
+/* ── Menüs der Karte und des Etiketts (Portal) ──────────────────────────── */
+
+#root .ofi-gv-board-menu__sep,
+body > :not(#root) .ofi-gv-board-menu__sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+#root .ofi-gv-board-menu__caption,
+body > :not(#root) .ofi-gv-board-menu__caption {
+    padding: 6px 8px 2px;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+#root .ofi-gv-board-menu__mark,
+body > :not(#root) .ofi-gv-board-menu__mark {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    color: var(--ofi-cal-accent, #0a7aff);
+}
+
+#root .ofi-gv-board-menu__danger,
+body > :not(#root) .ofi-gv-board-menu__danger {
+    color: var(--ofi-cal-danger, #d70015) !important;
+}
+
+/* ── KİŞİLER: Tabelle ───────────────────────────────────────────────────── */
+
+.ofi-gv .ofi-gv-people-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.ofi-gv .ofi-gv-people-tablewrap {
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.ofi-gv .ofi-gv-people-table { min-width: 760px; }
+
+.ofi-gv .ofi-gv-people-row { cursor: pointer; }
+
+.ofi-gv .ofi-gv-people-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.ofi-gv .ofi-gv-people-person__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.ofi-gv .ofi-gv-people-person__name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--gv-text);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#root .ofi-gv .ofi-gv-people-person__link {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 4px;
+    color: inherit;
+    text-decoration: none;
+}
+
+#root .ofi-gv .ofi-gv-people-person__link:focus-visible {
+    outline: 2px solid var(--gv-accent);
+    outline-offset: 2px;
+}
+
+/* Zweite Zeile: Titel der Person · laufende Aufgabe (Link). */
+.ofi-gv .ofi-gv-people-person__sub {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    max-width: 320px;
+    min-width: 0;
+    color: var(--gv-secondary);
+    font-size: 12px;
+}
+
+.ofi-gv .ofi-gv-people-person__title,
+#root .ofi-gv .ofi-gv-people-person__task {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv .ofi-gv-people-person__title { flex: 0 1 auto; }
+
+.ofi-gv .ofi-gv-people-person__title + .ofi-gv-people-person__task::before {
+    content: '·';
+    margin-right: 6px;
+    color: var(--gv-muted);
+}
+
+#root .ofi-gv .ofi-gv-people-person__task {
+    flex: 1 1 auto;
+    color: var(--gv-accent);
+    text-decoration: none;
+    transition: color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-people-person__task:hover { color: var(--gv-text); }
+
+.ofi-gv .ofi-gv-people-num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ofi-gv .ofi-gv-people-num.is-late { color: var(--gv-danger); }
+.ofi-gv .ofi-gv-people-muted { color: var(--gv-secondary); }
+
+.ofi-gv .ofi-gv-people-hint {
+    margin-top: -4px;
+    padding: 0 2px;
+}
+
+/* ── KİŞİLER: Etiketten ─────────────────────────────────────────────────── */
+
+.ofi-gv .ofi-gv-people-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#root .ofi-gv .ofi-gv-people-label {
+    height: 24px;
+    max-width: 240px;
+    padding: 0 8px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-people-label:hover {
+    border-color: var(--gv-field-border-hover);
+    background: var(--gv-hover);
+}
+
+#root .ofi-gv .ofi-gv-people-label:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+.ofi-gv .ofi-gv-people-label__count {
+    flex: none;
+    color: var(--gv-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Farbfelder im Etikettenfenster (Portal). */
+#root .ofi-gv-people-swatches,
+body > :not(#root) .ofi-gv-people-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 4px 2px;
+}
+
+#root .ofi-gv-people-swatch,
+body > :not(#root) .ofi-gv-people-swatch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: #8e8e93;
+    color: #fff;
+    cursor: pointer;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    transition: outline-color 140ms ease;
+}
+
+#root .ofi-gv-people-swatch.is-selected,
+body > :not(#root) .ofi-gv-people-swatch.is-selected { outline-color: var(--ofi-cal-accent, #0a7aff); }
+
+#root .ofi-gv-people-swatch:focus-visible,
+body > :not(#root) .ofi-gv-people-swatch:focus-visible { outline-color: var(--ofi-cal-accent, #0a7aff); }
+
+/* Farbpunkte im Etikettenmenü (Portal). */
+#root .ofi-gv-people-dot,
+body > :not(#root) .ofi-gv-people-dot {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: #8e8e93;
+}
+
+#root :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-blue,
+body > :not(#root) :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-blue { background: #0a7aff; }
+#root :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-green,
+body > :not(#root) :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-green { background: #34c759; }
+#root :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-orange,
+body > :not(#root) :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-orange { background: #ff9500; }
+#root :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-red,
+body > :not(#root) :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-red { background: #ff3b30; }
+#root :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-purple,
+body > :not(#root) :is(.ofi-gv-people-swatch, .ofi-gv-people-dot).is-purple { background: #af52de; }
+
+/* ── AYARLAR: Karte «Görev ayarları» (Portal) ───────────────────────────── */
+
+#root .ofi-gv-settings,
+body > :not(#root) .ofi-gv-settings {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    color: var(--ofi-cal-text, #1d1d1f);
+}
+
+#root .ofi-gv-settings__row,
+body > :not(#root) .ofi-gv-settings__row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 0;
+}
+
+#root .ofi-gv-settings__row + .ofi-gv-settings__row,
+body > :not(#root) .ofi-gv-settings__row + .ofi-gv-settings__row {
+    border-top: 1px solid var(--ofi-cal-border-soft, rgba(0, 0, 0, 0.07));
+}
+
+#root .ofi-gv-settings__text,
+body > :not(#root) .ofi-gv-settings__text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#root .ofi-gv-settings__label,
+body > :not(#root) .ofi-gv-settings__label {
+    font-weight: 500;
+}
+
+#root .ofi-gv-settings__caption,
+body > :not(#root) .ofi-gv-settings__caption {
+    margin-top: 2px;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+#root .ofi-gv-settings__select,
+body > :not(#root) .ofi-gv-settings__select {
+    flex: none;
+    width: 128px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-gv .ofi-gv-live-toolbar__sync,
+    #root .ofi-gv .ofi-gv-live-row__title,
+    .ofi-gv .ofi-gv-live-row__main,
+    .ofi-gv .ofi-gv-live-row__chevron,
+    #root .ofi-gv .ofi-gv-live-work__title,
+    #root .ofi-gv .ofi-gv-people-label,
+    #root .ofi-gv-people-swatch,
+    body > :not(#root) .ofi-gv-people-swatch { transition: none; }
+}

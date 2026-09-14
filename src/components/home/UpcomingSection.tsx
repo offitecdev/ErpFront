@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
-    Calendar as CalendarIcon,
     ChevronDown,
     Clipboard,
     Truck01,
@@ -17,13 +16,6 @@ import { logisticsApi } from '../../lib/api/logistics';
 import { useAuthStore } from '../../store/authStore';
 import { useModuleAccess } from '../../lib/useEnabledModules';
 import { SkeletonBar } from '../ui-shared/Loader';
-
-/* `bg-[#fff]` statt `bg-white`: index.css macht aus jedem `button.bg-white`
-   einen neutralen Button mit erzwungener `-webkit-text-fill-color` (#111827),
-   die sich auf alle Kinder vererbt — auf der Navy-Hover-Fläche bliebe die
-   Schrift dunkel. Gleiche Regel wie in DashboardStats. */
-const SURFACE =
-    'rounded-2xl border border-[#E3E7F0] bg-[#fff] shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-[#151616]';
 
 type UpcomingKey = 'installations' | 'meetings' | 'deliveries';
 
@@ -46,10 +38,10 @@ const isAssignedTechnician = (appt: any, userId?: string | null) =>
 
 const ORDER: UpcomingKey[] = ['installations', 'meetings', 'deliveries'];
 
-const CARD_META: Record<UpcomingKey, { icon: React.ComponentType<any>; badge: string }> = {
-    installations: { icon: Clipboard, badge: 'bg-violet-50 text-violet-600 dark:bg-violet-400/10 dark:text-violet-300' },
-    meetings: { icon: Users01, badge: 'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-300' },
-    deliveries: { icon: Truck01, badge: 'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300' },
+const CARD_ICON: Record<UpcomingKey, React.ComponentType<any>> = {
+    installations: Clipboard,
+    meetings: Users01,
+    deliveries: Truck01,
 };
 
 /**
@@ -166,18 +158,14 @@ export const UpcomingSection: React.FC = () => {
     if (available.length === 0) return null;
 
     return (
-        <section>
-            <div className="mb-3 flex items-center gap-2">
-                <CalendarIcon size={15} className="text-slate-400 dark:text-[#e8873a]" />
-                <h2 className="text-[12px] font-semibold uppercase tracking-wider text-slate-500 dark:text-[#8f95a1]">
-                    {t('dash.upcoming.title', { defaultValue: 'Anstehend' })}
-                </h2>
+        <section className="ofi-home-up">
+            <div className="ofi-home-section__head">
+                <h2 className="ofi-home-h2">{t('dash.upcoming.title', { defaultValue: 'Anstehend' })}</h2>
             </div>
 
-            <div className="space-y-3">
+            <div className="ofi-home-up__list">
                 {available.map((key) => {
-                    const meta = CARD_META[key];
-                    const Icon = meta.icon;
+                    const Icon = CARD_ICON[key];
                     const isOpen = open.has(key);
                     const items = data[key];
                     return (
@@ -186,91 +174,52 @@ export const UpcomingSection: React.FC = () => {
                                 type="button"
                                 onClick={() => (isOpen ? closePopup(key) : openPopup(key))}
                                 aria-expanded={isOpen}
-                                className={cx(
-                                    /* `bg-[#fff]` statt `bg-white`: index.css erzwingt auf jedem
-                                       `button.bg-white` `-webkit-text-fill-color` #111827 — die
-                                       weisse Hover-Schrift bliebe sonst dunkel (siehe SURFACE). */
-                                    'group flex w-full items-center gap-3 rounded-2xl border bg-[#fff] p-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150 dark:bg-[#151616]',
-                                    isOpen
-                                        ? 'border-[#6977c7] dark:border-[#e8873a]'
-                                        /* Hover der Startseite: Fläche dunkles
-                                           Marineblau, Schrift weiss (Nutzerwunsch
-                                           15.08.2026). Der GEÖFFNETE Zustand
-                                           behält seinen eigenen Akzent — er ist
-                                           eine Auswahl, kein Überfahren. */
-                                        : 'border-[#E3E7F0] hover:border-[#1f2654] hover:bg-[#1f2654] hover:shadow-[0_4px_12px_rgba(39,47,103,0.10)] dark:border-white/10 dark:hover:border-[#1f2654] dark:hover:bg-[#1f2654]',
-                                )}
+                                className={cx('ofi-home-up__card', isOpen && 'is-open')}
                             >
-                                <span
-                                    className={cx(
-                                        'flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors',
-                                        isOpen
-                                            ? 'bg-[#6977c7] text-white dark:bg-[#e8873a] dark:text-[#16130f]'
-                                            : cx(meta.badge, 'group-hover:bg-white/15 group-hover:text-white dark:group-hover:bg-white/15 dark:group-hover:text-white'),
-                                    )}
-                                >
-                                    <Icon size={17} />
-                                </span>
+                                <span className="ofi-home-up__icon"><Icon size={15} /></span>
                                 <span className="min-w-0 flex-1">
-                                    <span
-                                        className={cx(
-                                            'block truncate text-[13.5px] font-semibold transition-colors',
-                                            isOpen
-                                                ? 'text-[#6977c7] dark:text-[#e8873a]'
-                                                : 'text-[#1A1A1A] group-hover:text-white dark:text-white dark:group-hover:text-white',
-                                        )}
-                                    >
-                                        {labels[key]}
-                                    </span>
-                                    <span className="mt-0.5 block text-[11.5px] text-[#98A0AE] transition-colors group-hover:text-white/80 dark:text-[#8f95a1] dark:group-hover:text-white/80">
-                                        {t('dash.upcoming.week', { defaultValue: 'Diese Woche' })}
-                                    </span>
+                                    <span className="ofi-home-up__name">{labels[key]}</span>
+                                    <span className="ofi-home-up__meta">{t('dash.upcoming.week', { defaultValue: 'Diese Woche' })}</span>
                                 </span>
-                                <ChevronDown
-                                    size={16}
-                                    className={cx('shrink-0 text-slate-400 transition-transform duration-150 group-hover:!text-white', isOpen && 'rotate-180')}
-                                />
+                                <ChevronDown size={15} className="ofi-home-up__chev" />
                             </button>
 
                             {isOpen && (
-                                <div className={cx(SURFACE, 'ofi-rise-in mt-2 p-4 pt-2')}>
-                                    {/* The centered ✕ — the pop-up's own way out. */}
-                                    <button
-                                        type="button"
-                                        onClick={() => closePopup(key)}
-                                        aria-label={t('dash.upcoming.close', { defaultValue: 'Schliessen' })}
-                                        className="mx-auto flex size-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-black/5 hover:text-[#1A1A1A] dark:hover:bg-white/10 dark:hover:text-white"
-                                    >
-                                        <XClose size={16} />
-                                    </button>
-                                    <p className="mt-0.5 text-center text-[12.5px] font-semibold text-[#1A1A1A] dark:text-white">
-                                        {labels[key]}
-                                        <span className="ml-1.5 font-normal text-[#98A0AE]">
-                                            {t('dash.upcoming.thisWeek', { defaultValue: 'diese Woche' })}
-                                        </span>
-                                    </p>
+                                <div className="ofi-home-up__pop ofi-rise-in">
+                                    <div className="ofi-home-up__pophead">
+                                        <div className="min-w-0 truncate">
+                                            {labels[key]}{' '}
+                                            <span>{t('dash.upcoming.thisWeek', { defaultValue: 'diese Woche' })}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => closePopup(key)}
+                                            aria-label={t('dash.upcoming.close', { defaultValue: 'Schliessen' })}
+                                            className="ofi-home-up__close"
+                                        >
+                                            <XClose size={14} />
+                                        </button>
+                                    </div>
                                     {items === undefined ? (
-                                        <div className="mt-3 space-y-2">
-                                            <SkeletonBar className="h-8 rounded-lg" />
-                                            <SkeletonBar className="h-8 rounded-lg" delayMs={120} />
+                                        <div className="space-y-2 px-1 pb-1">
+                                            <SkeletonBar className="h-7 rounded-md" />
+                                            <SkeletonBar className="h-7 rounded-md" delayMs={120} />
                                         </div>
                                     ) : items.length === 0 ? (
-                                        <p className="py-6 text-center text-[12.5px] text-[#98A0AE] dark:text-[#8f95a1]">
+                                        <p className="ofi-home-up__empty">
                                             {t('dash.upcoming.empty', { defaultValue: 'Keine Termine diese Woche.' })}
                                         </p>
                                     ) : (
-                                        <ul className="mt-2 max-h-[228px] space-y-0.5 overflow-y-auto">
+                                        <ul className="ofi-home-up__rows">
                                             {items.map((item) => (
                                                 <li key={item.id}>
                                                     <button
                                                         type="button"
                                                         onClick={() => navigate(item.navigateTo)}
-                                                        className="group flex w-full items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[#1f2654] dark:hover:bg-[#1f2654]"
+                                                        className="ofi-home-up__row"
                                                     >
-                                                        <span className="min-w-0 truncate text-[13px] font-semibold text-[#1A1A1A] underline-offset-4 transition-colors group-hover:text-white group-hover:underline dark:text-white">
-                                                            {item.client}
-                                                        </span>
-                                                        <span className="shrink-0 text-right text-[11.5px] tabular-nums text-[#6B7280] transition-colors group-hover:text-white/80 dark:text-[#aab0bb] dark:group-hover:text-white/80">
+                                                        <span className="ofi-home-up__client">{item.client}</span>
+                                                        <span className="ofi-home-up__when">
                                                             {item.date.format('dddd')}
                                                             {' · '}
                                                             {item.hasTime ? item.date.format('HH:mm') : item.date.format('DD.MM.')}

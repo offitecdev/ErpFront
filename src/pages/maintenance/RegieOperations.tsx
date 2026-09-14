@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { AlertTriangle, CheckCircle, Clock, File02 as FileText, Plus, Save01 as Save, SearchLg as Search } from '@/components/icons/antIconCompat';
+import { AlertTriangle, CheckCircle, Clock, File02 as FileText, Plus, Save01 as Save } from '@/components/icons/antIconCompat';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -9,6 +9,7 @@ import { Card } from '../../components/ui-shared/Card';
 import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Field, Input, Select, Textarea } from '../../components/ui-shared/Field';
 import { Modal } from '../../components/ui-shared/Modal';
+import { FilterSelect, SearchBox } from '../../components/ui-shared/TableKit';
 import { articleApi, inventoryApi } from '../../lib/api/inventory';
 import { maintenanceApi, regieApi } from '../../lib/api/maintenance';
 import type { InventoryArticle, InventoryLocation } from '../../types/inventory';
@@ -242,14 +243,11 @@ export const RegieOperations = () => {
                 description={t('auto.plan_disi_servis_cagrilarini_sahada_kullanilan_m')}
                 actions={
                     <>
-                        <div className="relative">
-                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('auto.cagri_ara')} className="ofi-light-search-input w-[220px] pl-8 text-slate-950 placeholder:text-slate-400 dark:bg-white dark:text-slate-950 dark:placeholder:text-slate-400" />
-                        </div>
-                        <Select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus | '')} className="w-[150px]">
+                        <SearchBox value={search} onChange={setSearch} placeholder={t('auto.cagri_ara')} />
+                        <FilterSelect value={status} onChange={(next) => setStatus(next as TaskStatus | '')} label={t('common.status')}>
                             <option value="">{t('auto.tum_durumlar')}</option>
                             {Object.entries(getStatusLabel()).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                        </Select>
+                        </FilterSelect>
                         <Button variant={showForm ? 'secondary' : 'primary'} icon={<Plus size={13} />} onClick={() => setShowForm(!showForm)}>{t('auto.yeni_cagri')}</Button>
                     </>
                 }

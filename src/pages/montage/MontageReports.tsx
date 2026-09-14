@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuFileText, LuListChecks } from 'react-icons/lu';
 
-import { Clipboard, SearchLg } from '@/components/icons/antIconCompat';
+import { Clipboard } from '@/components/icons/antIconCompat';
 import { EmptyState } from '@/components/ui-shared/EmptyState';
+import { SearchBox } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import { formsApi, type FormSubmissionRow } from '@/lib/api/forms';
 import type { MontageReportOrderListItem } from '@/types/project';
@@ -48,7 +49,7 @@ export const MontageReports = () => {
                         role="tab"
                         aria-selected={section === id}
                         onClick={() => setSection(id)}
-                        className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 text-[13.5px] font-semibold transition-colors ${section === id ? 'border-[#1f2654] text-[#1f2654] dark:border-amber-400 dark:text-amber-300' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-white/55 dark:hover:text-white'}`}
+                        className={`inline-flex min-h-12 items-center gap-2 border-b-2 px-4 text-[13.5px] font-semibold transition-colors ${section === id ? 'border-[#0066e0] text-[#0066e0] dark:border-amber-400 dark:text-amber-300' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-white/55 dark:hover:text-white'}`}
                     >
                         {icon}{label}
                     </button>
@@ -61,7 +62,7 @@ export const MontageReports = () => {
                         <h2 className="text-[14px] font-bold text-slate-900 dark:text-white">{t('forms.panel.title')}</h2>
                     </header>
                     {checklistsLoading ? (
-                        <div className="flex h-48 items-center justify-center gap-2 text-[13px] text-slate-500"><span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654]" />{t('common.loading')}</div>
+                        <div className="flex h-48 items-center justify-center gap-2 text-[13px] text-slate-500"><span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0]" />{t('common.loading')}</div>
                     ) : checklists.length === 0 ? (
                         <EmptyState icon={<LuListChecks size={30} />} title={t('forms.panel.title')} description={t('forms.panel.empty')} />
                     ) : (
@@ -73,7 +74,7 @@ export const MontageReports = () => {
                                     onClick={() => navigate(`/montage/forms/${item.id}?back=${encodeURIComponent('/montage/reports')}`)}
                                     className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                                 >
-                                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#eef2fb] text-[#1f2654] dark:bg-amber-500/10 dark:text-amber-300"><LuListChecks size={18} /></span>
+                                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#eef2fb] text-[#0066e0] dark:bg-amber-500/10 dark:text-amber-300"><LuListChecks size={18} /></span>
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate text-[13.5px] font-semibold text-slate-900 dark:text-white">{item.templateName}</span>
                                         <span className="mt-1 block truncate text-[12px] text-slate-500 dark:text-white/55">{[item.customerName, item.orderNumber, item.projectNumber].filter(Boolean).join(' · ') || '—'}</span>
@@ -85,29 +86,21 @@ export const MontageReports = () => {
                     )}
                 </section>
             ) : <section className="overflow-hidden rounded-[3px] border border-slate-200 bg-white dark:border-white/10 dark:bg-[#17191c]">
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#1f2654] px-3 py-2.5 text-white dark:border-white/10 dark:bg-amber-500">
+                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#0066e0] px-3 py-2.5 text-white dark:border-white/10 dark:bg-amber-500">
                     <div>
                         <div className="text-[13px] font-bold">{t('montage.reportPicker.pageTitle')}</div>
                         <div className="text-[11px] text-white/70">{t('montage.reportPicker.pageHint')}</div>
                     </div>
-                    <div className="relative w-full sm:w-72">
-                        <SearchLg size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t('common.search')}
-                            className="h-9 w-full rounded-[3px] border border-white/25 bg-white pl-9 pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-white/35"
-                        />
-                    </div>
+                    <SearchBox value={search} onChange={setSearch} placeholder={t('common.search')} />
                 </header>
 
-                <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-[#1f2654] dark:border-white/10 dark:text-amber-300">
+                <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-[#0066e0] dark:border-white/10 dark:text-amber-300">
                     {t('projects.orders')}
                 </div>
 
                 {loading ? (
                     <div className="flex h-48 items-center justify-center gap-2 text-[13px] text-slate-500">
-                        <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#1f2654] dark:border-t-amber-500" />
+                        <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#0066e0] dark:border-t-amber-500" />
                         {t('common.loading')}
                     </div>
                 ) : rows.length === 0 ? (

@@ -105,5 +105,5 @@ export const statusBadgeClass = (kind: AppointmentStatusKind): string => {
     if (kind === 'completed') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
     if (kind === 'cancelled') return 'border-slate-200 bg-slate-50 text-slate-400 line-through';
     if (kind === 'ongoing') return 'border-amber-200 bg-amber-50 text-amber-700';
-    return 'border-[#272f67]/20 bg-[#272f67]/[0.06] text-[#272f67]';
+    return 'border-[#0a7aff]/20 bg-[#0a7aff]/[0.06] text-[#0a7aff]';
 };

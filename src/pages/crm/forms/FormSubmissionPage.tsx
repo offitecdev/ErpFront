@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { t } from '@/i18n/translate';
 import { FormFillView } from './components/FormFillView';
+import '@/styles/modules/checklists.css';
 
 /**
  * Ein Formular als eigene Seite (/crm/forms/:id) — für Deep-Links und

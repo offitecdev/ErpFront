@@ -12,7 +12,7 @@ interface StatusBadgeProps {
 
 const chipClassMap: Record<Variant, string> = {
     active: 'bg-[#059669] text-white border-transparent',
-    approved: 'bg-[#272f67] text-white border-transparent',
+    approved: 'bg-[#0a7aff] text-white border-transparent',
     passive: 'bg-[#64748b] text-white border-transparent',
     info: 'bg-[#3b82f6] text-white border-transparent',
     warning: 'bg-[#f59e0b] text-white border-transparent',

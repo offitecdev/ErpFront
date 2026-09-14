@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Camera01, Plus, Trash01 } from '@/components/icons/antIconCompat';
+import { Plus, Scan, Trash01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { DangerConfirmDialog } from '@/components/ui-shared/DangerConfirmDialog';
 import { t } from '@/i18n/translate';
@@ -10,6 +10,7 @@ import { articleApi } from '@/lib/api/inventory';
 import { useCalViewport } from '@/pages/calendar/calendarShared';
 import { useAuthStore } from '@/store/authStore';
 import { QuickAddSheet } from '../quick-add/QuickAddSheet';
+import { StockInPopup, type StockInArticle } from './StockInPopup';
 import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from './primitives';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { PRODUCTS_PAGE_SIZE, useArticlesList } from '../hooks/useArticlesList';
@@ -18,11 +19,16 @@ import { fmtMoney, fmtQty } from '../utils/format';
 
 // Sürüklenebilir sütun genişlikleri. Ad sütunu burada YOKTUR: genişliği olmayan
 // tek sütun odur ve artan yeri o emer.
+// Reihenfolge (10.09.2026): ERP-Code, Bezeichnung, Modellnummer, Seriennummer,
+// Barcode — dann Bestand und Preis.
 const ARTICLE_LIST_COLUMN_WIDTHS = {
-    code: 160,
-    stock: 128,
-    price: 144,
-    actions: 96,
+    code: 150,
+    model: 136,
+    serial: 136,
+    barcode: 136,
+    stock: 112,
+    price: 120,
+    actions: 64,
 };
 type ArticleListColumn = keyof typeof ARTICLE_LIST_COLUMN_WIDTHS;
 
@@ -70,6 +76,15 @@ export const ArticleListView = ({
         setQuickAddOpen(false);
         if (added > 0) list.reload({ silent: true });
     };
+    /* ZUGANG JE ZEILE (11.09.2026, Samet): das Plus neben dem Produktnamen
+       öffnet sofort das kleine Fenster «Zugang buchen» für GENAU diesen
+       Artikel — kein Umweg mehr über «vorhanden» und die Suche in der
+       Schnellerfassung. Der Bestand der Zeile springt ohne Neuladen nach. */
+    const [stockIn, setStockIn] = useState<StockInArticle | null>(null);
+    const onStockBooked = (article: StockInArticle, quantity: number) => {
+        list.patchItem(article.id, { totalQuantity: article.totalQuantity + quantity });
+        list.reload({ silent: true });
+    };
 
     /** İşaretli satırlar (sayfalar arası korunur) — toplu silmenin seçimi. */
     const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -105,7 +120,7 @@ export const ArticleListView = ({
     // Sürüklenebilir sütunlar: ad sütununun genişliği yoktur, kalan yeri o emer.
     // Koddaki tutamaç SAĞ kenardadır (ad sütununun solunda kaldığı için).
     const grid = useColumnWidths<ArticleListColumn>({
-        storageKey: 'offitec:inv-articles:col-widths:v2',
+        storageKey: 'offitec:inv-articles:col-widths:v3',
         defaults: ARTICLE_LIST_COLUMN_WIDTHS,
         minPx: 72,
     });
@@ -169,7 +184,7 @@ export const ArticleListView = ({
                         // Telefon: NUR die Schnellerfassung (Vorgabe 02.09.2026) —
                         // die Formularseiten sind für den Daumen kein Weg.
                         <button type="button" className="ofi-qa-launch is-phone" onClick={() => setQuickAddOpen(true)}>
-                            <Camera01 size={18} />
+                            <Scan size={18} />
                             {t('inv.quickAdd.button')}
                         </button>
                     ))
@@ -177,7 +192,7 @@ export const ArticleListView = ({
                         <div className="flex items-start gap-2">
                             {canQuickAdd && (
                                 <button type="button" className="ofi-qa-launch" onClick={() => setQuickAddOpen(true)}>
-                                    <Camera01 size={16} />
+                                    <Scan size={16} />
                                     {t('inv.quickAdd.button')}
                                 </button>
                             )}
@@ -188,7 +203,7 @@ export const ArticleListView = ({
                                     <button
                                         type="button"
                                         onClick={() => navigate(createPath)}
-                                        className="ofi-btn-brand flex items-center justify-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#1f2654]"
+                                        className="ofi-btn-brand flex items-center justify-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-[#0066e0]"
                                     >
                                         <Plus size={14} />
                                         {t(`${copyPrefix}.addButton`)}
@@ -196,7 +211,7 @@ export const ArticleListView = ({
                                     <button
                                         type="button"
                                         onClick={() => navigate(bulkCreatePath)}
-                                        className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                                        className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                                     >
                                         <Plus size={13} />
                                         {t(`${copyPrefix}.bulkAddButton`)}
@@ -207,6 +222,7 @@ export const ArticleListView = ({
                     )}
             />
             <QuickAddSheet open={quickAddOpen} onClose={closeQuickAdd} />
+            <StockInPopup article={stockIn} onClose={() => setStockIn(null)} onBooked={onStockBooked} />
 
             <FilterBar>
                 <SearchBox
@@ -254,7 +270,7 @@ export const ArticleListView = ({
                         <col ref={grid.setColRef('code')} style={{ width: grid.widths.code }} />
                         {/* Ad sütunu: genişliği yok, kalan yeri emer. */}
                         <col />
-                        <ResizableCols keys={['stock', 'price', 'actions'] as const} grid={grid} />
+                        <ResizableCols keys={['model', 'serial', 'barcode', 'stock', 'price', 'actions'] as const} grid={grid} />
                     </colgroup>
                     <thead>
                         <tr>
@@ -270,12 +286,15 @@ export const ArticleListView = ({
                                         }}
                                         onChange={togglePage}
                                         disabled={pageIds.length === 0}
-                                        className="size-3.5 cursor-pointer accent-[#272f67] disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="size-3.5 cursor-pointer accent-[#0a7aff] disabled:cursor-not-allowed disabled:opacity-40"
                                     />
                                 </th>
                             )}
                             <SortableTh label={codeLabel} sortKey="articleCode" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-left" {...grid.resizeProps('code')} />
                             <SortableTh label={nameLabel} sortKey="name" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-left" />
+                            <SortableTh label={t('inv.columns.modelNumber')} sortKey="modelNumber" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-left" {...grid.resizeProps('model')} />
+                            <SortableTh label={t('inv.columns.serialNumber')} sortKey="serialNumber" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-left" {...grid.resizeProps('serial')} />
+                            <SortableTh label={t('inv.columns.barcode')} sortKey="barcode" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-left" {...grid.resizeProps('barcode')} />
                             <SortableTh label={t('inv.columns.currentStock')} sortKey="totalQuantity" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-right" {...grid.resizeProps('stock')} />
                             <SortableTh label={t('inv.columns.salePrice')} sortKey="salePrice" activeKey={list.sort.by} direction={list.sort.direction} onSort={list.toggleSort} className="text-right" {...grid.resizeProps('price')} />
                             <th className="relative text-right">
@@ -306,11 +325,14 @@ export const ArticleListView = ({
                             <th />
                             <th />
                             <th />
+                            <th />
+                            <th />
+                            <th />
                         </tr>
                     </thead>
                     <tbody>
                         {(list.loading || list.items.length === 0) && (
-                            <TableStateRow colSpan={canDelete ? 6 : 5} loading={list.loading} emptyText={list.error || t(`${copyPrefix}.empty`)} />
+                            <TableStateRow colSpan={canDelete ? 9 : 8} loading={list.loading} emptyText={list.error || t(`${copyPrefix}.empty`)} />
                         )}
                         {!list.loading && list.items.map((article) => {
                             const critical = article.criticalStockLevel > 0 && article.totalQuantity <= article.criticalStockLevel;
@@ -329,7 +351,7 @@ export const ArticleListView = ({
                                                 aria-label={t('inv.bulkDelete.selectRow')}
                                                 checked={checked}
                                                 onChange={() => toggleRow(article.id)}
-                                                className="size-3.5 cursor-pointer accent-[#272f67]"
+                                                className="size-3.5 cursor-pointer accent-[#0a7aff]"
                                             />
                                         </td>
                                     )}
@@ -337,6 +359,18 @@ export const ArticleListView = ({
                                     <td className="text-slate-800 dark:text-white">
                                         <span className="flex items-center gap-2">
                                             {article.name}
+                                            {/* Das Plus: Zugang buchen, ohne die Zeile zu öffnen. */}
+                                            {canTransfer && article.itemType !== 'SERVICE' && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={t('inv.stockIn.title')}
+                                                    title={t('inv.stockIn.title')}
+                                                    onClick={(event) => { event.stopPropagation(); setStockIn(article); }}
+                                                    className="ofi-lager-rowplus inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-500 transition-colors hover:border-[#0a7aff] hover:text-[#0a7aff] dark:border-white/20 dark:text-white/60 dark:hover:border-[#0a7aff] dark:hover:text-[#0a7aff]"
+                                                >
+                                                    <Plus size={12} />
+                                                </button>
+                                            )}
                                             {/* Hizmet olarak işaretli kalemler listede rozetle ayrışır. */}
                                             {article.itemType === 'SERVICE' && (
                                                 <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
@@ -345,6 +379,9 @@ export const ArticleListView = ({
                                             )}
                                         </span>
                                     </td>
+                                    <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">{article.modelNumber || '—'}</td>
+                                    <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">{article.serialNumber || '—'}</td>
+                                    <td className="font-mono text-[12.5px] text-slate-600 dark:text-white/70">{article.supplierBarcode || article.systemBarcode || '—'}</td>
                                     <td className={`text-right font-mono text-[13px] ${critical ? 'font-bold text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-white/80'}`}>
                                         {fmtQty(article.totalQuantity)} {article.unit}
                                     </td>

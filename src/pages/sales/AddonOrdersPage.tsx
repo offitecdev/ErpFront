@@ -167,7 +167,7 @@ export const AddonOrdersPage = () => {
                     <button
                         type="button"
                         onClick={() => navigate(addonCreatePath(null))}
-                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#1f2654] hover:text-[#1f2654] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                     >
                         <Plus size={14} />
                         {t('crm.addon.newTitle')}

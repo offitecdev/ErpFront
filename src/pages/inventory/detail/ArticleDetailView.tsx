@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { Building02, CheckCircle, List, SwitchHorizontal01 } from '@/components/icons/antIconCompat';
+import { Building02, CheckCircle, List, Plus, QrCode01 as QrCode, SwitchHorizontal01 } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { Spinner } from '@/components/ui-shared/Loader';
 import { SlidingTopTabs } from '@/components/ui-shared/SlidingTopTabs';
@@ -19,6 +19,7 @@ import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
 import { CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../components/primitives';
+import { StockInPopup, type StockInArticle } from '../components/StockInPopup';
 import { useLanguageTick } from '../hooks/useLanguageTick';
 import { fmtMoney, fmtQty, fmtUnitCost } from '../utils/format';
 import { ArticleImagePanel } from './ArticleImagePanel';
@@ -63,6 +64,17 @@ export const ArticleDetailView = ({ copyPrefix }: {
 
     const permissions = useAuthStore((state) => state.permissions);
     const canUpdate = permissions.includes('inventory.articles.update');
+    const canTransfer = permissions.includes('inventory.transfer');
+
+    /* ZUGANG BUCHEN (11.09.2026, Samet): dasselbe Plus wie in der Liste, hier
+       im Kopf. Nach der Buchung springt der Bestand im Detail nach, und die
+       Bewegungsliste (falls offen) wird neu aufgesetzt. */
+    const [stockIn, setStockIn] = useState<StockInArticle | null>(null);
+    const [movementsTick, setMovementsTick] = useState(0);
+    const onStockBooked = (_article: StockInArticle, quantity: number) => {
+        setDetail((current) => current ? { ...current, totalQuantity: current.totalQuantity + quantity } : current);
+        setMovementsTick((tick) => tick + 1);
+    };
 
     // Detay / hareketler / tedarikçiler artık SEKMELERDİR (kullanıcı isteği —
     // popup ve ayrı görünüm yerine alt menü). Sekme panelleri yalnızca aktifken
@@ -70,6 +82,10 @@ export const ArticleDetailView = ({ copyPrefix }: {
     // ucundan, ancak sekmeye geçilince yüklenir.
     const [tab, setTab] = useState<'detail' | 'movements' | 'suppliers'>('detail');
     const [saving, setSaving] = useState(false);
+    /* «Barcode erzeugen» (10.09.2026): ein Systembarcode für Artikel ohne
+       Barcode — nur auf Knopfdruck, nie automatisch. Der Server schreibt ihn
+       sofort; die anderen Feldänderungen bleiben unberührt im Entwurf. */
+    const [generating, setGenerating] = useState(false);
 
     // Taslak sunucudaki kayıttan TÜRETİLİR; kullanıcı bir alana dokunduğunda
     // üzerine yazan bir kopya tutulur. Efektle senkronlamak yerine türetmek,
@@ -126,6 +142,20 @@ export const ArticleDetailView = ({ copyPrefix }: {
         setPendingImage(undefined);
     };
 
+    const generateBarcode = async () => {
+        if (!id) return;
+        setGenerating(true);
+        try {
+            const updated = await inventoryApi.generateBarcode(id);
+            setDetail((current) => current ? { ...current, ...updated } : updated);
+            toast.success(t('inv.detail.barcodeGenerated', { code: updated.systemBarcode ?? '' }));
+        } catch (err) {
+            toast.error(errorMessage(err, t('inv.detail.barcodeGenerateFailed')));
+        } finally {
+            setGenerating(false);
+        }
+    };
+
     const field = (key: keyof DetailDraft, extraClass = '') => ({
         value: draft?.[key] ?? '',
         onChange: (event: React.ChangeEvent<HTMLInputElement>) => editDraft({ [key]: event.target.value }),
@@ -138,10 +168,20 @@ export const ArticleDetailView = ({ copyPrefix }: {
                 /* Der Pfeil vor dem Titel ist weg: der Rückweg in die
                    Produktliste sitzt oben links in der Marke. */
                 title={detail?.name || t(`${copyPrefix}.detailTitle`)}
-                action={canUpdate && tab === 'detail' && detail && (
+                action={detail && (canTransfer || (canUpdate && tab === 'detail')) && (
                     // ORTAK kaydet: alanlar + açıklama + görsel tek istekte gider.
                     <div className="flex items-center gap-2">
-                        {dirty && (
+                        {canTransfer && detail.itemType !== 'SERVICE' && (
+                            <button
+                                type="button"
+                                onClick={() => setStockIn(detail)}
+                                className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
+                            >
+                                <Plus size={14} />
+                                {t('inv.stockIn.title')}
+                            </button>
+                        )}
+                        {canUpdate && tab === 'detail' && dirty && (
                             <button
                                 type="button"
                                 disabled={saving}
@@ -151,18 +191,21 @@ export const ArticleDetailView = ({ copyPrefix }: {
                                 {t('common.cancel')}
                             </button>
                         )}
-                        <button
-                            type="button"
-                            disabled={!dirty || saving}
-                            onClick={() => void save()}
-                            className="flex items-center gap-1.5 rounded-md bg-[#272f67] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#1f2654] disabled:opacity-40"
-                        >
-                            {saving ? <Spinner size="sm" /> : <CheckCircle size={14} />}
-                            {t('common.save')}
-                        </button>
+                        {canUpdate && tab === 'detail' && (
+                            <button
+                                type="button"
+                                disabled={!dirty || saving}
+                                onClick={() => void save()}
+                                className="flex items-center gap-1.5 rounded-md bg-[#0a7aff] px-3.5 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:opacity-40"
+                            >
+                                {saving ? <Spinner size="sm" /> : <CheckCircle size={14} />}
+                                {t('common.save')}
+                            </button>
+                        )}
                     </div>
                 )}
             />
+            <StockInPopup article={stockIn} onClose={() => setStockIn(null)} onBooked={onStockBooked} />
 
             {/* Alt menü: detay / hareketler / tedarikçiler — teklif çalışma
                 alanındaki sekme şeridiyle aynı dil (ofi-quote-tab*). */}
@@ -187,8 +230,8 @@ export const ArticleDetailView = ({ copyPrefix }: {
                                     onClick={() => setTab(item.key)}
                                     className={`ofi-quote-tab -mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md border border-b-0 px-4 py-2.5 text-[12.5px] transition-colors ${
                                         active
-                                            ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#1f2654]'
-                                            : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#1f2654] dark:text-white/70'
+                                            ? 'ofi-quote-tab-active border-slate-200 bg-[#eef2fb] font-bold text-[#0066e0]'
+                                            : 'border-transparent font-medium text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-[#0066e0] dark:text-white/70'
                                     }`}
                                 >
                                     {item.icon}
@@ -201,7 +244,7 @@ export const ArticleDetailView = ({ copyPrefix }: {
             )}
 
             {tab === 'movements' && detail ? (
-                <ArticleMovementsView articleId={detail.id} unit={detail.unit} />
+                <ArticleMovementsView key={movementsTick} articleId={detail.id} unit={detail.unit} />
             ) : tab === 'suppliers' && detail ? (
                 <ArticleSuppliersView articleId={detail.id} unit={detail.unit} />
             ) : (
@@ -212,7 +255,7 @@ export const ArticleDetailView = ({ copyPrefix }: {
                         <SectionCard title={t(`${copyPrefix}.detailTitle`)}>
                             {/* Etiket/değer tablosu: başlık satırı olmadığı için
                                 sürükleme tutamacı taşıyamaz — yalnızca çizgiler. */}
-                            <table data-inv-table data-grid-lines data-unstyled-table className="w-full">
+                            <table data-inv-table data-grid-lines data-unstyled-table data-lager-form className="w-full">
                                 <tbody>
                                     {(loading || !detail || !draft) && (
                                         <TableStateRow colSpan={2} loading={loading} emptyText={error || t('inv.detail.notFound')} />
@@ -229,6 +272,45 @@ export const ArticleDetailView = ({ copyPrefix }: {
                                                     ? <input aria-label={nameLabel} {...field('name', 'max-w-md')} />
                                                     : detail.name}
                                             </Row>
+                                            {/* Reihenfolge (10.09.2026): ERP-Code, Bezeichnung,
+                                                Modellnummer, Seriennummer, Barcode. Modell = die
+                                                Rolle des alten Produktcodes (zehn Geräte, eine
+                                                Modellnummer); die Serie ist je Gerät eindeutig. */}
+                                            <Row label={t('inv.columns.modelNumber')} mono={!canUpdate}>
+                                                {canUpdate
+                                                    ? <input aria-label={t('inv.columns.modelNumber')} {...field('modelNumber', 'font-mono max-w-xs')} />
+                                                    : (detail.modelNumber || '—')}
+                                            </Row>
+                                            <Row label={t('inv.columns.serialNumber')} mono={!canUpdate}>
+                                                {canUpdate
+                                                    ? <input aria-label={t('inv.columns.serialNumber')} {...field('serialNumber', 'font-mono max-w-xs')} />
+                                                    : (detail.serialNumber || '—')}
+                                            </Row>
+                                            <Row label={t('inv.columns.barcode')} mono={!canUpdate}>
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                                    {canUpdate
+                                                        ? <input aria-label={t('inv.detail.barcodeSupplier')} placeholder={t('inv.detail.barcodeSupplier')} {...field('supplierBarcode', 'font-mono max-w-xs')} />
+                                                        : <span>{detail.supplierBarcode || (detail.systemBarcode ? '' : t('inv.detail.barcodeNone'))}</span>}
+                                                    {detail.systemBarcode ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-mono text-[12.5px] text-slate-500 dark:text-white/60" title={t('inv.detail.barcodeSystem')}>
+                                                            <QrCode size={13} aria-hidden />
+                                                            {detail.systemBarcode}
+                                                        </span>
+                                                    ) : canUpdate && (
+                                                        /* Kein Systembarcode: der Knopf erzeugt einen —
+                                                           ausdrücklich nur hier, nie automatisch. */
+                                                        <button
+                                                            type="button"
+                                                            disabled={generating}
+                                                            onClick={() => void generateBarcode()}
+                                                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-300 px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:opacity-40 dark:border-white/20 dark:text-white/70"
+                                                        >
+                                                            {generating ? <Spinner size="sm" /> : <QrCode size={13} aria-hidden />}
+                                                            {t('inv.detail.barcodeGenerate')}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </Row>
                                             {/* Ürün/hizmet anahtarı (kullanıcı isteği 2026-08-14):
                                                 yeni kayıt ÜRÜN olarak doğar, buradan hizmete çevrilir.
                                                 Ortak Kaydet ile diğer alanlarla birlikte yazılır. */}
@@ -243,7 +325,7 @@ export const ArticleDetailView = ({ copyPrefix }: {
                                                                 aria-pressed={draft.itemType === kind}
                                                                 className={`rounded-[3px] border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
                                                                     draft.itemType === kind
-                                                                        ? 'border-[#272f67] bg-[#272f67] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
+                                                                        ? 'border-[#0a7aff] bg-[#0a7aff] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
                                                                         : 'border-slate-200 bg-white text-slate-500 hover:text-slate-800 dark:border-white/15 dark:bg-transparent dark:text-white/60'
                                                                 }`}
                                                             >

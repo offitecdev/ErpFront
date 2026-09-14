@@ -209,7 +209,7 @@ export const LeaveRequestPage = () => {
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
                         placeholder={t('personnel.leave.notePlaceholder')}
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13.5px] text-slate-800 outline-none transition-colors hover:border-slate-300 focus:border-[#1f2654] dark:border-white/15 dark:bg-transparent dark:text-white"
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-[13.5px] text-slate-800 outline-none transition-colors hover:border-slate-300 focus:border-[#0066e0] dark:border-white/15 dark:bg-transparent dark:text-white"
                     />
                 </Labelled>
 

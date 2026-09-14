@@ -1,0 +1,1392 @@
+/* invoicePages — aus src/index.css herausgelöst (12.09.2026).
+ *
+ * In index.css lagen diese Regeln im Anwendungs-Stilblatt, das JEDE Seite
+ * beim Start lädt und auf das die Anwendung wartet, bevor React einhängt —
+ * auch die Offerte, die keine einzige dieser Klassen zeigt.
+ *
+ * Herausgelöst wurde nur, was (a) ausschliesslich Auswahlausdrücke dieses
+ * Bereichs enthält und (b) sonst nirgends in index.css vorkommt. Alles,
+ * was eine geteilte Klasse berührt oder weiter unten noch einmal gesetzt
+ * wird, blieb dort stehen; die Reihenfolge gegenüber refine.css /
+ * buttons.css / controls.css / appleModal.css bleibt unberührt.
+ *
+ * Eingebunden wird die Datei von den Seiten, die diese Klassen zeigen.
+ * Kommt eine neue dazu, MUSS sie die Datei ebenfalls einbinden. */
+
+/* ═══════════════ RECHNUNGSSEITEN — Liste und die zwei Erfassungswege
+   (`pages/sales/invoices/*`, 30.08.2026)
+
+   Vorgaben Samet, der Reihe nach:
+   1. „Die Tabellen müssen sauber sein — so wie in der Kundenliste."
+      → Liste und Positionseditor benutzen die GEMEINSAME Ausstattung der App
+        (`SectionCard` + `data-inv-table data-list-table`) und bekommen deren
+        Verhalten auf kleinen Geräten geschenkt (Tablet: seitwärts rollen ·
+        Telefon: jede Zeile wird zur Karte, beschriftet aus `data-label`).
+   2. „So klar und hochwertig wie die Google-Fenster des Kalenders, mit
+      schnellen Fenstern, vollständig auf Telefon und Tablet benutzbar."
+      → gemalt wird ausschliesslich aus den `--ofi-cal-*` Marken; die Fenster
+        sind die schwebende Karte des Kalenders.
+   3. „Der Radius und die Masse ALLER Kästen — vor allem auf der Rechnungsliste
+      — müssen einheitlich sein."
+      → EIN Radius (`--ofi-invp-radius`) und EINE Bedienhöhe
+        (`--ofi-invp-control-h`) für Karten, Kacheln, Suchfeld, Auswahl und
+        Segmentwahl. Der Grundradius der App trägt `!important` OHNE Lage;
+        gewinnen kann nur, wer später steht UND in `@layer utilities` — darum
+        steht der Radiusblock ganz unten in dieser Lage (siehe
+        „Radius im Ratenplan-Editor" weiter oben, dieselbe Falle).
+   4. „Die Erstellung Schritt für Schritt, nicht eine lange Liste zum Scrollen;
+      die Eingabefelder grösser."
+      → `.ofi-invp-steps` ist der Schrittzähler, `.ofi-invp-grid` zeigt IMMER
+        nur den Kasten des aktuellen Schritts, und die Felder sind auf 40px
+        gewachsen.
+   ═══════════════════════════════════════════════════════════════════════ */
+.ofi-invp-page {
+    /* Ein Ort für Radius und Bedienhöhe des ganzen Moduls. */
+    --ofi-invp-radius: 12px;
+    /* 40px statt der frueheren 36px (01.09.2026): die Knoepfe der ganzen
+       Anwendung stehen jetzt auf `--ofi-btn-height` (styles/buttons.css).
+       Bliebe die Werkzeugleiste des Moduls bei 36px, staende ihr Suchfeld
+       4px niedriger als der Knopf daneben — genau der Versatz, den die
+       Vorgabe "alle gleich gross" beseitigen soll. */
+    --ofi-invp-control-h: 40px;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    /* Vorgabe Samet: die untereinander liegenden Karten brauchen mehr Luft. */
+    gap: 18px;
+}
+
+/* ── Die zwei Wege ───────────────────────────────────────────────────────
+   Kein Dialog, sondern ein kurzes Blatt unter dem Knopf: es sagt, was die
+   beiden Wege sind, und geht dann aus dem Weg — geöffnet wird eine SEITE. */
+.ofi-invp-menuwrap { position: relative; }
+/* Der Listenkopf trägt `.ofi-rise` — eine Animation mit `transform`, und die
+   öffnet einen eigenen STAPELKONTEXT. Darin nützt dem Menü sein z-index nichts
+   mehr gegen die Karte, die nach ihm kommt: es lag hinter der Tabelle. Gehoben
+   werden muss deshalb der Kopf selbst, nicht das Menü. */
+.ofi-invp-page > .ofi-rise { position: relative; z-index: 20; }
+.ofi-invp-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    width: 268px;
+    max-width: calc(100vw - 32px);
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 6px;
+    box-shadow: 0 8px 24px rgba(32, 33, 36, 0.16);
+}
+.dark .ofi-invp-menu { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55); }
+#root .ofi-invp-menu__item,
+body > :not(#root) .ofi-invp-menu__item {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    gap: 9px;
+    border: 0;
+    background: transparent;
+    padding: 8px 9px;
+    text-align: left;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease;
+}
+#root .ofi-invp-menu__item:hover,
+body > :not(#root) .ofi-invp-menu__item:hover { background: var(--ofi-cal-hover); }
+.ofi-invp-menu__item > svg { flex: none; margin-top: 2px; color: var(--ofi-cal-accent); }
+.ofi-invp-menu__title { display: block; font-size: 12.5px; font-weight: 600; }
+.ofi-invp-menu__hint {
+    display: block;
+    padding-top: 2px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ofi-cal-muted);
+}
+
+/* ── Oberleiste der Liste ────────────────────────────────────────────────
+   Alle Bedienteile auf EINER Höhe — sonst steht eine 36px-Auswahl neben einem
+   38px-Suchfeld und die Zeile wirkt zusammengewürfelt. */
+.ofi-invp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ofi-invp-toolbar > * { height: var(--ofi-invp-control-h); }
+.ofi-invp-segwrap { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.ofi-invp-segwrap::-webkit-scrollbar { display: none; }
+.ofi-invp-seg {
+    display: inline-flex;
+    height: 100%;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    align-items: center;
+    border: 1px solid var(--ofi-cal-border);
+    padding: 3px;
+}
+#root .ofi-invp-seg__btn,
+body > :not(#root) .ofi-invp-seg__btn {
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-invp-seg__btn:hover:not(.is-on),
+body > :not(#root) .ofi-invp-seg__btn:hover:not(.is-on) { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-invp-seg__btn.is-on,
+body > :not(#root) .ofi-invp-seg__btn.is-on { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+.ofi-invp-search { flex: 1 1 240px; max-width: 340px; }
+#root select.ofi-invp-select,
+body > :not(#root) select.ofi-invp-select {
+    height: var(--ofi-invp-control-h);
+    /* Dieselbe Breite wie jeder andere Filter der Anwendung
+       (`--ofi-ctl-filter-w`, styles/controls.css) — das Blatt behält sein
+       eigenes Muldenaussehen, aber nicht mehr sein eigenes Mass. */
+    min-width: var(--ofi-ctl-filter-w, 184px);
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    outline: none;
+}
+#root select.ofi-invp-select:focus,
+body > :not(#root) select.ofi-invp-select:focus { border-color: var(--ofi-cal-accent); }
+
+/* ── Kennzahlen ─────────────────────────────────────────────────────────
+   Vier gleich hohe Kästen; Farbe trägt nur die Zahl, nicht der Kasten. */
+.ofi-invp-tiles {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ofi-invp-tile {
+    display: flex;
+    min-width: 0;
+    min-height: 72px;
+    flex-direction: column;
+    justify-content: center;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 10px 16px;
+}
+.ofi-invp-tile__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-tile__value {
+    padding-top: 4px;
+    font-size: 17px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--ofi-cal-text);
+}
+.ofi-invp-tile.is-paid .ofi-invp-tile__value { color: #137333; }
+.ofi-invp-tile.is-open .ofi-invp-tile__value { color: #b06000; }
+.dark .ofi-invp-tile.is-paid .ofi-invp-tile__value { color: #6ee7b7; }
+.dark .ofi-invp-tile.is-open .ofi-invp-tile__value { color: #fdd663; }
+
+/* ── Zeilensymbole der Liste ────────────────────────────────────────────
+   Kreisrund, ohne Rahmen; die Fläche erscheint erst beim Überfahren. */
+#root .ofi-invp-glyph,
+body > :not(#root) .ofi-invp-glyph {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    padding: 0;
+    color: var(--ofi-cal-muted);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-invp-glyph:hover:not(:disabled),
+body > :not(#root) .ofi-invp-glyph:hover:not(:disabled) { background: var(--ofi-cal-hover); color: var(--ofi-cal-text); }
+#root .ofi-invp-glyph:disabled,
+body > :not(#root) .ofi-invp-glyph:disabled { cursor: not-allowed; opacity: 0.4; }
+#root .ofi-invp-glyph.is-pdf,
+body > :not(#root) .ofi-invp-glyph.is-pdf { color: #d93025; }
+.dark #root .ofi-invp-glyph.is-pdf,
+.dark body > :not(#root) .ofi-invp-glyph.is-pdf { color: #fca5a5; }
+#root .ofi-invp-glyph.is-ok:hover:not(:disabled),
+body > :not(#root) .ofi-invp-glyph.is-ok:hover:not(:disabled) { background: #e6f4ea; color: #137333; }
+#root .ofi-invp-glyph.is-danger:hover:not(:disabled),
+body > :not(#root) .ofi-invp-glyph.is-danger:hover:not(:disabled) { background: #fce8e6; color: #c5221f; }
+.dark #root .ofi-invp-glyph.is-ok:hover:not(:disabled),
+.dark body > :not(#root) .ofi-invp-glyph.is-ok:hover:not(:disabled) { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+.dark #root .ofi-invp-glyph.is-danger:hover:not(:disabled),
+.dark body > :not(#root) .ofi-invp-glyph.is-danger:hover:not(:disabled) { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+
+/* Die Rechnungsart der Zeile — als eigene Marke, nicht als graue Unterzeile:
+   ob Gesamt-, Akonto-, Zwischen- oder Schlussrechnung, muss auf einen Blick
+   lesbar sein (Vorgabe Samet). */
+.ofi-invp-kind {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    padding: 2px 9px;
+    font-size: 10.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-accent);
+}
+
+/* ── Schritt für Schritt ────────────────────────────────
+   Vorgabe Samet: die Erstellung führt SCHRITTWEISE, statt eine lange Seite
+   zum Herunterrollen zu sein. Der Zähler zeigt, wo man ist und was noch
+   kommt; erledigte Schritte sind anklickbar, spätere nicht.
+
+   ZWISCHEN den Nummern fliesst die Welle des Briefkopfs weiter (`WaveMark`) —
+   sie verbindet die Schritte, statt sie mit einem Strich zu trennen, und
+   trägt die Hausfarben Navy → Rot. */
+/* ── FORTSCHRITT NEBEN DEM TITEL ───────────────────────────────────────────
+   Vorgabe Samet (05.09.2026, mit Vorlage `process bar.png`): der Weg durch die
+   Erfassung ist eine PILLE mit SCHRÄGEN BALKEN — erreichte Schritte gefüllt,
+   kommende leer, «etwas grösser» als der erste Entwurf. Die Balken stehen
+   schräg (`skewX`), ihre Beschriftung wird gegengeschert und bleibt gerade;
+   die runde Pille schneidet die äusseren Schrägen ab, genau wie in der
+   Vorlage. Auf dem Telefon bleiben die Balken, die Namen fallen weg. */
+#root .ofi-invp-progress {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 5px;
+    height: 40px;
+    padding: 4px;
+    border: 1.5px solid #d7dae5;
+    border-radius: 999px !important;
+    background: #fff;
+    overflow: hidden;
+}
+#root .ofi-invp-progress__seg {
+    display: inline-flex;
+    min-width: 78px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 3px !important;
+    background: #eef0f6;
+    padding: 0 20px;
+    color: #70757a;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    /* DIE Schräge der Vorlage. */
+    transform: skewX(-18deg);
+    transition: background-color 180ms ease, color 180ms ease;
+}
+/* Der Text steht gerade, obwohl der Balken schräg steht. */
+#root .ofi-invp-progress__label { display: block; transform: skewX(18deg); }
+#root .ofi-invp-progress__seg.is-done,
+#root .ofi-invp-progress__seg.is-current { background: #0a7aff; color: #fff; }
+#root .ofi-invp-progress__seg:disabled { cursor: default; opacity: .75; }
+#root .ofi-invp-progress__seg:not(:disabled):not(.is-current):hover { background: #e2e5ef; }
+.dark #root .ofi-invp-progress { border-color: rgba(255, 255, 255, 0.16); background: #17191c; }
+.dark #root .ofi-invp-progress__seg { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.7); }
+.dark #root .ofi-invp-progress__seg.is-done,
+.dark #root .ofi-invp-progress__seg.is-current { background: #fbbf24; color: #17191c; }
+.dark #root .ofi-invp-progress__seg:not(:disabled):not(.is-current):hover { background: rgba(255, 255, 255, 0.14); }
+
+/* ── ANGABEN HINTER EINEM KNOPF ────────────────────────────────────────────
+   Vorgabe Samet (05.09.2026): der Nachtrag trägt KEINE Überschrift mehr;
+   Nummer, Hauptauftrag und Datum stehen rechts hinter «Auftragsdetails», die
+   Nummer klein darin — sie soll den Knopf nicht zur Überschrift machen. */
+#root .ofi-invp-headbar { display: inline-flex; align-items: center; gap: 10px; }
+#root .ofi-invp-details {
+    display: inline-flex;
+    height: 40px;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--ofi-cal-border, #dadce0);
+    border-radius: 999px !important;
+    background: #fff;
+    padding: 0 16px;
+    color: #0066e0;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.15;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-invp-details:hover { background: #f1f3f9; }
+#root .ofi-invp-details__text { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; }
+#root .ofi-invp-details__no {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #70757a;
+}
+.dark #root .ofi-invp-details { border-color: rgba(255, 255, 255, 0.18); background: transparent; color: rgba(255, 255, 255, 0.88); }
+.dark #root .ofi-invp-details:hover { background: rgba(255, 255, 255, 0.08); }
+.dark #root .ofi-invp-details__no { color: rgba(255, 255, 255, 0.6); }
+
+.ofi-invp-steps {
+    display: flex;
+    min-width: 0;
+    align-items: stretch;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 6px;
+}
+.ofi-invp-steps::-webkit-scrollbar { display: none; }
+.ofi-invp-step { display: flex; min-width: 0; flex: 1 1 0; align-items: center; list-style: none; }
+#root .ofi-invp-step__btn,
+body > :not(#root) .ofi-invp-step__btn {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 7px 12px;
+    text-align: left;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-invp-step__btn:not(:disabled):hover,
+body > :not(#root) .ofi-invp-step__btn:not(:disabled):hover { background: var(--ofi-cal-hover); }
+#root .ofi-invp-step__btn:disabled,
+body > :not(#root) .ofi-invp-step__btn:disabled { cursor: default; }
+.ofi-invp-step.is-current .ofi-invp-step__btn { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+.ofi-invp-step__num {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-step.is-current .ofi-invp-step__num {
+    border-color: transparent;
+    background: var(--ofi-cal-accent);
+    color: var(--ofi-cal-on-accent);
+}
+.ofi-invp-step.is-done .ofi-invp-step__num {
+    border-color: transparent;
+    background: #e6f4ea;
+    color: #137333;
+}
+.dark .ofi-invp-step.is-done .ofi-invp-step__num { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+.ofi-invp-step__text { min-width: 0; }
+.ofi-invp-step__label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-invp-step__hint {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 1px;
+    font-size: 11px;
+    color: var(--ofi-cal-muted);
+}
+/* Die Welle zwischen zwei Schritten. Sie darf schrumpfen, aber nie den Namen
+   des Schritts verdrängen — auf schmalen Geräten verschwindet sie ganz. */
+.ofi-invp-step__mark { flex: none; align-self: center; margin: 0 2px; }
+
+/* ── Der gleitende Umschalter (Glas) ───────────────────────
+   Vorgabe Samet: Projektauftrag und Lieferauftrag an EINEN Ort, mit
+   Projektauftrag als Voreinstellung, weicher gleitender Auswahl und
+   Glaseffekt. Die Marke ist ein eigenes Element und wird VERSCHOBEN — eine
+   Fläche, die je Knopf umgefärbt wird, kann nicht gleiten. */
+.ofi-invp-switchrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    padding: 14px 20px 0;
+}
+/* Steht die Zeile frei (über dem Schrittzähler), trägt sie kein Kartenpolster
+   — die Seite gibt ihr den Abstand. */
+.ofi-invp-switchrow.is-bare { padding: 0 2px; }
+.ofi-invp-switchrow__hint {
+    min-width: 0;
+    flex: 1 1 240px;
+    margin: 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-switch {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    padding: 4px;
+    /* Glas: milchige Fläche, ein Hauch Farbe darunter, weicher Rand. */
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    background:
+        linear-gradient(120deg, rgba(31, 42, 84, 0.10), rgba(211, 32, 38, 0.09)),
+        rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    box-shadow: 0 2px 10px rgba(32, 33, 36, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.dark .ofi-invp-switch {
+    border-color: rgba(255, 255, 255, 0.14);
+    background:
+        linear-gradient(120deg, rgba(99, 130, 220, 0.16), rgba(211, 32, 38, 0.14)),
+        rgba(255, 255, 255, 0.06);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.ofi-invp-switch__thumb {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    bottom: 4px;
+    z-index: 0;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2px 8px rgba(32, 33, 36, 0.16);
+    /* Das Gleiten: kurz, mit Nachschwingen — wie eine Karte, die einrastet. */
+    transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dark .ofi-invp-switch__thumb { background: rgba(255, 255, 255, 0.16); }
+#root .ofi-invp-switch__btn,
+body > :not(#root) .ofi-invp-switch__btn {
+    position: relative;
+    z-index: 1;
+    min-width: 132px;
+    border: 0;
+    background: transparent;
+    padding: 9px 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--ofi-cal-muted);
+    transition: color 160ms ease;
+}
+#root .ofi-invp-switch__btn.is-on,
+body > :not(#root) .ofi-invp-switch__btn.is-on { color: var(--ofi-cal-accent); }
+
+.ofi-invp-lead { margin: 0; padding: 0 4px; font-size: 12.5px; line-height: 1.5; color: var(--ofi-cal-muted); }
+
+/* ── Felderraster eines Schritts ────────────────────────────────────────
+   `auto-fit` statt fester Spalten: ein Feld ist nie schmaler als 210px, und
+   auf dem Telefon steht darum genau eines pro Zeile — ohne eigene Abfrage. */
+.ofi-invp-grid {
+    display: grid;
+    gap: 12px 18px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    padding: 14px 20px 16px;
+}
+.ofi-invp-grid + .ofi-invp-grid { border-top: 1px solid var(--ofi-cal-line); }
+/* Ein Feld ist so breit, wie sein Inhalt gelesen wird — nicht so breit wie die
+   Karte. Die Spalten haben darum eine OBERGRENZE, und das Raster beginnt links,
+   statt den Rest auf die Felder zu verteilen (Vorgabe Samet: „zu gross"). */
+.ofi-invp-grid { justify-content: start; }
+.ofi-invp-grid > .ofi-invp-field { width: 100%; max-width: 380px; }
+/* Ein Absatzfeld ist keine Zeile: es darf seine Spalte ausfüllen. */
+.ofi-invp-grid > .ofi-invp-field.is-wide { max-width: none; }
+.ofi-invp-grid--wide { grid-template-columns: minmax(0, 1fr); }
+.ofi-invp-field { display: block; min-width: 0; }
+.ofi-invp-field__label {
+    display: block;
+    padding-bottom: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-field__hint {
+    display: block;
+    padding-top: 5px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ofi-cal-faint);
+}
+.ofi-invp-pad { padding: 14px 20px 0; }
+.ofi-invp-note { padding: 26px 20px; text-align: center; font-size: 13px; color: var(--ofi-cal-muted); }
+
+/* ── Fussleiste eines Schritts ──────────────────────────────────────────── */
+.ofi-invp-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    padding: 12px 20px;
+}
+.ofi-invp-foot__spacer { flex: 1 1 auto; }
+/* Steht die Leiste allein (letzter Schritt), trägt sie das Kleid der Karte
+   selbst — ohne Kopf, denn ihren Namen sagt der Schrittzähler. */
+.ofi-invp-footbar {
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+}
+.ofi-invp-footbar > .ofi-invp-foot { border-top: 0; }
+
+/* ── Summenzeilen der Direktrechnung ────────────────────────────────────
+   Kein Kasten: drei Zeilen, Haarlinie dazwischen, die letzte fett. */
+.ofi-invp-sums {
+    width: min(400px, 100%);
+    margin-left: auto;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    padding: 8px 20px 14px;
+}
+.ofi-invp-sum {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    font-size: 13.5px;
+    color: var(--ofi-cal-text);
+}
+.ofi-invp-sum + .ofi-invp-sum { border-top: 1px solid var(--ofi-cal-line); }
+.ofi-invp-sum__label { display: flex; min-width: 0; align-items: center; color: var(--ofi-cal-muted); }
+.ofi-invp-sum__value { flex: none; font-variant-numeric: tabular-nums; }
+.ofi-invp-sum.is-total { font-size: 15px; font-weight: 600; }
+.ofi-invp-sum.is-total .ofi-invp-sum__label { color: var(--ofi-cal-text); }
+/* Der Steuersatz steht MITTEN in der Summenzeile ("MWST [8.1] %"). */
+#root input.ofi-invp-vat,
+body > :not(#root) input.ofi-invp-vat {
+    width: 74px;
+    height: 32px;
+    margin: 0 8px;
+    border: 1px solid var(--ofi-cal-border);
+    background: transparent;
+    padding: 0 10px;
+    font-size: 13px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+    outline: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+#root input.ofi-invp-vat:focus,
+body > :not(#root) input.ofi-invp-vat:focus { border-color: var(--ofi-cal-accent); }
+#root input.ofi-invp-vat::-webkit-outer-spin-button,
+#root input.ofi-invp-vat::-webkit-inner-spin-button,
+body > :not(#root) input.ofi-invp-vat::-webkit-outer-spin-button,
+body > :not(#root) input.ofi-invp-vat::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; appearance: none; }
+
+/* ── PDF-Vorschau in der schwebenden Karte ──────────────────────────────
+   Die Karte selbst ist die des Kalenders (`InvoicePopup` → `FloatingCard`) und
+   verkleinert sich unter 1024px von allein; hier steht nur ihr Inhalt. */
+.ofi-invp-pdfstate {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-pdfframe {
+    height: 100%;
+    width: 100%;
+    border: 1px solid var(--ofi-cal-border-soft);
+    background: #fff;
+}
+
+/* ── Das Eingabefeld der Erfassungsseiten ───────────────────────────────
+   Vorgabe Samet: „die Eingabefelder grösser" — 40px statt 36px, mit einem
+   ruhigen Ring beim Fokus statt einer harten Kante. Absatzfelder (Einleitungs-
+   text, Notiz) wachsen mit und tragen ihre eigene Mindesthöhe. */
+#root .ofi-invp-input,
+#root select.ofi-invp-input,
+#root textarea.ofi-invp-input,
+body > :not(#root) .ofi-invp-input,
+body > :not(#root) select.ofi-invp-input,
+body > :not(#root) textarea.ofi-invp-input {
+    display: block;
+    width: 100%;
+    height: var(--ofi-invp-control-h);
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    padding: 0 12px;
+    font-size: 13.5px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--ofi-cal-text);
+    outline: none;
+    box-shadow: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-invp-input:focus,
+body > :not(#root) .ofi-invp-input:focus {
+    border-color: var(--ofi-cal-accent);
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint);
+}
+#root .ofi-invp-input:disabled,
+body > :not(#root) .ofi-invp-input:disabled { cursor: not-allowed; opacity: 0.55; }
+#root .ofi-invp-input::placeholder,
+body > :not(#root) .ofi-invp-input::placeholder { font-style: normal; opacity: 1; color: var(--ofi-cal-faint); }
+#root textarea.ofi-invp-input,
+body > :not(#root) textarea.ofi-invp-input {
+    height: auto;
+    min-height: 108px;
+    padding: 10px 12px;
+    line-height: 1.55;
+    resize: vertical;
+}
+/* Zahlenfelder ohne Pfeilchen — sie schieben die Ziffern von der Kante weg. */
+#root input.ofi-invp-input[type="number"],
+body > :not(#root) input.ofi-invp-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+#root input.ofi-invp-input[type="number"]::-webkit-outer-spin-button,
+#root input.ofi-invp-input[type="number"]::-webkit-inner-spin-button,
+body > :not(#root) input.ofi-invp-input[type="number"]::-webkit-outer-spin-button,
+body > :not(#root) input.ofi-invp-input[type="number"]::-webkit-inner-spin-button { margin: 0; -webkit-appearance: none; appearance: none; }
+.ofi-invp-input.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── TIEFE ───────────────────────────────────────────────────────────────
+   Vorgabe Samet: „etwas dreidimensionaler, damit es schöner aussieht."
+
+   Tiefe heisst hier NICHT Schlagschatten überall, sondern eine Ordnung, die
+   man auch mit geschlossenen Augen beschreiben kann — dieselbe, die Google
+   seinen Flächen gibt:
+
+     • Was TRÄGT, liegt höher: Karten und der Schrittzähler steigen eine Stufe
+       über die Seite, ein Fenster (Menü, Vorschau) zwei.
+     • Was man DRÜCKT, hebt sich beim Überfahren und geht beim Klick nach
+       unten — ein Knopf ist ein Ding, kein Rechteck.
+     • Was man FÜLLT, liegt tiefer: Eingabefelder sind Mulden mit einer
+       Innenkante, keine erhabenen Kästen. Feld und Knopf sind damit auf einen
+       Blick auseinanderzuhalten, ohne dass Farbe es sagen muss.
+
+   Jeder Schatten ist ZWEITEILIG (enger Kernschatten + weiter Umgebungs-
+   schatten): ein einzelner weicher Schatten sieht aus wie Nebel, zwei sehen
+   aus wie Licht. Im Dunkelmodus tragen die Flächen keine weissen Glanzkanten
+   mehr, sondern dunklere Schatten — Licht von oben gibt es dort nicht.        */
+.ofi-invp-page {
+    /* Eine Stufe über der Seite — Karten, Zähler, Kacheln. */
+    --ofi-invp-e1: 0 1px 2px rgba(32, 33, 36, 0.10), 0 1px 3px 1px rgba(32, 33, 36, 0.05);
+    /* Angehoben: ein Knopf unter dem Zeiger, eine Kachel im Blick. */
+    --ofi-invp-e2: 0 1px 2px rgba(32, 33, 36, 0.12), 0 3px 8px 1px rgba(32, 33, 36, 0.09);
+    /* Fenster über allem: Menü, Vorschau. */
+    --ofi-invp-e3: 0 2px 6px rgba(32, 33, 36, 0.14), 0 10px 28px 4px rgba(32, 33, 36, 0.14);
+    /* Die Mulde eines Eingabefeldes. */
+    --ofi-invp-well: inset 0 1px 2px rgba(32, 33, 36, 0.10), inset 0 0 0 1px rgba(32, 33, 36, 0.02);
+    /* Glanzkante oben — sie macht aus einer Fläche eine Platte. */
+    --ofi-invp-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+.dark .ofi-invp-page {
+    --ofi-invp-e1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px 1px rgba(0, 0, 0, 0.35);
+    --ofi-invp-e2: 0 1px 3px rgba(0, 0, 0, 0.55), 0 4px 10px 1px rgba(0, 0, 0, 0.45);
+    --ofi-invp-e3: 0 2px 8px rgba(0, 0, 0, 0.6), 0 12px 30px 4px rgba(0, 0, 0, 0.5);
+    --ofi-invp-well: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+    --ofi-invp-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Die Platten ────────────────────────────────────────────────────────
+   Karte, Schrittzähler, Fussleiste und Kachel steigen gemeinsam eine Stufe.
+   Die Fläche bekommt dazu einen kaum merklichen Verlauf: oben eine Spur
+   heller als unten — so fällt Licht auf eine Platte. */
+.ofi-invp-page > section,
+.ofi-invp-steps,
+.ofi-invp-footbar,
+.ofi-invp-tile {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+    box-shadow: var(--ofi-invp-e1), var(--ofi-invp-sheen);
+}
+.dark .ofi-invp-page > section,
+.dark .ofi-invp-steps,
+.dark .ofi-invp-footbar,
+.dark .ofi-invp-tile {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0));
+}
+/* Die Haarlinie der Karte darf jetzt leiser sein — der Schatten trennt sie
+   schon von der Seite, und beides zusammen wäre ein doppelter Rand. */
+.ofi-invp-page > section { border-color: var(--ofi-cal-border-soft); }
+
+/* Der Kopfstreifen einer Karte trägt die Beschriftung des Schrittes; er sitzt
+   auf der Platte und bekommt darum die Glanzkante, nicht die Karte darunter. */
+.ofi-invp-page > section > header {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+}
+.dark .ofi-invp-page > section > header { background-image: none; }
+
+/* Eine Kachel hebt sich beim Überfahren leicht an — sie ist ablesbar, nicht
+   bedienbar, also bleibt es bei einer Andeutung. */
+.ofi-invp-tile { transition: box-shadow 160ms ease, transform 160ms ease; }
+.ofi-invp-tile:hover { box-shadow: var(--ofi-invp-e2), var(--ofi-invp-sheen); transform: translateY(-1px); }
+
+/* ── Die Schrittnummer als Plättchen ────────────────────────────────────
+   Erledigt, aktuell und wartend unterscheiden sich jetzt auch in der Höhe:
+   der aktuelle Schritt steht vorn, die erledigten liegen flach, die
+   kommenden sind eine leere Mulde. */
+.ofi-invp-step__num {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 1px rgba(32, 33, 36, 0.06);
+    transition: box-shadow 160ms ease, transform 160ms ease;
+}
+.ofi-invp-step.is-current .ofi-invp-step__num {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+    /* Der Ring in der Akzentfarbe ist der Lichtsaum des Plättchens. */
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        0 2px 6px rgba(31, 42, 84, 0.35),
+        0 0 0 4px var(--ofi-cal-accent-tint);
+    transform: translateY(-1px);
+}
+.ofi-invp-step.is-done .ofi-invp-step__num {
+    background-image: none;
+    box-shadow: inset 0 0 0 1px rgba(19, 115, 51, 0.14);
+}
+.dark .ofi-invp-step__num { background-image: none; box-shadow: none; }
+
+/* ── Knöpfe: ein Ding, kein Rechteck ────────────────────────────────────
+   Ruhe → beim Überfahren nur ein grösserer Schatten, der Knopf bleibt
+   stehen → beim Klick sinkt er ein. Das Heben um einen Pixel ist am
+   01.09.2026 gefallen («beim Überfahren nur eine Farbanimation»); das
+   Schrumpfen beim Klick kommt für jeden Knopf aus `styles/buttons.css`. */
+.ofi-invp-foot > button,
+.ofi-invp-page .ofi-btn-brand,
+.ofi-invp-page > .ofi-rise button {
+    box-shadow: var(--ofi-invp-e1);
+    transition: box-shadow 160ms ease, transform 160ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+.ofi-invp-foot > button:hover:not(:disabled),
+.ofi-invp-page .ofi-btn-brand:hover:not(:disabled),
+.ofi-invp-page > .ofi-rise button:hover:not(:disabled) {
+    box-shadow: var(--ofi-invp-e2);
+}
+.ofi-invp-foot > button:active:not(:disabled),
+.ofi-invp-page .ofi-btn-brand:active:not(:disabled),
+.ofi-invp-page > .ofi-rise button:active:not(:disabled) {
+    box-shadow: inset 0 1px 3px rgba(32, 33, 36, 0.28);
+}
+.ofi-invp-foot > button:disabled { box-shadow: none; }
+
+/* Die runden Zeilensymbole der Liste: sie sind flach, bis der Zeiger kommt —
+   dann werden sie zu einem kleinen Knopf. */
+#root .ofi-invp-glyph,
+body > :not(#root) .ofi-invp-glyph { transition: background-color 120ms ease, color 120ms ease, box-shadow 140ms ease, transform 140ms ease; }
+#root .ofi-invp-glyph:hover:not(:disabled),
+body > :not(#root) .ofi-invp-glyph:hover:not(:disabled) { box-shadow: var(--ofi-invp-e1); }
+#root .ofi-invp-glyph:active:not(:disabled),
+body > :not(#root) .ofi-invp-glyph:active:not(:disabled) { box-shadow: inset 0 1px 3px rgba(32, 33, 36, 0.22); }
+
+/* ── Felder sind Mulden ─────────────────────────────────────────────────
+   Ein Feld liegt TIEFER als die Platte, auf der es sitzt. Beim Fokus kommt es
+   auf Augenhöhe: die Innenkante weicht dem Lichtring der Akzentfarbe. */
+#root .ofi-invp-page .ofi-invp-input,
+#root .ofi-invp-page select.ofi-invp-select,
+#root .ofi-invp-page .ofi-invp-vat,
+body > :not(#root) .ofi-invp-page .ofi-invp-input,
+body > :not(#root) .ofi-invp-page select.ofi-invp-select,
+body > :not(#root) .ofi-invp-page .ofi-invp-vat {
+    box-shadow: var(--ofi-invp-well);
+}
+#root .ofi-invp-page .ofi-invp-input:focus,
+#root .ofi-invp-page select.ofi-invp-select:focus,
+#root .ofi-invp-page .ofi-invp-vat:focus,
+body > :not(#root) .ofi-invp-page .ofi-invp-input:focus,
+body > :not(#root) .ofi-invp-page select.ofi-invp-select:focus,
+body > :not(#root) .ofi-invp-page .ofi-invp-vat:focus {
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint), inset 0 1px 1px rgba(32, 33, 36, 0.04);
+}
+/* Das Suchfeld der Oberleiste gehört derselben Familie an. */
+.ofi-invp-toolbar .ofi-invp-search { box-shadow: var(--ofi-invp-well); }
+.ofi-invp-toolbar .ofi-invp-search:focus-within { box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint); }
+
+/* ── Der Umschalter: eine Rinne mit einem Plättchen darin ───────────────
+   Die Fläche bekommt eine Innenkante (die Rinne), die Marke einen echten
+   Schatten — erst dadurch liegt sie sichtbar DARIN und nicht daneben. */
+.ofi-invp-switch {
+    box-shadow:
+        inset 0 1px 2px rgba(32, 33, 36, 0.10),
+        0 1px 1px rgba(255, 255, 255, 0.6);
+}
+.dark .ofi-invp-switch { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); }
+.ofi-invp-switch__thumb {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.78));
+    box-shadow:
+        0 1px 1px rgba(32, 33, 36, 0.10),
+        0 3px 8px rgba(32, 33, 36, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease;
+}
+.dark .ofi-invp-switch__thumb {
+    background-image: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+/* Beim Umschalten drückt sich die Marke kurz flach — sie „rastet" ein. */
+.ofi-invp-switch:active .ofi-invp-switch__thumb { box-shadow: 0 1px 3px rgba(32, 33, 36, 0.2); }
+
+/* Die Segmentwahl der Liste liegt in derselben Rinne. */
+.ofi-invp-seg { box-shadow: inset 0 1px 2px rgba(32, 33, 36, 0.07); }
+.dark .ofi-invp-seg { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); }
+#root .ofi-invp-seg__btn.is-on,
+body > :not(#root) .ofi-invp-seg__btn.is-on {
+    box-shadow: 0 1px 2px rgba(32, 33, 36, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.dark #root .ofi-invp-seg__btn.is-on,
+.dark body > :not(#root) .ofi-invp-seg__btn.is-on { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45); }
+
+/* ── Fenster: zwei Stufen über der Seite ───────────────────────────────
+   Das Menü kommt aus dem Knopf heraus — es wächst aus seiner oberen rechten
+   Ecke, statt einfach da zu sein. */
+.ofi-invp-menu {
+    box-shadow: var(--ofi-invp-e3), var(--ofi-invp-sheen);
+    transform-origin: top right;
+    animation: ofi-invp-pop 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ofi-invp-menu__item > svg {
+    /* Das Zeichen sitzt auf einem eigenen kleinen Plättchen. */
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-tint);
+    padding: 4px;
+    box-sizing: content-box;
+    width: 15px;
+    height: 15px;
+}
+.ofi-invp-pdfframe { box-shadow: var(--ofi-invp-e2); }
+
+/* Die Rechnungsart-Marke der Liste: eine Pille, die auf der Zeile liegt. */
+.ofi-invp-kind { box-shadow: inset 0 0 0 1px rgba(31, 42, 84, 0.08); }
+
+/* ── Das Auswahlfeld ────────────────────────────────────────────────────
+   Die Pille, die das Blatt öffnet. Sie sieht aus wie ein Eingabefeld (Mulde),
+   verhält sich aber wie ein Knopf. */
+#root .ofi-invp-picker,
+body > :not(#root) .ofi-invp-picker {
+    display: flex;
+    width: 100%;
+    height: var(--ofi-invp-control-h);
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    padding: 0 12px 0 16px;
+    font-size: 13.5px;
+    text-align: left;
+    color: var(--ofi-cal-faint);
+    box-shadow: var(--ofi-invp-well);
+    transition: border-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+#root .ofi-invp-picker.is-filled,
+body > :not(#root) .ofi-invp-picker.is-filled { font-weight: 600; color: var(--ofi-cal-text); }
+#root .ofi-invp-picker:hover:not(:disabled),
+body > :not(#root) .ofi-invp-picker:hover:not(:disabled) { border-color: var(--ofi-cal-accent); }
+#root .ofi-invp-picker[aria-expanded="true"],
+body > :not(#root) .ofi-invp-picker[aria-expanded="true"] {
+    border-color: var(--ofi-cal-accent);
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint);
+}
+#root .ofi-invp-picker:disabled,
+body > :not(#root) .ofi-invp-picker:disabled { cursor: not-allowed; opacity: 0.55; }
+.ofi-invp-picker__value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-invp-picker__chev { flex: none; color: var(--ofi-cal-muted); }
+#root .ofi-invp-picker[aria-expanded="true"] .ofi-invp-picker__chev,
+body > :not(#root) .ofi-invp-picker[aria-expanded="true"] .ofi-invp-picker__chev { transform: rotate(180deg); }
+
+/* ── Das Blatt: Suchfeld oben, Karten darunter ──────────────────────────
+   Sieben Karten, solange niemand tippt (Vorgabe Samet) — mehr sind keine
+   Liste mehr, sondern ein Verzeichnis. Getippt wird in ALLEN Einträgen. */
+.ofi-invp-pick { display: flex; min-height: 0; flex-direction: column; padding: 8px; }
+/* Das Suchfeld steht still, die Karten rollen darunter durch — sonst muesste
+   man zum Tippen erst wieder hochrollen. */
+.ofi-invp-pick__search { flex: none; }
+.ofi-invp-pick__search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 999px;
+    background: var(--ofi-cal-hover);
+    padding: 0 12px;
+    height: 36px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-pick__search > svg { flex: none; }
+#root .ofi-invp-pick__search > input,
+body > :not(#root) .ofi-invp-pick__search > input {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    outline: none;
+    box-shadow: none;
+}
+#root .ofi-invp-pick__search > input::placeholder,
+body > :not(#root) .ofi-invp-pick__search > input::placeholder { color: var(--ofi-cal-faint); }
+.ofi-invp-pick__list {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 4px;
+    /* Der Rollbalken der Liste: ohne ihn lief das Blatt bei vielen Treffern
+       unten aus dem Bild (Vorgabe Samet). `overscroll-behavior` haelt das
+       Weiterrollen in der Liste — die Seite dahinter bleibt stehen. */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 8px;
+    /* Platz fuer den Balken, damit er die Karte nicht anschneidet. */
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ofi-cal-border) transparent;
+}
+.ofi-invp-pick__list::-webkit-scrollbar { width: 8px; }
+.ofi-invp-pick__list::-webkit-scrollbar-track { background: transparent; }
+.ofi-invp-pick__list::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--ofi-cal-border);
+    background-clip: content-box;
+}
+.ofi-invp-pick__list::-webkit-scrollbar-thumb:hover { background: var(--ofi-cal-muted); background-clip: content-box; }
+/* Eine angehobene Karte darf am Rand nicht abgeschnitten werden. */
+.ofi-invp-pick__list > * { flex: none; margin: 1px 0; }
+#root .ofi-invp-pick__card,
+body > :not(#root) .ofi-invp-pick__card {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 10px !important;
+    background: var(--ofi-cal-surface);
+    padding: 9px 12px;
+    text-align: left;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+/* Die Karte unter dem Zeiger (oder unter der Tastatur) hebt sich an. */
+#root .ofi-invp-pick__card.is-active,
+body > :not(#root) .ofi-invp-pick__card.is-active {
+    border-color: var(--ofi-cal-accent);
+    box-shadow: var(--ofi-invp-e1, 0 1px 3px rgba(32, 33, 36, 0.12));
+    transform: translateY(-1px);
+}
+#root .ofi-invp-pick__card.is-on,
+body > :not(#root) .ofi-invp-pick__card.is-on {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-tint);
+}
+.ofi-invp-pick__text { min-width: 0; }
+.ofi-invp-pick__label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-invp-pick__meta {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-top: 2px;
+    font-size: 11.5px;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invp-pick__check { flex: none; color: var(--ofi-cal-accent); }
+.ofi-invp-pick__empty { padding: 18px 12px; text-align: center; font-size: 12.5px; color: var(--ofi-cal-muted); }
+.ofi-invp-pick__foot {
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--ofi-cal-faint);
+}
+
+/* ── DIE DREI ABSCHNITTE DES BELEGS (05.09.2026) ────────────────────────
+   Vorgabe Samet: „Die Rechnung soll drei Abschnitte haben, einer davon ein
+   Rabattbereich; die Abschnitte müssen entfernbar sein, und ein entfernter
+   Abschnitt darf auch im PDF nicht mehr erscheinen."
+
+   Gezeichnet ist das als BLATT, nicht als Kartenstapel: die drei Abschnitte
+   sitzen in derselben Karte und sind nur durch eine Haarlinie getrennt — so
+   liest sich der Schritt wie der Beleg, den er beschreibt. Ein entfernter
+   Abschnitt bleibt als schmaler Steg stehen; er ist das Gedächtnis der Seite
+   („hier stand etwas") und zugleich der Weg zurück. */
+.ofi-invp-sec { display: block; }
+.ofi-invp-sec + .ofi-invp-sec { border-top: 1px solid var(--ofi-cal-line); }
+.ofi-invp-sec__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px 10px;
+}
+.ofi-invp-sec__num {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--ofi-cal-accent-soft);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-accent);
+}
+.ofi-invp-sec__num.is-off { background: var(--ofi-cal-hover); color: var(--ofi-cal-faint); }
+.ofi-invp-sec__text { min-width: 0; flex: 1 1 auto; }
+.ofi-invp-sec__title { display: block; font-size: 13px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-invp-sec__hint {
+    display: block;
+    padding-top: 2px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-invp-sec__remove,
+body > :not(#root) .ofi-invp-sec__remove {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-invp-sec__remove:hover,
+body > :not(#root) .ofi-invp-sec__remove:hover { background: #fce8e6; color: #c5221f; }
+.dark #root .ofi-invp-sec__remove:hover,
+.dark body > :not(#root) .ofi-invp-sec__remove:hover { background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+.ofi-invp-sec__body { padding-bottom: 4px; }
+/* Die Positionstabelle steht bündig in der Karte; ein Absatzfeld braucht den
+   Rand, den die Tabellenzellen selbst mitbringen. */
+.ofi-invp-sec__pad { padding: 2px 20px 14px; }
+
+/* Der Steg eines entfernten Abschnitts — leise, aber nicht unsichtbar: er
+   sagt, WAS fehlt, und trägt den einzigen Knopf, der es zurückholt. */
+.ofi-invp-sec.is-off {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--ofi-cal-hover);
+}
+.ofi-invp-sec__offtext {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-invp-sec__restore,
+body > :not(#root) .ofi-invp-sec__restore {
+    display: inline-flex;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    padding: 0 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-invp-sec__restore:hover:not(:disabled),
+body > :not(#root) .ofi-invp-sec__restore:hover:not(:disabled) { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+#root .ofi-invp-sec__restore:disabled,
+body > :not(#root) .ofi-invp-sec__restore:disabled { cursor: not-allowed; opacity: 0.45; }
+/* Der Knopf unter dem Absenderfeld steht auf der Grundlinie des Feldes und
+   nicht auf der seiner Beschriftung. */
+.ofi-invp-senderfoot { display: flex; align-items: flex-end; padding-bottom: 4px; }
+
+/* ── Der Rabattbereich ──────────────────────────────────────────────────
+   Eine Zeile je Nachlass: Bezeichnung · Prozent/Franken · Wert · was er
+   TATSÄCHLICH abzieht. Die letzte Spalte ist der Grund, warum der Stapel
+   nicht geraten werden muss — jeder Rabatt greift auf das, was der vorige
+   übrig lässt, und genau diese Grundlage steht dort. */
+.ofi-invp-disc { display: flex; flex-direction: column; gap: 10px; padding: 2px 20px 14px; }
+.ofi-invp-disc__empty { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ofi-cal-muted); }
+.ofi-invp-disc__row {
+    display: grid;
+    align-items: center;
+    gap: 8px 10px;
+    grid-template-columns: minmax(0, 1fr) auto 118px minmax(0, 190px) 32px;
+}
+.ofi-invp-disc__kind {
+    display: inline-flex;
+    height: var(--ofi-invp-control-h);
+    flex: none;
+    align-items: center;
+    border: 1px solid var(--ofi-cal-border);
+    padding: 3px;
+}
+#root .ofi-invp-disc__kindbtn,
+body > :not(#root) .ofi-invp-disc__kindbtn {
+    display: inline-flex;
+    min-width: 42px;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-muted);
+    transition: background-color 140ms ease, color 140ms ease;
+}
+#root .ofi-invp-disc__kindbtn.is-on,
+body > :not(#root) .ofi-invp-disc__kindbtn.is-on { background: var(--ofi-cal-accent-soft); color: var(--ofi-cal-accent); }
+/* `.ofi-invp-input` steht auf `width: 100%` — ein Feld mit eigener Breite muss
+   sie darum MIT `#root`-Vorsatz zurücknehmen, sonst misst es sich an der
+   ganzen Zeile (dieselbe Falle wie in der `.ofi-inv-*`-Lage). */
+#root .ofi-invp-disc__value,
+body > :not(#root) .ofi-invp-disc__value { width: 100%; }
+.ofi-invp-disc__effect {
+    min-width: 0;
+    font-size: 11.5px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-invp-disc__add,
+body > :not(#root) .ofi-invp-disc__add {
+    display: inline-flex;
+    height: 34px;
+    align-self: flex-start;
+    align-items: center;
+    gap: 6px;
+    border: 1px dashed var(--ofi-cal-border);
+    background: transparent;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ofi-cal-accent);
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-invp-disc__add:hover:not(:disabled),
+body > :not(#root) .ofi-invp-disc__add:hover:not(:disabled) { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+#root .ofi-invp-disc__add:disabled,
+body > :not(#root) .ofi-invp-disc__add:disabled { cursor: not-allowed; opacity: 0.45; }
+/* Eine Rabattzeile in der Summe ist ein ABZUG: sie trägt die Farbe des
+   Nachlasses, damit sie nicht wie eine weitere Teilsumme gelesen wird. */
+.ofi-invp-sum.is-discount .ofi-invp-sum__value { color: #b06000; }
+.dark .ofi-invp-sum.is-discount .ofi-invp-sum__value { color: #fdd663; }
+
+/* ── Kennzahl als Weg ───────────────────────────────────────────────────
+   „Offen" und „Bezahlt" sind zugleich der Filter danach: dieselbe Kachel,
+   nur anklickbar und mit einem Rahmen, wenn sie gerade filtert. */
+#root .ofi-invp-tile.is-click,
+body > :not(#root) .ofi-invp-tile.is-click {
+    align-items: stretch;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
+}
+#root .ofi-invp-tile.is-click:hover,
+body > :not(#root) .ofi-invp-tile.is-click:hover { background: var(--ofi-cal-hover); }
+#root .ofi-invp-tile.is-click.is-on,
+body > :not(#root) .ofi-invp-tile.is-click.is-on { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); }
+
+/* ── Liste + Rechnungsblatt ─────────────────────────────────────────────
+   Ab 1280px steht das Blatt NEBEN der Liste; darunter legt es sich als
+   Schicht darüber. Die Tabelle darf nie in zwei enge Spalten gepresst
+   werden — sie ist die gemeinsame Übersichtstabelle der Anwendung und
+   rechnet mit der vollen Breite. */
+.ofi-invp-split { display: grid; align-items: start; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+.ofi-invd__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    padding: 12px 14px 12px 16px;
+}
+.ofi-invd__ident { display: flex; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ofi-invd__number {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--ofi-cal-text);
+}
+/* Der Betrag trägt das Blatt. Alles andere darunter ist Beleg dafür. */
+.ofi-invd__amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 18px 16px 14px; }
+.ofi-invd__money {
+    font-size: 27px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ofi-cal-text);
+}
+
+/* ── Die eine Handlung: bezahlt ─────────────────────────────────────────
+   Vorgabe Samet: „einfacher und anders gelöst, damit die Liste nicht
+   zugestellt wird." Also kein Häkchen zwischen vier Symbolen, sondern die
+   grösste Fläche des Blattes — mit dem Zahlungsdatum direkt darunter, weil
+   „bezahlt" ein Ereignis mit einem Datum ist. */
+.ofi-invd__pay { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px; }
+#root .ofi-invd__paybtn,
+body > :not(#root) .ofi-invd__paybtn {
+    display: inline-flex;
+    width: 100%;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 0;
+    background: #137333;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    transition: background-color 140ms ease;
+}
+#root .ofi-invd__paybtn:hover:not(:disabled),
+body > :not(#root) .ofi-invd__paybtn:hover:not(:disabled) { background: #0f5c28; }
+#root .ofi-invd__paybtn:disabled,
+body > :not(#root) .ofi-invd__paybtn:disabled { cursor: not-allowed; opacity: 0.5; }
+.dark #root .ofi-invd__paybtn,
+.dark body > :not(#root) .ofi-invd__paybtn { background: #1f9d55; color: #04170c; }
+.dark #root .ofi-invd__paybtn:hover:not(:disabled),
+.dark body > :not(#root) .ofi-invd__paybtn:hover:not(:disabled) { background: #29b464; }
+.ofi-invd__paydate { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ofi-cal-muted); }
+#root .ofi-invd__paydate input,
+body > :not(#root) .ofi-invd__paydate input {
+    height: 34px;
+    border: 1px solid var(--ofi-cal-border);
+    background: transparent;
+    padding: 0 10px;
+    font-size: 12.5px;
+    color: var(--ofi-cal-text);
+    outline: none;
+}
+#root .ofi-invd__paydate input:focus,
+body > :not(#root) .ofi-invd__paydate input:focus { border-color: var(--ofi-cal-accent); }
+/* Bereits bezahlt: dieselbe Fläche bestätigt und bietet den Rückweg an —
+   klein, denn ein Zurückdrehen ist die Ausnahme. */
+.ofi-invd__paidmark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(19, 115, 51, 0.28);
+    background: #e6f4ea;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #137333;
+}
+.dark .ofi-invd__paidmark { border-color: rgba(110, 231, 183, 0.3); background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+#root .ofi-invd__undo,
+body > :not(#root) .ofi-invd__undo {
+    align-self: flex-start;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-decoration: underline;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-invd__undo:hover:not(:disabled),
+body > :not(#root) .ofi-invd__undo:hover:not(:disabled) { color: var(--ofi-cal-text); }
+
+/* Die übrigen Angaben — Beschriftung links, Wert rechts, Haarlinie dazwischen. */
+.ofi-invd__rows { margin: 0; border-top: 1px solid var(--ofi-cal-line); padding: 4px 16px; }
+.ofi-invd__row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 8px 0; }
+.ofi-invd__row + .ofi-invd__row { border-top: 1px solid var(--ofi-cal-line); }
+.ofi-invd__row dt { min-width: 0; flex: none; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-invd__row dd {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12.5px;
+    text-align: right;
+    color: var(--ofi-cal-text);
+}
+.ofi-invd__note {
+    margin: 0;
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ofi-cal-muted);
+}
+.ofi-invd__foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid var(--ofi-cal-line);
+    padding: 12px 16px;
+}
+#root .ofi-invd__act,
+body > :not(#root) .ofi-invd__act {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--ofi-cal-border);
+    background: transparent;
+    padding: 0 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+#root .ofi-invd__act:hover:not(:disabled),
+body > :not(#root) .ofi-invd__act:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+#root .ofi-invd__act:disabled,
+body > :not(#root) .ofi-invd__act:disabled { cursor: not-allowed; opacity: 0.45; }
+#root .ofi-invd__act.is-danger:hover:not(:disabled),
+body > :not(#root) .ofi-invd__act.is-danger:hover:not(:disabled) { border-color: #c5221f; background: #fce8e6; color: #c5221f; }
+.dark #root .ofi-invd__act.is-danger:hover:not(:disabled),
+.dark body > :not(#root) .ofi-invd__act.is-danger:hover:not(:disabled) { border-color: #fca5a5; background: rgba(248, 113, 113, 0.18); color: #fca5a5; }
+
+/* Die angeklickte Zeile bleibt sichtbar markiert, solange ihr Blatt offen
+   ist — sonst weiss man nach dem Rollen nicht mehr, wovon das Blatt spricht. */
+.ofi-invp-page table[data-inv-table] tr.ofi-invp-row.is-selected > td { background: var(--ofi-cal-accent-tint); }
+
+
+/* ── Beschreibung IN der Positionszeile ─────────────────────────────────
+   Vorgabe Samet (05.09.2026): „Die Rechnung muss genau der Offertentabelle
+   entsprechen — mit Beschreibung und allem." Auf dem Beleg steht die
+   Beschreibung UNTER der Bezeichnung, also steht sie hier ebenso: im selben
+   Feld der Zeile, eine Stufe leiser.
+
+   Sie trägt bewusst KEINEN Rahmen. Ein zweites gerahmtes Feld in derselben
+   Zelle läse sich als zweite Eingabe gleichen Ranges; die Beschreibung ist
+   aber ein Nachsatz zur Bezeichnung darüber. Solange nichts drinsteht, bleibt
+   sie eine Zeile hoch — eine Tabelle ohne Beschreibungen wird dadurch nicht
+   auseinandergezogen. */
+#root textarea.ofi-invp-linedesc,
+body > :not(#root) textarea.ofi-invp-linedesc {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    border: 0;
+    background: transparent;
+    padding: 0 2px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ofi-cal-muted);
+    outline: none;
+    resize: vertical;
+}
+#root textarea.ofi-invp-linedesc::placeholder,
+body > :not(#root) textarea.ofi-invp-linedesc::placeholder { color: var(--ofi-cal-faint); }
+#root textarea.ofi-invp-linedesc:focus,
+body > :not(#root) textarea.ofi-invp-linedesc:focus { color: var(--ofi-cal-text); }

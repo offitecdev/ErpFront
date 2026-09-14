@@ -10,19 +10,62 @@ import { createPortal } from 'react-dom';
  *
  * Envanterdeki bütün satır içi seçiciler (ürün/malzeme, tedarikçi) bunu paylaşır.
  */
-const computeStyle = (anchorEl: HTMLElement, width: number, maxHeight: number): CSSProperties => {
+const EDGE = 8;
+
+interface Placement {
+    style: CSSProperties;
+    /** Höhe, die der Inhalt (ohne Fusszeile) höchstens bekommt. */
+    bodyMax: number;
+}
+
+/**
+ * Natürliche Höhe des Inhalts: die Kinder des begrenzten Körpers einzeln
+ * gemessen (scrollHeight zählt auch das, was eine scrollende Liste gerade
+ * versteckt) plus die Fusszeile.
+ */
+const naturalHeight = (panelEl: HTMLDivElement | null): { body: number; footer: number } | null => {
+    if (!panelEl) return null;
+    const body = panelEl.firstElementChild as HTMLElement | null;
+    if (!body) return null;
+    let height = 0;
+    for (const child of Array.from(body.children) as HTMLElement[]) height += Math.max(child.scrollHeight, child.offsetHeight);
+    const footer = (panelEl.children[1] as HTMLElement | undefined)?.offsetHeight ?? 0;
+    return { body: height, footer };
+};
+
+/*
+ * Richtung nach Platz (13.09.2026, Samet: «ekrandan çıkmasın»): passt der
+ * Inhalt unter den Auslöser, geht er nach unten; sonst nach oben, wenn er dort
+ * passt; passt er nirgends ganz, auf die Seite mit mehr Platz — und die Liste
+ * wird auf genau diesen Platz begrenzt und scrollt. Das Fenster verlässt den
+ * Bildschirm nie.
+ */
+const computePlacement = (anchorEl: HTMLElement, width: number, maxHeight: number, panelEl: HTMLDivElement | null): Placement => {
     // Savunma: kopmuş bir çapa sayfayı çökertmemeli.
-    if (!anchorEl?.isConnected) return { position: 'fixed', top: -9999, left: -9999, width };
+    if (!anchorEl?.isConnected) return { style: { position: 'fixed', top: -9999, left: -9999, width }, bodyMax: maxHeight };
     const rect = anchorEl.getBoundingClientRect();
-    const panelWidth = Math.min(Math.max(rect.width, width), 420);
-    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - panelWidth - 8));
-    const spaceBelow = window.innerHeight - rect.bottom - 8;
-    // Aşağı açmak varsayılan; sadece liste aşağıya sığmıyorsa ve yukarıda daha
-    // çok yer varsa yön değişir.
-    const flipUp = spaceBelow < Math.min(maxHeight, 220) && rect.top > spaceBelow;
-    return flipUp
-        ? { position: 'fixed', bottom: window.innerHeight - rect.top + 2, left, width: panelWidth }
-        : { position: 'fixed', top: rect.bottom + 2, left, width: panelWidth };
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+    const panelWidth = Math.min(Math.max(rect.width, width), 420, viewportW - EDGE * 2);
+    const left = Math.min(Math.max(EDGE, rect.left), Math.max(EDGE, viewportW - panelWidth - EDGE));
+
+    const measured = naturalHeight(panelEl);
+    const footer = measured?.footer ?? 0;
+    const wanted = Math.min(maxHeight, measured ? measured.body : maxHeight) + footer;
+    const spaceBelow = viewportH - rect.bottom - 2 - EDGE;
+    const spaceAbove = rect.top - 2 - EDGE;
+
+    let up: boolean;
+    if (wanted <= spaceBelow) up = false;
+    else if (wanted <= spaceAbove) up = true;
+    else up = spaceAbove > spaceBelow;
+
+    const room = Math.max(up ? spaceAbove : spaceBelow, 0);
+    const bodyMax = Math.max(Math.min(maxHeight, room - footer), 48);
+    const style: CSSProperties = up
+        ? { position: 'fixed', bottom: viewportH - rect.top + 2, left, width: panelWidth, maxHeight: room }
+        : { position: 'fixed', top: rect.bottom + 2, left, width: panelWidth, maxHeight: room };
+    return { style, bodyMax };
 };
 
 export const AnchoredPicker = ({
@@ -44,7 +87,7 @@ export const AnchoredPicker = ({
     panelClassName?: string;
     children: ReactNode;
 }) => {
-    const [style, setStyle] = useState<CSSProperties>({ position: 'fixed', top: -9999, left: -9999 });
+    const [placement, setPlacement] = useState<Placement>({ style: { position: 'fixed', top: -9999, left: -9999 }, bodyMax: maxHeight });
     const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
 
     // Hücreyi takip et: kaydırma/boyutlandırma başına tek ölçüm (kare başına
@@ -54,7 +97,12 @@ export const AnchoredPicker = ({
         let frame = 0;
         const measure = () => {
             frame = 0;
-            setStyle(computeStyle(anchorEl, width, maxHeight));
+            setPlacement((current) => {
+                const next = computePlacement(anchorEl, width, maxHeight, panelEl);
+                const same = current.bodyMax === next.bodyMax
+                    && JSON.stringify(current.style) === JSON.stringify(next.style);
+                return same ? current : next;
+            });
         };
         const schedule = () => {
             if (frame) return;
@@ -68,14 +116,18 @@ export const AnchoredPicker = ({
         // any animation/transition settles so the panel snaps to the real place.
         window.addEventListener('animationend', schedule, true);
         window.addEventListener('transitionend', schedule, true);
+        // Inhalt wächst/schrumpft (Suche filtert, Daten kommen an) → neu messen.
+        const mutations = panelEl ? new MutationObserver(schedule) : null;
+        mutations?.observe(panelEl as HTMLDivElement, { childList: true, subtree: true, characterData: true });
         return () => {
+            mutations?.disconnect();
             if (frame) window.cancelAnimationFrame(frame);
             window.removeEventListener('scroll', schedule, true);
             window.removeEventListener('resize', schedule);
             window.removeEventListener('animationend', schedule, true);
             window.removeEventListener('transitionend', schedule, true);
         };
-    }, [anchorEl, width, maxHeight]);
+    }, [anchorEl, width, maxHeight, panelEl]);
 
     // Dışarı tıklama (panel ve çapa hariç) ya da Esc kapatır.
     useEffect(() => {
@@ -101,7 +153,7 @@ export const AnchoredPicker = ({
         <div
             ref={setPanelEl}
             role="dialog"
-            style={style}
+            style={placement.style}
             /* `.ofi-pop.is-list` = die Trefferliste der gemeinsamen
                Fensteroberfläche (index.css, "FENSTER-OBERFLÄCHE"): 10px, also
                eine Stufe weniger rund als ein Fenster — sie hängt an einem Feld
@@ -109,7 +161,7 @@ export const AnchoredPicker = ({
                die Liste war das einzige scharfkantige Stück der Kundensuche. */
             className={`ofi-quick-pop ofi-pop is-list z-[1100] flex flex-col overflow-hidden ${panelClassName}`}
         >
-            <div className="flex min-h-0 flex-col" style={{ maxHeight }}>{children}</div>
+            <div className="flex min-h-0 flex-col" style={{ maxHeight: placement.bodyMax }}>{children}</div>
             {footer && <div className="ofi-pop__rule border-t">{footer}</div>}
         </div>,
         document.body,

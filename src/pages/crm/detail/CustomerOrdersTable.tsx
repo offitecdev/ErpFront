@@ -357,13 +357,13 @@ export const CustomerOrdersTable = ({
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') { event.preventDefault(); void bill(order); }
                     }}
-                    className="h-8 w-20 rounded-[2px] border border-slate-300 bg-white px-2 text-right text-[13px] tabular-nums text-slate-800 outline-none transition-colors focus:border-[#1f2654] dark:border-white/20 dark:bg-white/5 dark:text-white"
+                    className="h-8 w-20 rounded-[2px] border border-slate-300 bg-white px-2 text-right text-[13px] tabular-nums text-slate-800 outline-none transition-colors focus:border-[#0066e0] dark:border-white/20 dark:bg-white/5 dark:text-white"
                 />
                 <button
                     type="button"
                     onClick={() => void bill(order)}
                     disabled={billingId === order.id}
-                    className="h-8 rounded-[2px] border border-dashed border-[#1f2654]/45 bg-white px-3 text-[12.5px] font-semibold text-[#1f2654] transition-colors hover:border-[#1f2654] hover:bg-[#f1f5fd] disabled:opacity-50 dark:border-sky-300/40 dark:bg-transparent dark:text-sky-300 dark:hover:bg-white/5"
+                    className="h-8 rounded-[2px] border border-dashed border-[#0066e0]/45 bg-white px-3 text-[12.5px] font-semibold text-[#0066e0] transition-colors hover:border-[#0066e0] hover:bg-[#f1f5fd] disabled:opacity-50 dark:border-sky-300/40 dark:bg-transparent dark:text-sky-300 dark:hover:bg-white/5"
                 >
                     {billingId === order.id ? i18nT('common.loading') : i18nT('billing.buttonLabel')}
                 </button>
@@ -399,7 +399,7 @@ export const CustomerOrdersTable = ({
                                 statuses[index] === 'done'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300'
                                     : statuses[index] === 'next'
-                                        ? 'border-[#1f2654]/35 bg-[#f1f5fd] font-semibold text-[#1f2654] dark:border-sky-300/40 dark:bg-white/5 dark:text-sky-300'
+                                        ? 'border-[#0066e0]/35 bg-[#f1f5fd] font-semibold text-[#0066e0] dark:border-sky-300/40 dark:bg-white/5 dark:text-sky-300'
                                         : 'border-slate-200 bg-white text-slate-400 dark:border-white/10 dark:bg-transparent dark:text-white/35'
                             }`}
                         >
@@ -501,7 +501,7 @@ export const CustomerOrdersTable = ({
                                                 onClick={() => toggle(parent.id)}
                                                 aria-expanded={open}
                                                 aria-label={hasChildren ? i18nT('crm.addonOrders') : i18nT('billing.paymentScheduleTab')}
-                                                className="inline-flex size-5 shrink-0 items-center justify-center rounded-[2px] text-slate-400 transition-colors hover:text-[#1f2654] dark:text-white/40 dark:hover:text-sky-300"
+                                                className="inline-flex size-5 shrink-0 items-center justify-center rounded-[2px] text-slate-400 transition-colors hover:text-[#0066e0] dark:text-white/40 dark:hover:text-sky-300"
                                             >
                                                 {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                             </button>
@@ -517,7 +517,7 @@ export const CustomerOrdersTable = ({
                                             <button
                                                 type="button"
                                                 onClick={() => toggle(parent.id)}
-                                                className="ml-[26px] mt-0.5 block text-[11px] font-semibold text-[#1f2654] hover:underline dark:text-sky-300"
+                                                className="ml-[26px] mt-0.5 block text-[11px] font-semibold text-[#0066e0] hover:underline dark:text-sky-300"
                                             >
                                                 {i18nT('crm.addonOrders')} ({addons.length})
                                             </button>
@@ -534,7 +534,7 @@ export const CustomerOrdersTable = ({
                                     <td className="text-right font-mono text-[13px] font-semibold tabular-nums">
                                         {fmtMoney(group.groupTotal)}
                                     </td>
-                                    <td className="text-right font-mono text-[13px] font-semibold tabular-nums text-[#1f2654] dark:text-sky-300">
+                                    <td className="text-right font-mono text-[13px] font-semibold tabular-nums text-[#0066e0] dark:text-sky-300">
                                         {fmtMoney(group.groupRemaining)}
                                     </td>
                                     <td className="text-right">{billingCell(parent)}</td>

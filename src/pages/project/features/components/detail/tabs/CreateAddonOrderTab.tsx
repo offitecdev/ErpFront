@@ -15,6 +15,7 @@ import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 import { getOrderRecordDate } from '../../../utils/projectOrderScope';
 import { getPendingAddonRequests } from '../../../utils/projectTotals';
 import { money } from '../../../utils/projectFormatters';
+import '@/styles/modules/projectDetail.css';
 
 /**
  * „Zusatzauftrag" — die Seite, auf der aus den seit dem letzten Zusatzauftrag

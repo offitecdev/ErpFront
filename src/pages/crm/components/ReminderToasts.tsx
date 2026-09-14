@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Bell01 as Bell, X as XIcon } from '@/components/icons/antIconCompat';
+import { ArrowRight, Bell01 as Bell, BellRinging, X as XIcon } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
 import { crmApi } from '@/lib/api/crm';
@@ -11,10 +11,14 @@ import { useAuthStore } from '@/store/authStore';
 /**
  * Der Wecker rechts oben: fällige Erinnerungen (Angebot läuft ab, Liefertermin
  * naht) und frische Ereignis-Benachrichtigungen (Montage-Rapport eingegangen,
- * Unterschrift eingegangen, …) blenden ein Fenster ein, das 15 Sekunden
- * herunterzählt und dann von selbst verschwindet. Das X schliesst sofort,
- * "Öffnen" springt zum Beleg bzw. Projekt. Mehrere Fenster stapeln sich; wird
- * der Stapel höher als der Bildschirm, bekommt er eine eigene Bildlaufleiste.
+ * Unterschrift eingegangen, …) blenden einen Mac-Banner ein, der 15 Sekunden
+ * herunterzählt und dann von selbst verschwindet. Der Schliesskreis (links
+ * oben, erscheint unter der Maus) schliesst sofort, «Öffnen» springt zum Beleg
+ * bzw. Projekt. Mehrere Banner stapeln sich; wird der Stapel höher als der
+ * Bildschirm, bekommt er eine eigene Bildlaufleiste.
+ *
+ * Kleid: styles/notifications.css (`.ofi-notice`) — seit 10.09.2026 das
+ * macOS-Banner (Symbolquadrat, Titel, Text, Zeit, 16px-Kante).
  *
  * Erinnerungen werden SOFORT beim Einblenden gestempelt (`ackReminders`), nicht
  * erst beim Wegklicken — sonst zeigt ein zweiter Browser-Tab dieselbe noch
@@ -34,6 +38,8 @@ const VISIBLE_SECONDS = 15;
 const POLL_MS = 60_000;
 /** Beim ersten Blick zählen Benachrichtigungen der letzten Minuten als "frisch". */
 const FIRST_LOOK_BACK_MS = 5 * 60_000;
+/** Dauer der Abgangs-Animation (`ofi-ntf-out` in notifications.css). */
+const LEAVE_MS = 200;
 
 interface ToastItem {
     key: string;
@@ -44,6 +50,8 @@ interface ToastItem {
     linkUrl: string | null;
     /** Verbleibende Sekunden bis zum automatischen Ausblenden. */
     secondsLeft: number;
+    /** Gleitet gerade hinaus — bleibt für die Animation noch kurz im Baum. */
+    leaving?: boolean;
 }
 
 export const ReminderToasts = () => {
@@ -57,8 +65,12 @@ export const ReminderToasts = () => {
     // Takt gesetzt (nicht beim Rendern — der Render bleibt rein).
     const lastNotificationLookRef = useRef<string | null>(null);
 
+    /** Erst hinausgleiten lassen, dann aus dem Baum nehmen. */
     const dismiss = useCallback((key: string) => {
-        setItems((current) => current.filter((item) => item.key !== key));
+        setItems((current) => current.map((item) => (item.key === key ? { ...item, leaving: true } : item)));
+        window.setTimeout(() => {
+            setItems((current) => current.filter((item) => item.key !== key));
+        }, LEAVE_MS);
     }, []);
 
     /** Das X: Erinnerungen endgültig schliessen, Benachrichtigungen nur ausblenden. */
@@ -153,24 +165,37 @@ export const ReminderToasts = () => {
         };
     }, [isAuthenticated]);
 
-    // EIN Zähler für den ganzen Stapel statt einer Uhr pro Fenster.
+    // EIN Zähler für den ganzen Stapel statt einer Uhr pro Fenster. Abgelaufene
+    // Banner gleiten hinaus wie weggeklickte.
     useEffect(() => {
         if (items.length === 0) return;
         const id = setInterval(() => {
-            setItems((current) => current
-                .map((item) => ({ ...item, secondsLeft: item.secondsLeft - 1 }))
-                .filter((item) => item.secondsLeft > 0));
+            setItems((current) => current.map((item) => {
+                if (item.leaving) return item;
+                const secondsLeft = item.secondsLeft - 1;
+                return { ...item, secondsLeft: Math.max(0, secondsLeft), leaving: secondsLeft <= 0 };
+            }));
         }, 1000);
         return () => clearInterval(id);
     }, [items.length]);
+
+    // Ausgelaufene Banner nach der Abgangs-Animation entfernen.
+    useEffect(() => {
+        const expired = items.filter((item) => item.leaving && item.secondsLeft === 0);
+        if (expired.length === 0) return;
+        const id = window.setTimeout(() => {
+            setItems((current) => current.filter((item) => !(item.leaving && item.secondsLeft === 0)));
+        }, LEAVE_MS);
+        return () => window.clearTimeout(id);
+    }, [items]);
 
     if (items.length === 0) return null;
 
     return (
         <div
-            // Rechts, unter der Kopfzeile. Wird der Stapel höher als der Schirm,
-            // rollt er in sich statt die Seite zu verlängern.
-            className="pointer-events-none fixed right-4 top-20 z-[200] flex max-h-[calc(100vh-6rem)] w-[340px] max-w-[calc(100vw-2rem)] flex-col gap-2 overflow-y-auto pr-1"
+            // Rechts oben in der Ecke, über der Kopfzeile. Wird der Stapel höher
+            // als der Schirm, rollt er in sich statt die Seite zu verlängern.
+            className="ofi-notice-stack"
             role="region"
             aria-label={t('crm.reminder.regionLabel')}
         >
@@ -180,65 +205,47 @@ export const ReminderToasts = () => {
                     <div
                         key={item.key}
                         role="alert"
-                        className={`ofi-rise-in pointer-events-auto shrink-0 overflow-hidden rounded-lg border bg-white shadow-lg dark:bg-slate-900 ${reminder
-                            ? 'border-amber-200 dark:border-amber-500/40'
-                            : 'border-sky-200 dark:border-sky-500/40'}`}
+                        className={`ofi-notice${reminder ? ' is-reminder' : ' is-notification'}${item.leaving ? ' is-leaving' : ''}`}
                     >
-                        <div className="flex items-start gap-2.5 p-3">
-                            <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md ${reminder
-                                ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300'
-                                : 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300'}`}>
-                                <Bell size={14} />
-                            </span>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-[11px] font-semibold uppercase tracking-wide ${reminder
-                                        ? 'text-amber-600 dark:text-amber-300'
-                                        : 'text-sky-600 dark:text-sky-300'}`}>
-                                        {reminder ? t('crm.reminder.badge') : t('notify.badge')}
-                                    </span>
-                                    {/* Sichtbarer Countdown — man sieht, wie lange das
-                                        Fenster noch steht, statt es raten zu müssen. */}
-                                    <span className="font-mono text-[11px] tabular-nums text-slate-400">
-                                        {item.secondsLeft}s
-                                    </span>
-                                </div>
-                                <div className="mt-0.5 break-words text-[13px] font-semibold text-slate-900 dark:text-white">
-                                    {item.title}
-                                </div>
-                                {item.subtitle && (
-                                    <div className="mt-0.5 break-words text-[11.5px] text-slate-500 dark:text-white/60">
-                                        {item.subtitle}
-                                    </div>
-                                )}
-                                {/* "Öffnen" — direkt zum Beleg bzw. Projekt. */}
-                                {item.linkUrl && (
-                                    <button
-                                        type="button"
-                                        onClick={() => open(item)}
-                                        className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-[#1f2654] underline-offset-2 hover:underline dark:text-sky-300"
-                                    >
-                                        {reminder ? t('crm.reminder.open') : t('notify.open')}
-                                        <ArrowRight size={11} />
-                                    </button>
-                                )}
+                        {/* Der Mac-Schliesskreis auf der linken oberen Ecke. */}
+                        <button
+                            type="button"
+                            onClick={() => close(item)}
+                            aria-label={reminder ? t('crm.reminders.dismiss') : t('common.close')}
+                            title={reminder ? t('crm.reminders.dismiss') : t('common.close')}
+                            className="ofi-ntf-close"
+                        >
+                            <XIcon size={11} />
+                        </button>
+
+                        {/* Das «App-Symbol»: Erinnerung orange, Ereignis blau. */}
+                        <span className={`ofi-ntf-app ${reminder ? 'is-orange' : 'is-blue'}`} aria-hidden="true">
+                            {reminder ? <Bell size={18} /> : <BellRinging size={18} />}
+                        </span>
+
+                        <div className="ofi-notice__body">
+                            <div className="ofi-notice__head">
+                                <span className="ofi-notice__kind">
+                                    {reminder ? t('crm.reminder.badge') : t('notify.badge')}
+                                </span>
+                                <span className="ofi-notice__time">{t('notify.time.now')}</span>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => close(item)}
-                                aria-label={reminder ? t('crm.reminders.dismiss') : t('common.close')}
-                                title={reminder ? t('crm.reminders.dismiss') : t('common.close')}
-                                className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
-                            >
-                                <XIcon size={13} />
-                            </button>
+                            <p className="ofi-notice__title">{item.title}</p>
+                            {item.subtitle && <p className="ofi-notice__text">{item.subtitle}</p>}
+                            {/* «Öffnen» — direkt zum Beleg bzw. Projekt. */}
+                            {item.linkUrl && (
+                                <div className="ofi-notice__actions">
+                                    <button type="button" onClick={() => open(item)} className="ofi-notice__open">
+                                        {reminder ? t('crm.reminder.open') : t('notify.open')}
+                                        <ArrowRight size={12} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        {/* Der Balken läuft die verbleibenden Sekunden ab. */}
-                        <div className={`h-1 w-full ${reminder ? 'bg-amber-100 dark:bg-amber-500/20' : 'bg-sky-100 dark:bg-sky-500/20'}`}>
-                            <div
-                                className={`h-full transition-[width] duration-1000 ease-linear ${reminder ? 'bg-amber-500' : 'bg-sky-500'}`}
-                                style={{ width: `${(item.secondsLeft / VISIBLE_SECONDS) * 100}%` }}
-                            />
+
+                        {/* Die Restlaufzeit als 2px-Linie am Fuss. */}
+                        <div className="ofi-notice__timer" aria-hidden="true">
+                            <span style={{ width: `${(item.secondsLeft / VISIBLE_SECONDS) * 100}%` }} />
                         </div>
                     </div>
                 );

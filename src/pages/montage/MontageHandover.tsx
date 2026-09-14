@@ -14,6 +14,7 @@ import { HandoverChecklist } from './components/HandoverChecklist';
 import { MontageHeader } from './components/MontageHeader';
 import { MontageImageUpload } from './components/MontageImageUpload';
 import { useHandoverReport } from './hooks/useHandoverReport';
+import '@/styles/modules/reportEditor.css';
 
 type HandoverTab = 'checklist' | 'images' | 'signatures';
 

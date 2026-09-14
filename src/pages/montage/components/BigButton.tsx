@@ -5,8 +5,8 @@ type Tone = 'brand' | 'navy' | 'navyOutline' | 'neutral' | 'success' | 'danger' 
 
 const TONES: Record<Tone, string> = {
     brand: 'bg-[#d30f15] text-white hover:bg-[#b90d12] active:bg-[#a40b10] dark:bg-amber-500 dark:hover:bg-amber-600 dark:active:bg-amber-700',
-    navy: 'bg-[#1f2654] text-white hover:bg-[#171d43] active:bg-[#111634] dark:bg-amber-500 dark:hover:bg-amber-600 dark:active:bg-amber-700',
-    navyOutline: 'border border-[#1f2654] bg-white text-[#1f2654] hover:bg-[#f1f4fa] dark:border-amber-500/70 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10',
+    navy: 'bg-[#0066e0] text-white hover:bg-[#171d43] active:bg-[#111634] dark:bg-amber-500 dark:hover:bg-amber-600 dark:active:bg-amber-700',
+    navyOutline: 'border border-[#0066e0] bg-white text-[#0066e0] hover:bg-[#f1f4fa] dark:border-amber-500/70 dark:bg-transparent dark:text-amber-300 dark:hover:bg-amber-500/10',
     neutral: 'bg-slate-100 text-slate-800 hover:bg-slate-200 active:bg-slate-300 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15',
     success: 'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800',
     danger: 'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800',

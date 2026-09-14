@@ -130,7 +130,7 @@ export const ArticleImagePanel = ({
                                 type="button"
                                 disabled={reading}
                                 onClick={() => fileRef.current?.click()}
-                                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#272f67] hover:text-[#272f67] disabled:opacity-50 dark:border-white/25 dark:text-white/70 dark:hover:border-white/50 dark:hover:text-white"
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 px-3 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0a7aff] hover:text-[#0a7aff] disabled:opacity-50 dark:border-white/25 dark:text-white/70 dark:hover:border-white/50 dark:hover:text-white"
                             >
                                 {reading ? <Spinner size="sm" /> : <UploadCloud02 size={14} />}
                                 {/* Tek görsel tutulur: mevcut görsel varken "değiştir". */}
