@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { LuCircleCheck, LuCopy, LuEllipsis, LuFlag, LuFlagOff, LuSend, LuTrash2, LuUndo2 } from 'react-icons/lu';
+import { LuCircleCheck, LuCopy, LuEllipsis, LuFlag, LuFlagOff, LuTrash2, LuUndo2 } from 'react-icons/lu';
 
 import { DangerConfirmDialog } from '@/components/ui-shared/DangerConfirmDialog';
 import { t } from '@/i18n/translate';
@@ -9,26 +9,26 @@ import { tasksApi, tasksErrorMessage } from '@/lib/api/tasksModule';
 import type { ManualTaskStatus, TaskDetailResult } from '@/types/tasksModule';
 import type { TaskDetailController } from '../../hooks/useTaskDetail';
 import { useIsTasksManager } from '../../store/tasksModuleStore';
-import { MANUAL_STATUSES, statusLabel } from '../../utils/taskFormat';
+import { MANUAL_STATUSES, isTaskLate, statusLabel } from '../../utils/taskFormat';
 import { TaskButton, TaskIconButton } from '../shared/TaskButton';
 import { ReasonDialog } from '../shared/ReasonDialog';
 import { TimerButton } from '../shared/TimerButton';
-import { CompletionRequestDialog } from './CompletionRequestDialog';
 import { PopoverMenu, type MenuEntry } from './PopoverMenu';
 
 /**
  * Handlungen im Kopf der Detailseite (Görevly taskDetail → setToolbar):
- * Start/Pause, «Tamamlama isteği», für die Leitung «Tamamla» (das eine Blau)
- * und ⋯ mit Bayrak, Durum, Kopyala, Sil. Was sichtbar ist, entscheiden die
- * Rechte des Servers (`permissions`) — die Leitung erkennt die Seite zusätzlich
- * am Bootstrap.
+ * Start/Pause, «Tamamla» (das eine Blau) und ⋯ mit Bayrak, Durum, Kopyala,
+ * Sil. Seit dem 16.09.2026 gibt es keine Abschlussanfrage mehr: wer messen
+ * darf, schliesst selbst ab. Was sichtbar ist, entscheiden die Rechte des
+ * Servers (`permissions`) — die Leitung erkennt die Seite zusätzlich am
+ * Bootstrap.
  */
 export const DetailActions = ({ ctl, data }: { ctl: TaskDetailController; data: TaskDetailResult }) => {
     const navigate = useNavigate();
     const isManager = useIsTasksManager();
     const { task, permissions } = data;
     const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
-    const [dialog, setDialog] = useState<'request' | 'block' | 'delete' | 'deleteRequest' | null>(null);
+    const [dialog, setDialog] = useState<'delay' | 'block' | 'delete' | 'deleteRequest' | null>(null);
     const [busy, setBusy] = useState(false);
 
     const run = async (fn: () => Promise<boolean>) => {
@@ -46,8 +46,15 @@ export const DetailActions = ({ ctl, data }: { ctl: TaskDetailController; data: 
     });
 
     const openItems = Math.max(0, task.checklist.total - task.checklist.done);
-    // Abschliessen nur die Administratorrolle (13.09.2026) — alle anderen beantragen.
-    const canComplete = permissions.canApproveCompletion && task.status !== 'COMPLETED' && task.approval.state !== 'PENDING';
+    // Überfällig hält der Abschluss einmal an: die Gecikme açıklaması ist Pflicht.
+    const complete = (delayReason?: string) => run(async () => {
+        const result = await ctl.act(() => tasksApi.complete(task.id, delayReason));
+        if (result) {
+            setDialog(null);
+            toast.success(t('tasksModule.detail.completed'));
+        }
+        return result !== null;
+    });
 
     const entries: MenuEntry[] = [];
     if (permissions.canFlag) {
@@ -61,7 +68,7 @@ export const DetailActions = ({ ctl, data }: { ctl: TaskDetailController; data: 
     if (isManager) {
         if (entries.length) entries.push({ kind: 'separator', key: 'sep-status' });
         entries.push({ kind: 'caption', key: 'status-caption', label: t('tasksModule.detail.statusCaption') });
-        for (const status of MANUAL_STATUSES.filter((entry) => permissions.canApproveCompletion || entry !== 'COMPLETED')) {
+        for (const status of MANUAL_STATUSES) {
             entries.push({
                 key: `status-${status}`,
                 label: statusLabel(status),
@@ -122,18 +129,13 @@ export const DetailActions = ({ ctl, data }: { ctl: TaskDetailController; data: 
 
     return (
         <>
-            {permissions.canTrack && <TimerButton taskId={task.id} running={task.timer.runningForMe} />}
-            {permissions.canRequestCompletion && (
-                <TaskButton icon={<LuSend size={14} />} disabled={busy} onClick={() => setDialog('request')}>
-                    {t('tasksModule.detail.requestCompletion')}
-                </TaskButton>
-            )}
-            {canComplete && (
+            {permissions.canTrack && <TimerButton taskId={task.id} running={task.timer.runningForMe} taskTitle={task.title} />}
+            {permissions.canComplete && (
                 <TaskButton
                     variant="primary"
                     icon={<LuCircleCheck size={14} />}
                     disabled={busy}
-                    onClick={() => void setStatus('COMPLETED')}
+                    onClick={() => (isTaskLate(task, Date.now()) ? setDialog('delay') : void complete())}
                 >
                     {t('tasksModule.detail.complete')}
                 </TaskButton>
@@ -156,19 +158,23 @@ export const DetailActions = ({ ctl, data }: { ctl: TaskDetailController; data: 
                 label={t('tasksModule.detail.more')}
             />
 
-            <CompletionRequestDialog
-                open={dialog === 'request'}
-                openItems={openItems}
-                busy={busy}
+            {/* Nur die ÜBERFÄLLIGE Aufgabe fragt vor dem Abschluss nach (15.09.2026). */}
+            <ReasonDialog
+                open={dialog === 'delay'}
                 onClose={() => setDialog(null)}
-                onConfirm={(note) => void run(async () => {
-                    const result = await ctl.act(() => tasksApi.requestCompletion(task.id, note || undefined));
-                    if (result) {
-                        setDialog(null);
-                        toast.success(t('tasksModule.detail.requestSent'));
-                    }
-                    return result !== null;
-                })}
+                onConfirm={(text) => void complete(text)}
+                title={t('tasksModule.delay.dialogTitle')}
+                subtitle={task.title}
+                label={t('tasksModule.delay.label')}
+                confirmLabel={t('tasksModule.detail.complete')}
+                note={(
+                    <>
+                        {t('tasksModule.delay.dialogCallout')}
+                        {openItems > 0 && <div>{t('tasksModule.detail.openItems', { count: openItems })}</div>}
+                    </>
+                )}
+                required
+                busy={busy}
             />
 
             <ReasonDialog

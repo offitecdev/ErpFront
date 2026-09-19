@@ -59,6 +59,8 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
                 'tenders.create', 'tenders.update', 'tenders.manage', 'tenders.calculate',
                 'tenders.import', 'tenders.export', 'tenders.approve',
             ],
+            // Rücknahmen als eigene Rechte (16.09.2026).
+            delete: ['tenders.cancel', 'salesOrders.cancel', 'salesOrders.revert'],
         },
     },
     {
@@ -77,6 +79,7 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
                 'projects.createAddonOrder', 'projects.approveVariation', 'projects.bookings.manage',
                 'projects.mail', 'mail.manage', 'mail.send',
             ],
+            delete: ['projects.cancel'],
         },
     },
     {
@@ -137,11 +140,13 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         key: 'billing',
         labelKey: 'modules.billing',
         labelDefault: 'Faturalama',
-        menuKeys: [],
-        pathPrefixes: [],
+        // Buchhaltung (16.09.2026): die Rechnungen haben ihr eigenes Menü.
+        menuKeys: ['accounting'],
+        pathPrefixes: ['/accounting'],
         actions: {
             read: ['billing.view'],
             write: ['billing.create', 'billing.manage'],
+            delete: ['invoices.cancel'],
         },
     },
     {
@@ -187,7 +192,7 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         // IT-Administration und hängt an einem Kennwort, nicht an einem Recht —
         // ohne diesen längeren Präfix fiele er an das settings-Modul und eine
         // Firmenkategorie ohne 'settings' würde die IT aussperren.
-        pathPrefixes: ['/settings/company-categories', '/settings/authorization', '/settings/modules', '/settings/reminders', '/settings/upload'],
+        pathPrefixes: ['/settings/company-categories', '/settings/authorization', '/settings/modules', '/settings/reminders', '/settings/upload', '/settings/two-factor'],
         actions: {
             write: ['roles.manage', 'users.manage', 'tenants.create', 'tenants.update'],
         },

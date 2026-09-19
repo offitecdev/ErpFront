@@ -44,7 +44,7 @@ export const useLiveOverview = ({ enabled }: { enabled: boolean }) => {
         try {
             const result = await tasksApi.live(todayBounds());
             if (current !== seq.current) return;
-            noteServerNow(result.serverNow);
+            noteServerNow(result.serverNow, true);
             writeTasksCache(CACHE_KEY, result);
             setData(result);
             setError(null);

@@ -9,6 +9,7 @@ import type { PeopleMap, TaskComment, TaskDetailResult } from '@/types/tasksModu
 import type { TaskDetailController } from '../../hooks/useTaskDetail';
 import { useNow } from '../../hooks/useNow';
 import { useTasksActorId } from '../../store/tasksModuleStore';
+import { clipboardFiles } from '../../utils/clipboardFiles';
 import { formatBytes, formatDayTime, personName, relativeTime } from '../../utils/taskFormat';
 import { TaskButton, TaskIconButton } from '../shared/TaskButton';
 import { AttachmentChip } from './AttachmentChip';
@@ -90,7 +91,7 @@ export const CommentsTab = ({ ctl, data }: { ctl: TaskDetailController; data: Ta
         }
     };
 
-    const addFiles = (list: FileList | null) => {
+    const addFiles = (list: FileList | File[] | null) => {
         const chosen = Array.from(list ?? []);
         if (!chosen.length) return;
         const next = [...files, ...chosen];
@@ -154,6 +155,13 @@ export const CommentsTab = ({ ctl, data }: { ctl: TaskDetailController; data: Ta
                         aria-label={t('tasksModule.comments.placeholder')}
                         className="ofi-gv-comments__input"
                         onChange={(event) => setText(event.target.value)}
+                        onPaste={(event) => {
+                            // Kopiertes Bild (Strg/⌘+V) wird Anhang des Kommentars; Text fügt sich normal ein.
+                            const pasted = clipboardFiles(event.clipboardData);
+                            if (!pasted.length) return;
+                            event.preventDefault();
+                            addFiles(pasted);
+                        }}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                                 event.preventDefault();

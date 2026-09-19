@@ -1,0 +1,438 @@
+/* ── Gün sonu raporu: Uyarı + Fenster (DailyReportPrompt) ─────────────────────
+   15.09.2026, Samet: «çok renkli, AI gibi — macOS/iOS gibi, takvimdeki pop-up
+   gibi». Glasfläche, Werte und Abstände wie styles/calendarPopover.css
+   (maccalendar2.png): 26px Ecke, gruppierte 16px-Kästen, 15px Text, EIN
+   Systemblau. Kein Farbverlauf, kein Icon. Hängt an document.body. */
+
+.ofi-dr-modal,
+.ofi-dr-notice {
+    --dr-glass: rgba(250, 250, 249, 0.8);
+    --dr-box: rgba(120, 120, 128, 0.065);
+    --dr-line: rgba(60, 60, 67, 0.09);
+    --dr-border: rgba(0, 0, 0, 0.18);
+    --dr-text: #1d1d1f;
+    --dr-secondary: #7c7c7e;
+    --dr-muted: #b2b2b4;
+    --dr-accent: #0a7aff;
+    --dr-accent-hover: #0066d6;
+    --dr-accent-soft: rgba(10, 122, 255, 0.14);
+    --dr-success: #34c759;
+    --dr-danger: #ff3b30;
+    --dr-font: -apple-system, BlinkMacSystemFont, 'Inter Variable', 'Segoe UI', sans-serif;
+    font-family: var(--dr-font);
+    -webkit-font-smoothing: antialiased;
+}
+
+.dark .ofi-dr-modal,
+.dark .ofi-dr-notice {
+    --dr-glass: rgba(43, 43, 45, 0.84);
+    --dr-box: rgba(255, 255, 255, 0.065);
+    --dr-line: rgba(255, 255, 255, 0.08);
+    --dr-border: rgba(0, 0, 0, 0.4);
+    --dr-text: #ececed;
+    --dr-secondary: #ababaf;
+    --dr-muted: #818185;
+    --dr-accent: #0a84ff;
+    --dr-accent-hover: #409cff;
+    --dr-accent-soft: rgba(10, 132, 255, 0.2);
+    --dr-success: #30d158;
+    --dr-danger: #ff453a;
+}
+
+.ofi-dr-modal button,
+.ofi-dr-notice button { font: inherit; cursor: pointer; }
+
+/* ── Uyarı: macOS-Mitteilung oben rechts ── */
+.ofi-dr-notice {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 60px);
+    right: 16px;
+    z-index: 12500;
+    width: min(344px, calc(100vw - 32px));
+    border: 1px solid var(--dr-border);
+    border-radius: 18px;
+    background: var(--dr-glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+    backdrop-filter: blur(22px) saturate(1.45);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 6px 24px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
+    animation: ofi-dr-slide 260ms cubic-bezier(.2, .8, .2, 1);
+}
+.dark .ofi-dr-notice { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 6px 24px rgba(0, 0, 0, 0.4); }
+
+.ofi-dr-notice__main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 12px 40px 12px 16px;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: var(--dr-text);
+    text-align: left;
+}
+.ofi-dr-notice__main:hover { background: var(--dr-box); }
+.ofi-dr-notice__main:focus-visible { outline: 3px solid var(--dr-accent-soft); outline-offset: 0; }
+.ofi-dr-notice__title { font-size: 13px; font-weight: 600; line-height: 18px; }
+.ofi-dr-notice__body { color: var(--dr-secondary); font-size: 13px; line-height: 18px; }
+
+.ofi-dr-notice__close {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-top: -10px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--dr-box);
+    color: var(--dr-secondary);
+}
+.ofi-dr-notice__close:hover { background: var(--dr-line); color: var(--dr-text); }
+
+/* ── Fenster ── */
+.ofi-dr-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 12500;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.18);
+    animation: ofi-dr-fade 160ms ease-out;
+}
+.dark .ofi-dr-modal { background: rgba(0, 0, 0, 0.4); }
+
+.ofi-dr {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: min(760px, 100%);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: 16px 12px 12px;
+    border: 1px solid var(--dr-border);
+    border-radius: 26px;
+    background: var(--dr-glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+    backdrop-filter: blur(22px) saturate(1.45);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75), 0 3px 16px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.08);
+    color: var(--dr-text);
+    animation: ofi-dr-rise 200ms cubic-bezier(.2, .8, .2, 1);
+}
+.dark .ofi-dr { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 3px 18px rgba(0, 0, 0, 0.35); }
+.ofi-dr button:disabled { cursor: default; opacity: .5; }
+
+/* Kopf */
+.ofi-dr__head { display: flex; align-items: flex-start; gap: 12px; padding: 0 4px 0 12px; }
+.ofi-dr__heading { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.ofi-dr__heading h2 { margin: 0; color: var(--dr-text); font-size: 22px; font-weight: 650; line-height: 28px; letter-spacing: -0.5px; }
+.ofi-dr__heading span { color: var(--dr-secondary); font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
+.ofi-dr__close {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    margin-top: 2px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--dr-box);
+    color: var(--dr-secondary);
+}
+.ofi-dr__close:hover { background: var(--dr-line); color: var(--dr-text); }
+
+/* Bu hafta — ein Kasten, fünf Tage */
+.ofi-dr__week {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: var(--dr-box);
+    list-style: none;
+}
+.ofi-dr__week li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 40px; }
+.ofi-dr__week-day { color: var(--dr-secondary); font-size: 11px; font-weight: 500; text-transform: capitalize; }
+.ofi-dr__week-mark {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: var(--dr-text);
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-dr__week li.is-today .ofi-dr__week-day { color: var(--dr-accent); font-weight: 600; }
+.ofi-dr__week li.is-today .ofi-dr__week-mark { background: var(--dr-accent); color: #fff; font-weight: 600; }
+.ofi-dr__week li.is-done .ofi-dr__week-mark { background: var(--dr-line); color: var(--dr-text); }
+.ofi-dr__week li.is-today.is-done .ofi-dr__week-mark { background: var(--dr-accent); color: #fff; }
+.ofi-dr__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── Das Blatt, auf dem im Bild geschrieben wird (16.09.2026) ──────────────
+   Samet: «ön izleme olmasın — direkt kalın yapsın, italik yapsın, görsel de
+   öyle görünsün». Die Fläche trägt darum dieselben Regeln wie der fertige
+   Rapport (`ofi-md`, tasksMarkdown.css); darüber nur die Werkzeugleiste. */
+.ofi-dr__bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px 7px;
+}
+
+.ofi-dr__label-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--dr-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-dr__editor {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid var(--dr-line);
+    border-radius: 16px;
+    background: #fff;
+    color: #1d1d1f;
+    color-scheme: light;
+    overflow: hidden;
+}
+
+.ofi-dr__editor.is-locked { opacity: 0.75; }
+
+.ofi-dr__toolbar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #ececee;
+    background: #fafafa;
+}
+
+.ofi-dr__toolbar-gap {
+    width: 1px;
+    height: 18px;
+    margin: 0 6px;
+    background: #e3e3e5;
+}
+
+.ofi-dr__toolbar-note { margin-left: auto; color: #8e8e93; font-size: 12px; }
+
+.ofi-dr__tool {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #3c3c43;
+}
+
+.ofi-dr__tool:hover:not(:disabled) { background: rgba(120, 120, 128, 0.12); color: #1d1d1f; }
+.ofi-dr__tool:active:not(:disabled) { background: rgba(120, 120, 128, 0.2); }
+.ofi-dr__picker { display: none; }
+
+/* Adresse eingeben: ein kleiner Kasten in der Leiste, kein Systemfenster. */
+.ofi-dr__linkbox {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 8px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid var(--dr-border);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+#root .ofi-dr__linkbox input,
+body > :not(#root) .ofi-dr__linkbox input {
+    width: min(320px, 50vw);
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid #e3e3e5;
+    border-radius: 8px;
+    outline: none;
+    background: #fff;
+    box-shadow: none;
+    color: #1d1d1f;
+    font: 400 14px/20px var(--dr-font);
+}
+
+.ofi-dr__linkbox-ok,
+.ofi-dr__linkbox-cancel {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #3c3c43;
+}
+
+.ofi-dr__linkbox-ok { color: #0a7aff; }
+.ofi-dr__linkbox-ok:hover, .ofi-dr__linkbox-cancel:hover { background: rgba(120, 120, 128, 0.12); }
+
+/* Die beschreibbare Fläche: sieht aus wie das gedruckte Blatt. */
+#root .ofi-dr__sheet,
+body > :not(#root) .ofi-dr__sheet {
+    position: relative;
+    flex: 1;
+    min-height: 280px;
+    max-height: min(52vh, 520px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: 16px 18px;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    color: #1d1d1f;
+    font-size: 15px;
+    line-height: 1.55;
+    --md-muted: #6e6e73;
+    --md-line: rgba(0, 0, 0, 0.1);
+    --md-link: #0a7aff;
+}
+
+.ofi-dr__sheet[data-empty="true"]::before {
+    content: attr(data-placeholder);
+    position: absolute;
+    color: #b2b2b4;
+    pointer-events: none;
+}
+
+/* Was der Browser beim Auszeichnen schreibt, sieht aus wie im Rapport. */
+.ofi-dr__sheet > * { margin: 0 0 9px; }
+.ofi-dr__sheet > :last-child { margin-bottom: 0; }
+.ofi-dr__sheet h2 { font-size: 18px; font-weight: 650; line-height: 1.3; margin: 16px 0 7px; }
+.ofi-dr__sheet h3 { font-size: 16px; font-weight: 650; line-height: 1.3; margin: 16px 0 7px; }
+.ofi-dr__sheet h4 { font-size: 14.5px; font-weight: 650; line-height: 1.3; margin: 16px 0 7px; }
+.ofi-dr__sheet > :first-child { margin-top: 0; }
+.ofi-dr__sheet ul { list-style: disc; padding-left: 20px; }
+.ofi-dr__sheet ol { list-style: decimal; padding-left: 20px; }
+.ofi-dr__sheet li { margin: 2px 0; }
+.ofi-dr__sheet blockquote { padding: 2px 0 2px 12px; border-left: 2px solid var(--md-line); color: var(--md-muted); }
+.ofi-dr__sheet hr { height: 0; margin: 14px 0; border: 0; border-top: 1px solid var(--md-line); }
+.ofi-dr__sheet a { color: var(--md-link); text-decoration: underline; text-underline-offset: 2px; }
+.ofi-dr__sheet code { padding: 1px 5px; border-radius: 5px; background: rgba(120, 120, 128, 0.12); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+
+.ofi-dr__sheet img {
+    display: block;
+    max-width: 100%;
+    max-height: 260px;
+    margin: 10px 0;
+    border: 1px solid var(--md-line);
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.ofi-dr__paper-muted { margin: 0; padding: 16px 18px; color: #8e8e93; font-size: 15px; }
+
+/* Anhänge: Name, darunter die volle Adresse — anklickbar (Vorgabe 16.09.2026). */
+.ofi-dr__files {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 4px 12px;
+    border-radius: 16px;
+    background: var(--dr-box);
+    list-style: none;
+}
+
+.ofi-dr__files li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 0;
+}
+
+.ofi-dr__files li + li { border-top: 1px solid var(--dr-line); }
+.ofi-dr__files li > svg { flex: none; margin-top: 3px; color: var(--dr-muted); }
+
+.ofi-dr__files a {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--dr-text);
+    text-decoration: none;
+}
+
+.ofi-dr__file-name { font-size: 14px; font-weight: 500; }
+
+.ofi-dr__file-url {
+    color: var(--dr-secondary);
+    font-size: 11px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+}
+
+.ofi-dr__file-remove {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--dr-muted);
+}
+
+.ofi-dr__file-remove:hover:not(:disabled) { background: var(--dr-line); color: var(--dr-text); }
+
+.ofi-dr__hint { margin: 0 12px; color: var(--dr-secondary); font-size: 12px; line-height: 16px; }
+
+.ofi-dr__error { margin: 0 12px; color: var(--dr-danger); font-size: 13px; line-height: 18px; }
+
+/* Fuss: zwei Kapseln wie im Kalender */
+.ofi-dr__actions { display: flex; justify-content: flex-end; gap: 8px; padding: 2px 0 0; }
+.ofi-dr__later,
+.ofi-dr__save { height: 34px; padding: 0 18px; border: 0; border-radius: 999px; font-size: 15px; font-weight: 500; }
+.ofi-dr__later { background: var(--dr-box); color: var(--dr-text); }
+.ofi-dr__later:hover:not(:disabled) { background: var(--dr-line); }
+.ofi-dr__save { background: var(--dr-accent); color: #fff; }
+.ofi-dr__save:hover:not(:disabled) { background: var(--dr-accent-hover); }
+.ofi-dr__saved { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 6px; color: var(--dr-text); font-size: 15px; font-weight: 500; }
+.ofi-dr__saved svg { color: var(--dr-success); }
+
+@keyframes ofi-dr-fade { from { opacity: 0; } }
+@keyframes ofi-dr-rise { from { opacity: 0; transform: scale(.97); } }
+@keyframes ofi-dr-slide { from { opacity: 0; transform: translateX(24px); } }
+
+@media (max-width: 600px) {
+    .ofi-dr-modal { padding: 12px; place-items: end center; }
+    .ofi-dr { border-radius: 22px; }
+    .ofi-dr__actions > button { flex: 1; }
+    .ofi-dr__toolbar { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-dr-modal, .ofi-dr, .ofi-dr-notice { animation: none; }
+}

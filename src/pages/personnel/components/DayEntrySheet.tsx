@@ -14,6 +14,7 @@ import {
 } from '../utils/format';
 import { PersonnelSheet } from './PersonnelSheet';
 import { CELL_INPUT_CLASS, GhostButton, PrimaryButton } from './primitives';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /**
  * ── EINEN TAG KORRIGIEREN ────────────────────────────────────────────────────
@@ -201,23 +202,39 @@ export const DayEntrySheet = ({
                             <div className="grid gap-2 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1">
                                     <span className="text-[11px] text-slate-500 dark:text-white/60">{t('personnel.field.checkIn')}</span>
-                                    <input
-                                        type="datetime-local"
-                                        disabled={segment.removed}
-                                        value={segment.startedAt}
-                                        onChange={(event) => patch(index, { startedAt: event.target.value })}
-                                        className={CELL_INPUT_CLASS}
-                                    />
+                                    <span className="flex gap-2">
+                                        <MacDatePicker
+                                            disabled={segment.removed}
+                                            value={segment.startedAt.slice(0, 10)}
+                                            onChange={(nextDate) => patch(index, { startedAt: `${nextDate}T${segment.startedAt.slice(11, 16) || '00:00'}` })}
+                                            className="is-field-sm"
+                                        />
+                                        <input
+                                            type="time"
+                                            disabled={segment.removed}
+                                            value={segment.startedAt.slice(11, 16)}
+                                            onChange={(event) => patch(index, { startedAt: `${segment.startedAt.slice(0, 10) || new Date().toISOString().slice(0, 10)}T${event.target.value}` })}
+                                            className={`${CELL_INPUT_CLASS} w-[96px] flex-none`}
+                                        />
+                                    </span>
                                 </label>
                                 <label className="flex flex-col gap-1">
                                     <span className="text-[11px] text-slate-500 dark:text-white/60">{t('personnel.field.checkOut')}</span>
-                                    <input
-                                        type="datetime-local"
-                                        disabled={segment.removed}
-                                        value={segment.endedAt}
-                                        onChange={(event) => patch(index, { endedAt: event.target.value })}
-                                        className={CELL_INPUT_CLASS}
-                                    />
+                                    <span className="flex gap-2">
+                                        <MacDatePicker
+                                            disabled={segment.removed}
+                                            value={segment.endedAt.slice(0, 10)}
+                                            onChange={(nextDate) => patch(index, { endedAt: `${nextDate}T${segment.endedAt.slice(11, 16) || '00:00'}` })}
+                                            className="is-field-sm"
+                                        />
+                                        <input
+                                            type="time"
+                                            disabled={segment.removed}
+                                            value={segment.endedAt.slice(11, 16)}
+                                            onChange={(event) => patch(index, { endedAt: `${segment.endedAt.slice(0, 10) || new Date().toISOString().slice(0, 10)}T${event.target.value}` })}
+                                            className={`${CELL_INPUT_CLASS} w-[96px] flex-none`}
+                                        />
+                                    </span>
                                 </label>
                             </div>
                         ) : (

@@ -45,6 +45,8 @@ export interface CatalogPageDto {
     path: string;
     labelKey: string;
     maxLevel: PageLevel;
+    /** Was ein Rang auf dieser Seite heisst (i18n-Schlüssel), z. B. Stufe 3 = stornieren. */
+    levelHints?: Partial<Record<PageLevel, string>>;
 }
 
 export interface CatalogModuleDto {

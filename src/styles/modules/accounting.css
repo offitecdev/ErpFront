@@ -1,0 +1,684 @@
+/* =========================================================
+   BUCHHALTUNG — macOS / SwiftUI (16.09.2026, Schritt 5)
+
+   Vorgabe Samet: «Rechnungen gehören in die Buchhaltung — an EINE
+   Stelle, sauber kontrollierbar, leicht zu bedienen», im Kleid der
+   übrigen Mac-Seiten: weisse Tafeln mit EINER Haarlinie, 10px Ecke,
+   keine Schatten, Segmentsteuerung mit grauer Rinne, gruppierte
+   Listen wie in den Systemeinstellungen, EIN Systemblau.
+
+   Alles steht unter `.acc` — keine Regel greift ausserhalb.
+   ========================================================= */
+
+.acc {
+    --acc-surface: #ffffff;
+    --acc-ground: #f5f5f7;
+    --acc-group: rgba(120, 120, 128, 0.08);
+    --acc-rail: rgba(120, 120, 128, 0.12);
+    --acc-text: #1d1d1f;
+    --acc-secondary: #6e6e73;
+    --acc-tertiary: #a1a1a6;
+    --acc-border: rgba(0, 0, 0, 0.1);
+    --acc-hairline: rgba(0, 0, 0, 0.07);
+    --acc-field: rgba(0, 0, 0, 0.15);
+    --acc-hover: rgba(0, 0, 0, 0.035);
+    --acc-accent: #0a7aff;
+    --acc-accent-soft: rgba(10, 122, 255, 0.1);
+    --acc-focus: rgba(10, 122, 255, 0.32);
+    --acc-green: #1f8a3b;
+    --acc-green-soft: rgba(52, 199, 89, 0.12);
+    --acc-orange: #b25000;
+    --acc-red: #d70015;
+    --acc-red-soft: rgba(255, 59, 48, 0.1);
+    --acc-seg-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    --acc-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    color: var(--acc-text);
+    font-feature-settings: 'cv11', 'calt';
+    -webkit-font-smoothing: antialiased;
+}
+html.dark .acc {
+    --acc-surface: #1c1c1e;
+    --acc-ground: #2c2c2e;
+    --acc-group: rgba(255, 255, 255, 0.05);
+    --acc-rail: rgba(255, 255, 255, 0.08);
+    --acc-text: #f5f5f7;
+    --acc-secondary: #a1a1a6;
+    --acc-tertiary: #6e6e73;
+    --acc-border: rgba(255, 255, 255, 0.1);
+    --acc-hairline: rgba(255, 255, 255, 0.08);
+    --acc-field: rgba(255, 255, 255, 0.16);
+    --acc-hover: rgba(255, 255, 255, 0.05);
+    --acc-accent: #3b8dff;
+    --acc-accent-soft: rgba(59, 141, 255, 0.18);
+    --acc-focus: rgba(59, 141, 255, 0.42);
+    --acc-green: #30d158;
+    --acc-green-soft: rgba(48, 209, 88, 0.16);
+    --acc-orange: #ffb340;
+    --acc-red: #ff453a;
+    --acc-red-soft: rgba(255, 69, 58, 0.16);
+    --acc-seg-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.5);
+}
+html.dark #root .acc h1 { color: var(--acc-text); }
+
+/* ── Kopf ─────────────────────────────────────────────────── */
+.acc-sub {
+    margin-top: -10px;
+    font-size: 13px;
+    color: var(--acc-secondary);
+}
+
+/* ── Die vier Zahlen ──────────────────────────────────────── */
+.acc-figures {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+.acc-figure {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+    text-align: left;
+    color: inherit;
+    transition: background-color .15s, border-color .15s;
+}
+.acc-figure:hover { background: var(--acc-hover); }
+.acc-figure.is-on { border-color: var(--acc-accent); box-shadow: 0 0 0 1px var(--acc-accent) inset; }
+.acc-figure__label {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--acc-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.acc-figure__value {
+    overflow: hidden;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.acc-figure__value.is-red { color: var(--acc-red); }
+.acc-figure__value.is-green { color: var(--acc-green); }
+.acc-figure__sub { font-size: 12px; color: var(--acc-tertiary); }
+
+.acc-figures--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Hinweise (zu verrechnen, Rückzahlungen) */
+.acc-hints { display: flex; flex-wrap: wrap; gap: 8px; }
+.acc-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--acc-border);
+    border-radius: 8px;
+    background: var(--acc-surface);
+    font-size: 12.5px;
+    color: var(--acc-text);
+    transition: background-color .15s;
+}
+.acc-hint:hover { background: var(--acc-hover); }
+.acc-hint__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--acc-red); }
+.acc-hint__dot.is-orange { background: var(--acc-orange); }
+
+/* Altersstruktur überfälliger Beträge */
+.acc-aging {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+}
+.acc-aging__cell { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 10px 14px; border-left: 3px solid transparent; }
+.acc-aging__cell + .acc-aging__cell { box-shadow: inset 1px 0 0 var(--acc-hairline); }
+.acc-aging__cell.is-1-30 { border-left-color: rgba(255, 159, 10, 0.55); }
+.acc-aging__cell.is-31-60 { border-left-color: rgba(255, 105, 0, 0.7); }
+.acc-aging__cell.is-61-90 { border-left-color: rgba(255, 59, 48, 0.75); }
+.acc-aging__cell.is-90plus { border-left-color: var(--acc-red); }
+.acc-aging__label { font-size: 12px; color: var(--acc-secondary); }
+.acc-aging__value { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.acc-aging__sub { font-size: 11.5px; color: var(--acc-tertiary); }
+
+/* Zahlungseingänge im Inspektor */
+.acc-pay { display: grid; grid-template-columns: minmax(0, 1fr) auto 22px; align-items: center; gap: 8px; }
+.acc-pay__amount { font-variant-numeric: tabular-nums; font-weight: 600; }
+.acc-pay__remove {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--acc-tertiary);
+    transition: background-color .15s, color .15s;
+}
+.acc-pay__remove:hover { background: var(--acc-red-soft); color: var(--acc-red); }
+.acc-progress { height: 4px; overflow: hidden; border-radius: 2px; background: var(--acc-rail); }
+.acc-progress > span { display: block; height: 100%; border-radius: 2px; background: var(--acc-green); }
+
+/* ── Segmentsteuerung ─────────────────────────────────────── */
+.acc-seg {
+    display: inline-flex;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--acc-rail);
+    scrollbar-width: none;
+}
+.acc-seg::-webkit-scrollbar { display: none; }
+.acc-seg button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--acc-secondary);
+    white-space: nowrap;
+    transition: background-color .15s, color .15s;
+}
+.acc-seg button:hover { color: var(--acc-text); }
+.acc-seg button.is-on {
+    background: var(--acc-surface);
+    color: var(--acc-text);
+    box-shadow: var(--acc-seg-shadow);
+}
+html.dark .acc-seg button.is-on { background: #636366; }
+.acc-seg__count {
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--acc-rail);
+    font-size: 11px;
+    line-height: 16px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.acc-seg__count.is-red { background: var(--acc-red-soft); color: var(--acc-red); }
+
+.acc-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+/* ── Tafel + Tabelle ──────────────────────────────────────── */
+.acc-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+}
+.acc-scroll { overflow-x: auto; }
+#root .acc table.acc-table {
+    width: 100%;
+    min-width: 860px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+#root .acc .acc-table th {
+    height: 34px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--acc-hairline);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--acc-secondary);
+    text-align: left;
+    white-space: nowrap;
+}
+#root .acc .acc-table td {
+    height: 46px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--acc-hairline);
+    vertical-align: middle;
+}
+#root .acc .acc-table tbody tr:last-child td { border-bottom: 0; }
+#root .acc .acc-table tbody tr { cursor: pointer; transition: background-color .12s; }
+#root .acc .acc-table tbody tr:hover { background: var(--acc-hover); }
+#root .acc .acc-table tbody tr.is-muted { color: var(--acc-tertiary); }
+#root .acc .acc-table th.is-num,
+.acc-table .is-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.acc-strong { font-weight: 600; }
+.acc-muted { color: var(--acc-secondary); }
+.acc-faint { color: var(--acc-tertiary); }
+.acc-red { color: var(--acc-red); }
+.acc-line2 {
+    display: block;
+    overflow: hidden;
+    max-width: 260px;
+    font-size: 12px;
+    color: var(--acc-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.acc-name {
+    display: block;
+    overflow: hidden;
+    max-width: 260px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.acc-struck { text-decoration: line-through; }
+.acc-empty {
+    padding: 44px 16px;
+    font-size: 13px;
+    color: var(--acc-secondary);
+    text-align: center;
+}
+
+/* ── Statusmarke: Punkt + Wort ────────────────────────────── */
+.acc-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.acc-state::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.acc-state.is-DRAFT { color: var(--acc-secondary); }
+.acc-state.is-DRAFT::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.acc-state.is-OPEN { color: var(--acc-accent); }
+.acc-state.is-OVERDUE { color: var(--acc-red); }
+.acc-state.is-PAID { color: var(--acc-green); }
+.acc-state.is-CANCELLED { color: var(--acc-tertiary); }
+.acc-state.is-CREDIT { color: var(--acc-orange); }
+.acc-state.is-CREDIT::before { border-radius: 2px; }
+
+/* ── Detailseite: Vorschau links, Inspektor rechts ────────── */
+.acc-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: start;
+    gap: 14px;
+}
+.acc-preview {
+    display: flex;
+    min-height: 720px;
+    overflow: hidden;
+    flex-direction: column;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-ground);
+}
+.acc-preview iframe { flex: 1; width: 100%; min-height: 720px; border: 0; background: var(--acc-ground); }
+.acc-preview__state {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    font-size: 13px;
+    color: var(--acc-secondary);
+}
+.acc-inspector { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+
+.acc-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+}
+.acc-hero__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.acc-hero__kind { font-size: 12px; font-weight: 500; color: var(--acc-secondary); }
+.acc-hero__amount {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+.acc-hero__meta { font-size: 12.5px; color: var(--acc-secondary); }
+.acc-hero__meta.is-red { color: var(--acc-red); font-weight: 500; }
+
+/* Gruppierte Liste (Systemeinstellungen) */
+.acc-section { display: flex; flex-direction: column; gap: 6px; }
+.acc-section__title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--acc-secondary);
+}
+.acc-group {
+    overflow: hidden;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+}
+.acc-row {
+    position: relative;
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 12px;
+    font-size: 13px;
+}
+.acc-row + .acc-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 0;
+    height: 1px;
+    background: var(--acc-hairline);
+}
+.acc-row__label { flex: 0 0 auto; color: var(--acc-text); }
+.acc-row__value {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--acc-secondary);
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.acc-row__value a, .acc-link {
+    color: var(--acc-accent);
+    cursor: pointer;
+}
+.acc-row__value a:hover, .acc-link:hover { text-decoration: underline; }
+.acc-row.is-stack { flex-direction: column; align-items: stretch; gap: 6px; }
+a.acc-row--link { color: inherit; text-decoration: none; transition: background-color .12s; }
+a.acc-row--link:hover { background: var(--acc-hover); }
+.acc-row .ofi-macdp { width: 140px; max-width: 150px; }
+
+/* Handlungen: macOS-Druckknöpfe — umrandet, 32px, EIN Systemblau.
+   `ofi-btn-plain ofi-nosize` am Knopf hält die App-Knopfregel fern. */
+.acc-btn {
+    display: inline-flex;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 14px;
+    border: 1px solid var(--acc-field);
+    border-radius: 8px;
+    background: var(--acc-surface);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--acc-text);
+    white-space: nowrap;
+    transition: background-color .15s, border-color .15s, color .15s;
+}
+.acc-btn:hover:not(:disabled) { background: var(--acc-hover); }
+.acc-btn:disabled { cursor: not-allowed; opacity: .45; }
+.acc-btn.is-primary { border-color: var(--acc-accent); background: var(--acc-accent); color: #fff; }
+.acc-btn.is-primary:hover:not(:disabled) { background: #006ae6; }
+html.dark .acc-btn.is-primary:hover:not(:disabled) { background: #5c9fff; }
+.acc-btn.is-danger { color: var(--acc-red); }
+.acc-btn.is-danger:hover:not(:disabled) { background: var(--acc-red-soft); border-color: var(--acc-red-soft); }
+.acc-btn.is-block { width: 100%; }
+
+.acc-actions { display: flex; flex-direction: column; gap: 8px; }
+.acc-actions .acc-btn { width: 100%; }
+.acc-actions__pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.acc-actions__pair .acc-btn { min-width: 0; padding: 0 10px; }
+.acc-btn__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.acc-note {
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: var(--acc-group);
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--acc-secondary);
+}
+.acc-note.is-warning { background: rgba(255, 159, 10, 0.12); color: var(--acc-orange); }
+
+/* Verlauf, knapp */
+.acc-events { display: flex; flex-direction: column; }
+.acc-event { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 8px 12px; font-size: 12.5px; }
+.acc-event + .acc-event { border-top: 1px solid var(--acc-hairline); }
+.acc-event__who { display: block; font-size: 12px; color: var(--acc-secondary); }
+.acc-event__when { font-size: 12px; color: var(--acc-tertiary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ── Neue Rechnung ────────────────────────────────────────── */
+.acc-flow { display: flex; flex-direction: column; gap: 14px; max-width: 980px; }
+.acc-steps { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--acc-tertiary); }
+.acc-steps__item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.acc-steps__dot {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--acc-rail);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--acc-secondary);
+}
+.acc-steps__item.is-on { color: var(--acc-text); font-weight: 500; }
+.acc-steps__item.is-on .acc-steps__dot { background: var(--acc-accent); color: #fff; }
+.acc-steps__item.is-done .acc-steps__dot { background: var(--acc-accent-soft); color: var(--acc-accent); }
+.acc-steps__sep { width: 24px; height: 1px; background: var(--acc-border); }
+
+.acc-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.acc-choice {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+    text-align: left;
+    color: inherit;
+    transition: border-color .15s, background-color .15s;
+}
+.acc-choice:hover { background: var(--acc-hover); }
+.acc-choice.is-on { border-color: var(--acc-accent); box-shadow: 0 0 0 1px var(--acc-accent) inset; }
+.acc-choice__icon {
+    display: grid;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--acc-accent-soft);
+    color: var(--acc-accent);
+}
+.acc-choice__title { font-size: 14px; font-weight: 600; }
+.acc-choice__text { margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--acc-secondary); }
+
+.acc-pick { display: flex; flex-direction: column; gap: 10px; }
+.acc-orders { max-height: 460px; overflow-y: auto; }
+.acc-order {
+    position: relative;
+    display: grid;
+    width: 100%;
+    grid-template-columns: 18px minmax(0, 1.4fr) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 14px;
+    font-size: 13px;
+    text-align: left;
+    color: inherit;
+}
+.acc-order + .acc-order { border-top: 1px solid var(--acc-hairline); }
+.acc-order:hover { background: var(--acc-hover); }
+.acc-order.is-on { background: var(--acc-accent-soft); }
+.acc-radio {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--acc-field);
+    border-radius: 50%;
+    background: var(--acc-surface);
+}
+.acc-order.is-on .acc-radio { border: 5px solid var(--acc-accent); }
+.acc-order__tag {
+    margin-left: 6px;
+    padding: 0 6px;
+    border: 1px solid var(--acc-border);
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--acc-secondary);
+}
+
+.acc-proposal { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+.acc-stages { display: flex; flex-direction: column; }
+.acc-stage { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; font-size: 13px; }
+.acc-stage + .acc-stage { border-top: 1px solid var(--acc-hairline); }
+.acc-stage__dot {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--acc-rail);
+    font-size: 11px;
+    color: var(--acc-secondary);
+}
+.acc-stage.is-done .acc-stage__dot { background: var(--acc-green-soft); color: var(--acc-green); }
+.acc-stage.is-next { background: var(--acc-accent-soft); }
+.acc-stage.is-next .acc-stage__dot { background: var(--acc-accent); color: #fff; }
+
+.acc-input {
+    width: 120px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--acc-field);
+    border-radius: 6px;
+    background: var(--acc-surface);
+    font-size: 13px;
+    color: var(--acc-text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+}
+/* index.css hebt jedes Feld über `#root :where(input…)` auf 40px — im
+   Inspektor gilt das 28px-Mass der Mac-Listen. */
+#root .acc .acc-input {
+    min-height: 28px;
+    border: 1px solid var(--acc-field);
+    border-radius: 6px;
+    background: var(--acc-surface);
+    font-size: 13px;
+    color: var(--acc-text);
+}
+#root .acc textarea.acc-input { min-height: 64px; }
+.acc-input.is-wide { width: 100%; text-align: left; }
+.acc-input:focus { border-color: var(--acc-accent); box-shadow: 0 0 0 3px var(--acc-focus); }
+textarea.acc-input { height: auto; min-height: 64px; padding: 6px 8px; resize: vertical; }
+.acc-unit { display: inline-flex; align-items: center; gap: 6px; color: var(--acc-secondary); }
+.acc-kind {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--acc-accent-soft);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--acc-accent);
+}
+.acc-total { font-size: 15px; font-weight: 600; color: var(--acc-text); }
+.acc-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* ── Tablet / Telefon ─────────────────────────────────────── */
+@media (max-width: 1180px) {
+    .acc-detail, .acc-proposal { grid-template-columns: minmax(0, 1fr); }
+    .acc-preview, .acc-preview iframe { min-height: 560px; }
+}
+@media (max-width: 760px) {
+    #root .acc .acc-table td:first-child { white-space: nowrap; }
+    .acc-figures--three { grid-template-columns: minmax(0, 1fr); }
+    .acc-aging { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .acc-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .acc-choices { grid-template-columns: minmax(0, 1fr); }
+    .acc-order { grid-template-columns: 18px minmax(0, 1fr) auto; }
+    .acc-order .acc-hide-sm { display: none; }
+    .acc-steps__sep { width: 10px; }
+    .acc-preview, .acc-preview iframe { min-height: 440px; }
+}
+
+@media (max-width: 520px) {
+    .acc-hide-phone { display: none; }
+}
+
+/* Invoice creation follows the quote detail's flat cards and table rows. */
+.acc-flow { max-width: 1180px; }
+.acc-flow .acc-section {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--acc-border);
+    border-radius: var(--acc-radius);
+    background: var(--acc-surface);
+}
+.acc-flow .acc-section__title {
+    min-height: 44px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--acc-hairline);
+    background: var(--acc-surface);
+    color: var(--acc-text);
+    font-size: 13.5px;
+    font-weight: 600;
+}
+.acc-flow .acc-section > .acc-group {
+    border: 0;
+    border-radius: 0;
+}
+.acc-flow .acc-section .acc-row {
+    min-height: 40px;
+    padding: 6px 16px;
+}
+.acc-flow .acc-section .acc-row + .acc-row::before { left: 16px; right: 16px; }
+.acc-flow .acc-section .acc-row__label {
+    color: var(--acc-secondary);
+    font-size: 12.5px;
+    font-weight: 400;
+}
+.acc-flow .acc-section .acc-row__value { color: var(--acc-text); }
+.acc-flow .acc-proposal { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); }
+.acc-flow .acc-kind {
+    border: 1px solid var(--acc-border);
+    background: var(--acc-surface);
+    color: var(--acc-text);
+    font-weight: 500;
+}
+#root .acc .acc-flow .acc-input {
+    border-color: var(--acc-field);
+    background: var(--acc-surface);
+    box-shadow: none;
+}
+#root .acc .acc-flow .acc-input:focus {
+    border-color: var(--acc-accent);
+    box-shadow: 0 0 0 3px var(--acc-focus);
+}
+.acc-flow .acc-order { min-height: 40px; padding: 8px 16px; }
+.acc-flow .acc-stage { min-height: 40px; padding: 8px 16px; }
+.acc-flow .acc-foot {
+    padding-top: 12px;
+    border-top: 1px solid var(--acc-hairline);
+}
+@media (max-width: 1180px) {
+    .acc-flow .acc-proposal { grid-template-columns: minmax(0, 1fr); }
+}

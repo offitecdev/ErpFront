@@ -167,3 +167,69 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(staleWhileRevalidate(event, SHELL_CACHE));
     }
 });
+
+/*
+ * «Çalışan görev» on the phone (15.09.2026): the running task sits in the
+ * notification shade (src/pages/tasks/components/timerDock/phoneNotification.ts).
+ * Its buttons never call the API from here — the app does, with its own
+ * session: the worker brings the app forward (or opens it) and hands the
+ * action over as a message. When no app window exists, the action waits in a
+ * small mailbox in Cache Storage that the app empties on start. The mailbox
+ * cache name must NOT start with "offitec-", or `activate` above deletes it.
+ */
+const TIMER_NOTIFICATION_KIND = 'ofi-task-timer';
+const TIMER_NOTIFICATION_MESSAGE = 'ofi:task-timer-notification';
+const TIMER_MAILBOX_CACHE = 'ofi-tdock-mailbox';
+const TIMER_MAILBOX_URL = '/__ofi-tdock-mailbox';
+
+const postToTimerMailbox = async (entry) => {
+    try {
+        const cache = await caches.open(TIMER_MAILBOX_CACHE);
+        const current = await cache.match(TIMER_MAILBOX_URL);
+        const list = current ? await current.json().catch(() => []) : [];
+        const next = (Array.isArray(list) ? list : []).concat(entry).slice(-10);
+        await cache.put(TIMER_MAILBOX_URL, new Response(JSON.stringify(next), { headers: { 'content-type': 'application/json' } }));
+    } catch (error) {
+        // Without the mailbox the app simply shows the current state next time.
+    }
+};
+
+const appWindows = () => self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+self.addEventListener('notificationclick', (event) => {
+    const data = event.notification.data || {};
+    if (data.kind !== TIMER_NOTIFICATION_KIND) return;
+    const action = ['pause', 'start', 'close'].includes(event.action) ? event.action : 'open';
+    const entry = { type: TIMER_NOTIFICATION_MESSAGE, action, taskId: String(data.taskId || ''), at: Date.now() };
+    event.notification.close();
+
+    event.waitUntil((async () => {
+        const windows = await appWindows();
+        if (action === 'close') {
+            // Closing needs no app in front: tell open windows, and leave a note for the next start.
+            windows.forEach((client) => client.postMessage(entry));
+            await postToTimerMailbox(entry);
+            return;
+        }
+        const client = windows.find((candidate) => candidate.visibilityState === 'visible') || windows[0];
+        if (client) {
+            client.postMessage(entry);
+            if ('focus' in client) await client.focus().catch(() => undefined);
+            return;
+        }
+        await postToTimerMailbox(entry);
+        if (self.clients.openWindow) await self.clients.openWindow(typeof data.url === 'string' ? data.url : '/');
+    })());
+});
+
+// Swiped away by the user: the app stops showing it there (the in-app window stays).
+self.addEventListener('notificationclose', (event) => {
+    const data = event.notification.data || {};
+    if (data.kind !== TIMER_NOTIFICATION_KIND) return;
+    const entry = { type: TIMER_NOTIFICATION_MESSAGE, action: 'dismissed', taskId: String(data.taskId || ''), at: Date.now() };
+    event.waitUntil((async () => {
+        const windows = await appWindows();
+        windows.forEach((client) => client.postMessage(entry));
+        await postToTimerMailbox(entry);
+    })());
+});

@@ -24,6 +24,7 @@ import { CcComboField, CustomerComboField, PeopleComboField, StaticComboField, T
 import { InviteSendPanel, type InviteTarget } from './InviteSendPanel';
 import { PeoplePickerModal } from './PeoplePickerModal';
 import { ccPersonFromEmail, draftDays, gmtOffsetLabel, personName, timeZoneId, type CalLabel, type CustomerLite, type DraftEntry, type FloatAnchor, type PickedPerson } from '../calendarShared';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 export type CreateKind = 'appointment' | 'meeting' | 'task';
 
@@ -45,7 +46,7 @@ export type CreatePrefill = {
  * gemessenen Höhe — und die Fläche, auf die man gerade schaut, wanderte unter
  * dem Zeiger weg.
  */
-const CARD_HEIGHT = 560;
+const CARD_HEIGHT = 440;
 
 type TechnicianRow = { id: string; firstName?: string; lastName?: string; email?: string | null; roleName?: string | null };
 
@@ -93,11 +94,13 @@ const STEPS: Record<CreateKind, Array<{ key: string; labelKey: string }>> = {
     ],
 };
 
-/* One labelled block of a step. */
+/* One labelled block of a step. Seit dem macOS-Kleid (14.09.2026) ist es
+   die GRUPPE der Vorlage: Überschrift darüber («Datum & Zeit»), der Inhalt in
+   einem hellgrauen Kasten (`.ofi-cal-field__box`, calendarMac.css). */
 const Field = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
     <div className="ofi-cal-field">
         <span className="ofi-cal-field__label">{label}{hint ? <span className="ofi-cal-field__hint"> · {hint}</span> : null}</span>
-        {children}
+        <div className="ofi-cal-field__box">{children}</div>
     </div>
 );
 
@@ -574,7 +577,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
     const timeRow = (
         <Field label={kind === 'task' ? t('calendar.create.dueDate') : t('calendar.wizard.date')}>
             <div className="flex flex-wrap items-center gap-2">
-                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="ofi-cal-input w-[150px]" />
+                <MacDatePicker value={date} onChange={(nextDate) => setDate(nextDate)} className="is-field-sm w-[150px]" />
                 {kind !== 'task' && (
                     <>
                         <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="ofi-cal-input w-[100px]" />
@@ -856,12 +859,15 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
             onClose={onClose}
             closeOnBack
             anchor={anchor}
-            width={view === 'mail' ? 560 : 500}
+            width={view === 'mail' ? 460 : 380}
             /* Angedockt ist die Karte ohnehin so hoch wie die Spalte. */
             initialHeight={docked ? undefined : CARD_HEIGHT}
             docked={docked}
             expanded={expanded}
             onToggleExpand={onToggleExpand}
+            /* Das macOS-Kleid des Anlegefensters hängt an dieser Klasse
+               (calendarMac.css §10): Segmentwahl, grosser Titel, Kästen. */
+            className="ofi-cal-createcard"
             title={cardTitle}
             subtitle={view === 'form'
                 ? multiDay
@@ -943,7 +949,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
             )}
 
             {view === 'form' && (
-                <div className="px-5 pb-4 pt-3">
+                <div className="ofi-cal-createform">
                     {step === 0 && kindTabs.length > 1 && (
                         <div className="ofi-cal-tabs" role="tablist">
                             {kindTabs.map((tab) => (

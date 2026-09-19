@@ -4,6 +4,7 @@ import { ColResizeHandle, Pager, ResizableCols, SectionCard, TableStateRow } fro
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { MOVEMENTS_PAGE_SIZE, useMovementsList } from '../hooks/useMovementsList';
 import { fmtDateTime, fmtMoney, fmtQty } from '../utils/format';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /** Hareket türü rozetleri — genel hareketler sayfasıyla aynı renk dili. */
 const KIND_META: Record<string, { labelKey: string; className: string }> = {
@@ -63,21 +64,9 @@ export const ArticleMovementsView = ({
                             <option key={kind} value={kind}>{t(KIND_META[kind].labelKey)}</option>
                         ))}
                     </select>
-                    <input
-                        type="date"
-                        value={list.dateFrom}
-                        onChange={(event) => list.setDateFrom(event.target.value)}
-                        aria-label={t('inv.movements.dateFrom')}
-                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#0066e0] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
-                    />
+                    <MacDatePicker value={list.dateFrom} onChange={(nextDate) => list.setDateFrom(nextDate)} ariaLabel={t('inv.movements.dateFrom')} className="is-toolbar" />
                     <span className="text-[12px] text-slate-400">—</span>
-                    <input
-                        type="date"
-                        value={list.dateTo}
-                        onChange={(event) => list.setDateTo(event.target.value)}
-                        aria-label={t('inv.movements.dateTo')}
-                        className="h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:border-[#0066e0] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white"
-                    />
+                    <MacDatePicker value={list.dateTo} onChange={(nextDate) => list.setDateTo(nextDate)} ariaLabel={t('inv.movements.dateTo')} className="is-toolbar" />
                 </div>
             </div>
 

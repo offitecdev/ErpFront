@@ -86,6 +86,12 @@ import { useTenderOrderDecision } from './detail/hooks/useTenderOrderDecision';
 import { useTenderLineStaging } from './detail/hooks/useTenderLineStaging';
 import { TenderDetailLoadingSkeleton } from './detail/components/TenderDetailLoadingSkeleton';
 import { OspOriginCard } from './detail/components/OspOriginCard';
+import { TenderRevertTraceCard } from '@/components/orders/RevertTraceCard';
+import { TenderLockCard } from './detail/components/TenderLockCard';
+import { TextCorrectionPopup } from './detail/popups/TextCorrectionPopup';
+import { TenderSnapshotPopup } from './detail/popups/TenderSnapshotPopup';
+import { isOverridable, OverrideDialog, useGovernance } from '@/components/governance';
+import { documentEventsApi } from '@/lib/api/documentEvents';
 import { TenderDetailHeader } from './detail/components/TenderDetailHeader';
 import { TenderWorkspaceTabs } from './detail/components/TenderWorkspaceTabs';
 import { TenderLineTable } from './detail/components/lines/TenderLineTable';
@@ -312,6 +318,12 @@ export const TenderDetail = () => {
        bleibt als Beleg stehen. Lebt der Auftrag noch, weist der Server die
        Rueckfrage an IHN zurueck; die Meldung sagt das. */
     const [cancelOfferOpen, setCancelOfferOpen] = useState(false);
+    // Gesperrte Offerte (16.09.2026): Textkorrektur und Stand beim Auftrag.
+    const [textCorrectionOpen, setTextCorrectionOpen] = useState(false);
+    // Ausnahmetür beim Löschen (wartende Termine) — nur Systemverwaltung.
+    const { isSystemAdmin } = useGovernance();
+    const [deleteOverrideBlockers, setDeleteOverrideBlockers] = useState<string[] | null>(null);
+    const [snapshotsOpen, setSnapshotsOpen] = useState(false);
     const [cancellingOffer, setCancellingOffer] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [deletingOffer, setDeletingOffer] = useState(false);
@@ -922,7 +934,15 @@ export const TenderDetail = () => {
             setDeleteOfferOpen(false);
             navigate('/sales/quotes');
         } catch (e: any) {
-            toast.error(e.response?.data?.error || t('tenders.tender_silinemedi'));
+            const blockers: string[] = Array.isArray(e.response?.data?.blockers) ? e.response.data.blockers : [];
+            // Nur wartende Termine sperren? Dann bietet die Systemverwaltung
+            // den Weg durch die Sperre an, statt nur abzulehnen.
+            if (isSystemAdmin && isOverridable('TENDER_DELETE', blockers)) {
+                setDeleteOfferOpen(false);
+                setDeleteOverrideBlockers(blockers);
+            } else {
+                toast.error(e.response?.data?.error || t('tenders.tender_silinemedi'));
+            }
         } finally {
             setDeletingOffer(false);
         }
@@ -1839,6 +1859,43 @@ export const TenderDetail = () => {
                 OSP-Zeile zeichnet die Karte nichts. */}
             <OspOriginCard tenderId={tender.id} />
 
+            {/* Ging der Auftrag dieser Offerte zurück in den Entwurf, steht
+                hier, welche AB-Nummer es war und welches Projekt wartet. */}
+            <TenderRevertTraceCard
+                tender={tender}
+                onOpenProject={(projectId) => navGuard.attempt(() => navigate(`/projects/${projectId}`))}
+                onOpenSnapshots={() => setSnapshotsOpen(true)}
+            />
+
+            {/* Gesperrt (freigegeben oder im Auftrag): welcher Weg offensteht —
+                Nachtrag, neue Version oder Textkorrektur. */}
+            {!isDraft && !tenderCancelled && (
+                <TenderLockCard
+                    ordered={isSalesOrderStatus}
+                    canCorrect={canApprove}
+                    showSnapshots={Number(tender.version || 1) > 1}
+                    onCorrect={() => setTextCorrectionOpen(true)}
+                    onOpenSnapshots={() => setSnapshotsOpen(true)}
+                />
+            )}
+            {textCorrectionOpen && (
+                <TextCorrectionPopup
+                    open
+                    tender={tender}
+                    positions={detailPositions}
+                    onClose={() => setTextCorrectionOpen(false)}
+                    onSaved={() => fetchDetail(tender.id, true)}
+                />
+            )}
+            {snapshotsOpen && (
+                <TenderSnapshotPopup
+                    open
+                    tenderId={tender.id}
+                    formatMoney={fmtMoney}
+                    onClose={() => setSnapshotsOpen(false)}
+                />
+            )}
+
             <TenderCustomerCard
                 groups={tenderDetailGroups}
                 summary={[tender.customerName, tenderValidityLabel].filter(Boolean).join(' · ')}
@@ -2047,6 +2104,9 @@ export const TenderDetail = () => {
                 projectSearchResults={projectSearchResults}
                 selectedProject={selectedExistingProject}
                 onSelectProject={setSelectedExistingProject}
+                waitingProjectLabel={tender.revertedProject
+                    ? (tender.revertedProject.projectNumber || tender.revertedProject.projectName || null)
+                    : null}
             />
             </Suspense>
             )}
@@ -2351,6 +2411,24 @@ export const TenderDetail = () => {
                         onCancel={() => setDeleteOfferOpen(false)}
                     />
                 </Suspense>
+            )}
+
+            {deleteOverrideBlockers && (
+                <OverrideDialog
+                    open
+                    title={t('governance.override.deleteTenderTitle', { number: tender.tenderNumber })}
+                    actionLabel={t('governance.override.deleteTenderAction')}
+                    documentNumber={tender.tenderNumber}
+                    blockers={deleteOverrideBlockers}
+                    consequence={t('governance.override.deleteTenderConsequence')}
+                    onCancel={() => setDeleteOverrideBlockers(null)}
+                    onConfirm={async (override) => {
+                        await documentEventsApi.deleteTenderWithOverride(tender.id, override);
+                        setDeleteOverrideBlockers(null);
+                        toast.success(t('tenders.tender_silindi'));
+                        navigate('/sales/quotes');
+                    }}
+                />
             )}
 
         </div>

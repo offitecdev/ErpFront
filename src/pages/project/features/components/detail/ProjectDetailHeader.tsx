@@ -13,6 +13,7 @@ import {
     User01 as UserRound,
 } from '@/components/icons/antIconCompat';
 
+import { DocumentHistoryButton } from '@/components/governance';
 import { t } from '@/i18n/translate';
 import type { ProjectDto, ProjectSalesOrder } from '@/types/project';
 import { money } from '../../utils/projectFormatters';
@@ -289,6 +290,16 @@ export const ProjectDetailHeader = memo(({
                     >
                         <InfoCircle size={17} strokeWidth={1.8} />
                     </button>
+                    {/* Verlauf des Projekts und seiner Aufträge (16.09.2026) —
+                        der rote Punkt zeigt einen Eingriff der Systemverwaltung. */}
+                    <DocumentHistoryButton
+                        variant="glyph"
+                        className="ofi-prj-glyph"
+                        entityType="PROJECT"
+                        entityId={project.id}
+                        documentNumber={project.projectNumber || project.projectName}
+                        refreshKey={`${project.status}:${project.cancelledAt ?? ''}:${orders.length}`}
+                    />
                     {canManageOrders && (settingsLoaded ? (
                         <Suspense fallback={<span className="size-8 shrink-0" />}>
                             <LazyProjectSettingsMenu

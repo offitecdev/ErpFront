@@ -6,7 +6,6 @@ import { InstallAppButton } from '@/components/ui-shared/InstallAppButton';
 import { LoginWave } from '@/components/login/LoginWave';
 import { LoginUpdateCard } from '@/components/login/LoginUpdateCard';
 import { LoginQrDialog } from '@/components/login/LoginQrDialog';
-import { LoginIntro } from '@/components/login/LoginIntro';
 import { LoginMfaStep, type MfaChallengeView } from '@/components/login/LoginMfaStep';
 import { LoginWordmark } from '@/components/login/LoginWordmark';
 import { OffitecMark } from '@/components/icons/OffitecMark';
@@ -153,14 +152,8 @@ export const Login = () => {
     const [shaking, setShaking] = useState(false);
     const [qrOpen, setQrOpen] = useState(false);
     /* ── Eröffnung ──────────────────────────────────────────────────────
-       Die schwarze Bühne (O·C·C — Rauch, Feuer, violettes Licht) liegt vor
-       der Seite und läuft bei JEDEM Aufruf der Anmeldung an; sie lässt sich
-       mit Klick, Taste oder dem Knopf unten abbrechen (LoginIntro.tsx).
-       `revealed` fällt schon, wenn die Bühne zu VERSCHWINDEN beginnt —
-       Bühne und Formular blenden dadurch ineinander über. `introMounted`
-       fällt erst danach und entfernt die Bühne aus dem Baum. */
-    const [introMounted, setIntroMounted] = useState(true);
-    const [revealed, setRevealed] = useState(false);
+       Die frühere schwarze O·C·C-Bühne bleibt als Bauteil erhalten, wird auf
+       der Anmeldung aber bewusst nicht mehr eingebunden. */
     /* ── Zweiter Faktor ─────────────────────────────────────────────────────
        Ist das gesetzt, stimmten E-Mail und Kennwort und es fehlt nur noch der
        Einmalcode. Die Seite tauscht dann BEIDE Spalten: links das Codefeld
@@ -173,8 +166,6 @@ export const Login = () => {
     const passwordRef = useRef<HTMLInputElement>(null);
 
     // Gemerkte Adresse → direkt ins Passwortfeld, sonst in die E-Mail.
-    // Läuft zweimal: beim Aufbau und noch einmal, wenn die Eröffnung abtritt —
-    // ein Klick auf die schwarze Bühne nimmt dem Feld sonst den Blinker.
     useEffect(() => {
         // Während der Codeeingabe setzt LoginMfaStep den Blinker selbst — hier
         // würde er ihn dem ersten Kästchen wieder wegnehmen.
@@ -182,7 +173,7 @@ export const Login = () => {
         const target = readRemembered() ? passwordRef.current : emailRef.current;
         const id = window.setTimeout(() => target?.focus(), 80);
         return () => window.clearTimeout(id);
-    }, [mfa, revealed]);
+    }, [mfa]);
 
     /** Schütteln neu starten, auch wenn gerade noch geschüttelt wird. */
     const shake = useCallback(() => {
@@ -371,12 +362,7 @@ export const Login = () => {
     const logo2x = isDarkMode ? offitecLogoDark2x : offitecLogo2x;
 
     return (
-        <main
-            className={`ofi-login${introMounted && !revealed ? ' is-intro' : ''}${revealed ? ' is-revealed' : ''}${mfa ? ' is-mfa' : ''}`}
-        >
-            {introMounted && (
-                <LoginIntro onReveal={() => setRevealed(true)} onDone={() => setIntroMounted(false)} />
-            )}
+        <main className={`ofi-login${mfa ? ' is-mfa' : ''}`}>
             {/* Die Welle läuft oben herein und beginnt erst unterhalb von Logo
                 und Bedienelementen (siehe CSS). */}
             <LoginWave className="ofi-login__wave ofi-login__wave--top" />

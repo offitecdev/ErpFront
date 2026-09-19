@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
-import { Check, ChevronDown, ChevronRight } from '@/components/icons/antIconCompat';
+import { ArrowRight, Check, ChevronDown, ChevronRight } from '@/components/icons/antIconCompat';
 
 import { t as i18nT } from '@/i18n/translate';
 import { customerApi } from '../../../lib/api/customer';
 import type { CustomerOrderDto } from '../../../lib/api/customer';
 import { billingApi } from '../../../lib/api/billing';
-import type { InvoiceDto } from '../../../types/billing';
+import { countsAsBilled, type InvoiceDto } from '../../../types/billing';
 import { ColResizeHandle, FILTER_INPUT_CLASS, FilterBar, Pager, ResizableCols, SearchBox, SectionCard, SortableTh, TableStateRow } from '../../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../../hooks/useColumnWidths';
 import {
@@ -62,7 +62,8 @@ interface OrderFigures {
 }
 
 const computeFigures = (order: CustomerOrderDto, invoices: InvoiceDto[]): OrderFigures => {
-    const own = invoices.filter((invoice) => invoice.salesOrderId === order.id && invoice.status !== 'CANCELLED');
+    // Entwürfe, Stornos und Stornobelege zählen nicht; Gutschriften negativ.
+    const own = invoices.filter((invoice) => invoice.salesOrderId === order.id && countsAsBilled(invoice));
     const billedAmount = round2(own.reduce((sum, invoice) => sum + (invoice.amount ?? 0), 0));
     const billedPercent = round2(own.reduce((sum, invoice) => sum + (invoice.billedPercent ?? 0), 0));
     const remainingPercent = Math.max(0, round2(100 - billedPercent));
@@ -116,7 +117,6 @@ export const CustomerOrdersTable = ({
     const [orders, setOrders] = useState<CustomerOrderDto[]>([]);
     const [invoices, setInvoices] = useState<InvoiceDto[]>([]);
     const [loading, setLoading] = useState(true);
-    const [billingId, setBillingId] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
     const [search, setSearch] = useState('');
@@ -156,7 +156,6 @@ export const CustomerOrdersTable = ({
 
     // Unkontrollierte Eingaben: der geteilte Input verschluckte hier die ersten
     // Tastenanschläge (gleiche Begründung wie in MyOrderDetail).
-    const percentRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
     const load = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
@@ -288,45 +287,9 @@ export const CustomerOrdersTable = ({
             return next;
         });
 
-    const bill = async (order: CustomerOrderDto) => {
-        const figures = figuresByOrder.get(order.id);
-        if (!figures || figures.remainingPercent <= EPSILON) return;
-
-        const raw = percentRefs.current[order.id]?.value?.trim() ?? '';
-        // Leer = der vorgeschlagene Wert (nächste Rate, sonst der ganze Rest).
-        const fallback = figures.nextStagePercent ?? figures.remainingPercent;
-        const percent = raw === '' ? fallback : Number(raw.replace(',', '.'));
-
-        if (!Number.isFinite(percent) || percent <= 0) {
-            toast.error(i18nT('billing.invalidPercent'));
-            return;
-        }
-        const capped = Math.min(percent, figures.remainingPercent);
-        const full = capped >= figures.remainingPercent - EPSILON;
-
-        try {
-            setBillingId(order.id);
-            const { invoice } = await billingApi.createInvoice({
-                salesOrderId: order.id,
-                billingType: full ? 'FULL' : 'PARTIAL',
-                percent: full ? null : capped,
-            });
-            // Kein Neuladen der Seite — die neue Rechnung wandert direkt in den
-            // Zustand, die Zeile rechnet sich daraus neu.
-            setInvoices((current) => [invoice, ...current]);
-            const input = percentRefs.current[order.id];
-            if (input) input.value = '';
-            toast.success(i18nT('billing.invoiceCreated'));
-            void load(true);
-        } catch (error: unknown) {
-            const message = (error as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
-            toast.error(typeof message === 'string' && message ? message : i18nT('billing.invoiceError'));
-        } finally {
-            setBillingId(null);
-        }
-    };
-
-    /** Verrechnungszelle: entweder der erreichte Prozentwert oder Eingabe + Knopf. */
+    /* Verrechnungszelle (16.09.2026, Schritt 5): der erreichte Anteil und der
+       Weg in die Buchhaltung. Rechnungen entstehen NUR dort — der frühere
+       Prozent-Eingang mit Sofort-Rechnung ist entfallen. */
     const billingCell = (order: CustomerOrderDto) => {
         const figures = figuresByOrder.get(order.id)!;
         if (figures.remainingPercent <= EPSILON) {
@@ -336,36 +299,22 @@ export const CustomerOrdersTable = ({
                 </span>
             );
         }
-        const suggestion = figures.nextStagePercent ?? figures.remainingPercent;
+        const draft = invoices.find((invoice) => invoice.salesOrderId === order.id && invoice.status === 'DRAFT');
         return (
-            <div className="flex items-center justify-end gap-1.5">
-                {figures.billedPercent > EPSILON && (
-                    <span className="font-mono text-[12px] tabular-nums text-slate-400 dark:text-white/40">
-                        {figures.billedPercent}%
-                    </span>
-                )}
-                {/* Ohne Ratenplan schlägt der Platzhalter den ganzen Rest vor,
-                    mit Plan die nächste Rate. */}
-                <input
-                    ref={(element) => { percentRefs.current[order.id] = element; }}
-                    type="number"
-                    min={0.1}
-                    max={figures.remainingPercent}
-                    step="0.1"
-                    defaultValue=""
-                    placeholder={`%${suggestion}`}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter') { event.preventDefault(); void bill(order); }
-                    }}
-                    className="h-8 w-20 rounded-[2px] border border-slate-300 bg-white px-2 text-right text-[13px] tabular-nums text-slate-800 outline-none transition-colors focus:border-[#0066e0] dark:border-white/20 dark:bg-white/5 dark:text-white"
-                />
+            <div className="flex items-center justify-end gap-2">
+                <span className="font-mono text-[12px] tabular-nums text-slate-400 dark:text-white/40">
+                    {figures.billedPercent}%
+                </span>
                 <button
                     type="button"
-                    onClick={() => void bill(order)}
-                    disabled={billingId === order.id}
-                    className="h-8 rounded-[2px] border border-dashed border-[#0066e0]/45 bg-white px-3 text-[12.5px] font-semibold text-[#0066e0] transition-colors hover:border-[#0066e0] hover:bg-[#f1f5fd] disabled:opacity-50 dark:border-sky-300/40 dark:bg-transparent dark:text-sky-300 dark:hover:bg-white/5"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(draft ? `/accounting/invoices/${draft.id}` : `/accounting/invoices/new?orderId=${order.id}`);
+                    }}
+                    className="ofi-btn-plain ofi-nosize inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#0a7aff] hover:underline dark:text-sky-300"
                 >
-                    {billingId === order.id ? i18nT('common.loading') : i18nT('billing.buttonLabel')}
+                    {draft ? i18nT('accounting.openDraft') : i18nT('accounting.createInvoiceLink')}
+                    <ArrowRight size={13} />
                 </button>
             </div>
         );

@@ -1,0 +1,318 @@
+/* ── Çalışan görev: das kleine Fenster unten (TaskTimerDock) ─────────────────
+   15.09.2026, Samet: «macOS SwiftUI tarzında küçük bir modal; görev başlayınca
+   otomatik altta çıksın, her yerden erişilsin, çarpıyla kapansın; görevin adı,
+   durdur/başlat, çalışıyor/durduruldu».
+
+   Dieselbe Glasfläche wie die Uyarı des Gün sonu raporu
+   (tasksDailyReport.css): 18px Ecke, feine Kante, weisser Innenrand. EIN
+   Systemblau für «Başlat», das Grün nur für den Punkt «Çalışıyor» — wie im
+   Modul. Kein Farbverlauf, keine Uhr.
+
+   Hängt an document.body — darum keine #root-Präfixe. Ebene 75: über der
+   Seite und ihren Leisten, unter dem Telefonmenü (80), den Karten (120) und
+   allen Fenstern. */
+
+.ofi-tdock {
+    --tdock-glass: rgba(250, 250, 249, 0.82);
+    --tdock-box: rgba(120, 120, 128, 0.1);
+    --tdock-box-hover: rgba(120, 120, 128, 0.17);
+    --tdock-border: rgba(0, 0, 0, 0.16);
+    --tdock-text: #1d1d1f;
+    --tdock-secondary: #7c7c7e;
+    --tdock-accent: #0a7aff;
+    --tdock-accent-hover: #0066d6;
+    --tdock-accent-soft: rgba(10, 122, 255, 0.14);
+    --tdock-focus: rgba(10, 122, 255, 0.38);
+    --tdock-working: #34c759;
+    --tdock-working-text: #248a3d;
+    --tdock-idle: #b0b0b4;
+    --tdock-width: min(372px, calc(100vw - 32px));
+    --tdock-font: -apple-system, BlinkMacSystemFont, 'Inter Variable', 'Segoe UI', sans-serif;
+
+    position: fixed;
+    right: 16px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    z-index: 75;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    width: var(--tdock-width);
+    min-height: 58px;
+    margin: 0;
+    padding: 6px 10px 6px 6px;
+    border: 1px solid var(--tdock-border);
+    border-radius: 18px;
+    background: var(--tdock-glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+    backdrop-filter: blur(22px) saturate(1.45);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 8px 28px rgba(0, 0, 0, 0.14), 0 1px 3px rgba(0, 0, 0, 0.08);
+    color: var(--tdock-text);
+    font-family: var(--tdock-font);
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: transform 280ms cubic-bezier(.2, .8, .2, 1);
+    animation: ofi-tdock-in 280ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.dark .ofi-tdock {
+    --tdock-glass: rgba(43, 43, 45, 0.84);
+    --tdock-box: rgba(255, 255, 255, 0.08);
+    --tdock-box-hover: rgba(255, 255, 255, 0.14);
+    --tdock-border: rgba(0, 0, 0, 0.45);
+    --tdock-text: #ececed;
+    --tdock-secondary: #ababaf;
+    --tdock-accent: #0a84ff;
+    --tdock-accent-hover: #409cff;
+    --tdock-accent-soft: rgba(10, 132, 255, 0.22);
+    --tdock-focus: rgba(10, 132, 255, 0.5);
+    --tdock-working: #30d158;
+    --tdock-working-text: #30d158;
+    --tdock-idle: #707075;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+/* Die Hausschrift steht per `*` auf jedem Element — hier gilt die Systemschrift. */
+.ofi-tdock * {
+    box-sizing: border-box;
+    font-family: var(--tdock-font);
+}
+
+/* Plätze: unten rechts (Standard), Mitte, links — neben der 84px-Leiste. */
+.ofi-tdock.is-right { right: 16px; left: auto; }
+.ofi-tdock.is-center { right: auto; left: 50%; margin-left: calc(var(--tdock-width) / -2); }
+.ofi-tdock.is-left { right: auto; left: 16px; }
+@media (min-width: 1024px) {
+    .ofi-tdock.is-left { left: 100px; }
+}
+
+/* Ziehen (nicht auf dem Telefon) */
+@media (min-width: 641px) {
+    .ofi-tdock { touch-action: none; }
+}
+.ofi-tdock.is-dragging {
+    transition: none;
+    cursor: grabbing;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 16px 40px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dark .ofi-tdock.is-dragging { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 16px 40px rgba(0, 0, 0, 0.55); }
+.ofi-tdock.is-dragging .ofi-tdock__main { cursor: grabbing; }
+
+/* Titel + Zustand — ein Knopf: öffnet die Aufgabe */
+.ofi-tdock__main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    min-height: 44px;
+    margin: 0;
+    padding: 4px 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+.ofi-tdock__main:hover { background: var(--tdock-box); }
+.ofi-tdock__main[aria-disabled="true"] { cursor: default; }
+.ofi-tdock__main[aria-disabled="true"]:hover { background: transparent; }
+
+.ofi-tdock__title {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--tdock-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 19px;
+    letter-spacing: -0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-tdock__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--tdock-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+}
+.ofi-tdock.is-running .ofi-tdock__status { color: var(--tdock-working-text); }
+
+.ofi-tdock__dot {
+    flex: none;
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--tdock-idle);
+}
+.ofi-tdock.is-running .ofi-tdock__dot {
+    background: var(--tdock-working);
+    animation: ofi-tdock-breathe 1.6s ease-in-out infinite;
+}
+
+/* Durdur / Başlat — EIN Knopf */
+.ofi-tdock__action {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    min-width: 0;
+    margin: 0;
+    padding: 0 13px 0 11px;
+    border: 0;
+    background: var(--tdock-box);
+    color: var(--tdock-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.ofi-tdock__action:hover { background: var(--tdock-box-hover); }
+.ofi-tdock__action.is-start { background: var(--tdock-accent); color: #fff; }
+.ofi-tdock__action.is-start:hover { background: var(--tdock-accent-hover); }
+.ofi-tdock__action:disabled,
+.ofi-tdock__action:disabled:hover { background: var(--tdock-box); color: var(--tdock-secondary); cursor: default; }
+/* Gefüllt wie SF Symbols pause.fill / play.fill */
+.ofi-tdock__action svg { flex: none; fill: currentColor; }
+
+/* ⧉ — Desktop: kleines Fenster über allen Programmen; Telefon: Mitteilung (an/aus) */
+.ofi-tdock__popout {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--tdock-secondary);
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.ofi-tdock__popout:hover { background: var(--tdock-box); color: var(--tdock-text); }
+.ofi-tdock__popout.is-on,
+.ofi-tdock__popout.is-on:hover { background: var(--tdock-accent-soft); color: var(--tdock-accent); }
+
+/* × */
+.ofi-tdock__close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin: 0 0 0 2px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--tdock-box);
+    color: var(--tdock-secondary);
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.ofi-tdock__close:hover { background: var(--tdock-box-hover); color: var(--tdock-text); }
+
+.ofi-tdock button:focus-visible { outline: 3px solid var(--tdock-focus); outline-offset: 1px; }
+
+.ofi-tdock.is-leaving {
+    pointer-events: none;
+    animation: ofi-tdock-out 180ms ease-in forwards;
+}
+
+@keyframes ofi-tdock-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+@keyframes ofi-tdock-out { to { opacity: 0; transform: translateY(14px) scale(.98); } }
+@keyframes ofi-tdock-breathe {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.45); }
+    50% { transform: scale(0.82); box-shadow: 0 0 0 4px rgba(52, 199, 89, 0); }
+}
+
+/* Telefon: volle Breite unten, über der Home-Leiste — und die Seite bekommt
+   unten so viel Luft, dass ihre letzte Zeile über das Fenster scrollt
+   (`data-ofi-tdock` setzt TaskTimerDock, solange es sichtbar ist). */
+@media (max-width: 640px) {
+    .ofi-tdock,
+    .ofi-tdock.is-right,
+    .ofi-tdock.is-center,
+    .ofi-tdock.is-left {
+        right: 12px;
+        left: 12px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+        width: auto;
+        margin-left: 0;
+    }
+
+    html[data-ofi-tdock] [data-page-scrollport] {
+        padding-bottom: calc(var(--page-pad-y, 1.25rem) + env(safe-area-inset-bottom, 0px) + 72px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-tdock,
+    .ofi-tdock.is-leaving,
+    .ofi-tdock.is-running .ofi-tdock__dot { animation: none; }
+    .ofi-tdock { transition: none; }
+}
+
+@media print {
+    .ofi-tdock { display: none; }
+}
+
+/* ── Auf dem Desktop: dasselbe Fenster als Picture-in-Picture ──
+   Der Browser zeichnet Rahmen und Titelleiste; der Inhalt füllt das Fenster
+   ohne Glas, Kante und Schatten. Steht NACH den Telefonregeln: das Fenster
+   ist schmal genug, dass `max-width: 640px` auch dort greift. */
+.ofi-tdock-desktopbody {
+    margin: 0;
+    overflow: hidden;
+}
+
+.ofi-tdock-desktophost {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 100vh;
+    padding: 0 4px;
+    background: #f5f5f7;
+}
+.dark .ofi-tdock-desktophost { background: #2c2c2e; }
+
+.ofi-tdock.is-desktop,
+.dark .ofi-tdock.is-desktop {
+    position: static;
+    inset: auto;
+    width: 100%;
+    max-width: 440px;
+    min-height: 0;
+    margin: 0;
+    padding: 2px 8px 2px 2px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+    animation: none;
+    transition: none;
+    touch-action: auto;
+}
+
+/* Immer die kleine Zeile — auch wenn der Browser das Fenster höher macht
+   (15.09.2026, Samet: «o kadar büyük açılmasın»): dann steht sie ruhig in der Mitte. */
+.ofi-tdock.is-desktop .ofi-tdock__main { min-height: 40px; }

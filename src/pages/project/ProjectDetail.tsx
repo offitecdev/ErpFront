@@ -4,6 +4,7 @@ import { Briefcase01 as BriefcaseBusiness } from '@/components/icons/antIconComp
 import { SkeletonBar } from '@/components/ui-shared/Loader';
 
 import { useOrderLifecycle } from '@/components/orders/useOrderLifecycle';
+import { ProjectWaitingTendersCard } from '@/components/orders/RevertTraceCard';
 import { projectApi } from '../../lib/api/project';
 import { useAuthStore } from '../../store/authStore';
 import type { ProjectSalesOrder } from '../../types/project';
@@ -92,10 +93,11 @@ export const ProjectDetail = () => {
     const { requestAction, dialog: lifecycleDialog } = useOrderLifecycle(async (order, outcome) => {
         if (selectedOrderId === order.id) setSelectedOrderId(null);
         // ZURÜCK IN ENTWURF: der Auftrag ist weg und seine Offerte wieder ein
-        // Entwurf. War es der letzte, steht das Projekt weiter da — als leere
-        // Planung —, also bleibt die Seite, wo sie ist, und lädt neu.
-        if (outcome.action === 'REVERT' && outcome.tenderId && outcome.projectReverted) {
-            await load(true);
+        // Entwurf. Zurückgesetzt wird, um die Offerte zu ändern — also führt
+        // der Weg direkt dorthin (16.09.2026), wie aus der Auftragsansicht.
+        // Das Projekt bleibt stehen; «Zurück» bringt auf diese Seite.
+        if (outcome.action === 'REVERT' && outcome.tenderId) {
+            navigate(`/sales/quotes/${outcome.tenderId}`);
             return;
         }
         await load(true);
@@ -226,6 +228,12 @@ export const ProjectDetail = () => {
                 addonAttention={addonAttention}
             />
             <div className="ofi-prj-stage">
+                {/* Offerten, deren Auftrag zurückgesetzt wurde und die auf
+                    dieses Projekt warten — über jedem Bereich (16.09.2026). */}
+                <ProjectWaitingTendersCard
+                    tenders={project.waitingTenders}
+                    onOpenTender={(tenderId) => navigate(`/sales/quotes/${tenderId}`)}
+                />
                 {sectionLoading ? (
                     <div className="space-y-3" aria-busy="true">
                         <SkeletonBar className="h-10 rounded-md" />

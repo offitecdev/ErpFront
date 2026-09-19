@@ -12,6 +12,7 @@ import { Button } from '../../components/ui-shared/Button';
 import { StatusChip } from '../../components/ui-shared/StatusBadge';
 import { FILTER_INPUT_CLASS, SectionCard, TableStateRow } from '../../components/ui-shared/TableKit';
 import { PdfPreviewSheet } from '../../components/pdf/PdfPreviewSheet';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /**
  * ── KUNDENBERICHTE ──────────────────────────────────────────────────────────
@@ -463,20 +464,10 @@ export const CustomerReports: React.FC<{ customerId: string }> = ({ customerId }
                                     </td>
                                     <td className="text-slate-600 dark:text-white/70">{order.project?.projectName || '—'}</td>
                                     <td>
-                                        <input
-                                            type="date"
-                                            value={ranges[order.id]?.start || ''}
-                                            onChange={(e) => setRanges((prev) => ({ ...prev, [order.id]: { ...prev[order.id], start: e.target.value } }))}
-                                            className={FILTER_INPUT_CLASS}
-                                        />
+                                        <MacDatePicker value={ranges[order.id]?.start || ''} onChange={(nextDate) => setRanges((prev) => ({ ...prev, [order.id]: { ...prev[order.id], start: nextDate } }))} className="is-field-sm" />
                                     </td>
                                     <td>
-                                        <input
-                                            type="date"
-                                            value={ranges[order.id]?.end || ''}
-                                            onChange={(e) => setRanges((prev) => ({ ...prev, [order.id]: { ...prev[order.id], end: e.target.value } }))}
-                                            className={FILTER_INPUT_CLASS}
-                                        />
+                                        <MacDatePicker value={ranges[order.id]?.end || ''} onChange={(nextDate) => setRanges((prev) => ({ ...prev, [order.id]: { ...prev[order.id], end: nextDate } }))} className="is-field-sm" />
                                     </td>
                                     {/* Yalnızca göz ikonu: indirme, açılan önizleme
                                         penceresinin kendi düğmesinden yapılır. */}

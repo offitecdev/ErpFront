@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
-import { LuCheck, LuCopy, LuExternalLink, LuFlag, LuFlagOff, LuPause, LuPencil, LuPlay, LuSend, LuTrash2 } from 'react-icons/lu';
+import { LuCheck, LuCircleCheck, LuCopy, LuExternalLink, LuFlag, LuFlagOff, LuPause, LuPencil, LuPlay, LuTrash2 } from 'react-icons/lu';
 
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
 import { t } from '@/i18n/translate';
 import type { ManualTaskStatus, TaskRow } from '@/types/tasksModule';
-import { useIsTasksAdmin, useIsTasksManager, useTasksActorId, useTasksModuleStore } from '../../store/tasksModuleStore';
+import { useIsTasksManager, useTasksActorId, useTasksModuleStore } from '../../store/tasksModuleStore';
 import { MANUAL_STATUSES, statusLabel } from '../../utils/taskFormat';
-import { canRequestRowCompletion, rowRights } from './taskListRules';
+import { canCompleteRow, rowRights } from './taskListRules';
 
 /**
  * Das ⋯-Menü einer Zeile (Görevly `V.taskMenu`) als Mac-Menü am Knopf. Was
@@ -19,7 +19,7 @@ export interface TaskRowMenuActions {
     open: (row: TaskRow) => void;
     edit: (row: TaskRow) => void;
     toggleTimer: (row: TaskRow) => void;
-    requestCompletion: (row: TaskRow) => void;
+    complete: (row: TaskRow) => void;
     toggleFlag: (row: TaskRow) => void;
     setStatus: (row: TaskRow, status: ManualTaskStatus) => void;
     duplicate: (row: TaskRow) => void;
@@ -69,7 +69,6 @@ export const TaskRowMenu = ({
     actions: TaskRowMenuActions;
 }) => {
     const isManager = useIsTasksManager();
-    const isAdmin = useIsTasksAdmin();
     const me = useTasksActorId();
     const canDelete = useTasksModuleStore((state) => Boolean(state.bootstrap?.actor.canDelete));
 
@@ -79,7 +78,7 @@ export const TaskRowMenu = ({
         onClose();
         action(row);
     };
-    const canRequest = canRequestRowCompletion(row, rights, isManager, isAdmin);
+    const canComplete = row.status !== 'COMPLETED' && canCompleteRow(row, rights, isManager);
     // Nicht-Admins, die beteiligt sind, beantragen das Löschen (einmal je Aufgabe).
     const involved = row.createdById === me || row.assigneeIds.includes(me);
     const canRequestDelete = !canDelete && involved && !row.deleteRequestedById;
@@ -98,8 +97,8 @@ export const TaskRowMenu = ({
                         onSelect={run(actions.toggleTimer)}
                     />
                 )}
-                {canRequest && (
-                    <MenuItem icon={<LuSend size={14} />} label={t('tasksModule.list.menu.requestCompletion')} onSelect={run(actions.requestCompletion)} />
+                {canComplete && (
+                    <MenuItem icon={<LuCircleCheck size={14} />} label={t('tasksModule.list.row.complete')} onSelect={run(actions.complete)} />
                 )}
                 {canRequestDelete && (
                     <MenuItem icon={<LuTrash2 size={14} />} label={t('tasksModule.deleteRequest.action')} danger onSelect={run(actions.requestDelete)} />
@@ -120,8 +119,7 @@ export const TaskRowMenu = ({
                     <>
                         <div className="ofi-gv-list-menu__sep" role="separator" />
                         <div className="ofi-gv-list-menu__caption">{t('tasksModule.list.menu.status')}</div>
-                        {/* «Tamamlandı» setzt nur die Administratorrolle — alle anderen beantragen. */}
-                        {MANUAL_STATUSES.filter((status) => isAdmin || status !== 'COMPLETED').map((status) => (
+                        {MANUAL_STATUSES.map((status) => (
                             <MenuItem
                                 key={status}
                                 label={statusLabel(status)}

@@ -1,6 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { LuPause } from 'react-icons/lu';
+import { LuClipboardList } from 'react-icons/lu';
 
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingPanel } from '@/components/ui-shared/Loader';
@@ -10,19 +9,21 @@ import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { useAuthStore } from '@/store/authStore';
 import '@/styles/modules/tasksModule.css';
 import '@/styles/modules/tasksOnboarding.css';
-import { useNow } from '../../hooks/useNow';
-import { useTaskTimer } from '../../hooks/useTaskTimer';
 import { useTasksModuleStore } from '../../store/tasksModuleStore';
-import { formatClock } from '../../utils/taskFormat';
+import { openDailyReport, preloadDailyReportPrompt } from '../dailyReport/dailyReportEvents';
+import { useDailyReportWindow } from '../dailyReport/dailyReportWindow';
 import { TaskSettingsButton } from '../settings/TaskSettingsButton';
+import { TaskButton } from './TaskButton';
 import { TaskOnboardingWelcome } from '../onboarding/TaskOnboardingWelcome';
-import { TaskIconButton } from './TaskButton';
+import { WorkingBanner } from './WorkingBanner';
 
 /**
  * ── HÜLLE JEDER SEITE DES GÖREVLER-MODULS ────────────────────────────────────
  *
- * Titel (wie im Lager), darunter EINE Zeile: die segmentierten Reiter des
- * Moduls und — solange die eigene Messung läuft — die laufende Uhr mit Pause.
+ * Titel (wie im Lager), darunter die Karte «Şu an çalışılıyor», solange die
+ * eigene Messung läuft (14.09.2026, Samet: «çalışılan görev üstte, başlık
+ * şeklinde; kronometre olmayacak») — nur hier im Modul, nirgends sonst —, dann
+ * EINE Zeile: die segmentierten Reiter des Moduls.
  * Die Reiter der Leitung (Freigaben, Kişiler) erscheinen nur, wenn der Server
  * die Person als Leitung meldet; das Menü der Seitenleiste kann das nicht
  * unterscheiden (das Rollenpaket gibt Seiten frei, nicht Stufen).
@@ -33,23 +34,21 @@ import { TaskIconButton } from './TaskButton';
 
 const SUMMARY_POLL_MS = 60_000;
 
-const ActiveTimerChip = () => {
-    const activeTimer = useTasksModuleStore((state) => state.bootstrap?.summary.activeTimer ?? null);
-    const now = useNow(1000, Boolean(activeTimer));
-    const { pause } = useTaskTimer();
-    if (!activeTimer) return null;
-    const elapsed = now - Date.parse(activeTimer.startedAt);
+/** Gün sonu raporu von Hand — nur im Zeitfenster der Firma (Modül ayarları, 15.09.2026). */
+const DailyReportButton = () => {
+    const win = useDailyReportWindow();
+    const range = { start: win.setting.promptTime, end: win.setting.endTime };
     return (
-        <span className="ofi-gv-timerchip" role="status" aria-live="off">
-            <i className="ofi-gv-live" aria-hidden />
-            <span className="ofi-gv-clock">{formatClock(elapsed)}</span>
-            <Link to={`/tasks/${activeTimer.taskId}`} className="ofi-gv-timerchip__title" title={activeTimer.taskTitle}>
-                {activeTimer.taskTitle}
-            </Link>
-            <TaskIconButton label={t('tasksModule.timer.pause')} onClick={() => void pause()}>
-                <LuPause size={14} />
-            </TaskIconButton>
-        </span>
+        <TaskButton
+            title={win.isOpen ? undefined : t('tasksModule.dailyReport.openDisabled', range)}
+            icon={<LuClipboardList size={14} />}
+            disabled={!win.isOpen}
+            onPointerEnter={preloadDailyReportPrompt}
+            onFocus={preloadDailyReportPrompt}
+            onClick={openDailyReport}
+        >
+            {t('tasksModule.dailyReport.open')}
+        </TaskButton>
     );
 };
 
@@ -110,13 +109,14 @@ export const TasksModuleShell = ({
             <InventoryListHeader
                 title={title}
                 action={(
-                    <div className="flex items-center gap-2">
+                    <div className="ofi-gv-head-actions">
                         {actions}
-                        <ActiveTimerChip />
+                        <DailyReportButton />
                         <TaskSettingsButton />
                     </div>
                 )}
             />
+            <WorkingBanner />
             {toolbar}
             {children}
             <TaskOnboardingWelcome onboarding={bootstrap.onboarding} />

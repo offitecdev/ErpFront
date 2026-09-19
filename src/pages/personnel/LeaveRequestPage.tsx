@@ -11,6 +11,7 @@ import { LeaveList } from './components/LeaveList';
 import { CELL_INPUT_CLASS, Labelled, PersonnelTopTabs, PrimaryButton, SectionCard } from './components/primitives';
 import { formatDate, fullName, leaveTypeLabel, toInputDate } from './utils/format';
 import { LEAVE_TYPES, LEAVE_TYPE_LABEL_MAX, countWorkdaysInRange, parseDateOnly, requiresLeaveTypeLabel } from './utils/personnel';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /**
  * ── ANTRAG STELLEN ───────────────────────────────────────────────────────────
@@ -23,9 +24,8 @@ import { LEAVE_TYPES, LEAVE_TYPE_LABEL_MAX, countWorkdaysInRange, parseDateOnly,
  *   Homeoffice  → Vorgesetzter → bewilligt   (die Buchhaltung sieht ihn nie)
  *
  * MOBILE TAUGLICHKEIT ist Vorgabe: eine Spalte auf dem Telefon, zwei ab Tablet,
- * Datumsfelder sind native `type="date"`-Felder — sie öffnen auf jedem Gerät den
- * eingebauten Kalender UND lassen sich von Hand tippen, ohne dass dafür eine
- * eigene Kalenderbibliothek geladen werden müsste.
+ * Datumsfelder sind der gemeinsame Kalender der Anwendung (`MacDatePicker`,
+ * 16.09.2026) — er lässt sich anklicken UND von Hand tippen.
  *
  * Die Arbeitstage im gewählten Zeitraum werden hier schon gezeigt, mit
  * DERSELBEN Funktion, mit der der Server sie gleich speichert.
@@ -162,24 +162,22 @@ export const LeaveRequestPage = () => {
                 )}
 
                 <Labelled label={t('personnel.filter.startDate')} required>
-                    <input
-                        type="date"
+                    <MacDatePicker
                         value={startDate}
-                        onChange={(event) => {
-                            setStartDate(event.target.value);
+                        onChange={(nextDate) => {
+                            setStartDate(nextDate);
                             // Ein Ende vor dem Beginn ist nie gewollt — es wandert mit.
-                            if (event.target.value > endDate) setEndDate(event.target.value);
+                            if (nextDate > endDate) setEndDate(nextDate);
                         }}
-                        className={CELL_INPUT_CLASS}
+                        className="is-field"
                     />
                 </Labelled>
                 <Labelled label={t('personnel.filter.endDate')} required>
-                    <input
-                        type="date"
+                    <MacDatePicker
                         min={startDate}
                         value={endDate}
-                        onChange={(event) => setEndDate(event.target.value)}
-                        className={CELL_INPUT_CLASS}
+                        onChange={setEndDate}
+                        className="is-field"
                     />
                 </Labelled>
 

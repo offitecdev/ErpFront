@@ -47,10 +47,14 @@
 }
 
 #root .ofi-gv .ofi-gv-list-time {
-    gap: 5px;
+    gap: 6px;
     color: var(--gv-secondary);
-    font-size: 12px;
+    font-size: 12.5px;
 }
+
+/* Läuft eine Messung: die Uhr in Textfarbe, einen Hauch grösser — im Takt der Kopfzeile. */
+#root .ofi-gv .ofi-gv-list-time.is-live { color: var(--gv-text); }
+#root .ofi-gv .ofi-gv-list-time .ofi-gv-clock { font-size: 13px; }
 
 #root .ofi-gv .ofi-gv-list-more {
     display: flex;
@@ -226,6 +230,16 @@ body > :not(#root) .ofi-gv-list-person__name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Die eigene Person beim Anlegen: fest eingetragen, ohne Entfernen (14.09.2026). */
+#root .ofi-gv-list-person.is-self,
+body > :not(#root) .ofi-gv-list-person.is-self {
+    padding: 0 7px;
+    border-color: transparent;
+    color: var(--ofi-cal-accent, #0a7aff);
+    background: var(--ofi-cal-accent-soft, rgba(10, 122, 255, 0.09));
+    cursor: default;
 }
 
 /* Die Etikettenmarke liest `--la-*`, die es im Portal nicht gibt — im Fenster

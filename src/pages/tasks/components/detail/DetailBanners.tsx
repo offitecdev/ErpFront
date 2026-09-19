@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { LuCircleCheck, LuCircleX, LuClock, LuShieldCheck, LuTrash2, LuTriangleAlert } from 'react-icons/lu';
+import { LuCircleCheck, LuHourglass, LuTrash2, LuTriangleAlert } from 'react-icons/lu';
 
 import { DangerConfirmDialog } from '@/components/ui-shared/DangerConfirmDialog';
 
@@ -10,13 +10,13 @@ import { tasksApi, tasksErrorMessage } from '@/lib/api/tasksModule';
 import type { TaskDetailResult } from '@/types/tasksModule';
 import type { TaskDetailController } from '../../hooks/useTaskDetail';
 import { useNow } from '../../hooks/useNow';
-import { useIsTasksAdmin, useIsTasksManager, useTasksActorId } from '../../store/tasksModuleStore';
-import { formatDuration, personName, relativeTime, smartDate } from '../../utils/taskFormat';
+import { useIsTasksManager } from '../../store/tasksModuleStore';
+import { personName, relativeTime, smartDate } from '../../utils/taskFormat';
 import { ReasonDialog } from '../shared/ReasonDialog';
 import { TaskButton } from '../shared/TaskButton';
 
 type Tone = 'review' | 'alert' | 'done' | 'progress';
-type DialogKind = 'rejectReview' | 'rejectCompletion' | 'editBlock' | 'rejectDelete' | 'approveDelete';
+type DialogKind = 'editBlock' | 'rejectDelete' | 'approveDelete';
 
 const Banner = ({ tone, icon, title, text, actions }: {
     tone: Tone;
@@ -36,16 +36,12 @@ const Banner = ({ tone, icon, title, text, actions }: {
 );
 
 /**
- * Hinweisstreifen unter dem Kopf, in Görevlys Reihenfolge: Vorschlag in
- * Prüfung → Vorschlag abgelehnt → Abschluss wartet → Abschluss abgelehnt →
- * nicht machbar → erledigt. Entscheiden darf nur die Leitung; wer den
- * Abschluss beantragt hat, kann ihn zurückziehen.
+ * Hinweisstreifen unter dem Kopf, in dieser Reihenfolge: Löschanfrage →
+ * Gecikme açıklaması → nicht machbar → erledigt. Abschlussanfragen gibt es
+ * seit dem 16.09.2026 nicht mehr — abgeschlossen wird direkt.
  */
 export const DetailBanners = ({ ctl, data }: { ctl: TaskDetailController; data: TaskDetailResult }) => {
     const isManager = useIsTasksManager();
-    // Görev-Talepe entscheidet nur die Administratorrolle (14.09.2026).
-    const isAdmin = useIsTasksAdmin();
-    const me = useTasksActorId();
     const navigate = useNavigate();
     const now = useNow(60_000);
     const { task, permissions, people } = data;
@@ -61,29 +57,6 @@ export const DetailBanners = ({ ctl, data }: { ctl: TaskDetailController; data: 
     };
 
     const banners: ReactNode[] = [];
-
-    if (task.review.state === 'PENDING') {
-        banners.push(
-            <Banner
-                key="review"
-                tone="review"
-                icon={<LuShieldCheck size={16} />}
-                title={t('tasksModule.detail.banner.reviewTitle')}
-                // Wer nicht freigibt, liest die Warnung: noch nicht beginnen.
-                text={isAdmin ? t('tasksModule.detail.banner.reviewText') : t('tasksModule.detail.banner.reviewWaitText')}
-                actions={isAdmin ? (
-                    <>
-                        <TaskButton variant="danger" disabled={busy} onClick={() => setDialog('rejectReview')}>
-                            {t('tasksModule.review.notSuitable')}
-                        </TaskButton>
-                        <TaskButton variant="primary" disabled={busy} onClick={() => void run(() => tasksApi.approveReview(task.id))}>
-                            {t('tasksModule.review.suitable')}
-                        </TaskButton>
-                    </>
-                ) : undefined}
-            />,
-        );
-    }
 
     if (task.deleteRequest?.requestedById) {
         const parts = [
@@ -116,66 +89,21 @@ export const DetailBanners = ({ ctl, data }: { ctl: TaskDetailController; data: 
         );
     }
 
-    if (task.review.state === 'REJECTED') {
-        const worked = task.work?.totalMs ?? 0;
-        // Wer den Talep gestellt hat, soll am Görev erklären, wie viel Zeit verloren ging.
-        const isRequester = (task.review.requestedById || task.createdById) === me;
+    /* Gecikme açıklaması: bleibt stehen, auch nach Freigabe/Ablehnung (15.09.2026, Samet). */
+    if (task.delay?.reason) {
+        const by = [personName(people, task.delay.byId), relativeTime(task.delay.at, now)].filter(Boolean).join(' · ');
         banners.push(
             <Banner
-                key="review-rejected"
+                key="delay-reason"
                 tone="alert"
-                icon={<LuCircleX size={16} />}
-                title={t('tasksModule.detail.banner.reviewRejectedTitle')}
+                icon={<LuHourglass size={16} />}
+                title={t('tasksModule.delay.bannerTitle')}
                 text={(
                     <>
-                        <div>{task.review.note || t('tasksModule.detail.banner.noReason')}</div>
-                        {worked > 0 && <div>{t('tasksModule.review.lostTime', { time: formatDuration(worked) })}</div>}
-                        {isRequester && <div>{t('tasksModule.review.explainLoss')}</div>}
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{task.delay.reason}</div>
+                        {by && <div>{by}</div>}
                     </>
                 )}
-            />,
-        );
-    }
-
-    if (task.approval.state === 'PENDING') {
-        const parts = [
-            personName(people, task.approval.requestedById),
-            relativeTime(task.approval.requestedAt, now),
-            task.approval.note ?? '',
-        ].filter(Boolean);
-        banners.push(
-            <Banner
-                key="approval"
-                tone="review"
-                icon={<LuClock size={16} />}
-                title={t('tasksModule.detail.banner.approvalTitle')}
-                text={parts.join(' · ')}
-                actions={permissions.canApproveCompletion ? (
-                    <>
-                        <TaskButton variant="danger" disabled={busy} onClick={() => setDialog('rejectCompletion')}>
-                            {t('tasksModule.detail.reject')}
-                        </TaskButton>
-                        <TaskButton variant="primary" disabled={busy} onClick={() => void run(() => tasksApi.approveCompletion(task.id))}>
-                            {t('tasksModule.detail.approve')}
-                        </TaskButton>
-                    </>
-                ) : permissions.canCancelCompletionRequest ? (
-                    <TaskButton disabled={busy} onClick={() => void run(() => tasksApi.cancelCompletionRequest(task.id))}>
-                        {t('tasksModule.detail.withdraw')}
-                    </TaskButton>
-                ) : undefined}
-            />,
-        );
-    }
-
-    if (task.approval.state === 'REJECTED' && task.status !== 'COMPLETED') {
-        banners.push(
-            <Banner
-                key="approval-rejected"
-                tone="alert"
-                icon={<LuTriangleAlert size={16} />}
-                title={t('tasksModule.detail.banner.approvalRejectedTitle')}
-                text={task.approval.decisionNote || t('tasksModule.detail.banner.fixRequested')}
             />,
         );
     }
@@ -216,28 +144,6 @@ export const DetailBanners = ({ ctl, data }: { ctl: TaskDetailController; data: 
         <>
             {banners.length > 0 && <div className="ofi-gv-detail-banners">{banners}</div>}
 
-            <ReasonDialog
-                open={dialog === 'rejectReview'}
-                onClose={() => setDialog(null)}
-                title={t('tasksModule.detail.rejectReviewTitle')}
-                label={t('tasksModule.detail.reason')}
-                confirmLabel={t('tasksModule.review.notSuitable')}
-                required
-                danger
-                busy={busy}
-                onConfirm={(note) => void run(() => tasksApi.rejectReview(task.id, note))}
-            />
-            <ReasonDialog
-                open={dialog === 'rejectCompletion'}
-                onClose={() => setDialog(null)}
-                title={t('tasksModule.detail.rejectCompletionTitle')}
-                label={t('tasksModule.detail.reason')}
-                confirmLabel={t('tasksModule.detail.reject')}
-                required
-                danger
-                busy={busy}
-                onConfirm={(note) => void run(() => tasksApi.rejectCompletion(task.id, note))}
-            />
             <ReasonDialog
                 open={dialog === 'rejectDelete'}
                 onClose={() => setDialog(null)}

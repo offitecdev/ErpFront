@@ -1,17 +1,32 @@
 import { DangerConfirmDialog } from '@/components/ui-shared/DangerConfirmDialog';
 import { t } from '@/i18n/translate';
 import { ReasonDialog } from '../shared/ReasonDialog';
-import { CompletionRequestDialog } from './CompletionRequestDialog';
 import type { TaskRowDialogsState } from './useTaskRowActions';
 
 /* Die Fenster der Zeilenhandlungen — EIN Ort, damit die Seite schlank bleibt. */
-export const TaskRowDialogs = ({ dialogs }: { dialogs: TaskRowDialogsState }) => (
+export const TaskRowDialogs = ({ dialogs }: { dialogs: TaskRowDialogsState }) => {
+    const open = dialogs.completionFor;
+    const openItems = open ? Math.max(0, open.checklist.total - open.checklist.done) : 0;
+    return (
     <>
-        <CompletionRequestDialog
-            task={dialogs.completionFor}
-            busy={dialogs.busy}
+        {/* Abschliessen geht sonst ohne Fenster — nur die ÜBERFÄLLIGE Aufgabe
+            fragt nach der Gecikme açıklaması (15.09.2026). */}
+        <ReasonDialog
+            open={open !== null}
             onClose={dialogs.closeCompletion}
-            onConfirm={(note) => void dialogs.confirmCompletion(note)}
+            onConfirm={(text) => void dialogs.confirmComplete(text)}
+            title={t('tasksModule.delay.dialogTitle')}
+            subtitle={open?.title}
+            label={t('tasksModule.delay.label')}
+            confirmLabel={t('tasksModule.list.row.complete')}
+            note={(
+                <>
+                    {t('tasksModule.delay.dialogCallout')}
+                    {openItems > 0 && <div>{t('tasksModule.list.completion.openItems', { count: openItems })}</div>}
+                </>
+            )}
+            required
+            busy={dialogs.busy}
         />
         <ReasonDialog
             open={dialogs.blockFor !== null}
@@ -47,4 +62,5 @@ export const TaskRowDialogs = ({ dialogs }: { dialogs: TaskRowDialogsState }) =>
             onConfirm={() => void dialogs.confirmDelete()}
         />
     </>
-);
+    );
+};

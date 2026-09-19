@@ -10,6 +10,7 @@ import { Button } from '../../../components/ui-shared/Button';
 import { ColResizeHandle, ResizableCols, CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../../../components/ui-shared/TableKit';
 import { useColumnWidths } from '../../../hooks/useColumnWidths';
 import { CUSTOMER_ADD_ROW_BUTTON_CLASS } from './customerDetail.constants';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /**
  * Aktivitäten (Zeitachse) als Tabelle mit gesammeltem Speichern — gleiche
@@ -44,6 +45,8 @@ const SYSTEM_ACTIVITY_LABEL_KEYS: Record<string, string> = {
     TENDER_CREATED: 'crm.customers.activityTenderCreated',
     TENDER_APPROVED: 'crm.customers.activityTenderApproved',
     TENDER_ORDERED: 'crm.customers.activityTenderOrdered',
+    SALES_ORDER_CREATED: 'crm.customers.activitySalesOrderCreated',
+    SALES_ORDER_REVERTED: 'crm.customers.activitySalesOrderReverted',
     OFFER_MAIL_SENT: 'crm.customers.activityTenderMailed',
 };
 
@@ -214,12 +217,7 @@ export const CustomerActivitiesTable = ({
                         return (
                             <tr key={row.key} className="group transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
                                 <td>
-                                    <input
-                                        type="date"
-                                        value={row.activityDate}
-                                        onChange={(event) => patch(row.key, { activityDate: event.target.value })}
-                                        className={CELL_INPUT_CLASS}
-                                    />
+                                    <MacDatePicker value={row.activityDate} onChange={(nextDate) => patch(row.key, { activityDate: nextDate })} className="is-field-sm" />
                                 </td>
                                 <td>
                                     {/* Systemeinträge behalten ihre Art — nur ihre Beschreibung ist frei. */}

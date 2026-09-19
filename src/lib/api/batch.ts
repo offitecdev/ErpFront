@@ -37,11 +37,22 @@ const fetchOneByOne = async (gets: string[]): Promise<BatchResults> => {
     return Object.fromEntries(entries);
 };
 
+/** 502 with no body = the server could not reach its own sub-request (the
+    loopback inside /batch failed), not an answer of the endpoint itself. */
+const isLoopFailure = (entry: BatchEntry | undefined) =>
+    !entry || (entry.status === 502 && entry.body == null);
+
 export const fetchBatch = async (gets: string[]): Promise<BatchResults> => {
     if (batchUnsupported) return fetchOneByOne(gets);
     try {
         const res = await getShared<{ results: BatchResults }>(batchUrl(gets));
-        return res.data.results;
+        const results = res.data.results;
+        const failed = gets.filter((get) => isLoopFailure(results[get]));
+        if (!failed.length) return results;
+        // The batch route is broken on this server: fetch those entries
+        // directly, and skip /batch entirely if nothing came through.
+        if (failed.length === gets.length) batchUnsupported = true;
+        return { ...results, ...(await fetchOneByOne(failed)) };
     } catch (error) {
         const status = (error as { response?: { status?: number } }).response?.status;
         if (status === 404) {

@@ -29,8 +29,14 @@ import { useAuthStore } from '@/store/authStore';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { ensureMaintenanceLocale } from '@/pages/maintenance/MaintenanceShared';
 
+import { MiniMonth } from './components/MiniMonth';
 import { MonthGrid } from './components/MonthGrid';
 import { TimeGrid } from './components/TimeGrid';
+/* Das macOS-Kleid des Kalenders (14.09.2026) — Werkzeugleiste, Seitenleiste
+   mit dem Monatsblatt unten, getönte Karten, die Fenster. Liegt im Bündel
+   NACH index.css und appleModal.css, weil App.tsx zuletzt geladen wird. */
+import '@/styles/calendarMac.css';
+import '@/styles/calendarPopover.css';
 import { SectionSplash } from '@/components/ui-shared/SectionSplash';
 import { NewTaskCard } from '@/pages/crm/tasks/NewTaskCard';
 import { TaskBoard } from '@/pages/crm/tasks/TaskBoard';
@@ -881,6 +887,12 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                     ? `${range.start.format('MMM')} – ${range.end.format('MMM YYYY')}`
                     : `${range.start.format('MMM YYYY')} – ${range.end.format('MMM YYYY')}`)
             : anchor.format('MMMM YYYY');
+    /* «September» fett, «2026» mager — die Titelzeile der Vorlage. Das Jahr
+       ist immer das letzte Wort; eine Spanne wie «Aug – Sep 2026» trägt es
+       genauso am Ende. */
+    const periodSplit = periodLabel.match(/^(.*\S)\s+(\d{4})$/);
+    const periodMain = periodSplit ? periodSplit[1] : periodLabel;
+    const periodYear = periodSplit ? periodSplit[2] : '';
 
     const views: Array<{ key: CalendarView; label: string }> = [
         { key: 'day', label: t('calendar.day') },
@@ -920,10 +932,10 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
             onClick={() => setNewTaskOpen(true)}
             aria-label={t('crm.tasks.newTask')}
             title={phone ? t('crm.tasks.newTask') : undefined}
-            className={`ofi-cal-createbtn ${compact ? 'is-compact' : ''}`}
+            className={`ofi-cal-createbtn ${compact ? 'is-compact' : ''} ${phone ? '' : 'has-label'}`}
         >
-            <Plus size={18} />
-            {!phone && t('crm.tasks.newTask')}
+            <Plus size={16} />
+            {!phone && <span>{t('crm.tasks.newTask')}</span>}
         </button>
     ) : null;
 
@@ -937,16 +949,16 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                     const rect = createButtonRef.current?.getBoundingClientRect();
                     openCreate({ kind: singleKind }, rect ? anchorFromRect(rect) : null);
                 }}
-                /* Auf dem Telefon bleibt vom Knopf das Pluszeichen: die Zeile
-                   traegt schon Datum, Ansicht und Modus. Der Name steht als
-                   `aria-label`/`title` weiter da. */
+                /* Das Plus der Vorlage (14.09.2026): nur das Zeichen, der
+                   Name steht als `aria-label`/`title` — wie in Apples
+                   Kalender, wo der Knopf links in der Werkzeugleiste nur ein
+                   «+» trägt. */
                 aria-label={createLabel}
-                title={compact ? createLabel : undefined}
+                title={createLabel}
                 className={`ofi-cal-createbtn ${compact ? 'is-compact' : ''}`}
             >
-                <Plus size={18} />
-                {!phone && createLabel}
-                {!singleKind && !phone && <ChevronDown size={14} className="opacity-60" />}
+                <Plus size={16} />
+                {!singleKind && <ChevronDown size={14} className="opacity-60" />}
             </button>
             {createMenuOpen && !singleKind && (
                 <div className={`ofi-cal-createmenu ${compact ? 'is-right' : ''}`}>
@@ -970,13 +982,15 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
 
     return (
         <div className={`ofi-cal-page ${createOpen && splitView ? 'is-expanded' : ''}`}>
-            {/* ── header: today · arrows · month, then view + mode ─────────── */}
+            {/* ── DIE WERKZEUGLEISTE (14.09.2026, Vorgabe Samet: «tamamen
+                macOS UI», Vorlage maccalendar.png) ───────────────────────────
+                Wie in Apples Kalender: links der Griff zur Leiste und das
+                Plus, in der MITTE die Segmentwahl Tag | Woche | Monat, rechts
+                Postfach, Modus und die Suche. Der Monatsname mit ‹ Heute ›
+                steht NICHT mehr hier, sondern gross über dem Raster
+                (`.ofi-cal-titlerow` unten) — genau wie in der Vorlage. */}
             <header className="ofi-cal-topbar">
-                {/* Datumszeiger und Ansichtswahl gehören dem KALENDER. Der
-                    Aufgabenmodus bringt seinen eigenen Zeitraum in der Leiste
-                    des Stapels mit — beides gleichzeitig wären zwei Regler für
-                    dieselbe Frage. */}
-                <div className="flex min-w-0 items-center gap-1">
+                <div className="ofi-cal-topbar__left">
                     {/* Schmaler Schirm: der Griff zur Leiste. Auf dem
                         Schreibtisch steht sie ohnehin offen daneben — und im
                         Aufgabenmodus gibt es sie gar nicht (12.09.2026), also
@@ -993,17 +1007,33 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                             <LuPanelLeft size={17} />
                         </button>
                     )}
+                    {/* Je Modus EIN Anlegeknopf — das Plus der Vorlage. */}
+                    {mode === 'calendar' && createControl}
+                    {mode === 'tasks' && taskCreateControl}
+                </div>
+
+                <div className="ofi-cal-topbar__center">
+                    {/* Datumszeiger und Ansichtswahl gehören dem KALENDER. Der
+                        Aufgabenmodus bringt seinen eigenen Zeitraum in der Leiste
+                        des Stapels mit — beides gleichzeitig wären zwei Regler für
+                        dieselbe Frage. */}
                     {mode === 'calendar' && (
-                        <>
-                            <button type="button" className="ofi-cal-todaybtn" onClick={goToday}>{t('calendar.today')}</button>
-                            <button type="button" aria-label={t('common.back')} className="ofi-cal-navbtn" onClick={() => step(-1)}><ChevronLeft size={18} /></button>
-                            <button type="button" aria-label={t('common.next')} className="ofi-cal-navbtn" onClick={() => step(1)}><ChevronRight size={18} /></button>
-                            <span className="ofi-cal-period">{periodLabel}</span>
-                        </>
+                        <div className="ofi-cal-viewgroup">
+                            {views.map((item) => (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    onClick={() => setView(item.key)}
+                                    className={view === item.key ? 'is-active' : ''}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
                     )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="ofi-cal-topbar__right">
                     {/* Termine aus dem Postfach nachholen. Steht neben der
                         Ansichtswahl, weil es den KALENDER füllt und nicht die
                         Aufgaben; im eingebetteten Projektkalender entfällt er,
@@ -1020,20 +1050,6 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                         >
                             <RefreshCcw01 size={17} className={pulling ? 'animate-spin' : undefined} />
                         </button>
-                    )}
-                    {mode === 'calendar' && (
-                        <div className="ofi-cal-viewgroup">
-                            {views.map((item) => (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    onClick={() => setView(item.key)}
-                                    className={view === item.key ? 'is-active' : ''}
-                                >
-                                    {item.label}
-                                </button>
-                            ))}
-                        </div>
                     )}
 
                     {canViewTasks && (
@@ -1062,12 +1078,19 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                         </div>
                     )}
 
-                    {/* Je Modus EIN Anlegeknopf. Im Kalender sitzt er auf dem
-                        Schreibtisch in der Leiste und nur auf schmalen Schirmen
-                        hier; im Aufgabenmodus gibt es keine Leiste, also steht
-                        er immer hier. */}
-                    {mode === 'calendar' && compact && createControl}
-                    {mode === 'tasks' && taskCreateControl}
+                    {/* Die Suche — rechts in der Werkzeugleiste, wo die
+                        Vorlage ihre Lupe trägt (vorher in der Leiste). */}
+                    {mode === 'calendar' && (
+                        <label className={`ofi-cal-search ofi-cal-toolsearch ${search ? 'has-value' : ''}`}>
+                            <SearchLg size={13} className="shrink-0" />
+                            <input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder={t('calendar.searchPlaceholder')}
+                                aria-label={t('calendar.searchPlaceholder')}
+                            />
+                        </label>
+                    )}
                 </div>
             </header>
 
@@ -1095,8 +1118,6 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                        an und liegt auch nicht in der Tabulatorreihenfolge. */
                     inert={compact && !drawerOpen ? true : undefined}
                 >
-                    {!compact && createControl}
-
                     {/* Die Schublade sagt, was sie ist, und wie man sie wieder
                         zumacht — der Griff daneben ist auf einem Telefon nur ein
                         schmaler Streifen. */}
@@ -1114,22 +1135,6 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                         </div>
                     )}
 
-                    {/* DAS KLEINE MONATSBLATT IST WEG (12.09.2026, Vorgabe
-                        Samet: «entfernt die kleine Kalenderansicht»). Es war
-                        eine ZWEITE Datumswahl neben der Kopfzeile, die schon
-                        Monat, Pfeile und «Heute» trägt — und im Aufgabenmodus
-                        wählte es etwas ganz anderes (die Woche des Bretts) als
-                        im Kalender, mit demselben Griff. Die Leiste trägt jetzt
-                        nur noch, was ihr allein gehört: Suche und Etiketten. */}
-                    <label className="ofi-cal-search">
-                        <SearchLg size={13} className="shrink-0 text-slate-400" />
-                        <input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t('calendar.searchPlaceholder')}
-                        />
-                    </label>
-
                     {/* DIE ETIKETTEN (25.08.2026, Vorgabe Samet): EINE flache
                         Reihe. Kein Sammelbegriff «Termine» mehr, unter dem die
                         Stände als Unterpunkte hingen — jedes Etikett ist ein
@@ -1146,10 +1151,40 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                             onAdd={(popupAnchor) => setLabelSettings({ anchor: popupAnchor, startNew: true })}
                         />
                     </div>
+
+                    {/* DAS KLEINE MONATSBLATT — UNTEN LINKS (14.09.2026,
+                        Vorgabe Samet: «takvimi sol tarafta alta al», wie in
+                        Apples Kalender). Am 12.09. war es aus der Leiste
+                        geflogen; jetzt steht es wieder da, am Fuss der Leiste,
+                        und blättert den grossen Kalender auf den gewählten
+                        Tag. Im Aufgabenmodus gibt es die Leiste ohnehin
+                        nicht, also auch kein zweites Datum. */}
+                    <MiniMonth
+                        anchor={anchor}
+                        selectedDay={selectedDay}
+                        now={now}
+                        eventsByDay={eventsByDay}
+                        onPickDay={pickDay}
+                    />
                 </aside>}
 
                 {/* ── main surface ──────────────────────────────────────── */}
-                <div className="min-w-0">
+                <div className="ofi-cal-main min-w-0">
+                    {/* Der grosse Titel «September 2026» mit ‹ Heute › rechts —
+                        die Zeile der Vorlage über dem Raster. */}
+                    {mode === 'calendar' && (
+                        <div className="ofi-cal-titlerow">
+                            <h2 className="ofi-cal-period">
+                                <span className="ofi-cal-period__main">{periodMain}</span>
+                                {periodYear && <span className="ofi-cal-period__year"> {periodYear}</span>}
+                            </h2>
+                            <div className="ofi-cal-navgroup">
+                                <button type="button" aria-label={t('common.back')} className="ofi-cal-navbtn" onClick={() => step(-1)}><ChevronLeft size={16} /></button>
+                                <button type="button" className="ofi-cal-todaybtn" onClick={goToday}>{t('calendar.today')}</button>
+                                <button type="button" aria-label={t('common.next')} className="ofi-cal-navbtn" onClick={() => step(1)}><ChevronRight size={16} /></button>
+                            </div>
+                        </div>
+                    )}
                     {mode === 'tasks' ? (
                         /* GENAU DIE SEITE /crm/tasks (12.09.2026, Vorgabe
                            Samet): dieselbe Filterzeile samt Kundenfilter,

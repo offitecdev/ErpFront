@@ -4,9 +4,17 @@ import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight } from '@/components/icons/antIconCompat';
 import { dayKey, type CalEvent } from '../calendarShared';
 
-/* Compact month picker at the top of the rail. Picking a day moves the big
-   calendar; a dot under a number marks a day that has entries. Deliberately
-   small (28px rows) — the rail is chrome, not a second calendar. */
+/**
+ * DAS KLEINE MONATSBLATT — UNTEN IN DER SEITENLEISTE (14.09.2026, Vorgabe
+ * Samet: «takvimi sol tarafta alta al», Vorlage: Apples Kalender).
+ *
+ * Monatsname fett links, die Pfeile rechts daneben, darunter die
+ * Wochentagskürzel und die Tage: heute im roten Kreis, der gewählte Tag im
+ * grauen — genau wie am Mac. Ein Klick blättert den grossen Kalender auf
+ * diesen Tag; ein Punkt unter der Zahl sagt, dass dort Einträge stehen.
+ * Das Blatt folgt dem angezeigten Monat, blättert aber auch selbst vor und
+ * zurück, ohne den grossen Kalender mitzuziehen.
+ */
 export const MiniMonth = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: {
     anchor: dayjs.Dayjs;
     selectedDay: dayjs.Dayjs;
@@ -22,30 +30,32 @@ export const MiniMonth = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: 
     const weekDays = Array.from({ length: 7 }, (_, index) => gridStart.add(index, 'day').format('dd'));
 
     return (
-        <div className="ofi-cal-rail-block px-1.5 pb-1.5 pt-1">
-            <div className="mb-0.5 flex items-center justify-between">
-                <button
-                    type="button"
-                    aria-label={cursor.subtract(1, 'month').format('MMMM YYYY')}
-                    className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                    onClick={() => setCursor((current) => current.subtract(1, 'month'))}
-                >
-                    <ChevronLeft size={13} />
-                </button>
-                <span className="text-[11.5px] font-bold capitalize text-slate-800 dark:text-white/90">{cursor.format('MMMM YYYY')}</span>
-                <button
-                    type="button"
-                    aria-label={cursor.add(1, 'month').format('MMMM YYYY')}
-                    className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/45 dark:hover:bg-white/10 dark:hover:text-white"
-                    onClick={() => setCursor((current) => current.add(1, 'month'))}
-                >
-                    <ChevronRight size={13} />
-                </button>
+        <div className="ofi-cal-minimonth">
+            <div className="ofi-cal-minimonth__head">
+                <span className="ofi-cal-minimonth__title">{cursor.format('MMMM YYYY')}</span>
+                <span className="ofi-cal-minimonth__nav">
+                    <button
+                        type="button"
+                        aria-label={cursor.subtract(1, 'month').format('MMMM YYYY')}
+                        className="ofi-cal-minimonth__navbtn"
+                        onClick={() => setCursor((current) => current.subtract(1, 'month'))}
+                    >
+                        <ChevronLeft size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        aria-label={cursor.add(1, 'month').format('MMMM YYYY')}
+                        className="ofi-cal-minimonth__navbtn"
+                        onClick={() => setCursor((current) => current.add(1, 'month'))}
+                    >
+                        <ChevronRight size={14} />
+                    </button>
+                </span>
             </div>
-            <div className="grid grid-cols-7 text-center text-[9px] font-semibold uppercase text-slate-400 dark:text-white/35">
-                {weekDays.map((day, index) => <div key={`${day}-${index}`} className="py-0.5">{day}</div>)}
+            <div className="ofi-cal-minimonth__dow">
+                {weekDays.map((day, index) => <div key={`${day}-${index}`}>{day}</div>)}
             </div>
-            <div className="grid grid-cols-7">
+            <div className="ofi-cal-minimonth__days">
                 {days.map((day) => {
                     const key = dayKey(day);
                     const isSelected = key === dayKey(selectedDay);
@@ -57,10 +67,12 @@ export const MiniMonth = ({ anchor, selectedDay, now, eventsByDay, onPickDay }: 
                             key={key}
                             type="button"
                             onClick={() => onPickDay(day)}
-                            className={`ofi-cal-mini-day ${isSelected ? 'is-selected' : ''} ${isToday && !isSelected ? 'is-today' : ''} ${outside ? 'is-outside' : ''}`}
+                            aria-label={day.format('dddd, D. MMMM YYYY')}
+                            aria-current={isToday ? 'date' : undefined}
+                            className={`ofi-cal-mini-day ${isSelected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''} ${outside ? 'is-outside' : ''}`}
                         >
                             {day.date()}
-                            {hasEvents && !isSelected && <span className="ofi-cal-mini-day__dot" />}
+                            {hasEvents && <span className="ofi-cal-mini-day__dot" />}
                         </button>
                     );
                 })}

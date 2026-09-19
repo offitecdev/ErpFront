@@ -2,6 +2,7 @@ import React from 'react';
 import AntInput from 'antd/es/input';
 import AntSelect from 'antd/es/select';
 import { AntdTheme } from './AntdTheme';
+import { MacDatePicker } from './MacDatePicker';
 
 import { t } from '@/i18n/translate';
 
@@ -53,13 +54,6 @@ const antSizeMap: Record<string, 'small' | 'middle' | 'large'> = {
     '2xl': 'large',
 };
 
-const nativeInputSizeMap: Record<string, string> = {
-    sm: 'h-8 px-2.5 text-sm',
-    md: 'h-10 px-3 text-sm',
-    lg: 'h-11 px-3.5 text-base',
-    xl: 'h-12 px-4 text-base',
-    '2xl': 'h-14 px-4 text-lg',
-};
 
 export const Input: React.FC<SharedInputProps> = ({
     className = '',
@@ -78,21 +72,24 @@ export const Input: React.FC<SharedInputProps> = ({
     ...rest
 }) => {
     if (type === 'date') {
+        /* Der eine Kalender der Anwendung (16.09.2026) statt des Systemfeldes.
+           Aufrufer lesen `event.target.value` — das Ereignis wird darum
+           nachgebildet. */
         return (
-            <input
-                {...rest}
+            <MacDatePicker
                 id={id}
-                name={name}
-                type="date"
-                value={value as string | undefined}
-                defaultValue={defaultValue as string | undefined}
-                onChange={onChange}
-                placeholder={placeholder ?? t('auto.tarih_secin')}
+                value={String(value ?? defaultValue ?? '')}
+                onChange={(next) => onChange?.({
+                    target: { value: next, name: name ?? '' },
+                    currentTarget: { value: next, name: name ?? '' },
+                } as unknown as React.ChangeEvent<HTMLInputElement>)}
+                placeholder={placeholder}
+                ariaLabel={(rest as { 'aria-label'?: string })['aria-label'] ?? placeholder ?? t('auto.tarih_secin')}
                 disabled={disabled}
                 required={required}
-                min={min}
-                max={max}
-                className={`${inputClass} ${nativeInputSizeMap[size] || nativeInputSizeMap.md} ${className}`}
+                min={min === undefined ? undefined : String(min)}
+                max={max === undefined ? undefined : String(max)}
+                className={`${size === 'sm' ? 'is-field-sm' : 'is-field'} ${className}`}
             />
         );
     }

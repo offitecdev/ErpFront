@@ -1,61 +1,93 @@
-import type { TaskStatus, WorkReport, WorkReportSession } from '@/types/tasksModule';
+import { absoluteAttachmentUrl } from '@/lib/api/tasksModule';
+import type { DailyReport, WorkReport, WorkReportSession } from '@/types/tasksModule';
+import { parseMarkdown, type MdBlock } from './markdownDoc';
 
 /**
- * ── ARBEITSRAPPORT EINER PERSON: DAS DOKUMENT (13.09.2026, Vorgabe Samet) ────
+ * ── ARBEITSRAPPORT EINER PERSON: DAS DOKUMENT ────────────────────────────────
  *
- * «Rapor tek kişi için; günlük veya haftalık; sade, Arial, siyah beyaz,
- * tablolu.» Aus den Rohstoffen des Servers wird hier EIN Dokument aus fertigen
- * Texten gebaut — Vorschau und PDF lesen dasselbe:
+ * 16.09.2026 (Samet): «Raporlamada gün gün yazsın; grafik falan kaldır, diğer
+ * şeyleri de, görev bazlı bakışı da kaldır — sadece gün gün, gün sonunda neler
+ * yaptı.» Damit ist der Rapport NUR noch die Sammlung der Gün sonu raporları:
  *
- *   Woche   NUR Tage und Aufgaben: je Tag die bearbeiteten Aufgaben mit ihrer
- *           Zeit, Tagestotal, am Ende das Wochentotal.
- *   Tag     ausführlicher: Aufgaben (Etiketten, Status, Zeit, heute abgehakt,
- *           Checkliste), Zeiteinträge, abgehakte Punkte, Kommentare.
+ *   Kopf     Titel, rechts oben das gerechnete graue Muster (reportMark.ts),
+ *            darunter Person, Zeitraum, Firma/erstellt
+ *   Tage     je Kalendertag eine Überschrift und das freie Blatt des Tages
+ *            (Markdown → Blöcke, markdownDoc.ts), darunter seine Dateien als
+ *            anklickbare Adressen (Bilder und PDF liegen bei Cloudflare) und
+ *            zuletzt die Zeiten des Tages: welche Aufgabe, wie lange
+ *            (16.09.2026, Samet: «çalıştığı görevler ve kaç saat çalıştığı,
+ *            gün gün, ince gri kenarlı bir tabloda»)
  *
- * Messungen über Mitternacht werden auf die Tage verteilt. Die Datei kennt
- * weder i18n noch React: Übersetzer und Sprache kommen herein (so läuft sie
- * auch im Probedruck-Skript unter Node).
+ * Vorschau (ReportBody) und PDF (workReportPdfLayout) lesen dasselbe Dokument.
+ * Die Datei kennt weder i18n noch React: Übersetzer und Sprache kommen herein.
  */
 
 export type WorkPeriod = 'day' | 'week';
 
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-export interface WorkColumn {
-    header: string;
-    /** Relative Breite; das PDF rechnet sie auf die Seitenbreite um. */
-    width: number;
-    align?: 'left' | 'right';
+/** Eine Datei des Tages — im Rapport steht ihre anklickbare Adresse. */
+export interface WorkReportFile {
+    id: string;
+    name: string;
+    url: string;
+    isImage: boolean;
+    isPdf: boolean;
 }
 
-export interface WorkRow {
-    cells: string[];
-    /** Summenzeile (fett, Linie darüber). */
-    total?: boolean;
-    /** Beginn einer Gruppe (Tag): kräftigere Linie darüber. */
-    groupStart?: boolean;
-}
-
-export interface WorkTable {
+/** Eine Zeile der Zeittabelle eines Tages. */
+export interface WorkReportTime {
+    taskId: string;
     title: string;
-    columns: WorkColumn[];
-    rows: WorkRow[];
-    emptyText: string;
+    ms: number;
+    duration: string;
+}
+
+export interface WorkReportDay {
+    key: string;
+    /** «Pazartesi». */
+    weekday: string;
+    /** «14.09.2026». */
+    dateText: string;
+    /** «Pazartesi · 14.09.2026». */
+    heading: string;
+    /** Das Blatt des Tages; leer = nichts geschrieben. */
+    blocks: MdBlock[];
+    files: WorkReportFile[];
+    /** Zeit je Aufgabe an diesem Tag, längste zuerst; leer = keine Messung. */
+    times: WorkReportTime[];
+    /** Summe der Zeiten des Tages, schon als Text. */
+    total: string;
+    /** Es gibt einen gespeicherten Rapport für diesen Tag. */
+    written: boolean;
 }
 
 export interface WorkReportDocument {
+    period: WorkPeriod;
     title: string;
-    /** Name der Person. */
     person: string;
-    period: string;
-    meta: Array<{ label: string; value: string }>;
-    tables: WorkTable[];
+    /** «Haftalık · 14.09.2026 – 20.09.2026». */
+    subtitle: string;
+    /** «Firma · Oluşturulma 16.09.2026 17:05». */
+    meta: string;
+    days: WorkReportDay[];
+    labels: {
+        files: string;
+        missing: string;
+        empty: string;
+        /** Überschrift und Spalten der Zeittabelle. */
+        worked: string;
+        task: string;
+        duration: string;
+        total: string;
+    };
     footerLeft: string;
     pageLabel: (page: number, pages: number) => string;
     fileName: string;
 }
 
 const K = 'tasksModule.reports.work';
+const MINUTE_MS = 60_000;
 
 /* ── Zeitraum ───────────────────────────────────────────────────────────── */
 
@@ -90,212 +122,121 @@ export const shiftPeriod = (period: WorkPeriod, dateKey: string, step: number): 
     return toDateKey(from);
 };
 
-/* ── Formate ────────────────────────────────────────────────────────────── */
-
-/** Stundenzettel-Form «7:45» — in jeder Sprache gleich lesbar. */
-export const formatHours = (ms: number): string => {
-    const minutes = Math.round(Math.max(0, ms) / 60_000);
-    return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`;
-};
-
-const formatters = (locale: string) => ({
-    day: new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    weekday: new Intl.DateTimeFormat(locale, { weekday: 'long' }),
-    time: new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }),
-});
-
-/* ── Messungen auf Tage verteilen ───────────────────────────────────────── */
-
-/** Eine Messung über Mitternacht wird zu je einer Zeile pro Tag. */
-const splitSessionByDay = (session: WorkReportSession): WorkReportSession[] => {
-    const start = new Date(session.startedAt);
-    const end = session.endedAt ? new Date(session.endedAt) : new Date(start.getTime() + session.ms);
-    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) return [];
-    const parts: WorkReportSession[] = [];
-    let cursor = start;
-    while (cursor < end) {
-        const nextDay = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
-        const partEnd = nextDay < end ? nextDay : end;
-        const tail = partEnd.getTime() === end.getTime();
-        parts.push({
-            taskId: session.taskId,
-            startedAt: cursor.toISOString(),
-            endedAt: tail && session.live ? null : partEnd.toISOString(),
-            ms: partEnd.getTime() - cursor.getTime(),
-            live: tail && session.live,
-        });
-        cursor = partEnd;
-    }
-    return parts;
-};
-
 /* ── Dokument ───────────────────────────────────────────────────────────── */
+
+/** «2 sa 05 dk» — so wie der Gün sonu raporu die Zeit zeigt. */
+export const hoursMinutesText = (t: Translate, ms: number): string => {
+    const minutes = Math.round(Math.max(0, ms) / MINUTE_MS);
+    return t(`${K}.daily.duration`, { hours: Math.floor(minutes / 60), minutes: pad(minutes % 60) });
+};
+
+const isWeekend = (day: Date) => day.getDay() === 0 || day.getDay() === 6;
+
+/**
+ * Messzeit je Kalendertag UND Aufgabe; eine Messung über Mitternacht wird
+ * geteilt (die Tagesgrenzen kennt nur der Browser).
+ */
+const splitSessionsByDay = (sessions: WorkReportSession[]): Map<string, Map<string, number>> => {
+    const byDay = new Map<string, Map<string, number>>();
+    for (const session of sessions) {
+        const start = new Date(session.startedAt);
+        const end = session.endedAt ? new Date(session.endedAt) : new Date(start.getTime() + session.ms);
+        if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) continue;
+        let cursor = start;
+        while (cursor < end) {
+            const nextDay = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+            const partEnd = nextDay < end ? nextDay : end;
+            const key = toDateKey(cursor);
+            const tasks = byDay.get(key) ?? new Map<string, number>();
+            tasks.set(session.taskId, (tasks.get(session.taskId) ?? 0) + partEnd.getTime() - cursor.getTime());
+            byDay.set(key, tasks);
+            cursor = partEnd;
+        }
+    }
+    return byDay;
+};
+
+const capitalize = (text: string, locale: string) => text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+
+const toFiles = (daily: DailyReport | undefined): WorkReportFile[] =>
+    (daily?.files ?? []).map((file) => ({
+        id: file.id,
+        name: file.fileName,
+        url: absoluteAttachmentUrl(file),
+        isImage: file.isImage,
+        isPdf: file.isPdf,
+    }));
 
 export const buildWorkReportDocument = (
     report: WorkReport,
     options: { period: WorkPeriod; t: Translate; locale: string; company: string },
 ): WorkReportDocument => {
     const { period, t, locale, company } = options;
-    const fmt = formatters(locale);
-    const from = new Date(report.from);
-    const { days } = periodBounds(period, toDateKey(from));
-    const dayLabel = (day: Date) => `${fmt.weekday.format(day)}, ${fmt.day.format(day)}`;
-    const periodText = period === 'week'
-        ? t(`${K}.weekRange`, { from: fmt.day.format(days[0]), to: fmt.day.format(days[days.length - 1]) })
-        : dayLabel(from);
+    const dayFmt = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const weekdayFmt = new Intl.DateTimeFormat(locale, { weekday: 'long' });
+    const timeFmt = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
+
+    const { days: periodDays } = periodBounds(period, toDateKey(new Date(report.from)));
     const generated = new Date(report.generatedAt);
     const person = report.employee.name || t(`${K}.unknownPerson`);
     const title = t(`${K}.title`);
-    const taskTitle = (id: string) => report.tasks[id]?.title ?? '';
-    const statusText = (status: TaskStatus) => t(`tasksModule.status.${status}`);
+    const periodText = period === 'week'
+        ? t(`${K}.weekRange`, { from: dayFmt.format(periodDays[0]), to: dayFmt.format(periodDays[periodDays.length - 1]) })
+        : `${capitalize(weekdayFmt.format(periodDays[0]), locale)}, ${dayFmt.format(periodDays[0])}`;
+    const kindText = period === 'week' ? t(`${K}.kind.week`) : t(`${K}.kind.day`);
 
-    const segments = report.sessions.flatMap(splitSessionByDay)
-        .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
-    const totalMs = segments.reduce((sum, segment) => sum + segment.ms, 0);
-
-    const tables: WorkTable[] = [];
-
-    if (period === 'week') {
-        // Tag → Aufgabe → Zeit, in der Reihenfolge der ersten Messung des Tages.
-        const rows: WorkRow[] = [];
-        days.forEach((day) => {
+    /* Gün sonu raporları: Montag–Freitag immer, Wochenende nur mit Rapport oder Arbeit. */
+    const dailyByDate = new Map((report.dailyReports ?? []).map((daily) => [daily.date, daily]));
+    const timesByDate = splitSessionsByDay(report.sessions ?? []);
+    const taskTitle = (taskId: string) => report.tasks?.[taskId]?.title || t(`${K}.unknownTask`);
+    const days: WorkReportDay[] = periodDays
+        .filter((day) => period === 'day' || !isWeekend(day)
+            || dailyByDate.has(toDateKey(day)) || timesByDate.has(toDateKey(day)))
+        .map((day) => {
             const key = toDateKey(day);
-            const byTask = new Map<string, number>();
-            for (const segment of segments) {
-                if (toDateKey(new Date(segment.startedAt)) !== key) continue;
-                byTask.set(segment.taskId, (byTask.get(segment.taskId) ?? 0) + segment.ms);
-            }
-            const weekend = day.getDay() === 0 || day.getDay() === 6;
-            if (!byTask.size) {
-                // Freie Wochenenden fallen weg; ein freier Werktag steht mit 0:00 da.
-                if (!weekend) rows.push({ cells: [dayLabel(day), '–', formatHours(0)], groupStart: true });
-                return;
-            }
-            let first = true;
-            let dayMs = 0;
-            byTask.forEach((ms, taskId) => {
-                rows.push({ cells: [first ? dayLabel(day) : '', taskTitle(taskId), formatHours(ms)], groupStart: first });
-                first = false;
-                dayMs += ms;
-            });
-            if (byTask.size > 1) rows.push({ cells: ['', t(`${K}.dayTotal`), formatHours(dayMs)], total: true });
-        });
-        rows.push({ cells: [t(`${K}.weekTotal`), '', formatHours(totalMs)], total: true, groupStart: true });
-        tables.push({
-            title: t(`${K}.weekTitle`),
-            columns: [
-                { header: t(`${K}.col.date`), width: 42 },
-                { header: t(`${K}.col.task`), width: 118 },
-                { header: t(`${K}.col.time`), width: 20, align: 'right' },
-            ],
-            rows,
-            emptyText: t(`${K}.noTasks`),
-        });
-    } else {
-        const msByTask = new Map<string, number>();
-        for (const segment of segments) msByTask.set(segment.taskId, (msByTask.get(segment.taskId) ?? 0) + segment.ms);
-        const checkedByTask = new Map<string, number>();
-        for (const item of report.checkedItems) checkedByTask.set(item.taskId, (checkedByTask.get(item.taskId) ?? 0) + 1);
-        const taskIds = Object.keys(report.tasks).sort((a, b) =>
-            (msByTask.get(b) ?? 0) - (msByTask.get(a) ?? 0) || taskTitle(a).localeCompare(taskTitle(b)));
-
-        tables.push({
-            title: t(`${K}.tasksTitle`),
-            columns: [
-                { header: t(`${K}.col.task`), width: 58 },
-                { header: t(`${K}.col.labels`), width: 30 },
-                { header: t(`${K}.col.status`), width: 26 },
-                { header: t(`${K}.col.time`), width: 16, align: 'right' },
-                { header: t(`${K}.col.checkedToday`), width: 22, align: 'right' },
-                { header: t(`${K}.col.checklist`), width: 20, align: 'right' },
-            ],
-            rows: [
-                ...taskIds.map((id): WorkRow => {
-                    const task = report.tasks[id];
-                    return {
-                        cells: [
-                            task.title,
-                            task.labels.join(', '),
-                            statusText(task.effectiveStatus),
-                            formatHours(msByTask.get(id) ?? 0),
-                            String(checkedByTask.get(id) ?? 0),
-                            task.checkTotal ? `${task.checkDone}/${task.checkTotal}` : '–',
-                        ],
-                    };
-                }),
-                ...(taskIds.length ? [{ cells: [t(`${K}.total`), '', '', formatHours(totalMs), String(report.checkedItems.length), ''], total: true }] : []),
-            ],
-            emptyText: t(`${K}.noTasks`),
+            const daily = dailyByDate.get(key);
+            const weekday = capitalize(weekdayFmt.format(day), locale);
+            const dateText = dayFmt.format(day);
+            const times: WorkReportTime[] = [...(timesByDate.get(key) ?? new Map<string, number>())]
+                .filter(([, ms]) => ms >= MINUTE_MS / 2)
+                .map(([taskId, ms]) => ({ taskId, title: taskTitle(taskId), ms, duration: hoursMinutesText(t, ms) }))
+                .sort((left, right) => right.ms - left.ms || left.title.localeCompare(right.title, locale));
+            return {
+                key,
+                weekday,
+                dateText,
+                heading: `${weekday} · ${dateText}`,
+                blocks: parseMarkdown(daily?.body ?? ''),
+                files: toFiles(daily),
+                times,
+                total: hoursMinutesText(t, times.reduce((sum, entry) => sum + entry.ms, 0)),
+                written: Boolean(daily),
+            };
         });
 
-        tables.push({
-            title: t(`${K}.sessionsTitle`),
-            columns: [
-                { header: t(`${K}.col.start`), width: 18 },
-                { header: t(`${K}.col.end`), width: 22 },
-                { header: t(`${K}.col.task`), width: 120 },
-                { header: t(`${K}.col.duration`), width: 20, align: 'right' },
-            ],
-            rows: [
-                ...segments.map((segment): WorkRow => ({
-                    cells: [
-                        fmt.time.format(new Date(segment.startedAt)),
-                        segment.live || !segment.endedAt ? t(`${K}.running`) : fmt.time.format(new Date(segment.endedAt)),
-                        taskTitle(segment.taskId),
-                        formatHours(segment.ms),
-                    ],
-                })),
-                ...(segments.length ? [{ cells: ['', '', t(`${K}.total`), formatHours(totalMs)], total: true }] : []),
-            ],
-            emptyText: t(`${K}.noSessions`),
-        });
-
-        if (report.checkedItems.length) {
-            tables.push({
-                title: t(`${K}.checkedTitle`),
-                columns: [
-                    { header: t(`${K}.col.clock`), width: 18 },
-                    { header: t(`${K}.col.task`), width: 62 },
-                    { header: t(`${K}.col.item`), width: 100 },
-                ],
-                rows: report.checkedItems.map((item) => ({
-                    cells: [fmt.time.format(new Date(item.doneAt)), taskTitle(item.taskId), item.text],
-                })),
-                emptyText: '',
-            });
-        }
-        if (report.comments.length) {
-            tables.push({
-                title: t(`${K}.commentsTitle`),
-                columns: [
-                    { header: t(`${K}.col.clock`), width: 18 },
-                    { header: t(`${K}.col.task`), width: 62 },
-                    { header: t(`${K}.col.comment`), width: 100 },
-                ],
-                rows: report.comments.map((comment) => ({
-                    cells: [fmt.time.format(new Date(comment.createdAt)), taskTitle(comment.taskId), comment.text],
-                })),
-                emptyText: '',
-            });
-        }
-    }
-
-    const kindText = period === 'week' ? t(`${K}.weekly`) : t(`${K}.daily`);
     const safe = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_');
+    const lastDay = periodDays[periodDays.length - 1];
     return {
+        period,
         title,
         person,
-        period: periodText,
+        subtitle: `${kindText} · ${periodText}`,
         meta: [
-            { label: t(`${K}.meta.person`), value: person },
-            { label: t(`${K}.meta.period`), value: `${kindText} · ${periodText}` },
-            { label: t(`${K}.meta.totalTime`), value: formatHours(totalMs) },
-            ...(company ? [{ label: t(`${K}.meta.company`), value: company }] : []),
-            { label: t(`${K}.meta.generatedAt`), value: `${fmt.day.format(generated)} ${fmt.time.format(generated)}` },
-        ],
-        tables,
+            company,
+            `${t(`${K}.meta.generatedAt`)} ${dayFmt.format(generated)} ${timeFmt.format(generated)}`,
+        ].filter(Boolean).join(' · '),
+        days,
+        labels: {
+            files: t(`${K}.daily.files`),
+            missing: t(`${K}.daily.missing`),
+            empty: t(`${K}.daily.empty`),
+            worked: t(`${K}.daily.worked`),
+            task: t(`${K}.col.task`),
+            duration: t(`${K}.col.duration`),
+            total: t(`${K}.total`),
+        },
         footerLeft: `${title} · ${person} · ${periodText}`,
         pageLabel: (page, pages) => t(`${K}.page`, { page, pages }),
-        fileName: safe(`${title}_${person}_${toDateKey(days[0])}${period === 'week' ? `_${toDateKey(days[days.length - 1])}` : ''}`),
+        fileName: safe(`${title}_${person}_${toDateKey(periodDays[0])}${period === 'week' ? `_${toDateKey(lastDay)}` : ''}`),
     };
 };

@@ -156,11 +156,11 @@ export const MyOrders = () => {
                 action={
                     <button
                         type="button"
-                        onClick={() => navigate('/sales/invoices?type=DELIVERY')}
+                        onClick={() => navigate('/accounting/invoices?type=DELIVERY')}
                         className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3.5 py-2 text-[12.5px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] dark:border-white/20 dark:text-white/70 dark:hover:text-white"
                     >
                         <Receipt size={14} />
-                        {t('nav.salesInvoices')}
+                        {t('nav.outgoingInvoices')}
                     </button>
                 }
             />

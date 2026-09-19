@@ -77,7 +77,54 @@ export const invoiceKindTitle = (kind: InvoiceKind): string => ({
     AKONTO: 'Akontorechnung',
     ZWISCHEN: 'Zwischenrechnung',
     SCHLUSS: 'Schlussrechnung',
+    STORNO: 'Stornorechnung',
+    GUTSCHRIFT: 'Gutschrift',
 } as const)[kind] ?? 'Rechnung';
+
+/**
+ * ── GEGENBELEG (17.09.2026, Schritt 6) ──────────────────────────────────────
+ * Storno-Rechnung und Gutschrift drucken EINE Zeile mit Verweis auf die
+ * Rechnung, die sie betreffen, darunter den Grund — und den Betrag negativ.
+ * Die Zeilen des Originals stehen als Beleg am Datensatz, der Kunde liest hier
+ * aber nur, WAS zurückgenommen wird.
+ */
+const buildCreditPositions = (
+    invoice: InvoiceDto,
+    vatRate: number,
+): { positions: TenderPdfData['positions']; totals: TenderPdfTotals } => {
+    const gross = round2(Number(invoice.amount) || 0);
+    const net = vatRate > 0 ? round2(gross / (1 + vatRate / 100)) : gross;
+    const ref = invoice.reversesInvoice;
+    const refText = ref
+        ? `${invoiceKindTitle(ref.kind)} Nr. ${ref.invoiceNumber}${ref.invoiceDate ? ` vom ${fmtDay(ref.invoiceDate)}` : ''}`
+        : '';
+    const title = invoice.kind === 'STORNO'
+        ? `Storno ${refText}`.trim()
+        : `Gutschrift zu ${refText}`.trim();
+    const lines: string[] = [];
+    if (ref && invoice.kind === 'GUTSCHRIFT' && Math.abs(Math.abs(gross) - Math.abs(Number(ref.amount) || 0)) > 0.005) {
+        const chf = (value: number) => `CHF ${Math.abs(value).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        lines.push(`Rechnungsbetrag ${chf(Number(ref.amount) || 0)}, davon gutgeschrieben ${chf(gross)}`);
+    }
+    if (invoice.creditReason) lines.push(`Grund: ${invoice.creditReason}`);
+    return {
+        positions: [{
+            shortDescription: `1 ${title}`,
+            longDescription: lines.join('\n') || null,
+            rowType: 'PRODUCT',
+            isTopLevel: true,
+            hierarchyLevel: 1,
+            quantity: 1,
+            unit: 'Pau.',
+            unitPrice: net,
+            taxRate: vatRate,
+            lineTotal: gross,
+        }],
+        totals: { netTotal: net, vatTotal: round2(gross - net), grossTotal: gross },
+    };
+};
+
+const isCreditDocument = (invoice: Pick<InvoiceDto, 'kind'>) => invoice.kind === 'STORNO' || invoice.kind === 'GUTSCHRIFT';
 
 /** AKONTO/ZWISCHEN/SCHLUSS satırının kalın başlığı ("Anzahlung von 50.00%"). */
 const partialRowTitle = (kind: InvoiceKind, percent: number): string => {
@@ -194,15 +241,39 @@ const buildDirectPositions = (
     };
 };
 
+/* ── MINDERUNG AUF DER RECHNUNG (16.09.2026) ──────────────────────────────────
+   Ein Nachtrag mit Minussumme wird nicht selbst verrechnet, sondern von der
+   Rechnung seines Hauptauftrags abgezogen. Der Server legt ihn dort als eigene
+   Minuszeile an (Quelle = der Nachtrag). Der Beleg zeigt ihn mit Namen, damit
+   der Kunde sieht, warum der Betrag kleiner ist. */
+const MINDERUNG_LABEL: Record<PdfLang, string> = { de: 'Minderung', en: 'Reduction', tr: 'Eksiltme' };
+
+const minderungLinesOf = (invoice: InvoiceDto, lang: PdfLang): Array<{ label: string; gross: number }> =>
+    [...(invoice.lineItems || [])]
+        .filter((line) => Number(line.lineTotal) < 0 && line.sourceId && line.sourceId !== invoice.salesOrderId)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((line) => ({
+            label: `${MINDERUNG_LABEL[lang]} ${String(line.description || '').replace(/^Minderung\s+/, '').replace(/\s*\(%[^)]*\)\s*$/, '')}`.trim(),
+            gross: round2(Number(line.lineTotal) || 0),
+        }));
+
 /** Yüzdelik fatura: tek satırlık pozisyon listesi + net/KDV/brüt özeti. */
 const buildPartialPositions = (
     invoice: InvoiceDto,
     ctx: InvoiceOrderContext,
     vatRate: number,
+    lang: PdfLang = 'de',
 ): { positions: TenderPdfData['positions']; totals: TenderPdfTotals } => {
     const gross = round2(Number(invoice.amount) || 0);
     const net = vatRate > 0 ? round2(gross / (1 + vatRate / 100)) : gross;
     const kind = invoice.kind;
+    const minderungen = minderungLinesOf(invoice, lang);
+    // Mit Minderungen trägt die erste Zeile den Auftragsanteil, jede Minderung
+    // folgt als eigene Minuszeile — die Zeilen summieren sich zum Betrag.
+    const orderGross = minderungen.length
+        ? round2(gross - minderungen.reduce((sum, row) => sum + row.gross, 0))
+        : gross;
+    const netOf = (value: number) => (vatRate > 0 ? round2(value / (1 + vatRate / 100)) : value);
 
     const refLines = [`${invoiceKindTitle(kind)} Nr. ${invoice.invoiceNumber} zum Auftrag ${ctx.orderNumber}`];
     if (kind === 'SCHLUSS') {
@@ -220,10 +291,22 @@ const buildPartialPositions = (
                 hierarchyLevel: 1,
                 quantity: 1,
                 unit: 'Pau.',
-                unitPrice: net,
+                unitPrice: netOf(orderGross),
                 taxRate: vatRate,
-                lineTotal: gross,
+                lineTotal: orderGross,
             },
+            ...minderungen.map((row, index) => ({
+                shortDescription: `${index + 2} ${row.label}`,
+                longDescription: null,
+                rowType: 'PRODUCT',
+                isTopLevel: true,
+                hierarchyLevel: 1,
+                quantity: 1,
+                unit: 'Pau.',
+                unitPrice: netOf(row.gross),
+                taxRate: vatRate,
+                lineTotal: row.gross,
+            })),
         ],
         totals: { netTotal: net, vatTotal: round2(gross - net), grossTotal: gross },
     };
@@ -237,6 +320,8 @@ const buildFullPositions = async (
     tenderId: string,
     vatRate: number,
     onProgress?: (p: TenderPdfProgress) => void,
+    invoice?: InvoiceDto,
+    lang: PdfLang = 'de',
 ): Promise<{ positions: TenderPdfData['positions']; totals: TenderPdfTotals } | null> => {
     try {
         const detail = await tenderApi.getById(tenderId, { includeActivities: false, deferOrderPdfContent: true });
@@ -252,17 +337,51 @@ const buildFullPositions = async (
         const summary = computeTenderPricingSummary(simpleRows, vatRate, documentDiscounts);
         onProgress?.({ stage: 'positions', done: 0, total: withImages.length });
 
+        const discounts = summary.discounts
+            .filter((entry) => entry.amount > 0)
+            .map((entry, index) => ({
+                name: discountDisplayName(entry, index),
+                percent: entry.percent,
+                amount: entry.amount,
+            }));
+
+        /* MINDERUNG: die Offerte zeigt den ganzen Auftrag, die Rechnung ist
+           um die Minderungen kleiner. Sie stehen im Summenblock nach den
+           Rabatten, jede mit ihrem Namen (netto), und das Total ist der
+           Rechnungsbetrag. Fehlen die Zeilen (ältere Antwort), deckt eine
+           Sammelzeile die Differenz — nie ein Total, das nicht stimmt. */
+        const invoiceGross = invoice ? round2(Number(invoice.amount) || 0) : summary.grossTotal;
+        const gap = round2(invoiceGross - summary.grossTotal);
+        if (invoice && gap < -0.01) {
+            const toNet = (value: number) => (vatRate > 0 ? value / (1 + vatRate / 100) : value);
+            const named = minderungLinesOf(invoice, lang);
+            const rows = named.length
+                ? named
+                : [{ label: MINDERUNG_LABEL[lang], gross: gap }];
+            const minderungNet = rows.reduce((sum, row) => sum + round2(toNet(-row.gross)), 0);
+            const netTotal = round2(summary.netTotal - minderungNet);
+            return {
+                positions: withImages,
+                totals: {
+                    subtotal: discounts.length ? summary.netBeforeDiscounts : summary.netTotal,
+                    discounts: [
+                        ...discounts,
+                        ...rows.map((row) => ({ name: row.label, percent: 0, amount: round2(toNet(-row.gross)) })),
+                    ],
+                    totalDiscountAmount: round2(summary.totalDiscountAmount + minderungNet),
+                    combinedDiscountPercent: summary.combinedDiscountPercent,
+                    netTotal,
+                    vatTotal: round2(invoiceGross - netTotal),
+                    grossTotal: invoiceGross,
+                },
+            };
+        }
+
         return {
             positions: withImages,
             totals: {
                 subtotal: summary.netBeforeDiscounts,
-                discounts: summary.discounts
-                    .filter((entry) => entry.amount > 0)
-                    .map((entry, index) => ({
-                        name: discountDisplayName(entry, index),
-                        percent: entry.percent,
-                        amount: entry.amount,
-                    })),
+                discounts,
                 totalDiscountAmount: summary.totalDiscountAmount,
                 combinedDiscountPercent: summary.combinedDiscountPercent,
                 netTotal: summary.netTotal,
@@ -351,6 +470,7 @@ export async function buildInvoicePdfBytes(
     lang: PdfLang = 'de',
 ): Promise<Uint8Array> {
     const direct = isDirectInvoice(invoice);
+    const credit = isCreditDocument(invoice);
     // Der Steuersatz der Direktrechnung ist EINGEFROREN: ein später geänderter
     // Firmenwert darf eine gestellte Rechnung nicht rückwirkend verschieben.
     const vatRate = direct && invoice.vatRate != null
@@ -366,33 +486,43 @@ export async function buildInvoicePdfBytes(
     //  - „Positionen" weg → keine Tabelle; der Beleg zeigt nur die Summe
     //  - „Schlusstext" weg → keine Karte unter dem Total
     // Eine Auftragsrechnung kennt die Abschnitte nicht: sie druckt wie bisher.
-    const sections = direct ? parseInvoiceSections(invoice.sections) : ALL_SECTIONS;
+    const sections = direct && !credit ? parseInvoiceSections(invoice.sections) : ALL_SECTIONS;
     const discounts = direct && sections.discount ? invoiceDiscounts(invoice) : [];
 
     // Direktrechnung: die eigenen Positionen. Sonst RECHNUNG aus der Offerte
     // (alle Positionen) bzw. in jedem anderen Fall die eine Prozentzeile.
-    const body = direct
+    const body = credit
+        ? buildCreditPositions(invoice, vatRate)
+        : direct
         ? buildDirectPositions(invoice, vatRate, discounts)
         : ((invoice.kind === 'RECHNUNG' && ctx.tenderId
-            ? await buildFullPositions(ctx.tenderId, vatRate, onProgress)
+            ? await buildFullPositions(ctx.tenderId, vatRate, onProgress, invoice, lang)
             : null)
-            ?? buildPartialPositions(invoice, ctx, vatRate));
+            ?? buildPartialPositions(invoice, ctx, vatRate, lang));
 
     // Kartta TAM BEŞ satır (kullanıcı isteği): Auftrags-Nr. YOK, Fälligkeit
     // EN SONDA. Kommission tekliften gelir (faturalama ekranında girilmez).
     // Die Bilder kosten eine Runde zum Server — sie werden nur geholt, wenn die
     // Positionstabelle auch wirklich gedruckt wird (Abschnitt „Positionen").
-    const positions = direct && sections.positions
+    const positions = direct && !credit && sections.positions
         ? await attachDirectPositionImages(body.positions)
         : body.positions;
 
-    const infoRows: NonNullable<TenderPdfData['infoRows']> = [
-        { label: 'Rechnungs-Nr.', value: invoice.invoiceNumber, emphasize: true },
-        { label: 'Rechnungsdatum', value: fmtDay(invoice.invoiceDate || invoice.createdAt) },
-        { label: 'Salesperson', value: invoice.salespersonName || ctx.salespersonName || '' },
-        { label: 'Kommission', value: invoice.commissionNumber || ctx.commissionNumber || '' },
-        { label: 'Fälligkeit', value: fmtDay(invoice.dueDate) },
-    ];
+    const infoRows: NonNullable<TenderPdfData['infoRows']> = credit
+        ? [
+            { label: 'Beleg-Nr.', value: invoice.invoiceNumber, emphasize: true },
+            { label: 'Datum', value: fmtDay(invoice.invoiceDate || invoice.createdAt) },
+            { label: 'Zu Rechnung', value: invoice.reversesInvoice?.invoiceNumber || '' },
+            { label: 'Salesperson', value: invoice.salespersonName || ctx.salespersonName || '' },
+            { label: 'Kommission', value: invoice.commissionNumber || ctx.commissionNumber || '' },
+        ]
+        : [
+            { label: 'Rechnungs-Nr.', value: invoice.invoiceNumber, emphasize: true },
+            { label: 'Rechnungsdatum', value: fmtDay(invoice.invoiceDate || invoice.createdAt) },
+            { label: 'Salesperson', value: invoice.salespersonName || ctx.salespersonName || '' },
+            { label: 'Kommission', value: invoice.commissionNumber || ctx.commissionNumber || '' },
+            { label: 'Fälligkeit', value: fmtDay(invoice.dueDate) },
+        ];
 
     const data: TenderPdfData = {
         tenderNumber: invoice.invoiceNumber,
@@ -413,19 +543,20 @@ export async function buildInvoicePdfBytes(
         // Teilrechnung IST bereits eine Rate, dort würde der Plan gegen den
         // Rechnungsbetrag (nicht gegen die Auftragssumme) gerechnet.
         paymentStages: invoice.kind === 'RECHNUNG' ? (direct ? parseInvoicePaymentStages(invoice.paymentStages) : ctx.paymentStages ?? null) : null,
+        // Ein Gegenbeleg verlangt kein Geld: keine Zahlungsbedingung, kein QR-Teil.
         // Zahlungsbedingungen gehören auf die RECHNUNG, nicht auf die Offerte:
         // erst hier gibt es einen fälligen Betrag, auf den sich "zahlbar innert
         // 30 Tagen" überhaupt beziehen kann. Auf der Direktrechnung IST diese
         // Karte der Abschnitt „Schlusstext": entfernt heisst, sie fällt weg.
-        showPaymentTerms: sections.closing,
-        paymentTermsText: direct ? (invoice.closingText || null) : null,
+        showPaymentTerms: !credit && sections.closing,
+        paymentTermsText: direct && !credit ? (invoice.closingText || null) : null,
         // Abschnitt „Positionen" entfernt: keine Tabelle, nur die Summe.
-        hidePositionsTable: direct && !sections.positions,
+        hidePositionsTable: direct && !credit && !sections.positions,
         // Die Absenderzeile des Belegs. Sie ist beim Erstellen aus den
         // Mandanteneinstellungen vorbelegt und dann eingefroren — der
         // QR-Gläubiger bleibt davon unberührt (er muss zum Konto passen).
         senderLine: direct ? (invoice.senderAddress || null) : null,
-        qrBillEnabled: true,
+        qrBillEnabled: !credit,
         lang,
         docTitle: title,
         infoRows,

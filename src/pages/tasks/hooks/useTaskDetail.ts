@@ -14,6 +14,7 @@ import type {
     TaskDetailResult,
 } from '@/types/tasksModule';
 import { useTasksModuleStore } from '../store/tasksModuleStore';
+import { reconcileTimerWithServer } from './useTaskTimer';
 import { emitTasksChanged, useTasksChanged, type TasksChangeKind } from '../utils/taskEvents';
 import { readTasksCache, writeTasksCache } from '../utils/tasksCache';
 
@@ -33,6 +34,12 @@ const detailCacheKey = (taskId: string): string => `detail:${taskId}`;
  */
 
 const POLL_MS = 30_000;
+
+const blockAttachmentIds = (blocks: ContentDto['blocks']): Set<string> =>
+    new Set(blocks
+        .filter((block) => block.type === 'image' || block.type === 'file')
+        .map((block) => block.meta.attId)
+        .filter((attId): attId is string => typeof attId === 'string'));
 
 type Envelope = { task: TaskDetail; people: PeopleMap };
 
@@ -71,7 +78,8 @@ export const useTaskDetail = (taskId: string) => {
         try {
             const next = await tasksApi.detail(taskId);
             if (seq !== requestSeqRef.current) return;
-            noteServerNow(next.serverNow);
+            noteServerNow(next.serverNow, true);
+            reconcileTimerWithServer([{ id: next.task.id, runningForMe: next.task.timer.runningForMe }]);
             lastLoadRef.current = Date.now();
             if (silent && revAtStart !== localRevRef.current) return;
             setData((previous) => (
@@ -162,7 +170,19 @@ export const useTaskDetail = (taskId: string) => {
     }, [applyEnvelope, notify, load]);
 
     const helpers = useMemo(() => ({
-        setContent: (content: ContentDto) => update((current) => ({ ...current, content })),
+        setContent: (content: ContentDto) => update((current) => {
+            // Wie der Server: ein aus dem Inhalt gelöschter Bild-/Dateiblock nimmt seine Datei mit.
+            const kept = blockAttachmentIds(content.blocks);
+            const dropped = new Set([...blockAttachmentIds(current.content.blocks)].filter((id) => !kept.has(id)));
+            if (!dropped.size) return { ...current, content };
+            const attachments = current.attachments.filter((entry) => !dropped.has(entry.id));
+            return {
+                ...current,
+                content,
+                attachments,
+                task: { ...current.task, attachmentCount: Math.max(0, current.task.attachmentCount - (current.attachments.length - attachments.length)) },
+            };
+        }),
         upsertChecklist: (checklist: Checklist) => update((current) => {
             const exists = current.checklists.some((entry) => entry.id === checklist.id);
             return {

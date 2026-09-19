@@ -137,7 +137,26 @@ export interface AddonOrderSavedDto {
     paymentStages?: string | null;
 }
 
+/** Ein Artikel des Hauptauftrags, der gemindert werden kann (16.09.2026). */
+export interface MinderungSourceDto {
+    articleId: string;
+    description: string;
+    unit: string;
+    /** Preis, zu dem der Artikel verkauft wurde (netto). */
+    unitPrice: number;
+    /** Menge, die noch wegfallen kann. */
+    available: number;
+}
+
 export const addonOrdersApi = {
+    /** Was im Hauptauftrag steht und gemindert werden kann. */
+    minderungSources: async (parentSalesOrderId: string, excludeAddonId?: string | null): Promise<MinderungSourceDto[]> => {
+        const params = new URLSearchParams({ parentSalesOrderId });
+        if (excludeAddonId) params.set('excludeAddonId', excludeAddonId);
+        const res = await apiClient.get(`/addon-orders/minderung-sources?${params}`);
+        return Array.isArray(res.data?.items) ? res.data.items : [];
+    },
+
     list: async (filter: { parentSalesOrderId?: string | null; projectId?: string | null; customerId?: string | null; search?: string } = {}): Promise<AddonOrderListItemDto[]> => {
         const params = new URLSearchParams();
         if (filter.parentSalesOrderId) params.set('parentSalesOrderId', filter.parentSalesOrderId);

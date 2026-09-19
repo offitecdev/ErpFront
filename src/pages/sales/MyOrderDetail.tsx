@@ -13,13 +13,14 @@ import { myOrdersApi } from '../../lib/api/billing';
 import { openAmount, sharePercent } from '../../lib/orderBillingTotals';
 import { deliveryReportApi, type DeliveryReportDto } from '../../lib/api/project';
 import { OverviewPieCharts } from '../project/features/components/detail/tabs/overview/OverviewPieCharts';
-import type { MyOrderDetailDto } from '../../types/billing';
+import { countsAsBilled, type MyOrderDetailDto } from '../../types/billing';
 import { OrderPaymentTab } from './components/OrderPaymentTab';
 import { OrderOverviewTab } from './components/OrderOverviewTab';
 import { OrderAddonsTab } from './components/OrderAddonsTab';
 import { OrderQuoteTab } from './components/OrderQuoteTab';
 import { isDeliveryOrder, stagesForOrder, type Stage, type StageItem } from './components/orderOverviewShared';
 import { OrderLifecycleButton, useOrderLifecycle } from '@/components/orders/useOrderLifecycle';
+import { DocumentHistoryButton } from '@/components/governance';
 import { useAuthStore } from '@/store/authStore';
 
 import { t } from '@/i18n/translate';
@@ -226,7 +227,7 @@ export const MyOrderDetail = () => {
             items: (summary?.invoices || []).map((inv) => ({
                 label: inv.invoiceNumber,
                 meta: `${clampPercent(inv.billedPercent)}% · ${fmtMoney(inv.amount)}`,
-                done: inv.status !== 'CANCELLED',
+                done: countsAsBilled(inv),
             })),
         };
 
@@ -340,6 +341,15 @@ export const MyOrderDetail = () => {
                     fragt den Server, was noch offensteht: «zurück in den
                     Entwurf», solange nichts geschehen ist, sonst nur noch das
                     Storno. Gelöscht wird hier nichts mehr im Stillen. */}
+                {/* Verlauf des Auftrags (16.09.2026) — für alle, die ihn sehen. */}
+                <div className="flex items-center gap-2">
+                <DocumentHistoryButton
+                    entityType={order.parentSalesOrder?.id ? 'ADDON_ORDER' : 'SALES_ORDER'}
+                    entityId={order.id}
+                    documentNumber={order.orderNumber}
+                    className="h-9"
+                    refreshKey={`${order.status}:${orderCancelled}`}
+                />
                 {canDeleteOrder && (
                     <div className="flex items-center gap-2">
                         {orderCancelled && (
@@ -358,6 +368,7 @@ export const MyOrderDetail = () => {
                         />
                     </div>
                 )}
+                </div>
             </div>
 
             <TabBar tab={activeTab} onSelect={setTab} showAddons={!delivery} addonCount={addons.length} />

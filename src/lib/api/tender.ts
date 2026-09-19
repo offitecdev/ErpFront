@@ -602,7 +602,54 @@ export const tenderApi = {
         const res = await apiClient.patch(`/tenders/${id}/mark-offer-accepted`);
         return res.data;
     },
+
+    /**
+     * TEXTKORREKTUR (16.09.2026) an einer gesperrten Offerte: nur Texte, nie
+     * Menge oder Preis; Grund Pflicht. Der Server schreibt jede Änderung in den
+     * Verlauf.
+     */
+    correctTexts: async (id: string, input: TenderTextCorrectionInput): Promise<{ changed: number }> => {
+        const res = await apiClient.post(`/tenders/${id}/text-corrections`, input);
+        return res.data;
+    },
+
+    /** Stand beim Auftrag — die Schnappschüsse, neueste zuerst. */
+    listSnapshots: async (id: string): Promise<TenderSnapshotDto[]> => {
+        const res = await apiClient.get(`/tenders/${id}/snapshots`);
+        return Array.isArray(res.data) ? res.data : [];
+    },
 };
+
+export interface TenderTextCorrectionInput {
+    reason: string;
+    positions?: Array<{ id: string; shortDescription?: string; longDescription?: string | null; unit?: string | null }>;
+    meta?: Partial<Record<'billingAddress' | 'installationAddress' | 'deliveryAddress' | 'commissionNumber' | 'customerReference', string | null>>;
+}
+
+export interface TenderSnapshotPosition {
+    id: string;
+    parentPositionId?: string | null;
+    positionNumber: string;
+    shortDescription: string;
+    longDescription?: string | null;
+    rowType?: string | null;
+    hierarchyLevel?: number | null;
+    quantity: number;
+    unit?: string | null;
+    unitPrice?: number | null;
+    discount?: number | null;
+}
+
+export interface TenderSnapshotDto {
+    id: string;
+    version: number;
+    orderNumber: string | null;
+    reason: string;
+    positions: TenderSnapshotPosition[];
+    totals: { orderTotal?: number; currency?: string | null };
+    createdAt: string;
+    createdBy: string | null;
+}
 
 export const articleApi = {
     list: async (): Promise<ArticleDto[]> => {

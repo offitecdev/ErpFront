@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import dayjs from 'dayjs';
+import { LuMaximize2, LuMinimize2 } from 'react-icons/lu';
 
-import { ArrowRight, CalendarDate, CalendarPlus01, File05 as FileIcon, InfoCircle, Mail01, MarkerPin01, Phone, Send01, Share04, Trash01, User01, X } from '@/components/icons/antIconCompat';
+import { ArrowRight, BriefcaseBusiness as Briefcase01, Building2 as Building02, CalendarDays as CalendarDate, CalendarPlus as CalendarPlus01, ChevronRight, Clock3, FileText as File02, Files as FileIcon, Hash as Hash01, Info as InfoCircle, List, Mail as Mail01, MapPin as MarkerPin01, Phone, Send as Send01, Share2 as Share04, ShoppingCart as ShoppingCart01, Tag as Tag01, Trash2 as Trash01, UserRound as User01, UsersRound as Users01, X } from 'lucide-react';
 import { t } from '@/i18n/translate';
 import { AppointmentDocumentsPanel, PaneSaveButton, type AppointmentDocsHandle, type PaneSaveReport, type PaneSaveState } from '@/components/ui-shared/AppointmentDocuments';
 import { projectApi, type AppointmentSeriesDto } from '@/lib/api/project';
@@ -46,8 +47,8 @@ import { calLabelName, ccPersonFromEmail, dotClass, type CalEvent, type CalEvent
  * Die Klassen `.ofi-newtask__mark*` sind dieselben wie im Aufgabenfenster —
  * eine zweite Fassung derselben Reihe liefe unweigerlich auseinander.
  */
-const CARD_WIDTH = 440;
-const CARD_HEIGHT = 480;
+/* Reference width includes the border. Height follows the actual ERP data. */
+const CARD_WIDTH = 340;
 /**
  * VERGRÖSSERN (25.08.2026, Vorgabe Samet: «in der Auskunftskarte soll es auch
  * ein Vergrössern geben — statt nur der zwei Zeilen»).
@@ -76,15 +77,40 @@ const STATUS_LABEL_KEY: Record<CalStatus, string> = {
    Flex-Zeile mit `items-baseline` — bei einem Wert, der umbrach, sass die
    Beschriftung dann auf der Grundlinie der ERSTEN Zeile und die nächste Zeile
    begann woanders. */
-const Row = ({ label, value }: { label: string; value?: string | null }) => {
-    if (!value) return null;
+/* DIE ZEILE DER VORLAGE (maccalendar2.png, 14.09.2026): links das Zeichen,
+   dann das Wort, rechts der Wert — «Repeat … Never». `trailing` ersetzt den
+   Wert durch ein Bedienelement (der Schalter der Einladung). */
+const Row = ({ icon, label, sub, value, trailing }: { icon?: ReactNode; label: string; sub?: string | null; value?: string | null; trailing?: ReactNode }) => {
+    if (!value && !trailing) return null;
     return (
-        <div className="ofi-cal-detailrow">
-            <span className="ofi-cal-detail__label">{label}</span>
-            <span className="ofi-cal-detail__value">{value}</span>
+        <div className={`ofi-cal-detailrow ${sub ? 'has-sub' : ''}`}>
+            <span className="ofi-cal-detail__icon" aria-hidden>{icon}</span>
+            {/* `sub`: die zweite, graue Zeile unter dem Wort («Date / Tomorrow»
+                in der Vorlage) — der Wert rechts bleibt dann dem Schalter. */}
+            <span className="ofi-cal-detail__text">
+                <span className="ofi-cal-detail__label">{label}</span>
+                {sub && <span className="ofi-cal-detail__sub">{sub}</span>}
+            </span>
+            {trailing ?? <span className="ofi-cal-detail__value">{value}</span>}
         </div>
     );
 };
+
+/* Compact macOS switch; read-only state stays visible without accepting input. */
+const Switch = ({ on, label, onClick }: { on: boolean; label: string; onClick?: () => void }) => (
+    <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        title={label}
+        onClick={onClick}
+        disabled={!onClick}
+        className={`ofi-cal-switch ${on ? 'is-on' : ''}`}
+    >
+        <span className="ofi-cal-switch__knob" />
+    </button>
+);
 
 /* Detail of a clicked entry, in the same free-floating card as everything else.
    The heavy payload loads lazily so the grid stays light. */
@@ -299,10 +325,12 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                rückte dabei nach oben; mit ihr rollt der Inhalt innen und die
                Karte bleibt, wo und wie sie ist. Die zweite Grösse ist ebenso
                fest — vergrössern heißt umschalten, nicht mitwachsen. */
-            initialHeight={enlarged ? ENLARGED_HEIGHT : CARD_HEIGHT}
-            expanded={enlarged}
-            onToggleExpand={() => setEnlarged((current) => !current)}
-            className={`ofi-cal-detailcard ${enlarged ? 'is-enlarged' : ''}`}
+            initialHeight={enlarged ? ENLARGED_HEIGHT : undefined}
+            /* Rechts neben dem Termin, senkrecht auf seiner Mitte, der Pfeil
+               links — wie der Popover der Vorlage. */
+            prefer="right"
+            anchorAlign="middle"
+            className={`ofi-cal-detailcard ${enlarged ? 'is-enlarged' : ''} ${pane ? 'has-pane' : ''}`}
             closeOnOutside={!pane}
             title={event.title}
             /* DER STAND WANDERT IN DIE KOPFZEILE (25.08.2026, Vorgabe Samet:
@@ -331,122 +359,22 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                trägt jeder nur noch sein Zeichen; was er tut, steht in seinem
                `title`. GESCHRIEBEN steht allein, was eine Entscheidung ist:
                die Löschfrage und «Speichern». */
-            footer={(
+            /* KEIN KNOPFFUSS MEHR (14.09.2026, Vorlage maccalendar2.png: der
+               Popover hat keinen). Was zu TUN ist, steht als Zeilen mit Pfeil
+               in einer Gruppe am Ende des Blatts (`.ofi-cal-actions`, unten).
+               Nur der Speichern-Knopf einer offenen Spalte bleibt im Fuss:
+               er gehört zum Blatt, das gerade offen ist. */
+            footer={pane && canEditDays ? (
                 <div className="ofi-cal-detailfoot">
-                    {/* `flex-wrap`: auf einem Telefon stehen vier Knoepfe
-                        nebeneinander laengst neben dem Bildrand — hier
-                        umbrechen sie in eine zweite Zeile. */}
                     <span className="ofi-cal-detailfoot__actions">
-                        {deletable && onDelete && (
-                            confirmDelete ? (
-                                /* Bei einem mehrtägigen Einsatz ist «löschen»
-                                   zweideutig — deshalb wird gefragt, WAS weg
-                                   soll: dieser eine Tag oder der ganze Einsatz.
-                                   HIER stehen WÖRTER: eine Frage, die man mit
-                                   zwei gleich aussehenden Zeichen beantworten
-                                   müsste, ist keine Frage. */
-                                <>
-                                    <button type="button" onClick={() => onDelete(event, 'day')} className="ofi-cal-btn is-danger">
-                                        {multiDay ? t('calendar.days.deleteDay') : t('common.delete')}
-                                    </button>
-                                    {multiDay && (
-                                        <button type="button" onClick={() => onDelete(event, 'series')} className="ofi-cal-btn is-danger">
-                                            {t('calendar.days.deleteAll', { count: days.length })}
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfirmDelete(false)}
-                                        className="ofi-cal-btn is-icon"
-                                        aria-label={t('common.cancel')}
-                                        title={t('common.cancel')}
-                                    >
-                                        <X size={15} />
-                                    </button>
-                                </>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmDelete(true)}
-                                    className="ofi-cal-btn is-icon"
-                                    aria-label={t('common.delete')}
-                                    title={t('common.delete')}
-                                >
-                                    <Trash01 size={15} />
-                                </button>
-                            )
-                        )}
-                        {/* «Unterlagen» und «Einsatzplan» standen HIER — als
-                            Umschalter mitten in einer Reihe von Auslösern
-                            (12.09.2026). Sie sind in die Zeichenreihe OBEN
-                            gewandert, wo das Aufgabenfenster seine Blätter
-                            wechselt; im Fuss steht jetzt nur noch, was etwas
-                            TUT. */}
-                        {event.category === 'appointments' && canCreate && (
-                            <button
-                                type="button"
-                                onClick={() => onCreateFrom(event)}
-                                className="ofi-cal-btn is-icon"
-                                aria-label={t('calendar.detail.newAppointment')}
-                                title={t('calendar.detail.newAppointment')}
-                            >
-                                <CalendarPlus01 size={15} />
-                            </button>
-                        )}
-                        {detail?.meetingUrl && (
-                            <a
-                                href={detail.meetingUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="ofi-cal-btn is-icon is-primary"
-                                aria-label={t('calendar.invite.join')}
-                                title={`${t('calendar.invite.join')} — ${detail.meetingUrl}`}
-                            >
-                                <Share04 size={15} />
-                            </a>
-                        )}
-                        {canSendInvite && inviteTarget && !loading && (
-                            <button
-                                type="button"
-                                onClick={() => setView('invite')}
-                                className="ofi-cal-btn is-icon"
-                                aria-label={t('calendar.invite.sendTitle')}
-                                title={detail?.inviteSentAt ? t('calendar.invite.resend') : t('calendar.invite.sendTitle')}
-                            >
-                                <Send01 size={15} />
-                            </button>
-                        )}
-                        {event.navigateTo && (
-                            <button
-                                type="button"
-                                onClick={() => onNavigate(event)}
-                                className="ofi-cal-btn is-icon"
-                                aria-label={t('calendar.detail.goToItem')}
-                                title={t('calendar.detail.goToItem')}
-                            >
-                                <ArrowRight size={15} />
-                            </button>
-                        )}
-                        {/* SPEICHERN — GANZ AM SCHLUSS, RECHTS NEBEN DEM PFEIL
-                            (25.08.2026, Vorgabe Samet). Der Pfeil bleibt, wo er
-                            war; der Knopf tritt dahinter. Er ist nur da, solange
-                            eine Spalte offen ist, und gilt dann für BEIDE: bei
-                            den Tagen wie bei den Unterlagen ist es derselbe
-                            Knopf, der den Griff der offenen Spalte fragt.
-                            Bei den Unterlagen ist er die Abkürzung (dort wird
-                            weiter von selbst gesichert), beim EINSATZPLAN der
-                            einzige Weg: grau, bis ein Tag gelöscht oder
-                            angehängt wurde, dann anklickbar (01.09.2026). */}
-                        {pane && canEditDays && (
-                            <PaneSaveButton
-                                state={paneSave.state}
-                                dirty={paneSave.dirty}
-                                onSave={() => paneHandle.current?.saveNow()}
-                            />
-                        )}
+                        <PaneSaveButton
+                            state={paneSave.state}
+                            dirty={paneSave.dirty}
+                            onSave={() => paneHandle.current?.saveNow()}
+                        />
                     </span>
                 </div>
-            )}
+            ) : undefined}
         >
             <div className="ofi-cal-detailbody">
                 {/* ── DIE ZEICHENREIHE (12.09.2026) ────────────────────────
@@ -469,6 +397,7 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                             className={`ofi-newtask__mark ${!pane ? 'is-active' : ''}`}
                         >
                             <InfoCircle size={16} />
+                            <span className="ofi-newtask__marktext">{t('calendar.create.stepDetails')}</span>
                         </button>
                         {showDocs && (
                             <button
@@ -481,6 +410,7 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                                 className={`ofi-newtask__mark ${pane === 'docs' ? 'is-active' : ''}`}
                             >
                                 <FileIcon size={16} />
+                                <span className="ofi-newtask__marktext">{t('calendar.docs.short')}</span>
                                 {documentCount > 0 && <span className="ofi-newtask__markdot">{documentCount}</span>}
                             </button>
                         )}
@@ -495,6 +425,7 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                                 className={`ofi-newtask__mark ${pane === 'days' ? 'is-active' : ''}`}
                             >
                                 <CalendarDate size={16} />
+                                <span className="ofi-newtask__marktext">{t('calendar.days.addShort')}</span>
                                 {multiDay && <span className="ofi-newtask__markdot">{days.length}</span>}
                             </button>
                         )}
@@ -508,8 +439,51 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                     </div>
                 )}
 
-                {event.subtitle && <div className="ofi-cal-detailbody__sub">{event.subtitle}</div>}
-
+                {/* DER GROSSE TITEL IM BLATT (macOS-Kleid, 14.09.2026, Vorlage
+                    maccalendar2.png): Titel, darunter Datum und Dauer, darunter
+                    das Etikett als kleine Marke. Die Kopfleiste des Fensters
+                    trägt dieselben Worte weiter (für die Vorlesehilfe und den
+                    Griff), zeigt sie aber nicht mehr — calendarMac.css blendet
+                    sie dort aus, sonst stünde alles zweimal. */}
+                {/* Unterlagen / Tage (15.09.2026, Samet): kein Titelkasten
+                    darüber — das Blatt beginnt direkt unter der Segmentleiste. */}
+                {!pane && (
+                <div className="ofi-cal-hero">
+                    {/* Der Titelkasten der Vorlage: Titel, darunter zwei Zeilen
+                        mit Haarlinie («Notes» / «URL» dort — hier Datum und
+                        Etikett). */}
+                    <div className="ofi-cal-hero__box">
+                        <div className="ofi-cal-hero__title">{event.title}</div>
+                        <div className={`ofi-cal-hero__notes ${detail?.notes ? '' : 'is-placeholder'}`}>{detail?.notes || t('calendar.detail.notes')}</div>
+                        {detail?.meetingUrl
+                            ? <a className="ofi-cal-hero__url" href={detail.meetingUrl} target="_blank" rel="noreferrer">{detail.meetingUrl}</a>
+                            : <div className="ofi-cal-hero__url is-placeholder">{event.subtitle || 'URL'}</div>}
+                    </div>
+                </div>
+                )}
+                {!pane && (
+                    <section className="ofi-cal-schedule">
+                        <div className="ofi-cal-detailcol__head">{t('calendar.wizard.stepTime')}</div>
+                        <div className="ofi-cal-group">
+                            <Row icon={<CalendarDate />} label={t('calendar.wizard.date')}
+                                sub={multiDay ? when : sameDay ? event.start.format('dddd, DD. MMMM YYYY') : `${event.start.format('DD.MM.YYYY')} – ${event.end.format('DD.MM.YYYY')}`}
+                                trailing={<Switch on label={t('calendar.wizard.date')} />} />
+                            <Row icon={<Clock3 />} label={t('calendar.todaySheet.time')}
+                                sub={event.allDay ? t('calendar.allDay') : `${event.start.format('HH:mm')} – ${event.end.format('HH:mm')}`}
+                                trailing={<Switch on={!event.allDay} label={t('calendar.todaySheet.time')} />} />
+                        </div>
+                        <div className="ofi-cal-group ofi-cal-labelgroup">
+                            <Row icon={<List />} label={t('calendar.create.stepDetails')} trailing={
+                                <span className="ofi-cal-detail__value ofi-cal-labelvalue">
+                                    {event.labelColor
+                                        ? <span className="ofi-ucal-dot" style={{ background: event.labelColor }} />
+                                        : <span className={dotClass(event.status)} />}
+                                    <span>{calLabelName(event.labelName) || t(STATUS_LABEL_KEY[event.status])}</span>
+                                </span>
+                            } />
+                        </div>
+                    </section>
+                )}
                 {/* DER AUSGESCHRIEBENE EINSATZPLAN IST WEG (25.08.2026, Vorgabe
                     Samet: ««(1) Di, 25.08.2026 09:30–14:00 / (2) Mi, 26.08.2026
                     09:30–14:00» — so muss das nicht dastehen»). Der Zeitraum
@@ -571,15 +545,18 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                                     Dauer); gepflegt und vergeben wird es dort,
                                     wo die Liste steht: hinter dem Zahnrad der
                                     Leiste und im Anlegefenster. */}
-                                <Row label={t('calendar.detail.customer')} value={detail.customerName} />
-                                <Row label={t('calendar.detail.project')} value={detail.projectName} />
-                                <Row label={t('calendar.detail.order')} value={detail.orderNumber} />
-                                <Row label={t('calendar.detail.offer')} value={detail.tenderNumber} />
-                                <Row label={t('calendar.detail.manager')} value={detail.manager} />
-                                <Row label={t('calendar.detail.contract')} value={detail.contractTitle ? `${detail.contractTitle}${detail.contractCode ? ` (${detail.contractCode})` : ''}` : null} />
-                                <Row label={t('calendar.detail.site')} value={detail.siteName} />
-                                <Row label={t('calendar.detail.period')} value={detail.period} />
-                                <Row label={t('calendar.detail.notes')} value={detail.notes} />
+                                {/* DIE GRUPPE DER VORLAGE (14.09.2026): Zeichen ·
+                                    Wort · Wert, Haarlinien dazwischen, in einem
+                                    Glaskasten unter der Überschrift. */}
+                                <div className="ofi-cal-group">
+                                <Row icon={<Building02 size={15} />} label={t('calendar.detail.customer')} value={detail.customerName} />
+                                <Row icon={<Briefcase01 size={15} />} label={t('calendar.detail.project')} value={detail.projectName} />
+                                <Row icon={<ShoppingCart01 size={15} />} label={t('calendar.detail.order')} value={detail.orderNumber} />
+                                <Row icon={<File02 size={15} />} label={t('calendar.detail.offer')} value={detail.tenderNumber} />
+                                <Row icon={<User01 size={15} />} label={t('calendar.detail.manager')} value={detail.manager} />
+                                <Row icon={<Tag01 size={15} />} label={t('calendar.detail.contract')} value={detail.contractTitle ? `${detail.contractTitle}${detail.contractCode ? ` (${detail.contractCode})` : ''}` : null} />
+                                <Row icon={<MarkerPin01 size={15} />} label={t('calendar.detail.site')} value={detail.siteName} />
+                                <Row icon={<CalendarDate size={15} />} label={t('calendar.detail.period')} value={detail.period} />
                                 {/* DAS BEGLEITWORT STEHT BEI DEN ANGABEN
                                     (25.08.2026). Geschrieben wird es im Zettel
                                     der Unterlagen — zusammen mit den Bildern,
@@ -587,22 +564,39 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                                     hier: wer die Karte aufmacht, soll sehen,
                                     was zu diesem Einsatz gesagt wurde, ohne
                                     erst ein Blatt aufzuklappen. */}
-                                <Row label={t('calendar.docs.coverNote')} value={series?.coverNote} />
+                                <Row icon={<Hash01 size={15} />} label={t('calendar.docs.coverNote')} value={series?.coverNote} />
+                                {/* DIE EINLADUNG ALS SCHALTER (Vorlage: die Schalter
+                                    «Date»/«Time»): an = gesendet, der Zeitpunkt steht
+                                    daneben; wer senden darf, stösst mit dem Schalter
+                                    das Versandblatt an. */}
                                 {inviteTarget && (
                                     <Row
+                                        icon={<Send01 size={15} />}
                                         label={t('calendar.invite.statusLabel')}
-                                        value={detail.inviteSentAt
+                                        sub={detail.inviteSentAt
                                             ? t('calendar.invite.sentOn', { when: dayjs(detail.inviteSentAt).format('DD.MM.YYYY HH:mm') })
                                             : t('calendar.invite.notSent')}
+                                        trailing={(
+                                            <span className="ofi-cal-detail__value ofi-cal-detail__value--switch">
+                                                <Switch
+                                                    on={Boolean(detail.inviteSentAt)}
+                                                    label={detail.inviteSentAt ? t('calendar.invite.resend') : t('calendar.invite.sendTitle')}
+                                                    onClick={canSendInvite && !loading ? () => setView('invite') : undefined}
+                                                />
+                                            </span>
+                                        )}
                                     />
                                 )}
+                                </div>
 
                                 {(detail.customerEmail || detail.customerPhone || detail.customerAddress) && (
                                     <div className="ofi-cal-contact">
                                         <div className="ofi-cal-detailcol__head">{t('calendar.detail.contact')}</div>
-                                        {detail.customerEmail && <div className="ofi-cal-contact__row"><Mail01 size={12} /><span className="truncate">{detail.customerEmail}</span></div>}
-                                        {detail.customerPhone && <div className="ofi-cal-contact__row"><Phone size={12} />{detail.customerPhone}</div>}
-                                        {detail.customerAddress && <div className="ofi-cal-contact__row"><MarkerPin01 size={12} /><span className="truncate">{detail.customerAddress}</span></div>}
+                                        <div className="ofi-cal-group">
+                                            {detail.customerEmail && <div className="ofi-cal-contact__row"><Mail01 size={15} /><span className="truncate">{detail.customerEmail}</span></div>}
+                                            {detail.customerPhone && <div className="ofi-cal-contact__row"><Phone size={15} />{detail.customerPhone}</div>}
+                                            {detail.customerAddress && <div className="ofi-cal-contact__row"><MarkerPin01 size={15} /><span className="truncate">{detail.customerAddress}</span></div>}
+                                        </div>
                                     </div>
                                 )}
                             </section>
@@ -620,10 +614,10 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                             <section className="ofi-cal-detailcol">
                                 <div className="ofi-cal-detailcol__head">{t('calendar.detail.participants')}</div>
                                 {detail.participants.length > 0 ? (
-                                    <div className="space-y-0.5">
+                                    <div className="ofi-cal-group">
                                         {detail.participants.map((person) => (
                                             <div key={person.id || person.name} className="ofi-cal-person">
-                                                <span className="ofi-cal-person__avatar"><User01 size={12} /></span>
+                                                <span className="ofi-cal-person__avatar"><Users01 size={13} /></span>
                                                 <span className="min-w-0 flex-1">
                                                     <span className="ofi-cal-person__name">{person.name}</span>
                                                     <span className="ofi-cal-person__meta">
@@ -661,24 +655,9 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                                 stillschweigend verloren geht. */}
                             {pane && (
                                 <aside className="ofi-cal-detailcol is-pane">
-                                    {/* Der Kopf der Spalte bleibt beim Rollen
-                                        stehen: was nicht hineinpasst, wird
-                                        gescrollt — und das X muss dabei immer
-                                        erreichbar sein (Vorgabe 24.08.2026). */}
-                                    <div className="ofi-cal-panehead">
-                                        <span className="ofi-cal-detailcol__head">
-                                            {pane === 'docs' ? t('calendar.docs.title') : t('calendar.days.title')}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => void closePane()}
-                                            className="ofi-cal-panehead__close"
-                                            aria-label={t('common.close')}
-                                            title={t('common.close')}
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
+                                    {/* KEIN KOPF MIT X MEHR (15.09.2026, Samet):
+                                        zurück geht es über die Segmentleiste
+                                        oben, das Blatt öffnet sich direkt. */}
                                     {pane === 'docs' ? (
                                         <AppointmentDocumentsPanel
                                             appointmentId={event.refId}
@@ -702,6 +681,77 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                             )}
                         </div>
                     </>
+                )}
+
+                {/* DIE HANDGRIFFE ALS ZEILEN (14.09.2026, Vorlage: «Tags ›»):
+                    eine Gruppe am Ende des Blatts — Zeichen, Wort, Pfeil —
+                    statt einer Knopfreihe im Fuss. Löschen steht rot und
+                    fragt in derselben Gruppe nach (Tag / ganzer Einsatz). */}
+                {!pane && (
+                    <div className="ofi-cal-actions">
+                        <div className="ofi-cal-group">
+                            {event.category === 'appointments' && canCreate && (
+                                <button type="button" onClick={() => onCreateFrom(event)} className="ofi-cal-actionrow">
+                                    <CalendarPlus01 size={15} />
+                                    <span>{t('calendar.detail.newAppointment')}</span>
+                                    <ChevronRight size={15} />
+                                </button>
+                            )}
+                            {detail?.meetingUrl && (
+                                <a href={detail.meetingUrl} target="_blank" rel="noreferrer" className="ofi-cal-actionrow" title={detail.meetingUrl}>
+                                    <Share04 size={15} />
+                                    <span>{t('calendar.invite.join')}</span>
+                                    <ChevronRight size={15} />
+                                </a>
+                            )}
+                            {canSendInvite && inviteTarget && !loading && (
+                                <button type="button" onClick={() => setView('invite')} className="ofi-cal-actionrow">
+                                    <Send01 size={15} />
+                                    <span>{detail?.inviteSentAt ? t('calendar.invite.resend') : t('calendar.invite.sendTitle')}</span>
+                                    <ChevronRight size={15} />
+                                </button>
+                            )}
+                            {event.navigateTo && (
+                                <button type="button" onClick={() => onNavigate(event)} className="ofi-cal-actionrow">
+                                    <ArrowRight size={15} />
+                                    <span>{t('calendar.detail.goToItem')}</span>
+                                    <ChevronRight size={15} />
+                                </button>
+                            )}
+                            <button type="button" onClick={() => setEnlarged((current) => !current)} className="ofi-cal-actionrow">
+                                {enlarged ? <LuMinimize2 size={15} /> : <LuMaximize2 size={15} />}
+                                <span>{enlarged ? t('calendar.create.collapse') : t('calendar.create.expand')}</span>
+                                <ChevronRight size={15} />
+                            </button>
+                        </div>
+                        {deletable && onDelete && (
+                            <div className="ofi-cal-group">
+                                {confirmDelete ? (
+                                    <>
+                                        <button type="button" onClick={() => onDelete(event, 'day')} className="ofi-cal-actionrow is-danger">
+                                            <Trash01 size={15} />
+                                            <span>{multiDay ? t('calendar.days.deleteDay') : t('common.delete')}</span>
+                                        </button>
+                                        {multiDay && (
+                                            <button type="button" onClick={() => onDelete(event, 'series')} className="ofi-cal-actionrow is-danger">
+                                                <Trash01 size={15} />
+                                                <span>{t('calendar.days.deleteAll', { count: days.length })}</span>
+                                            </button>
+                                        )}
+                                        <button type="button" onClick={() => setConfirmDelete(false)} className="ofi-cal-actionrow">
+                                            <X size={15} />
+                                            <span>{t('common.cancel')}</span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button type="button" onClick={() => setConfirmDelete(true)} className="ofi-cal-actionrow is-danger">
+                                        <Trash01 size={15} />
+                                        <span>{t('common.delete')}</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {!loading && !detail && !event.loadDetail && (

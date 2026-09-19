@@ -102,12 +102,18 @@ export const FloatingCard = ({
     centered = false,
     openAt = 'center',
     prefer = 'left',
+    anchorAlign = 'top',
     leading,
     initialHeight,
     className,
     z,
     children,
 }: {
+    /* Senkrechte Lage zum Anker: 'top' = Oberkante des Ankers (Vorgabe);
+       'middle' = die Karte steht auf der MITTE des Ankers, wie ein Mac-
+       Popover neben seinem Termin (Kalender-Auskunft, 14.09.2026). Gilt nur,
+       solange die Karte nicht gezogen wurde. */
+    anchorAlign?: 'top' | 'middle';
     open: boolean;
     onClose: () => void;
     title: ReactNode;
@@ -170,6 +176,10 @@ export const FloatingCard = ({
     const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
     /* null = follow the content; a number once the user pulled an edge. */
     const [height, setHeight] = useState<number | null>(null);
+    /* Ob die Karte noch dort steht, wo sie beim Öffnen hingesetzt wurde. Nur
+       dann zeigt der Popover-Pfeil (`data-arrow`, macOS-Kleid des Kalenders)
+       auf seinen Anker — nach einem Zug wiese er ins Leere. */
+    const [moved, setMoved] = useState(false);
     const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
     const resizeRef = useRef<{ edge: 'top' | 'bottom'; originY: number; baseY: number; baseHeight: number } | null>(null);
 
@@ -203,7 +213,8 @@ export const FloatingCard = ({
     const movable = !docked && !compact && !narrow;
 
     useEffect(() => {
-        if (!open) { setPos(null); setHeight(null); return; }
+        if (!open) { setPos(null); setHeight(null); setMoved(false); return; }
+        setMoved(false);
         // Eine stillstehende Karte wird IMMER mittig gesetzt, eine ziehbare nur,
         // wenn sie es bestellt hat.
         centerPendingRef.current = centered || !movable;
@@ -248,13 +259,19 @@ export const FloatingCard = ({
         setPos((current) => {
             if (!current) return current;
             const maxY = window.innerHeight - actual - MARGIN;
-            const y = Math.min(Math.max(MARGIN, current.y), Math.max(MARGIN, maxY));
-            return y === current.y ? current : { ...current, y };
+            /* 'middle': die Karte steht auf der Mitte ihres Ankers — erst
+               jetzt, mit der GEMESSENEN Höhe, lässt sich das rechnen. Nach
+               einem Zug bleibt sie, wo sie hingezogen wurde. */
+            const wanted = anchorAlign === 'middle' && anchor && !centered && !moved
+                ? (anchor.top + anchor.bottom) / 2 - actual / 2
+                : current.y;
+            const y = Math.min(Math.max(MARGIN, wanted), Math.max(MARGIN, maxY));
+            return Math.abs(y - current.y) < 0.5 ? current : { ...current, y };
         });
         // `pos` is a dependency on purpose: the card only exists once `pos` is
         // set, so the pass that measures the real height must run right after
         // that first placement (the deps above alone would not fire it).
-    }, [open, children, width, pos, openAt, movable, gutter, cardWidth]);
+    }, [open, children, width, pos, openAt, movable, gutter, cardWidth, anchor, anchorAlign, centered, moved]);
 
     /* Zurück-Griff = dieses Fenster zu (Vorgabe 12.09.2026). Er steht neben
        Escape, nicht an seiner Stelle: die Taste hat die Maus, den Griff hat
@@ -303,6 +320,7 @@ export const FloatingCard = ({
         const onMove = (moveEvent: PointerEvent) => {
             const drag = dragRef.current;
             if (!drag) return;
+            setMoved(true);
             const measured = cardRef.current?.offsetWidth ?? cardWidth;
             // Keep at least the grip strip on screen in every direction.
             const x = Math.min(Math.max(-measured + 80, moveEvent.clientX - drag.offsetX), window.innerWidth - 80);
@@ -402,13 +420,31 @@ export const FloatingCard = ({
         );
     }
 
+    /* DER POPOVER-PFEIL (macOS-Kleid des Kalenders, 14.09.2026): die Karte
+       sagt per `data-arrow`, an welcher Kante ihr Anker liegt, und per
+       `--ofi-arrow-top`, auf welcher Höhe — gezeichnet wird er nur von
+       Stilblättern, die ihn wollen (calendarMac.css). Steht die Karte nicht
+       mehr neben dem Anker (gezogen, mittig, klein), gibt es keinen. */
+    let arrow: 'left' | 'right' | null = null;
+    let arrowTop = 0;
+    if (movable && anchor && !centered && !moved && pos) {
+        if (pos.x + cardWidth <= anchor.left + 2) arrow = 'right';
+        else if (pos.x >= anchor.right - 2) arrow = 'left';
+        const cardHeight = height ?? cardRef.current?.offsetHeight ?? 460;
+        /* Der Pfeil zeigt auf die MITTE des Ankers (Vorlage: auf den Termin
+           daneben), bei 'top' knapp unter dessen Oberkante. */
+        const target = anchorAlign === 'middle' ? (anchor.top + anchor.bottom) / 2 : anchor.top + 14;
+        arrowTop = Math.min(Math.max(target - pos.y, 24), Math.max(24, cardHeight - 24));
+    }
+
     return createPortal(
         <section
             ref={cardRef}
             role="dialog"
             aria-label={typeof title === 'string' ? title : undefined}
+            data-arrow={arrow ?? undefined}
             className={`ofi-float-card ${compact ? 'is-compact' : ''} ${narrow ? 'is-narrow' : ''} ${className || ''}`}
-            style={{ left: pos!.x, top: pos!.y, width: cardWidth, height: height ?? undefined, zIndex: z }}
+            style={{ left: pos!.x, top: pos!.y, width: cardWidth, height: height ?? undefined, zIndex: z, ...(arrow ? { ['--ofi-arrow-top' as string]: `${arrowTop}px` } : {}) }}
         >
             {movable && <span className="ofi-float-card__edge is-top" onPointerDown={(event) => startResize(event, 'top')} aria-hidden />}
             {header}

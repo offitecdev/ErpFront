@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui-shared/Switch';
 import { t } from '@/i18n/translate';
 import { tasksApi, tasksErrorMessage } from '@/lib/api/tasksModule';
 import type { PeopleMap, TaskDetail, TaskEnvelope } from '@/types/tasksModule';
-import { useIsTasksAdmin, useIsTasksManager, useTasksModuleStore } from '../../store/tasksModuleStore';
+import { useIsTasksAdmin, useTasksActorId, useTasksModuleStore } from '../../store/tasksModuleStore';
 import { emitTasksChanged } from '../../utils/taskEvents';
 import { isoToTimeInput, priorityLabel } from '../../utils/taskFormat';
 import { DateTimeField } from '../shared/DateTimeField';
@@ -31,7 +31,8 @@ import { AssigneeChips, LabelChips, SheetRow } from './TaskSheetFields';
  * hat: Felder, Etiketten, Personen — in dieser Reihenfolge.
  * Ohne Administratorrolle entsteht ein Görev-Talep («wartet auf Freigabe»): der
  * gelbe Hinweis warnt, noch nicht damit zu beginnen, und der Administrator
- * entscheidet «uygun / uygun değil» in «Onaylar». Personen wählt die Leitung.
+ * entscheidet «uygun / uygun değil» in «Onaylar». Wer anlegt, ist immer selbst
+ * verantwortlich (fester Chip «Siz»); weitere Personen wählt die Leitung.
  */
 export const TaskSheet = ({
     open,
@@ -49,9 +50,9 @@ export const TaskSheet = ({
     onSaved: (envelope: TaskEnvelope) => void;
     onDeleted: (taskId: string) => void;
 }) => {
-    const isManager = useIsTasksManager();
     // Sofort freigegeben ist nur, was die Administratorrolle anlegt — alles andere ist ein Görev-Talep.
     const isAdmin = useIsTasksAdmin();
+    const me = useTasksActorId();
     const canDelete = useTasksModuleStore((state) => Boolean(state.bootstrap?.actor.canDelete));
     const serverOffsetMs = useTasksModuleStore((state) => state.serverOffsetMs);
     const refreshSummary = useTasksModuleStore((state) => state.refreshSummary);
@@ -127,8 +128,8 @@ export const TaskSheet = ({
         const envelope = await tasksApi.create({
             title,
             description: draft.description.trim() || null,
-            // Ein Teammitglied ist immer selbst zugewiesen (der Server setzt es).
-            assigneeIds: isManager ? draft.assigneeIds : undefined,
+            // Die eigene Person trägt der Server immer ein; nur die Administratorrolle weist weitere zu (15.09.2026).
+            assigneeIds: isAdmin ? draft.assigneeIds.filter((id) => id !== me) : undefined,
             startAt: draft.startAt,
             dueAt: draft.dueAt,
             reminderAt: draft.reminderAt,
@@ -138,8 +139,6 @@ export const TaskSheet = ({
         });
         emitTasksChanged('task', envelope.task.id);
         void refreshSummary();
-        // Ohne Administratorrolle entsteht ein Görev-Talep («wartet auf Freigabe»); der Administrator bekommt die Anfrage.
-        if (!isAdmin) toast.warning(t('tasksModule.list.toast.createdPending'), { duration: 9000 });
         onCreated(envelope.task);
     };
 
@@ -156,7 +155,7 @@ export const TaskSheet = ({
                 latest = await tasksApi.setLabels(current.id, draft.labelIds);
                 current = latest.task;
             }
-            if (isManager && !sameIdSet(draft.assigneeIds, current.assigneeIds)) {
+            if (isAdmin && !sameIdSet(draft.assigneeIds, current.assigneeIds)) {
                 latest = await tasksApi.setAssignees(current.id, draft.assigneeIds);
                 current = latest.task;
             }
@@ -281,9 +280,17 @@ export const TaskSheet = ({
                             />
                         </SheetRow>
 
-                        {isManager && (
+                        {/* Neu: die eigene Person steht fest drin (der Server trägt sie immer ein,
+                            14.09.2026) — die Leitung wählt weitere dazu, ein Teammitglied sieht nur sich. */}
+                        {(isAdmin || !editing) && (
                             <SheetRow label={t('tasksModule.list.sheet.assignees')}>
-                                <AssigneeChips ids={draft.assigneeIds} people={people} onChange={(assigneeIds) => patch({ assigneeIds })} />
+                                <AssigneeChips
+                                    ids={draft.assigneeIds}
+                                    people={people}
+                                    onChange={(assigneeIds) => patch({ assigneeIds })}
+                                    selfId={editing ? undefined : me || undefined}
+                                    canPick={isAdmin}
+                                />
                             </SheetRow>
                         )}
 
@@ -325,8 +332,6 @@ export const TaskSheet = ({
                                 <Switch checked={draft.flagged} onChange={(flagged) => patch({ flagged })} label={t('tasksModule.list.sheet.flag')} />
                             </div>
                         </SheetRow>
-
-                        {!isAdmin && !editing && <PopupNote tone="warning">{t('tasksModule.list.sheet.memberWarning')}</PopupNote>}
                     </div>
                 )}
             </PopupDialog>

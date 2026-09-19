@@ -12,12 +12,22 @@ import { isTaskStatus, type CalStatus } from '../calendarShared';
  * Neu ist der KREIS vor einer Aufgabe: offen ein Ring, erledigt ein Häkchen.
  * Eine Aufgabe ist kein Termin — man muss sie erkennen, ohne die Farben Sage
  * und Basil auseinanderhalten zu müssen (und ohne Farben überhaupt).
+ *
+ * Seit dem macOS-Kleid (14.09.2026) steht vor der Zeitzeile das kleine
+ * Uhr-Zeichen, das Apples Kalender seinen Karten gibt («⏱ 11:00 – 13:00»).
  */
 
 const TaskMark = ({ done }: { done: boolean }) => (
     <svg className="ofi-ucal-chip__mark" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
         <circle cx="8" cy="8" r="6.25" />
         {done && <path d="M5.1 8.15 L7.05 10.1 L10.95 6.2" />}
+    </svg>
+);
+
+const ClockMark = () => (
+    <svg className="ofi-ucal-chip__clock" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <circle cx="8" cy="8" r="6.2" />
+        <path d="M8 4.6V8l2.4 1.6" />
     </svg>
 );
 
@@ -37,6 +47,11 @@ export const ChipLabel = ({ status, title, time, meta }: {
                 {title}
             </span>
         </span>
-        {meta ? <span className="ofi-ucal-chip__meta">{meta}</span> : null}
+        {meta ? (
+            <span className="ofi-ucal-chip__meta">
+                <ClockMark />
+                <span className="ofi-ucal-chip__metatext">{meta}</span>
+            </span>
+        ) : null}
     </>
 );

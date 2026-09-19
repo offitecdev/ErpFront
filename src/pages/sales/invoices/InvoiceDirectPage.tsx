@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Eye, RefreshCcw01, Receipt } from '@/components/icons/antIconCompat';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 import { SectionCard } from '@/components/ui-shared/TableKit';
 import { StatusChip } from '@/components/ui-shared/StatusBadge';
 import { t } from '@/i18n/translate';
@@ -47,7 +48,7 @@ import {
 import '@/styles/modules/invoicePages.css';
 
 /**
- * ── DIREKTRECHNUNG (`/sales/invoices/new/direct`) ────────────────────────────
+ * ── DIREKTRECHNUNG (`/accounting/invoices/new/direct`) ────────────────────────────
  *
  * Vorgabe Samet: „eine Rechnung direkt erstellen — kein Fenster, eine Seite mit
  * Zurück-Knopf. Produkte wie im Angebot wählen oder von Hand eintippen, Preise
@@ -140,15 +141,9 @@ export const InvoiceDirectPage = () => {
     const [closingText, setClosingText] = useState(() => (settings.paymentTerms || '').trim());
 
     const [saving, setSaving] = useState(false);
-    /* Die Nummer, die diese Rechnung bekommen wird. Sie steht schon in der
-       Vorschau, statt «Entwurf» zu schreiben (Vorgabe Samet 05.09.2026) — der
-       Server gibt sie aus, ohne den Zähler zu bewegen. */
-    const [nextNumber, setNextNumber] = useState<string | null>(null);
-    useEffect(() => {
-        let cancelled = false;
-        void billingApi.nextInvoiceNumber().then((number) => { if (!cancelled) setNextNumber(number); });
-        return () => { cancelled = true; };
-    }, []);
+    /* Seit der Buchhaltung (16.09.2026, Schritt 5) entsteht die Rechnung als
+       ENTWURF ohne Nummer — die Vorschau schreibt darum «Entwurf»; die
+       RE-Nummer kommt erst beim Ausstellen auf der Rechnungsseite. */
 
     /* Bearbeiten: den Beleg holen und die Maske damit fuellen. Der Server
        liefert ihn mit Zeilen; Rabatte und Zahlungsplan stehen als JSON darin. */
@@ -158,10 +153,9 @@ export const InvoiceDirectPage = () => {
         let cancelled = false;
         void (async () => {
             try {
-                const invoices = await billingApi.listInvoices({});
-                const found = invoices.find((row) => row.id === editId) || null;
+                const found = await billingApi.getInvoice(editId).catch(() => null);
                 if (cancelled) return;
-                if (!found) { toast.error(t('crm.order_not_found')); navigate('/sales/invoices'); return; }
+                if (!found) { toast.error(t('crm.order_not_found')); navigate('/accounting/invoices'); return; }
                 setEditing(found);
                 setCustomerId(found.customerId ?? null);
                 setRecipientName(found.recipientName || found.customer?.companyName || '');
@@ -330,7 +324,7 @@ export const InvoiceDirectPage = () => {
                 customerId,
                 projectId: null,
                 salesOrderId: null,
-                invoiceNumber: editing?.invoiceNumber || nextNumber || t('invoices.draftNumber'),
+                invoiceNumber: editing?.invoiceNumber || t('invoices.draftNumber'),
                 billingType: 'FULL',
                 kind: 'RECHNUNG',
                 invoiceDate: body.invoiceDate,
@@ -390,13 +384,14 @@ export const InvoiceDirectPage = () => {
         if (saving || !validate()) return false;
         setSaving(true);
         try {
+            // Neu = ein ENTWURF; ausgestellt wird auf der Rechnungsseite.
             const { invoice } = editId
                 ? await billingApi.updateDirectInvoice(editId, payload())
-                : await billingApi.createDirectInvoice(payload());
-            toast.success(editId
-                ? t('invoices.saved', { number: invoice.invoiceNumber })
-                : t('invoices.created', { number: invoice.invoiceNumber }));
-            if (exit) navigate('/sales/invoices');
+                : await billingApi.createDirectInvoice({ ...payload(), draft: true });
+            toast.success(invoice.status === 'DRAFT'
+                ? t('accounting.draftSaved')
+                : t('invoices.saved', { number: invoice.invoiceNumber }));
+            if (exit) navigate(`/accounting/invoices/${invoice.id}`, { replace: true });
             return true;
         } catch (e) {
             toast.error(apiError(e, t('billing.invoiceError')));
@@ -405,6 +400,9 @@ export const InvoiceDirectPage = () => {
             setSaving(false);
         }
     };
+
+    // Neu: weiter zur Vorschau (Entwurf); Ändern: speichern.
+    const saveLabel = editId ? t('common.save') : t('accounting.toPreview');
 
     const STEPS: WizardStep[] = [
         { key: 'recipient', label: t('invoices.stepRecipient'), hint: t('invoices.stepHintRecipient') },
@@ -485,10 +483,10 @@ export const InvoiceDirectPage = () => {
                     <InvoiceStepFoot
                         stepIndex={0}
                         stepCount={STEPS.length}
-                        onBack={() => navigate('/sales/invoices')}
+                        onBack={() => navigate(editId ? `/accounting/invoices/${editId}` : '/accounting/invoices/new')}
                         onNext={() => setStep(1)}
                         nextDisabled={!recipientReady}
-                        finalLabel={t('invoices.createBtn')}
+                        finalLabel={saveLabel}
                         onFinal={() => void create()}
                     />
                 </SectionCard>
@@ -513,7 +511,7 @@ export const InvoiceDirectPage = () => {
                         onClosingTextChange={setClosingText}
                         closingPlaceholder={(settings.paymentTerms || '').trim() || t('invoices.closingPlaceholder')}
                         vat={{ rate: vatRate, onRateChange: (rate) => setVatRateText(String(rate)) }}
-                                               formatMoney={fmtMoney}
+                        formatMoney={fmtMoney}
                         readOnly={saving}
                     />
 
@@ -523,7 +521,7 @@ export const InvoiceDirectPage = () => {
                         onBack={() => setStep(0)}
                         onNext={() => setStep(2)}
                         nextDisabled={!linesReady}
-                        finalLabel={t('invoices.createBtn')}
+                        finalLabel={saveLabel}
                         onFinal={() => void create()}
                     />
                 </SectionCard>
@@ -563,22 +561,23 @@ export const InvoiceDirectPage = () => {
 
                     <div className="ofi-invp-grid ofi-invp-grid--4">
                         <InvoiceField label={t('billing.invoiceDate')}>
-                            <input
-                                type="date"
-                                className={FIELD_INPUT_CLASS}
+                            <MacDatePicker
+                                className="is-block"
                                 value={invoiceDate}
-                                onChange={(event) => {
-                                    setInvoiceDate(event.target.value);
-                                    if (!dueTouched) setDueDate(event.target.value);
+                                ariaLabel={t('billing.invoiceDate')}
+                                onChange={(next) => {
+                                    setInvoiceDate(next);
+                                    if (!dueTouched || dueDate < next) setDueDate(next);
                                 }}
                             />
                         </InvoiceField>
                         <InvoiceField label={t('billing.dueDate')}>
-                            <input
-                                type="date"
-                                className={FIELD_INPUT_CLASS}
+                            <MacDatePicker
+                                className="is-block"
                                 value={dueDate}
-                                onChange={(event) => { setDueTouched(true); setDueDate(event.target.value); }}
+                                min={invoiceDate}
+                                ariaLabel={t('billing.dueDate')}
+                                onChange={(next) => { setDueTouched(true); setDueDate(next); }}
                             />
                         </InvoiceField>
                         <InvoiceField label={t('billing.salesperson')}>
@@ -610,7 +609,7 @@ export const InvoiceDirectPage = () => {
                         stepCount={STEPS.length}
                         onBack={() => setStep(1)}
                         onNext={() => undefined}
-                        finalLabel={t('invoices.createBtn')}
+                        finalLabel={saveLabel}
                         finalIcon={<Receipt size={14} />}
                         finalDisabled={saving || !linesReady}
                         onFinal={() => void create()}
@@ -632,7 +631,7 @@ export const InvoiceDirectPage = () => {
                 onSave={() => void create(false).then((saved) => { if (saved) guard.proceed(); })} />
             <InvoicePdfPopup
                 open={previewOpen}
-                title={t('invoices.previewTitle', { number: editing?.invoiceNumber || nextNumber || t('invoices.draftNumber') })}
+                title={t('invoices.previewTitle', { number: editing?.invoiceNumber || t('invoices.draftNumber') })}
                 subtitle={`${t('invoices.category_DIRECT')} · ${fmtMoney(grossTotal)}`}
                 blob={previewBlob}
                 loading={previewLoading}

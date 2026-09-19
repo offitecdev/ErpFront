@@ -13,7 +13,16 @@ export const DetailRail = ({ ctl, data }: { ctl: TaskDetailController; data: Tas
     return (
         <aside className="ofi-gv-detail-rail">
             <RailInfoCard ctl={ctl} data={data} />
-            {isManager && data.work && <RailWorkCard work={data.work} people={data.people} serverNow={data.serverNow} />}
+            {/* Teammitglieder bekommen vom Server nur ihre eigenen Messungen. */}
+            {data.work && (
+                <RailWorkCard
+                    taskId={data.task.id}
+                    work={data.work}
+                    myStartedAt={data.task.timer.myStartedAt}
+                    people={data.people}
+                    serverNow={data.serverNow}
+                />
+            )}
             <RailForecastCard forecast={data.forecast} />
             <RailChatCard taskId={data.task.id} rooms={data.chatRooms} canCreate={isManager && !isOnboardingTaskId(data.task.id)} />
         </aside>

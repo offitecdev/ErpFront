@@ -85,6 +85,7 @@ export const CustomerPickCell = ({
                 if (customer) onPick(customer);
             }}
             placeholder={t('invoices.recipientName')}
+            inputClassName="ofi-invp-input"
             emptyText={t('invoices.recipientPickNone')}
             invalid={false}
             listWidth={340}

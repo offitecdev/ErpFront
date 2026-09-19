@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 
+import i18n from '@/i18n';
 import { t } from '@/i18n/translate';
 import type {
     InvoiceCategory,
@@ -15,6 +16,8 @@ import {
 } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import type { Variant } from '@/components/ui-shared/StatusBadge';
 import '@/styles/modules/invoicePages.css';
+// Das macOS-Kleid des ganzen Moduls (16.09.2026) — lädt NACH invoicePages.css.
+import '@/styles/modules/invoiceMac.css';
 
 /**
  * ── RECHNUNGSSEITEN: gemeinsame Rechnung und Beschriftung ────────────────────
@@ -39,12 +42,31 @@ export const fmtDate = (value?: string | null): string => (value ? dayjs(value).
 
 export const isoToday = (): string => dayjs().format('YYYY-MM-DD');
 
+/** Rechnungsdatum bzw. Fälligkeit als Kalendertag (`YYYY-MM-DD`) für ein Datumsfeld. */
+export const invoiceDay = (invoice: InvoiceDto, field: 'invoiceDate' | 'dueDate'): string =>
+    (field === 'invoiceDate'
+        ? invoice.invoiceDate || invoice.createdAt
+        : invoice.dueDate || invoice.invoiceDate || invoice.createdAt || ''
+    ).slice(0, 10);
+
 export const round2 = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
 
-export const apiError = (error: unknown, fallback: string): string =>
-    (error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error
-    || (error instanceof Error && error.message)
-    || fallback;
+/**
+ * Fehlertext einer Serverantwort. Rechnungsfehler tragen eine Kennung
+ * (`code`, siehe `invoiceErrors.ts` im Backend) — sie wird in der Sprache des
+ * Nutzers ausgegeben (Vorgabe 16.09.2026: Warnungen nicht nur deutsch). Ohne
+ * Kennung bleibt der Text des Servers.
+ */
+export const apiError = (error: unknown, fallback: string): string => {
+    const data = (error as {
+        response?: { data?: { error?: string; code?: string; params?: Record<string, unknown> } };
+    } | null)?.response?.data;
+    const key = data?.code ? `invoices.err.${data.code}` : '';
+    if (key && i18n.exists(key)) return t(key, data?.params);
+    return data?.error
+        || (error instanceof Error && error.message)
+        || fallback;
+};
 
 /**
  * Reihenfolge der Rechnungstypen in der Liste (Vorgabe: sortiert nach

@@ -9,12 +9,12 @@ import { personReportHref } from '../reports/reportQuery';
 
 /**
  * Die Tabelle «Kişiler»: je Person offene, erledigte und verspätete Aufgaben,
- * gemessene Zeit, erledigte Punkte und verlorene Zeit. Wer gerade misst, trägt
+ * gemessene Zeit und erledigte Punkte. Wer gerade misst, trägt
  * den roten Punkt und den Titel der laufenden Aufgabe. Ein Klick auf die Zeile
  * öffnet den Personenbericht.
  */
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 7;
 
 const reportPath = (employeeId: string) => personReportHref(employeeId);
 
@@ -41,7 +41,6 @@ export const PeopleStatsTable = ({
                         <th className="text-right">{t('tasksModule.people.columns.overdue')}</th>
                         <th className="text-right">{t('tasksModule.people.columns.time')}</th>
                         <th className="text-right">{t('tasksModule.people.columns.checkDone')}</th>
-                        <th className="text-right">{t('tasksModule.people.columns.wasted')}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -72,7 +71,7 @@ export const PeopleStatsTable = ({
                                             >
                                                 {person.name}
                                             </Link>
-                                            {person.activeTask && <i className="ofi-gv-live" aria-label={t('tasksModule.people.working')} />}
+                                            {person.activeTask && <i className="ofi-gv-working__dot" aria-label={t('tasksModule.people.working')} />}
                                         </div>
                                         {(person.title || person.activeTask) && (
                                             <div className="ofi-gv-people-person__sub">
@@ -100,9 +99,6 @@ export const PeopleStatsTable = ({
                             <td className={`text-right ofi-gv-people-num ${person.overdueCount > 0 ? 'is-late' : ''}`}>{person.overdueCount}</td>
                             <td className="text-right ofi-gv-people-num">{formatDuration(person.ms)}</td>
                             <td className="text-right ofi-gv-people-num">{person.checkDone}</td>
-                            <td className="text-right ofi-gv-people-num">
-                                {person.wastedMs > 0 ? formatDuration(person.wastedMs) : <span className="ofi-gv-people-muted">—</span>}
-                            </td>
                         </tr>
                     ))}
                 </tbody>

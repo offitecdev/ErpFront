@@ -1,0 +1,797 @@
+/* =========================================================
+   RECHNUNGSMODUL — macOS / SwiftUI (16.09.2026)
+
+   Vorgabe Samet: «Das ganze Rechnungsmodul im SwiftUI-/macOS-Stil,
+   sauberer und leichter erreichbar — und auf dem Tablet darf nichts
+   überlaufen, besonders die deutschen Texte nicht.»
+
+   Die Sprache ist die der übrigen Mac-Seiten (Offerte, Lager, Kalender):
+   ein natives Fenster, nicht apple.com. Also
+     · weisse Tafeln mit EINER Haarlinie, 10px Ecke, kein Schatten,
+       keine Verläufe, keine Glanzkanten (die «3D»-Tiefe von 08.2026 ist
+       hiermit abgelöst);
+     · Segmentsteuerungen wie in SwiftUI: graue Rinne, weisses Segment;
+     · umrandete Druckknöpfe mit 8px-Ecke, EIN Systemblau;
+     · Felder mit Haarlinie und blauem Fokusring;
+     · das Rechnungsblatt als Inspektor mit gruppierten Listen
+       (Beschriftung ausserhalb, graue Gruppe, eingerückte Trennlinien).
+
+   Eingebunden über `invoiceShared.ts` — also von jeder Rechnungsseite und
+   vom `OrderBillingSection` (Projekt- und Auftragsabrechnung). Die Datei
+   lädt NACH invoicePages.css und index.css und gewinnt über die
+   Reihenfolge; Ecken stehen in `@layer utilities` (die App flacht
+   `rounded-*` mit einer geschichteten `!important`-Regel ab).
+   ========================================================= */
+
+.ofi-invp-page,
+.ofi-inv-scope,
+.ofi-inv-pop,
+.ofi-invd {
+    --mac-surface: #ffffff;
+    --mac-window: #ffffff;
+    --mac-group: rgba(120, 120, 128, 0.08);
+    --mac-rail: rgba(120, 120, 128, 0.12);
+    --mac-text: #1d1d1f;
+    --mac-secondary: #6e6e73;
+    --mac-tertiary: #a1a1a6;
+    --mac-border: rgba(0, 0, 0, 0.1);
+    --mac-hairline: rgba(0, 0, 0, 0.07);
+    --mac-field: rgba(0, 0, 0, 0.15);
+    --mac-field-hover: rgba(0, 0, 0, 0.26);
+    --mac-hover: rgba(0, 0, 0, 0.035);
+    --mac-press: rgba(0, 0, 0, 0.07);
+    --mac-accent: #0a7aff;
+    --mac-accent-hover: #006ae6;
+    --mac-accent-soft: rgba(10, 122, 255, 0.1);
+    --mac-focus: rgba(10, 122, 255, 0.32);
+    --mac-green: #1f8a3b;
+    --mac-green-soft: rgba(52, 199, 89, 0.12);
+    --mac-orange: #b25000;
+    --mac-red: #d70015;
+    --mac-red-soft: rgba(255, 59, 48, 0.1);
+    --mac-seg-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    --mac-radius: 10px;
+    --mac-ctl-radius: 8px;
+    --mac-ctl-h: 32px;
+
+    /* Die Werte, aus denen die älteren Regeln malen, zeigen auf die Mac-Palette. */
+    --ofi-cal-surface: var(--mac-surface);
+    --ofi-cal-surface-2: var(--mac-surface);
+    --ofi-cal-border: var(--mac-field);
+    --ofi-cal-border-soft: var(--mac-border);
+    --ofi-cal-line: var(--mac-hairline);
+    --ofi-cal-hover: var(--mac-hover);
+    --ofi-cal-text: var(--mac-text);
+    --ofi-cal-muted: var(--mac-secondary);
+    --ofi-cal-faint: var(--mac-tertiary);
+    --ofi-cal-accent: var(--mac-accent);
+    --ofi-cal-accent-hover: var(--mac-accent-hover);
+    --ofi-cal-accent-soft: var(--mac-accent-soft);
+    --ofi-cal-accent-tint: var(--mac-accent-soft);
+    --ofi-cal-on-accent: #fff;
+    --ofi-invp-e1: none;
+    --ofi-invp-e2: none;
+    --ofi-invp-e3: 0 10px 30px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+    --ofi-invp-well: none;
+    --ofi-invp-sheen: 0 0 #0000;
+    --ofi-invp-radius: var(--mac-radius);
+    --ofi-invp-control-h: var(--mac-ctl-h);
+    -webkit-font-smoothing: antialiased;
+}
+
+html.dark :is(.ofi-invp-page, .ofi-inv-scope, .ofi-inv-pop, .ofi-invd) {
+    --mac-surface: #1c1c1e;
+    --mac-window: #1c1c1e;
+    --mac-group: rgba(255, 255, 255, 0.05);
+    --mac-rail: rgba(255, 255, 255, 0.08);
+    --mac-text: #f5f5f7;
+    --mac-secondary: #a1a1a6;
+    --mac-tertiary: #6e6e73;
+    --mac-border: rgba(255, 255, 255, 0.1);
+    --mac-hairline: rgba(255, 255, 255, 0.08);
+    --mac-field: rgba(255, 255, 255, 0.16);
+    --mac-field-hover: rgba(255, 255, 255, 0.3);
+    --mac-hover: rgba(255, 255, 255, 0.05);
+    --mac-press: rgba(255, 255, 255, 0.1);
+    --mac-accent: #3b8dff;
+    --mac-accent-hover: #5c9fff;
+    --mac-accent-soft: rgba(59, 141, 255, 0.18);
+    --mac-focus: rgba(59, 141, 255, 0.42);
+    --mac-green: #30d158;
+    --mac-green-soft: rgba(48, 209, 88, 0.16);
+    --mac-orange: #ffb340;
+    --mac-red: #ff453a;
+    --mac-red-soft: rgba(255, 69, 58, 0.16);
+    --mac-seg-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.5);
+    --ofi-invp-e3: 0 12px 34px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+
+/* ── 1. Seite: Luft, eine Schrift, keine Tiefe ─────────────── */
+.ofi-invp-page { gap: 14px; color: var(--mac-text); }
+
+html #root .ofi-invp-page > section,
+html #root .ofi-invp-page .ofi-invp-steps,
+html #root .ofi-invp-page .ofi-invp-footbar,
+html #root .ofi-invp-page .ofi-invp-tile,
+html #root .ofi-invd,
+html #root .ofi-inv-scope.ofi-inv-card {
+    border: 1px solid var(--mac-border) !important;
+    background: var(--mac-surface) !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+html #root .ofi-invp-page > section > header {
+    background-image: none !important;
+}
+html #root .ofi-invp-page .ofi-invp-tile:hover { transform: none; }
+
+/* ── 2. Kopf: Titel wie eine Fenstertitelzeile ─────────────── */
+html #root .ofi-invp-page > .ofi-rise > h1 {
+    font-size: 20px !important;
+    font-weight: 650 !important;
+    letter-spacing: -0.02em;
+}
+
+/* Knöpfe des Moduls: umrandete Druckknöpfe, EIN Blau. */
+html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button,
+html #root .ofi-invd .ofi-invd__act {
+    display: inline-flex;
+    height: var(--mac-ctl-h) !important;
+    min-height: var(--mac-ctl-h) !important;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--mac-field) !important;
+    background: var(--mac-surface) !important;
+    padding: 0 12px !important;
+    color: var(--mac-text) !important;
+    -webkit-text-fill-color: currentColor;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    white-space: nowrap;
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.05) !important;
+    transform: none !important;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease !important;
+}
+html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button:not(:disabled):hover,
+html #root .ofi-invd .ofi-invd__act:not(:disabled):hover { background: var(--mac-hover) !important; }
+html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button:not(:disabled):active,
+html #root .ofi-invd .ofi-invd__act:not(:disabled):active { background: var(--mac-press) !important; }
+html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button:is(.ofi-btn-brand, [class~="bg-[#0a7aff]"]),
+html #root .ofi-invd .ofi-invd__act.is-primary {
+    border-color: transparent !important;
+    background: var(--mac-accent) !important;
+    color: #fff !important;
+}
+html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button:is(.ofi-btn-brand, [class~="bg-[#0a7aff]"]):not(:disabled):hover,
+html #root .ofi-invd .ofi-invd__act.is-primary:not(:disabled):hover { background: var(--mac-accent-hover) !important; }
+html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button:disabled,
+html #root .ofi-invd .ofi-invd__act:disabled { opacity: 0.45; cursor: default; }
+html #root .ofi-invd .ofi-invd__act.is-danger { color: var(--mac-red) !important; }
+html #root .ofi-invd .ofi-invd__act.is-danger:not(:disabled):hover {
+    border-color: var(--mac-field) !important;
+    background: var(--mac-red-soft) !important;
+}
+
+/* Das Menü «Rechnung erstellen»: ein macOS-Menü. */
+html #root .ofi-invp-menu {
+    width: 300px;
+    border: 0.5px solid var(--mac-border);
+    background: color-mix(in srgb, var(--mac-surface) 92%, transparent);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    padding: 5px;
+    box-shadow: var(--ofi-invp-e3);
+}
+html #root .ofi-invp-menu__item { padding: 8px 10px; }
+html #root .ofi-invp-menu__item:hover { background: var(--mac-accent); color: #fff; }
+html #root .ofi-invp-menu__item:hover :is(.ofi-invp-menu__hint, svg) { color: rgba(255, 255, 255, 0.85); }
+html #root .ofi-invp-menu__item > svg { background: none; padding: 0; margin-top: 1px; }
+.ofi-invp-menu__title { font-size: 13px; font-weight: 500; }
+.ofi-invp-menu__hint { white-space: normal; }
+
+/* ── 3. Werkzeugzeile ──────────────────────────────────────── */
+.ofi-invp-toolbar { gap: 10px; }
+.ofi-invp-toolbar > * { height: var(--mac-ctl-h); }
+
+/* Segmentsteuerung wie in SwiftUI: graue Rinne, weisses Segment. */
+html #root .ofi-invp-page .ofi-invp-seg {
+    height: var(--mac-ctl-h);
+    border: 0 !important;
+    background: var(--mac-rail) !important;
+    padding: 2px;
+    gap: 2px;
+    box-shadow: none !important;
+}
+html #root .ofi-invp-page .ofi-invp-seg__btn {
+    height: 100%;
+    padding: 0 14px;
+    color: var(--mac-text);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: none !important;
+}
+html #root .ofi-invp-page .ofi-invp-seg__btn:hover:not(.is-on) { background: rgba(0, 0, 0, 0.04); color: var(--mac-text); }
+html.dark #root .ofi-invp-page .ofi-invp-seg__btn:hover:not(.is-on) { background: rgba(255, 255, 255, 0.05); }
+html #root .ofi-invp-page .ofi-invp-seg__btn.is-on {
+    background: var(--mac-surface) !important;
+    color: var(--mac-text) !important;
+    font-weight: 600;
+    box-shadow: var(--mac-seg-shadow) !important;
+}
+html.dark #root .ofi-invp-page .ofi-invp-seg__btn.is-on { background: #636366 !important; }
+
+html #root .ofi-invp-page .ofi-invp-search { box-shadow: none !important; }
+html #root .ofi-invp-page select.ofi-invp-select {
+    height: var(--mac-ctl-h);
+    border: 1px solid var(--mac-field);
+    padding: 0 30px 0 10px;
+    font-size: 13px;
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ── 4. Kennzahlen: vier ruhige Kacheln ────────────────────── */
+.ofi-invp-tiles { gap: 10px; }
+html #root .ofi-invp-page .ofi-invp-tile {
+    min-height: 64px;
+    padding: 10px 14px;
+    gap: 2px;
+}
+/* Beschriftungen dürfen umbrechen statt abgeschnitten zu werden — deutsche
+   Wörter sind lang. */
+.ofi-invp-page .ofi-invp-tile__label {
+    overflow: visible;
+    white-space: normal;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--mac-secondary);
+}
+.ofi-invp-page .ofi-invp-tile__value {
+    padding-top: 2px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ofi-invp-page .ofi-invp-tile.is-paid .ofi-invp-tile__value { color: var(--mac-green); }
+.ofi-invp-page .ofi-invp-tile.is-open .ofi-invp-tile__value { color: var(--mac-orange); }
+html #root .ofi-invp-page .ofi-invp-tile.is-click:hover { background: var(--mac-hover) !important; }
+html #root .ofi-invp-page .ofi-invp-tile.is-click.is-on {
+    border-color: var(--mac-accent) !important;
+    background: var(--mac-accent-soft) !important;
+    box-shadow: inset 0 0 0 0.5px var(--mac-accent) !important;
+}
+
+/* ── 5. Liste ─────────────────────────────────────────────── */
+.ofi-invp-page .ofi-invp-kind {
+    border-radius: 5px;
+    background: var(--mac-rail);
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--mac-secondary);
+    box-shadow: none;
+}
+.ofi-invp-page table[data-inv-table] tr.ofi-invp-row.is-selected > td {
+    background: var(--mac-accent-soft);
+}
+
+/* ── 6. Das Rechnungsblatt = Inspektor ────────────────────── */
+html #root .ofi-invd {
+    gap: 0;
+    overflow: hidden;
+    padding-bottom: 4px;
+}
+.ofi-invd__head { border-bottom: 0; padding: 14px 12px 4px 16px; }
+.ofi-invd__number {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+.ofi-invd__amount { padding: 4px 16px 14px; gap: 8px; }
+.ofi-invd__money { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+.ofi-invd__pay { padding: 0 16px 14px; gap: 8px; }
+html #root .ofi-invd .ofi-invd__paybtn {
+    height: 36px;
+    background: var(--mac-green);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #fff;
+}
+html #root .ofi-invd .ofi-invd__paybtn:hover:not(:disabled) { background: color-mix(in srgb, var(--mac-green) 86%, #000); }
+html.dark #root .ofi-invd .ofi-invd__paybtn { color: #04170c; }
+.ofi-invd__paydate { font-size: 13px; color: var(--mac-secondary); }
+.ofi-invd__paidmark {
+    border: 0 !important;
+    background: var(--mac-green-soft) !important;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--mac-green) !important;
+}
+html #root .ofi-invd .ofi-invd__undo { color: var(--mac-accent); text-decoration: none; font-size: 12.5px; font-weight: 500; }
+html #root .ofi-invd .ofi-invd__undo:hover:not(:disabled) { color: var(--mac-accent-hover); text-decoration: underline; }
+
+/* Gruppen: Beschriftung aussen, graue Fläche innen (Systemeinstellungen). */
+.ofi-invd__group { padding: 0 12px 12px; }
+.ofi-invd__caption {
+    padding: 2px 6px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mac-secondary);
+}
+.ofi-invd__card,
+html #root .ofi-invd .ofi-invd__rows {
+    margin: 0;
+    border: 0;
+    background: var(--mac-group);
+    padding: 0 12px;
+}
+.ofi-invd__field,
+.ofi-invd__row {
+    position: relative;
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+}
+.ofi-invd__field + .ofi-invd__field,
+html #root .ofi-invd .ofi-invd__row + .ofi-invd__row { border-top: 1px solid var(--mac-hairline); }
+.ofi-invd__field > span,
+html #root .ofi-invd .ofi-invd__row dt {
+    min-width: 0;
+    flex: 0 1 auto;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--mac-text);
+}
+html #root .ofi-invd .ofi-invd__row dd {
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 13px;
+    color: var(--mac-secondary);
+    white-space: nowrap;
+}
+.ofi-invd__field > strong { font-size: 13px; font-weight: 500; color: var(--mac-secondary); }
+
+/* Datumsfelder = iOS-Kapsel (`MacDatePicker`); das ganze Datum ist immer lesbar. */
+.ofi-invd :is(.ofi-invd__field, .ofi-invd__paydate) > .ofi-macdp { width: 104px; }
+
+.ofi-invd__datebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 2px 0;
+}
+.ofi-invd__warn {
+    flex: 1 1 100%;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--mac-red);
+}
+
+.ofi-invd__note {
+    margin: 0 12px 12px;
+    border: 0;
+    border-radius: var(--mac-radius);
+    background: var(--mac-group);
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: var(--mac-secondary);
+}
+.ofi-invd__foot {
+    gap: 8px;
+    border-top: 1px solid var(--mac-hairline);
+    padding: 12px 12px 8px;
+}
+.ofi-invd__foot > .ofi-invd__act { flex: 1 1 auto; justify-content: center; }
+
+/* ── 7. Erfassungsseiten ──────────────────────────────────── */
+/* Felder: Haarlinie, blauer Ring, keine Mulde. */
+html #root .ofi-invp-page :is(.ofi-invp-input, .ofi-invp-picker, .ofi-invp-vat) {
+    border: 1px solid var(--mac-field);
+    background: var(--mac-surface);
+    font-size: 13px;
+    box-shadow: none !important;
+}
+html #root .ofi-invp-page :is(.ofi-invp-input, .ofi-invp-picker, .ofi-invp-vat):hover:not(:disabled):not(:focus) {
+    border-color: var(--mac-field-hover);
+}
+html #root .ofi-invp-page :is(.ofi-invp-input, .ofi-invp-vat):focus,
+html #root .ofi-invp-page .ofi-invp-picker[aria-expanded="true"] {
+    border-color: var(--mac-accent);
+    box-shadow: 0 0 0 3px var(--mac-focus) !important;
+}
+html #root .ofi-invp-page .ofi-invp-picker.is-filled { font-weight: 500; }
+.ofi-invp-page .ofi-invp-field__label {
+    padding-bottom: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--mac-secondary);
+}
+.ofi-invp-page .ofi-invp-grid { gap: 14px 16px; padding: 16px 18px; }
+.ofi-invp-page .ofi-invp-foot { gap: 8px; padding: 12px 18px; border-top-color: var(--mac-hairline); }
+
+/* Fortschritt: eine Segmentsteuerung statt der schrägen Balken. */
+html #root .ofi-invp-page .ofi-invp-progress {
+    height: var(--mac-ctl-h);
+    gap: 2px;
+    border: 0;
+    background: var(--mac-rail);
+    padding: 2px;
+}
+html #root .ofi-invp-page .ofi-invp-progress__seg {
+    min-width: 0;
+    background: transparent;
+    padding: 0 14px;
+    color: var(--mac-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    transform: none;
+}
+html #root .ofi-invp-page .ofi-invp-progress__label { transform: none; }
+html #root .ofi-invp-page .ofi-invp-progress__seg.is-done { background: transparent; color: var(--mac-text); }
+html #root .ofi-invp-page .ofi-invp-progress__seg.is-current {
+    background: var(--mac-surface);
+    color: var(--mac-text);
+    font-weight: 600;
+    box-shadow: var(--mac-seg-shadow);
+}
+html.dark #root .ofi-invp-page .ofi-invp-progress__seg.is-current { background: #636366; color: #fff; }
+html #root .ofi-invp-page .ofi-invp-progress__seg:not(:disabled):not(.is-current):hover { background: rgba(0, 0, 0, 0.04); }
+
+/* Schrittleiter (Rechnung aus Auftrag): flach, Nummer als kleiner Kreis. */
+html #root .ofi-invp-page .ofi-invp-step.is-current .ofi-invp-step__btn {
+    border-color: transparent;
+    background: var(--mac-accent-soft);
+}
+html #root .ofi-invp-page .ofi-invp-step__num {
+    width: 22px;
+    height: 22px;
+    background-image: none;
+    box-shadow: none;
+    transform: none;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+html #root .ofi-invp-page .ofi-invp-step.is-done .ofi-invp-step__num { background: var(--mac-green-soft); color: var(--mac-green); }
+html #root .ofi-invp-page .ofi-invp-step__label { font-size: 13px; font-weight: 500; }
+.ofi-invp-page .ofi-invp-step__mark { display: none; }
+
+/* Projekt- / Lieferauftrag: dieselbe Segmentsteuerung, ohne Glas. */
+html #root .ofi-invp-page .ofi-invp-switch {
+    border: 0;
+    background: var(--mac-rail);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 2px;
+    box-shadow: none;
+}
+html #root .ofi-invp-page .ofi-invp-switch__thumb {
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    background: var(--mac-surface);
+    background-image: none;
+    box-shadow: var(--mac-seg-shadow);
+}
+html.dark #root .ofi-invp-page .ofi-invp-switch__thumb { background: #636366; }
+html #root .ofi-invp-page .ofi-invp-switch__btn {
+    min-width: 128px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mac-text);
+}
+html #root .ofi-invp-page .ofi-invp-switch__btn.is-on { color: var(--mac-text); font-weight: 600; }
+
+/* Auswahlblatt der Pickers: Mac-Liste statt schwebender Karten. */
+html #root .ofi-invp-pick__card { border-color: transparent; box-shadow: none; transform: none; }
+html #root .ofi-invp-pick__card.is-active { border-color: transparent; background: var(--mac-hover); transform: none; box-shadow: none; }
+html #root .ofi-invp-pick__card.is-on { border-color: transparent; background: var(--mac-accent-soft); }
+.ofi-invp-pick__search { border-radius: 8px !important; background: var(--mac-rail); border-color: transparent; height: 32px; }
+
+/* ── 8. Abrechnung im Projekt / Auftrag (OrderBillingSection) ── */
+html #root .ofi-inv-scope.ofi-inv-card { border-radius: var(--mac-radius); }
+.ofi-inv-scope .ofi-inv-card__head { min-height: 44px; border-bottom-color: var(--mac-hairline); }
+.ofi-inv-scope .ofi-inv-card__title { font-size: 14px; font-weight: 600; }
+.ofi-inv-scope .ofi-inv-meta {
+    gap: 10px 14px;
+    border-bottom-color: var(--mac-hairline);
+    background: var(--mac-group);
+}
+.ofi-inv-scope .ofi-inv-meta > .ofi-inv-field { width: 200px; }
+.ofi-inv-scope .ofi-inv-field__label { font-size: 12px; color: var(--mac-secondary); }
+
+html:not(.dark) #root :is(.ofi-inv-scope, .ofi-inv-pop) .ofi-inv-input,
+html.dark #root :is(.ofi-inv-scope, .ofi-inv-pop) .ofi-inv-input,
+html:not(.dark) body > :not(#root) :is(.ofi-inv-scope, .ofi-inv-pop) .ofi-inv-input,
+html.dark body > :not(#root) :is(.ofi-inv-scope, .ofi-inv-pop) .ofi-inv-input {
+    height: var(--mac-ctl-h);
+    min-height: var(--mac-ctl-h);
+    border: 1px solid var(--mac-field);
+    background: var(--mac-surface);
+    line-height: calc(var(--mac-ctl-h) - 2px);
+}
+html #root :is(.ofi-inv-scope, .ofi-inv-pop) .ofi-inv-input:focus,
+html body > :not(#root) :is(.ofi-inv-scope, .ofi-inv-pop) .ofi-inv-input:focus {
+    border-color: var(--mac-accent);
+    box-shadow: 0 0 0 3px var(--mac-focus);
+}
+/* Datumsspalten der Abrechnungstabelle und des Rechnungsfensters. */
+html #root .ofi-inv-scope td.ofi-inv-datecol,
+html body > :not(#root) .ofi-inv-pop td .ofi-macdp { text-align: center; }
+.ofi-inv-scope td.ofi-inv-datecol { padding-left: 6px; padding-right: 6px; }
+.ofi-inv-pop td.ofi-inv-num > .ofi-macdp { margin-left: auto; }
+
+html #root .ofi-inv-scope .ofi-inv-btn,
+html body > :not(#root) .ofi-inv-pop .ofi-inv-btn {
+    height: 30px !important;
+    min-height: 30px !important;
+    border: 1px solid var(--mac-field) !important;
+    background: var(--mac-surface) !important;
+    padding: 0 12px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--mac-text) !important;
+}
+html #root .ofi-inv-scope .ofi-inv-btn:hover:not(:disabled) { background: var(--mac-hover); }
+
+/* ── 8b. Liste: Mac-Dichte, ruhige Marken ─────────────────── */
+/* Suche + Filter der Seite auf Mac-Mass (nur hier, nicht app-weit). */
+.ofi-invp-page {
+    --ofi-ctl-h: var(--mac-ctl-h);
+    --ofi-ctl-font: 13px;
+    --ofi-ctl-radius: var(--mac-ctl-radius);
+    --ofi-ctl-lead: 30px;
+}
+@media (min-width: 720px) {
+    .ofi-invp-page .ofi-invp-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+html #root .ofi-invp-page table[data-list-table] th { height: 38px; padding-top: 6px; padding-bottom: 6px; font-size: 12px; }
+html #root .ofi-invp-page table[data-list-table] td { height: 54px; padding-top: 8px; padding-bottom: 8px; }
+html #root .ofi-invp-page table[data-list-table] tr[data-filter-row] th { height: auto; padding-top: 0; padding-bottom: 8px; }
+html #root .ofi-invp-page table[data-list-table] .ofi-filter-input { height: 28px !important; min-height: 28px !important; font-size: 12.5px; }
+html #root .ofi-invp-page table[data-list-table] td { overflow: hidden; text-overflow: ellipsis; }
+/* Typmarken: leise getönt statt vollfarbig. */
+html #root .ofi-invp-page .ofi-status-chip,
+html #root .ofi-invd .ofi-status-chip {
+    border: 0 !important;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    background: var(--mac-rail) !important;
+    color: var(--mac-secondary) !important;
+}
+html #root :is(.ofi-invp-page, .ofi-invd) .ofi-status-chip:is([data-variant="approved"], [data-variant="info"]) { background: var(--mac-accent-soft) !important; color: var(--mac-accent) !important; }
+html #root :is(.ofi-invp-page, .ofi-invd) .ofi-status-chip:is([data-variant="active"], [data-variant="order"]) { background: var(--mac-green-soft) !important; color: var(--mac-green) !important; }
+html #root :is(.ofi-invp-page, .ofi-invd) .ofi-status-chip[data-variant="warning"] { background: rgba(255, 149, 0, 0.14) !important; color: var(--mac-orange) !important; }
+html #root :is(.ofi-invp-page, .ofi-invd) .ofi-status-chip[data-variant="danger"] { background: var(--mac-red-soft) !important; color: var(--mac-red) !important; }
+
+/* Blatt NEBEN der Liste: der Kunde braucht Platz — Beleg und Verkäufer
+   weichen, solange der Bildschirm dafür nicht breit genug ist (sie stehen
+   ohnehin im Blatt). */
+@media (min-width: 1280px) and (max-width: 1719px) {
+    .ofi-invp-split.has-detail table[data-inv-table] :is(col, th, td).ofi-invp-col-sp { display: none; }
+}
+@media (min-width: 1280px) and (max-width: 1499px) {
+    .ofi-invp-split.has-detail table[data-inv-table] :is(col, th, td).ofi-invp-col-ref { display: none; }
+}
+
+/* ── 9. Tablet (640–1279px) ───────────────────────────────── */
+/* Die Liste passt auf den Schirm, statt seitwärts zu rollen: feste
+   Spalten, Kunde nimmt den Rest, Text endet mit «…». */
+@media (min-width: 640px) and (max-width: 1023px) {
+    html #root .ofi-invp-page table[data-inv-table][data-list-table] {
+        table-layout: fixed;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    html #root .ofi-invp-page table[data-list-table] :is(th, td):first-child { min-width: 0; }
+    html #root .ofi-invp-page table[data-list-table] col:first-child { width: 150px !important; }
+    html #root .ofi-invp-page table[data-list-table] col:nth-child(2) { width: 124px !important; }
+    html #root .ofi-invp-page table[data-list-table] :is(th, td) { padding-left: 10px; padding-right: 10px; }
+}
+@media (max-width: 1279px) {
+    /* Das Blatt legt sich als Inspektor rechts über die Liste. */
+    html #root .ofi-invd {
+        border-radius: 14px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.12) !important;
+        max-height: calc(100dvh - 96px);
+    }
+    /* Verkäufer ist die am wenigsten gelesene Spalte — sie weicht zuerst. */
+    .ofi-invp-page table[data-inv-table] :is(col, th, td).ofi-invp-col-sp { display: none; }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+    /* Der Beleg (Projekt/Auftrag) steht im Blatt — in der Liste weicht er. */
+    .ofi-invp-page table[data-inv-table] :is(col, th, td).ofi-invp-col-ref { display: none; }
+    /* Typwahl über die ganze Breite, Suche und Status darunter. */
+    .ofi-invp-toolbar > .ofi-invp-segwrap { flex: 1 1 100%; }
+    html #root .ofi-invp-page .ofi-invp-seg { display: flex; width: 100%; }
+    html #root .ofi-invp-page .ofi-invp-seg__btn { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; }
+    .ofi-invp-toolbar .ofi-invp-search { max-width: none; }
+    .ofi-invp-page .ofi-invp-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ofi-invp-page .ofi-invp-grid--split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1100px) {
+    .ofi-inv-scope .ofi-inv-meta { justify-content: stretch; }
+    .ofi-inv-scope .ofi-inv-meta > .ofi-inv-field { flex: 1 1 160px; width: auto; }
+}
+/* Telefon: Segmente dürfen rollen, Fussknöpfe füllen die Zeile. */
+@media (max-width: 639px) {
+    html #root .ofi-invp-page .ofi-invp-seg__btn { padding: 0 10px; }
+    .ofi-invd__foot > .ofi-invd__act { flex: 1 1 40%; }
+}
+
+@layer utilities {
+    html #root .ofi-invp-page :is(
+        section,
+        .ofi-invp-tile,
+        .ofi-invp-steps,
+        .ofi-invp-footbar,
+        .ofi-invp-pdfframe
+    ),
+    html #root .ofi-invd,
+    html #root .ofi-inv-scope.ofi-inv-card { border-radius: var(--mac-radius) !important; }
+    html #root .ofi-invp-page :is(.ofi-invp-seg, .ofi-invp-progress, .ofi-invp-switch) { border-radius: 9px !important; }
+    html #root .ofi-invp-page :is(.ofi-invp-seg__btn, .ofi-invp-progress__seg, .ofi-invp-switch__btn, .ofi-invp-switch__thumb) { border-radius: 7px !important; }
+    html #root .ofi-invp-page :is(input, select).ofi-invp-input,
+    html #root .ofi-invp-page :is(.ofi-invp-picker, select.ofi-invp-select, input.ofi-invp-vat),
+    html #root .ofi-invp-page :is(.ofi-rise, .ofi-invp-foot) button,
+    html #root .ofi-invd :is(.ofi-invd__act, .ofi-invd__paybtn),
+    html #root :is(.ofi-inv-scope, .ofi-inv-pop) :is(.ofi-inv-input, .ofi-inv-btn),
+    html body > :not(#root) .ofi-inv-pop :is(.ofi-inv-input, .ofi-inv-btn) { border-radius: var(--mac-ctl-radius) !important; }
+    html #root .ofi-invp-page textarea.ofi-invp-input { border-radius: var(--mac-radius) !important; }
+    html #root .ofi-invp-page :is(.ofi-invp-search, .ofi-invp-search > label) { border-radius: var(--mac-ctl-radius) !important; }
+    html #root .ofi-invp-page .ofi-invp-menu,
+    html #root .ofi-invd :is(.ofi-invd__card, .ofi-invd__rows, .ofi-invd__paidmark) { border-radius: var(--mac-radius) !important; }
+    html #root .ofi-invp-page .ofi-invp-menu__item { border-radius: 6px !important; }
+    html #root .ofi-invp-page .ofi-invp-pick__card { border-radius: 8px !important; }
+    @media (max-width: 1279px) {
+        html #root .ofi-invd { border-radius: 14px !important; }
+    }
+}
+
+/* Creation forms use the same quiet rows and inline fields as the quote detail. */
+#root .ofi-invp-page .ofi-invp-grid {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 12px 24px;
+    padding: 18px;
+}
+#root .ofi-invp-page .ofi-invp-grid > .ofi-invp-field { max-width: none; }
+#root .ofi-invp-page .ofi-invp-grid > .ofi-invp-field {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: start;
+}
+#root .ofi-invp-page .ofi-invp-field__label {
+    padding: 6px 0 0;
+    font-size: 12.5px;
+    font-weight: 400;
+}
+#root .ofi-invp-page .ofi-invp-field > :not(.ofi-invp-field__label) { grid-column: 2; min-width: 0; }
+#root .ofi-invp-page .ofi-invp-field__hint { padding-top: 4px; }
+#root .ofi-invp-page :is(input, select).ofi-invp-input,
+#root .ofi-invp-page .ofi-invp-picker {
+    min-height: 28px;
+    height: 28px;
+    padding: 3px 9px;
+    border-radius: 6px;
+}
+#root .ofi-invp-page textarea.ofi-invp-input { min-height: 72px; padding: 7px 9px; }
+#root .ofi-invp-page .ofi-invp-addon-meta { border-bottom: 1px solid var(--mac-hairline); }
+#root .ofi-invp-page .ofi-invp-input.is-static {
+    display: flex;
+    align-items: center;
+    border-color: transparent;
+    background: var(--mac-group);
+    color: var(--mac-text);
+}
+#root .ofi-invp-page .ofi-macdp:is(.is-field, .is-block) {
+    height: 28px;
+    border: 1px solid var(--mac-field);
+    border-radius: 6px;
+    background: var(--mac-surface);
+    box-shadow: none;
+}
+#root .ofi-invp-page .ofi-macdp:is(.is-field, .is-block):hover:not(.is-disabled) {
+    border-color: var(--mac-field-hover);
+}
+#root .ofi-invp-page .ofi-macdp:is(.is-field, .is-block).is-open {
+    border-color: var(--mac-accent);
+    box-shadow: 0 0 0 3px var(--mac-focus);
+}
+html body #root .ofi-invp-page .ofi-macdp.is-block > input.ofi-macdp__input {
+    padding: 0 9px !important;
+    text-align: left !important;
+}
+
+#root .ofi-invp-page .document-workspace {
+    --doc-line: var(--mac-hairline);
+    --doc-surface: var(--mac-surface);
+    --doc-surface-strong: var(--mac-hover);
+    --doc-muted: var(--mac-secondary);
+    --doc-accent: var(--mac-accent);
+    --doc-field-h: 26px;
+    border: 0;
+    border-radius: 0;
+    background: var(--mac-surface);
+    color: var(--mac-text);
+}
+#root .ofi-invp-page .document-tabs {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--mac-hairline);
+}
+#root .ofi-invp-page .document-tab { border-radius: 6px; font-weight: 500; }
+#root .ofi-invp-page .document-tab.is-on {
+    border-color: var(--mac-field);
+    background: var(--mac-surface);
+    color: var(--mac-text);
+}
+#root .ofi-invp-page .document-panel,
+#root .ofi-invp-page .document-inline { background: var(--mac-surface); }
+#root .ofi-invp-page .document-table { color: var(--mac-text); font-variant-numeric: tabular-nums; }
+#root .ofi-invp-page .document-table th {
+    height: 34px;
+    padding: 0 6px;
+    border-bottom: 1px solid var(--mac-border);
+    background: var(--mac-surface);
+    color: var(--mac-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    vertical-align: middle;
+}
+#root .ofi-invp-page .document-table td {
+    height: 40px;
+    padding: 7px 6px;
+    border-bottom: 1px solid var(--mac-hairline);
+    background: var(--mac-surface);
+}
+#root .ofi-invp-page .document-table :is(th, td) + :is(th, td) {
+    border-left: 1px solid var(--mac-hairline);
+}
+#root .ofi-invp-page .document-table :is(th, td):first-child { padding-left: 16px; }
+#root .ofi-invp-page .document-table :is(th, td):last-child { padding-right: 12px; }
+#root .ofi-invp-page .document-table tbody tr:hover td { background: var(--mac-hover); }
+#root .ofi-invp-page .document-table tbody tr.is-selected td { background: var(--mac-accent-soft); }
+#root .ofi-invp-page .document-cell {
+    height: 26px;
+    min-height: 26px;
+    padding: 2px 5px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 400;
+    box-shadow: none;
+}
+#root .ofi-invp-page .document-cell:hover:not([readonly]) {
+    border-color: var(--mac-field);
+    background: var(--mac-surface);
+}
+#root .ofi-invp-page .document-cell:focus {
+    border-color: var(--mac-accent);
+    background: var(--mac-surface);
+    box-shadow: 0 0 0 3px var(--mac-focus);
+    outline: none;
+}
+#root .ofi-invp-page .document-ordinal,
+#root .ofi-invp-page .document-amount { padding-top: 11px !important; }
+#root .ofi-invp-page .document-actions,
+#root .ofi-invp-page .document-foot { background: var(--mac-surface); }
+#root .ofi-invp-page .document-foot { border-top: 1px solid var(--mac-hairline); }
+
+@media (max-width: 840px) {
+    #root .ofi-invp-page .ofi-invp-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+    #root .ofi-invp-page .ofi-invp-grid > .ofi-invp-field { grid-template-columns: minmax(0, 1fr); }
+    #root .ofi-invp-page .ofi-invp-field > :not(.ofi-invp-field__label) { grid-column: 1; }
+    #root .ofi-invp-page .ofi-invp-field__label { padding: 0 0 5px; }
+}

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+    ClockRewind,
     Copy01 as Copy,
     RefreshCcw01 as RefreshCw,
     Settings01 as Settings,
     Trash01 as Trash2,
     XClose,
 } from '@/components/icons/antIconCompat';
+import { DocumentHistoryPopup, useGovernance } from '@/components/governance';
 import { t } from '@/i18n/translate';
 
 type TenderSettingsMenuProps = {
@@ -23,6 +25,9 @@ type TenderSettingsMenuProps = {
      * gesperrt — dass der Weg zu ist, ist die halbe Auskunft.
      */
     linked?: boolean;
+    /** Für den Verlauf (16.09.2026). */
+    tenderId: string;
+    tenderNumber: string;
 };
 
 /**
@@ -42,8 +47,14 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({
     onCancelOffer,
     cancelled = false,
     linked = false,
+    tenderId,
+    tenderNumber,
 }) => {
     const [open, setOpen] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(false);
+    // Stornieren = eigenes Recht, Storno aufheben = nur Systemverwaltung (16.09.2026).
+    const { can, isSystemAdmin } = useGovernance();
+    const cancelAllowed = cancelled ? isSystemAdmin : can('TENDER_CANCEL');
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -102,9 +113,22 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({
                         role="menuitem"
                         onClick={() => {
                             setOpen(false);
+                            setHistoryOpen(true);
+                        }}
+                        className="ofi-tp-menu__item"
+                    >
+                        <ClockRewind size={14} /> {t('governance.historyTitle')}
+                    </button>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!cancelAllowed}
+                        title={cancelAllowed ? undefined : (cancelled ? t('governance.uncancelAdminOnly') : t('governance.noPermissionCancel'))}
+                        onClick={() => {
+                            setOpen(false);
                             onCancelOffer();
                         }}
-                        className={`ofi-tp-menu__item ${cancelled ? '' : 'is-danger'}`}
+                        className={`ofi-tp-menu__item ${cancelled ? '' : 'is-danger'} ${cancelAllowed ? '' : 'cursor-not-allowed opacity-45'}`}
                     >
                         {cancelled ? <RefreshCw size={14} /> : <XClose size={14} />}
                         {cancelled ? t('tenders.lifecycle.uncancelOffer') : t('tenders.lifecycle.cancelOffer')}
@@ -127,7 +151,21 @@ export const TenderSettingsMenu: React.FC<TenderSettingsMenuProps> = ({
                             {t('tenders.lifecycle.deleteBlocked')}
                         </div>
                     )}
+                    {!cancelAllowed && (
+                        <div className="px-3 pb-2 pt-1 text-[11.5px] leading-snug text-slate-500 dark:text-white/55">
+                            {cancelled ? t('governance.uncancelAdminOnly') : t('governance.noPermissionCancel')}
+                        </div>
+                    )}
                 </div>
+            )}
+            {historyOpen && (
+                <DocumentHistoryPopup
+                    open
+                    entityType="TENDER"
+                    entityId={tenderId}
+                    documentNumber={tenderNumber}
+                    onClose={() => setHistoryOpen(false)}
+                />
             )}
         </div>
     );

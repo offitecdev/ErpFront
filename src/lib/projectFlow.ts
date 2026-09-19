@@ -1,5 +1,5 @@
 import type { ProjectDto } from '../types/project';
-import type { ProjectListInvoiceDto, ProjectListOrderDto } from '../types/billing';
+import { countsAsBilled, type ProjectListInvoiceDto, type ProjectListOrderDto } from '../types/billing';
 import type { ProjectListDeliveryReportDto, ServiceReportDto, SignatureRequestDto } from './api/project';
 
 /**
@@ -54,7 +54,7 @@ const stageFromPercent = (percent: number): StageState =>
 
 const billedPercentForOrder = (orderId: string, invoices: ProjectListInvoiceDto[]): number => {
     const total = invoices
-        .filter((inv) => inv.salesOrderId === orderId && inv.status !== 'CANCELLED')
+        .filter((inv) => inv.salesOrderId === orderId && countsAsBilled(inv))
         .reduce((sum, inv) => sum + (Number(inv.billedPercent) || 0), 0);
     return clampPercent(total);
 };
@@ -100,7 +100,7 @@ const computeProjectBillingPercent = (
 ): number => {
     // Project-scoped invoices (no salesOrderId) cover the whole project.
     const projectLevel = invoices
-        .filter((inv) => inv.projectId === project.id && !inv.salesOrderId && inv.status !== 'CANCELLED')
+        .filter((inv) => inv.projectId === project.id && !inv.salesOrderId && countsAsBilled(inv))
         .reduce((sum, inv) => sum + (Number(inv.billedPercent) || 0), 0);
     if (projectLevel > 0) return clampPercent(projectLevel);
 

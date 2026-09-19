@@ -52,7 +52,8 @@ import { CELL_INPUT_CLASS, ColResizeHandle, ResizableCols, SectionCard } from '.
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import type { DraftOrderFee, DraftOrderRow } from './types';
-import { fmtMoney, fmtUnitPricePrecise, parseNum } from './utils/format';
+import { fmtMoneyIn, fmtUnitPricePrecise, parseNum } from './utils/format';
+import { CURRENCY_CODES, CURRENCY_SYMBOLS, DEFAULT_CURRENCY, toCurrencyCode, type CurrencyCode } from '@/utils/currency';
 import {
     allVatCountries,
     clampPercent,
@@ -397,6 +398,11 @@ export const OrderCreatePage = () => {
     const [orderVatCountry, setOrderVatCountry] = useState(() => vatRatesForCountry(pdfSettings.country).label);
     const [orderVatRate, setOrderVatRate] = useState(() => String(pdfSettings.vatRate ?? 0));
     const [vatCountryList, setVatCountryList] = useState(() => allVatCountries());
+    // ── PARA BİRİMİ (Vorgabe Samet, 16.09.2026) ─────────────────────────────
+    // KDV'nin altında seçilir; yalnızca GÖSTERİMİ değiştirir (kur çevrimi yok),
+    // sunucu `currency` alanını zaten tutar ve PDF onu basar.
+    const [currency, setCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
+    const fmtMoney = (value?: number | null) => fmtMoneyIn(value, currency);
     const [customVatLabel, setCustomVatLabel] = useState('');
     const [customVatRate, setCustomVatRate] = useState('');
 
@@ -550,6 +556,7 @@ export const OrderCreatePage = () => {
                 const legacyLineRate = order.items.find((item) => (item.vatRate ?? 0) > 0)?.vatRate ?? 0;
                 setOrderVatRate(String(order.vatMode === 'TOTAL' ? (order.orderVatRate ?? 0) : legacyLineRate));
                 if (order.orderVatCountry) setOrderVatCountry(order.orderVatCountry);
+                setCurrency(toCurrencyCode(order.currency));
             })
             .catch((err) => {
                 toast.error(err?.response?.data?.error || t('inv.orders.loadFailed'));
@@ -1197,6 +1204,7 @@ export const OrderCreatePage = () => {
                 vatMode: 'TOTAL' as const,
                 orderVatRate: priceless ? 0 : clampPercent(parseNum(orderVatRate) ?? 0),
                 orderVatCountry: priceless ? null : (orderVatCountry.trim() || null),
+                currency,
                 items,
                 // Ek ücretler her kayıtta gönderilir (boş dizi = ücret yok) ki
                 // düzenlemede silinen ücret sunucuda da silinsin.
@@ -2062,6 +2070,32 @@ export const OrderCreatePage = () => {
                                                     <Plus size={13} />
                                                 </button>
                                             </span>
+                                        </div>
+                                    </div>
+
+                                    {/* ── WÄHRUNG ─────────────────────────────────────
+                                        Unter der MwSt (Vorgabe Samet, 16.09.2026):
+                                        eine macOS-Auswahl wie beim Land — das Zeichen
+                                        steht im Feld und vor jeder Zeile der Liste. */}
+                                    <span className="ofi-ord-cap">{t('inv.orders.currencyPicker.title')}</span>
+                                    <div className="ofi-ord-group">
+                                        <div className="ofi-ord-row">
+                                            <span className="ofi-ord-label">{t('inv.orders.currencyPicker.label')}</span>
+                                            <SelectMenu
+                                                className="ofi-ord-menu"
+                                                buttonClassName="ofi-ord-select"
+                                                ariaLabel={t('inv.orders.currencyPicker.label')}
+                                                value={currency}
+                                                listWidth={260}
+                                                prefix={<span className="ofi-ord-cur">{CURRENCY_SYMBOLS[currency]}</span>}
+                                                options={CURRENCY_CODES.map((code) => ({
+                                                    value: code,
+                                                    label: t(`inv.orders.currencyPicker.${code}`),
+                                                    hint: code,
+                                                    icon: <span className="ofi-ord-cur">{CURRENCY_SYMBOLS[code]}</span>,
+                                                }))}
+                                                onChange={(next) => setCurrency(toCurrencyCode(next))}
+                                            />
                                         </div>
                                     </div>
                                 </>

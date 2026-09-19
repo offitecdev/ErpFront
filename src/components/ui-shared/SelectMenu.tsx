@@ -24,6 +24,8 @@ export interface SelectMenuOption {
     label: string;
     /** Graue Zusatzzeile rechts vom Namen (z. B. Personalnummer). */
     hint?: string;
+    /** Kleines Zeichen vor dem Namen in der Liste (z. B. das Währungssymbol). */
+    icon?: ReactNode;
     disabled?: boolean;
 }
 
@@ -179,6 +181,7 @@ export const SelectMenu = ({
                                     index === activeIndex ? 'is-active' : ''
                                 }`}
                             >
+                                {option.icon}
                                 <span className={`min-w-0 flex-1 truncate text-[12.5px] ${
                                     isSelected
                                         ? 'font-semibold text-slate-900 dark:text-white'

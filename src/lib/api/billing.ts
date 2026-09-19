@@ -14,6 +14,13 @@ import type {
     OrderRevertResultDto,
     ProjectListInvoiceDto,
     ProjectListOrderDto,
+    UpdateOrderDraftInput,
+    AccountingFiguresDto,
+    CreditDocumentDto,
+    FullCancelPlanDto,
+    InvoicePaymentDto,
+    ToBillItemDto,
+    FullCancelResultDto,
 } from '../../types/billing';
 
 export const billingApi = {
@@ -82,6 +89,12 @@ export const billingApi = {
         return res.data;
     },
 
+    /** Rechnungsdatum + Fälligkeit — auch für gestellte Rechnungen. */
+    updateDates: async (id: string, invoiceDate: string, dueDate: string): Promise<{ message: string; invoice: InvoiceDto }> => {
+        const res = await apiClient.patch(`/billing/invoices/${id}/dates`, { invoiceDate, dueDate });
+        return res.data;
+    },
+
     updateStatus: async (id: string, status: InvoiceStatus, paidAt?: string | null): Promise<{ message: string; invoice: InvoiceDto }> => {
         const res = await apiClient.patch(`/billing/invoices/${id}/status`, { status, paidAt: paidAt ?? null });
         return res.data;
@@ -99,9 +112,79 @@ export const billingApi = {
         return Array.isArray(res.data) ? res.data : [];
     },
 
-    /** Kalıcı silme — sunucu yalnızca iptal edilmiş faturalar için izin verir. */
-    deleteInvoice: async (id: string): Promise<{ message: string }> => {
-        const res = await apiClient.delete(`/billing/invoices/${id}`);
+    // ── Buchhaltung (16.09.2026, Schritt 5) ───────────────────────────────
+    /** EINE Rechnung in voller Form — die Detailseite. */
+    getInvoice: async (id: string): Promise<InvoiceDto> => {
+        const res = await apiClient.get(`/billing/invoices/${id}`);
+        return res.data;
+    },
+
+    /** Den Entwurf einer Auftragsrechnung neu rechnen. */
+    updateOrderDraft: async (id: string, input: UpdateOrderDraftInput): Promise<{ message: string; invoice: InvoiceDto }> => {
+        const res = await apiClient.put(`/billing/invoices/${id}/draft`, input);
+        return res.data;
+    },
+
+    /** Ausstellen: der Entwurf bekommt seine RE-Nummer. */
+    issueInvoice: async (id: string): Promise<{ message: string; invoice: InvoiceDto }> => {
+        const res = await apiClient.post(`/billing/invoices/${id}/issue`);
+        return res.data;
+    },
+
+    /**
+     * Einen ENTWURF verwerfen. Eine ausgestellte Rechnung wird nie gelöscht,
+     * auch nicht nach dem Storno — der Server lehnt das ab.
+     */
+    discardDraft: async (id: string): Promise<void> => {
+        await apiClient.delete(`/billing/invoices/${id}`);
+    },
+
+    // ── Gegenbelege (17.09.2026, Schritt 6) ────────────────────────────────
+    /** Offene Rechnung → Storno-Rechnung (eigene Nummer, negativer Betrag). */
+    stornoInvoice: async (id: string, reason: string): Promise<CreditDocumentDto> => {
+        const res = await apiClient.post(`/billing/invoices/${id}/storno`, { reason });
+        return res.data.document;
+    },
+
+    // ── Zahlungseingänge und Übersichten (Schritt 7) ───────────────────────
+    addPayment: async (id: string, input: { amount: number | null; paidAt: string; note?: string | null }): Promise<InvoicePaymentDto> => {
+        const res = await apiClient.post(`/billing/invoices/${id}/payments`, input);
+        return res.data.payment;
+    },
+    removePayment: async (id: string, paymentId: string): Promise<void> => {
+        await apiClient.delete(`/billing/invoices/${id}/payments/${paymentId}`);
+    },
+    /** Kennzahlen der Buchhaltung — `today` = Kalendertag der Person. */
+    figures: async (today: string): Promise<AccountingFiguresDto> => {
+        const res = await apiClient.get(`/billing/figures?today=${encodeURIComponent(today)}`);
+        return res.data;
+    },
+    toBill: async (today: string): Promise<ToBillItemDto[]> => {
+        const res = await apiClient.get(`/billing/to-bill?today=${encodeURIComponent(today)}`);
+        return Array.isArray(res.data) ? res.data : [];
+    },
+
+    /** Gutschrift zu einer ausgestellten Rechnung. `amount` fehlt = der ganze Rest. */
+    creditInvoice: async (id: string, amount: number | null, reason: string): Promise<CreditDocumentDto> => {
+        const res = await apiClient.post(`/billing/invoices/${id}/credit`, { amount, reason });
+        return res.data.document;
+    },
+};
+
+/** «Gesamten Vorgang stornieren» — Vorschau und Ausführung (Schritt 6 / F1). */
+export const fullCancelApi = {
+    preview: async (scope: 'ORDER' | 'PROJECT', id: string): Promise<FullCancelPlanDto> => {
+        const base = scope === 'ORDER' ? '/sales-orders' : '/projects';
+        const res = await apiClient.get(`${base}/${id}/full-cancel`);
+        return res.data;
+    },
+    run: async (
+        scope: 'ORDER' | 'PROJECT',
+        id: string,
+        input: { reason: string; credits: Record<string, number>; expectedInvoiceIds: string[] },
+    ): Promise<FullCancelResultDto> => {
+        const base = scope === 'ORDER' ? '/sales-orders' : '/projects';
+        const res = await apiClient.post(`${base}/${id}/full-cancel`, input);
         return res.data;
     },
 };

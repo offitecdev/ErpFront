@@ -1,27 +1,31 @@
 import { t } from '@/i18n/translate';
 
-export type DetailTab = 'content' | 'comments' | 'files' | 'activity';
+export type DetailTab = 'content' | 'comments' | 'issues' | 'files' | 'activity';
 
 /**
  * Reiter der Aufgabe im Kleid der Modulleiste (`.ofi-gv-nav`): İçerik ·
- * Yorumlar · Dosyalar · Geçmiş (nur Leitung). Zähler als leise Marke.
+ * Yorumlar · Soru & Sorunlar · Dosyalar · Geçmiş (nur Leitung). Zähler als
+ * leise Marke; bei den Fragen zählt sie die OFFENEN (16.09.2026).
  */
 export const DetailTabs = ({
     value,
     onChange,
     commentCount,
+    issueCount,
     fileCount,
     showActivity,
 }: {
     value: DetailTab;
     onChange: (next: DetailTab) => void;
     commentCount: number;
+    issueCount: number;
     fileCount: number;
     showActivity: boolean;
 }) => {
     const tabs: Array<{ key: DetailTab; label: string; count?: number }> = [
         { key: 'content', label: t('tasksModule.detail.tabs.content') },
         { key: 'comments', label: t('tasksModule.detail.tabs.comments'), count: commentCount },
+        { key: 'issues', label: t('tasksModule.detail.tabs.issues'), count: issueCount },
         { key: 'files', label: t('tasksModule.detail.tabs.files'), count: fileCount },
     ];
     if (showActivity) tabs.push({ key: 'activity', label: t('tasksModule.detail.tabs.activity') });

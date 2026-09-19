@@ -85,6 +85,8 @@ const DRAFT_STATUS: CalStatus = 'planned';
 
 const timeLabel = (event: { start: dayjs.Dayjs; end: dayjs.Dayjs }) =>
     `${event.start.format('HH:mm')}–${event.end.format('HH:mm')}`;
+/* Samstag und Sonntag stehen eine Spur grauer im Blatt (macOS-Kleid). */
+const isWeekend = (day: dayjs.Dayjs) => day.day() === 0 || day.day() === 6;
 
 /* Day / week time grid.
    Entries are draggable cards: grab the body to move an entry in time and
@@ -144,6 +146,7 @@ export const TimeGrid = ({ days, eventsByDay, now, draft, onOpenEvent, onOpenDay
 
     const today = dayjs();
     const nowTop = (minutesOf(now) / 60) * HOUR_HEIGHT;
+    const todayInView = days.some((day) => dayKey(day) === dayKey(today));
     const cols = days.length;
     /* Auf dem Telefon behaelt jede Tagesspalte ihre Mindestbreite: passen die
        sieben nicht mehr nebeneinander, wird das Raster seitwaerts geschoben
@@ -524,7 +527,7 @@ export const TimeGrid = ({ days, eventsByDay, now, draft, onOpenEvent, onOpenDay
                                 key={dayKey(day)}
                                 type="button"
                                 onClick={() => onOpenDay(day)}
-                                className="ofi-cal-daybtn"
+                                className={`ofi-cal-daybtn ${isWeekend(day) ? 'is-weekend' : ''}`}
                             >
                                 <span className={`ofi-cal-daybtn__name ${isToday ? 'is-today' : ''}`}>{day.format('ddd')}</span>
                                 <span className={`ofi-cal-daybtn__num ${isToday ? 'is-today' : ''}`}>
@@ -539,7 +542,7 @@ export const TimeGrid = ({ days, eventsByDay, now, draft, onOpenEvent, onOpenDay
                     <div className="ofi-cal-allday grid" style={{ gridTemplateColumns }}>
                         <div className="ofi-cal-allday__label ofi-cal-gutter">{t('calendar.allDay')}</div>
                         {days.map((day, index) => (
-                            <div key={dayKey(day)} data-day-col className="ofi-cal-allday__col">
+                            <div key={dayKey(day)} data-day-col className={`ofi-cal-allday__col ${isWeekend(day) ? 'is-weekend' : ''}`}>
                                 {visible(index, allDayInColumn(index)).map((event) => (
                                     <div
                                         key={event.id}
@@ -600,13 +603,19 @@ export const TimeGrid = ({ days, eventsByDay, now, draft, onOpenEvent, onOpenDay
                 )}
             </div>
 
-            <div className="grid" style={{ gridTemplateColumns, minWidth: gridMinWidth }}>
+            <div className="grid ofi-cal-gridbody" style={{ gridTemplateColumns, minWidth: gridMinWidth }}>
+                {/* JETZT (macOS-Kleid, 14.09.2026): EINE rote Linie über alle
+                    Spalten und die Uhrzeit als rote Marke in der Stundenspalte
+                    — der Punkt bleibt allein am heutigen Tag (unten in seiner
+                    Spalte). Nur, wenn heute überhaupt im Blatt steht. */}
+                {todayInView && <div className="ofi-cal-nowline" style={{ top: nowTop, left: gutter }} aria-hidden />}
                 <div className="ofi-cal-gutter relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
                     {HOURS.map((hour) => (
                         <div key={hour} className="ofi-cal-hourlabel" style={{ top: hour * HOUR_HEIGHT }}>
                             {hour > 0 ? `${String(hour).padStart(2, '0')}:00` : ''}
                         </div>
                     ))}
+                    {todayInView && <span className="ofi-cal-nowbadge" style={{ top: nowTop }}>{now.format('HH:mm')}</span>}
                 </div>
 
                 {days.map((day, dayIndex) => {
@@ -646,7 +655,7 @@ export const TimeGrid = ({ days, eventsByDay, now, draft, onOpenEvent, onOpenDay
                     const draftSpill = spans.find((span) => !span.end.isSame(span.start, 'day') && dayKey(span.start.add(1, 'day')) === key) || null;
 
                     return (
-                        <div key={key} data-day-col className="ofi-cal-col" style={{ height: HOURS.length * HOUR_HEIGHT }}>
+                        <div key={key} data-day-col className={`ofi-cal-col ${isWeekend(day) ? 'is-weekend' : ''}`} style={{ height: HOURS.length * HOUR_HEIGHT }}>
                             {HOURS.map((hour) => (
                                 <div key={hour} className="ofi-cal-hourline" style={{ top: hour * HOUR_HEIGHT }} />
                             ))}

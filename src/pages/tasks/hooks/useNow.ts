@@ -1,23 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 
 import { useTasksModuleStore } from '../store/tasksModuleStore';
+import { clockNow, subscribeClock } from './liveClock';
 
 /**
- * «Jetzt» nach der Uhr des SERVERS (Browseruhr + gemessener Versatz), im Takt
- * von `intervalMs`. Laufende Messungen zählen damit auf jedem Gerät gleich,
- * auch wenn die Uhr des Rechners ein paar Minuten danebenliegt.
- * `enabled = false` hält den Takt an (nichts läuft → kein Neuzeichnen).
+ * «Jetzt» nach der Uhr des SERVERS (Browseruhr + gemessener Versatz).
+ * Laufende Messungen zählen damit auf jedem Gerät gleich, auch wenn die Uhr
+ * des Rechners ein paar Minuten danebenliegt.
+ *
+ * Alle Aufrufer hängen am EINEN Takt des Moduls (`liveClock`): sie werden im
+ * selben Tick geweckt und lesen denselben Stand — die Sekunden springen überall
+ * gleichzeitig um. `intervalMs` ≥ 60 s = nur beim Minutenwechsel wecken;
+ * `enabled = false` hält den Takt für diesen Aufrufer an (nichts läuft → kein
+ * Neuzeichnen).
  */
-export const useNow = (intervalMs = 1000, enabled = true): number => {
+export const useNow = (intervalMs = 60_000, enabled = true): number => {
     const offset = useTasksModuleStore((state) => state.serverOffsetMs);
-    const [now, setNow] = useState(() => Date.now() + offset);
+    const [, wake] = useReducer((count: number) => count + 1, 0);
+    const quantum = intervalMs >= 60_000 ? 'minute' : 'second';
 
-    useEffect(() => {
-        setNow(Date.now() + offset);
-        if (!enabled) return undefined;
-        const id = window.setInterval(() => setNow(Date.now() + offset), intervalMs);
-        return () => window.clearInterval(id);
-    }, [intervalMs, enabled, offset]);
+    useEffect(() => (enabled ? subscribeClock(wake, quantum) : undefined), [enabled, quantum]);
 
-    return now;
+    return clockNow() + offset;
 };

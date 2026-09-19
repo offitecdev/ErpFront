@@ -4,16 +4,18 @@ import { LuCheck, LuChevronDown } from 'react-icons/lu';
 
 import { t } from '@/i18n/translate';
 import type { LiveOverview, LivePerson } from '@/types/tasksModule';
-import { formatClock, formatDuration, formatTime } from '../../utils/taskFormat';
+import { formatDuration, formatTime } from '../../utils/taskFormat';
+import { WorkingMark } from '../shared/WorkingMark';
 
 /**
  * EINE Zeile je Person (13.09.2026, Samet: «daha sade günlük pano»): wer ·
- * Zustand (arbeitet mit laufender Uhr / Boşta) · aktuelle Aufgabe mit ihren
- * Etiketten als leiser Text · heute gesamt. Ein Klick klappt die Aufgaben des
- * Tages mit ihren Zeiten auf — sonst bleibt die Tafel ruhig.
+ * Zustand («Çalışıyor» / Boşta) · aktuelle Aufgabe mit ihren Etiketten als
+ * leiser Text · heute gesamt. Ein Klick klappt die Aufgaben des Tages mit
+ * ihren Zeiten auf — sonst bleibt die Tafel ruhig.
  *
- * `driftMs` = jetzt − Stand der Antwort: die Zahlen des Servers gelten bis
- * `serverNow`, eine laufende Messung wächst bis zur nächsten Ladung weiter.
+ * KEINE UHR (14.09.2026, Samet: «canlı sayımı kaldır»): die Zahlen sind die
+ * abgeschlossenen Messungen bis `serverNow` — nichts wächst im Browser weiter;
+ * die nächste Ladung (alle 15 s) bringt den neuen Stand.
  */
 
 interface TaskWork {
@@ -25,13 +27,13 @@ interface TaskWork {
     completedAt: string | null;
 }
 
-const workPerTask = (person: LivePerson, driftMs: number): TaskWork[] => {
+const workPerTask = (person: LivePerson): TaskWork[] => {
     const byTask = new Map<string, TaskWork>();
     for (const session of person.sessions) {
         const live = !session.endedAt;
         const entry = byTask.get(session.taskId)
             ?? { taskId: session.taskId, title: session.taskTitle, ms: 0, live: false, done: false, completedAt: null };
-        entry.ms += session.durationMs + (live ? driftMs : 0);
+        entry.ms += session.durationMs;
         entry.live = entry.live || live;
         byTask.set(session.taskId, entry);
     }
@@ -51,18 +53,14 @@ const labelText = (labels: LiveOverview['taskLabels'], taskId: string): string =
 export const LivePersonRow = ({
     person,
     labels,
-    nowMs,
-    driftMs,
 }: {
     person: LivePerson;
     labels: LiveOverview['taskLabels'];
-    nowMs: number;
-    driftMs: number;
 }) => {
     const [open, setOpen] = useState(false);
     const running = person.running;
-    const tasks = workPerTask(person, driftMs);
-    const todayMs = person.todayMs + (running ? driftMs : 0);
+    const tasks = workPerTask(person);
+    const todayMs = person.todayMs;
     const name = person.name || t('tasksModule.live.unknownPerson');
     const expandable = tasks.length > 0;
     const runningLabels = running ? labelText(labels, running.taskId) : '';
@@ -92,8 +90,7 @@ export const LivePersonRow = ({
                 <span className="ofi-gv-live-row__state">
                     {running ? (
                         <span className="ofi-gv-live-state is-working">
-                            <i className="ofi-gv-live" aria-hidden />
-                            <span className="ofi-gv-clock">{formatClock(nowMs - Date.parse(running.startedAt))}</span>
+                            <WorkingMark label={t('tasksModule.live.working')} />
                         </span>
                     ) : (
                         <span className="ofi-gv-live-state">{t('tasksModule.live.idle')}</span>
@@ -131,7 +128,7 @@ export const LivePersonRow = ({
                             <span className="ofi-gv-live-work__mark">
                                 {task.done
                                     ? <LuCheck size={13} aria-label={t('tasksModule.live.completed')} />
-                                    : task.live ? <i className="ofi-gv-live" aria-hidden /> : null}
+                                    : task.live ? <i className="ofi-gv-working__dot" aria-hidden /> : null}
                             </span>
                             <Link to={`/tasks/${task.taskId}`} className="ofi-gv-live-work__title" title={task.title}>
                                 {task.title || t('tasksModule.live.untitled')}

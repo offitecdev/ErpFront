@@ -280,7 +280,21 @@ export interface ProjectDto {
     projectVariations?: any[];
     extraMaterials?: any[];
     addonRequests?: ProjectAddonRequestDto[];
+    /** Offerten, deren Auftrag zurückgesetzt wurde und die auf dieses Projekt warten. */
+    waitingTenders?: WaitingTenderDto[];
     _count?: { reports: number; expenses: number; projectVariations: number; salesOrders?: number };
+}
+
+/** Eine Offerte im Entwurf, auf die das Projekt wartet (16.09.2026). */
+export interface WaitingTenderDto {
+    id: string;
+    tenderNumber: string;
+    version: number;
+    revertedOrderNumber: string | null;
+    revertedAt: string | null;
+    revertedBy: string | null;
+    /** Angesetzte Termine, die an den neuen Auftrag übergehen. */
+    parkedAppointmentCount: number;
 }
 
 export interface ProjectAddonRequestDto {

@@ -14,7 +14,6 @@ import {
 import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { cx } from '../../lib/utils/cx';
-import { SkeletonBar } from '../ui-shared/Loader';
 import { useDashboardStats } from './useDashboardStats';
 import { CHART_PALETTE, ConversionDonut, MonthlyBarChart, StackedSplit, chf0, type ChartMode } from './DashboardCharts';
 import { buildOverviewTiles, useOverviewTiles, type OverviewTileKey, type OverviewTileSpec } from './overviewTiles';
@@ -117,16 +116,79 @@ const OverviewTile: React.FC<{ spec: OverviewTileSpec; onOpen?: () => void }> = 
     );
 };
 
+/* The loading state is the page itself, drawn empty: the same sections, the
+   same hairline tiles and cards, with quiet grey bones where the words and
+   figures will stand. Big grey slabs with a sweeping band read as a broken
+   page (Samet, 14.09.2026, loadingbad.png) — one calm, in-phase pulse on
+   small bones reads as "loading". Nothing moves when the data arrives. */
+const Bone: React.FC<{ w: string; h?: number; className?: string }> = ({ w, h = 10, className }) => (
+    <span aria-hidden="true" className={cx('ofi-home-bone', className)} style={{ width: w, height: h }} />
+);
+
+const SkeletonCard: React.FC<{ className?: string; bodyHeight: number; titleW: string; subW: string; children?: React.ReactNode }> = ({
+    className, bodyHeight, titleW, subW, children,
+}) => (
+    <section className={cx('ofi-home-card', className)}>
+        <header className="ofi-home-card__head">
+            <div className="flex w-full min-w-0 flex-col gap-[7px] pt-[3px]">
+                <Bone w={titleW} h={11} />
+                <Bone w={subW} h={9} />
+            </div>
+        </header>
+        <div className="ofi-home-card__body" style={{ minHeight: bodyHeight }}>{children}</div>
+    </section>
+);
+
 const StatsSkeleton: React.FC = () => (
-    <div className="ofi-home-stats">
-        <div className="ofi-home-tiles">
-            {[0, 1, 2, 3].map((i) => <SkeletonBar key={i} className="h-[98px] rounded-[10px]" delayMs={i * 90} />)}
-        </div>
-        <SkeletonBar className="h-[340px] rounded-[10px]" delayMs={360} />
-        <div className="grid gap-4 lg:grid-cols-2">
-            <SkeletonBar className="h-[220px] rounded-[10px]" delayMs={450} />
-            <SkeletonBar className="h-[220px] rounded-[10px]" delayMs={540} />
-        </div>
+    <div className="ofi-home-stats" role="status" aria-busy="true">
+        <section className="ofi-home-section">
+            <div className="ofi-home-section__head"><Bone w="72px" h={11} /></div>
+            <div className="ofi-home-tiles">
+                {['46%', '38%', '52%', '42%'].map((w, i) => (
+                    <div key={i} className="ofi-home-tile ofi-home-tile--skeleton">
+                        <Bone w={w} h={10} />
+                        <Bone w="34%" h={22} className="mt-[9px]" />
+                        <Bone w="58%" h={9} className="mt-auto" />
+                    </div>
+                ))}
+            </div>
+        </section>
+        <section className="ofi-home-section">
+            <div className="ofi-home-section__head"><Bone w="132px" h={11} /></div>
+            <div className="grid gap-4 xl:grid-cols-3">
+                <SkeletonCard className="xl:col-span-2" bodyHeight={296} titleW="44%" subW="30%">
+                    <div className="ofi-home-skel-bars">
+                        {[38, 62, 48, 74, 56, 82, 44, 66, 52, 78, 60, 70].map((pct, i) => (
+                            <span key={i} className="ofi-home-bone" style={{ height: `${pct}%` }} />
+                        ))}
+                    </div>
+                </SkeletonCard>
+                <SkeletonCard bodyHeight={296} titleW="40%" subW="62%">
+                    <div className="flex h-full flex-col items-center justify-center gap-5">
+                        <span className="ofi-home-bone ofi-home-skel-ring" />
+                        <div className="flex w-full flex-col gap-2">
+                            <Bone w="70%" h={9} />
+                            <Bone w="56%" h={9} />
+                        </div>
+                    </div>
+                </SkeletonCard>
+            </div>
+        </section>
+        <section className="ofi-home-section">
+            <div className="ofi-home-section__head"><Bone w="84px" h={11} /></div>
+            <div className="grid gap-4 lg:grid-cols-2">
+                {['48%', '42%'].map((titleW, i) => (
+                    <SkeletonCard key={i} bodyHeight={150} titleW={titleW} subW="64%">
+                        <div className="flex flex-col gap-3">
+                            <Bone w="100%" h={14} />
+                            <Bone w="62%" h={9} />
+                            <Bone w="54%" h={9} />
+                            <Bone w="46%" h={9} />
+                        </div>
+                    </SkeletonCard>
+                ))}
+            </div>
+        </section>
     </div>
 );
 

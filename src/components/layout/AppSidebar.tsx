@@ -1,11 +1,26 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import {
     ChevronDown,
     DotsVertical,
+    Lock01,
     XClose as CloseOutlined,
 } from '../icons/antIconCompat';
 import { hrefFor, isModifiedClick } from '../../lib/navLink';
+import { readItGateTicket } from '../../lib/itGate';
+
+/* DAS EINSTELLUNGSMENÜ HINTER EINEM KENNWORT (16.09.2026, Vorgabe Samet:
+   «ayarlar menüsüne tıklanınca tek bir şifre istesin, açılırsa menü
+   açılabilir, modüle erişim açılmıştır desin»). Es ist DAS Kennwort der
+   IT-Schleuse (`/settings/it-gate/verify`) — ein Kennwort für alles; der
+   Ausweis liegt danach im sessionStorage und öffnet auch die Seiten dahinter
+   (die /settings-Routen stehen selbst hinter `ItGate`). Solange er fehlt,
+   klappt das Menü beim Zeigen nicht auf; ein Klick fragt nach dem Kennwort. */
+const GATED_GROUPS = new Set(['settings']);
+const ItGatePrompt = lazy(() =>
+    import('../../pages/settings/components/ItGatePrompt').then((module) => ({ default: module.ItGatePrompt })),
+);
 
 /* ── Shared menu types (also consumed by MainLayout) ── */
 export type MenuLeaf = {
@@ -110,6 +125,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     const [panelKey, setPanelKey] = useState<string | null>(null);
     const [openGroups, setOpenGroups] = useState<string[]>([]);
     const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+    /** Gruppe, für die gerade das Kennwort abgefragt wird. */
+    const [gateFor, setGateFor] = useState<string | null>(null);
+    /* Nach dem Freischalten neu zeichnen, damit das Schloss verschwindet. */
+    const [, setUnlockTick] = useState(0);
+    const isLocked = (key: string) => GATED_GROUPS.has(key) && !readItGateTicket();
     /* Tablets run the desktop rail (≥1024px) but have no pointer to hover with:
        there the submenu panel opens on TAP instead of hover-intent, and the
        edge handles grow to a finger-sized target. */
@@ -247,6 +267,32 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         onNavigate(path);
     };
 
+    const askPassword = (key: string) => {
+        cancelOpen(); cancelClose();
+        setPanelKey(null);
+        setGateFor(key);
+    };
+    const onGateUnlocked = () => {
+        const key = gateFor;
+        setGateFor(null);
+        setUnlockTick((n) => n + 1);
+        toast.success(t('settings.itGate.granted'));
+        if (!key) return;
+        if (isMobile) setOpenGroups((prev) => (prev.includes(key) ? prev : [...prev, key]));
+        else setPanelKey(key);
+    };
+    const gatePrompt = gateFor ? (
+        <Suspense fallback={null}>
+            <ItGatePrompt
+                open
+                title={t('settings.itGate.menuTitle')}
+                subtitle={t('settings.itGate.menuNote')}
+                onClose={() => setGateFor(null)}
+                onUnlocked={onGateUnlocked}
+            />
+        </Suspense>
+    ) : null;
+
     /* Nur was gerade gezeigt wird, steht offen — ohne Zeiger kein Untermenü.
        DAS UNTERMENÜ HÄNGT AM EINTRAG, NICHT AN DER SEITE (Vorgabe
        28.08.2026): «für Startseite und Kalender soll es nicht aufgehen, für
@@ -256,7 +302,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
        blieben. Diese Sperre ist weg. */
     const resolvedPanelKey = panelKey;
     const panelData = resolvedPanelKey ? items.find((i) => i.section.key === resolvedPanelKey) : null;
-    const panelVisible = !isMobile && !!panelData && panelData.section.type === 'group';
+    const panelVisible = !isMobile && !!panelData && panelData.section.type === 'group' && !isLocked(panelData.section.key);
 
     /* ══════════ Mobile drawer — unchanged accordion layout ══════════ */
     if (isMobile) {
@@ -335,17 +381,23 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                 );
                             }
 
-                            const groupOpen = openGroups.includes(section.key);
+                            const locked = isLocked(section.key);
+                            const groupOpen = !locked && openGroups.includes(section.key);
                             return (
                                 <div key={section.key}>
                                     <button
                                         type="button"
-                                        onClick={() => setOpenGroups((prev) => (prev.includes(section.key) ? prev.filter((k) => k !== section.key) : [...prev, section.key]))}
+                                        onClick={() => {
+                                            if (locked) { askPassword(section.key); return; }
+                                            setOpenGroups((prev) => (prev.includes(section.key) ? prev.filter((k) => k !== section.key) : [...prev, section.key]));
+                                        }}
                                         className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-100 ${ROW_IDLE} font-medium`}
                                     >
                                         <Icon size={20} className={`shrink-0 ${ICON_IDLE}`} />
                                         <span className="flex-1 truncate text-[14px]">{t(section.label)}</span>
-                                        <ChevronDown size={16} className={`shrink-0 opacity-70 transition-transform duration-150 ${groupOpen ? 'rotate-180' : ''}`} />
+                                        {locked
+                                            ? <Lock01 size={15} className="shrink-0 opacity-60" />
+                                            : <ChevronDown size={16} className={`shrink-0 opacity-70 transition-transform duration-150 ${groupOpen ? 'rotate-180' : ''}`} />}
                                     </button>
 
                                     {groupOpen && (
@@ -373,6 +425,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                         })}
                     </div>
                 </nav>
+                {gatePrompt}
             </div>
         );
     }
@@ -420,6 +473,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                             // submenu page; singles are their own page.
                             const target = isSingle ? section.path : children[0]?.key;
                             if (!target) return null;
+                            const locked = !isSingle && isLocked(section.key);
                             return (
                                 <a
                                     key={section.key}
@@ -427,6 +481,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                     onClick={(e) => {
                                         if (isModifiedClick(e)) return;
                                         e.preventDefault();
+                                        if (locked) { askPassword(section.key); return; }
                                         // No hover on a tablet: a tap on a module opens
                                         // its submenu (tapping again closes it), so the
                                         // flyout stays reachable by finger. Single pages
@@ -440,11 +495,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         }
                                         go(target);
                                     }}
-                                    onMouseEnter={() => { if (touchInputRef.current) return; if (!isSingle) scheduleOpen(section.key); else cancelOpen(); }}
+                                    onMouseEnter={() => { if (touchInputRef.current) return; if (!isSingle && !locked) scheduleOpen(section.key); else cancelOpen(); }}
                                     onMouseLeave={cancelOpen}
-                                    className={`flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
+                                    className={`relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
                                 >
                                     <Icon size={23} className="shrink-0" />
+                                    {locked && <Lock01 size={11} aria-hidden className="absolute right-3 top-2 opacity-60" />}
                                     {/* Nicht 14px: die Beschriftung sitzt in einer 84px breiten
                                         Leiste, dort schneidet schon „Buchhaltung“ bei 12px an. */}
                                     <span className="w-full truncate text-[12px] font-semibold leading-tight">{t(section.label)}</span>
@@ -504,6 +560,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     </div>
                 </div>
             )}
+
+            {gatePrompt}
 
             {/* Kein Anheft-Griff mehr (16.08.2026): das Untermenü öffnet nur
                 beim Zeigen und legt sich über die Seite — sie rückt nie zur

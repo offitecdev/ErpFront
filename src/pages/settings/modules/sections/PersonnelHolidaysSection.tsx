@@ -10,6 +10,7 @@ import '@/styles/personnel.css';
 import type { HolidayCatalogEntry, HolidayYear } from '@/pages/personnel/types/personnel';
 import { formatDate } from '@/pages/personnel/utils/format';
 import '@/styles/modules/moduleSettings.css';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /**
  * ── FEIERTAGE (Einstellungen → Module → Personal) ───────────────────────────
@@ -283,12 +284,7 @@ export const PersonnelHolidaysSection = () => {
                         <div className="ofi-hol-own">
                             <span className="ofi-hol-ownhead">{t('personnel.holidays.ownAdd')}</span>
                             <div className="ofi-hol-ownrow">
-                                <input
-                                    type="date"
-                                    value={ownDate}
-                                    onChange={(event) => setOwnDate(event.target.value)}
-                                    className="ofi-cal-input"
-                                />
+                                <MacDatePicker value={ownDate} onChange={(nextDate) => setOwnDate(nextDate)} className="is-field-sm" />
                                 <input
                                     value={ownName}
                                     onChange={(event) => setOwnName(event.target.value)}

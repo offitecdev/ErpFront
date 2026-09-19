@@ -6,7 +6,7 @@ export type TenderFormat = 'SIA451' | 'CRBX';
  * Der Server entscheidet, ob gelöscht oder nur noch storniert werden darf, und
  * sagt mit `deleteBlockers` / `cancelBlockers`, was im Weg steht.
  */
-export type TenderLifecycleBlocker = 'CANCELLED' | 'SALES_ORDER' | 'PROJECT';
+export type TenderLifecycleBlocker = 'CANCELLED' | 'SALES_ORDER' | 'PROJECT' | 'PARKED_APPOINTMENT';
 
 export interface TenderLifecycleDto {
     status: TenderStatus;
@@ -56,6 +56,15 @@ export interface TenderListItem {
     /** STORNO: gesetzt = die Offerte ist zurueckgenommen (bleibt als Beleg). */
     cancelledAt?: string | null;
     cancelReason?: string | null;
+    /* ── ZURÜCK IN DEN ENTWURF (16.09.2026) ──────────────────────────────────
+       Die Spur eines zurückgesetzten Auftrags: seine AB-Nummer (Liste + Detail),
+       wann und von wem, das Projekt, das auf die Offerte wartet, und wie viele
+       angesetzte Termine dort auf den neuen Auftrag warten (nur Detail). */
+    revertedOrderNumber?: string | null;
+    revertedAt?: string | null;
+    revertedBy?: string | null;
+    revertedProject?: { id: string; projectNumber?: string | null; projectName?: string | null; status?: string | null } | null;
+    parkedAppointmentCount?: number;
     tenderNumber: string;
     version: number;
     format: TenderFormat;

@@ -83,24 +83,32 @@ export const PAGE_MODULES: CatalogModule[] = [
         key: 'sales',
         labelKey: 'nav.sales',
         pages: [
-            { key: 'sales.quotes', path: '/sales/quotes', labelKey: 'nav.tenderManagement', maxLevel: 2 },
-            { key: 'sales.orders', path: '/sales/orders', labelKey: 'nav.myOrders', maxLevel: 2 },
+            // Stufe 3 (16.09.2026) = stornieren / zurücksetzen — siehe Serverkopie.
+            { key: 'sales.quotes', path: '/sales/quotes', labelKey: 'nav.tenderManagement', maxLevel: 3 },
+            { key: 'sales.orders', path: '/sales/orders', labelKey: 'nav.myOrders', maxLevel: 3 },
             // Zusatzaufträge / Nachträge (05.09.2026) — erbt die Stufe der
             // Auftragsliste, bis eine Rolle ihre eigene trägt (pageAccess.ts).
             { key: 'sales.addonOrders', path: '/sales/addon-orders', labelKey: 'nav.addonOrders', maxLevel: 2 },
             // OSP (04.09.2026): Offertanfragen der Offitec Selection Platform.
             { key: 'sales.osp', path: '/sales/osp', labelKey: 'nav.salesOsp', maxLevel: 2 },
-            // Rechnungsliste (30.08.2026) — Löschen ist hier eine eigene Stufe:
-            // eine stornierte Rechnung endgültig zu entfernen ist mehr, als eine
-            // neue auszustellen.
-            { key: 'sales.invoices', path: '/sales/invoices', labelKey: 'nav.salesInvoices', maxLevel: 3 },
+        ],
+    },
+    {
+        // Buchhaltung (16.09.2026, Schritt 5) — die Rechnungen an EINER Stelle.
+        // Erbt von der früheren Verkaufszeile `sales.invoices` (pageAccess.ts).
+        key: 'accounting',
+        labelKey: 'nav.accounting',
+        pages: [
+            { key: 'accounting.invoices', path: '/accounting/invoices', labelKey: 'nav.outgoingInvoices', maxLevel: 3 },
+            // «Zu verrechnen» (17.09.2026) — erbt von der Rechnungsliste (pageAccess.ts).
+            { key: 'accounting.toBill', path: '/accounting/to-bill', labelKey: 'nav.toBill', maxLevel: 1 },
         ],
     },
     {
         key: 'projects',
         labelKey: 'nav.projects',
         pages: [
-            { key: 'projects.list', path: '/projects', labelKey: 'nav.projectManagement', maxLevel: 2 },
+            { key: 'projects.list', path: '/projects', labelKey: 'nav.projectManagement', maxLevel: 3 },
         ],
     },
     {
@@ -132,6 +140,35 @@ export const PAGE_MODULES: CatalogModule[] = [
             { key: 'tasks.workspace', path: '/tasks', labelKey: 'nav.tasksWorkspace', maxLevel: 3 },
         ],
     },
+    {
+        // Einstellungen (15.09.2026): Aegis-Einrichtung neu starten — nur wer die
+        // Zeile in seiner Rolle trägt. 1 ansehen · 2 neu starten.
+        key: 'settings',
+        labelKey: 'nav.settings',
+        // PDF- und Moduleinstellungen (15.09.2026): reine Sichtbarkeit, Stufe 1 —
+        // speichern regeln weiterhin die Rechte der Endpunkte.
+        pages: [
+            { key: 'settings.pdf', path: '/settings/pdf', labelKey: 'nav.pdfSettings', maxLevel: 1 },
+            { key: 'settings.modules', path: '/settings/modules', labelKey: 'nav.moduleSettings', maxLevel: 1 },
+            { key: 'settings.twoFactor', path: '/settings/two-factor', labelKey: 'nav.twoFactorSettings', maxLevel: 2 },
+        ],
+    },
+];
+
+/**
+ * ── EINSTELLUNGSSEITEN, DIE KEINE ROLLE VERGIBT (15.09.2026) ────────────────
+ *
+ * Sie stehen NICHT im Katalog (also nie in `pageAccess`) und werden in der
+ * Rollentabelle unter «Einstellungen» nur als feste Zeile gezeigt, damit klar
+ * ist, warum man sie dort nicht setzen kann:
+ *   admin → hängt an roles.manage (eine Rolle darf das Rollenbauen nicht selbst vergeben)
+ *   it    → hinter dem IT-Kennwort (ItGate)
+ */
+export const FIXED_SETTINGS_PAGES: ReadonlyArray<{ path: string; labelKey: string; lock: 'admin' | 'it' }> = [
+    { path: '/settings/authorization', labelKey: 'nav.authorizationSettings', lock: 'admin' },
+    { path: '/settings/company-categories', labelKey: 'nav.companyCategories', lock: 'admin' },
+    { path: '/settings/mail', labelKey: 'nav.mailSettings', lock: 'it' },
+    { path: '/settings/upload', labelKey: 'nav.upload', lock: 'it' },
 ];
 
 export const ALL_PAGES: CatalogPage[] = PAGE_MODULES.flatMap((moduleDef) => moduleDef.pages);

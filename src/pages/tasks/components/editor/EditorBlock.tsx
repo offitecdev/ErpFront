@@ -6,6 +6,7 @@ import type { Checklist, ContentBlock, TaskAttachment } from '@/types/tasksModul
 import { ChecklistGroup } from '../checklist/ChecklistGroup';
 import { TaskIconButton } from '../shared/TaskButton';
 import { isTextBlock } from './blockModel';
+import type { ImageMetaPatch } from './ImageBlock';
 import { MediaBlock } from './MediaBlock';
 import { TableBlock } from './TableBlock';
 import type { TableMeta } from './tableModel';
@@ -15,6 +16,8 @@ export interface EditorBlockHandlers extends TextBlockHandlers {
     onMenu: (blockId: string, anchor: HTMLElement) => void;
     /** null = Tabelle entfernen. */
     onTableChange: (blockId: string, table: TableMeta | null) => void;
+    /** Bild: Breite/Ausschnitt geändert. */
+    onImageChange: (blockId: string, patch: ImageMetaPatch) => void;
 }
 
 const PLACEHOLDER_KEY: Record<string, string> = {
@@ -73,7 +76,7 @@ export const EditorBlock = memo(({
             ? <ChecklistGroup checklist={checklist} autoFocusNew={autoFocusChecklist} />
             : <div className="ofi-gv-editor-missing">{t('tasksModule.editor.checklistMissing')}</div>;
     } else {
-        body = <MediaBlock block={block} attachment={attachment} />;
+        body = <MediaBlock block={block} attachment={attachment} editable={editable} onImageChange={handlers.onImageChange} />;
     }
 
     return (

@@ -1,0 +1,399 @@
+/* Calendar popovers, measured against maccalendar2.png.
+   One surface and spacing definition for detail and creation. Portal selectors
+   intentionally outrank the shared appleModal controls without affecting them. */
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) {
+    --ofi-modal-radius: 26px;
+    --ofi-glass: rgba(250, 250, 249, 0.76);
+    --ofi-glass-box: rgba(120, 120, 128, 0.065);
+    --ofi-glass-line: rgba(60, 60, 67, 0.075);
+    --ofi-glass-track: rgba(118, 118, 128, 0.14);
+    --ofi-glass-icon: #b1b2b3;
+    --ofi-win-font: -apple-system, BlinkMacSystemFont, 'Inter Variable', 'Segoe UI', sans-serif;
+    --ofi-win-text: #484849;
+    --ofi-win-secondary: #7c7c7e;
+    --ofi-win-muted: #b2b2b4;
+    --ofi-win-accent: #ff2d34;
+    --ofi-win-accent-hover: #ed242b;
+    --ofi-win-accent-soft: rgba(255, 45, 52, 0.15);
+    --ofi-win-accent-tint: rgba(255, 45, 52, 0.08);
+    --ofi-win-focus: rgba(255, 45, 52, 0.25);
+    --ofi-win-surface-2: var(--ofi-glass-box);
+    --ofi-win-fill: var(--ofi-glass-track);
+    --ofi-win-hairline: var(--ofi-glass-line);
+    --ofi-win-border: rgba(0, 0, 0, 0.18);
+    overflow: visible;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: var(--ofi-modal-radius);
+    background: var(--ofi-glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.45);
+    backdrop-filter: blur(22px) saturate(1.45);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75), 0 3px 16px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-family: var(--ofi-win-font);
+    -webkit-font-smoothing: antialiased;
+}
+html.dark .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) {
+    --ofi-glass: rgba(43, 43, 45, 0.8);
+    --ofi-glass-box: rgba(255, 255, 255, 0.065);
+    --ofi-glass-line: rgba(255, 255, 255, 0.075);
+    --ofi-glass-track: rgba(255, 255, 255, 0.12);
+    --ofi-glass-icon: #969699;
+    --ofi-win-text: #ececed;
+    --ofi-win-secondary: #ababaf;
+    --ofi-win-muted: #818185;
+    --ofi-win-border: rgba(0, 0, 0, 0.38);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 3px 18px rgba(0, 0, 0, 0.35);
+}
+.ofi-float-card.ofi-cal-createcard.is-docked {
+    overflow: hidden;
+    border: 0;
+    border-right: 1px solid var(--ofi-win-border);
+    border-radius: 0;
+    background: var(--ofi-win-surface);
+    backdrop-filter: none;
+    box-shadow: none;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__body {
+    border-radius: var(--ofi-modal-radius);
+    scrollbar-width: thin;
+    overscroll-behavior: contain;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__footer {
+    border-radius: 0 0 var(--ofi-modal-radius) var(--ofi-modal-radius);
+    border-top-color: var(--ofi-glass-line);
+    background: transparent;
+}
+.ofi-float-card.ofi-cal-detailcard .ofi-float-card__grip { display: none; }
+.ofi-float-card.ofi-cal-detailcard.has-pane .ofi-float-card__grip {
+    display: flex;
+    border: 0;
+    background: transparent;
+    padding: 8px 12px 0;
+}
+.ofi-cal-detailcard .ofi-float-card__grip > .min-w-0 { visibility: hidden; }
+.ofi-float-card.ofi-cal-detailcard .ofi-float-card__body { padding: 0; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailbody { padding: 12px; }
+.ofi-float-card.ofi-cal-createcard .ofi-float-card__grip { border: 0; background: transparent; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-createform { padding: 0 12px 12px; }
+
+/* The anchor arrow shares the surface; the outline sits underneath. */
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow]::before,
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow]::after {
+    content: '';
+    position: absolute;
+    top: var(--ofi-arrow-top, 50%);
+    width: 12px;
+    height: 24px;
+    margin-top: -12px;
+    background: var(--ofi-glass);
+    pointer-events: none;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow]::after {
+    width: 13px;
+    height: 26px;
+    margin-top: -13px;
+    background: var(--ofi-win-border);
+    z-index: -1;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='left']::before { left: -12px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='left']::after { left: -13px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='right']::before { right: -12px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='right']::after { right: -13px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+
+/* 34px capsule, no inset padding around the red selected segment. */
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__marks, .ofi-cal-tabs) {
+    display: flex;
+    width: 100%;
+    height: 34px;
+    gap: 0;
+    margin: 0 0 12px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    background: var(--ofi-glass-track);
+}
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__mark, .ofi-cal-tab) {
+    display: inline-flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 0;
+    height: 34px;
+    gap: 4px;
+    padding: 0 8px;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-win-text) !important;
+    font: 500 15px/20px var(--ofi-win-font);
+    box-shadow: none;
+}
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__mark, .ofi-cal-tab).is-active {
+    background: var(--ofi-win-accent);
+    color: #fff !important;
+    -webkit-text-fill-color: #fff;
+    font-weight: 600;
+    box-shadow: none;
+}
+.ofi-cal-detailcard .ofi-newtask__mark :is(svg, .ofi-newtask__marklabel),
+.ofi-cal-detailcard .ofi-newtask__marklabel { display: none; }
+.ofi-cal-detailcard .ofi-newtask__marktext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-cal-detailcard .ofi-newtask__markdot { position: static; flex: none; min-width: 15px; height: 15px; border: 0; background: rgba(0, 0, 0, 0.15); font-size: 10px; line-height: 15px; }
+
+/* Title, notes and URL are one 16px rounded group. */
+.ofi-cal-detailcard .ofi-cal-hero { padding: 0; }
+.ofi-cal-detailcard .ofi-cal-hero__box { padding: 12px 12px 0; border-radius: 16px; background: var(--ofi-glass-box); }
+.ofi-cal-detailcard .ofi-cal-hero__title { padding: 0 0 4px; color: var(--ofi-win-text); font-size: 25px; font-weight: 650; line-height: 30px; letter-spacing: -0.8px; overflow-wrap: anywhere; }
+.ofi-cal-detailcard .ofi-cal-hero__notes { min-height: 34px; padding-bottom: 10px; color: var(--ofi-win-secondary); font-size: 15px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ofi-cal-detailcard .ofi-cal-hero__url { display: block; min-height: 44px; padding: 12px 0; border-top: 1px solid var(--ofi-glass-line); color: var(--ofi-win-secondary); font-size: 15px; line-height: 20px; overflow-wrap: anywhere; }
+.ofi-cal-detailcard .ofi-cal-hero__url.is-placeholder { color: var(--ofi-win-muted); }
+.ofi-cal-detailcard .ofi-cal-hero__url[href]:hover { color: var(--ofi-win-accent); }
+
+.ofi-cal-detailcard .ofi-cal-schedule { margin: 6px 0 0; }
+.ofi-cal-detailcard .ofi-cal-labelgroup { margin-top: 12px; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailgrid { gap: 0; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailcol { border: 0; border-radius: 0; background: transparent; padding: 0; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailcol__head,
+.ofi-float-card.ofi-cal-createcard :is(.ofi-cal-steptitle, .ofi-cal-field__label) { padding: 8px 12px 7px; color: var(--ofi-win-secondary); font-size: 13px; font-weight: 600; line-height: 17px; letter-spacing: 0; text-transform: none; }
+.ofi-cal-detailcard .ofi-cal-group,
+.ofi-cal-createcard .ofi-cal-field__box { padding: 0 12px; border-radius: 16px; background: var(--ofi-glass-box); }
+.ofi-cal-detailcard .ofi-cal-group:empty { display: none; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailrow {
+    position: relative;
+    display: grid;
+    grid-template-columns: 24px auto minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+    min-height: 46px;
+    padding: 12px 0;
+    border: 0;
+}
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailrow.has-sub { min-height: 64px; align-items: start; }
+.ofi-cal-detailcard .ofi-cal-detailrow.has-sub .ofi-cal-switch { margin-top: 1px; justify-self: end; }
+.ofi-cal-detailcard .ofi-cal-detail__icon { display: flex; align-items: center; justify-content: center; color: var(--ofi-glass-icon); }
+.ofi-cal-detailcard .ofi-cal-detail__icon svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.ofi-cal-detailcard .ofi-cal-detail__text { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.ofi-float-card.ofi-cal-detailcard :is(.ofi-cal-detail__label, .ofi-cal-detail__value) { font-size: 15px; font-weight: 400; line-height: 21px; color: var(--ofi-win-text); letter-spacing: 0; text-transform: none; }
+.ofi-cal-detailcard .ofi-cal-detail__label { white-space: normal; }
+.ofi-cal-detailcard .ofi-cal-detail__value { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.ofi-cal-detailcard .ofi-cal-detail__sub { color: var(--ofi-win-secondary); font-size: 13.5px; line-height: 18px; }
+.ofi-cal-detailcard .ofi-cal-detailrow.has-sub { grid-template-columns: 24px minmax(0, 1fr) 44px; }
+.ofi-cal-detailcard .ofi-cal-detail__value--switch { display: flex; justify-content: flex-end; }
+.ofi-cal-detailcard .ofi-cal-labelvalue { display: flex; justify-content: flex-end; align-items: center; gap: 3px; }
+.ofi-cal-labelvalue .ofi-ucal-dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
+.ofi-cal-detailcard .ofi-cal-detailrow + .ofi-cal-detailrow::before,
+.ofi-cal-detailcard .ofi-cal-contact__row + .ofi-cal-contact__row::before,
+.ofi-cal-detailcard .ofi-cal-person + .ofi-cal-person::before,
+.ofi-cal-detailcard .ofi-cal-actionrow + .ofi-cal-actionrow::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--ofi-glass-line); }
+
+/* Reference switch: 44 × 19px track and 25 × 15px oval thumb. */
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-cal-switch, .ofi-cal-mailtoggle .ofi-cal-check) {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    height: 19px;
+    border: 0 !important;
+    border-radius: 999px !important;
+    padding: 0;
+    background: rgba(120, 120, 128, 0.22);
+    box-shadow: none;
+    cursor: pointer;
+}
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-cal-switch, .ofi-cal-mailtoggle .ofi-cal-check).is-on { background: var(--ofi-win-accent); }
+:is(.ofi-float-card.ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-switch:disabled { opacity: 1; cursor: default; }
+.ofi-cal-detailcard .ofi-cal-switch__knob,
+.ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check::after { content: ''; position: absolute; top: 2px; left: 2px; width: 25px; height: 15px; border-radius: 999px; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); transition: left 140ms ease; }
+.ofi-cal-detailcard .ofi-cal-switch.is-on .ofi-cal-switch__knob,
+.ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check.is-on::after { left: 17px; }
+.ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check svg { display: none; }
+
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-contact { margin-top: 4px; padding-top: 0; border: 0; }
+.ofi-cal-detailcard .ofi-cal-contact__row { position: relative; display: flex; align-items: center; gap: 16px; min-height: 46px; padding: 12px 0; border: 0; color: var(--ofi-win-text); font-size: 15px; }
+.ofi-cal-detailcard .ofi-cal-contact__row svg { flex: none; width: 24px; height: 22px; color: var(--ofi-glass-icon); stroke-width: 1.5; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-person { position: relative; padding: 12px 0; border: 0; gap: 16px; }
+.ofi-cal-detailcard .ofi-cal-person__avatar { width: 24px; height: 24px; border: 0; background: transparent; color: var(--ofi-glass-icon); }
+.ofi-cal-detailcard .ofi-cal-person__avatar svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.ofi-cal-detailcard .ofi-cal-person__name { color: var(--ofi-win-text); font-size: 15px; font-weight: 400; }
+.ofi-cal-detailcard .ofi-cal-person__meta { color: var(--ofi-win-secondary); font-size: 13.5px; }
+.ofi-cal-detailcard .ofi-cal-emptyline { border: 0; border-radius: 16px; background: var(--ofi-glass-box); padding: 12px; color: var(--ofi-win-secondary); }
+.ofi-cal-detailcard .ofi-cal-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+:is(.ofi-float-card.ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-actionrow {
+    position: relative;
+    display: grid;
+    width: 100%;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    min-height: 46px;
+    border: 0;
+    border-radius: 0 !important;
+    padding: 12px 0;
+    background: transparent;
+    color: var(--ofi-win-text);
+    font: 400 15px/21px var(--ofi-win-font);
+    text-align: left;
+    text-decoration: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+.ofi-cal-detailcard .ofi-cal-actionrow > svg:first-child { width: 22px; height: 22px; color: var(--ofi-glass-icon); stroke-width: 1.5; justify-self: center; }
+.ofi-cal-detailcard .ofi-cal-actionrow > svg:last-child { width: 16px; height: 16px; color: var(--ofi-win-muted); }
+.ofi-cal-detailcard .ofi-cal-actionrow > span { min-width: 0; }
+:is(.ofi-float-card.ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-actionrow:hover { color: var(--ofi-win-accent); }
+:is(.ofi-float-card.ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-actionrow.is-danger { color: var(--ofi-win-accent); }
+.ofi-cal-detailcard .ofi-cal-panehead { background: var(--ofi-glass); border-color: var(--ofi-glass-line); }
+.ofi-cal-detailcard .ofi-cal-extnote { border-radius: 16px; margin-top: 12px; }
+
+/* Creation retains its working wizard, using the same material and controls. */
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-titlefield { border: 0; border-radius: 16px; padding: 12px; margin: 0 0 12px; background: var(--ofi-glass-box); color: var(--ofi-win-text); font: 600 25px/30px var(--ofi-win-font); letter-spacing: -0.6px; box-shadow: none; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-step { min-height: 0; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-field { padding: 0 0 12px; }
+.ofi-cal-createcard .ofi-cal-field__box { padding: 12px; }
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-mailtoggle { gap: 12px; border: 0; border-radius: 16px !important; background: var(--ofi-glass-box); padding: 12px; box-shadow: none; }
+.ofi-cal-createcard .ofi-cal-mailtoggle > svg { order: -1; color: var(--ofi-glass-icon) !important; }
+.ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check { order: 3; margin-left: auto; }
+.ofi-cal-createcard .ofi-cal-field__hint { color: var(--ofi-win-secondary); font-weight: 400; }
+.ofi-cal-createcard .ofi-cal-tznote { color: var(--ofi-win-secondary); font-size: 12px; }
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard) :is(button, a, input):focus-visible { outline: 2px solid var(--ofi-win-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+    .ofi-cal-detailcard .ofi-cal-switch__knob,
+    .ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check::after { transition: none; }
+}
+/* Shared modal radii are !important in this layer; override them in place. */
+@layer utilities {
+    :is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__marks, .ofi-newtask__mark, .ofi-cal-tabs, .ofi-cal-tab, .ofi-cal-switch) { border-radius: 999px !important; }
+    .ofi-float-card.ofi-cal-detailcard .ofi-cal-detailcol { border-radius: 0 !important; }
+}
+
+/* ── KOMPAKT (14.09.2026, 22:25 — Samet: «pop uplar aşırı büyük … hepsini
+   küçült, temiz, glass; detay pop up'da çarpı işareti olsun») ──────────────
+   Dieselbe Bauart wie oben, eine Nummer kleiner: 340px breit, 14px-Ecken,
+   Segmente 28px, Titel 18px, Zeilen 36px (zweizeilig 48px) mit 13px-Schrift,
+   Zeichen 16px, Schalter 34×20, Kästen 10px rund, Blatt höchstens 620px hoch
+   (innen rollt es). Das Anlegefenster liest dieselben Masse (Felder 30px).
+   Die Selektoren spiegeln die des Blocks darüber, damit sie durch die
+   Reihenfolge gewinnen. Das Kreuz oben rechts ist zurück — klein, rund. */
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) {
+    --ofi-modal-radius: 14px;
+    --ofi-win-control-h: 30px;
+    -webkit-backdrop-filter: blur(26px) saturate(1.55);
+    backdrop-filter: blur(26px) saturate(1.55);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 6px 20px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+html.dark .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(0, 0, 0, 0.5); }
+.ofi-float-card.ofi-cal-detailcard:not(.is-enlarged) { max-height: min(620px, calc(100dvh - 32px)); }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailbody { padding: 10px; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-createform { padding: 0 10px 10px; }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__footer { padding: 8px 10px; }
+
+/* Das Kreuz: klein und rund, oben rechts über dem Inhalt; die Segmentleiste
+   lässt ihm den Platz. Mit offenem Nebenblatt dasselbe Kreuz. */
+.ofi-float-card.ofi-cal-detailcard .ofi-float-card__grip,
+.ofi-float-card.ofi-cal-detailcard.has-pane .ofi-float-card__grip {
+    display: flex;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    left: auto;
+    z-index: 4;
+    min-height: 0;
+    border: 0;
+    background: transparent;
+    padding: 0;
+}
+.ofi-float-card.ofi-cal-detailcard .ofi-float-card__grip > .min-w-0 { display: none; }
+#root .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__iconbtn,
+body > :not(#root).ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__iconbtn,
+body > :not(#root) .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__iconbtn {
+    /* 15.09.2026 (Samet: «çarpı çok küçük») — 28px, so hoch wie die Segmentleiste. */
+    width: 28px;
+    height: 28px;
+    border-radius: 999px !important;
+    background: rgba(120, 120, 128, 0.2);
+    color: var(--ofi-win-secondary);
+    box-shadow: none;
+}
+#root .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__iconbtn svg,
+body > :not(#root).ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__iconbtn svg,
+body > :not(#root) .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) .ofi-float-card__iconbtn svg { width: 16px; height: 16px; }
+.ofi-float-card.ofi-cal-detailcard .ofi-newtask__marks { width: calc(100% - 36px); }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailbody > .ofi-cal-hero:first-child .ofi-cal-hero__title { padding-right: 32px; }
+
+/* Segmentleiste 28px, Wörter 12.5px. */
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__marks, .ofi-cal-tabs) { height: 28px; margin: 0 0 10px; }
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__mark, .ofi-cal-tab) { height: 28px; gap: 3px; padding: 0 6px; font: 500 12.5px/16px var(--ofi-win-font); }
+.ofi-cal-detailcard .ofi-newtask__markdot { min-width: 14px; height: 14px; font-size: 9px; line-height: 14px; }
+
+/* Titelkasten. */
+.ofi-cal-detailcard .ofi-cal-hero__box { padding: 9px 10px 0; border-radius: 10px; }
+.ofi-cal-detailcard .ofi-cal-hero__title { padding: 0 0 3px; font-size: 18px; font-weight: 600; line-height: 22px; letter-spacing: -0.3px; }
+.ofi-cal-detailcard .ofi-cal-hero__notes { min-height: 0; padding-bottom: 8px; font-size: 12.5px; line-height: 17px; }
+.ofi-cal-detailcard .ofi-cal-hero__url { min-height: 34px; padding: 8px 0; font-size: 12.5px; line-height: 17px; }
+.ofi-cal-detailcard .ofi-cal-schedule { margin: 4px 0 0; }
+.ofi-cal-detailcard .ofi-cal-labelgroup { margin-top: 10px; }
+
+/* Überschriften, Kästen, Zeilen. */
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailcol__head,
+.ofi-float-card.ofi-cal-createcard :is(.ofi-cal-steptitle, .ofi-cal-field__label) { padding: 6px 10px 4px; font-size: 11.5px; line-height: 15px; }
+.ofi-cal-detailcard .ofi-cal-group,
+.ofi-cal-createcard .ofi-cal-field__box { padding: 0 10px; border-radius: 10px; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailrow { grid-template-columns: 20px auto minmax(0, 1fr); gap: 10px; min-height: 36px; padding: 8px 0; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-detailrow.has-sub { min-height: 48px; }
+.ofi-cal-detailcard .ofi-cal-detailrow.has-sub { grid-template-columns: 20px minmax(0, 1fr) 34px; }
+.ofi-cal-detailcard .ofi-cal-detail__icon svg { width: 16px; height: 16px; }
+.ofi-float-card.ofi-cal-detailcard :is(.ofi-cal-detail__label, .ofi-cal-detail__value) { font-size: 13px; line-height: 18px; }
+.ofi-cal-detailcard .ofi-cal-detail__sub { font-size: 11.5px; line-height: 15px; }
+.ofi-cal-labelvalue .ofi-ucal-dot { width: 10px; height: 10px; }
+
+/* Schalter 34×20, runder Knopf. */
+:is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-cal-switch, .ofi-cal-mailtoggle .ofi-cal-check) { width: 34px; min-width: 34px; height: 20px; }
+.ofi-cal-detailcard .ofi-cal-switch__knob,
+.ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check::after { top: 2px; left: 2px; width: 16px; height: 16px; }
+.ofi-cal-detailcard .ofi-cal-switch.is-on .ofi-cal-switch__knob,
+.ofi-cal-createcard .ofi-cal-mailtoggle .ofi-cal-check.is-on::after { left: 16px; }
+
+/* Kontakt, Teilnehmer, Handgriffe. */
+.ofi-cal-detailcard .ofi-cal-contact__row { gap: 10px; min-height: 36px; padding: 8px 0; font-size: 13px; }
+.ofi-cal-detailcard .ofi-cal-contact__row svg { width: 20px; height: 16px; }
+.ofi-float-card.ofi-cal-detailcard .ofi-cal-person { padding: 8px 0; gap: 10px; }
+.ofi-cal-detailcard .ofi-cal-person__avatar { width: 20px; height: 20px; }
+.ofi-cal-detailcard .ofi-cal-person__avatar svg { width: 16px; height: 16px; }
+.ofi-cal-detailcard .ofi-cal-person__name { font-size: 13px; }
+.ofi-cal-detailcard .ofi-cal-person__meta { font-size: 11.5px; }
+.ofi-cal-detailcard .ofi-cal-emptyline { border-radius: 10px; padding: 8px 10px; font-size: 12.5px; }
+.ofi-cal-detailcard .ofi-cal-actions { gap: 10px; margin-top: 10px; }
+:is(.ofi-float-card.ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-actionrow { grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; min-height: 36px; padding: 8px 0; font: 400 13px/18px var(--ofi-win-font); }
+.ofi-cal-detailcard .ofi-cal-actionrow > svg:first-child { width: 16px; height: 16px; }
+.ofi-cal-detailcard .ofi-cal-actionrow > svg:last-child { width: 14px; height: 14px; }
+.ofi-cal-detailcard .ofi-cal-extnote { border-radius: 10px; margin-top: 10px; padding: 8px 10px; font-size: 12.5px; }
+.ofi-cal-detailcard .ofi-cal-chiptag { font-size: 12px; }
+
+/* Anlegen: Kopf schlank, Titel 18px, Felder 30px. */
+.ofi-float-card.ofi-cal-createcard .ofi-float-card__grip { padding: 8px 8px 4px 12px; gap: 6px; }
+.ofi-float-card.ofi-cal-createcard .ofi-float-card__title { font-size: 13px; }
+.ofi-float-card.ofi-cal-createcard .ofi-float-card__subtitle { font-size: 11.5px; }
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-titlefield { border-radius: 10px; padding: 8px 10px; margin: 0 0 10px; font: 600 18px/22px var(--ofi-win-font); letter-spacing: -0.3px; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-field { padding: 0 0 10px; }
+.ofi-cal-createcard .ofi-cal-field__box { padding: 8px 10px; }
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-mailtoggle { gap: 10px; border-radius: 10px !important; padding: 8px 10px; font-size: 12.5px; }
+.ofi-cal-createcard .ofi-cal-mailtoggle > svg { width: 16px; height: 16px; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-scopeline { border-radius: 10px; padding: 8px 10px; font-size: 12.5px; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-invitehint { font-size: 11.5px; }
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-cal-input, input.ofi-cal-input, textarea.ofi-cal-input) { font-size: 12.5px; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-chiptag { font-size: 12px; }
+.ofi-float-card.ofi-cal-createcard .ofi-cal-stepdot { width: 5px; height: 5px; }
+
+/* Nachbesserung: die Segmentleiste weicht dem Kreuz (Gewicht wie die
+   Leistenregel oben), und die Suchfelder im Anlegefenster stehen auf 30px. */
+:is(.ofi-float-card.ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-newtask__marks { width: calc(100% - 30px); }
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-field__box :is(input, .ofi-cal-input) {
+    height: 30px !important;
+    min-height: 30px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-radius: 8px !important;
+    font-size: 12.5px !important;
+}
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-field__box textarea { min-height: 60px !important; font-size: 12.5px !important; border-radius: 8px !important; }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronDown } from '@/components/icons/antIconCompat';
+import { ChevronDown, Lock01 as Lock } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
 import type { CatalogModuleDto, PageLevel } from '@/lib/api/authorization';
+import { FIXED_SETTINGS_PAGES } from '@/lib/pageCatalog';
 
 /**
  * ── DIE BERECHTIGUNGSTABELLE ─────────────────────────────────────────────────
@@ -186,6 +187,12 @@ export const PageLevelTable = ({
                                             <span className="ml-2 font-mono text-[10.5px] text-slate-300 dark:text-white/25">
                                                 {page.path}
                                             </span>
+                                            {/* Was die oberste Stufe HIER heisst (Stornieren statt Löschen). */}
+                                            {page.levelHints?.[3] && (
+                                                <span className="mt-0.5 block text-[11.5px] text-slate-500 dark:text-white/55">
+                                                    {t(page.levelHints[3])}
+                                                </span>
+                                            )}
                                         </td>
                                         {LEVEL_COLUMNS.map((column) => {
                                             const offered = column.level === 0 || column.level <= page.maxLevel;
@@ -215,6 +222,24 @@ export const PageLevelTable = ({
                                     </tr>
                                 );
                             }),
+                            /* Feste Einstellungsseiten (15.09.2026): sichtbar, aber
+                               nicht wählbar — Administrator bzw. IT-Kennwort. */
+                            ...(open && moduleDef.key === 'settings' ? FIXED_SETTINGS_PAGES : []).map((page) => (
+                                <tr key={page.path} className="text-slate-400 dark:text-white/35">
+                                    <td className="pl-8 text-[12.5px]">
+                                        {t(page.labelKey)}
+                                        <span className="ml-2 font-mono text-[10.5px] text-slate-300 dark:text-white/25">
+                                            {page.path}
+                                        </span>
+                                    </td>
+                                    <td colSpan={LEVEL_COLUMNS.length} className="text-center text-[11.5px]">
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <Lock size={12} />
+                                            {t(page.lock === 'admin' ? 'settings.roles.fixedAdmin' : 'settings.roles.fixedIt')}
+                                        </span>
+                                    </td>
+                                </tr>
+                            )),
                         ];
                     })}
                 </tbody>

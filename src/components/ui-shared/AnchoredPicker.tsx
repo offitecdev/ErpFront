@@ -40,13 +40,13 @@ const naturalHeight = (panelEl: HTMLDivElement | null): { body: number; footer: 
  * wird auf genau diesen Platz begrenzt und scrollt. Das Fenster verlässt den
  * Bildschirm nie.
  */
-const computePlacement = (anchorEl: HTMLElement, width: number, maxHeight: number, panelEl: HTMLDivElement | null): Placement => {
+const computePlacement = (anchorEl: HTMLElement, width: number, maxHeight: number, panelEl: HTMLDivElement | null, exactWidth = false): Placement => {
     // Savunma: kopmuş bir çapa sayfayı çökertmemeli.
     if (!anchorEl?.isConnected) return { style: { position: 'fixed', top: -9999, left: -9999, width }, bodyMax: maxHeight };
     const rect = anchorEl.getBoundingClientRect();
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
-    const panelWidth = Math.min(Math.max(rect.width, width), 420, viewportW - EDGE * 2);
+    const panelWidth = Math.min(exactWidth ? width : Math.max(rect.width, width), 420, viewportW - EDGE * 2);
     const left = Math.min(Math.max(EDGE, rect.left), Math.max(EDGE, viewportW - panelWidth - EDGE));
 
     const measured = naturalHeight(panelEl);
@@ -75,6 +75,7 @@ export const AnchoredPicker = ({
     maxHeight = 420,
     footer,
     panelClassName = '',
+    exactWidth = false,
     children,
 }: {
     /** Seçicinin tutunduğu hücre; null ise seçici kapalıdır. */
@@ -85,6 +86,8 @@ export const AnchoredPicker = ({
     footer?: ReactNode;
     /** Zusätzliche Klasse am Panel — für Oberflächen mit eigenem Kleid. */
     panelClassName?: string;
+    /** true = genau `width`, nicht so breit wie der Auslöser (Kalender). */
+    exactWidth?: boolean;
     children: ReactNode;
 }) => {
     const [placement, setPlacement] = useState<Placement>({ style: { position: 'fixed', top: -9999, left: -9999 }, bodyMax: maxHeight });
@@ -98,7 +101,7 @@ export const AnchoredPicker = ({
         const measure = () => {
             frame = 0;
             setPlacement((current) => {
-                const next = computePlacement(anchorEl, width, maxHeight, panelEl);
+                const next = computePlacement(anchorEl, width, maxHeight, panelEl, exactWidth);
                 const same = current.bodyMax === next.bodyMax
                     && JSON.stringify(current.style) === JSON.stringify(next.style);
                 return same ? current : next;
@@ -127,7 +130,7 @@ export const AnchoredPicker = ({
             window.removeEventListener('animationend', schedule, true);
             window.removeEventListener('transitionend', schedule, true);
         };
-    }, [anchorEl, width, maxHeight, panelEl]);
+    }, [anchorEl, width, maxHeight, panelEl, exactWidth]);
 
     // Dışarı tıklama (panel ve çapa hariç) ya da Esc kapatır.
     useEffect(() => {

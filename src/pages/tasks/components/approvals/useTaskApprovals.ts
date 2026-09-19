@@ -8,32 +8,15 @@ import { useTasksModuleStore } from '../../store/tasksModuleStore';
 import { emitTasksChanged, useTasksChanged } from '../../utils/taskEvents';
 
 /**
- * Daten der Freigaben (nur Leitung): Abschlussanfragen und Aufgabenvorschläge.
- * Eine Entscheidung nimmt die Karte sofort weg; der Rundruf lädt danach leise
- * nach — dieselbe Aufgabe kann in BEIDEN Listen stehen und sich dabei ändern.
+ * Daten der Freigaben (nur Administrator). Seit dem 16.09.2026 steht hier NUR
+ * noch die Löschanfrage: abgeschlossen wird direkt, es gibt nichts mehr zu
+ * bestätigen. Eine Entscheidung nimmt die Karte sofort weg; der Rundruf lädt
+ * danach leise nach.
  */
 
-export type ApprovalKind = 'completion' | 'review' | 'delete';
 export type ApprovalDecision = 'approve' | 'reject';
 
-const LIST_OF: Record<ApprovalKind, 'completionRequests' | 'reviewRequests' | 'deleteRequests'> = {
-    completion: 'completionRequests',
-    review: 'reviewRequests',
-    delete: 'deleteRequests',
-};
-
-const callFor = (kind: ApprovalKind, decision: ApprovalDecision, taskId: string, note: string) => {
-    // Löschanfrage bestätigen = die Aufgabe löschen (nur Admins).
-    if (kind === 'delete') {
-        return decision === 'approve' ? tasksApi.remove(taskId) : tasksApi.rejectDelete(taskId, note || undefined);
-    }
-    if (kind === 'completion') {
-        return decision === 'approve' ? tasksApi.approveCompletion(taskId) : tasksApi.rejectCompletion(taskId, note);
-    }
-    return decision === 'approve' ? tasksApi.approveReview(taskId) : tasksApi.rejectReview(taskId, note);
-};
-
-export const approvalBusyKey = (kind: ApprovalKind, taskId: string): string => `${kind}:${taskId}`;
+export const approvalBusyKey = (taskId: string): string => `delete:${taskId}`;
 
 export const useTaskApprovals = (enabled: boolean) => {
     const refreshSummary = useTasksModuleStore((state) => state.refreshSummary);
@@ -57,13 +40,14 @@ export const useTaskApprovals = (enabled: boolean) => {
 
     useTasksChanged((kind) => { if (enabled && kind === 'task') void load(); });
 
-    const decide = useCallback(async (kind: ApprovalKind, task: TaskDetail, decision: ApprovalDecision, note = '') => {
-        setBusyKey(approvalBusyKey(kind, task.id));
+    /** Löschanfrage bestätigen = die Aufgabe löschen (nur Admins). */
+    const decide = useCallback(async (task: TaskDetail, decision: ApprovalDecision, note = '') => {
+        setBusyKey(approvalBusyKey(task.id));
         try {
-            await callFor(kind, decision, task.id, note);
-            const listKey = LIST_OF[kind];
+            if (decision === 'approve') await tasksApi.remove(task.id);
+            else await tasksApi.rejectDelete(task.id, note || undefined);
             setData((current) => (current
-                ? { ...current, [listKey]: (current[listKey] ?? []).filter((item) => item.id !== task.id) }
+                ? { ...current, deleteRequests: (current.deleteRequests ?? []).filter((item) => item.id !== task.id) }
                 : current));
             toast.success(decision === 'approve' ? t('tasksModule.approvals.toast.approved') : t('tasksModule.approvals.toast.rejected'));
             void refreshSummary();

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { tasksApi } from '@/lib/api/tasksModule';
+import { tasksApi, todayParams } from '@/lib/api/tasksModule';
 import type { PeopleMap, TaskDetail, TaskListFilter, TaskListParams, TaskListPeriod, TaskListResult, TaskRow } from '@/types/tasksModule';
 import { periodRange } from '../components/list/taskListRules';
 import { useTasksModuleStore } from '../store/tasksModuleStore';
+import { reconcileTimerWithServer } from './useTaskTimer';
 import { useTasksChanged } from '../utils/taskEvents';
 import { readTasksCache, writeTasksCache } from '../utils/tasksCache';
 
@@ -109,6 +110,7 @@ export const useTaskList = (query: TaskListQuery, enabled: boolean) => {
         setTotal(last.total);
         setLoadedAtMs(Date.parse(last.serverNow));
         noteServerNow(last.serverNow);
+        reconcileTimerWithServer(merged.map((row) => ({ id: row.id, runningForMe: row.timer.runningForMe })));
         setError(null);
         setLoaded(true);
         if (merged.length || !isNarrowed(params)) {
@@ -122,7 +124,8 @@ export const useTaskList = (query: TaskListQuery, enabled: boolean) => {
 
     const load = useCallback(async (silent: boolean) => {
         const id = ++requestRef.current;
-        const params = paramsRef.current;
+        // Zeilen zeigen die Zeit des Tages — der Tag wird bei JEDEM Laden neu bestimmt (Mitternacht).
+        const params = { ...paramsRef.current, ...todayParams() };
         const pageCount = silent ? pagesRef.current : 1;
         if (!silent) setFetching(true);
         try {
@@ -163,7 +166,7 @@ export const useTaskList = (query: TaskListQuery, enabled: boolean) => {
         const nextPage = pagesRef.current + 1;
         setLoadingMore(true);
         try {
-            const result = await tasksApi.list({ ...paramsRef.current, page: nextPage });
+            const result = await tasksApi.list({ ...paramsRef.current, ...todayParams(), page: nextPage });
             if (id !== requestRef.current) return;
             pagesRef.current = nextPage;
             setRows((current) => {
@@ -242,16 +245,14 @@ export const toListRow = (task: TaskRow | TaskDetail): TaskRow => ({
     reviewState: task.reviewState,
     blockReason: task.blockReason,
     deleteRequestedById: task.deleteRequestedById,
+    hasDelayReason: task.hasDelayReason,
     assigneeIds: task.assigneeIds,
     labelIds: task.labelIds,
     checklist: task.checklist,
     commentCount: task.commentCount,
     attachmentCount: task.attachmentCount,
     overdue: task.overdue,
-    timer: { runningForMe: task.timer.runningForMe },
-    ...(task.work ? {
-        work: 'liveCount' in task.work
-            ? task.work
-            : { totalMs: task.work.totalMs, liveCount: task.work.live.length },
-    } : {}),
+    timer: { runningForMe: task.timer.runningForMe, myStartedAt: task.timer.myStartedAt ?? null },
+    // Die Antwort eines Schreibwegs kennt die Tageszeit nicht — die Zeile behaelt ihre bis zum Nachladen.
+    ...(task.work && 'liveCount' in task.work ? { work: task.work } : {}),
 });

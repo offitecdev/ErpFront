@@ -7725,6 +7725,10 @@ body > :not(#root) .ofi-inv-scope tr.is-current .ofi-inv-input:focus { box-shado
     white-space: nowrap;
     color: var(--ofi-cal-text);
 }
+/* Minderung (Nachtrag mit Minussumme, 16.09.2026): der Betrag steht rot. */
+.ofi-inv-num.is-minus,
+.ofi-inv-scope .ofi-inv-num.is-minus { color: #d70015; }
+.dark .ofi-inv-scope .ofi-inv-num.is-minus { color: #ff6961; }
 .ofi-inv-num.is-strong { font-weight: 600; }
 /* Diese vier Toene sitzen auf ZELLEN, und die Zellenregel oben zaehlt zwei
    Klassen/Attribute — ohne den vorangestellten Bereichsnamen verlieren sie

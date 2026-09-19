@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { LoadingPanel } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
 import { tasksErrorCode, tasksErrorMessage } from '@/lib/api/tasksModule';
 import '@/styles/modules/tasksDetail.css';
+import '@/styles/modules/tasksIssues.css';
 import { ActivityTab } from './components/detail/ActivityTab';
 import { CommentsTab } from './components/detail/CommentsTab';
 import { ContentTab } from './components/detail/ContentTab';
@@ -14,6 +15,7 @@ import { DetailHeader } from './components/detail/DetailHeader';
 import { DetailRail } from './components/detail/DetailRail';
 import { DetailTabs, type DetailTab } from './components/detail/DetailTabs';
 import { FilesTab } from './components/detail/FilesTab';
+import { IssuesTab } from './components/issues/IssuesTab';
 import { TaskButton } from './components/shared/TaskButton';
 import { TasksModuleShell } from './components/shared/TasksModuleShell';
 import { useTaskDetail } from './hooks/useTaskDetail';
@@ -28,13 +30,19 @@ import { useIsTasksManager, useTasksModuleStore } from './store/tasksModuleStore
 export const TaskDetailPage = () => {
     const { taskId = '' } = useParams();
     const navigate = useNavigate();
+    /* Aus der Mail einer Frage: `/tasks/:id?issue=…` öffnet den Reiter und
+       rollt genau diesen Faden in die Mitte (16.09.2026). */
+    const [search] = useSearchParams();
+    const focusIssueId = search.get('issue');
     const ctl = useTaskDetail(taskId);
     const isManager = useIsTasksManager();
     const onboarding = useTasksModuleStore((state) => state.bootstrap?.onboarding);
     const [tab, setTab] = useState<DetailTab>('content');
+    /** Offene Fragen: der Reiter zählt selbst mit, ohne die Seite neu zu laden. */
+    const [openIssues, setOpenIssues] = useState<number | null>(null);
     const { data, loading, error } = ctl;
 
-    useEffect(() => { setTab('content'); }, [taskId]);
+    useEffect(() => { setTab(focusIssueId ? 'issues' : 'content'); setOpenIssues(null); }, [taskId, focusIssueId]);
     useEffect(() => { if (tab === 'activity' && !isManager) setTab('content'); }, [tab, isManager]);
     useEffect(() => {
         if (onboarding?.taskId === taskId) navigate(`/tasks/guide/${onboarding.guide}`, { replace: true });
@@ -80,11 +88,15 @@ export const TaskDetailPage = () => {
                         value={tab}
                         onChange={setTab}
                         commentCount={data.task.commentCount}
+                        issueCount={openIssues ?? data.task.openIssueCount ?? 0}
                         fileCount={data.attachments.length}
                         showActivity={isManager}
                     />
                     {tab === 'content' && <ContentTab key={data.task.id} ctl={ctl} data={data} />}
                     {tab === 'comments' && <CommentsTab ctl={ctl} data={data} />}
+                    {tab === 'issues' && (
+                        <IssuesTab key={data.task.id} ctl={ctl} data={data} focusIssueId={focusIssueId} onOpenCount={setOpenIssues} />
+                    )}
                     {tab === 'files' && <FilesTab ctl={ctl} data={data} />}
                     {tab === 'activity' && isManager && <ActivityTab taskId={data.task.id} people={data.people} />}
                 </div>

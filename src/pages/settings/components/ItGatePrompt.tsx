@@ -14,8 +14,11 @@ import { PopupButton, PopupDialog, PopupField } from '@/components/ui-shared/Pop
  * (`/settings/it-gate/verify` → Ticket im sessionStorage, siehe lib/itGate.ts)
  * und ruft danach `onUnlocked`.
  */
-export const ItGatePrompt = ({ open, onClose, onUnlocked }: {
+export const ItGatePrompt = ({ open, onClose, onUnlocked, title, subtitle }: {
     open: boolean;
+    /** Eigene Überschrift/Hinweis, z. B. für das Einstellungsmenü. */
+    title?: string;
+    subtitle?: string;
     onClose: () => void;
     /** Wird nach richtigem Kennwort gerufen — der Ausweis liegt dann schon ab. */
     onUnlocked: () => void;
@@ -50,8 +53,8 @@ export const ItGatePrompt = ({ open, onClose, onUnlocked }: {
         <PopupDialog
             open={open}
             onClose={onClose}
-            title={t('settings.itGate.title')}
-            subtitle={t('inv.codes.itNote')}
+            title={title ?? t('settings.itGate.title')}
+            subtitle={subtitle ?? t('inv.codes.itNote')}
             icon={<Lock01 size={16} />}
             width={400}
             footer={(

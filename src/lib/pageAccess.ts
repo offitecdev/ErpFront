@@ -42,6 +42,7 @@ const RETIRED_PAGE_KEYS: Readonly<Record<string, string>> = {
     'personnel.leaves': 'personnel.requests',
     'personnel.approvals': 'personnel.requestsIncoming',
     'personnel.incoming': 'personnel.requestsIncoming',
+    'sales.invoices': 'accounting.invoices',
 };
 
 /**
@@ -74,6 +75,9 @@ const PAGE_LEVEL_FALLBACKS: Readonly<Record<string, string>> = {
     'crm.activities': 'crm.communication',
     // Nachträge sind Aufträge — wer die Auftragsliste sieht, sieht auch sie.
     'sales.addonOrders': 'sales.orders',
+    // Die PDF-Einstellungen gestalten die Offerte — wer Offerten führt, behält sie.
+    'settings.pdf': 'sales.quotes',
+    'accounting.toBill': 'accounting.invoices',
 };
 
 /**

@@ -20,13 +20,12 @@ export const rowRights = (row: TaskRow, me: string, isManager: boolean): RowRigh
 };
 
 /**
- * Abschluss beantragen (13.09.2026): alle ausser der Administratorrolle —
- * Verantwortliche und die Leitung, solange die Aufgabe offen ist.
+ * Abschliessen (16.09.2026, Samet: «tamamlama talebi olmayacak, direkt
+ * tamamlanabilecek»): Verantwortliche und die Leitung, solange die Aufgabe
+ * offen ist. Es gibt nichts mehr zu beantragen.
  */
-export const canRequestRowCompletion = (row: TaskRow, rights: RowRights, isManager: boolean, isAdmin: boolean): boolean =>
-    !isAdmin
-    && row.approvalState !== 'PENDING'
-    && isOpenStatus(row.status)
+export const canCompleteRow = (row: TaskRow, rights: RowRights, isManager: boolean): boolean =>
+    isOpenStatus(row.status)
     && row.reviewState !== 'REJECTED'
     && (rights.canTrack || isManager);
 

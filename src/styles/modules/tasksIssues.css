@@ -1,0 +1,639 @@
+/* =========================================================
+   Offitec — GÖREVLER: «SORULAR & SORUNLAR» (16.09.2026)
+
+   Vorgabe Samet, 2. Runde: «iphone wp gibi olmalı … aynısı
+   olmasın ama benzer bi şey» — der Verlauf steht GEGENÜBER wie
+   im Messenger auf dem Telefon: die eigene Nachricht rechts in
+   der getönten Blase, fremde links in der hellgrauen, beide mit
+   Zipfel an der unteren Ecke, die Uhrzeit leise IN der Blase,
+   je Tag eine Marke dazwischen.
+
+   NICHT WhatsApp: kein Grün, kein gemustertes Papier, keine
+   Häkchen — die Töne des Hauses (ein Blau, ein Grau) und
+   dieselbe Ruhe wie im ganzen Modul.
+
+   Dazu: EINE Kapsel oben (wie `.ofi-cal-tabs` im Kalender-
+   fenster), ihre gewählte Hälfte trägt die Farbe der Art —
+   Blau fragt, Rot meldet ein Problem. Über jedem Faden die
+   farbige Überschrift. Bild und PDF stehen IN der Blase.
+
+   Markiert wird mit «@» im Text (`.ofi-gv-mention`), nicht mit
+   eigenen Knöpfen.
+
+   Kein Schatten, keine getönten Flächen, nichts bewegt sich beim
+   Überfahren — nur Farben blenden (140ms).
+   Präfix: .ofi-gv-issue*; Fenster (das «@») hängen an
+   `.ofi-gv-picker` aus tasksModule.css.
+   ========================================================= */
+
+.ofi-gv-issues {
+    /* Die zwei Farben der Kapsel; alles Weitere kommt aus --gv-*. */
+    --gv-q: var(--gv-accent, #0a7aff);
+    --gv-i: var(--gv-danger, #d70015);
+    /* Fremde Blase: helles Grau. Eigene: das Blau des Hauses, sehr leise. */
+    --gv-bubble: #f1f2f4;
+    --gv-bubble-own: #dbeafe;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 14px;
+}
+
+/* ── Kopfleiste: die Kapsel und «Yeni soru» ─────────────────────────────── */
+
+.ofi-gv-issues__bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ofi-gv-issues__seg {
+    display: inline-flex;
+    gap: 0;
+    height: 34px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--gv-fill);
+}
+
+#root .ofi-gv .ofi-gv-issues__segbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    min-width: 108px;
+    padding: 0 16px;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--gv-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: none;
+    transition: background-color 140ms ease, color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-issues__segbtn:hover { color: var(--gv-text); }
+
+/* Die gewählte Hälfte trägt die Farbe ihrer Art — das ist der ganze Unterschied. */
+#root .ofi-gv .ofi-gv-issues__segbtn.is-active.is-question { background: var(--gv-q); color: #fff; }
+#root .ofi-gv .ofi-gv-issues__segbtn.is-active.is-issue { background: var(--gv-i); color: #fff; }
+#root .ofi-gv .ofi-gv-issues__segbtn.is-active { font-weight: 600; }
+#root .ofi-gv .ofi-gv-issues__segbtn.is-active .ofi-gv-count {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+}
+
+.ofi-gv-issues__list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ── Ein Faden ──────────────────────────────────────────────────────────── */
+
+.ofi-gv-issue {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 14px;
+    background: var(--gv-surface);
+}
+
+.ofi-gv-issue.is-resolved { opacity: 0.72; }
+.ofi-gv-issue.is-resolved.is-open { opacity: 1; }
+
+/* Aus der Mail gekommen (`?issue=`): ein ruhiger Ring, kein Blinken. */
+.ofi-gv-issue.is-focused { box-shadow: 0 0 0 3px var(--gv-focus); }
+.ofi-gv-issue.is-focused.is-issue { box-shadow: 0 0 0 3px rgba(215, 0, 21, 0.22); }
+
+/* ZUGEKLAPPT IST DER KOPF DIE GANZE ZEILE — und der Schalter dazu. */
+#root .ofi-gv .ofi-gv-issue__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 14px;
+    border: 0 !important;
+    border-radius: 14px !important;
+    background: transparent;
+    text-align: left;
+    transition: background-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-issue__head:hover { background: var(--gv-hover); }
+.ofi-gv-issue.is-open .ofi-gv-issue__head { border-radius: 14px 14px 0 0 !important; }
+
+/* Der Pfeil dreht sich beim Aufklappen — das ist die ganze Bewegung. */
+.ofi-gv-issue__chev {
+    flex: none;
+    color: var(--gv-muted);
+    transition: transform 160ms ease;
+}
+
+.ofi-gv-issue.is-open .ofi-gv-issue__chev { transform: rotate(180deg); }
+
+.ofi-gv-issue__count {
+    flex: none;
+    color: var(--gv-muted);
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+.ofi-gv-issue__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+.ofi-gv-issue__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.ofi-gv-issue__kind {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.ofi-gv-issue__kind.is-question { color: var(--gv-q); }
+.ofi-gv-issue__kind.is-issue { color: var(--gv-i); }
+
+/* Das Ausrufezeichen: dieselbe Marke, die im Postfach steht. */
+.ofi-gv-issue__bang,
+.ofi-gv-issue__done {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.ofi-gv-issue__bang { background: rgba(215, 0, 21, 0.1); color: var(--gv-danger); }
+.ofi-gv-issue__done { background: rgba(31, 138, 59, 0.1); color: var(--gv-success); }
+
+/* DIE FARBIGE ÜBERSCHRIFT — zugeklappt ist sie die Zeile selbst. */
+.ofi-gv-issue__title {
+    margin: 0;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv-issue.is-open .ofi-gv-issue__title { font-size: 16px; }
+
+.ofi-gv-issue__title.is-question { color: var(--gv-q); }
+.ofi-gv-issue__title.is-issue { color: var(--gv-i); }
+
+/* ── Wer angeschrieben wurde, welche Aufgaben im Faden stehen ───────────── */
+
+#root .ofi-gv .ofi-gv-issue-chip,
+.ofi-gv-issue-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+    height: 24px;
+    padding: 0 9px;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 999px;
+    background: var(--gv-fill);
+    color: var(--gv-text);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.ofi-gv-issue-chip.is-to { border-color: rgba(10, 122, 255, 0.35); background: var(--gv-accent-soft); }
+
+.ofi-gv-issue-chip__role {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gv-accent);
+}
+
+.ofi-gv-issue-chip__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-gv-issue-dot {
+    display: inline-block;
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--gv-muted);
+}
+
+.ofi-gv-issue-dot.is-progress { background: var(--gv-accent); }
+.ofi-gv-issue-dot.is-review { background: var(--gv-warning); }
+.ofi-gv-issue-dot.is-done { background: var(--gv-success); }
+.ofi-gv-issue-dot.is-alert { background: var(--gv-danger); }
+
+/* ── Der Verlauf: Blasen GEGENÜBER ──────────────────────────────────────── */
+
+.ofi-gv-issue__stream {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+/* Die Tagesmarke sitzt mittig zwischen den Blasen. */
+.ofi-gv-issue__day {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0 6px;
+}
+
+.ofi-gv-issue__day span {
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: var(--gv-fill);
+    color: var(--gv-secondary);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.ofi-gv-issue-msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+}
+
+.ofi-gv-issue-msg.is-own { align-items: flex-end; }
+.ofi-gv-issue-msg.is-other { align-items: flex-start; }
+/* Luft NUR zwischen zwei Sprechenden, nicht innerhalb einer Reihe. */
+.ofi-gv-issue-msg.is-first { margin-top: 10px; }
+.ofi-gv-issue__stream > .ofi-gv-issue-msg:first-child { margin-top: 0; }
+
+.ofi-gv-issue-msg__author {
+    margin: 0 0 3px 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.ofi-gv-issue-msg__author.is-question { color: var(--gv-q); }
+.ofi-gv-issue-msg__author.is-issue { color: var(--gv-i); }
+
+.ofi-gv-issue-bubble {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: min(76%, 560px);
+    padding: 9px 13px 6px;
+    border-radius: 17px;
+    background: var(--gv-bubble);
+    color: var(--gv-text);
+}
+
+.ofi-gv-issue-msg.is-own .ofi-gv-issue-bubble { background: var(--gv-bubble-own); }
+
+/* DER ZIPFEL an der letzten Blase einer Reihe — die Ecke wird spitz und ein
+   kleines Dreieck lehnt sich an. Kein Bild, keine Maske: ein Pseudoelement
+   mit derselben Farbe wie die Blase. */
+.ofi-gv-issue-msg.is-last.is-own .ofi-gv-issue-bubble { border-bottom-right-radius: 5px; }
+.ofi-gv-issue-msg.is-last.is-other .ofi-gv-issue-bubble { border-bottom-left-radius: 5px; }
+
+.ofi-gv-issue-msg.is-last .ofi-gv-issue-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 11px;
+    height: 13px;
+}
+
+.ofi-gv-issue-msg.is-last.is-own .ofi-gv-issue-bubble::after {
+    right: -6px;
+    background: var(--gv-bubble-own);
+    clip-path: polygon(0 0, 100% 100%, 0 100%);
+    border-bottom-left-radius: 2px;
+}
+
+.ofi-gv-issue-msg.is-last.is-other .ofi-gv-issue-bubble::after {
+    left: -6px;
+    background: var(--gv-bubble);
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    border-bottom-right-radius: 2px;
+}
+
+.ofi-gv-issue-bubble__text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Die Markierung im Satz — dasselbe Blau wie überall, nur kräftiger gesetzt. */
+.ofi-gv-issue-mention {
+    color: var(--gv-accent);
+    font-weight: 600;
+}
+
+/* Die Uhrzeit sitzt IN der Blase, unten rechts und leise. */
+.ofi-gv-issue-bubble__time {
+    align-self: flex-end;
+    margin-top: -4px;
+    color: var(--gv-muted);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Bild und PDF stehen IN der Blase. */
+.ofi-gv-issue-bubble__images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ofi-gv-issue-bubble__images img {
+    display: block;
+    max-width: 230px;
+    max-height: 180px;
+    border-radius: 11px;
+    object-fit: cover;
+}
+
+#root .ofi-gv a.ofi-gv-issue-file,
+.ofi-gv-issue-file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 320px;
+    padding: 7px 9px;
+    border-radius: 11px;
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    text-decoration: none;
+    transition: background-color 140ms ease;
+}
+
+#root .ofi-gv a.ofi-gv-issue-file:hover { background: var(--gv-hover); }
+
+.ofi-gv-issue-file__icon { display: inline-flex; color: var(--gv-secondary); }
+.ofi-gv-issue-file__body { display: flex; min-width: 0; flex-direction: column; flex: 1 1 auto; }
+.ofi-gv-issue-file__name { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-gv-issue-file__size { color: var(--gv-muted); font-size: 11.5px; }
+
+/* ── Schreiben: neue Frage und Antwort ──────────────────────────────────── */
+
+.ofi-gv-issue__foot { display: flex; margin-top: 10px; }
+
+.ofi-gv-issue__replybox,
+.ofi-gv-issue-new {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ofi-gv-issue__replybox {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv-issue-new {
+    padding: 14px 16px;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 14px;
+    background: var(--gv-surface);
+}
+
+#root .ofi-gv input.ofi-gv-issue-new__title {
+    display: block;
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--gv-field-border);
+    border-radius: var(--gv-control-radius);
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: none;
+    transition: border-color 140ms ease;
+}
+
+#root .ofi-gv textarea.ofi-gv-issue-new__text {
+    display: block;
+    width: 100%;
+    min-height: 64px;
+    padding: 8px 10px;
+    border: 1px solid var(--gv-field-border);
+    border-radius: var(--gv-control-radius);
+    background: var(--gv-surface);
+    color: var(--gv-text);
+    font-size: 14px;
+    line-height: 1.55;
+    resize: none;
+    box-shadow: none;
+    transition: border-color 140ms ease;
+}
+
+#root .ofi-gv input.ofi-gv-issue-new__title::placeholder,
+#root .ofi-gv textarea.ofi-gv-issue-new__text::placeholder {
+    color: var(--gv-muted);
+    font-style: normal;
+    font-weight: 400;
+    opacity: 1;
+}
+
+#root .ofi-gv input.ofi-gv-issue-new__title:hover:not(:focus),
+#root .ofi-gv textarea.ofi-gv-issue-new__text:hover:not(:focus) { border-color: var(--gv-field-border-hover); }
+
+#root .ofi-gv input.ofi-gv-issue-new__title:focus,
+#root .ofi-gv textarea.ofi-gv-issue-new__text:focus {
+    border-color: var(--gv-accent);
+    box-shadow: 0 0 0 3px var(--gv-focus);
+}
+
+.ofi-gv-issue-new__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ofi-gv-issue-new__hint { color: var(--gv-muted); font-size: 11.5px; }
+
+/* Das Ausrufezeichen ist an: rot, damit man es nicht aus Versehen stehen lässt. */
+#root .ofi-gv .ofi-gv-iconbtn.ofi-gv-issue-bang-on {
+    border-color: rgba(215, 0, 21, 0.35);
+    background: rgba(215, 0, 21, 0.1);
+    color: var(--gv-danger);
+}
+
+.ofi-gv-issue-pending {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ofi-gv-issue-pending__file {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+    height: 24px;
+    padding: 0 4px 0 9px;
+    border: 1px solid var(--gv-border);
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.ofi-gv-issue-pending__size { color: var(--gv-muted); font-size: 11.5px; }
+
+#root .ofi-gv .ofi-gv-issue-chip__x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--gv-secondary);
+}
+
+#root .ofi-gv .ofi-gv-issue-chip__x:hover { background: var(--gv-hover); color: var(--gv-text); }
+
+/* ── Das Schreibfeld mit farbigen Markierungen ──────────────────────────────
+   Ein <textarea> kann keinen Teil seines Textes färben. Darum liegt EIN
+   SPIEGEL darunter, der denselben Satz zeichnet — mit farbigem «@Name» —, und
+   die Schrift im Feld selbst ist durchsichtig (der Schreibzeiger nicht).
+   Beide MÜSSEN dieselbe Schrift, denselben Innenabstand und dieselbe
+   Zeilenhöhe haben, sonst laufen sie auseinander. */
+
+.ofi-gv-mentionbox { position: relative; }
+
+/* JEDE Zeile muss an derselben Stelle brechen wie im Feld darüber — sonst
+   steht der Schreibzeiger neben dem Buchstaben, auf dem er stehen sollte.
+   Darum tragen Spiegel und Feld GENAU dieselbe Typografie; `anywhere` (das
+   früher hier stand) brach lange Wörter eher als das Feld und liess den
+   Zeiger springen. */
+#root .ofi-gv .ofi-gv-mentionbox__mirror,
+.ofi-gv-mentionbox__mirror,
+#root .ofi-gv textarea.ofi-gv-mentionbox__input {
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.55;
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-transform: none;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: normal;
+    tab-size: 4;
+}
+
+#root .ofi-gv .ofi-gv-mentionbox__mirror,
+.ofi-gv-mentionbox__mirror {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: var(--gv-control-radius);
+    color: var(--gv-text);
+    pointer-events: none;
+    user-select: none;
+}
+
+#root .ofi-gv textarea.ofi-gv-mentionbox__input {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    /* Die Schrift zeichnet der Spiegel; Zeiger und Auswahl bleiben echt. */
+    color: transparent;
+    caret-color: var(--gv-text);
+}
+
+#root .ofi-gv textarea.ofi-gv-mentionbox__input::selection { background: rgba(10, 122, 255, 0.28); }
+#root .ofi-gv textarea.ofi-gv-mentionbox__input::-moz-selection { background: rgba(10, 122, 255, 0.28); }
+
+/* Die Markierung: derselbe Ton wie in der Blase, leicht hinterlegt. KEIN
+   fetterer Schnitt und kein waagrechter Innenabstand — beides würde die
+   Zeile im Spiegel breiter machen als im Feld, und der Zeiger stünde falsch. */
+.ofi-gv-mention-token {
+    border-radius: 4px;
+    background: var(--gv-accent-soft);
+    color: var(--gv-accent);
+    font-weight: inherit;
+}
+
+/* ── Das «@»-Fenster (Portal: eigener Zwilling ausserhalb von #root) ────── */
+
+#root .ofi-gv-mention .ofi-gv-mention__group,
+body > :not(#root) .ofi-gv-mention .ofi-gv-mention__group,
+.ofi-gv-mention__group {
+    padding: 8px 10px 4px;
+    color: var(--ofi-cal-muted, #8e8e93);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.ofi-gv-mention__meta {
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--ofi-cal-muted, #8e8e93);
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+/* ── Enge Fenster ───────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+    .ofi-gv-issues { padding: 12px 10px; }
+    .ofi-gv-issue { padding: 12px 12px 14px; }
+    .ofi-gv-issue-bubble { max-width: 86%; }
+    #root .ofi-gv .ofi-gv-issues__segbtn { min-width: 0; flex: 1 1 0; padding: 0 12px; }
+    .ofi-gv-issues__seg { width: 100%; }
+    .ofi-gv-issue-new__hint { display: none; }
+}
+
+/* ── Dunkel ─────────────────────────────────────────────────────────────── */
+
+.dark .ofi-gv-issues {
+    --gv-bubble: rgba(255, 255, 255, 0.09);
+    --gv-bubble-own: rgba(10, 122, 255, 0.28);
+}
+
+.dark .ofi-gv-issue__bang { background: rgba(255, 105, 97, 0.16); }
+.dark .ofi-gv-issue__done { background: rgba(48, 209, 88, 0.16); }
+.dark .ofi-gv-issue-mention { color: #6ab4ff; }
+
+/* Im Dunkeln ist --gv-hairline eine SCHWARZE Linie — auf dunklem Grund
+   unsichtbar. Jede Kontur, die eine Fläche von der anderen trennt, bekommt
+   hier ihre helle Fassung. */
+.dark .ofi-gv-issue,
+.dark .ofi-gv-issue-new { border-color: rgba(255, 255, 255, 0.1); }
+.dark .ofi-gv-issue__replybox { border-top-color: rgba(255, 255, 255, 0.1); }
+.dark #root .ofi-gv .ofi-gv-issue-chip,
+.dark .ofi-gv-issue-chip { border-color: rgba(255, 255, 255, 0.12); }
+.dark .ofi-gv-issue-chip.is-to { border-color: rgba(10, 122, 255, 0.5); }
+.dark #root .ofi-gv a.ofi-gv-issue-file,
+.dark .ofi-gv-issue-file { background: rgba(0, 0, 0, 0.22); }

@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { CalendarCheck01 as CalendarDays, ChevronDown, File05 as FileText, FileCheck02, Plus, Trash01 } from '@/components/icons/antIconCompat';
+import { CalendarCheck01 as CalendarDays, ChevronDown, File05 as FileText, FileCheck02, Minus, Plus, Trash01 } from '@/components/icons/antIconCompat';
+import { PopupCard, PopupEmpty } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import { AddonPaymentSchedule } from '@/components/orders/AddonPaymentSchedule';
 import type { PaymentStage } from '@/lib/paymentSchedule';
 import { RichTextMarkdownEditor } from '@/pages/sales/detail/components/RichTextMarkdownEditor';
 import { richHtmlToPlainText } from '@/pages/sales/detail/utils/markdown.utils';
-import { applyDiscounts, createDiscountEntry, MAX_TOTAL_DISCOUNTS, type TenderDiscountEntry } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
+import { createDiscountEntry, MAX_TOTAL_DISCOUNTS, type TenderDiscountEntry } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import { DocumentDiscounts } from './DocumentDiscounts';
 import { DocumentLineTable } from './DocumentLineTable';
-import { documentLineAmount, emptyDocumentLine, type DocumentLine } from './documentLines';
+import { documentLineAmount, emptyDocumentLine, signedDiscounts, type DocumentLine } from './documentLines';
 import './documentWorkspace.css';
 
 /**
@@ -31,6 +32,15 @@ import './documentWorkspace.css';
 
 type Panel = 'letter' | 'plan' | 'closing' | 'discount';
 
+/** Ein Artikel des Hauptauftrags, der gemindert werden kann. */
+export interface MinderungSource {
+    articleId: string;
+    description: string;
+    unit: string;
+    unitPrice: number;
+    available: number;
+}
+
 export function DocumentWorkspace({
     lines, onChange,
     coverLetter, onCoverLetterChange,
@@ -39,6 +49,7 @@ export function DocumentWorkspace({
     closingText, onClosingTextChange, closingPlaceholder,
     vat,
     formatMoney, readOnly = false,
+    minderung,
 }: {
     lines: DocumentLine[];
     onChange: (lines: DocumentLine[]) => void;
@@ -57,13 +68,50 @@ export function DocumentWorkspace({
     vat?: { rate: number; onRateChange: (value: number) => void };
     formatMoney: (value: number) => string;
     readOnly?: boolean;
+    /**
+     * MINDERUNG (16.09.2026) — nur der Nachtrag: Minuszeilen sind erlaubt, und
+     * ein Knopf holt die Artikel des Hauptauftrags mit ihrem Verkaufspreis.
+     * `parentLabel` nennt den Auftrag, von dem eine Minussumme abgeht.
+     */
+    minderung?: {
+        loadSources: () => Promise<MinderungSource[]>;
+        parentLabel?: string | null;
+    };
 }) {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [panel, setPanel] = useState<Panel | null>(null);
+    const [sourcesOpen, setSourcesOpen] = useState(false);
+    const [sources, setSources] = useState<MinderungSource[] | null>(null);
+    const [sourcesFailed, setSourcesFailed] = useState(false);
     const selectedLines = lines.filter((line) => selected.has(line.key));
+    const allowMinus = Boolean(minderung);
+
+    const openSources = () => {
+        if (!minderung) return;
+        setSourcesOpen(true);
+        setSources(null);
+        setSourcesFailed(false);
+        minderung.loadSources()
+            .then((items) => setSources(items))
+            .catch(() => { setSources([]); setSourcesFailed(true); });
+    };
+    /* Eine Minuszeile mit dem Preis des Auftrags; die Menge startet bei −1
+       (oder weniger, wenn nur ein Bruchteil übrig ist) und wird angepasst. */
+    const addMinderungLine = (source: MinderungSource) => {
+        const quantity = Math.min(1, source.available);
+        onChange([...lines, {
+            ...emptyDocumentLine(),
+            articleId: source.articleId,
+            description: source.description,
+            unit: source.unit,
+            quantity: String(-quantity),
+            unitPrice: String(source.unitPrice),
+        }]);
+        setSourcesOpen(false);
+    };
 
     const subtotal = lines.reduce((sum, line) => sum + documentLineAmount(line), 0);
-    const breakdown = applyDiscounts(subtotal, discounts);
+    const breakdown = signedDiscounts(subtotal, discounts);
     const netTotal = Math.round((breakdown.remaining + Number.EPSILON) * 100) / 100;
     const vatTotal = vat ? Math.round(((netTotal * vat.rate) / 100 + Number.EPSILON) * 100) / 100 : 0;
     const grossTotal = Math.round((netTotal + vatTotal + Number.EPSILON) * 100) / 100;
@@ -108,9 +156,11 @@ export function DocumentWorkspace({
                     {panel === 'letter' && (readOnly
                         ? <p className="document-detail-text">{richHtmlToPlainText(coverLetter).trim() || '—'}</p>
                         : <RichTextMarkdownEditor value={coverLetter} onChange={onCoverLetterChange} minHeight={140} />)}
-                    {panel === 'plan' && (
-                        <AddonPaymentSchedule stages={stages} onChange={onStagesChange} baseTotal={grossTotal} formatMoney={formatMoney} readOnly={readOnly} />
-                    )}
+                    {panel === 'plan' && (netTotal < 0
+                        /* Eine Minderung wird nicht selbst verrechnet — ein
+                           Zahlungsplan hätte nichts zu verteilen. */
+                        ? <p className="document-detail-text">{t('documentEditor.minderungNoPlan')}</p>
+                        : <AddonPaymentSchedule stages={stages} onChange={onStagesChange} baseTotal={grossTotal} formatMoney={formatMoney} readOnly={readOnly} />)}
                     {panel === 'closing' && onClosingTextChange && (
                         <textarea
                             className="document-panel-field"
@@ -126,7 +176,7 @@ export function DocumentWorkspace({
                         <DocumentDiscounts
                             entries={discounts}
                             onChange={onDiscountsChange}
-                            base={subtotal}
+                            base={Math.abs(subtotal)}
                             formatMoney={formatMoney}
                             max={MAX_TOTAL_DISCOUNTS}
                             disabled={readOnly}
@@ -142,6 +192,7 @@ export function DocumentWorkspace({
                 onChange={onChange}
                 formatMoney={formatMoney}
                 readOnly={readOnly}
+                allowMinus={allowMinus}
             />
 
             {/* Unter der Tabelle steht LINKS der Knopf für die nächste Zeile
@@ -160,6 +211,17 @@ export function DocumentWorkspace({
                 >
                     <Plus size={16} />
                 </button>
+                {minderung && (
+                    <button
+                        type="button"
+                        className="document-button"
+                        disabled={readOnly}
+                        onClick={openSources}
+                    >
+                        <Minus size={14} />
+                        {t('documentEditor.minderungFromOrder')}
+                    </button>
+                )}
                 {selectedLines.length > 0 && (
                     <button
                         type="button"
@@ -176,16 +238,17 @@ export function DocumentWorkspace({
             {/* Die Summe steht schmal am rechten Rand. */}
             <div className="document-foot">
                 <dl className="document-totals">
-                    {breakdown.applied.some((entry) => entry.amount > 0) && (
+                    {breakdown.applied.some((entry) => entry.amount !== 0) && (
                         <>
                             <div className="document-total-row">
                                 <dt>{t('invoices.subtotal')}</dt>
                                 <dd>{formatMoney(subtotal)}</dd>
                             </div>
-                            {breakdown.applied.map((entry, index) => (entry.amount > 0 ? (
+                            {breakdown.applied.map((entry, index) => (entry.amount !== 0 ? (
                                 <div key={index} className="document-total-row is-discount">
                                     <dt>{(entry.name || '').trim() || t('invoices.discountFallback', { index: index + 1 })}</dt>
-                                    <dd>− {formatMoney(entry.amount)}</dd>
+                                    {/* Auf eine Minussumme wirkt der Nachlass umgekehrt. */}
+                                    <dd>{entry.amount > 0 ? '−' : '+'} {formatMoney(Math.abs(entry.amount))}</dd>
                                 </div>
                             ) : null))}
                         </>
@@ -193,7 +256,7 @@ export function DocumentWorkspace({
                     {/* «Netto» steht nur, wenn es etwas ANDERES sagt als die
                         Endsumme — ohne MwSt. und ohne Nachlass wäre es dieselbe
                         Zahl zweimal (Nachtrag). */}
-                    {(vat || breakdown.applied.some((entry) => entry.amount > 0)) && (
+                    {(vat || breakdown.applied.some((entry) => entry.amount !== 0)) && (
                         <div className="document-total-row">
                             <dt>{t('invoices.netTotal')}</dt>
                             <dd>{formatMoney(netTotal)}</dd>
@@ -217,12 +280,54 @@ export function DocumentWorkspace({
                             <dd>{formatMoney(vatTotal)}</dd>
                         </div>
                     )}
-                    <div className="document-total-row is-total">
+                    <div className={`document-total-row is-total ${netTotal < 0 ? 'is-minus' : ''}`}>
                         <dt>{t('invoices.grossTotal')}</dt>
                         <dd>{formatMoney(vat ? grossTotal : netTotal)}</dd>
                     </div>
                 </dl>
             </div>
+            {/* Eine Minussumme ist eine Minderung — sagen, wohin sie geht. */}
+            {minderung && netTotal < 0 && (
+                <p className="document-help is-minus">
+                    {minderung.parentLabel
+                        ? t('documentEditor.minderungNote', { order: minderung.parentLabel })
+                        : t('documentEditor.minderungNoteNoOrder')}
+                </p>
+            )}
+
+            {sourcesOpen && (
+                <PopupCard
+                    open
+                    onClose={() => setSourcesOpen(false)}
+                    title={t('documentEditor.minderungFromOrder')}
+                    subtitle={minderung?.parentLabel || undefined}
+                    width={520}
+                >
+                    {sources === null ? (
+                        <PopupEmpty>{t('common.loading')}</PopupEmpty>
+                    ) : sources.length === 0 ? (
+                        <PopupEmpty>{sourcesFailed ? t('documentEditor.minderungSourcesFailed') : t('documentEditor.minderungNoSources')}</PopupEmpty>
+                    ) : (
+                        <div className="document-sources">
+                            {sources.map((source) => (
+                                <button
+                                    key={source.articleId}
+                                    type="button"
+                                    className="ofi-option-row document-source"
+                                    onClick={() => addMinderungLine(source)}
+                                >
+                                    <span className="document-source__name">{source.description}</span>
+                                    <span className="document-source__meta">
+                                        {t('documentEditor.minderungAvailable', { quantity: source.available, unit: source.unit || '' })}
+                                        {' · '}
+                                        {formatMoney(source.unitPrice)}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </PopupCard>
+            )}
         </section>
     );
 }

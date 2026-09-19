@@ -9,6 +9,7 @@ import { dayAtHour, inOneHour } from '../detail/detailDates';
 import { PopoverMenu, type MenuEntry } from '../detail/PopoverMenu';
 import { PeoplePicker } from '../shared/PeoplePicker';
 import { TaskIconButton } from '../shared/TaskButton';
+import { useIsTasksAdmin } from '../../store/tasksModuleStore';
 import { useChecklistEnv } from './checklistEnv';
 
 type Popover =
@@ -19,9 +20,9 @@ type Popover =
 
 /**
  * Werkzeuge eines Punkts beim Überfahren (Görevly `cl-tools`): Bugün · Yarın ·
- * Tarih · Hatırlatıcı · Kişi · Bayrak · ⋯ · Sil. Teammitglieder geben einen
- * Punkt nur an Verantwortliche der Aufgabe; die Leitung an jede Person — der
- * Server nimmt sie dann als Verantwortliche auf.
+ * Tarih · Hatırlatıcı · Kişi · Bayrak · ⋯ · Sil. Einen Punkt gibt man nur an
+ * Verantwortliche der Aufgabe; allein die Administratorrolle an jede Person —
+ * der Server nimmt sie dann als Verantwortliche auf (15.09.2026).
  */
 export const ChecklistItemTools = ({
     item,
@@ -41,6 +42,7 @@ export const ChecklistItemTools = ({
     onDelete: () => void;
 }) => {
     const env = useChecklistEnv();
+    const isAdmin = useIsTasksAdmin();
     const [popover, setPopover] = useState<Popover | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -119,7 +121,7 @@ export const ChecklistItemTools = ({
                     if (assigneeId !== item.assigneeId) void onPatch({ assigneeId }, { assigneeId });
                 }}
                 allowNone
-                onlyIds={env.isManager ? undefined : env.taskAssigneeIds}
+                onlyIds={isAdmin ? undefined : env.taskAssigneeIds}
             />
             <DateEditCard
                 open={dateField !== null}

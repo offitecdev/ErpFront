@@ -1,0 +1,627 @@
+/* ═══════════════ KALENDER IM macOS-KLEID (14.09.2026) ═══════════════════════
+   Samet: «calendar ui tamamen mac os ui olması lazım … takvimi sol tarafta
+   alta al … pop up da direkt görseldeki gibi» — Vorlage: die beiden
+   Bildschirmfotos von Apples Kalender (maccalendar.png, maccalendar2.png).
+
+   Die BAUTEILE bleiben (CalendarPage, TimeGrid, MonthGrid, MiniMonth,
+   FloatingCard, CreatePopup, DetailPopup) — hier steht nur das Kleid. Es wird
+   von CalendarPage.tsx importiert und landet damit NACH index.css, dark.css
+   und appleModal.css im Bündel (App.tsx wird in main.tsx zuletzt geladen).
+
+   Aufbau der Vorlage, Stück für Stück:
+     · Die Seite ist EIN Fenster: weiss, Haarlinie, 12px-Ecken. Oben die
+       Werkzeugleiste (links Leiste/Plus, mittig die Segmentwahl Tag | Woche |
+       Monat, rechts Suche), darunter links die Seitenleiste in hellem Grau
+       mit den Kalendern (Etiketten) und — unten — dem kleinen Monatsblatt,
+       rechts der grosse Titel «September 2026» mit ‹ Heute › und das Raster.
+     · Rasterkarten: hell getönte Fläche in der Kalenderfarbe, links ein
+       3px-Balken, Schrift in der dunklen Stufe derselben Farbe, Uhr-Zeichen
+       vor der Zeit. Heute = roter Kreis, die Jetzt-Linie rot mit Zeitmarke.
+     · Fenster (Anlegen, Auskunft): grosser Titel, darunter gruppierte
+       Kästen mit Überschrift («Datum & Zeit»), Segmentwahl für die Art.
+
+   Die Farbtafel steht als `--ofi-cal-*` NEU auf `.ofi-cal-page`, damit jede
+   bestehende Regel des Moduls (Leistenzeilen, Stundenbeschriftung, Linien)
+   von selbst in Mac-Farben malt; Dunkel = dieselbe Tafel unter `html.dark`.
+   Die Fenster lesen ohnehin die Fenstertafel (`--ofi-win-*`, appleModal.css).
+
+   SELEKTORGEWICHT: index.css schreibt die Knöpfe des Moduls als `#root .x`
+   (1,1,0) — hier steht darum `#root .ofi-cal-page .x` (1,2,0). Die Fenster
+   sind Portalwurzeln: der Träger `:is(.ofi-float-card.ofi-cal-…):is(#root *,
+   body > :not(#root) *, body > :not(#root))` schlägt appleModal.css §12.
+   Die Telefon-/Tabletregeln von index.css (Schublade, seitwärts geschobene
+   Woche) bleiben unberührt: alles, was die Seitenleiste STELLT, steht hier
+   unter `@media (min-width: 1024px)`. */
+
+/* ── 1. Farbtafel ─────────────────────────────────────────────────────────── */
+.ofi-cal-page {
+    --ofi-mac-red: #ff3b30;
+    --ofi-mac-blue: #0a7aff;
+    --ofi-mac-sidebar: #f5f5f7;
+    --ofi-mac-weekend: rgba(0, 0, 0, 0.022);
+    --ofi-mac-knob: #ffffff;
+    --ofi-mac-knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+    --ofi-mac-track: rgba(0, 0, 0, 0.05);
+    --ofi-mac-fill: rgba(0, 0, 0, 0.05);
+    --ofi-mac-fill-hover: rgba(0, 0, 0, 0.09);
+    --ofi-mac-btn-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08);
+
+    --ofi-cal-surface: #ffffff;
+    --ofi-cal-surface-2: #f5f5f7;
+    --ofi-cal-surface-3: #fafafa;
+    --ofi-cal-hover: rgba(0, 0, 0, 0.045);
+    --ofi-cal-border: rgba(0, 0, 0, 0.1);
+    --ofi-cal-border-soft: rgba(0, 0, 0, 0.07);
+    --ofi-cal-line: rgba(0, 0, 0, 0.07);
+    --ofi-cal-text: #1d1d1f;
+    --ofi-cal-text-2: #3a3a3c;
+    --ofi-cal-muted: #8e8e93;
+    --ofi-cal-faint: #c7c7cc;
+    --ofi-cal-accent: #0a7aff;
+    --ofi-cal-accent-hover: #0066e0;
+    --ofi-cal-on-accent: #ffffff;
+    --ofi-cal-accent-soft: rgba(10, 122, 255, 0.12);
+    --ofi-cal-accent-tint: rgba(10, 122, 255, 0.07);
+    --ofi-cal-tab-active-bg: #ffffff;
+    --ofi-cal-tab-active-text: #1d1d1f;
+    --ofi-cal-shadow-soft: 0 10px 32px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+    --ofi-cal-danger: #d70015;
+    --ofi-cal-now: #ff3b30;
+    --ofi-cal-draft: #0a7aff;
+    --ofi-cal-draft-border: transparent;
+}
+html.dark .ofi-cal-page {
+    --ofi-mac-red: #ff453a;
+    --ofi-mac-blue: #3b8dff;
+    --ofi-mac-sidebar: #232325;
+    --ofi-mac-weekend: rgba(255, 255, 255, 0.025);
+    --ofi-mac-knob: rgba(255, 255, 255, 0.16);
+    --ofi-mac-knob-shadow: none;
+    --ofi-mac-track: rgba(255, 255, 255, 0.07);
+    --ofi-mac-fill: rgba(255, 255, 255, 0.08);
+    --ofi-mac-fill-hover: rgba(255, 255, 255, 0.13);
+    --ofi-mac-btn-shadow: none;
+
+    --ofi-cal-surface: #1c1c1e;
+    --ofi-cal-surface-2: #232325;
+    --ofi-cal-surface-3: #19191b;
+    --ofi-cal-hover: rgba(255, 255, 255, 0.06);
+    --ofi-cal-border: rgba(255, 255, 255, 0.11);
+    --ofi-cal-border-soft: rgba(255, 255, 255, 0.08);
+    --ofi-cal-line: rgba(255, 255, 255, 0.08);
+    --ofi-cal-text: #f5f5f7;
+    --ofi-cal-text-2: #d1d1d6;
+    --ofi-cal-muted: #8e8e93;
+    --ofi-cal-faint: #48484a;
+    --ofi-cal-accent: #3b8dff;
+    --ofi-cal-accent-hover: #5c9fff;
+    --ofi-cal-on-accent: #ffffff;
+    --ofi-cal-accent-soft: rgba(59, 141, 255, 0.2);
+    --ofi-cal-accent-tint: rgba(59, 141, 255, 0.11);
+    --ofi-cal-tab-active-bg: rgba(255, 255, 255, 0.16);
+    --ofi-cal-tab-active-text: #f5f5f7;
+    --ofi-cal-shadow-soft: 0 14px 40px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+    --ofi-cal-danger: #ff453a;
+    --ofi-cal-now: #ff453a;
+    --ofi-cal-draft: #3b8dff;
+}
+
+/* ── 2. Das Fenster ───────────────────────────────────────────────────────── */
+/* Die Seite füllt die Höhe, die ihr die Anwendung lässt, und rollt INNEN (das
+   Raster) — wie ein Programmfenster. Löst sich `100%` nicht auf (eingebettet
+   im Projekt), bleibt die Mindesthöhe und das Raster deckelt sich selbst. */
+.ofi-cal-page:not(.is-expanded) {
+    gap: 0;
+    height: 100%;
+    min-height: 560px;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 12px;
+    background: var(--ofi-cal-surface);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.02), 0 6px 22px rgba(0, 0, 0, 0.05);
+    font-variant-numeric: tabular-nums;
+}
+html.dark .ofi-cal-page:not(.is-expanded) { box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
+
+/* ── 3. Werkzeugleiste ────────────────────────────────────────────────────── */
+.ofi-cal-page .ofi-cal-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 52px;
+    flex: none;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    background: var(--ofi-cal-surface);
+    padding: 8px 12px;
+}
+.ofi-cal-topbar__left,
+.ofi-cal-topbar__center,
+.ofi-cal-topbar__right { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.ofi-cal-topbar__center { justify-content: center; }
+.ofi-cal-topbar__right { justify-content: flex-end; }
+.ofi-cal-topbar__left > .relative { display: flex; }
+
+/* Mac-Werkzeugknopf: 30px-Quadrat, Haarlinie, 6px-Ecke. */
+#root .ofi-cal-page .ofi-cal-navbtn,
+#root .ofi-cal-page .ofi-cal-createbtn {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    align-self: center;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px !important;
+    background: var(--ofi-cal-surface);
+    padding: 0;
+    color: var(--ofi-cal-text-2);
+    box-shadow: var(--ofi-mac-btn-shadow);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-cal-page .ofi-cal-navbtn:hover,
+#root .ofi-cal-page .ofi-cal-createbtn:hover { background: var(--ofi-cal-surface-2); color: var(--ofi-cal-text); box-shadow: var(--ofi-mac-btn-shadow); }
+#root .ofi-cal-page .ofi-cal-createbtn svg:first-child { color: var(--ofi-cal-text-2); }
+#root .ofi-cal-page .ofi-cal-createbtn svg:last-child:not(:first-child) { display: none; }
+/* «Neue Aufgabe» im Aufgabenmodus trägt sein Wort — derselbe Knopf, breiter. */
+#root .ofi-cal-page .ofi-cal-createbtn.has-label { width: auto; gap: 6px; padding: 0 12px 0 9px; font-size: 13px; font-weight: 500; }
+#root .ofi-cal-page .ofi-cal-createbtn.has-label svg:last-child:not(:first-child) { display: inline; }
+
+/* Das Anlegemenü unter dem Plus: Mac-Menü, 8px-Ecke, 5px-Zeilen. */
+.ofi-cal-page .ofi-cal-createmenu {
+    top: calc(100% + 6px);
+    min-width: 188px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 8px;
+    padding: 5px;
+    box-shadow: var(--ofi-cal-shadow-soft);
+}
+#root .ofi-cal-page .ofi-cal-createmenu button {
+    border-radius: 5px !important;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 400;
+}
+#root .ofi-cal-page .ofi-cal-createmenu button:hover { background: var(--ofi-cal-accent); color: #fff; }
+.ofi-cal-page .ofi-cal-createmenu .ofi-ucal-dot { border-radius: 999px; width: 8px; height: 8px; }
+
+/* Segmentwahl Tag | Woche | Monat und der Modus-Umschalter: Mac-Segmentleiste
+   — graue Schiene, weisser Knopf mit Schatten, nichts rund. */
+.ofi-cal-page .ofi-cal-viewgroup,
+.ofi-cal-page .ofi-cal-modegroup {
+    gap: 2px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--ofi-mac-track);
+    padding: 2px;
+}
+#root .ofi-cal-page .ofi-cal-viewgroup button,
+#root .ofi-cal-page .ofi-cal-modegroup button {
+    height: 26px;
+    min-width: 30px;
+    border-left: 0;
+    border-radius: 6px !important;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-cal-page .ofi-cal-modegroup button { padding: 0 10px; }
+#root .ofi-cal-page .ofi-cal-viewgroup button:hover,
+#root .ofi-cal-page .ofi-cal-modegroup button:hover { background: var(--ofi-cal-hover); }
+#root .ofi-cal-page .ofi-cal-viewgroup button.is-active,
+#root .ofi-cal-page .ofi-cal-modegroup button.is-active {
+    background: var(--ofi-mac-knob);
+    color: var(--ofi-cal-text);
+    box-shadow: var(--ofi-mac-knob-shadow);
+}
+
+/* Die Suche rechts in der Werkzeugleiste: Mac-Suchfeld, rund, Lupe links. */
+.ofi-cal-page .ofi-cal-toolsearch {
+    width: 200px;
+    min-width: 0;
+    height: 30px;
+    gap: 6px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 7px;
+    background: var(--ofi-cal-surface);
+    padding: 0 8px 0 9px;
+    box-shadow: var(--ofi-mac-btn-shadow);
+}
+.ofi-cal-page .ofi-cal-toolsearch:focus-within { border-color: var(--ofi-cal-accent); box-shadow: 0 0 0 3px var(--ofi-cal-accent-soft); }
+.ofi-cal-page .ofi-cal-toolsearch svg { color: var(--ofi-cal-muted); }
+#root .ofi-cal-page .ofi-cal-toolsearch input { font-size: 13px; }
+#root .ofi-cal-page .ofi-cal-toolsearch input::placeholder { color: var(--ofi-cal-muted); }
+html.dark .ofi-cal-page .ofi-cal-toolsearch { background: rgba(255, 255, 255, 0.06); }
+
+/* ── 4. Titelzeile «September 2026» ‹ Heute › ─────────────────────────────── */
+.ofi-cal-titlerow {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px 8px 20px;
+}
+.ofi-cal-page .ofi-cal-period {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    color: var(--ofi-cal-text);
+    text-transform: capitalize;
+}
+.ofi-cal-period__year { font-weight: 400; color: var(--ofi-cal-text); }
+.ofi-cal-navgroup { display: inline-flex; flex: none; align-items: center; gap: 6px; }
+#root .ofi-cal-page .ofi-cal-todaybtn {
+    height: 30px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 6px !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+    box-shadow: var(--ofi-mac-btn-shadow);
+}
+#root .ofi-cal-page .ofi-cal-todaybtn:hover { background: var(--ofi-cal-surface-2); }
+
+/* ── 5. Körper: Seitenleiste + Raster ─────────────────────────────────────── */
+.ofi-cal-page:not(.is-expanded) .ofi-cal-body { flex: 1; min-height: 0; gap: 0; }
+.ofi-cal-main { display: flex; min-height: 0; flex-direction: column; }
+@media (min-width: 1024px) {
+    .ofi-cal-page:not(.is-expanded) .ofi-cal-body { grid-template-columns: 216px minmax(0, 1fr); }
+    .ofi-cal-page:not(.is-expanded) .ofi-cal-body.is-tasks { grid-template-columns: minmax(0, 1fr); }
+    /* Die Seitenleiste: hellgrau, Haarlinie rechts, füllt die Höhe; die
+       Etiketten oben, das Monatsblatt unten (Vorgabe: «takvimi sol tarafta
+       alta al»). */
+    .ofi-cal-page .ofi-cal-rail {
+        position: static;
+        display: flex;
+        /* index.css stellt die Leiste `align-self: start` (klebend) — hier
+           füllt sie die ganze Höhe, sonst endet ihr Grau am Monatsblatt. */
+        align-self: stretch;
+        min-height: 0;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        border-right: 1px solid var(--ofi-cal-border-soft);
+        background: var(--ofi-mac-sidebar);
+        padding: 10px 8px 6px;
+    }
+    .ofi-cal-page .ofi-cal-rail > .ofi-cal-rail-block { flex: 1; }
+}
+/* Die Schublade (unter 1024px) trägt dieselben Farben. */
+.ofi-cal-page .ofi-cal-rail.is-drawer { background: var(--ofi-mac-sidebar); border-right-color: var(--ofi-cal-border); }
+
+/* Überschrift einer Gruppe («Etiketten» — wie «iCloud» in der Vorlage). */
+.ofi-cal-page .ofi-cal-rail-title {
+    padding: 4px 8px 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-cal-page .ofi-cal-labelgear { width: 20px; height: 20px; border-radius: 5px !important; }
+#root .ofi-cal-page .ofi-cal-labelgear:hover { background: var(--ofi-mac-fill); color: var(--ofi-cal-text); }
+/* Eine Kalenderzeile: farbiger Haken, Name, Zahl — kein zweiter Punkt. */
+#root .ofi-cal-page .ofi-cal-railrow {
+    gap: 9px;
+    border-radius: 6px !important;
+    padding: 4px 8px;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-cal-page .ofi-cal-railrow:hover { background: var(--ofi-mac-fill); }
+.ofi-cal-page .ofi-cal-railrow .ofi-ucal-dot { display: none; }
+.ofi-cal-page .ofi-cal-railrow .ofi-cal-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--ofi-label, var(--ofi-cal-muted));
+    background: transparent;
+}
+.ofi-cal-page .ofi-cal-railrow .ofi-cal-check.is-on { border-color: var(--ofi-label, var(--ofi-cal-accent)); background: var(--ofi-label, var(--ofi-cal-accent)); }
+.ofi-cal-page .ofi-cal-railrow .ofi-cal-check__mark {
+    width: 4px;
+    height: 8px;
+    margin-top: -2px;
+    border: solid #fff;
+    border-width: 0 1.8px 1.8px 0;
+    border-radius: 0;
+    background: transparent;
+    transform: rotate(45deg);
+}
+.ofi-cal-page .ofi-cal-railcount { font-size: 11px; font-weight: 500; color: var(--ofi-cal-muted); }
+#root .ofi-cal-page .ofi-cal-labeladd { border-radius: 6px !important; padding: 4px 8px; font-size: 12.5px; font-weight: 500; }
+
+/* Das kleine Monatsblatt unten in der Leiste. */
+.ofi-cal-minimonth {
+    flex: none;
+    margin-top: auto;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    padding: 10px 2px 2px;
+}
+.ofi-cal-minimonth__head { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px 6px 6px; }
+.ofi-cal-minimonth__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: capitalize;
+    color: var(--ofi-cal-text);
+}
+.ofi-cal-minimonth__nav { display: flex; flex: none; gap: 2px; }
+#root .ofi-cal-page .ofi-cal-minimonth__navbtn {
+    display: flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px !important;
+    background: transparent;
+    color: var(--ofi-cal-muted);
+}
+#root .ofi-cal-page .ofi-cal-minimonth__navbtn:hover { background: var(--ofi-mac-fill); color: var(--ofi-cal-text); }
+.ofi-cal-minimonth__dow {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    padding-bottom: 2px;
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+}
+.ofi-cal-minimonth__days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 1px; }
+#root .ofi-cal-page .ofi-cal-mini-day {
+    height: 25px;
+    border-radius: 999px !important;
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-cal-page .ofi-cal-mini-day:hover { background: var(--ofi-mac-fill); }
+#root .ofi-cal-page .ofi-cal-mini-day.is-outside { color: var(--ofi-cal-muted); opacity: 1; }
+#root .ofi-cal-page .ofi-cal-mini-day.is-selected { background: var(--ofi-mac-fill-hover); color: var(--ofi-cal-text); font-weight: 600; }
+#root .ofi-cal-page .ofi-cal-mini-day.is-today,
+#root .ofi-cal-page .ofi-cal-mini-day.is-today.is-selected { background: var(--ofi-mac-red); color: #fff; font-weight: 600; }
+.ofi-cal-page .ofi-cal-mini-day__dot { bottom: 3px; width: 3px; height: 3px; background: var(--ofi-cal-muted); }
+#root .ofi-cal-page .ofi-cal-mini-day.is-today .ofi-cal-mini-day__dot { background: #fff; }
+
+/* ── 6. Rasterfläche ──────────────────────────────────────────────────────── */
+.ofi-cal-page:not(.is-expanded) .ofi-cal-surface {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+    border: 0;
+    border-top: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 0;
+}
+.ofi-cal-page:not(.is-expanded) .ofi-cal-scroll { flex: 1; min-height: 0; max-height: calc(100dvh - 190px); }
+.ofi-cal-page .ofi-cal-headrow { border-bottom-color: var(--ofi-cal-border-soft); }
+.ofi-cal-page .ofi-cal-tz { font-size: 10px; font-weight: 400; color: var(--ofi-cal-muted); }
+
+/* Tageskopf «Mo 14»: Name und Zahl in EINER Zeile, heute die Zahl im roten
+   Kreis (Vorlage: «Tue ①»). */
+#root .ofi-cal-page .ofi-cal-daybtn { flex-direction: row; gap: 5px; padding: 11px 4px 9px; }
+.ofi-cal-page .ofi-cal-daybtn__name {
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: capitalize;
+    color: var(--ofi-cal-text-2);
+}
+.ofi-cal-page .ofi-cal-daybtn__name.is-today { color: var(--ofi-cal-text); font-weight: 500; }
+.ofi-cal-page .ofi-cal-daybtn__num {
+    height: 24px;
+    min-width: 24px;
+    padding: 0 5px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ofi-cal-text);
+}
+#root .ofi-cal-page .ofi-cal-daybtn:hover .ofi-cal-daybtn__num:not(.is-today) { background: var(--ofi-mac-fill); }
+.ofi-cal-page .ofi-cal-daybtn__num.is-today { background: var(--ofi-mac-red); color: #fff; font-weight: 600; }
+/* Wochenende: eine Spur grauer, in Kopf, ganztägiger Zeile und Spalte. */
+.ofi-cal-page .ofi-cal-daybtn.is-weekend,
+.ofi-cal-page .ofi-cal-allday__col.is-weekend,
+.ofi-cal-page .ofi-cal-col.is-weekend,
+.ofi-cal-page .ofi-cal-monthcell.is-weekend { background-color: var(--ofi-mac-weekend); }
+
+.ofi-cal-page .ofi-cal-allday { border-bottom-color: var(--ofi-cal-border); }
+.ofi-cal-page .ofi-cal-allday__label { font-size: 11px; font-weight: 400; }
+.ofi-cal-page .ofi-cal-allday__col { border-left-color: var(--ofi-cal-line); }
+.ofi-cal-page .ofi-cal-hourlabel { font-size: 11px; font-weight: 400; color: var(--ofi-cal-muted); }
+.ofi-cal-page .ofi-cal-col { border-left-color: var(--ofi-cal-line); }
+.ofi-cal-page .ofi-cal-hourline { border-top-color: var(--ofi-cal-line); }
+
+/* Jetzt: EINE rote Linie über alle Spalten, die Zeit als rote Marke in der
+   Stundenspalte, der Punkt nur am heutigen Tag. */
+.ofi-cal-gridbody { position: relative; }
+.ofi-cal-nowline {
+    position: absolute;
+    right: 0;
+    z-index: 24;
+    height: 1px;
+    background: var(--ofi-cal-now);
+    opacity: 0.45;
+    pointer-events: none;
+}
+.ofi-cal-nowbadge {
+    position: absolute;
+    right: 6px;
+    z-index: 26;
+    transform: translateY(-50%);
+    border-radius: 5px;
+    background: var(--ofi-cal-now);
+    padding: 1px 5px;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 14px;
+    color: #fff;
+    pointer-events: none;
+}
+.ofi-cal-page .ofi-cal-now__dot { width: 9px; height: 9px; margin-left: -4.5px; }
+.ofi-cal-page .ofi-cal-now__line { height: 2px; }
+
+/* ── 7. Die Karten ────────────────────────────────────────────────────────── */
+/* Apples Karte: hell getönt in der Kalenderfarbe, links ein Balken, die
+   Schrift in der dunklen Stufe derselben Farbe — nicht mehr Googles satte
+   Fläche mit weisser Schrift. Die Farbe reist als `--ofi-chip-bg` (Etikett:
+   inline aus chipStyle(); ohne Etikett: die Klassen unten). */
+html .ofi-cal-page .ofi-ucal-chip {
+    --ofi-chip-bg: #0a7aff;
+    border: 0;
+    border-left: 3px solid var(--ofi-chip-bg);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ofi-chip-bg) 15%, var(--ofi-cal-surface));
+    padding: 2px 6px 2px 5px;
+    font-size: 12px;
+    line-height: 15px;
+    color: color-mix(in srgb, var(--ofi-chip-bg) 72%, #000);
+    box-shadow: none;
+    text-decoration: none;
+}
+html .ofi-cal-page .ofi-ucal-chip:hover { background: color-mix(in srgb, var(--ofi-chip-bg) 24%, var(--ofi-cal-surface)); }
+html.dark .ofi-cal-page .ofi-ucal-chip {
+    background: color-mix(in srgb, var(--ofi-chip-bg) 26%, var(--ofi-cal-surface));
+    color: color-mix(in srgb, var(--ofi-chip-bg) 68%, #fff);
+}
+html.dark .ofi-cal-page .ofi-ucal-chip:hover { background: color-mix(in srgb, var(--ofi-chip-bg) 36%, var(--ofi-cal-surface)); }
+html .ofi-cal-page .ofi-ucal-chip__title { font-weight: 600; }
+html .ofi-cal-page .ofi-ucal-chip__time { font-weight: 400; }
+html .ofi-cal-page .ofi-ucal-chip__meta {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11.5px;
+    line-height: 15px;
+    color: inherit;
+    opacity: 0.88;
+}
+html .ofi-cal-page .ofi-ucal-chip__metatext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ucal-chip__clock { width: 10px; height: 10px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+html .ofi-cal-page .ofi-ucal-chip.is-allday { min-height: 20px; }
+html .ofi-cal-page .ofi-ucal-chip:focus-visible { outline: 2px solid var(--ofi-cal-accent); outline-offset: 1px; }
+
+/* Ohne Etikett: Apples Kalenderfarben statt Googles. */
+html .ofi-cal-page .ofi-ucal-chip--planned { --ofi-chip-bg: #0a7aff; }
+html .ofi-cal-page .ofi-ucal-chip--ongoing { --ofi-chip-bg: #5856d6; }
+html .ofi-cal-page .ofi-ucal-chip--done { --ofi-chip-bg: #34c759; }
+html .ofi-cal-page .ofi-ucal-chip--meeting { --ofi-chip-bg: #af52de; }
+html .ofi-cal-page .ofi-ucal-chip--maintenance { --ofi-chip-bg: #ff9500; }
+html .ofi-cal-page .ofi-ucal-chip--task { --ofi-chip-bg: #34c759; }
+html .ofi-cal-page .ofi-ucal-chip--cancelled,
+html .ofi-cal-page .ofi-ucal-chip--taskDone { --ofi-chip-bg: #8e8e93; text-decoration: line-through; }
+html .ofi-cal-page .ofi-ucal-chip--taskDone .ofi-ucal-chip__mark path { stroke: var(--ofi-cal-surface); }
+/* Der Entwurf: dieselbe Karte, im Systemblau, mit Ring und Schatten — «noch
+   nicht gespeichert». */
+html .ofi-cal-page .ofi-ucal-chip--draft {
+    --ofi-chip-bg: var(--ofi-cal-draft);
+    box-shadow: 0 0 0 1.5px var(--ofi-chip-bg), 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+html .ofi-cal-page .ofi-ucal-chip--draft:hover { background: color-mix(in srgb, var(--ofi-chip-bg) 24%, var(--ofi-cal-surface)); }
+html .ofi-cal-page .ofi-ucal-chip.is-dragging { outline: 0; box-shadow: 0 0 0 1.5px var(--ofi-chip-bg); }
+.ofi-cal-page .ofi-cal-card.is-ghost { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18); border-radius: 4px; }
+/* Nachtmontage: die offene Kante bleibt, nur auf der getönten Karte. */
+html .ofi-cal-page .ofi-ucal-chip.is-continues { border-bottom: 1px dashed var(--ofi-chip-bg); }
+html .ofi-cal-page .ofi-ucal-chip.is-continued { border-top: 1px dashed var(--ofi-chip-bg); }
+/* Der Punkt vor einem Etikett (Menü, Kopfzeile): rund wie am Mac. */
+.ofi-cal-page .ofi-ucal-dot { border-radius: 999px; }
+
+/* ── 8. Monatsblatt ───────────────────────────────────────────────────────── */
+.ofi-cal-monthwrap { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.ofi-cal-monthbody { flex: 1; grid-auto-rows: minmax(96px, 1fr); }
+.ofi-cal-page .ofi-cal-monthhead { border-bottom-color: var(--ofi-cal-border-soft); }
+.ofi-cal-page .ofi-cal-monthhead > div {
+    padding: 8px 10px 6px;
+    text-align: right;
+    text-transform: capitalize;
+    letter-spacing: 0;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--ofi-cal-text-2);
+}
+.ofi-cal-page .ofi-cal-monthcell {
+    min-height: 96px;
+    border-right-color: var(--ofi-cal-line);
+    border-bottom-color: var(--ofi-cal-line);
+    padding: 3px 4px 4px;
+}
+.ofi-cal-page .ofi-cal-monthcell.is-outside { background: var(--ofi-cal-surface-3); }
+.ofi-cal-page .ofi-cal-monthcell.is-outside.is-weekend { background: var(--ofi-cal-surface-3); }
+.ofi-cal-page .ofi-cal-monthcell.is-selected { box-shadow: inset 0 0 0 1.5px var(--ofi-cal-accent-soft); }
+.ofi-cal-page .ofi-cal-monthcell.is-drop { background: var(--ofi-cal-accent-tint); box-shadow: inset 0 0 0 2px var(--ofi-cal-accent); }
+.ofi-cal-monthcell__head { display: flex; justify-content: flex-end; margin-bottom: 2px; }
+#root .ofi-cal-page .ofi-cal-monthcell__num {
+    height: 22px;
+    min-width: 22px;
+    padding: 0 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+#root .ofi-cal-page .ofi-cal-monthcell__num:hover { background: var(--ofi-mac-fill); }
+#root .ofi-cal-page .ofi-cal-monthcell__num.is-today { background: var(--ofi-mac-red); color: #fff; font-weight: 600; }
+/* Ein Termin MIT Uhrzeit steht im Monat wie am Mac: Punkt, Zeit, Titel — ohne
+   getönte Fläche; nur der ganztägige bleibt ein Balken. */
+html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip.is-timed {
+    position: relative;
+    border-left: 0;
+    background: transparent;
+    padding: 1px 4px 1px 14px;
+    color: var(--ofi-cal-text);
+}
+html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip.is-timed:hover { background: var(--ofi-mac-fill); }
+html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip.is-timed::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--ofi-chip-bg);
+    transform: translateY(-50%);
+}
+html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip.is-timed .ofi-ucal-chip__title { font-weight: 500; }
+html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip.is-timed .ofi-ucal-chip__time { color: var(--ofi-cal-muted); }
+html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip--draft.is-timed { background: color-mix(in srgb, var(--ofi-chip-bg) 15%, var(--ofi-cal-surface)); box-shadow: 0 0 0 1.5px var(--ofi-chip-bg); }
+#root .ofi-cal-page .ofi-cal-monthcell__more { font-size: 11px; font-weight: 500; color: var(--ofi-cal-muted); }
+
+/* ── 9. Telefon und Tablet ────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+    .ofi-cal-page:not(.is-expanded) { min-height: 0; }
+    .ofi-cal-page .ofi-cal-toolsearch { width: 160px; }
+}
+@media (max-width: 639px) {
+    .ofi-cal-page .ofi-cal-topbar { display: flex; flex-wrap: wrap; min-height: 0; padding: 8px 10px; }
+    .ofi-cal-topbar__center { order: 3; width: 100%; }
+    .ofi-cal-topbar__right { flex: 1; }
+    .ofi-cal-page .ofi-cal-toolsearch { width: 34px; padding: 0; justify-content: center; }
+    #root .ofi-cal-page .ofi-cal-toolsearch input { display: none; }
+    .ofi-cal-page .ofi-cal-toolsearch:focus-within,
+    .ofi-cal-page .ofi-cal-toolsearch.has-value { width: 150px; padding: 0 8px 0 9px; justify-content: flex-start; }
+    #root .ofi-cal-page .ofi-cal-toolsearch:focus-within input,
+    #root .ofi-cal-page .ofi-cal-toolsearch.has-value input { display: block; }
+    .ofi-cal-titlerow { padding: 10px 12px 6px 14px; }
+    .ofi-cal-page .ofi-cal-period { font-size: 19px; padding-left: 0; }
+    #root .ofi-cal-page .ofi-cal-todaybtn { height: 30px; padding: 0 12px; font-size: 12.5px; }
+    #root .ofi-cal-page .ofi-cal-navbtn { width: 30px; height: 30px; }
+    .ofi-cal-page .ofi-cal-daybtn__name { font-size: 12px; }
+    .ofi-cal-page .ofi-cal-daybtn__num { font-size: 12.5px; height: 22px; min-width: 22px; }
+    .ofi-cal-page:not(.is-expanded) .ofi-cal-scroll { max-height: calc(100dvh - 230px); }
+}
+

@@ -4,7 +4,7 @@ import { tasksApi } from '@/lib/api/tasksModule';
 import type { WorkReport } from '@/types/tasksModule';
 import { useTasksChanged } from '../../utils/taskEvents';
 import type { ReportQuery } from './reportQuery';
-import { periodBounds, type WorkPeriod } from './workReportModel';
+import { periodBounds, toDateKey, type WorkPeriod } from './workReportModel';
 
 /**
  * Lädt den Arbeitsrapport der Wahl (EINE Anfrage für Zeitraum + Person).
@@ -43,8 +43,9 @@ export const useReportData = (query: ReportQuery, enabled: boolean): ReportData 
         const requestId = requestRef.current + 1;
         requestRef.current = requestId;
         setPendingKey(requestKey);
-        const { from, to } = periodBounds(current.period, current.date);
-        tasksApi.workReport(from.toISOString(), to.toISOString(), current.person)
+        const { from, to, days } = periodBounds(current.period, current.date);
+        const dayKeys = { fromDate: toDateKey(days[0]), toDate: toDateKey(days[days.length - 1]) };
+        tasksApi.workReport(from.toISOString(), to.toISOString(), current.person, dayKeys)
             .then((report) => {
                 if (requestRef.current !== requestId) return;
                 setLoaded({ key: requestKey, report, period: current.period });

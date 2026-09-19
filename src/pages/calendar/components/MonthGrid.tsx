@@ -150,17 +150,20 @@ export const MonthGrid = ({ anchor, range, eventsByDay, selectedDay, now, draft,
     const draftTitle = draft?.title?.trim() || t('calendar.create.untitled');
 
     return (
-        <div>
+        /* `ofi-cal-monthwrap` / `ofi-cal-monthbody`: das Blatt füllt die Höhe
+           der Fläche, die Wochen teilen sie sich gleichmässig (macOS-Kleid). */
+        <div className="ofi-cal-monthwrap">
             <div className="ofi-cal-monthhead">
                 {weekDays.map((day) => <div key={day}>{day}</div>)}
             </div>
-            <div className="grid grid-cols-7">
+            <div className="grid grid-cols-7 ofi-cal-monthbody">
                 {days.map((day) => {
                     const key = dayKey(day);
                     const dayEvents = eventsByDay.get(key) || [];
                     const isSelected = key === dayKey(selectedDay);
                     const isToday = key === dayKey(now);
                     const outside = day.month() !== anchor.month();
+                    const weekend = day.day() === 0 || day.day() === 6;
                     return (
                         <div
                             key={key}
@@ -171,9 +174,10 @@ export const MonthGrid = ({ anchor, range, eventsByDay, selectedDay, now, draft,
                                 onSelectDay(day);
                                 onCreateDay?.(day, anchorFromPoint(clickEvent.clientX, clickEvent.clientY));
                             }}
-                            className={`ofi-cal-monthcell ${isSelected ? 'is-selected' : ''} ${outside ? 'is-outside' : ''} ${dropKey === key || inSpan(key) ? 'is-drop' : ''}`}
+                            className={`ofi-cal-monthcell ${isSelected ? 'is-selected' : ''} ${outside ? 'is-outside' : ''} ${weekend ? 'is-weekend' : ''} ${dropKey === key || inSpan(key) ? 'is-drop' : ''}`}
                         >
-                            <div className="mb-1 flex items-center justify-center">
+                            {/* Die Zahl rechts oben in der Zelle, heute im roten Kreis. */}
+                            <div className="ofi-cal-monthcell__head">
                                 <button
                                     type="button"
                                     onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpenDay(day); }}
@@ -201,7 +205,7 @@ export const MonthGrid = ({ anchor, range, eventsByDay, selectedDay, now, draft,
                                                 beginDrag(pointerEvent, { kind: 'draft' }, { start: entry.start, end: entry.end });
                                             }}
                                             onClick={(clickEvent) => clickEvent.stopPropagation()}
-                                            className={`ofi-ucal-chip ofi-ucal-chip--draft is-allday ${movable ? 'is-draggable' : ''}`}
+                                            className={`ofi-ucal-chip ofi-ucal-chip--draft is-allday ${draft!.allDay ? '' : 'is-timed'} ${movable ? 'is-draggable' : ''}`}
                                         >
                                             <ChipLabel
                                                 status={DRAFT_STATUS}
@@ -218,7 +222,10 @@ export const MonthGrid = ({ anchor, range, eventsByDay, selectedDay, now, draft,
                                         tabIndex={0}
                                         onPointerDown={(pointerEvent) => beginDrag(pointerEvent, { kind: 'event', event }, { start: event.start, end: event.end })}
                                         onClick={(clickEvent) => clickEvent.stopPropagation()}
-                                        className={`${chipClass(event)} is-allday ${event.editable && onReschedule ? 'is-draggable' : ''}`}
+                                        /* `is-timed`: ein Termin MIT Uhrzeit steht im Monat
+                                           wie am Mac — Punkt, Zeit, Titel, ohne Fläche;
+                                           nur der ganztägige bleibt ein farbiger Balken. */
+                                        className={`${chipClass(event)} is-allday ${event.allDay ? '' : 'is-timed'} ${event.editable && onReschedule ? 'is-draggable' : ''}`}
                                         style={chipStyle(event)}
                                     >
                                         <ChipLabel

@@ -9,6 +9,7 @@ import { useLanguageTick } from './hooks/useLanguageTick';
 import { ORDERS_PAGE_SIZE, useOrdersList } from './hooks/useOrdersList';
 import { fmtDateTime, fmtMoneyIn } from './utils/format';
 import { FILTERABLE_ORDER_STATUSES, ORDER_STATUS_META } from './utils/orderStatus';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /* Der Filter neben der Suche trägt das hausweite Mass (styles/controls.css);
    die frühere handgeschriebene Klassenkette stand 36px hoch und wich damit
@@ -80,21 +81,9 @@ export const OrdersPage = () => {
                         <option key={status} value={status}>{t(ORDER_STATUS_META[status].labelKey)}</option>
                     ))}
                 </select>
-                <input
-                    type="date"
-                    value={list.dateFrom}
-                    onChange={(event) => list.setDateFrom(event.target.value)}
-                    aria-label={t('inv.movements.dateFrom')}
-                    className={TOOLBAR_CONTROL_CLASS}
-                />
+                <MacDatePicker value={list.dateFrom} onChange={(nextDate) => list.setDateFrom(nextDate)} ariaLabel={t('inv.movements.dateFrom')} className="is-toolbar" />
                 <span className="text-[12px] text-slate-400">—</span>
-                <input
-                    type="date"
-                    value={list.dateTo}
-                    onChange={(event) => list.setDateTo(event.target.value)}
-                    aria-label={t('inv.movements.dateTo')}
-                    className={TOOLBAR_CONTROL_CLASS}
-                />
+                <MacDatePicker value={list.dateTo} onChange={(nextDate) => list.setDateTo(nextDate)} ariaLabel={t('inv.movements.dateTo')} className="is-toolbar" />
             </FilterBar>
 
             <SectionCard title={t('inv.orders.sectionTitle', { count: list.total })}>

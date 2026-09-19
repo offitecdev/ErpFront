@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { Spinner } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
+import { clipboardFiles } from '../../utils/clipboardFiles';
 import { formatBytes } from '../../utils/taskFormat';
 import { TaskButton, TaskIconButton } from '../shared/TaskButton';
 import { MAX_CHAT_FILE_BYTES, MAX_CHAT_FILES } from './chatFormat';
@@ -73,9 +74,9 @@ export const ChatComposer = ({
     };
 
     const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-        const pasted = Array.from(event.clipboardData.files);
+        const pasted = clipboardFiles(event.clipboardData);
         if (!pasted.length) return;
-        if (!event.clipboardData.types.includes('text/plain')) event.preventDefault();
+        event.preventDefault();
         addFiles(pasted);
     };
 

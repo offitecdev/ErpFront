@@ -4,6 +4,7 @@ import { LuSettings } from 'react-icons/lu';
 import { t } from '@/i18n/translate';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { TaskIconButton } from '../shared/TaskButton';
+import { useIsTasksAdmin } from '../../store/tasksModuleStore';
 import { TaskSettingsCard } from './TaskSettingsCard';
 
 /**
@@ -21,6 +22,10 @@ export const TaskSettingsButton = () => {
     useLanguageTick();
     const [open, setOpen] = useState(false);
     const closedAt = useRef(0);
+    // 15.09.2026 (Samet): «ayarlar Administrator haricine görünmesin».
+    const isAdmin = useIsTasksAdmin();
+
+    if (!isAdmin) return null;
 
     const close = () => {
         closedAt.current = Date.now();

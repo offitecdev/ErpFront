@@ -487,6 +487,17 @@ body > :not(#root) .ofi-gv-add:hover {
 
 .ofi-gv-due.is-late { color: var(--gv-danger, #d70015); }
 .ofi-gv-due.is-soon { color: var(--gv-warning, #b25000); }
+.ofi-gv-due.is-ok { color: var(--gv-success, #1f8a3b); }
+
+/* Gecikme açıklaması liegt vor — nur der Administrator sieht das Zeichen (15.09.2026). */
+.ofi-gv-delay-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--gv-warning, #b25000);
+    font-size: 12px;
+    white-space: nowrap;
+}
 
 /* ── Laufende Messung ───────────────────────────────────────────────────── */
 
@@ -500,8 +511,10 @@ body > :not(#root) .ofi-gv-add:hover {
     border: 1px solid var(--gv-border);
     border-radius: 6px;
     background: var(--gv-surface);
-    font-size: 12.5px;
+    font-size: 13px;
 }
+
+#root .ofi-gv .ofi-gv-timerchip .ofi-gv-clock { font-size: 14px; }
 
 .ofi-gv-live {
     flex: none;
@@ -509,21 +522,14 @@ body > :not(#root) .ofi-gv-add:hover {
     height: 7px;
     border-radius: 999px;
     background: #ff3b30;
-    animation: ofi-gv-live 1.6s ease-in-out infinite;
 }
 
-@keyframes ofi-gv-live {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .ofi-gv-live { animation: none; }
-}
-
+/* Laufende Uhr — überall dieselbe Schrift, feste Ziffernbreite: nichts rutscht beim Ticken. */
 .ofi-gv-clock {
     font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
     font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 .ofi-gv-timerchip__title {
@@ -536,6 +542,40 @@ body > :not(#root) .ofi-gv-add:hover {
 }
 
 .ofi-gv-timerchip__title:hover { color: var(--gv-text); }
+
+.ofi-gv-head-actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+@media (max-width: 640px) {
+    .ofi-gv > .ofi-rise {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .ofi-gv > .ofi-rise > h1,
+    .ofi-gv > .ofi-rise > div:last-child {
+        flex-basis: 100%;
+    }
+
+    .ofi-gv > .ofi-rise > div:last-child {
+        justify-content: flex-start;
+    }
+
+    .ofi-gv-head-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    #root .ofi-gv .ofi-gv-timerchip {
+        max-width: 100%;
+    }
+}
 
 /* ── Hinweisstreifen (Freigabe, Blockade, abgeschlossen) ────────────────── */
 
@@ -886,4 +926,186 @@ html.dark #root .ofi-gv button.ofi-togglegroup__btn.is-on:hover,
 html.dark #root .ofi-gv button.ofi-togglegroup__btn.is-on:hover * {
     color: var(--gv-accent) !important;
     -webkit-text-fill-color: var(--gv-accent) !important;
+}
+
+
+/* ── «Çalışılıyor» — laufende Messung OHNE Uhr (14.09.2026, Samet) ─────────
+   «kronometre olmayacak, sadece animasyonlu çalışılıyor yazacak; çalışılan
+   görevin rengi değişsin, üstte başlık şeklinde yazsın» — Glaskarte nach dem
+   Mac-Kalender (maccalendar2.png): milchig, 14px Ecke, feine Kante, weicher
+   Schatten. EIN Grün für «läuft», das Systemblau bleibt den Knöpfen. */
+
+.ofi-gv {
+    --gv-working: #34c759;
+    --gv-working-text: #248a3d;
+    --gv-working-soft: rgba(52, 199, 89, 0.09);
+    --gv-working-line: rgba(52, 199, 89, 0.28);
+}
+
+.dark .ofi-gv {
+    --gv-working: #30d158;
+    --gv-working-text: #30d158;
+    --gv-working-soft: rgba(48, 209, 88, 0.12);
+    --gv-working-line: rgba(48, 209, 88, 0.32);
+}
+
+@keyframes ofi-gv-breathe {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.45); }
+    50% { transform: scale(0.82); box-shadow: 0 0 0 5px rgba(52, 199, 89, 0); }
+}
+
+@keyframes ofi-gv-shimmer-text {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+.ofi-gv-working__dot {
+    flex: none;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--gv-working, #34c759);
+    animation: ofi-gv-breathe 1.6s ease-in-out infinite;
+}
+
+.ofi-gv-working {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--gv-working-text, #248a3d);
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Das Wort schimmert leise von rechts nach links — Bewegung ohne Zahl. */
+.ofi-gv-working__text {
+    background: linear-gradient(90deg, currentColor 0%, currentColor 40%, rgba(255, 255, 255, 0.85) 50%, currentColor 60%, currentColor 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: ofi-gv-shimmer-text 2.4s linear infinite;
+}
+
+.ofi-gv-working.is-others { color: var(--gv-secondary); font-weight: 500; }
+.ofi-gv-working.is-others .ofi-gv-working__dot { width: 7px; height: 7px; opacity: 0.75; }
+.ofi-gv-working.is-others .ofi-gv-working__text { animation: none; -webkit-text-fill-color: currentColor; background: none; }
+
+/* Die Karte oben im Modul */
+.ofi-gv-working-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 14px 16px 14px 18px;
+    border: 1px solid var(--gv-working-line);
+    border-radius: 14px;
+    background:
+        linear-gradient(135deg, var(--gv-working-soft), rgba(255, 255, 255, 0) 60%),
+        rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    animation: ofi-gv-card-in 220ms ease-out;
+}
+
+.dark .ofi-gv-working-card {
+    background:
+        linear-gradient(135deg, var(--gv-working-soft), rgba(0, 0, 0, 0) 60%),
+        rgba(40, 40, 42, 0.72);
+    box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Linke Kante in Grün, wie eine Kalenderkarte. */
+.ofi-gv-working-card::before {
+    content: "";
+    position: absolute;
+    inset: 10px auto 10px 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--gv-working);
+}
+
+@keyframes ofi-gv-card-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+
+.ofi-gv-working-card__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ofi-gv-working-card__caption {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--gv-working-text);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+#root .ofi-gv .ofi-gv-working-card__title {
+    overflow: hidden;
+    color: var(--gv-text);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#root .ofi-gv a.ofi-gv-working-card__title:hover { text-decoration: underline; text-decoration-color: var(--gv-muted); }
+
+.ofi-gv-working-card__hint {
+    color: var(--gv-secondary);
+    font-size: 12px;
+}
+
+#root .ofi-gv .ofi-gv-working-card__pause { flex: none; height: 30px; border-radius: 8px; }
+
+@media (max-width: 640px) {
+    .ofi-gv-working-card { flex-wrap: wrap; padding: 12px 14px 12px 16px; }
+    #root .ofi-gv .ofi-gv-working-card__title { font-size: 16px; white-space: normal; }
+    #root .ofi-gv .ofi-gv-working-card__pause { width: 100%; justify-content: center; }
+}
+
+/* Die Zeile, an der gerade gearbeitet wird */
+#root .ofi-gv .ofi-gv-row.is-working {
+    position: relative;
+    background: var(--gv-working-soft);
+}
+
+#root .ofi-gv .ofi-gv-row.is-working:hover { background: var(--gv-working-soft); filter: brightness(0.99); }
+
+#root .ofi-gv .ofi-gv-row.is-working::before {
+    content: "";
+    position: absolute;
+    inset: 6px auto 6px 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--gv-working);
+}
+
+#root .ofi-gv .ofi-gv-row.is-working .ofi-gv-list-title { font-weight: 600; }
+
+/* Detailkarte «Bugünkü çalışma» während einer Messung */
+#root .ofi-gv .ofi-gv-detail-card.is-working { border-color: var(--gv-working-line); }
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-gv-working__dot,
+    .ofi-gv-working__text,
+    .ofi-gv-working-card { animation: none; }
+    .ofi-gv-working__text { -webkit-text-fill-color: currentColor; background: none; }
 }

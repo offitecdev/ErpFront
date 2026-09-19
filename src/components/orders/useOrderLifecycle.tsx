@@ -11,6 +11,9 @@ import {
 import { PopupActions, PopupButton, PopupCaption, PopupDialog, PopupEmpty, PopupField, PopupNote } from '@/components/ui-shared/PopupKit';
 import { t } from '@/i18n/translate';
 import { myOrdersApi } from '@/lib/api/billing';
+import { documentEventsApi } from '@/lib/api/documentEvents';
+import { isOverridable, OverrideDialog, useGovernance } from '@/components/governance';
+import { FullCancelDialog } from './FullCancelDialog';
 import type { LifecycleBlocker, OrderCancelResultDto, OrderLifecycleDto, OrderRevertResultDto } from '@/types/billing';
 
 /**
@@ -83,17 +86,22 @@ const blockerLabel = (blocker: LifecycleBlocker): string => {
 /* Eine wählbare Handlung im Fenster — Titel, Erklärung, und wenn versperrt,
    die Gründe darunter. Gesperrte Zeilen verschwinden NICHT: dass ein Weg zu
    ist und warum, ist die halbe Auskunft. */
-const ActionRow = ({ icon, title, description, blockers, selected, danger, onSelect }: {
+const ActionRow = ({ icon, title, description, blockers, lockedText, selected, danger, onSelect, extra }: {
     icon: ReactNode;
     title: string;
     description: string;
     blockers: LifecycleBlocker[];
+    /** Gesperrt, weil der Rolle das Recht fehlt (16.09.2026) — ein eigener Satz. */
+    lockedText?: string | null;
     selected: boolean;
     danger?: boolean;
     onSelect: () => void;
+    /** Unter der Zeile, z. B. der Weg der Systemverwaltung durch die Sperre. */
+    extra?: ReactNode;
 }) => {
-    const blocked = blockers.length > 0;
+    const blocked = blockers.length > 0 || Boolean(lockedText);
     return (
+        <>
         <button
             type="button"
             disabled={blocked}
@@ -113,11 +121,13 @@ const ActionRow = ({ icon, title, description, blockers, selected, danger, onSel
                 <span className="mt-0.5 block text-[12px] leading-snug text-slate-500 dark:text-white/60">{description}</span>
                 {blocked && (
                     <span className="mt-1.5 block text-[12px] leading-snug text-rose-600 dark:text-rose-300">
-                        {blockers.map((blocker) => blockerLabel(blocker)).join(' · ')}
+                        {lockedText || blockers.map((blocker) => blockerLabel(blocker)).join(' · ')}
                     </span>
                 )}
             </span>
         </button>
+        {extra}
+        </>
     );
 };
 
@@ -130,12 +140,20 @@ export const useOrderLifecycle = (
     const [busy, setBusy] = useState(false);
     const [choice, setChoice] = useState<OrderLifecycleAction | null>(null);
     const [reason, setReason] = useState('');
+    // Rechte je Rücknahme und die Ausnahmetür (16.09.2026, Schritt 4).
+    const { can, isSystemAdmin } = useGovernance();
+    const [overrideOpen, setOverrideOpen] = useState(false);
+    // Storno MIT ausgestellten Rechnungen läuft über die Übersicht (Schritt 6).
+    const [fullCancel, setFullCancel] = useState<{ order: LifecycleOrderRef; reason: string } | null>(null);
+    const mayRevert = can('ORDER_REVERT');
+    const mayCancel = can('ORDER_CANCEL');
 
     const close = useCallback(() => {
         setTarget(null);
         setLifecycle(null);
         setChoice(null);
         setReason('');
+        setOverrideOpen(false);
     }, []);
 
     const requestAction = useCallback((order: LifecycleOrderRef) => {
@@ -158,9 +176,11 @@ export const useOrderLifecycle = (
                 setLifecycle(data);
                 // Der offene Weg ist vorgewählt; ist der Auftrag storniert,
                 // bleibt nur die Rücknahme des Stornos.
-                if (data.cancelled) setChoice('UNCANCEL');
-                else if (data.isAddon) setChoice(data.counts.invoices > 0 ? 'CANCEL' : 'DELETE_ADDON');
-                else setChoice(data.canRevertToDraft ? 'REVERT' : 'CANCEL');
+                // Vorgewählt wird nur, was die Rolle auch darf.
+                if (data.cancelled) setChoice(isSystemAdmin ? 'UNCANCEL' : null);
+                else if (data.isAddon) setChoice(data.counts.invoices > 0 ? (mayCancel ? 'CANCEL' : null) : 'DELETE_ADDON');
+                else if (data.canRevertToDraft && mayRevert) setChoice('REVERT');
+                else setChoice(mayCancel && data.canCancel ? 'CANCEL' : null);
             })
             .catch((error: unknown) => {
                 if (cancelled) return;
@@ -170,6 +190,8 @@ export const useOrderLifecycle = (
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
+        // Die Rechte stehen fest, solange das Fenster offen ist.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [target]);
 
     const confirm = useCallback(async () => {
@@ -186,6 +208,12 @@ export const useOrderLifecycle = (
                     projectId: result.projectId,
                     projectReverted: result.projectReverted,
                 });
+                return;
+            }
+            if (choice === 'CANCEL' && (lifecycle?.invoicesToSettle ?? 0) > 0) {
+                // Rechnungen müssen mitgeregelt werden: weiter zur Übersicht.
+                setFullCancel({ order: target, reason: reason.trim() });
+                close();
                 return;
             }
             if (choice === 'CANCEL') {
@@ -216,10 +244,37 @@ export const useOrderLifecycle = (
         } finally {
             setBusy(false);
         }
-    }, [target, choice, reason, close, onDone]);
+    }, [target, choice, reason, lifecycle, close, onDone]);
+
+    /* AUSNAHMETÜR: derselbe Abschluss wie das normale Zurücksetzen, nur über
+       den Weg mit Grund, Nummer und Kennwort. Ein Fehler wirft — das Fenster
+       der Ausnahme bleibt dann offen und zeigt ihn. */
+    const confirmOverride = useCallback(async (override: Parameters<typeof documentEventsApi.revertOrderWithOverride>[1]) => {
+        if (!target) return;
+        const result = await documentEventsApi.revertOrderWithOverride(target.id, override);
+        toast.success(t('orders.lifecycle.revertDone', { orderNumber: target.orderNumber }));
+        const current = target;
+        close();
+        await onDone(current, {
+            action: 'REVERT',
+            tenderId: result.tenderId,
+            projectId: result.projectId,
+            projectReverted: result.projectReverted,
+        });
+    }, [target, close, onDone]);
+
+    const uncancelLocked = Boolean(lifecycle?.uncancelBlockers?.length);
+    const settleCount = lifecycle?.invoicesToSettle ?? 0;
+    const choiceAllowed = choice === 'REVERT' ? mayRevert
+        : choice === 'CANCEL' ? mayCancel
+            : choice === 'UNCANCEL' ? isSystemAdmin && !uncancelLocked
+                : Boolean(choice);
+    const overrideOffered = Boolean(lifecycle && !lifecycle.isAddon && !lifecycle.cancelled
+        && !lifecycle.canRevertToDraft && isSystemAdmin
+        && isOverridable('ORDER_REVERT', lifecycle.revertBlockers));
 
     const confirmLabel = choice === 'CANCEL'
-        ? t('orders.lifecycle.cancelAction')
+        ? (settleCount > 0 ? t('orders.fullCancel.continue') : t('orders.lifecycle.cancelAction'))
         : choice === 'UNCANCEL'
             ? t('orders.lifecycle.uncancelAction')
             : choice === 'DELETE_ADDON'
@@ -243,7 +298,7 @@ export const useOrderLifecycle = (
                     <PopupButton
                         variant={choice === 'UNCANCEL' ? 'primary' : 'danger'}
                         loading={busy}
-                        disabled={!choice || loading}
+                        disabled={!choice || loading || !choiceAllowed}
                         onClick={() => { void confirm(); }}
                     >
                         {confirmLabel}
@@ -261,7 +316,10 @@ export const useOrderLifecycle = (
                             {t('orders.lifecycle.reasonLabel')}: {lifecycle.cancelReason}
                         </div>
                     )}
-                    <PopupNote>{t('orders.lifecycle.uncancelExplain')}</PopupNote>
+                    {uncancelLocked
+                        ? <PopupNote tone="warning">{t('orders.fullCancel.uncancelLocked')}</PopupNote>
+                        : <PopupNote>{t('orders.lifecycle.uncancelExplain')}</PopupNote>}
+                    {!isSystemAdmin && !uncancelLocked && <PopupNote tone="warning">{t('governance.uncancelAdminOnly')}</PopupNote>}
                 </div>
             ) : (
                 <div className="space-y-2.5">
@@ -283,8 +341,16 @@ export const useOrderLifecycle = (
                                 ? t('orders.lifecycle.revertTextLast')
                                 : t('orders.lifecycle.revertText')}
                             blockers={lifecycle.revertBlockers}
+                            lockedText={mayRevert ? null : t('governance.noPermissionRevert')}
                             selected={choice === 'REVERT'}
                             onSelect={() => setChoice('REVERT')}
+                            extra={overrideOffered ? (
+                                <div className="flex justify-end">
+                                    <button type="button" className="ofi-cal-btn is-danger" onClick={() => setOverrideOpen(true)}>
+                                        {t('governance.override.revertOpen')}
+                                    </button>
+                                </div>
+                            ) : null}
                         />
                     )}
 
@@ -300,6 +366,7 @@ export const useOrderLifecycle = (
                                 ? t('orders.lifecycle.cancelTextAddons', { addonCount: lifecycle.counts.addons })
                                 : t('orders.lifecycle.cancelText')}
                         blockers={lifecycle.cancelBlockers}
+                        lockedText={mayCancel ? null : t('governance.noPermissionCancel')}
                         selected={choice === 'CANCEL'}
                         danger
                         onSelect={() => setChoice('CANCEL')}
@@ -320,23 +387,61 @@ export const useOrderLifecycle = (
                     {choice === 'REVERT' && lifecycle.projectId && lifecycle.lastOfProject && (
                         <PopupNote tone="warning">{t('orders.lifecycle.revertProjectNote')}</PopupNote>
                     )}
+                    {choice === 'CANCEL' && settleCount > 0 && (
+                        <PopupNote tone="warning">
+                            {t('orders.fullCancel.settleNote', { invoiceCount: settleCount })}
+                        </PopupNote>
+                    )}
                     {choice === 'CANCEL' && (
                         <PopupCaption>{t('orders.lifecycle.cancelAppointmentsNote')}</PopupCaption>
                     )}
-                    {/* Zurueck in den Entwurf loescht die angesetzten Termine
-                        mit — und zieht die schon verschickten Einladungen
-                        zurueck. Das muss vorher dastehen. */}
+                    {/* Zurueck in den Entwurf laesst die angesetzten Termine
+                        STEHEN (16.09.2026): sie warten im Projekt und gehen an
+                        den neuen Auftrag ueber. Gut zu wissen, keine Warnung. */}
                     {choice === 'REVERT' && lifecycle.counts.upcomingAppointments > 0 && (
-                        <PopupNote tone="warning">
-                            {t('orders.lifecycle.revertAppointmentsNote', { appointmentCount: lifecycle.counts.upcomingAppointments })}
+                        <PopupNote>
+                            {t('orders.lifecycle.revertAppointmentsNote', {
+                                count: lifecycle.counts.upcomingAppointments,
+                                appointmentCount: lifecycle.counts.upcomingAppointments,
+                            })}
                         </PopupNote>
                     )}
                 </div>
             )}
+            {overrideOpen && lifecycle && (
+                <OverrideDialog
+                    open
+                    title={t('governance.override.revertTitle', { orderNumber: target.orderNumber })}
+                    actionLabel={t('governance.override.revertAction')}
+                    documentNumber={target.orderNumber}
+                    blockers={lifecycle.revertBlockers}
+                    consequence={t('governance.override.revertConsequence')}
+                    onCancel={() => setOverrideOpen(false)}
+                    onConfirm={confirmOverride}
+                />
+            )}
         </PopupDialog>
     ) : null;
 
-    return { requestAction, dialog, busy };
+    const fullCancelDialog: ReactNode = fullCancel ? (
+        <FullCancelDialog
+            scope="ORDER"
+            id={fullCancel.order.id}
+            initialReason={fullCancel.reason}
+            onClose={() => setFullCancel(null)}
+            onDone={async (result) => {
+                const order = fullCancel.order;
+                setFullCancel(null);
+                await onDone(order, {
+                    action: 'CANCEL',
+                    projectId: null,
+                    projectCancelled: result.projectCancelled,
+                });
+            }}
+        />
+    ) : null;
+
+    return { requestAction, dialog: <>{dialog}{fullCancelDialog}</>, busy };
 };
 
 /** Der einheitliche rote Knopf, der dieses Fenster öffnet. */

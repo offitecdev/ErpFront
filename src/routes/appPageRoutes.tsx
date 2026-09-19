@@ -1,4 +1,4 @@
-import { Route, Navigate, useParams } from 'react-router-dom';
+import { Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { isProjectModuleEnabledForTenant } from '../lib/moduleCatalog';
 import { applePage, lagerPage, lazyNamed, page } from './routeHelpers';
@@ -65,8 +65,11 @@ const TenderReport = lazyNamed(() => import('../pages/sales/TenderReport'), 'Ten
 const OspPage = lazyNamed(() => import('../pages/sales/osp/OspPage'), 'OspPage');
 // Rechnungen — Liste aller Rechnungen und die zwei Erstellungswege (aus einem
 // Auftrag bzw. die selbst ausgefüllte Direktrechnung), jeder als eigene Seite.
-const InvoiceListPage = lazyNamed(() => import('../pages/sales/invoices/InvoiceListPage'), 'InvoiceListPage');
-const InvoiceFromOrderPage = lazyNamed(() => import('../pages/sales/invoices/InvoiceFromOrderPage'), 'InvoiceFromOrderPage');
+// Buchhaltung (16.09.2026, Schritt 5): Liste, Erstellen, Detail — EIN Ort.
+const OutgoingInvoicesPage = lazyNamed(() => import('../pages/accounting/OutgoingInvoicesPage'), 'OutgoingInvoicesPage');
+const NewInvoicePage = lazyNamed(() => import('../pages/accounting/NewInvoicePage'), 'NewInvoicePage');
+const InvoiceDetailPage = lazyNamed(() => import('../pages/accounting/InvoiceDetailPage'), 'InvoiceDetailPage');
+const ToBillPage = lazyNamed(() => import('../pages/accounting/ToBillPage'), 'ToBillPage');
 const InvoiceDirectPage = lazyNamed(() => import('../pages/sales/invoices/InvoiceDirectPage'), 'InvoiceDirectPage');
 // Yeni tablo tabanlı envanter modülü — eski sayfalar pages/inventory_old altında arşivlendi.
 const ProductsPage = lazyNamed(() => import('../pages/inventory/ProductsPage'), 'ProductsPage');
@@ -118,6 +121,7 @@ const ModuleSettingsPage = lazyNamed(() => import('../pages/settings/modules/Mod
 // Upload der IT (17.08.2026): Stammdaten aus einer CSV/Excel-Datei, Bestand
 // immer 0. Sammelstelle mit Modulliste links — heute nur Produkte. Lebt in den
 // Einstellungen und hinter der IT-Schleuse.
+const TwoFactorSettingsPage = lazyNamed(() => import('../pages/settings/twoFactor/TwoFactorSettingsPage'), 'TwoFactorSettingsPage');
 const UploadSettingsPage = lazyNamed(() => import('../pages/settings/upload/UploadSettingsPage'), 'UploadSettingsPage');
 
 /* Alte CRM-Adressen von Angebot und Auftrag auf die Verkaufs-Adresse
@@ -131,6 +135,13 @@ const LegacyQuoteRedirect = ({ report = false }: { report?: boolean }) => {
 const LegacyOrderRedirect = () => {
     const { id } = useParams();
     return <Navigate to={`/sales/orders/${id}`} replace />;
+};
+
+/* Rechnungen: vom Verkauf in die Buchhaltung (16.09.2026) — der Abfrageteil
+   reist mit (?type=…, ?edit=…). */
+const LegacyInvoicesRedirect = ({ to = '/accounting/invoices' }: { to?: string }) => {
+    const { search } = useLocation();
+    return <Navigate to={`${to}${search}`} replace />;
 };
 
 /* Schichtplanung ist eine Firmenrichtlinie: sie ändert die Sollstunden JEDES
@@ -163,6 +174,18 @@ const AuthorizationAdminRoute = ({ detail = false }: { detail?: boolean }) => {
         return <Navigate to="/" replace />;
     }
     return page(detail ? RoleEditorPage : AuthorizationPage);
+};
+
+// Zwei-Faktor (Aegis) neu einrichten: Recht aus der Rollenzeile ODER die
+// Administratorrolle (deren Rechte folgen erst beim nächsten Öffnen der
+// Berechtigungen). Der Server prüft dasselbe noch einmal.
+const TwoFactorSettingsRoute = () => {
+    const permissions = useAuthStore((s) => s.permissions);
+    const isSystemAdmin = useAuthStore((s) => s.isSystemAdmin);
+    if (!isSystemAdmin && !permissions.includes('security.mfa.view')) {
+        return <Navigate to="/" replace />;
+    }
+    return page(TwoFactorSettingsPage);
 };
 
 const ProjectModuleRoute = ({ component }: { component: RouteComponent }) => {
@@ -258,13 +281,19 @@ export const renderAppPageRoutes = () => (
         {/* Feste Wege vor jedem ':id' — hier gibt es ohnehin keinen. */}
         <Route path="/sales/addon-orders/new" element={page(AddonOrderCreatePage)} />
         <Route path="/sales/addon-orders/:id/edit" element={page(AddonOrderCreatePage)} />
-        {/* Rechnungen (30.08.2026): eine Liste ALLER Rechnungen — Projekt-,
-            Liefer- und Direktrechnung. Die beiden Erstellungswege sind EIGENE
-            SEITEN mit Zurück-Knopf, kein Fenster (Vorgabe). Die festen Adressen
-            stehen vor keiner ':id'-Route, es gibt hier keine. */}
-        <Route path="/sales/invoices" element={page(InvoiceListPage)} />
-        <Route path="/sales/invoices/new/order" element={page(InvoiceFromOrderPage)} />
-        <Route path="/sales/invoices/new/direct" element={page(InvoiceDirectPage)} />
+        {/* BUCHHALTUNG (16.09.2026, Schritt 5): Rechnungen entstehen, ändern
+            und schliessen sich NUR hier. Feste Wege vor ':id'. Die früheren
+            Adressen unter /sales/invoices leiten weiter (Lesezeichen,
+            gespeicherte Reiter). */}
+        <Route path="/accounting" element={<Navigate to="/accounting/invoices" replace />} />
+        <Route path="/accounting/invoices" element={page(OutgoingInvoicesPage)} />
+        <Route path="/accounting/invoices/new" element={page(NewInvoicePage)} />
+        <Route path="/accounting/invoices/new/direct" element={page(InvoiceDirectPage)} />
+        <Route path="/accounting/invoices/:id" element={page(InvoiceDetailPage)} />
+        <Route path="/accounting/to-bill" element={page(ToBillPage)} />
+        <Route path="/sales/invoices" element={<LegacyInvoicesRedirect />} />
+        <Route path="/sales/invoices/new/order" element={<LegacyInvoicesRedirect to="/accounting/invoices/new" />} />
+        <Route path="/sales/invoices/new/direct" element={<LegacyInvoicesRedirect to="/accounting/invoices/new/direct" />} />
         <Route path="/crm/tenders" element={<Navigate to="/sales/quotes" replace />} />
         <Route path="/crm/tenders/:id" element={<LegacyQuoteRedirect />} />
         <Route path="/crm/tenders/:id/report" element={<LegacyQuoteRedirect report />} />
@@ -341,21 +370,25 @@ export const renderAppPageRoutes = () => (
         <Route path="/settings/upload" element={<LazyItGate>{page(UploadSettingsPage)}</LazyItGate>} />
         <Route path="/upload" element={<Navigate to="/settings/upload?module=products" replace />} />
         <Route path="/upload/products" element={<Navigate to="/settings/upload?module=products" replace />} />
-        <Route path="/settings/pdf" element={page(PdfSettings)} />
+        {/* 16.09.2026 (Samet): das GANZE Einstellungsmenü steht hinter dem einen
+            Kennwort der IT-Schleuse — die Seiten ebenso, sonst öffnet eine
+            getippte Adresse, was das gesperrte Menü verbirgt. */}
+        <Route path="/settings/pdf" element={<LazyItGate>{page(PdfSettings)}</LazyItGate>} />
         {/* Firmen- und E-Mail-Einstellungen stehen hinter der IT-Schleuse
             (Kennwortabfrage, "nur IT-Administration") — ZUSÄTZLICH zur
             jeweiligen Berechtigungsprüfung, nicht statt ihrer. */}
         <Route path="/settings/company-categories" element={<LazyItGate><CompanyCategoriesAdminRoute /></LazyItGate>} />
         <Route path="/settings/mail" element={<LazyItGate><ProjectModuleRoute component={MailSettings} /></LazyItGate>} />
-        <Route path="/settings/checklists" element={<ProjectModuleRoute component={ChecklistSettings} />} />
+        <Route path="/settings/checklists" element={<LazyItGate><ProjectModuleRoute component={ChecklistSettings} /></LazyItGate>} />
         {/* Berechtigungen: Zugangs­daten + Modulstufen je Person — Admin-Fläche. */}
-        <Route path="/settings/authorization" element={<AuthorizationAdminRoute />} />
+        <Route path="/settings/authorization" element={<LazyItGate><AuthorizationAdminRoute /></LazyItGate>} />
         {/* Fester Pfad VOR ':id' — sonst wird "new" als Rollen-id gelesen. */}
-        <Route path="/settings/authorization/new" element={<AuthorizationAdminRoute detail />} />
-        <Route path="/settings/authorization/:id" element={<AuthorizationAdminRoute detail />} />
+        <Route path="/settings/authorization/new" element={<LazyItGate><AuthorizationAdminRoute detail /></LazyItGate>} />
+        <Route path="/settings/authorization/:id" element={<LazyItGate><AuthorizationAdminRoute detail /></LazyItGate>} />
         {/* Moduleinstellungen: oben die Einstellungsart (Erinnerungen), links
             die Module. Das frühere Erinnerungs-Menü führt hierher. */}
-        <Route path="/settings/modules" element={page(ModuleSettingsPage)} />
+        <Route path="/settings/modules" element={<LazyItGate>{page(ModuleSettingsPage)}</LazyItGate>} />
+        <Route path="/settings/two-factor" element={<LazyItGate><TwoFactorSettingsRoute /></LazyItGate>} />
         <Route path="/settings/reminders" element={<Navigate to="/settings/modules?module=sales&category=reminders" replace />} />
     </>
 );

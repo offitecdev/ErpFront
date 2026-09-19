@@ -12,6 +12,7 @@ import type {
     ClosedSession,
     ContentBlock,
     ContentDto,
+    DailyReportSetting,
     DirectoryPerson,
     LabelColor,
     LabelDto,
@@ -29,6 +30,7 @@ import type {
     TaskComment,
     TaskDetailResult,
     TaskEnvelope,
+    TaskIssue,
     TaskListParams,
     TaskListResult,
     TaskOnboarding,
@@ -39,6 +41,8 @@ import type {
     TasksSummary,
     WorkReport,
     ActiveTimerInfo,
+    DailyReport,
+    MyDailyReport,
 } from '@/types/tasksModule';
 
 /**
@@ -51,6 +55,20 @@ import type {
 
 const BASE = '/tasks';
 
+/**
+ * Kalendertag des Browsers (14.09.2026, Samet: «her gün baştan başlasın
+ * sayaçlar»): Liste und Detail zeigen die Zeit DIESES Tages, die Summe aller
+ * Tage steht im Rapport. Der Server kennt die Zeitzone des Browsers nicht —
+ * darum gehen die Grenzen mit.
+ */
+export const todayParams = (now = new Date()): { dayFrom: string; dayTo: string } => {
+    const from = new Date(now);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(from);
+    to.setHours(23, 59, 59, 999);
+    return { dayFrom: from.toISOString(), dayTo: to.toISOString() };
+};
+
 /* Ein Zeiger liegt meist kurz vor dem Klick auf einer Aufgabenzeile. Diese
    kleine Einweg-Vorladung startet den Detailaufruf bereits dort; die Seite
    verbraucht genau dieselbe Promise und entfernt sie danach sofort. Damit
@@ -62,7 +80,7 @@ const detailCacheKey = (taskId: string): string => {
     return `${tenant}:${taskId}`;
 };
 const requestTaskDetail = (taskId: string): Promise<TaskDetailResult> =>
-    apiClient.get<TaskDetailResult>(`${BASE}/${taskId}`).then((response) => response.data);
+    apiClient.get<TaskDetailResult>(`${BASE}/${taskId}`, { params: todayParams() }).then((response) => response.data);
 const preloadTaskDetail = (taskId: string): Promise<void> => {
     const key = detailCacheKey(taskId);
     const current = detailPreloads.get(key);
@@ -120,6 +138,33 @@ export interface MoveTaskInput {
     afterTaskId?: string | null;
 }
 
+/**
+ * EIN FADEN in «Sorular & Sorunlar». Personen und Aufgaben reisen als Liste:
+ * mit Datei wird daraus multipart (jedes Feld eine Zeichenkette, Listen als
+ * JSON-Text — der Server nimmt beides an).
+ */
+export interface IssueCreateInput {
+    kind: TaskIssue['kind'];
+    title: string;
+    text?: string;
+    important?: boolean;
+    /** Markierte Personen IN DER REIHENFOLGE der Auswahl: die erste bekommt die Mail. */
+    personIds?: string[];
+    taskIds?: string[];
+}
+
+/** Körper eines Fadens: mit Dateien multipart, sonst JSON. */
+const issueBody = (fields: Record<string, unknown>, files: File[]): FormData | Record<string, unknown> => {
+    if (!files.length) return fields;
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) {
+        if (value === undefined || value === null) continue;
+        form.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value));
+    }
+    for (const file of files) form.append('files', file, file.name);
+    return form;
+};
+
 /** Text + Dateien als multipart (Feld `files`); ohne Dateien reicht JSON. */
 const textWithFiles = (text: string, files: File[]): FormData | { text: string } => {
     if (!files.length) return { text };
@@ -156,8 +201,12 @@ export const tasksApi = {
         apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/status`, reason ? { status, reason } : { status }).then((r) => r.data),
     block: (taskId: string, reason: string | null) =>
         apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/block`, { reason }).then((r) => r.data),
-    requestCompletion: (taskId: string, note?: string) =>
-        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/completion-request`, note ? { note } : {}).then((r) => r.data),
+    /**
+     * Direkt abschliessen (16.09.2026) — keine Anfrage, keine Freigabe.
+     * Überfällig: `delayReason` ist Pflicht (Server: DELAY_REASON_REQUIRED).
+     */
+    complete: (taskId: string, delayReason?: string) =>
+        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/complete`, delayReason ? { delayReason } : {}).then((r) => r.data),
     /** Löschen beantragen (Nicht-Admins); ein Admin bestätigt mit `remove` oder lehnt ab. */
     requestDelete: (taskId: string, note?: string) =>
         apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/delete-request`, note ? { note } : {}).then((r) => r.data),
@@ -165,16 +214,9 @@ export const tasksApi = {
         apiClient.delete<TaskEnvelope>(`${BASE}/${taskId}/delete-request`).then((r) => r.data),
     rejectDelete: (taskId: string, note?: string) =>
         apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/delete-request/reject`, note ? { note } : {}).then((r) => r.data),
-    cancelCompletionRequest: (taskId: string) =>
-        apiClient.delete<TaskEnvelope>(`${BASE}/${taskId}/completion-request`).then((r) => r.data),
-    approveCompletion: (taskId: string, note?: string) =>
-        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/completion-request/approve`, note ? { note } : {}).then((r) => r.data),
-    rejectCompletion: (taskId: string, note: string) =>
-        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/completion-request/reject`, { note }).then((r) => r.data),
-    approveReview: (taskId: string, note?: string) =>
-        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/review/approve`, note ? { note } : {}).then((r) => r.data),
-    rejectReview: (taskId: string, note: string) =>
-        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/review/reject`, { note }).then((r) => r.data),
+    /** «Ortak ekle»: GENAU EINE Person sofort als Verantwortliche aufnehmen — keine Anfrage. */
+    addPartner: (taskId: string, employeeId: string) =>
+        apiClient.post<TaskEnvelope>(`${BASE}/${taskId}/partners`, { employeeId }).then((r) => r.data),
     setAssignees: (taskId: string, employeeIds: string[]) =>
         apiClient.put<TaskEnvelope>(`${BASE}/${taskId}/assignees`, { employeeIds }).then((r) => r.data),
     setLabels: (taskId: string, labelIds: string[]) =>
@@ -230,6 +272,25 @@ export const tasksApi = {
     addComment: (taskId: string, text: string, files: File[] = []) =>
         apiClient.post<{ comment: TaskComment; people: PeopleMap }>(`${BASE}/${taskId}/comments`, textWithFiles(text, files)).then((r) => r.data),
     deleteComment: (commentId: string) => apiClient.delete(`${BASE}/comments/${commentId}`).then(() => undefined),
+    /* ── Sorular & Sorunlar ─────────────────────────────────────────────── */
+    issues: (taskId: string) =>
+        apiClient.get<{ data: TaskIssue[]; people: PeopleMap }>(`${BASE}/${taskId}/issues`).then((r) => r.data),
+    createIssue: (taskId: string, input: IssueCreateInput, files: File[] = []) =>
+        apiClient.post<{ issue: TaskIssue; people: PeopleMap }>(
+            `${BASE}/${taskId}/issues`,
+            // Echtes `true`/`false`: als JSON eine Wahrheit, als multipart «true»/«false».
+            // Eine 1 kam auf dem Server als Zahl an und fiel durch die Prüfung («Girilen bilgiler geçersiz»).
+            issueBody({ ...input, important: Boolean(input.important) }, files),
+        ).then((r) => r.data),
+    replyToIssue: (issueId: string, text: string, files: File[] = [], personIds: string[] = []) =>
+        apiClient.post<{ issue: TaskIssue; people: PeopleMap }>(
+            `${BASE}/issues/${issueId}/replies`,
+            issueBody({ text, personIds }, files),
+        ).then((r) => r.data),
+    setIssueResolved: (issueId: string, resolved: boolean) =>
+        apiClient.post<{ issue: TaskIssue }>(`${BASE}/issues/${issueId}/status`, { resolved }).then((r) => r.data.issue),
+    deleteIssue: (issueId: string) => apiClient.delete(`${BASE}/issues/${issueId}`).then(() => undefined),
+
     attachments: (taskId: string) =>
         apiClient.get<{ data: TaskAttachment[] }>(`${BASE}/${taskId}/attachments`).then((r) => r.data.data),
     uploadAttachments: (taskId: string, files: File[]) => {
@@ -257,8 +318,28 @@ export const tasksApi = {
         apiClient.get<{ data: PersonStats[]; range: ReportRange; serverNow: string }>(`${BASE}/people`, { params: rangeParams(range) }).then((r) => r.data),
 
     /* ── Berichte ───────────────────────────────────────────────────────── */
-    workReport: (from: string, to: string, person = '') =>
-        apiClient.get<WorkReport>(`${BASE}/reports/work`, { params: { from, to, ...(person ? { person } : {}) } }).then((r) => r.data),
+    /** `fromDate`/`toDate` (YYYY-MM-DD): mit ihnen kommen die Gün sonu raporları dazu. */
+    workReport: (from: string, to: string, person = '', days?: { fromDate: string; toDate: string }) =>
+        apiClient.get<WorkReport>(`${BASE}/reports/work`, { params: { from, to, ...(person ? { person } : {}), ...(days ?? {}) } }).then((r) => r.data),
+
+    /* ── Gün sonu raporu (jede Person, eigener Rapport) ─────────────────── */
+    myDailyReport: (params: { date: string; from: string; to: string; weekStart: string }) =>
+        apiClient.get<MyDailyReport>(`${BASE}/daily-reports/me`, { params }).then((r) => r.data),
+    saveDailyReport: (input: { date: string; from: string; to: string; body: string }) =>
+        apiClient.put<{ report: DailyReport }>(`${BASE}/daily-reports/me`, input).then((r) => r.data.report),
+    /** Bild/PDF/Datei für das Blatt eines Tages — sie hängt an keiner Aufgabe. */
+    uploadDailyReportFiles: (day: { date: string; from: string; to: string }, files: File[]) => {
+        const form = new FormData();
+        form.append('date', day.date);
+        form.append('from', day.from);
+        form.append('to', day.to);
+        for (const file of files) form.append('files', file, file.name);
+        return apiClient.post<{ data: TaskAttachment[] }>(`${BASE}/daily-reports/me/files`, form).then((r) => r.data.data);
+    },
+    dailyReportSetting: () =>
+        apiClient.get<{ settings: DailyReportSetting }>(`${BASE}/daily-reports/settings`).then((r) => r.data.settings),
+    saveDailyReportSetting: (settings: DailyReportSetting) =>
+        apiClient.put<{ settings: DailyReportSetting }>(`${BASE}/daily-reports/settings`, settings).then((r) => r.data.settings),
 
     /* ── Einstellungen ──────────────────────────────────────────────────── */
     settings: () => apiClient.get<{ settings: TaskSettings }>(`${BASE}/settings/me`).then((r) => r.data.settings),
@@ -306,6 +387,15 @@ export const attachmentUrl = (attachment: Pick<TaskAttachment, 'contentPath'> & 
     if (download) params.set('download', '1');
     const query = params.toString();
     return `${base}${attachment.contentPath}${query ? `?${query}` : ''}`;
+};
+
+/**
+ * Dieselbe Adresse, aber vollständig (mit Herkunft) — der Rapport und sein PDF
+ * drucken sie als anklickbaren Link (16.09.2026).
+ */
+export const absoluteAttachmentUrl = (attachment: Pick<TaskAttachment, 'contentPath'> & { url?: string | null }): string => {
+    const url = attachmentUrl(attachment);
+    return /^https?:/i.test(url) ? url : `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
 /**

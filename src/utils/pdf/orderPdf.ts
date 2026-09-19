@@ -808,6 +808,9 @@ export async function buildOrderPdfBytes(
     lang: OrderPdfLang = 'de'
 ): Promise<Uint8Array> {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    // Der Titel ersetzt in der Vorschau (blob:-URL) die UUID als Dokumentname.
+    doc.setProperties({ title: order.referenceNumber || 'Bestellung' });
+    doc.viewerPreferences({ DisplayDocTitle: true });
     await registerFonts(doc);
     // Jede Zeile setzt ihre Sperrung selbst (0 Tc) — sonst erbte der Text nach
     // einem gesperrten Spaltentitel dessen Sperrung.

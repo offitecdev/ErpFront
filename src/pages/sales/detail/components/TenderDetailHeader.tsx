@@ -19,7 +19,7 @@ import '@/styles/tenderHeader.css';
 type StatusChipVariant = 'active' | 'approved' | 'passive' | 'info' | 'warning' | 'danger' | 'neutral' | 'order';
 
 type TenderDetailHeaderProps = {
-    tender: Pick<TenderListItem, 'tenderNumber' | 'version'>;
+    tender: Pick<TenderListItem, 'id' | 'tenderNumber' | 'version'>;
     tenderStatusVariant: StatusChipVariant;
     tenderStatusLabel: React.ReactNode;
     isDraft: boolean;
@@ -187,6 +187,8 @@ export const TenderDetailHeader = ({
                     /* Auftrag oder Projekt an der Offerte = kein Loeschen mehr,
                        nur noch Storno (Vorgabe Samet 06.09.2026). */
                     linked={Boolean(salesOrderId || projectId)}
+                    tenderId={tender.id}
+                    tenderNumber={tender.tenderNumber}
                 />
             </div>
 

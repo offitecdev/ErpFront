@@ -59,19 +59,26 @@ export interface TaskRow {
     blockReason: string | null;
     /** Wer das Löschen beantragt hat (null = keine offene Anfrage). */
     deleteRequestedById: string | null;
+    /** Gecikme açıklaması liegt vor (Text nur im Detail). */
+    hasDelayReason?: boolean;
     assigneeIds: string[];
     labelIds: string[];
     checklist: { done: number; total: number };
     commentCount: number;
     attachmentCount: number;
     overdue: boolean;
-    /** Nur die EIGENE laufende Messung. */
-    timer: { runningForMe: boolean };
-    /** Nur für die Leitung: Zeit bis `serverNow`, laufende Messungen. */
-    work?: { totalMs: number; liveCount: number };
+    /** Nur die EIGENE laufende Messung — ihr Anteil steckt NICHT in `work.dayMs` (der Browser zählt sie ab dem Klick). */
+    timer: { runningForMe: boolean; myStartedAt: string | null };
+    /**
+     * Zeit des TAGES bis `serverNow` — Leitung: alle Personen, sonst nur die eigenen;
+     * `liveCount` zählt auch die eigene laufende Messung, ihre Zeit aber nicht (siehe `timer`).
+     */
+    work?: { dayMs: number; liveCount: number };
 }
 
 export interface TaskDetail extends Omit<TaskRow, 'timer' | 'work'> {
+    /** Offene Fragen und Probleme — die Marke am Reiter «Sorular & Sorunlar». */
+    openIssueCount: number;
     priority: TaskPriority;
     origin: 'MANAGER' | 'MEMBER';
     startAt: string | null;
@@ -105,6 +112,12 @@ export interface TaskDetail extends Omit<TaskRow, 'timer' | 'work'> {
         requestedAt: string | null;
         note: string | null;
     };
+    /** Gecikme açıklaması einer verspätet fertig gemeldeten Aufgabe (reason null = keine). */
+    delay?: {
+        reason: string | null;
+        byId: string | null;
+        at: string | null;
+    };
 }
 
 export interface TaskPermissions {
@@ -117,16 +130,18 @@ export interface TaskPermissions {
     canUpload: boolean;
     canComment: boolean;
     canFlag: boolean;
-    canRequestCompletion: boolean;
-    /** Abschluss bestätigen/ablehnen oder direkt abschliessen — nur die Administratorrolle. */
-    canApproveCompletion: boolean;
-    canCancelCompletionRequest: boolean;
+    /** Direkt abschliessen: Verantwortliche und Leitung einer offenen Aufgabe (16.09.2026). */
+    canComplete: boolean;
     canManage: boolean;
     /** Nur Admins löschen … */
     canDelete: boolean;
     /** … alle anderen Beteiligten beantragen es. */
     canRequestDelete: boolean;
     canCancelDeleteRequest: boolean;
+    /** Verantwortliche zuweisen/entfernen — nur die Administratorrolle. */
+    canAssign?: boolean;
+    /** «Ortak ekle»: EINE Person direkt hinzufügen (Nicht-Admin, verantwortlich, offene Aufgabe). */
+    canAddPartner?: boolean;
 }
 
 export interface TaskEnvelope {
@@ -199,6 +214,9 @@ export interface TaskListParams {
     /** ISO-Grenzen des Zeitraums (beide oder keine). */
     from?: string;
     to?: string;
+    /** Kalendertag des Browsers — die Zeilen zeigen die Zeit dieses Tages. */
+    dayFrom?: string;
+    dayTo?: string;
     page?: number;
     pageSize?: number;
 }
@@ -221,9 +239,7 @@ export interface TaskSearchHit {
 }
 
 export interface TaskApprovalsResult {
-    completionRequests: TaskDetail[];
-    reviewRequests: TaskDetail[];
-    /** Offene Löschanfragen — nur Admins bekommen sie. */
+    /** Offene Löschanfragen — nur Admins bekommen sie; Abschlussanfragen gibt es nicht mehr. */
     deleteRequests: TaskDetail[];
     people: PeopleMap;
     serverNow: string;
@@ -251,7 +267,20 @@ export interface ContentBlock {
         cellVAlign?: Array<Array<'' | 'top' | 'middle' | 'bottom'>>;
         groupId?: string;
         attId?: string;
+        /** Bild: Anzeigebreite in px (fehlt = natürliche Grösse, höchstens 420px hoch). */
+        width?: number;
+        /** Bild: sichtbarer Ausschnitt in Anteilen des Originals. */
+        crop?: ImageCrop;
+        /** Bild: Breite/Höhe des Originals (Rahmen des Ausschnitts). */
+        ratio?: number;
     };
+}
+
+export interface ImageCrop {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
 }
 
 export interface ContentDto {
@@ -299,7 +328,7 @@ export interface ChecklistProgress {
 
 export interface TaskAttachment {
     id: string;
-    kind: 'TASK' | 'COMMENT' | 'CHAT';
+    kind: 'TASK' | 'COMMENT' | 'CHAT' | 'ISSUE' | 'DAILY';
     fileName: string;
     contentType: string;
     sizeBytes: number;
@@ -323,6 +352,56 @@ export interface TaskComment {
     canDelete: boolean;
 }
 
+/* ── Sorular & Sorunlar ───────────────────────────────────────────────── */
+
+/** «Sorular» (Frage) und «Sorunlar» (Problem) — die zwei Reiter der Kapsel. */
+export type IssueKind = 'QUESTION' | 'ISSUE';
+export type IssueStatus = 'OPEN' | 'RESOLVED';
+
+/** TO = die zuerst markierte Person (An-Feld der Mail), CC = alle weiteren. */
+export interface IssuePerson {
+    employeeId: string;
+    role: 'TO' | 'CC';
+}
+
+/** Eine im Faden markierte ANDERE Aufgabe. */
+export interface IssueLink {
+    taskId: string;
+    title: string;
+    status: TaskStatus;
+}
+
+/** Eine Sprechblase: die Frage selbst oder eine Antwort. Dateien stehen DARIN. */
+export interface IssueMessage {
+    id: string;
+    authorId: string;
+    text: string;
+    createdAt: string;
+    attachments: TaskAttachment[];
+    isOpening: boolean;
+}
+
+export interface TaskIssue {
+    id: string;
+    taskId: string;
+    kind: IssueKind;
+    /** Die farbige Überschrift über der Blase. */
+    title: string;
+    status: IssueStatus;
+    important: boolean;
+    authorId: string;
+    createdAt: string;
+    lastMessageAt: string;
+    resolvedById: string | null;
+    resolvedAt: string | null;
+    people: IssuePerson[];
+    links: IssueLink[];
+    messages: IssueMessage[];
+    canReply: boolean;
+    canResolve: boolean;
+    canDelete: boolean;
+}
+
 /* ── Detail ───────────────────────────────────────────────────────────── */
 
 export type ForecastReason = 'NEEDS_CHECKLIST' | 'NOT_ENOUGH_DATA' | 'ALL_DONE';
@@ -342,7 +421,10 @@ export interface TaskForecast {
 
 export interface WorkBreakdownEntry {
     employeeId: string;
+    /** Alle Tage. */
     ms: number;
+    /** Nur der Kalendertag der Anfrage — die Ansicht zeigt den Tag, die Summe steht im Rapport. */
+    dayMs: number;
     sessions: number;
     first: string;
     last: string;
@@ -353,6 +435,8 @@ export interface WorkDto {
     totalMs: number;
     closedMs: number;
     liveMs: number;
+    /** Zeit des Kalendertags über alle gezeigten Personen. */
+    dayMs: number;
     breakdown: WorkBreakdownEntry[];
 }
 
@@ -440,12 +524,17 @@ export interface PersonStats {
     overdueCount: number;
     ms: number;
     checkDone: number;
-    wastedMs: number;
     activeTask: { taskId: string; title: string; startedAt: string } | null;
 }
 
 export interface TaskSettings {
     reminderLeadMinutes: number;
+}
+
+/** Gün sonu raporu je Firma: Zeitfenster («HH:MM», Browserzeit) Mo–Fr, in dem der Rapport geschrieben wird. */
+export interface DailyReportSetting {
+    promptTime: string;
+    endTime: string;
 }
 
 /* ── Chat ─────────────────────────────────────────────────────────────── */
@@ -530,25 +619,19 @@ export interface ChatUnread {
     rooms: Record<string, number>;
 }
 
-/* ── Berichte (nur Zahlen und Tabellen — das PDF baut die Oberfläche) ─── */
+/* ── Berichte ──────────────────────────────────────────────────────────── */
 
-/** Arbeitsrapport EINER Person, Tag/Woche (GET /tasks/reports/work) — der Browser gruppiert nach Tagen. */
+/**
+ * Arbeitsrapport EINER Person, Tag/Woche (GET /tasks/reports/work).
+ * 16.09.2026 (Samet): «sadece gün gün, gün sonunda neler yaptı» — der Rapport
+ * ist nur noch die Sammlung der Gün sonu raporları des Zeitraums.
+ */
 export interface WorkReportSession {
     taskId: string;
     startedAt: string;
+    /** null = läuft noch. */
     endedAt: string | null;
     ms: number;
-    live: boolean;
-}
-
-export interface WorkReportTask {
-    id: string;
-    title: string;
-    status: TaskStatus;
-    effectiveStatus: TaskStatus;
-    labels: string[];
-    checkTotal: number;
-    checkDone: number;
 }
 
 export interface WorkReport {
@@ -556,10 +639,45 @@ export interface WorkReport {
     to: string;
     generatedAt: string;
     employee: PersonRef;
-    sessions: WorkReportSession[];
-    checkedItems: Array<{ taskId: string; text: string; doneAt: string }>;
-    comments: Array<{ taskId: string; text: string; createdAt: string }>;
-    tasks: Record<string, WorkReportTask>;
+    /** Gün sonu raporları im Zeitraum — optional, solange ein älterer Server antwortet. */
+    dailyReports?: DailyReport[];
+    /** Messungen im Zeitraum; der Browser teilt sie auf seine Kalendertage auf. */
+    sessions?: WorkReportSession[];
+    /** Titel der Aufgaben aus `sessions`. */
+    tasks?: Record<string, { id: string; title: string }>;
+}
+
+/* ── Gün sonu raporu (GET/PUT /tasks/daily-reports/me) ──────────────────── */
+
+export interface DailyTaskTime {
+    taskId: string;
+    title: string;
+    ms: number;
+}
+
+export interface DailyReport {
+    /** Kalendertag des Browsers, YYYY-MM-DD. */
+    date: string;
+    /** Das freie Blatt in Markdown (alte Rapporte: ihre Punkte als «- …»-Zeilen). */
+    body: string;
+    /** Bilder, PDF und Dateien des Tages — im Rapport anklickbare Adressen. */
+    files: TaskAttachment[];
+    /** Beim Speichern aus den Messungen des Tages kopiert (nicht mehr angezeigt). */
+    taskTimes: DailyTaskTime[];
+    totalMs: number;
+    submittedAt: string;
+}
+
+export interface MyDailyReport {
+    date: string;
+    report: DailyReport | null;
+    /** Dateien des Tages, auch ohne gespeicherten Rapport. */
+    files: TaskAttachment[];
+    /** Live aus den Messungen des Tages. */
+    taskTimes: DailyTaskTime[];
+    totalMs: number;
+    week: Array<{ date: string; submitted: boolean; totalMs: number }>;
+    serverNow: string;
 }
 
 export type ReportRangeKey = '7' | '30' | '90' | 'all';

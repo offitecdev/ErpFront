@@ -6,14 +6,15 @@ import { t } from '@/i18n/translate';
 import { tasksApi, tasksErrorMessage } from '@/lib/api/tasksModule';
 import type { ManualTaskStatus, PeopleMap, TaskDetail, TaskEnvelope, TaskRow } from '@/types/tasksModule';
 import { selectTimerRunning, useTaskTimer } from '../../hooks/useTaskTimer';
-import { useIsTasksAdmin, useIsTasksManager, useTasksActorId, useTasksModuleStore } from '../../store/tasksModuleStore';
+import { useIsTasksManager, useTasksActorId, useTasksModuleStore } from '../../store/tasksModuleStore';
 import { emitTasksChanged } from '../../utils/taskEvents';
-import { canRequestRowCompletion, rowRights } from './taskListRules';
+import { isTaskLate } from '../../utils/taskFormat';
+import { canCompleteRow, rowRights } from './taskListRules';
 import type { TaskRowMenuActions } from './TaskRowMenu';
 
 /**
  * Alles, was man an einer Zeile TUT: Abhakkreis, Menüpunkte und die drei
- * Fenster, die dafür aufgehen (Abschlussanfrage, «Yapılamadı»-Grund, Löschen).
+ * Fenster, die dafür aufgehen (Gecikme açıklaması, «Yapılamadı»-Grund, Löschen).
  * Nach jeder Änderung: Zeile aus der Antwort, Rundruf (die Liste lädt leise
  * neu und sortiert um), Zähler der Leiste.
  */
@@ -28,7 +29,6 @@ export const useTaskRowActions = ({
 }) => {
     const navigate = useNavigate();
     const isManager = useIsTasksManager();
-    const isAdmin = useIsTasksAdmin();
     const me = useTasksActorId();
     const refreshSummary = useTasksModuleStore((state) => state.refreshSummary);
     const { start, pause } = useTaskTimer();
@@ -76,7 +76,11 @@ export const useTaskRowActions = ({
         }
     }, [applyEnvelope, markBusy, patchRow]);
 
-    /** Görevly `V.quickComplete`. */
+    /**
+     * Der Abhakkreis schliesst die Aufgabe SOFORT (16.09.2026): keine Anfrage,
+     * keine Freigabe. Nur eine überfällige Aufgabe hält kurz an — sie braucht
+     * die Gecikme açıklaması. Wieder öffnen darf weiterhin nur die Leitung.
+     */
     const quickComplete = useCallback((row: TaskRow) => {
         if (row.status === 'COMPLETED') {
             if (!isManager) {
@@ -91,28 +95,26 @@ export const useTaskRowActions = ({
             );
             return;
         }
-        if (isAdmin) {
-            // Nur die Administratorrolle schliesst ab; eine offene Anfrage wird damit bestätigt.
-            const call = row.approvalState === 'PENDING'
-                ? () => tasksApi.approveCompletion(row.id)
-                : () => tasksApi.setStatus(row.id, 'COMPLETED');
-            void runOptimistic(row, { status: 'COMPLETED', effectiveStatus: 'COMPLETED' }, call, 'tasksModule.list.toast.completed');
+        if (!canCompleteRow(row, rowRights(row, me, isManager), isManager)) return;
+        if (isTaskLate(row, Date.now())) {
+            setCompletionFor(row);
             return;
         }
-        if (row.approvalState === 'PENDING') {
-            toast(t('tasksModule.errors.COMPLETION_ALREADY_REQUESTED'));
-            return;
-        }
-        if (!canRequestRowCompletion(row, rowRights(row, me, isManager), isManager, isAdmin)) return;
-        setCompletionFor(row);
-    }, [isAdmin, isManager, me, runOptimistic]);
+        void runOptimistic(
+            row,
+            { status: 'COMPLETED', effectiveStatus: 'COMPLETED' },
+            () => tasksApi.complete(row.id),
+            'tasksModule.list.toast.completed',
+        );
+    }, [isManager, me, runOptimistic]);
 
-    const confirmCompletion = useCallback(async (note: string) => {
+    /** Überfällig abgeschlossen: die Erklärung reist mit. */
+    const confirmComplete = useCallback(async (delayReason: string) => {
         if (!completionFor) return;
         setDialogBusy(true);
         try {
-            applyEnvelope(await tasksApi.requestCompletion(completionFor.id, note || undefined));
-            toast.success(t('tasksModule.list.toast.requestSent'));
+            applyEnvelope(await tasksApi.complete(completionFor.id, delayReason));
+            toast.success(t('tasksModule.list.toast.completed'));
             setCompletionFor(null);
         } catch (error) {
             toast.error(tasksErrorMessage(error));
@@ -185,7 +187,7 @@ export const useTaskRowActions = ({
         toggleTimer: (row) => void (selectTimerRunning(row.id, row.timer.runningForMe)(useTasksModuleStore.getState())
             ? pause(row.id)
             : start(row.id, row.title)),
-        requestCompletion: (row) => setCompletionFor(row),
+        complete: (row) => quickComplete(row),
         toggleFlag: (row) => void runOptimistic(row, { flagged: !row.flagged }, () => tasksApi.update(row.id, { flagged: !row.flagged })),
         setStatus: (row, status) => void setStatus(row, status),
         duplicate: async (row) => {
@@ -202,7 +204,7 @@ export const useTaskRowActions = ({
         },
         remove: (row) => setDeleteFor(row),
         requestDelete: (row) => setDeleteRequestFor(row),
-    }), [navigate, onEdit, pause, refreshSummary, runOptimistic, setStatus, start]);
+    }), [navigate, onEdit, pause, quickComplete, refreshSummary, runOptimistic, setStatus, start]);
 
     return {
         quickComplete,
@@ -218,7 +220,7 @@ export const useTaskRowActions = ({
             closeBlock: () => setBlockFor(null),
             closeDelete: () => setDeleteFor(null),
             closeDeleteRequest: () => setDeleteRequestFor(null),
-            confirmCompletion,
+            confirmComplete,
             confirmBlock,
             confirmDelete,
             confirmDeleteRequest,

@@ -7,7 +7,6 @@ import { LivePersonRow } from './components/live/LivePersonRow';
 import { useLiveOverview } from './components/live/useLiveOverview';
 import { TaskButton } from './components/shared/TaskButton';
 import { TasksModuleShell } from './components/shared/TasksModuleShell';
-import { useNow } from './hooks/useNow';
 import { useIsTasksManager } from './store/tasksModuleStore';
 import { localeTag } from './utils/taskFormat';
 import { TasksAdminOnly } from './components/shared/TasksAdminOnly';
@@ -28,13 +27,10 @@ const TaskBoardPageContent = () => {
     const isManager = useIsTasksManager();
     const live = useLiveOverview({ enabled: true });
     const { data, error } = live;
-    const anyRunning = Boolean(data?.people.some((person) => person.running));
-    const nowMs = useNow(anyRunning ? 1000 : 30_000);
 
     const people = data?.people ?? [];
     const workingCount = people.filter((person) => person.running).length;
     const activeCount = people.filter((person) => person.running || person.todayMs > 0).length;
-    const driftMs = data ? Math.max(0, nowMs - Date.parse(data.serverNow)) : 0;
     const dayLabel = data
         ? new Intl.DateTimeFormat(localeTag(), { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(data.day.from))
         : '';
@@ -46,7 +42,7 @@ const TaskBoardPageContent = () => {
                 <div className="ofi-gv-live-toolbar">
                     <span className="ofi-gv-live-toolbar__day">{dayLabel}</span>
                     <span className="ofi-gv-live-toolbar__stat">
-                        {workingCount > 0 && <i className="ofi-gv-live" aria-hidden />}
+                        {workingCount > 0 && <i className="ofi-gv-working__dot" aria-hidden />}
                         {t('tasksModule.live.workingCount', { count: workingCount })}
                     </span>
                     {isManager && (
@@ -92,8 +88,6 @@ const TaskBoardPageContent = () => {
                                         key={person.employeeId}
                                         person={person}
                                         labels={data.taskLabels}
-                                        nowMs={nowMs}
-                                        driftMs={driftMs}
                                     />
                                 ))}
                             </ul>

@@ -813,6 +813,31 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
 .ofi-ord-select svg:last-child { flex: none; color: var(--ofi-cal-faint); transition: transform 160ms cubic-bezier(0.2, 0.8, 0.3, 1); }
 .ofi-ord-select[aria-expanded="true"] svg:last-child { transform: rotate(180deg); color: var(--ofi-cal-accent); }
 
+/* Das Währungszeichen (Vorgabe Samet, 16.09.2026): ein kleines graues
+   Kästchen vor dem Namen — im Feld und in der Liste (die im Portal hängt,
+   darum ohne Eltern-Selektor). CHF ist drei Buchstaben breit, € einer. */
+.ofi-ord-select > .ofi-ord-cur:first-child { flex: none; }
+.ofi-ord-cur {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: rgba(118, 118, 128, 0.12);
+    color: #1d1d1f;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+}
+.dark .ofi-ord-cur {
+    background: rgba(118, 118, 128, 0.28);
+    color: rgba(255, 255, 255, 0.9);
+}
+
 /* ── DIE SCHRITTE IM KOPF EINES FENSTERS ──────────────────────────────────
    Vorgabe Samet: «Ordnet den Ablauf vielleicht in Schritte — Schritt 1 …»
    Die Leiste sagt, wo man ist und was noch kommt; der laufende Schritt trägt

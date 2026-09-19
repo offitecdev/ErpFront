@@ -386,3 +386,56 @@
     .document-toolbar, .document-bulk-bar { padding: 10px; }
     .document-toolbar-end { gap: 6px; }
 }
+
+/* ── MINDERUNG (16.09.2026) ──────────────────────────────────────────────────
+   Eine Minuszeile des Nachtrags: der Betrag rot, die Menge mit einem kleinen
+   Umschalter «+ / −» davor. Rot nur dort, wo das Minus steht — die Zeile
+   bleibt sonst so ruhig wie jede andere. */
+.document-qty-cell { position: relative; }
+.document-qty-cell .document-cell { padding-left: 26px; }
+.document-sign {
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--doc-line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--doc-muted);
+    transition: color .15s, border-color .15s, background-color .15s;
+}
+.document-sign:hover { color: var(--doc-accent); border-color: var(--doc-accent); }
+.document-sign.is-minus { color: #d70015; border-color: #f5c2c7; background: #fff5f5; }
+.dark .document-sign { background: #1a1a1c; }
+.dark .document-sign.is-minus { color: #ff6961; border-color: #5c2b2e; background: #2a1d1e; }
+.document-table tr.is-minus .document-amount,
+.document-table tr.is-minus .document-cell { color: #d70015; }
+.dark .document-table tr.is-minus .document-amount,
+.dark .document-table tr.is-minus .document-cell { color: #ff6961; }
+.document-total-row.is-total.is-minus dd { color: #d70015; }
+.dark .document-total-row.is-total.is-minus dd { color: #ff6961; }
+.document-help.is-minus { color: #b4232a; }
+.dark .document-help.is-minus { color: #ff8a84; }
+
+/* Auswahl «Aus dem Auftrag mindern» — liegt im Portal, darum ohne --doc-Werte. */
+.document-sources { display: flex; flex-direction: column; gap: 2px; }
+.document-source {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    text-align: left;
+}
+.document-source__name { font-size: 13px; font-weight: 600; color: #1d1d1f; }
+.document-source__meta { font-size: 12px; color: #71717a; }
+.dark .document-source__name { color: #f5f5f7; }
+.dark .document-source__meta { color: #a1a1aa; }
+.document-workspace > .document-help.is-minus { margin: 0; padding: 0 16px 14px; text-align: right; }

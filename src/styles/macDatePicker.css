@@ -1,0 +1,263 @@
+/* =========================================================
+   iOS-/macOS-DATUMSWAHL (16.09.2026) — `MacDatePicker`
+   Vorlage: pickers-date-picker-inline-expanded@2x.png
+
+   Zwei Teile:
+     · `.ofi-macdp`      die graue Kapsel mit dem Datum (im Formular)
+     · `.ofi-macdp-pop`  das Fenster mit dem Monat (Portal an <body>)
+   Das Fenster hängt AUSSERHALB von #root; die Regeln stehen darum ohne
+   #root-Präfix, mit `html body` für die nötige Spezifität, und die
+   Knopfregeln der App (buttons.css, appleModal.css) werden mit
+   `!important` abgewiesen.
+   ========================================================= */
+
+.ofi-macdp,
+.ofi-macdp-pop {
+    --dp-blue: #0a7aff;
+    --dp-blue-soft: rgba(10, 122, 255, 0.12);
+    --dp-text: #1d1d1f;
+    --dp-muted: #aeaeb2;
+    --dp-capsule: rgba(120, 120, 128, 0.12);
+    --dp-capsule-hover: rgba(120, 120, 128, 0.18);
+    --dp-surface: #ffffff;
+    --dp-hover: rgba(120, 120, 128, 0.1);
+    --dp-line: rgba(60, 60, 67, 0.12);
+}
+html.dark .ofi-macdp,
+html.dark .ofi-macdp-pop {
+    --dp-blue: #3b8dff;
+    --dp-blue-soft: rgba(59, 141, 255, 0.24);
+    --dp-text: #f5f5f7;
+    --dp-muted: #6e6e73;
+    --dp-capsule: rgba(118, 118, 128, 0.24);
+    --dp-capsule-hover: rgba(118, 118, 128, 0.34);
+    --dp-surface: #2c2c2e;
+    --dp-hover: rgba(255, 255, 255, 0.08);
+    --dp-line: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Die Kapsel ───────────────────────────────────────────── */
+.ofi-macdp {
+    position: relative;
+    display: inline-flex;
+    width: 104px;
+    max-width: 100%;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    border-radius: 7px;
+    background: var(--dp-capsule);
+    cursor: pointer;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-macdp:hover:not(.is-disabled) { background: var(--dp-capsule-hover); }
+.ofi-macdp.is-open { box-shadow: 0 0 0 1.5px var(--dp-blue); }
+.ofi-macdp.is-disabled { cursor: default; opacity: 0.5; }
+.ofi-macdp.is-block { width: 100%; }
+.ofi-macdp.is-compact { height: 30px; width: 96px; }
+/* Formularfeld: volle Breite, Höhe der übrigen Felder, Datum links. */
+.ofi-macdp.is-field { width: 100%; height: var(--ofi-ctl-h, 40px); }
+html body .ofi-macdp.is-field > input.ofi-macdp__input { text-align: left !important; padding: 0 12px !important; font-size: 14px !important; }
+.ofi-macdp.is-field-sm { width: 100%; height: 32px; }
+/* Filterleiste: Höhe der Leiste, feste Breite. */
+.ofi-macdp.is-toolbar { width: 124px; height: var(--ofi-ctl-h, 40px); }
+html body .ofi-macdp.is-toolbar > input.ofi-macdp__input { font-size: 13.5px !important; }
+.ofi-macdp.is-field-sm.w-\[150px\] { width: 150px; }
+.ofi-macdp.is-field.w-\[180px\] { width: 180px; }
+html body .ofi-macdp.is-field-sm > input.ofi-macdp__input { text-align: left !important; padding: 0 10px !important; }
+
+html body .ofi-macdp > input.ofi-macdp__input {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 8px !important;
+    font-family: inherit;
+    font-size: 13px !important;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    text-align: center !important;
+    color: var(--dp-text) !important;
+    cursor: inherit;
+    outline: none !important;
+}
+html body .ofi-macdp.is-open > input.ofi-macdp__input { color: var(--dp-blue) !important; cursor: text; }
+html body .ofi-macdp.is-compact > input.ofi-macdp__input { font-size: 12.5px !important; padding: 0 6px !important; }
+html body .ofi-macdp > input.ofi-macdp__input::placeholder { color: var(--dp-muted); }
+
+/* ── Das Fenster ──────────────────────────────────────────── */
+html body .ofi-quick-pop.ofi-macdp-pop {
+    z-index: 12000 !important;
+    border: 0.5px solid var(--dp-line) !important;
+    border-radius: 12px !important;
+    background: var(--dp-surface) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+    font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+html.dark body .ofi-quick-pop.ofi-macdp-pop { box-shadow: 0 14px 44px rgba(0, 0, 0, 0.6) !important; }
+
+.ofi-macdp-cal { padding: 10px 8px 6px; user-select: none; color: var(--dp-text); }
+
+.ofi-macdp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 0 4px 6px;
+}
+html body .ofi-macdp-pop button {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    font-family: inherit !important;
+    letter-spacing: normal !important;
+    transform: none !important;
+    -webkit-text-fill-color: currentColor !important;
+}
+html body .ofi-macdp-pop .ofi-macdp-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 6px !important;
+    padding: 2px 4px !important;
+    color: var(--dp-text) !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    text-transform: capitalize;
+}
+.ofi-macdp-title > svg { color: var(--dp-blue); transition: transform 180ms ease; }
+.ofi-macdp-title.is-open > svg { transform: rotate(90deg); }
+html body .ofi-macdp-pop .ofi-macdp-title.is-open { color: var(--dp-blue) !important; }
+
+.ofi-macdp-nav { display: inline-flex; align-items: center; gap: 2px; }
+html body .ofi-macdp-pop .ofi-macdp-nav > button {
+    display: inline-flex;
+    width: 24px !important;
+    height: 24px !important;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    color: var(--dp-blue) !important;
+}
+html body .ofi-macdp-pop .ofi-macdp-nav > button:hover { background: var(--dp-hover) !important; }
+
+.ofi-macdp-week,
+.ofi-macdp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.ofi-macdp-week > span {
+    padding-bottom: 3px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--dp-muted);
+}
+.ofi-macdp-grid { row-gap: 1px; }
+html body .ofi-macdp-pop .ofi-macdp-day {
+    display: inline-flex;
+    width: 28px !important;
+    height: 28px !important;
+    justify-self: center;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px !important;
+    color: var(--dp-text) !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    font-variant-numeric: tabular-nums;
+    transition: background-color 100ms ease;
+}
+html body .ofi-macdp-pop .ofi-macdp-day:hover:not(:disabled):not(.is-selected) { background: var(--dp-hover) !important; }
+html body .ofi-macdp-pop .ofi-macdp-day.is-today { color: var(--dp-blue) !important; }
+html body .ofi-macdp-pop .ofi-macdp-day.is-selected {
+    background: var(--dp-blue-soft) !important;
+    color: var(--dp-blue) !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+}
+/* Heute UND gewählt: der volle blaue Kreis, wie bei iOS. */
+html body .ofi-macdp-pop .ofi-macdp-day.is-selected.is-today {
+    background: var(--dp-blue) !important;
+    color: #fff !important;
+}
+html body .ofi-macdp-pop .ofi-macdp-day:disabled { color: var(--dp-muted) !important; opacity: 0.45; cursor: default; }
+
+.ofi-macdp-foot {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+    border-top: 0.5px solid var(--dp-line);
+    padding-top: 4px;
+}
+html body .ofi-macdp-pop .ofi-macdp-foot > button {
+    border-radius: 6px !important;
+    padding: 3px 8px !important;
+    color: var(--dp-blue) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+}
+html body .ofi-macdp-pop .ofi-macdp-foot > button:hover:not(:disabled) { background: var(--dp-hover) !important; }
+.ofi-macdp-foot.has-clear { justify-content: space-between; }
+html body .ofi-macdp-pop .ofi-macdp-foot > button.is-clear { color: #8e8e93 !important; }
+html body .ofi-macdp-pop .ofi-macdp-foot > button.is-clear:hover { color: #ff3b30 !important; }
+
+/* Monatswahl: drei Spalten, der aktuelle Monat blau hinterlegt. */
+.ofi-macdp-months {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 2px 2px 4px;
+}
+html body .ofi-macdp-pop .ofi-macdp-months > button {
+    height: 30px !important;
+    border-radius: 7px !important;
+    color: var(--dp-text) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    text-transform: capitalize;
+}
+html body .ofi-macdp-pop .ofi-macdp-months > button:hover { background: var(--dp-hover) !important; }
+html body .ofi-macdp-pop .ofi-macdp-months > button.is-on {
+    background: var(--dp-blue-soft) !important;
+    color: var(--dp-blue) !important;
+    font-weight: 600 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-macdp-title > svg { transition: none; }
+}
+
+/* ── Formular-/Filterfelder sehen aus wie ihre Nachbarn ─────
+   Neben weissen, umrandeten Eingabefeldern wäre die graue Kapsel ein
+   Fremdkörper: dort trägt das Datumsfeld dieselbe Fläche und Kante. */
+.ofi-macdp:is(.is-field, .is-field-sm, .is-toolbar) {
+    border: 1px solid var(--ofi-ctl-border, #c3c6cd);
+    border-radius: 8px;
+    background: var(--ofi-ctl-surface, #fff);
+}
+.ofi-macdp:is(.is-field, .is-field-sm, .is-toolbar):hover:not(.is-disabled) {
+    border-color: var(--ofi-ctl-border-hover, #a6aab3);
+    background: var(--ofi-ctl-surface, #fff);
+}
+.ofi-macdp:is(.is-field, .is-field-sm, .is-toolbar).is-open {
+    border-color: var(--dp-blue);
+    box-shadow: 0 0 0 3px rgba(10, 122, 255, 0.14);
+}
+html.dark .ofi-macdp:is(.is-field, .is-field-sm, .is-toolbar) {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.05);
+}

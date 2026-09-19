@@ -1,10 +1,12 @@
 import {
+    Fragment,
     useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
     useRef,
     useState,
+    type ClipboardEvent,
     type KeyboardEvent,
     type MutableRefObject,
 } from 'react';
@@ -12,7 +14,7 @@ import { toast } from 'sonner';
 import { LuListChecks } from 'react-icons/lu';
 
 import { DangerConfirmDialog } from '@/components/ui-shared/DangerConfirmDialog';
-import { Spinner } from '@/components/ui-shared/Loader';
+import { DotRing } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
 import { tasksApi, tasksErrorMessage } from '@/lib/api/tasksModule';
 import type {
@@ -25,6 +27,7 @@ import type {
 } from '@/types/tasksModule';
 import { ChecklistEnvContext, type ChecklistEnv } from '../checklist/checklistEnv';
 import { ChecklistGroup } from '../checklist/ChecklistGroup';
+import { clipboardFiles } from '../../utils/clipboardFiles';
 import { TaskButton } from '../shared/TaskButton';
 import { BlockMenu } from './BlockMenu';
 import {
@@ -115,7 +118,9 @@ export const BlockEditor = ({
     const [deletingGroup, setDeletingGroup] = useState(false);
     const [addingChecklist, setAddingChecklist] = useState(false);
     const [autoFocusGroupId, setAutoFocusGroupId] = useState<string | null>(null);
-    const [uploading, setUploading] = useState(false);
+    /** Laufender Upload: wo seine Blöcke landen — dort steht bis dahin ein Platzhalter mit Ladekranz. */
+    const [pendingUpload, setPendingUpload] = useState<{ afterId: string | null; slashBlockId: string | null; count: number } | null>(null);
+    const uploading = pendingUpload !== null;
     const mediaTargetRef = useRef<{ afterId: string | null; slashBlockId: string | null }>({ afterId: null, slashBlockId: null });
 
     /** Ganzer Stand von aussen (Konflikt, neuerer Serverstand): alle Textblöcke neu setzen. */
@@ -289,7 +294,7 @@ export const BlockEditor = ({
     const onFilesChosen = async (files: File[]) => {
         if (!files.length) return;
         const { afterId, slashBlockId } = mediaTargetRef.current;
-        setUploading(true);
+        setPendingUpload({ afterId, slashBlockId, count: files.length });
         try {
             const uploaded = await tasksApi.uploadAttachments(taskId, files);
             onAttachmentsAdded(uploaded);
@@ -302,8 +307,28 @@ export const BlockEditor = ({
         } catch (error) {
             toast.error(tasksErrorMessage(error));
         } finally {
-            setUploading(false);
+            setPendingUpload(null);
         }
+    };
+
+    /**
+     * Strg/⌘+V mit einem Bild (Bildschirmfoto, «Bild kopieren»): hochladen und als
+     * Bildblock hinter den aktuellen Block setzen — ein leerer Absatz wird ersetzt.
+     * Läuft in der Capture-Phase, damit Textblock/Tabelle das Einfügen nicht als Text schlucken.
+     */
+    const onPasteCapture = (event: ClipboardEvent<HTMLDivElement>) => {
+        if (!editable) return;
+        const images = clipboardFiles(event.clipboardData, { imagesOnly: true });
+        if (!images.length) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (uploading) return;
+        const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-editor-text]') : null;
+        const blockId = target?.dataset.editorText ?? activeBlockRef.current;
+        const block = blockId ? blocksRef.current.find((entry) => entry.id === blockId) : undefined;
+        const replace = block && block.type === 'p' && !inlineHtmlToText(block.text).trim() && blocksRef.current.length > 1;
+        mediaTargetRef.current = { afterId: block?.id ?? null, slashBlockId: replace ? block.id : null };
+        void onFilesChosen(images);
     };
 
     /* ── Tastatur und Eingabe in Textblöcken ──────────────────────────── */
@@ -513,6 +538,19 @@ export const BlockEditor = ({
             setBlocks(next);
             actionsRef.current.markDirty();
         },
+        onImageChange: (blockId, patch) => {
+            const next = blocksRef.current.map((block) => {
+                if (block.id !== blockId) return block;
+                const meta = { ...block.meta, ...patch };
+                for (const key of Object.keys(patch) as Array<keyof typeof patch>) {
+                    if (patch[key] === undefined) delete meta[key];
+                }
+                return { ...block, meta };
+            });
+            blocksRef.current = next;
+            setBlocks(next);
+            actionsRef.current.markDirty();
+        },
     }), []);
 
     const env = useMemo<ChecklistEnv>(() => ({
@@ -534,10 +572,26 @@ export const BlockEditor = ({
     const activeBlock = activeBlockId ? blocks.find((block) => block.id === activeBlockId) : undefined;
     const alignEnabled = Boolean(activeBlock && isTextBlock(activeBlock.type));
     const soleTextBlock = blocks.length === 1 && isTextBlock(blocks[0].type);
+    // Ohne Zielblock (oder Ziel inzwischen weg) steht der Platzhalter am Ende.
+    const uploadAnchored = Boolean(pendingUpload && blocks.some((block) =>
+        block.id === (pendingUpload.slashBlockId ?? pendingUpload.afterId)));
+    const uploadPlaceholder = pendingUpload ? (
+        <div className="ofi-gv-editor-block is-uploading">
+            {Array.from({ length: pendingUpload.count }, (_, index) => (
+                <div key={index} className="ofi-gv-editor-uploading">
+                    <DotRing size={30} label={t('tasksModule.editor.uploading')} />
+                </div>
+            ))}
+        </div>
+    ) : null;
 
     return (
         <ChecklistEnvContext.Provider value={env}>
-            <div ref={hostRef} className={`ofi-gv-editor ${editable ? 'is-editable' : 'is-readonly'}`}>
+            <div
+                ref={hostRef}
+                className={`ofi-gv-editor ${editable ? 'is-editable' : 'is-readonly'}`}
+                onPasteCapture={editable ? onPasteCapture : undefined}
+            >
                 {editable && (
                     <EditorToolbar
                         format={format}
@@ -552,20 +606,30 @@ export const BlockEditor = ({
                 )}
 
                 <div className="ofi-gv-editor-blocks">
-                    {blocks.map((block) => (
-                        <EditorBlock
-                            key={block.id}
-                            block={block}
-                            number={numbers.get(block.id) ?? 1}
-                            editable={editable}
-                            rev={`${syncRev}:${blockRevRef.current.get(block.id) ?? 0}`}
-                            showPlaceholder={soleTextBlock}
-                            attachment={block.meta.attId ? attachmentById.get(block.meta.attId) : undefined}
-                            checklist={block.meta.groupId ? checklistById.get(block.meta.groupId) : undefined}
-                            autoFocusChecklist={Boolean(block.meta.groupId && block.meta.groupId === autoFocusGroupId)}
-                            handlers={handlers}
-                        />
-                    ))}
+                    {blocks.map((block) => {
+                        const uploadHere = pendingUpload && (pendingUpload.slashBlockId === block.id
+                            || (!pendingUpload.slashBlockId && pendingUpload.afterId === block.id));
+                        const replaced = uploadHere && pendingUpload.slashBlockId === block.id;
+                        return (
+                            <Fragment key={block.id}>
+                                {!replaced && (
+                                    <EditorBlock
+                                        block={block}
+                                        number={numbers.get(block.id) ?? 1}
+                                        editable={editable}
+                                        rev={`${syncRev}:${blockRevRef.current.get(block.id) ?? 0}`}
+                                        showPlaceholder={soleTextBlock}
+                                        attachment={block.meta.attId ? attachmentById.get(block.meta.attId) : undefined}
+                                        checklist={block.meta.groupId ? checklistById.get(block.meta.groupId) : undefined}
+                                        autoFocusChecklist={Boolean(block.meta.groupId && block.meta.groupId === autoFocusGroupId)}
+                                        handlers={handlers}
+                                    />
+                                )}
+                                {uploadHere && uploadPlaceholder}
+                            </Fragment>
+                        );
+                    })}
+                    {pendingUpload && !uploadAnchored && uploadPlaceholder}
                     {!editable && !blocks.length && !orphans.length && (
                         <div className="ofi-gv-editor-empty">{t('tasksModule.editor.empty')}</div>
                     )}
@@ -590,12 +654,6 @@ export const BlockEditor = ({
                         <TaskButton icon={<LuListChecks size={14} />} disabled={addingChecklist} onClick={() => void addChecklist(null, null)}>
                             {t('tasksModule.editor.addChecklist')}
                         </TaskButton>
-                        {uploading && (
-                            <span className="ofi-gv-caption ofi-gv-editor-foot__status">
-                                <Spinner size="xs" />
-                                {t('tasksModule.editor.uploading')}
-                            </span>
-                        )}
                     </div>
                 )}
 

@@ -621,6 +621,9 @@ export async function buildPriceRequestPdfBytes(
     lang: PriceRequestPdfLang = 'de'
 ): Promise<Uint8Array> {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    // Der Titel ersetzt in der Vorschau (blob:-URL) die UUID als Dokumentname.
+    doc.setProperties({ title: `Preisanfrage-${order.referenceNumber || ''}` });
+    doc.viewerPreferences({ DisplayDocTitle: true });
     await registerFonts(doc);
     // Jede Zeile setzt ihre Sperrung selbst (0 Tc) — sonst erbte der Text nach
     // einem gesperrten Spaltentitel dessen Sperrung.

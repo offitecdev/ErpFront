@@ -29,6 +29,14 @@ interface TasksModuleState {
     error: unknown;
     /** Unterschied Server − Browser in ms (für die laufende Uhr). */
     serverOffsetMs: number;
+    /**
+     * Die EIGENE laufende Messung — unabhängig vom Bootstrap (14.09.2026, Samet:
+     * «ilk front başlayacak, arka planda backend'e gönderecek»): ein Klick zählt
+     * sofort, auch wenn der Bootstrap noch lädt oder fehlt. undefined = unbekannt.
+     */
+    activeTimer: ActiveTimerInfo | null | undefined;
+    /** false = nur der GEMERKTE Bootstrap sagt es (kann alt sein); true nach Klick, frischem Bootstrap oder Özet. */
+    activeTimerKnown: boolean;
     directory: DirectoryPerson[] | null;
     /** Das letzte Laden des Verzeichnisses ist gescheitert — beim nächsten Öffnen erneut versuchen. */
     directoryFailed: boolean;
@@ -40,7 +48,8 @@ interface TasksModuleState {
     setActiveTimer: (activeTimer: ActiveTimerInfo | null) => void;
     setOnboarding: (onboarding: TaskOnboarding) => void;
     loadDirectory: (force?: boolean) => Promise<DirectoryPerson[]>;
-    noteServerNow: (serverNow: string | undefined) => void;
+    /** `trusted` = Antwort kommt nie aus dem Redis-Cache (Bootstrap, Timer, Detail, Hızlı, Pano). */
+    noteServerNow: (serverNow: string | undefined, trusted?: boolean) => void;
 }
 
 let bootstrapInFlight: Promise<TasksBootstrap | null> | null = null;
@@ -50,6 +59,44 @@ const offsetFrom = (serverNow: string | undefined): number | null => {
     if (!serverNow) return null;
     const server = Date.parse(serverNow);
     return Number.isFinite(server) ? server - Date.now() : null;
+};
+
+/**
+ * Der Uhrversatz wird EINMAL gemessen und dann festgehalten (14.09.2026, Samet:
+ * «sayaçlar bir anda geri sayıyor ileri sayıyor»). Jede Antwort stempelt ihr
+ * `serverNow` VOR der Datenbankarbeit und kommt mit anderer Laufzeit an — Chat
+ * alle 4 s, Pano alle 15 s, Liste, Detail, Özet, Hızlı mod: jede Messung wich
+ * um 50–300 ms ab, und jede Abweichung verschob ALLE Uhren um genau so viel —
+ * bei ganzen Sekunden sprang die Anzeige vor und zurück. Ein fester Versatz ist
+ * um seine Laufzeit verschoben, aber in sich stimmig: nichts springt je.
+ * Nur eine ECHTE Änderung (Rechneruhr gestellt, anderer Server) wird übernommen.
+ */
+const OFFSET_RESET_MS = 1500;
+/** Nur frische Antworten dürfen die Uhr stellen; `weak` bleibt für bereits laufende Sitzungen als Übergangswert erhalten. */
+let offsetSource: 'none' | 'weak' | 'trusted' = 'none';
+
+const nextOffset = (current: number, sample: number, trusted: boolean): number => {
+    // Eine gecachte Antwort trägt ein bis zu 15 s altes `serverNow`. Auch als
+    // allererste Antwort darf sie weder die sichtbare Uhr noch `actionAt`
+    // verschieben; Bootstrap/Detail/Timer liefern gleich danach eine frische.
+    if (!trusted) return current;
+    if (offsetSource === 'none' || offsetSource === 'weak') {
+        offsetSource = 'trusted';
+        return sample;
+    }
+    return Math.abs(sample - current) > OFFSET_RESET_MS ? sample : current;
+};
+
+/**
+ * Laufende Messung aus einer Antwort übernehmen — ohne die eigene Uhr zu
+ * verrücken: meldet der Server DIESELBE Aufgabe, bleibt die Startzeit des
+ * Klicks (die des Servers weicht um die Netzlaufzeit ab; jede Übernahme liesse
+ * Kopfzeile, Hızlı mod und Zeilen um eine Sekunde springen). Nur eine deutlich
+ * andere Startzeit (andere Messung, anderes Gerät) ersetzt sie.
+ */
+export const mergeActiveTimer = (current: ActiveTimerInfo | null | undefined, incoming: ActiveTimerInfo | null): ActiveTimerInfo | null => {
+    void current;
+    return incoming;
 };
 
 /* Sofort sichtbar (13.09.2026): der letzte Bootstrap dieser Firma steht beim
@@ -63,6 +110,8 @@ export const useTasksModuleStore = create<TasksModuleState>((set, get) => ({
     loading: false,
     error: null,
     serverOffsetMs: 0,
+    activeTimer: cachedBootstrap ? cachedBootstrap.summary.activeTimer ?? null : undefined,
+    activeTimerKnown: false,
     directory: null,
     directoryFailed: false,
 
@@ -73,19 +122,35 @@ export const useTasksModuleStore = create<TasksModuleState>((set, get) => ({
         if (fresh && !force) return state.bootstrap;
         if (bootstrapInFlight) return bootstrapInFlight;
         if (state.tenantKey !== tenantKey) {
-            set({ bootstrap: readTasksCache<TasksBootstrap>('bootstrap'), directory: null, tenantKey, loadedAt: 0 });
+            const cached = readTasksCache<TasksBootstrap>('bootstrap');
+            set({
+                bootstrap: cached,
+                directory: null,
+                tenantKey,
+                loadedAt: 0,
+                activeTimer: cached ? cached.summary.activeTimer ?? null : undefined,
+                activeTimerKnown: false,
+            });
         }
         set({ loading: true, error: null });
         bootstrapInFlight = tasksApi.bootstrap()
             .then((bootstrap) => {
                 writeTasksCache('bootstrap', bootstrap);
                 const offset = offsetFrom(bootstrap.serverNow);
-                set({
-                    bootstrap,
-                    tenantKey,
-                    loadedAt: Date.now(),
-                    loading: false,
-                    ...(offset !== null ? { serverOffsetMs: offset } : {}),
+                set((state) => {
+                    // Dieselbe Firma: die laufende Uhr behält die Startzeit des Klicks.
+                    const activeTimer = state.tenantKey === tenantKey
+                        ? mergeActiveTimer(state.activeTimer, bootstrap.summary.activeTimer)
+                        : bootstrap.summary.activeTimer;
+                    return {
+                        bootstrap: { ...bootstrap, summary: { ...bootstrap.summary, activeTimer } },
+                        activeTimer,
+                        activeTimerKnown: true,
+                        tenantKey,
+                        loadedAt: Date.now(),
+                        loading: false,
+                        ...(offset !== null ? { serverOffsetMs: nextOffset(state.serverOffsetMs, offset, true) } : {}),
+                    };
                 });
                 return bootstrap;
             })
@@ -111,9 +176,14 @@ export const useTasksModuleStore = create<TasksModuleState>((set, get) => ({
 
     /* Nur der Inhalt — der Uhrversatz kommt ausschliesslich aus FRISCHEN Antworten
        (refreshSummary/noteServerNow), sonst liesse ein gemerkter Stand die Uhren wandern. */
-    setSummary: (summary) => set((state) => ({
-        bootstrap: state.bootstrap ? { ...state.bootstrap, summary } : state.bootstrap,
-    })),
+    setSummary: (summary) => set((state) => {
+        const activeTimer = mergeActiveTimer(state.activeTimer, summary.activeTimer);
+        return {
+            activeTimer,
+            activeTimerKnown: true,
+            bootstrap: state.bootstrap ? { ...state.bootstrap, summary: { ...summary, activeTimer } } : state.bootstrap,
+        };
+    }),
 
     setLabels: (labels) => set((state) => ({
         bootstrap: state.bootstrap ? { ...state.bootstrap, labels } : state.bootstrap,
@@ -125,7 +195,10 @@ export const useTasksModuleStore = create<TasksModuleState>((set, get) => ({
             : state.bootstrap,
     })),
 
+    /* Der Klick — zählt IMMER, auch ohne Bootstrap; der Server erfährt es danach (useTaskTimer). */
     setActiveTimer: (activeTimer) => set((state) => ({
+        activeTimer,
+        activeTimerKnown: true,
         bootstrap: state.bootstrap
             ? { ...state.bootstrap, summary: { ...state.bootstrap.summary, activeTimer } }
             : state.bootstrap,
@@ -154,9 +227,11 @@ export const useTasksModuleStore = create<TasksModuleState>((set, get) => ({
         return directoryInFlight;
     },
 
-    noteServerNow: (serverNow) => {
+    noteServerNow: (serverNow, trusted = false) => {
         const offset = offsetFrom(serverNow);
-        if (offset !== null) set({ serverOffsetMs: offset });
+        if (offset === null) return;
+        const next = nextOffset(get().serverOffsetMs, offset, trusted);
+        if (next !== get().serverOffsetMs) set({ serverOffsetMs: next });
     },
 }));
 

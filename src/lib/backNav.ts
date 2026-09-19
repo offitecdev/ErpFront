@@ -75,7 +75,9 @@ const MAIN_PAGES: Record<string, string> = {
     '/sales/osp': 'nav.salesOsp',
     '/sales/orders': 'nav.myOrders',
     '/sales/addon-orders': 'nav.addonOrders',
-    '/sales/invoices': 'nav.salesInvoices',
+
+    '/accounting/invoices': 'nav.outgoingInvoices',
+    '/accounting/to-bill': 'nav.toBill',
 
     '/projects': 'nav.projectManagement',
     '/services/reports': 'nav.serviceReports',
@@ -104,6 +106,7 @@ const MAIN_PAGES: Record<string, string> = {
     '/settings/mail': 'nav.mailSettings',
     '/settings/company-categories': 'nav.companyCategories',
     '/settings/upload': 'nav.upload',
+    '/settings/two-factor': 'nav.twoFactorSettings',
     '/settings/checklists': '',
 
     /* Der rote Montage-Arbeitsplatz ist für den Monteur die GANZE Anwendung —

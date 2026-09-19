@@ -639,17 +639,15 @@ export const OrderDetailPage = () => {
        ein Mailfenster») — auch ohne hinterlegte Adresse, denn das Häkchen
        «manuell gesendet» braucht keine. Gesendet wird nur mit seinem Knopf. */
     const showSend = canManage && stage !== 'RECEIPT';
-    const canSendMail = Boolean(order.supplierEmail);
+    // Empfänger frei eintippbar (15.09.2026) — eine hinterlegte Lieferantenadresse ist nicht nötig.
+    const canSendMail = Boolean(mailTo.trim() || order.supplierEmail);
     /* Das Häkchen folgt dem Status: gesetzt = die Mail dieser Stufe ist draussen.
        Setzen geht auf DRAFT (Anfrage) und PENDING (bestätigter Auftrag),
        entfernen nur, wenn es von Hand gesetzt wurde. */
     const manualChecked = mailState === 'SENT';
-    const manualLocked = manualChecked
-        ? !order.emailSentManually
-        : !(status === 'DRAFT' || status === 'PENDING');
-    const manualHint = manualChecked
-        ? (order.emailSentManually ? null : t('inv.orders.mail.manualSystemSent'))
-        : (status === 'ORDER_DRAFT' ? t('inv.orders.mail.manualNeedsConfirm') : null);
+    // Jederzeit umschaltbar (Samet, 15.09.2026) — keine Sperre mehr.
+    const manualLocked = false;
+    const manualHint: string | null = null;
 
     const primary: { label: string; icon: React.ReactNode; onClick: () => void; busyKey: string } | null = (() => {
         if (!canManage) return null;
@@ -1150,6 +1148,32 @@ export const OrderDetailPage = () => {
                 <SectionCard
                     title={t('inv.orders.views.pdf')}
                     action={(
+                        <div className="flex items-center gap-2">
+                        {/* Die Vorschau ist eine blob:-URL — Chromes eigene Leiste
+                            zeigte «<uuid>» und lud «<uuid>.pdf» herunter. Die Leiste
+                            ist darum aus (#toolbar=0, wie PdfPreviewSheet); Name und
+                            Download kommen von hier: BE-….pdf. */}
+                        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 dark:text-white/80">
+                            <File05 size={14} />
+                            {pdfFileName}
+                        </span>
+                        <button
+                            type="button"
+                            disabled={!pdfUrl}
+                            onClick={() => {
+                                if (!pdfUrl) return;
+                                const anchor = document.createElement('a');
+                                anchor.href = pdfUrl;
+                                anchor.download = pdfFileName;
+                                document.body.appendChild(anchor);
+                                anchor.click();
+                                anchor.remove();
+                            }}
+                            className="flex items-center gap-1 rounded-md bg-[#0a7aff] px-2.5 py-1 text-[11.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:opacity-50"
+                        >
+                            <FileDownload02 size={13} />
+                            {t('common.download')}
+                        </button>
                         <div className="flex items-center gap-1 rounded-md border border-slate-200 p-0.5 dark:border-white/15">
                             {PDF_LANGS.map((lang) => (
                                 <button
@@ -1166,6 +1190,7 @@ export const OrderDetailPage = () => {
                                 </button>
                             ))}
                         </div>
+                        </div>
                     )}
                 >
                     <div className="h-[70vh] min-h-[420px] overflow-hidden bg-slate-100 dark:bg-white/5">
@@ -1174,7 +1199,7 @@ export const OrderDetailPage = () => {
                                 {t('inv.orders.pdfGenerating')}
                             </div>
                         ) : (
-                            <iframe title="order-pdf" src={pdfUrl} className="h-full w-full" />
+                            <iframe title={pdfFileName} src={`${pdfUrl}#toolbar=0&navpanes=0`} className="h-full w-full" />
                         )}
                     </div>
                 </SectionCard>

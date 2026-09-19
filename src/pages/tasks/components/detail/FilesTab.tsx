@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { toast } from 'sonner';
 import { LuTrash2, LuUpload, LuX } from 'react-icons/lu';
 
@@ -9,6 +9,7 @@ import { attachmentUrl, tasksApi, tasksErrorMessage } from '@/lib/api/tasksModul
 import type { TaskAttachment, TaskDetailResult } from '@/types/tasksModule';
 import type { TaskDetailController } from '../../hooks/useTaskDetail';
 import { useNow } from '../../hooks/useNow';
+import { clipboardFiles, isEditableTarget } from '../../utils/clipboardFiles';
 import { formatBytes, relativeTime } from '../../utils/taskFormat';
 import { TaskIconButton } from '../shared/TaskButton';
 import { AttachmentChip } from './AttachmentChip';
@@ -45,6 +46,22 @@ export const FilesTab = ({ ctl, data }: { ctl: TaskDetailController; data: TaskD
         }
     };
 
+    // Strg/⌘+V irgendwo auf dem Reiter lädt kopierte Bilder/Dateien hoch (nicht in Eingabefeldern).
+    const uploadRef = useRef(upload);
+    useEffect(() => { uploadRef.current = upload; });
+    useEffect(() => {
+        if (!permissions.canUpload) return undefined;
+        const onPaste = (event: ClipboardEvent) => {
+            if (event.defaultPrevented || isEditableTarget(event.target)) return;
+            const pasted = clipboardFiles(event.clipboardData);
+            if (!pasted.length) return;
+            event.preventDefault();
+            void uploadRef.current(pasted);
+        };
+        document.addEventListener('paste', onPaste);
+        return () => document.removeEventListener('paste', onPaste);
+    }, [permissions.canUpload]);
+
     const remove = async () => {
         if (!pendingRemove) return;
         setRemoving(true);
@@ -53,6 +70,8 @@ export const FilesTab = ({ ctl, data }: { ctl: TaskDetailController; data: TaskD
             removeAttachment(pendingRemove.id);
             setPendingRemove(null);
             notify('task', false);
+            // Der Server hat auch die Blöcke dieser Datei aus dem Inhalt genommen — neuen Stand holen.
+            void ctl.reload(true);
         } catch (error) {
             toast.error(tasksErrorMessage(error));
         } finally {

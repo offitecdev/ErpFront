@@ -23,6 +23,8 @@ import {
     Menu02 as MenuOutlined,
     Package as InboxOutlined,
     ListChecks as TasksModuleIcon,
+    // Buchhaltung (16.09.2026) — der Beleg.
+    Receipt as AccountingIcon,
     Plus as PlusOutlined,
     Settings01 as SettingOutlined,
     Truck01 as CarOutlined,
@@ -66,6 +68,7 @@ import { WhatsNewHost } from '../updates/WhatsNewHost';
 import { OutlookMark } from '../icons/OutlookMark';
 import { TaskMark } from '../icons/TaskMark';
 import { SAMPLE_QUOTE_ITEM_ID, newestQuotePath } from '../updates/sampleQuote';
+import { DAILY_REPORT_OPEN_EVENT } from '../../pages/tasks/components/dailyReport/dailyReportEvents';
 
 const LazyReminderToasts = React.lazy(() =>
     import('../../pages/crm/components/ReminderToasts').then((module) => ({ default: module.ReminderToasts })),
@@ -88,6 +91,62 @@ const DeferredReminderToasts = () => {
     );
 };
 
+const LazyDailyReportPrompt = React.lazy(() =>
+    import('../../pages/tasks/components/dailyReport/DailyReportPrompt').then((module) => ({ default: module.DailyReportPrompt })),
+);
+
+/**
+ * Gün sonu raporu (hafta içi 16:00) — wie die Erinnerungen erst nach dem ersten
+ * Bild. Ein Klick auf «Gün sonu raporu» davor hängt es SOFORT ein; die
+ * Anforderung wartet in dailyReportEvents.ts, bis das Fenster sie abholt
+ * (16.09.2026, Samet: «tek tıkta açılmalı ama bazen açılmıyor»).
+ */
+const DeferredDailyReportPrompt = () => {
+    const [ready, setReady] = useState(false);
+
+    useEffect(() => {
+        const timerId = window.setTimeout(() => setReady(true), 4_000);
+        const now = () => setReady(true);
+        window.addEventListener(DAILY_REPORT_OPEN_EVENT, now);
+        return () => {
+            window.clearTimeout(timerId);
+            window.removeEventListener(DAILY_REPORT_OPEN_EVENT, now);
+        };
+    }, []);
+
+    if (!ready) return null;
+    return (
+        <React.Suspense fallback={null}>
+            <LazyDailyReportPrompt />
+        </React.Suspense>
+    );
+};
+
+const LazyTaskTimerDock = React.lazy(() =>
+    import('../../pages/tasks/components/timerDock/TaskTimerDock').then((module) => ({ default: module.TaskTimerDock })),
+);
+
+const TASKS_MODULE_PERMISSIONS = ['tasks.view', 'tasks.manage', 'tasks.delete'];
+
+/** Çalışan görev (15.09.2026): das kleine Fenster unten mit der laufenden Aufgabe — auf jeder Seite, nach dem ersten Bild. */
+const DeferredTaskTimerDock = () => {
+    const canUse = useAuthStore((state) => state.isAuthenticated
+        && (state.isSystemAdmin || state.permissions.some((permission) => TASKS_MODULE_PERMISSIONS.includes(permission))));
+    const [ready, setReady] = useState(false);
+
+    useEffect(() => {
+        if (!canUse || ready) return undefined;
+        return afterPageSettled(() => setReady(true), { minMs: 800, maxMs: 5_000 });
+    }, [canUse, ready]);
+
+    if (!ready || !canUse) return null;
+    return (
+        <React.Suspense fallback={null}>
+            <LazyTaskTimerDock />
+        </React.Suspense>
+    );
+};
+
 /* ── Menü Tipleri ── */
 /** `module`: explicit module tag for leaves that belong to a different module
     than their section (e.g. fieldwork pages inside the projects group). */
@@ -98,6 +157,10 @@ type MenuLeaf = {
     module?: string;
     /** Nur für die Administratorrolle (`Role.isSystemAdmin`). */
     adminOnly?: boolean;
+    /** Recht ODER Administratorrolle — für Rechte, die die Administratorrolle
+        erst beim nächsten Öffnen der Berechtigungen in ihre Rolle geschrieben
+        bekommt (Zwei-Faktor, 15.09.2026). */
+    permissionOrAdmin?: string;
     /** Eigenes Zeichen vor dem Namen (siehe AppSidebar). */
     icon?: (props: { size?: number; className?: string }) => React.JSX.Element;
 };
@@ -223,11 +286,20 @@ const MENU_SECTIONS: MenuSection[] = [
             // Zusatzaufträge / Nachträge (05.09.2026): alle NT-Belege in einer
             // Liste, neben den Aufträgen — jeder mit eigenem PDF.
             { key: '/sales/addon-orders', label: 'nav.addonOrders', permission: 'crm.customers.view' },
-            // Rechnungen (30.08.2026): ALLE Rechnungen an einer Stelle —
-            // Projektauftrag, Lieferauftrag und die selbst ausgefüllte
-            // Direktrechnung. Sie stehen neben Angebot und Auftrag, weil sie das
-            // Ende derselben Kette sind.
-            { key: '/sales/invoices', label: 'nav.salesInvoices', permission: 'billing.view', module: 'billing' },
+        ],
+    },
+    // Buchhaltung (16.09.2026, Schritt 5): die Rechnungen wohnen an EINER
+    // Stelle. Verkauf und Projekte zeigen nur noch den Stand und führen
+    // hierher; die alten Adressen unter /sales/invoices leiten weiter.
+    {
+        type: 'group',
+        key: 'accounting',
+        label: 'nav.accounting',
+        icon: AccountingIcon,
+        items: [
+            { key: '/accounting/invoices', label: 'nav.outgoingInvoices', permission: 'billing.view', module: 'billing' },
+            // «Zu verrechnen» (17.09.2026, Schritt 7).
+            { key: '/accounting/to-bill', label: 'nav.toBill', permission: 'billing.view', module: 'billing' },
         ],
     },
     {
@@ -246,11 +318,6 @@ const MENU_SECTIONS: MenuSection[] = [
                (Lesezeichen, Rollentabelle und der Schlüssel `crm.forms`
                bleiben damit unverändert gültig). */
             { key: '/crm/forms', label: 'nav.crmForms', permission: 'projects.view' },
-            // Rechnungen der PROJEKTAUFTRÄGE (Vorgabe Samet: „nicht alle —
-            // Projektauftrag vorgewählt"). Es ist dieselbe Liste wie unter
-            // Verkauf, nur mit gesetztem Typ; die Seitenleiste unterscheidet
-            // Einträge mit Abfrageteil (siehe `activeUrl`).
-            { key: '/sales/invoices?type=PROJECT', label: 'nav.projectInvoices', permission: 'billing.view', module: 'billing' },
         ],
     },
     {
@@ -337,6 +404,10 @@ const MENU_SECTIONS: MenuSection[] = [
                ein RECHT steht bewusst nicht davor (die IT trägt selten die
                Lagerrolle), die Hürde ist das Kennwort der Schleuse. */
             { key: '/settings/upload', label: 'nav.upload', module: 'administration' },
+            /* Zwei-Faktor (Aegis) neu einrichten (15.09.2026): nicht für alle —
+               die Rollenzeile «Einstellungen → Zwei-Faktor» gibt die Seite frei
+               (pageAccess), das Recht deckt Konten ohne Stufenkarte ab. */
+            { key: '/settings/two-factor', label: 'nav.twoFactorSettings', module: 'administration', permissionOrAdmin: 'security.mfa.view' },
         ],
     },
 ];
@@ -628,6 +699,7 @@ const MainLayoutInner: React.FC = () => {
                     : sectionEnabled;
                 if (!visible) return [];
                 if (item.adminOnly && !isSystemAdmin) return [];
+                if (item.permissionOrAdmin && !isSystemAdmin && !permissions.includes(item.permissionOrAdmin)) return [];
                 // Seitenrechte der Rolle (17.08.2026): steht die Seite im
                 // Katalog und gibt die Rolle sie nicht frei, verschwindet der
                 // Eintrag. Seiten ausserhalb des Katalogs bleiben unberührt.
@@ -646,7 +718,7 @@ const MainLayoutInner: React.FC = () => {
             if (!items.length) return [];
             return [{ ...section, items }];
         });
-    }, [projectModuleEnabled, enabledModules, packageModules, pageAccess, isTechnicianWorkspace, isSystemAdmin]);
+    }, [projectModuleEnabled, enabledModules, packageModules, pageAccess, isTechnicianWorkspace, isSystemAdmin, permissions]);
     /* Seitenwächter (17.08.2026): eine gesperrte Seite darf auch über die
        Adresszeile nicht aufgehen. Ohne Regeln (leere Karte) greift nichts —
        siehe lib/pageAccess.ts. Der Server bleibt die eigentliche Schranke.
@@ -1154,15 +1226,19 @@ const MainLayoutInner: React.FC = () => {
                                 <MenuOutlined size={18} />
                             </button>}
 
-                            {/* Brand icon — mobile only; on desktop it lives atop the rail. */}
-                            <a
+                            {/* Brand icon — only on wide screens without the rail
+                                (on the rail it sits atop it). Vorgabe Samet,
+                                15.09.2026: auf dem Handy kein Zeichen — der
+                                Zurück-Pfeil rückt an seinen Platz, statt mit
+                                ihm über das Apps-Zeichen zu laufen. */}
+                            {(hideMenuRail || useNativeTouchDrawer) && <a
                                 href={hrefFor('/')}
                                 aria-label="Offitec"
                                 onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); guardedNavigate('/'); }}
-                                className={`ofi-hdr-ctl ml-1 mr-1 flex shrink-0 items-center justify-center ${hideMenuRail || useNativeTouchDrawer ? '' : 'lg:hidden'}`}
+                                className="ofi-hdr-ctl ml-1 mr-1 hidden shrink-0 items-center justify-center lg:flex"
                             >
                                 <img src="/fav4.svg" alt="Offitec" width={32} height={32} decoding="async" fetchPriority="high" className="size-8" />
-                            </a>
+                            </a>}
 
                             {/* ── Header tools: quick create / back, split view, "+" tab launcher ──
                                 Der BLITZ steht ganz vorn (Vorgabe 28.08.2026):
@@ -1266,9 +1342,11 @@ const MainLayoutInner: React.FC = () => {
                         </div>
 
                         <button
+                            type="button"
                             onClick={() => setIsNotificationPanelOpen((value) => !value)}
                             className="ofi-hdr-ctl relative flex items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-[#e3efff] dark:hover:bg-white/10"
                             aria-label={t('nav.notifications')}
+                            aria-expanded={isNotificationPanelOpen}
                         >
                             <BellOutlined size={16} />
                             {unreadNotificationCount > 0 && (
@@ -1280,8 +1358,11 @@ const MainLayoutInner: React.FC = () => {
                         <LanguageSwitcher />
                         <div className="relative" ref={dropdownRef}>
                             <button
+                                type="button"
                                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                                className="ofi-hdr-ctl flex items-center justify-center rounded-full transition-colors hover:bg-[#e3efff]"
+                                aria-label={t('nav.profile')}
+                                aria-expanded={isProfileDropdownOpen}
+                                className="ofi-hdr-ctl ofi-header-profile flex items-center justify-center rounded-full transition-colors hover:bg-[#e3efff]"
                             >
                                 {user ? (
                                     <PersonAvatar id={user.id} name={userName || user.email} size={32} className="ofi-nosize" />
@@ -1478,6 +1559,10 @@ export const MainLayout: React.FC = () => (
             muss überall im Programm läuten. Im rechten Fenster der geteilten
             Ansicht NICHT — sonst liefe er zweimal und läutete doppelt. */}
         {!IS_SPLIT_PANE && <DeferredReminderToasts />}
+        {/* Gün sonu raporu: auf jeder Seite, nicht doppelt in der geteilten Ansicht. */}
+        {!IS_SPLIT_PANE && <DeferredDailyReportPrompt />}
+        {/* Çalışan görev: die laufende Aufgabe unten, auf jeder Seite — nicht doppelt in der geteilten Ansicht. */}
+        {!IS_SPLIT_PANE && <DeferredTaskTimerDock />}
         {!IS_SPLIT_PANE && <MailComposeHost />}
         {/* Das Neuigkeiten-Fenster hängt aus demselben Grund am Rahmen: es soll
             nach der Anmeldung erscheinen, gleich auf welcher Seite man landet —

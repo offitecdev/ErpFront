@@ -164,7 +164,13 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
             // Die Meldung kommt deshalb aus i18n und NICHT aus `res.message`,
             // sonst steht sie auch in einer deutschen oder englischen Sitzung
             // auf Türkisch. `reused` unterscheidet den bereits vorhandenen Auftrag.
-            toast.success(res.reused ? t('tenders.order_already_created') : t('tenders.order_created'));
+            toast.success(res.reused
+                ? t('tenders.order_already_created')
+                : res.reusedWaitingProject
+                    ? (res.relinkedAppointments
+                        ? t('orders.revertTrace.orderReused', { count: res.relinkedAppointments })
+                        : t('orders.revertTrace.orderReusedPlain'))
+                    : t('tenders.order_created'));
 
             // Der Kunde erfährt SOFORT vom Auftrag — ohne Rückfrage und noch
             // bevor die Seite zum Projekt/Auftrag wechselt, damit ein Mailfehler

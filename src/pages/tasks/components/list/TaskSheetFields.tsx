@@ -42,11 +42,17 @@ export const AssigneeChips = ({
     ids,
     people,
     onChange,
+    selfId,
+    canPick = true,
 }: {
     ids: string[];
     /** Namen aus der Aufgabe; neu Gewählte kommen aus dem Verzeichnis. */
     people: PeopleMap;
     onChange: (next: string[]) => void;
+    /** Neu anlegen: die eigene Person steht fest vorne — der Server trägt sie immer ein. */
+    selfId?: string;
+    /** Weitere Personen wählen (nur die Leitung). */
+    canPick?: boolean;
 }) => {
     const directory = useTasksModuleStore((state) => state.directory);
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -54,7 +60,12 @@ export const AssigneeChips = ({
 
     return (
         <div className="ofi-gv-list-sheet__chips">
-            {ids.map((id) => (
+            {selfId && (
+                <span className="ofi-gv-list-person is-self" title={t('tasksModule.list.sheet.selfAssignedHint')}>
+                    <span className="ofi-gv-list-person__name">{t('tasksModule.list.sheet.selfAssigned')}</span>
+                </span>
+            )}
+            {ids.filter((id) => id !== selfId).map((id) => (
                 <span key={id} className="ofi-gv-list-person">
                     <span className="ofi-gv-list-person__name">{nameOf(id)}</span>
                     <button
@@ -67,16 +78,27 @@ export const AssigneeChips = ({
                     </button>
                 </span>
             ))}
-            <button
-                type="button"
-                className="ofi-gv-add ofi-btn-plain"
-                aria-haspopup="listbox"
-                onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
-            >
-                <LuPlus size={12} aria-hidden />
-                {t('tasksModule.list.sheet.addPerson')}
-            </button>
-            <PeoplePicker anchorEl={anchor} onClose={() => setAnchor(null)} selected={ids} onChange={onChange} multiple />
+            {canPick && (
+                <>
+                    <button
+                        type="button"
+                        className="ofi-gv-add ofi-btn-plain"
+                        aria-haspopup="listbox"
+                        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
+                    >
+                        <LuPlus size={12} aria-hidden />
+                        {t('tasksModule.list.sheet.addPerson')}
+                    </button>
+                    <PeoplePicker
+                        anchorEl={anchor}
+                        onClose={() => setAnchor(null)}
+                        selected={ids}
+                        onChange={onChange}
+                        excludeIds={selfId ? [selfId] : undefined}
+                        multiple
+                    />
+                </>
+            )}
         </div>
     );
 };

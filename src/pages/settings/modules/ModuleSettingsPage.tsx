@@ -16,6 +16,8 @@ import '@/styles/modules/moduleSettings.css';
 import { PersonnelShiftSection } from './sections/PersonnelShiftSection';
 import { PersonnelHolidaysSection } from './sections/PersonnelHolidaysSection';
 import { PersonnelLeavePolicySection } from './sections/PersonnelLeavePolicySection';
+// Görev Yönetimi (15.09.2026): Uhrzeit des Gün-sonu-raporu-Fensters (war fest 16:00).
+import { TasksDailyReportSection } from './sections/TasksDailyReportSection';
 
 /**
  * MODULEINSTELLUNGEN — LINKS die Module, OBEN ihre Einstellungsarten.
@@ -37,8 +39,8 @@ import { PersonnelLeavePolicySection } from './sections/PersonnelLeavePolicySect
  * direkt landet.
  */
 
-type CategoryKey = 'reminders' | 'osp' | 'units' | 'codes' | 'shift' | 'holidays' | 'leavePolicy';
-type ModuleKey = 'crm' | 'sales' | 'projects' | 'inventory' | 'personnel' | 'calendar';
+type CategoryKey = 'reminders' | 'osp' | 'units' | 'codes' | 'shift' | 'holidays' | 'leavePolicy' | 'dailyReport';
+type ModuleKey = 'crm' | 'sales' | 'projects' | 'inventory' | 'personnel' | 'tasks' | 'calendar';
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
     reminders: 'settings.modules.catReminders',
@@ -48,6 +50,7 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
     shift: 'settings.modules.catShift',
     holidays: 'settings.modules.catHolidays',
     leavePolicy: 'settings.modules.catLeavePolicy',
+    dailyReport: 'settings.modules.catDailyReport',
 };
 
 /**
@@ -60,6 +63,7 @@ const MODULES: ReadonlyArray<{ key: ModuleKey; labelKey: string; categories: Rea
     { key: 'projects', labelKey: 'nav.projects', categories: [] },
     { key: 'inventory', labelKey: 'nav.inventory', categories: ['units', 'codes'] },
     { key: 'personnel', labelKey: 'nav.personnel', categories: ['shift', 'holidays', 'leavePolicy'] },
+    { key: 'tasks', labelKey: 'nav.tasksModule', categories: ['dailyReport'] },
     { key: 'calendar', labelKey: 'nav.calendar', categories: [] },
 ];
 
@@ -149,6 +153,7 @@ export const ModuleSettingsPage = () => {
                     {category === 'shift' && <PersonnelShiftSection />}
                     {category === 'holidays' && <PersonnelHolidaysSection />}
                     {category === 'leavePolicy' && <PersonnelLeavePolicySection />}
+                    {category === 'dailyReport' && <TasksDailyReportSection />}
                     {!category && (
                         <div className="ofi-mset-card">
                             <p className="ofi-mset-empty">{t('settings.modules.nothingHere')}</p>

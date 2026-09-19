@@ -4,6 +4,7 @@ import { Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 
 import { crossesMidnight, spanOnDay } from '../calendarShared';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 /**
  * DER EINSATZPLAN — EINE ZEILE JE TAG (24.08.2026).
@@ -175,13 +176,7 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], frozenIds = [], di
                 {days.map((day, index) => (
                     <div key={day.appointmentId || `${day.start.valueOf()}-${index}`} className="ofi-cal-dayrow">
                         <span className="ofi-cal-dayrow__num">{t('calendar.days.dayNumber', { index: index + 1 })}</span>
-                        <input
-                            type="date"
-                            value={day.start.format('YYYY-MM-DD')}
-                            disabled={disabled || isFrozen(day)}
-                            onChange={(event) => onChange(patchDay(days, index, { date: event.target.value }))}
-                            className="ofi-cal-input"
-                        />
+                        <MacDatePicker value={day.start.format('YYYY-MM-DD')} disabled={disabled || isFrozen(day)} onChange={(nextDate) => onChange(patchDay(days, index, { date: nextDate }))} className="is-field-sm" />
                         <input
                             type="time"
                             value={day.start.format('HH:mm')}

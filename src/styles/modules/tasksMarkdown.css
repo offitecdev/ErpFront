@@ -1,0 +1,102 @@
+/* =========================================================
+   Offitec — GÖREVLER: DAS FREIE BLATT (Markdown)
+
+   16.09.2026 (Samet): «gün sonu raporu direkt beyaz bir
+   sayfa, markdown olacak, görsel ekleyebilecek». Dieselben
+   Blöcke stehen im Rapport (ReportBody) und in der Vorschau
+   des Gün sonu raporu (DailyReportPrompt, ein Portal
+   AUSSERHALB von #root) — darum eigene, überall gültige
+   Klassen und Farben aus Variablen mit Rückfall.
+   ========================================================= */
+
+.ofi-md {
+    --md-muted: var(--gv-secondary, #6e6e73);
+    --md-line: var(--gv-hairline, rgba(0, 0, 0, 0.1));
+    --md-soft: rgba(120, 120, 128, 0.12);
+    --md-link: #0a7aff;
+    display: flow-root;
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.ofi-md > :first-child { margin-top: 0; }
+.ofi-md > :last-child { margin-bottom: 0; }
+
+.ofi-md .ofi-md-p {
+    margin: 0 0 9px;
+    white-space: pre-line;
+}
+
+.ofi-md .ofi-md-h {
+    margin: 16px 0 7px;
+    font-weight: 650;
+    line-height: 1.3;
+}
+
+.ofi-md .ofi-md-h.is-h1 { font-size: 18px; }
+.ofi-md .ofi-md-h.is-h2 { font-size: 16px; }
+.ofi-md .ofi-md-h.is-h3 { font-size: 14.5px; }
+
+.ofi-md ul.ofi-md-list,
+.ofi-md ol.ofi-md-list {
+    margin: 0 0 9px;
+    padding-left: 20px;
+}
+
+.ofi-md ul.ofi-md-list { list-style: disc; }
+.ofi-md ol.ofi-md-list { list-style: decimal; }
+.ofi-md .ofi-md-list li { margin: 2px 0; }
+
+.ofi-md .ofi-md-quote {
+    margin: 0 0 9px;
+    padding: 2px 0 2px 12px;
+    border-left: 2px solid var(--md-line);
+    color: var(--md-muted);
+}
+
+.ofi-md .ofi-md-rule {
+    height: 0;
+    margin: 14px 0;
+    border: 0;
+    border-top: 1px solid var(--md-line);
+}
+
+.ofi-md .ofi-md-figure {
+    margin: 12px 0;
+}
+
+.ofi-md .ofi-md-figure img {
+    display: block;
+    max-width: 100%;
+    max-height: 420px;
+    border: 1px solid var(--md-line);
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.ofi-md .ofi-md-figure figcaption {
+    margin-top: 5px;
+    color: var(--md-muted);
+    font-size: 12px;
+}
+
+.ofi-md .is-bold { font-weight: 650; }
+.ofi-md .is-italic { font-style: italic; }
+
+.ofi-md .is-code {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--md-soft);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+}
+
+.ofi-md .ofi-md-link {
+    color: var(--md-link);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ofi-md .ofi-md-link:hover { text-decoration-thickness: 2px; }

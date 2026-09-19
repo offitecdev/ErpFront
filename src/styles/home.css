@@ -231,6 +231,42 @@
     color: var(--ofi-win-secondary);
 }
 
+/* ── loading: the page drawn empty (DashboardStats StatsSkeleton) ─────────
+   Small bones inside the real tiles/cards, all pulsing IN PHASE — no sweeping
+   band, no grey slabs (those read as a broken page, loadingbad.png 14.09). */
+@keyframes ofi-home-bone-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+.ofi-home-bone {
+    display: block;
+    flex: none;
+    max-width: 100%;
+    border-radius: 4px;
+    background: var(--ofi-win-hairline, rgba(0, 0, 0, 0.08));
+    animation: ofi-home-bone-pulse 1.6s ease-in-out infinite;
+}
+#root .ofi-home-tile--skeleton { cursor: default; }
+.ofi-home-skel-bars {
+    display: flex;
+    height: 264px;
+    align-items: flex-end;
+    gap: 3%;
+    border-bottom: 1px solid var(--ofi-win-hairline);
+    padding: 0 2%;
+}
+.ofi-home-skel-bars > .ofi-home-bone { flex: 1; border-radius: 4px 4px 0 0; }
+.ofi-home-skel-ring {
+    width: 148px;
+    height: 148px;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: inset 0 0 0 22px var(--ofi-win-hairline, rgba(0, 0, 0, 0.08));
+}
+@media (prefers-reduced-motion: reduce) {
+    .ofi-home-bone { animation: none; }
+}
+
 /* ── the picker sheet ────────────────────────────────────────────────────── */
 .ofi-home-pick { display: flex; flex-direction: column; gap: 14px; max-height: min(60vh, 520px); overflow-y: auto; padding-bottom: 6px; }
 .ofi-home-pick__caption { padding: 0 2px 5px; font-size: 12px; font-weight: 600; color: var(--ofi-win-text); }

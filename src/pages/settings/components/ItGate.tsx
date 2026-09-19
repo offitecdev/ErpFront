@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import { Lock01 as Lock } from '@/components/icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
@@ -34,6 +35,7 @@ export const ItGate = ({ children }: { children: ReactNode }) => {
             );
             if (data?.ticket && data?.expiresAt) storeItGateTicket(data.ticket, data.expiresAt);
             setOpen(true);
+            toast.success(t('settings.itGate.granted'));
         } catch (err: unknown) {
             const status = (err as { response?: { status?: number } })?.response?.status;
             setError(status === 429 ? t('settings.itGate.tooMany') : t('settings.itGate.wrong'));

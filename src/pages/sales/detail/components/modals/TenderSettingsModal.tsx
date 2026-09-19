@@ -37,6 +37,7 @@ import { TenderCcField } from '../mail/TenderCcField';
 // Eski (klasik, sablon.pdf antetli) şablon — geri dönmek için bu satırı aç:
 // import type { TenderPdfTotals } from '@/utils/pdf/tenderPdf';
 import type { TenderPdfTotals } from '@/utils/pdf/tenderPdfModern';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 const bytesToBase64 = (bytes: Uint8Array) => {
     let binary = '';
@@ -366,7 +367,7 @@ export const TenderSettingsModal: React.FC<TenderSettingsModalProps> = ({ open, 
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
                         <div className="xl:col-span-2">
                             <div className="space-y-3 rounded-[2px] border border-slate-200 bg-white p-4">
-                                <PopupField label={t('common.date')}><input className="ofi-cal-input w-full" type="date" value={slotForm.date} onChange={(e) => setSlotForm({ ...slotForm, date: e.target.value })} /></PopupField>
+                                <PopupField label={t('common.date')}><MacDatePicker value={slotForm.date} onChange={(nextDate) => setSlotForm({ ...slotForm, date: nextDate })} className="is-field" /></PopupField>
                                 <div className="grid grid-cols-2 gap-3">
                                     <PopupField label={t('common.start')}><input className="ofi-cal-input w-full" type="time" value={slotForm.start} onChange={(e) => setSlotForm({ ...slotForm, start: e.target.value })} /></PopupField>
                                     <PopupField label={t('common.end')}><input className="ofi-cal-input w-full" type="time" value={slotForm.end} onChange={(e) => setSlotForm({ ...slotForm, end: e.target.value })} /></PopupField>

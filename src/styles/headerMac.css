@@ -1,0 +1,190 @@
+/* =========================================================
+   KOPFLEISTE: MACOS-WERKZEUGLEISTE (15.09.2026)
+
+   Drei Runden mit Samet an einem Tag:
+     1. Glasscheiben mit Gefälle, Lichtsaum, Schatten, 14px-Ecken —
+        «çok kaba, karnları çok kötü» (zu grob, die Bäuche sind hässlich).
+     2. Nur Zeichen, keine Fläche — «kartlar yok, sadece ikon var, o kadar
+        iyi durmuyor; macOS SwiftUI header gibi olmalı».
+     3. DAS HIER: jeder Knopf auf seiner eigenen, flachen KARTE — so wie
+        die Knöpfe einer macOS-Werkzeugleiste (Finder, Mail): weisser
+        Grund, EINE Haarlinie, weiche Ecke, ein Hauch Schatten nach unten.
+        Kein Gefälle, kein Lichtsaum, kein Blur. Zeiger = die Karte wird
+        eine Spur grau, Druck = eine Spur dunkler; offen/aktiv = blasse
+        Blautönung mit blauer Kante und blauem Zeichen.
+
+   Dieselbe Karte tragen Symbolknöpfe, Reiter, Firmenfeld und Kalender —
+   eine Leiste, ein Stoff. Nichts bewegt sich beim Ueberfahren (Vorgabe
+   01.09.2026), nur Farbe.
+
+   Diese Datei steht in main.tsx ZULETZT und ausserhalb jeder Schicht; sie
+   setzt `!important`, weil index.css und Tailwind die Knöpfe der Leiste
+   mit wichtigen Regeln (Kante, Radius, Grund) belegen. Masse, Abstände
+   und Reihenfolge bleiben bei MainLayout/refine.css — hier steht nur die
+   Oberfläche.
+   ========================================================= */
+
+#root .ofi-topbar {
+    --ofi-tb-radius: 10px;                 /* die Knopfkante der Anwendung */
+    --ofi-tb-ink: #3a3a3c;                 /* Zeichen ruhend: secondary label */
+    --ofi-tb-ink-strong: #1d1d1f;
+    --ofi-tb-accent: #0a7aff;              /* Apple-Blau der Anwendung */
+    --ofi-tb-card: #ffffff;
+    --ofi-tb-card-hover: #f5f5f7;
+    --ofi-tb-card-pressed: #e8e8ed;
+    --ofi-tb-edge: #d2d2d7;                /* die Feldkante der Anwendung */
+    --ofi-tb-edge-hover: #c4c4cb;
+    --ofi-tb-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    --ofi-tb-selected: #e3efff;
+    --ofi-tb-selected-hover: #d6e7ff;
+    --ofi-tb-selected-edge: rgba(10, 122, 255, 0.38);
+    --ofi-tb-focus: rgba(10, 122, 255, 0.45);
+}
+html.dark #root .ofi-topbar {
+    --ofi-tb-ink: #d6d6dc;
+    --ofi-tb-ink-strong: #f2f2f7;
+    --ofi-tb-accent: var(--ofi-d-wheat, #e6cf9e);
+    --ofi-tb-card: rgba(255, 255, 255, 0.06);
+    --ofi-tb-card-hover: rgba(255, 255, 255, 0.10);
+    --ofi-tb-card-pressed: rgba(255, 255, 255, 0.15);
+    --ofi-tb-edge: rgba(255, 255, 255, 0.14);
+    --ofi-tb-edge-hover: rgba(255, 255, 255, 0.22);
+    --ofi-tb-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --ofi-tb-selected: rgba(230, 207, 158, 0.16);
+    --ofi-tb-selected-hover: rgba(230, 207, 158, 0.22);
+    --ofi-tb-selected-edge: rgba(230, 207, 158, 0.45);
+    --ofi-tb-focus: rgba(230, 207, 158, 0.55);
+}
+
+/* ── Die Karte: jeder Knopf, jeder Reiter, jedes Feld ────────────── */
+#root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab),
+html.dark #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab) {
+    border-radius: var(--ofi-tb-radius) !important;
+    border: 1px solid var(--ofi-tb-edge) !important;
+    background: var(--ofi-tb-card) !important;
+    box-shadow: var(--ofi-tb-shadow) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease !important;
+}
+/* (Der zweite Selektor mit `html.dark` ist kein Doppel: dark.css zieht jeden
+   `button.bg-white` — Blitz und «+» — mit gleicher Spezifität und späterem
+   Laden auf die Kartenfarbe; ein Selektor mehr entscheidet.) */
+
+/* Das «+» stand mit 48px über allen Nachbarn — dieselbe Höhe wie alle. */
+#root .ofi-topbar button.ofi-workspace-launcher {
+    width: var(--ofi-control-height) !important;
+    min-width: var(--ofi-control-height) !important;
+    height: var(--ofi-control-height) !important;
+    min-height: var(--ofi-control-height) !important;
+}
+#root .ofi-topbar .ofi-workspace-launcher > svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ── Zeiger und Druck: nur Farbe ─────────────────────────────────── */
+@media (hover: hover) {
+    html #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab):hover {
+        border-color: var(--ofi-tb-edge-hover) !important;
+        background: var(--ofi-tb-card-hover) !important;
+    }
+}
+html #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab):not(:disabled):active {
+    background: var(--ofi-tb-card-pressed) !important;
+}
+
+/* ── Offen / aktiv: blasse Tönung, Kante und Zeichen in der Akzentfarbe ── */
+html #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab):is(
+    [aria-expanded="true"], [aria-pressed="true"], [aria-current="page"], [data-active="true"], .is-open, .is-current
+) {
+    --ofi-tb-ink: var(--ofi-tb-accent);
+    --ofi-tb-ink-strong: var(--ofi-tb-accent);
+    border-color: var(--ofi-tb-selected-edge) !important;
+    background: var(--ofi-tb-selected) !important;
+}
+@media (hover: hover) {
+    html #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab):is(
+        [aria-expanded="true"], [aria-pressed="true"], [aria-current="page"], [data-active="true"], .is-open, .is-current
+    ):hover {
+        background: var(--ofi-tb-selected-hover) !important;
+    }
+}
+
+/* ── Zwei bleiben frei: Apps-Zeichen und Personenbild ─────────────
+   Das Apps-Zeichen «muss gar nicht eingekreist werden» (28.08.2026), es
+   antwortet auf den Zeiger mit seiner eigenen Helligkeit (refine.css). Das
+   runde Bild der Person in einer eckigen Karte sähe eingesperrt aus — es
+   bekommt nur die graue Rundung unter dem Zeiger. */
+html #root .ofi-topbar :is(button.ofi-hdr-ctl.ofi-apps-btn, button.ofi-hdr-ctl.ofi-header-profile) {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 9999px !important;
+}
+@media (hover: hover) {
+    html #root .ofi-topbar button.ofi-hdr-ctl.ofi-header-profile:hover {
+        background: var(--ofi-tb-card-hover) !important;
+    }
+}
+html #root .ofi-topbar button.ofi-hdr-ctl.ofi-header-profile:not(:disabled):active {
+    background: var(--ofi-tb-card-pressed) !important;
+}
+
+/* ── Firmenfeld: das Kürzel folgt der Kartenecke ─────────────────── */
+#root .ofi-topbar .ofi-tsw-btn .ofi-tsw-mono {
+    border-radius: 7px !important;
+}
+
+/* ── Reiter: Schrift ruhend dunkel, gewählt in der Akzentfarbe ───── */
+#root .ofi-topbar a.workspace-tab {
+    font-weight: 500 !important;
+}
+#root .ofi-topbar a.workspace-tab[data-active="true"] {
+    font-weight: 600 !important;
+}
+#root .ofi-topbar a.workspace-tab [role="button"] {
+    border-radius: 6px !important;
+    color: inherit !important;
+    opacity: 0.55;
+}
+#root .ofi-topbar a.workspace-tab [role="button"]:hover {
+    background: rgba(0, 0, 0, 0.07) !important;
+    opacity: 1;
+}
+html.dark #root .ofi-topbar a.workspace-tab [role="button"]:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── Tastaturfokus ───────────────────────────────────────────────── */
+#root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab):focus-visible {
+    outline: 2px solid var(--ofi-tb-focus) !important;
+    outline-offset: 2px;
+}
+
+/* ── Zeichenfarbe ────────────────────────────────────────────────────
+   index.css stellt `.ofi-topbar svg` in EINER Schicht mit `!important`
+   auf Blau; eine wichtige Regel ausserhalb der Schicht käme dagegen nie
+   an. Darum steht diese in derselben Schicht, mit mehr Gewicht. Das
+   Bild der Person (`.ofi-header-profile`), der Zähler der Glocke und das
+   Apps-Zeichen behalten ihre eigenen Farben. */
+@layer utilities {
+    #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab) {
+        color: var(--ofi-tb-ink) !important;
+    }
+    #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl):not(.ofi-header-profile):not(.ofi-apps-btn) svg,
+    #root .ofi-topbar a.workspace-tab [role="button"] svg {
+        color: var(--ofi-tb-ink) !important;
+    }
+    #root .ofi-topbar a.workspace-tab,
+    #root .ofi-topbar button.ofi-glass-ctl,
+    #root .ofi-topbar button.ofi-glass-ctl .ofi-tsw-btn__label {
+        color: var(--ofi-tb-ink-strong) !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-topbar :is(button.ofi-header-icon-button, button.ofi-hdr-ctl, a.workspace-tab) {
+        transition: none !important;
+    }
+}

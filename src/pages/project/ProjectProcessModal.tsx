@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
     Check,
@@ -15,20 +16,15 @@ import {
     PopupEmpty,
     PopupNote,
 } from '../../components/ui-shared/PopupKit';
-import { BillingDialog } from '../../components/billing/BillingDialog';
 import { SpecialClosureModal } from './SpecialClosureModal';
 import { useAuthStore } from '../../store/authStore';
 import { projectApi, deliveryReportApi } from '../../lib/api/project';
 import { billingApi, myOrdersApi } from '../../lib/api/billing';
 import { computeProjectFlow, type ProjectFlow } from '../../lib/projectFlow';
-import type { InvoiceDto, MyOrderDto } from '../../types/billing';
+import { countsAsBilled, type InvoiceDto, type MyOrderDto } from '../../types/billing';
 import type { ProjectDto } from '../../types/project';
 
 import { t } from '@/i18n/translate';
-
-/* The billing sheet is opened from INSIDE this dialog, so it has to stack above
-   it (the dialog itself sits at 150). */
-const BILLING_SHEET_Z = 200;
 
 type Phase = 'overview' | 'technical' | 'billing' | 'done';
 
@@ -90,8 +86,9 @@ export const ProjectProcessModal = ({
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [showSpecialClosure, setShowSpecialClosure] = useState(false);
-    /** The order currently being invoiced from the billing step. */
-    const [billTarget, setBillTarget] = useState<BillItem | null>(null);
+    // Rechnungen entstehen in der Buchhaltung (16.09.2026, Schritt 5) — der
+    // Schritt «Verrechnung» zeigt nur, was fehlt, und führt dorthin.
+    const navigate = useNavigate();
 
     const permissions = useAuthStore((state) => state.permissions);
     // "Special Closure" (Sonderabschluss) is a project-manager-only privilege.
@@ -130,20 +127,13 @@ export const ProjectProcessModal = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [project.id]);
 
-    // Refresh only the invoice-derived parts after billing from inside the modal.
-    const reloadInvoices = async () => {
-        try {
-            setInvoices(await billingApi.listInvoices({ projectId: project.id }));
-        } catch {
-            /* keep previous */
-        }
-    };
-
     const billItems = useMemo<BillItem[]>(() => {
         const items: BillItem[] = [];
         for (const order of orders) {
             items.push({ id: order.id, label: order.orderNumber, amount: Number(order.totalAmount) || 0, isAddon: false });
             for (const addon of order.addonSalesOrders || []) {
+                // Eine Minderung (Minussumme) wird nie selbst verrechnet.
+                if ((Number(addon.totalAmount) || 0) <= 0) continue;
                 items.push({ id: addon.id, label: addon.orderNumber, amount: Number(addon.totalAmount) || 0, isAddon: true });
             }
         }
@@ -152,11 +142,11 @@ export const ProjectProcessModal = ({
 
     const billedForOrder = (orderId: string) =>
         clampPercent(invoices
-            .filter((inv) => inv.salesOrderId === orderId && inv.status !== 'CANCELLED')
+            .filter((inv) => inv.salesOrderId === orderId && countsAsBilled(inv))
             .reduce((sum, inv) => sum + (Number(inv.billedPercent) || 0), 0));
 
     const projectLevelBilled = clampPercent(invoices
-        .filter((inv) => inv.projectId === project.id && !inv.salesOrderId && inv.status !== 'CANCELLED')
+        .filter((inv) => inv.projectId === project.id && !inv.salesOrderId && countsAsBilled(inv))
         .reduce((sum, inv) => sum + (Number(inv.billedPercent) || 0), 0));
 
     const unbilledItems = projectLevelBilled >= 100
@@ -383,8 +373,8 @@ export const ProjectProcessModal = ({
                                                     {item.isAddon ? ` · ${t('projects.complete.addonLabel')}` : ''}
                                                 </span>
                                             </span>
-                                            <PopupButton onClick={() => setBillTarget(item)}>
-                                                {t('billing.buttonLabel')}
+                                            <PopupButton onClick={() => navigate(`/accounting/invoices/new?orderId=${item.id}`)}>
+                                                {t('accounting.createInvoiceLink')}
                                             </PopupButton>
                                         </div>
                                     ))}
@@ -404,16 +394,6 @@ export const ProjectProcessModal = ({
                     </div>
                 )}
             </PopupDialog>
-
-            {/* Invoicing an order from the billing step — the sheet stacks above
-                this dialog and refreshes only the invoice figures on success. */}
-            <BillingDialog
-                open={Boolean(billTarget)}
-                target={billTarget ? { type: 'order', id: billTarget.id, label: billTarget.label } : null}
-                zIndex={BILLING_SHEET_Z}
-                onClose={() => setBillTarget(null)}
-                onSuccess={() => { setBillTarget(null); void reloadInvoices(); }}
-            />
 
             {showSpecialClosure && (
                 <SpecialClosureModal

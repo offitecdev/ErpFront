@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Trash01 } from '@/components/icons/antIconCompat';
+import { ChevronDown, Minus, Plus, Trash01 } from '@/components/icons/antIconCompat';
 import { ColResizeHandle } from '@/components/ui-shared/TableKit';
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { t } from '@/i18n/translate';
@@ -7,7 +7,7 @@ import { RichTextMarkdownEditor } from '@/pages/sales/detail/components/RichText
 import { richTextToHtml, richTextToPlain } from '@/pages/sales/detail/utils/markdown.utils';
 import { applyDiscounts, createDiscountEntry, type TenderDiscountEntry } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import { DocumentProductCell } from './DocumentProductCell';
-import { documentArticlePatch, documentLineAmount, documentLineBase, type DocumentLine } from './documentLines';
+import { documentArticlePatch, documentLineAmount, documentLineBase, documentLineIsMinus, documentNumber, type DocumentLine } from './documentLines';
 
 /**
  * ── POSITIONSTABELLE DES BELEGS ──────────────────────────────────────────────
@@ -56,7 +56,14 @@ const COLUMN_LABEL: Record<(typeof COLUMNS)[number], () => string> = {
 
 /** Der Prozentsatz, den die Rabattzelle zeigt: die Wirkung des ganzen Stapels. */
 const combinedPercent = (line: DocumentLine): number =>
-    applyDiscounts(documentLineBase(line), line.discounts).combinedPercent || 0;
+    applyDiscounts(Math.abs(documentLineBase(line)), line.discounts).combinedPercent || 0;
+
+/** Vorzeichen der Menge umdrehen: Zusatz ↔ Minderung. */
+const flipQuantity = (value: string): string => {
+    const parsed = documentNumber(value);
+    if (!Number.isFinite(parsed) || parsed === 0) return value.trim().startsWith('-') ? value.trim().slice(1) : `-${value.trim() || '1'}`;
+    return String(-parsed);
+};
 
 /** Tippen in die Zelle setzt EINEN Nachlass; 0 löscht den Stapel. */
 const percentToStack = (line: DocumentLine, percent: number): TenderDiscountEntry[] => {
@@ -82,13 +89,18 @@ const textPatch = (line: DocumentLine, next: string): Partial<DocumentLine> => {
     return { description: next, ...(line.articleId ? { longDescription: '' } : {}) };
 };
 
-export function DocumentLineTable({ lines, selected, onSelect, onChange, formatMoney, readOnly = false }: {
+export function DocumentLineTable({ lines, selected, onSelect, onChange, formatMoney, readOnly = false, allowMinus = false }: {
     lines: DocumentLine[];
     selected: Set<string>;
     onSelect: (keys: Set<string>) => void;
     onChange: (lines: DocumentLine[]) => void;
     formatMoney: (value: number) => string;
     readOnly?: boolean;
+    /**
+     * MINDERUNG (16.09.2026): der Nachtrag darf Minuszeilen tragen — die Menge
+     * bekommt einen Umschalter «+ / −», und eine Minuszeile ist rot gezeichnet.
+     */
+    allowMinus?: boolean;
 }) {
     /* Aufgeklappte Beschreibungen. Eine Zeile MIT Text startet zu — die
        Tabelle soll beim Öffnen kurz sein —, und der Pfeil sagt, dass da etwas
@@ -150,8 +162,9 @@ export function DocumentLineTable({ lines, selected, onSelect, onChange, formatM
                         const isOpen = expanded.has(line.key);
                         const percent = combinedPercent(line);
                         const stacked = line.discounts.length > 1;
+                        const minus = allowMinus && documentLineIsMinus(line);
                         return (
-                            <tr key={line.key} className={selected.has(line.key) ? 'is-selected' : ''}>
+                            <tr key={line.key} className={`${selected.has(line.key) ? 'is-selected' : ''} ${minus ? 'is-minus' : ''}`}>
                                 <td>
                                     <input
                                         type="checkbox"
@@ -226,7 +239,18 @@ export function DocumentLineTable({ lines, selected, onSelect, onChange, formatM
                                     )}
                                 </td>
                                 {(['unit', 'quantity', 'unitPrice'] as const).map((field) => (
-                                    <td key={field}>
+                                    <td key={field} className={field === 'quantity' && allowMinus ? 'document-qty-cell' : undefined}>
+                                        {field === 'quantity' && allowMinus && !readOnly && (
+                                            <button
+                                                type="button"
+                                                className={`document-sign ${minus ? 'is-minus' : ''}`}
+                                                title={minus ? t('documentEditor.makeAddition') : t('documentEditor.makeMinderung')}
+                                                aria-label={minus ? t('documentEditor.makeAddition') : t('documentEditor.makeMinderung')}
+                                                onClick={() => patch(line.key, { quantity: flipQuantity(line.quantity) })}
+                                            >
+                                                {minus ? <Minus size={12} /> : <Plus size={12} />}
+                                            </button>
+                                        )}
                                         <input
                                             className={`document-cell ${field === 'unit' ? 'is-text' : ''}`}
                                             aria-label={`${COLUMN_LABEL[field]()} ${index + 1}`}

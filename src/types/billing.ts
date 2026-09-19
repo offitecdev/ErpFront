@@ -2,14 +2,149 @@ import type { PaymentStage } from '../lib/paymentSchedule';
 import type { TenderDiscountEntry } from '../pages/sales/detail/utils/tenderDiscounts.utils';
 import type { ProjectStatus } from './project';
 
-export type InvoiceStatus = 'ISSUED' | 'PAID' | 'CANCELLED';
+/**
+ * DRAFT (16.09.2026, Schritt 5): in der Buchhaltung angelegt, aber noch nicht
+ * ausgestellt — ohne Nummer (`invoiceNumber` ist leer) und nirgends als
+ * verrechnet gezählt.
+ */
+export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PAID' | 'CANCELLED';
 export type InvoiceBillingType = 'FULL' | 'PARTIAL';
 /**
  * Rechnung = tam fatura (tüm pozisyonlar, %100) | Akonto = avans faturası |
  * Zwischen = ara fatura | Schluss = kalan yüzdeyi kapatan son fatura.
  * billingType bundan türetilir (RECHNUNG/SCHLUSS → FULL, diğerleri → PARTIAL).
  */
-export type InvoiceKind = 'RECHNUNG' | 'AKONTO' | 'ZWISCHEN' | 'SCHLUSS';
+export type InvoiceKind = 'RECHNUNG' | 'AKONTO' | 'ZWISCHEN' | 'SCHLUSS' | 'STORNO' | 'GUTSCHRIFT';
+
+/** Gegenbelege (17.09.2026, Schritt 6): negativer Betrag, zeigen auf ihre Rechnung. */
+export const CREDIT_INVOICE_KINDS: readonly InvoiceKind[] = ['STORNO', 'GUTSCHRIFT'];
+export const isCreditInvoice = (invoice: { kind?: InvoiceKind | string | null }): boolean =>
+    invoice.kind === 'STORNO' || invoice.kind === 'GUTSCHRIFT';
+/** Zählt diese Rechnung als verrechnet? (Entwurf, Storno und Stornobeleg nicht.) */
+export const countsAsBilled = (invoice: { status: string; kind?: string | null }): boolean =>
+    invoice.status !== 'CANCELLED' && invoice.status !== 'DRAFT' && invoice.kind !== 'STORNO';
+
+/** Die Regeln einer Rechnung, wie der Server sie liefert (`GET /billing/invoices/:id`). */
+export interface InvoiceLifecycleDto {
+    isDraft: boolean;
+    isCreditDocument: boolean;
+    cancelled: boolean;
+    paid: boolean;
+    /** Eingegangenes Geld (positiv). */
+    paidAmount: number;
+    creditedAmount: number;
+    /** Noch offen (bei der Gutschrift: noch zurückzuzahlen). */
+    openAmount: number;
+    creditableAmount: number;
+    canDiscard: boolean;
+    canIssue: boolean;
+    canRecordPayment: boolean;
+    canUndoPayment: boolean;
+    canCancel: boolean;
+    canCredit: boolean;
+    cancelBlockers: string[];
+    creditBlockers: string[];
+}
+
+export interface InvoiceReversalDto {
+    id: string;
+    invoiceNumber: string;
+    kind: InvoiceKind;
+    amount: number;
+    status: InvoiceStatus;
+    invoiceDate?: string | null;
+}
+
+/** Ein Zahlungseingang (Schritt 7). OFFSET = mit offener Rechnung verrechnet. */
+export interface InvoicePaymentDto {
+    id: string;
+    amount: number;
+    kind: 'PAYMENT' | 'OFFSET';
+    paidAt: string;
+    note: string | null;
+    createdByName: string | null;
+    createdAt: string;
+}
+
+export interface AccountingFiguresDto {
+    open: { amount: number; count: number };
+    overdue: { amount: number; count: number };
+    issuedMonth: { amount: number; count: number };
+    paidMonth: { amount: number; count: number };
+    aging: Array<{ bucket: '1-30' | '31-60' | '61-90' | '90+'; amount: number; count: number }>;
+    refundsOpen: { amount: number; count: number };
+    toBillNow: number;
+}
+
+export type ToBillReason = 'STAGE_DUE' | 'STAGE_SOON' | 'FIRST_STAGE' | 'PROJECT_DONE' | 'DELIVERED' | 'ADDON' | 'OPEN';
+
+/** Eine Zeile «Zu verrechnen» (Schritt 7 / G14). */
+export interface ToBillItemDto {
+    salesOrderId: string;
+    orderNumber: string;
+    isAddon: boolean;
+    parentNumber: string | null;
+    customerName: string | null;
+    projectId: string | null;
+    projectLabel: string | null;
+    reason: ToBillReason;
+    urgency: 'NOW' | 'SOON' | 'LATER';
+    dueDate: string | null;
+    stageIndex: number | null;
+    stageLabel: string | null;
+    baseAmount: number;
+    billedAmount: number;
+    remainingAmount: number;
+    proposedPercent: number;
+    proposedAmount: number;
+    proposedKind: InvoiceKind;
+    draftId: string | null;
+}
+
+export interface CreditDocumentDto {
+    id: string;
+    invoiceNumber: string;
+    kind: 'STORNO' | 'GUTSCHRIFT';
+    amount: number;
+    reversesInvoiceId: string;
+    reversesNumber: string;
+    /** Gutschrift: tatsächlich zurückzuzahlen. */
+    refundAmount?: number;
+}
+
+/** Vorschau «Gesamten Vorgang stornieren». */
+export interface FullCancelPlanDto {
+    scope: 'ORDER' | 'PROJECT';
+    rootId: string;
+    rootNumber: string | null;
+    customer: { id: string; companyName: string; email: string | null } | null;
+    project: { id: string; projectNumber: string | null; projectName: string; willCancel: boolean } | null;
+    orders: Array<{ id: string; orderNumber: string; isAddon: boolean; totalAmount: number }>;
+    tenders: Array<{ id: string; tenderNumber: string | null }>;
+    invoices: Array<{
+        id: string;
+        invoiceNumber: string;
+        kind: InvoiceKind;
+        status: InvoiceStatus;
+        amount: number;
+        salesOrderId: string | null;
+        action: 'STORNO' | 'GUTSCHRIFT' | 'DISCARD' | 'NONE';
+        creditable: number;
+        paidAmount: number;
+        openAmount: number;
+    }>;
+    upcomingAppointmentIds: string[];
+    needsInvoiceRight: boolean;
+    canSettleInvoices: boolean;
+    blockers: string[];
+}
+
+export interface FullCancelResultDto {
+    documents: CreditDocumentDto[];
+    salesOrderIds: string[];
+    projectCancelled: boolean;
+    cancelledAppointmentIds: string[];
+}
 /**
  * Rechnungstyp der Liste — vom Server ABGELEITET, nicht gespeichert:
  *  PROJECT  = Projektauftrag  (Rechnung hängt an einem Projekt)
@@ -98,6 +233,19 @@ export interface InvoiceDto {
     paymentStages?: string | null;
     /** Zahlungseingang — gesetzt, sobald die Rechnung als bezahlt markiert ist. */
     paidAt?: string | null;
+    /** Gegenbeleg: die Rechnung, die er zurücknimmt, und sein Grund. */
+    reversesInvoiceId?: string | null;
+    creditReason?: string | null;
+    reversesInvoice?: { id: string; invoiceNumber: string; invoiceDate?: string | null; kind: InvoiceKind; amount: number } | null;
+    /** Storno-Rechnungen und Gutschriften zu dieser Rechnung. */
+    reversals?: InvoiceReversalDto[];
+    /** Nur die Detailantwort trägt die Regeln und die Eingänge. */
+    lifecycle?: InvoiceLifecycleDto;
+    payments?: InvoicePaymentDto[];
+    /** Zahlungsstand (Liste und Detail, Schritt 7). */
+    paidAmount?: number;
+    creditedAmount?: number;
+    openAmount?: number;
     issuedByEmployeeId: string;
     createdAt: string;
     updatedAt: string;
@@ -228,7 +376,10 @@ export type LifecycleBlocker =
     | 'MONTAGE_STARTED'
     | 'ADDON'
     | 'SALES_ORDER'
-    | 'PROJECT';
+    | 'PROJECT'
+    | 'PARKED_APPOINTMENT'
+    | 'CREDIT_DOCUMENT'
+    | 'OPEN_INVOICE';
 
 export interface OrderLifecycleDto {
     orderNumber: string;
@@ -258,6 +409,10 @@ export interface OrderLifecycleDto {
     cancelBlockers: LifecycleBlocker[];
     canRevertToDraft: boolean;
     canCancel: boolean;
+    /** Ausgestellte Rechnungen, die ein Storno mitregeln muss (Schritt 6). */
+    invoicesToSettle?: number;
+    /** Gegenbeleg ausgestellt → Storno lässt sich nicht aufheben. */
+    uncancelBlockers?: LifecycleBlocker[];
 }
 
 export interface OrderRevertResultDto {
@@ -386,7 +541,8 @@ export interface MyOrderDetailDto extends MyOrderDto {
 export interface CreateInvoiceInput {
     salesOrderId?: string | null;
     projectId?: string | null;
-    billingType: InvoiceBillingType;
+    /** Fehlt er, entscheidet der Prozentsatz über die Art (Schritt 5). */
+    billingType?: InvoiceBillingType | null;
     kind?: InvoiceKind | null;
     percent?: number | null;
     /** Rechnungsdatum (ISO gün). Verilmezse sunucu "şimdi" kullanır. */
@@ -397,6 +553,19 @@ export interface CreateInvoiceInput {
     commissionNumber?: string | null;
     // invoiceNumber kasıtlı olarak YOK: Rechnungsnummer sunucuda üretilir
     // (RE- serisi yalnızca ileri gider), gövdeden gelen numara kabul edilmez.
+    notes?: string | null;
+    /** Als Entwurf anlegen — die Nummer kommt erst beim Ausstellen. */
+    draft?: boolean;
+}
+
+/** Den Entwurf einer Auftragsrechnung neu rechnen (Buchhaltung). */
+export interface UpdateOrderDraftInput {
+    /** Fehlt = der offene Rest (Rechnung/Schlussrechnung). */
+    percent?: number | null;
+    invoiceDate?: string | null;
+    dueDate?: string | null;
+    salespersonName?: string | null;
+    commissionNumber?: string | null;
     notes?: string | null;
 }
 
@@ -439,4 +608,6 @@ export interface CreateDirectInvoiceInput {
     discounts?: TenderDiscountEntry[];
     closingText?: string | null;
     senderAddress?: string | null;
+    /** Als Entwurf anlegen — die Nummer kommt erst beim Ausstellen. */
+    draft?: boolean;
 }

@@ -32,6 +32,7 @@ import './styles/updateWindow.css'
 // Meldungen im Mac-Kleid (10.09.2026): Sonner-Toasts, der Wecker rechts und
 // die Mitteilungszentrale unter der Glocke lesen die Fenstertafel von oben.
 import './styles/notifications.css'
+import './styles/headerMac.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
 import { initInstallPrompt } from './lib/pwa/installPrompt'

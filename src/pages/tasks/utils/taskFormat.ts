@@ -46,6 +46,10 @@ export const priorityLabel = (priority: TaskPriority): string => t(`tasksModule.
 
 export const isOpenStatus = (status: TaskStatus): boolean => status !== 'COMPLETED' && status !== 'REJECTED';
 
+/** Offen und Termin überschritten — dann verlangt die Abschlussanfrage eine Gecikme açıklaması (Server: DELAY_REASON_REQUIRED). */
+export const isTaskLate = (task: { dueAt: string | null; status: TaskStatus }, nowMs: number): boolean =>
+    Boolean(task.dueAt) && isOpenStatus(task.status) && new Date(task.dueAt as string).getTime() < nowMs;
+
 /* ── Etiketten ──────────────────────────────────────────────────────────── */
 
 export const LABEL_COLORS: LabelColor[] = ['gray', 'blue', 'green', 'orange', 'red', 'purple'];
@@ -89,6 +93,25 @@ export interface RemainingInfo {
     tone: 'late' | 'soon' | '';
 }
 
+/** «3 gün 4 sa» / «2 sa 10 dk» / «5 dk» — die Menge einer Zeitspanne. */
+const durationAmount = (ms: number): string => {
+    const abs = Math.abs(ms);
+    const days = Math.floor(abs / DAY_MS);
+    const hours = Math.floor((abs % DAY_MS) / 3_600_000);
+    const minutes = Math.floor((abs % 3_600_000) / 60_000);
+    if (days >= 1) {
+        return days < 7 && hours
+            ? t('tasksModule.remaining.daysHours', { days, hours })
+            : t('tasksModule.remaining.days', { count: days });
+    }
+    if (hours >= 1) {
+        return minutes
+            ? t('tasksModule.remaining.hoursMinutes', { hours, minutes })
+            : t('tasksModule.remaining.hours', { count: hours });
+    }
+    return t('tasksModule.remaining.minutes', { count: Math.max(1, minutes) });
+};
+
 /** Görevly `U.remaining`: «3 gün 4 sa kaldı» / «2 sa gecikti». */
 export const remainingInfo = (dueAt: string | null | undefined, nowMs: number): RemainingInfo | null => {
     if (!dueAt) return null;
@@ -96,26 +119,27 @@ export const remainingInfo = (dueAt: string | null | undefined, nowMs: number): 
     if (!Number.isFinite(due)) return null;
     const diff = due - nowMs;
     const overdue = diff < 0;
-    const abs = Math.abs(diff);
-    const days = Math.floor(abs / DAY_MS);
-    const hours = Math.floor((abs % DAY_MS) / 3_600_000);
-    const minutes = Math.floor((abs % 3_600_000) / 60_000);
-    let amount: string;
-    if (days >= 1) {
-        amount = days < 7 && hours
-            ? t('tasksModule.remaining.daysHours', { days, hours })
-            : t('tasksModule.remaining.days', { count: days });
-    } else if (hours >= 1) {
-        amount = minutes
-            ? t('tasksModule.remaining.hoursMinutes', { hours, minutes })
-            : t('tasksModule.remaining.hours', { count: hours });
-    } else {
-        amount = t('tasksModule.remaining.minutes', { count: Math.max(1, minutes) });
-    }
     return {
-        text: t(overdue ? 'tasksModule.remaining.overdue' : 'tasksModule.remaining.left', { amount }),
-        tone: overdue ? 'late' : abs < DAY_MS ? 'soon' : '',
+        text: t(overdue ? 'tasksModule.remaining.overdue' : 'tasksModule.remaining.left', { amount: durationAmount(diff) }),
+        tone: overdue ? 'late' : Math.abs(diff) < DAY_MS ? 'soon' : '',
     };
+};
+
+/**
+ * Terminstand einer ERLEDIGTEN Aufgabe (14.09.2026, Samet: «bittiğinde süre devam
+ * etsin ama gecikme göstersin»): der Abschluss ist die Freigabe — bis dahin läuft
+ * die Restzeit (`remainingInfo`) als Verzug weiter, auch mit offener Anfrage.
+ * «2 gün gecikmeyle tamamlandı» / «Zamanında tamamlandı»; null = kein Termin.
+ */
+export const completionInfo = (
+    dueAt: string | null | undefined,
+    completedAt: string | null | undefined,
+): { text: string; tone: 'late' | 'ok' } | null => {
+    const due = dueAt ? Date.parse(dueAt) : Number.NaN;
+    const done = completedAt ? Date.parse(completedAt) : Number.NaN;
+    if (!Number.isFinite(due) || !Number.isFinite(done)) return null;
+    if (done - due < 60_000) return { text: t('tasksModule.remaining.completedOnTime'), tone: 'ok' };
+    return { text: t('tasksModule.remaining.completedLate', { amount: durationAmount(done - due) }), tone: 'late' };
 };
 
 /* ── Datum ──────────────────────────────────────────────────────────────── */

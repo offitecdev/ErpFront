@@ -393,6 +393,16 @@ export const TenderList = () => {
                                                         title={`${i18nT('osp.title')} · ${t.ospReference}`}
                                                     />
                                                 )}
+                                                {/* Zurückgesetzter Auftrag: seine AB-Nummer bleibt
+                                                    sichtbar (und auffindbar), bis wieder erteilt. */}
+                                                {t.revertedOrderNumber && (
+                                                    <span
+                                                        className="shrink-0 whitespace-nowrap rounded-full border border-[#e6e8eb] px-1.5 py-px text-[11px] font-medium text-slate-500 dark:border-white/15 dark:text-white/60"
+                                                        title={i18nT('orders.revertTrace.tenderTitle', { orderNumber: t.revertedOrderNumber })}
+                                                    >
+                                                        {i18nT('orders.revertTrace.formerOrder', { orderNumber: t.revertedOrderNumber })}
+                                                    </span>
+                                                )}
                                                 {hasOpenOspRevision(t) && (
                                                     <span
                                                         className="inline-flex shrink-0 text-amber-500"

@@ -4,6 +4,7 @@ import type { SalesOrderMode } from '@/lib/api/project';
 import type { ProjectDto } from '@/types/project';
 
 import { PopupActions, PopupButton, PopupEmpty, PopupField, PopupNote, TenderDialog } from './shell/TenderPopupShell';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 type OrderDecisionPopupProps = {
     open: boolean;
@@ -29,6 +30,12 @@ type OrderDecisionPopupProps = {
      * themselves are NOT shown (user request).
      */
     notifyRecipient: string | null;
+    /**
+     * Das Projekt, das auf diese Offerte wartet (ihr Auftrag ging zurück in
+     * den Entwurf, 16.09.2026). «Neues Projekt» legt dann KEINES an — der
+     * Auftrag kommt wieder dorthin; das sagt der Hinweis statt der Nummernzeile.
+     */
+    waitingProjectLabel?: string | null;
 };
 
 /**
@@ -54,6 +61,7 @@ export const OrderDecisionPopup = ({
     selectedProject,
     onSelectProject,
     notifyRecipient,
+    waitingProjectLabel,
 }: OrderDecisionPopupProps) => (
     <TenderDialog
         open={open}
@@ -103,12 +111,7 @@ export const OrderDecisionPopup = ({
         {mode === 'INVOICE' && (
             <div className="pt-2">
                 <PopupField label={t('tenders.lieferdatum_intern')} required>
-                    <input
-                        type="date"
-                        className="ofi-cal-input w-[180px]"
-                        value={deliveryDate}
-                        onChange={(event) => onDeliveryDateChange(event.target.value)}
-                    />
+                    <MacDatePicker value={deliveryDate} onChange={(nextDate) => onDeliveryDateChange(nextDate)} className="is-field w-[180px]" />
                 </PopupField>
             </div>
         )}
@@ -133,7 +136,11 @@ export const OrderDecisionPopup = ({
                     // The project name is NOT entered here — the system names the
                     // project by its own code (PR-2026-10001) and the counter
                     // continues where it left off.
-                    <p className="pt-2 text-[12.5px]" style={{ color: 'var(--ofi-cal-muted)' }}>{t('tenders.project_code_auto_hint')}</p>
+                    waitingProjectLabel ? (
+                        <PopupNote className="mt-2">{t('orders.revertTrace.decisionHint', { project: waitingProjectLabel })}</PopupNote>
+                    ) : (
+                        <p className="pt-2 text-[12.5px]" style={{ color: 'var(--ofi-cal-muted)' }}>{t('tenders.project_code_auto_hint')}</p>
+                    )
                 ) : (
                     <div className="pt-1">
                         <PopupField label={t('tenders.project_search')}>

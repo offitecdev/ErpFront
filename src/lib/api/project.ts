@@ -267,7 +267,16 @@ export const projectApi = {
         // Teklifin `internalDeliveryDate` alanina yazilir.
         deliveryDate?: string;
         overtimeHourlyRate?: number;
-    }): Promise<{ message: string; salesOrder: SalesOrderDto; project?: ProjectDto | null; reused?: boolean }> => {
+    }): Promise<{
+        message: string;
+        salesOrder: SalesOrderDto;
+        project?: ProjectDto | null;
+        reused?: boolean;
+        /** Der Auftrag kam in das Projekt, das auf diese Offerte wartete. */
+        reusedWaitingProject?: boolean;
+        /** Geparkte Termine, die der neue Auftrag übernommen hat. */
+        relinkedAppointments?: number;
+    }> => {
         const res = await apiClient.post('/sales-orders/from-tender', input);
         return res.data;
     },

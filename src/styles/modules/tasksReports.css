@@ -1,13 +1,17 @@
 /* =========================================================
-   Offitec — GÖREVLER / TASKS-MODUL: ARBEITSRAPPORT (13.09.2026)
+   Offitec — GÖREVLER / TASKS-MODUL: ARBEITSRAPPORT
 
-   Vorgabe Samet: «sade — günlük/haftalık, Arial, siyah beyaz,
-   tablolu; kişi bazlı özetler sayfa sayfa». Das PDF ist
-   schwarz-weiss (utils/pdf/workReportPdfLayout.ts); der
-   Bildschirm zeigt dasselbe Dokument als schlichte Tafeln:
-     · Werkzeugzeile: Täglich/Wöchentlich · ‹ Datum › · Personen
-     · je Blatt: Titel, Beschriftung/Wert-Paare, Tabellen
-     · Tabellen im Hauskleid (`data-inv-table`), Summenzeile fett
+   16.09.2026 (Samet): «gün gün yazsın, grafik falan kaldır,
+   görev bazlı bakışı da kaldır — sadece gün gün, gün sonunda
+   neler yaptı. Dalga yerine sağ üstte köşeyi kaplayan desen.»
+   Der Bildschirm zeigt dasselbe Blatt wie das PDF
+   (utils/pdf/workReportPdfLayout.ts):
+     · Werkzeugzeile: Person · Günlük/Haftalık · ‹ Datum › · Sprache
+     · Kopf: Titel, Person, Zeitraum — rechts oben das
+       gerechnete graue Muster (reportMark.ts) bis in die Ecke
+     · Tag für Tag: Überschrift, das freie Blatt (ofi-md, siehe
+       tasksMarkdown.css), darunter die Dateien als Adressen und
+       die Zeiten des Tages in einer dünn umrandeten Tabelle
 
    Alles unter `.ofi-gv-rep-*`, Seitenregeln unter `.ofi-gv`
    (tasksModule.css liefert die `--gv-*`-Palette).
@@ -64,94 +68,220 @@
 
 .ofi-gv .ofi-gv-rep-trigger__chevron { flex: none; color: var(--gv-muted); }
 
-/* ── Dokument ───────────────────────────────────────────────────────────── */
+/* ── Das Blatt ──────────────────────────────────────────────────────────── */
 
+/* Papier wie das PDF — auch im Dunkelmodus weiss. */
 .ofi-gv .ofi-gv-rep {
+    --gv-surface: #fff;
+    --gv-text: #1d1d1f;
+    --gv-secondary: #6e6e73;
+    --gv-muted: #8e8e93;
+    --gv-hairline: rgba(0, 0, 0, 0.08);
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 22px;
+    max-width: 880px;
     min-width: 0;
+    padding: 26px 24px 24px;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 10px;
+    color: var(--gv-text);
+    background: var(--gv-surface);
+    overflow: hidden;
+    color-scheme: light;
     transition: opacity 140ms ease;
 }
 
 .ofi-gv .ofi-gv-rep[aria-busy="true"] { opacity: 0.6; }
 
-.ofi-gv .ofi-gv-rep-sheet {
+/* Kopf: links die Angaben, rechts das Muster — es deckt die obere Ecke
+   (Vorgabe 16.09.2026) und schiebt sich mit negativen Rändern über das
+   Innenmass des Blattes bis an Kante und Oberkante, wie im PDF. */
+.ofi-gv .ofi-gv-rep-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(150px, 34%, 300px);
+    align-items: start;
+    gap: 16px;
+    min-width: 0;
+}
+
+.ofi-gv .ofi-gv-rep-head__text {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px 16px 16px;
-}
-
-.ofi-gv .ofi-gv-rep-sheet__title {
-    margin: 0;
-    color: var(--gv-text);
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.3;
-}
-
-.ofi-gv .ofi-gv-rep-pairs {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 4px 16px;
-    margin: 0;
-}
-
-.ofi-gv .ofi-gv-rep-pairs > div {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 3px;
     min-width: 0;
-    padding: 3px 0;
-    border-bottom: 1px solid var(--gv-hairline);
-    font-size: 12.5px;
 }
 
-.ofi-gv .ofi-gv-rep-pairs dt { color: var(--gv-secondary); }
+.ofi-gv .ofi-gv-rep-mark {
+    /* Ohne `max-width: none` bliebe das Bild an der Grundregel `img { max-width: 100% }` hängen. */
+    width: calc(100% + 24px);
+    max-width: none;
+    height: auto;
+    margin: -26px -24px 0 0;
+    pointer-events: none;
+    user-select: none;
+}
 
-.ofi-gv .ofi-gv-rep-pairs dd {
+.ofi-gv .ofi-gv-rep-head__title {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.ofi-gv .ofi-gv-rep-head__person { font-size: 15px; font-weight: 600; }
+.ofi-gv .ofi-gv-rep-head__sub { font-size: 13px; }
+.ofi-gv .ofi-gv-rep-head__meta { color: var(--gv-secondary); font-size: 12px; }
+
+.ofi-gv .ofi-gv-rep-muted {
     margin: 0;
-    color: var(--gv-text);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    text-align: right;
+    color: var(--gv-secondary);
+    font-style: italic;
 }
 
-.ofi-gv .ofi-gv-rep-block {
+/* ── Tag für Tag ────────────────────────────────────────────────────────── */
+
+.ofi-gv .ofi-gv-rep-days {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+}
+
+.ofi-gv .ofi-gv-rep-day {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--gv-hairline);
+}
+
+.ofi-gv .ofi-gv-rep-day__head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.ofi-gv .ofi-gv-rep-day__date {
+    color: var(--gv-secondary);
+    font-size: 13px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Die Links des Blattes bleiben schwarz-weiss wie im PDF. */
+.ofi-gv .ofi-gv-rep .ofi-md { --md-link: #1d1d1f; }
+
+/* ── Dateien: Name und darunter die volle Adresse, anklickbar ───────────── */
+
+.ofi-gv .ofi-gv-rep-files {
     display: flex;
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+    padding-top: 4px;
 }
 
-.ofi-gv .ofi-gv-rep-block__title {
-    margin: 0;
-    color: var(--gv-text);
-    font-size: 13px;
+.ofi-gv .ofi-gv-rep-files__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gv-secondary);
+    font-size: 12px;
     font-weight: 600;
 }
 
-.ofi-gv .ofi-gv-rep-scroll {
-    overflow-x: auto;
-    border: 1px solid var(--gv-hairline);
-    border-radius: var(--gv-radius);
+.ofi-gv .ofi-gv-rep-files ul {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
-#root .ofi-gv .ofi-gv-rep-scroll > table th.is-num,
-#root .ofi-gv .ofi-gv-rep-scroll > table td.is-num {
+.ofi-gv .ofi-gv-rep-files li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+}
+
+.ofi-gv .ofi-gv-rep-files li > svg { flex: none; margin-top: 2px; color: var(--gv-muted); }
+
+.ofi-gv .ofi-gv-rep-files a {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--gv-text);
+    text-decoration: none;
+}
+
+.ofi-gv .ofi-gv-rep-files__name { font-size: 13px; font-weight: 500; }
+
+.ofi-gv .ofi-gv-rep-files__url {
+    color: var(--gv-secondary);
+    font-size: 11px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+}
+
+.ofi-gv .ofi-gv-rep-files a:hover .ofi-gv-rep-files__name { text-decoration: underline; }
+
+/* ── Zeiten des Tages: «ince gri kenarları olan tablo» (16.09.2026) ─────── */
+
+.ofi-gv .ofi-gv-rep-times {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding-top: 4px;
+}
+
+.ofi-gv .ofi-gv-rep-times__title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gv-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#root .ofi-gv .ofi-gv-rep-times table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+#root .ofi-gv .ofi-gv-rep-times th,
+#root .ofi-gv .ofi-gv-rep-times td {
+    padding: 6px 9px;
+    border: 1px solid #e3e3e5;
+    color: var(--gv-text);
+    text-align: left;
+    vertical-align: top;
+}
+
+#root .ofi-gv .ofi-gv-rep-times thead th {
+    color: var(--gv-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#root .ofi-gv .ofi-gv-rep-times tfoot th,
+#root .ofi-gv .ofi-gv-rep-times tfoot td { font-weight: 600; }
+
+#root .ofi-gv .ofi-gv-rep-times .is-num {
+    width: 1%;
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-}
-
-#root .ofi-gv .ofi-gv-rep-scroll > table tr.ofi-gv-rep-total > td { font-weight: 600; }
-
-#root .ofi-gv .ofi-gv-rep-scroll > table td.ofi-gv-rep-empty {
-    padding: 16px;
-    color: var(--gv-secondary);
-    font-size: 12.5px;
-    text-align: center;
 }
 
 /* ── Fehler ─────────────────────────────────────────────────────────────── */
@@ -168,12 +298,14 @@
     .ofi-gv .ofi-gv-rep-bar__field { width: 100%; }
     .ofi-gv .ofi-gv-rep-bar__group { max-width: 100%; flex-wrap: wrap; }
     .ofi-gv .ofi-gv-rep-bar__language { margin-left: 0; }
+    .ofi-gv .ofi-gv-rep { padding: 18px 16px 16px; }
+    .ofi-gv .ofi-gv-rep-mark { width: calc(100% + 16px); max-width: none; margin: -18px -16px 0 0; }
+}
+
+@media (max-width: 720px) {
+    .ofi-gv .ofi-gv-rep-head { grid-template-columns: minmax(0, 1fr) 40%; gap: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .ofi-gv .ofi-gv-rep { transition: none; }
 }
-
-/* Wochenrapport: ein neuer Tag bekommt eine kräftigere Linie, Summen fett. */
-#root .ofi-gv .ofi-gv-rep-scroll > table tr.is-group > td { border-top: 1px solid var(--gv-text); }
-#root .ofi-gv .ofi-gv-rep-scroll > table tr.ofi-gv-rep-total > td { border-top: 1px solid var(--gv-hairline); }

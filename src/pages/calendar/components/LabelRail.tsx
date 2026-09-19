@@ -32,7 +32,9 @@ const LabelRow = ({ color, name, count, checked, title, onToggle }: {
     title: string;
     onToggle: () => void;
 }) => (
-    <button type="button" onClick={onToggle} title={title} className="ofi-cal-railrow">
+    /* `--ofi-label`: der Haken trägt die Kalenderfarbe (macOS-Kleid, 14.09.2026)
+       — der Punkt daneben bleibt im Baum, ist dort aber ausgeblendet. */
+    <button type="button" onClick={onToggle} title={title} className="ofi-cal-railrow" style={{ ['--ofi-label' as string]: color }}>
         <span className={`ofi-cal-check ${checked ? 'is-on' : ''}`}>
             {checked && <span className="ofi-cal-check__mark" />}
         </span>

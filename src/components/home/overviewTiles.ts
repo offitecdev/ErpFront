@@ -151,7 +151,7 @@ export const buildOverviewTiles = (summary: DashboardSummaryDto, t: TFunction): 
         hint: t('dash.tiles.invoicesHint', { defaultValue: 'Fakturierter Betrag aller Rechnungen' }),
         value: chf0(summary.financials.invoiced),
         sub: t('dash.fin.paidSub', { defaultValue: 'davon bezahlt {{value}}', value: chf0(summary.financials.paid) }),
-        to: '/sales/invoices',
+        to: '/accounting/invoices',
     },
     openReceivables: {
         key: 'openReceivables',
@@ -160,7 +160,7 @@ export const buildOverviewTiles = (summary: DashboardSummaryDto, t: TFunction): 
         hint: t('dash.tiles.openHint', { defaultValue: 'Fakturiert, noch nicht bezahlt' }),
         value: chf0(summary.financials.open),
         sub: t('dash.tiles.ofInvoiced', { defaultValue: 'von {{value}} fakturiert', value: chf0(summary.financials.invoiced) }),
-        to: '/sales/invoices',
+        to: '/accounting/invoices?status=OPEN',
         tone: 'red',
     },
     paid: {
@@ -170,7 +170,7 @@ export const buildOverviewTiles = (summary: DashboardSummaryDto, t: TFunction): 
         hint: t('dash.tiles.paidHint', { defaultValue: 'Bezahlte Rechnungen' }),
         value: chf0(summary.financials.paid),
         sub: t('dash.tiles.ofInvoiced', { defaultValue: 'von {{value}} fakturiert', value: chf0(summary.financials.invoiced) }),
-        to: '/sales/invoices',
+        to: '/accounting/invoices?status=PAID',
     },
     unbilled: {
         key: 'unbilled',

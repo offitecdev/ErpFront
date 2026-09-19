@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { deliveryReportApi } from '@/lib/api/project';
 import { billingApi, myOrdersApi } from '@/lib/api/billing';
 import { computeProjectFlow, type ProjectFlow } from '@/lib/projectFlow';
-import type { InvoiceDto, MyOrderDto } from '@/types/billing';
+import { countsAsBilled, type InvoiceDto, type MyOrderDto } from '@/types/billing';
 import type { ProjectDto } from '@/types/project';
 
 /** A base order or one of its addon orders, flattened for display. */
@@ -72,7 +72,7 @@ export const useProjectFlowSummary = (project: ProjectDto | null, enabled = true
 
     const billedForOrder = useMemo(() => (orderId: string) =>
         clampPercent(invoices
-            .filter((inv) => inv.salesOrderId === orderId && inv.status !== 'CANCELLED')
+            .filter((inv) => inv.salesOrderId === orderId && countsAsBilled(inv))
             .reduce((sum, inv) => sum + (Number(inv.billedPercent) || 0), 0)),
         [invoices]);
 

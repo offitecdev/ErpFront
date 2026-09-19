@@ -29,7 +29,7 @@ const PersonTrigger = ({ value, onChange }: { value: string; onChange: (next: st
     const loadDirectory = useTasksModuleStore((state) => state.loadDirectory);
     const actorId = useTasksActorId();
     useEffect(() => { void loadDirectory(); }, [loadDirectory]);
-    const selectedId = value || actorId;
+    const selectedId = value || directory?.[0]?.id || actorId;
     const name = directory?.find((person) => person.id === selectedId)?.name ?? '';
 
     return (
@@ -41,14 +41,14 @@ const PersonTrigger = ({ value, onChange }: { value: string; onChange: (next: st
                 aria-haspopup="listbox"
                 onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
             >
-                <span className="ofi-gv-rep-trigger__text">{name || t('common.loading')}</span>
+                <span className="ofi-gv-rep-trigger__text">{name || t(`${K}.person`)}</span>
                 <LuChevronDown size={14} className="ofi-gv-rep-trigger__chevron" aria-hidden />
             </button>
             <PeoplePicker
                 anchorEl={anchor}
                 onClose={() => setAnchor(null)}
                 selected={[selectedId]}
-                onChange={(ids) => { if (ids[0]) onChange(ids[0] === actorId ? '' : ids[0]); }}
+                onChange={(ids) => { if (ids[0]) onChange(ids[0]); }}
             />
         </>
     );
@@ -76,8 +76,8 @@ export const ReportToolbar = ({
                     value={query.period}
                     onChange={(period) => onChange({ ...query, period })}
                     options={[
-                        { key: 'day', label: t(`${K}.daily`) },
-                        { key: 'week', label: t(`${K}.weekly`) },
+                        { key: 'day', label: t(`${K}.kind.day`) },
+                        { key: 'week', label: t(`${K}.kind.week`) },
                     ]}
                 />
             </div>

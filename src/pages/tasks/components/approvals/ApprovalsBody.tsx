@@ -4,18 +4,16 @@ import { tasksErrorMessage } from '@/lib/api/tasksModule';
 import type { TaskDetail } from '@/types/tasksModule';
 import { useNow } from '../../hooks/useNow';
 import { ApprovalSection } from './ApprovalSection';
-import { CompletionRequestCard } from './CompletionRequestCard';
 import { DeleteRequestCard } from './DeleteRequestCard';
-import { ProposalCard } from './ProposalCard';
-import { approvalBusyKey, type ApprovalKind, type TaskApprovalsState } from './useTaskApprovals';
+import { approvalBusyKey, type TaskApprovalsState } from './useTaskApprovals';
 
-/* Laden, Fehler, «Bekleyen onay yok» — sonst die zwei Tafeln (leere fallen weg). */
+/* Laden, Fehler, «Bekleyen onay yok» — sonst die Tafel der Löschanfragen. */
 export const ApprovalsBody = ({
     approvals,
     onReject,
 }: {
     approvals: TaskApprovalsState;
-    onReject: (kind: ApprovalKind, task: TaskDetail) => void;
+    onReject: (task: TaskDetail) => void;
 }) => {
     const nowMs = useNow(60_000);
     const { data, error, busyKey, decide } = approvals;
@@ -32,9 +30,9 @@ export const ApprovalsBody = ({
         );
     }
 
-    const { completionRequests, reviewRequests, people } = data;
+    const { people } = data;
     const deleteRequests = data.deleteRequests ?? [];
-    if (!completionRequests.length && !reviewRequests.length && !deleteRequests.length) {
+    if (!deleteRequests.length) {
         return (
             <div className="ofi-gv-panel">
                 <div className="ofi-gv-empty">
@@ -46,52 +44,18 @@ export const ApprovalsBody = ({
     }
 
     return (
-        <>
-            {deleteRequests.length > 0 && (
-                <ApprovalSection title={t('tasksModule.deleteRequest.section')} count={deleteRequests.length}>
-                    {deleteRequests.map((task) => (
-                        <DeleteRequestCard
-                            key={task.id}
-                            task={task}
-                            people={people}
-                            nowMs={nowMs}
-                            busy={busyKey === approvalBusyKey('delete', task.id)}
-                            onReject={() => onReject('delete', task)}
-                            onApprove={() => void decide('delete', task, 'approve')}
-                        />
-                    ))}
-                </ApprovalSection>
-            )}
-            {completionRequests.length > 0 && (
-                <ApprovalSection title={t('tasksModule.approvals.completions')} count={completionRequests.length}>
-                    {completionRequests.map((task) => (
-                        <CompletionRequestCard
-                            key={task.id}
-                            task={task}
-                            people={people}
-                            nowMs={nowMs}
-                            busy={busyKey === approvalBusyKey('completion', task.id)}
-                            onReject={() => onReject('completion', task)}
-                            onApprove={() => void decide('completion', task, 'approve')}
-                        />
-                    ))}
-                </ApprovalSection>
-            )}
-            {reviewRequests.length > 0 && (
-                <ApprovalSection title={t('tasksModule.approvals.proposals')} count={reviewRequests.length}>
-                    {reviewRequests.map((task) => (
-                        <ProposalCard
-                            key={task.id}
-                            task={task}
-                            people={people}
-                            nowMs={nowMs}
-                            busy={busyKey === approvalBusyKey('review', task.id)}
-                            onReject={() => onReject('review', task)}
-                            onApprove={() => void decide('review', task, 'approve')}
-                        />
-                    ))}
-                </ApprovalSection>
-            )}
-        </>
+        <ApprovalSection title={t('tasksModule.deleteRequest.section')} count={deleteRequests.length}>
+            {deleteRequests.map((task) => (
+                <DeleteRequestCard
+                    key={task.id}
+                    task={task}
+                    people={people}
+                    nowMs={nowMs}
+                    busy={busyKey === approvalBusyKey(task.id)}
+                    onReject={() => onReject(task)}
+                    onApprove={() => void decide(task, 'approve')}
+                />
+            ))}
+        </ApprovalSection>
     );
 };

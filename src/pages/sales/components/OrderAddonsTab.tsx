@@ -64,7 +64,8 @@ const AddonContentSheet = ({ order, addon, canEdit, onClose, onDelete }: {
     const navigate = useNavigate();
     const addons = order.addonSalesOrders || [];
     // Fakturiert = eingefroren; der Server lehnt Änderungen ohnehin ab.
-    const invoiced = (addon.billingSummary?.invoices || []).some((invoice) => invoice.status !== 'CANCELLED');
+    // Ein Entwurf sperrt nichts (er fällt beim Löschen mit) — jede ausgestellte Rechnung schon.
+    const invoiced = (addon.billingSummary?.invoices || []).some((invoice) => invoice.status !== 'CANCELLED' && invoice.status !== 'DRAFT');
 
     const materialRows = useMemo(
         () => addonSlice(order.extraMaterials, addon, addons, (item) => item.addedAt).map((item) => ({

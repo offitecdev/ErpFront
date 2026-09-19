@@ -1,152 +1,341 @@
 import type { jsPDF } from 'jspdf';
 
-import type { WorkReportDocument, WorkRow, WorkTable } from '../../pages/tasks/components/reports/workReportModel';
+import type { MdSpan } from '../../pages/tasks/components/reports/markdownDoc';
+import { REPORT_MARK } from '../../pages/tasks/components/reports/reportMark';
+import type { WorkReportDocument } from '../../pages/tasks/components/reports/workReportModel';
+import { drawSvgArt } from './svgArtPdf';
 
 /**
- * ── ARBEITSRAPPORT: DAS BLATT (13.09.2026, Vorgabe Samet) ────────────────────
+ * ── ARBEITSRAPPORT: DAS BLATT (16.09.2026, Samet) ────────────────────────────
  *
- * «Bizim tasarımımızla bir alakası olmamalı — Arial, düz siyah beyaz, tablolu.»
- * Absichtlich OHNE das Haus-Kit (modernReportKit): kein Logo, keine Welle,
- * keine Farben. Schwarz auf Weiss, Arial, dünne schwarze Linien — EINE Person:
+ * «Gün gün yazsın; grafik falan, görev bazlı bakış, QR — kaldır. Dalganın
+ * yerine sağ üstte, köşeyi kaplayan orta boy bir desen.» Also:
  *
- *   Kopf          Titel, darunter Person/Zeitraum/Gesamtzeit/Firma/erstellt am
- *   Tabellen      Woche: Tag · Aufgabe · Zeit — Tag: Aufgaben, Zeiteinträge, …
- *   jede Seite    Fusszeile: Rapport · Person · Zeitraum links, «Seite x / y» rechts
+ *   Kopf     rechts oben das gerechnete graue Muster (reportMark.ts) bis in die
+ *            Ecke; links Titel, Person, Zeitraum, Firma
+ *   Tage     je Kalendertag eine Überschrift (Wochentag · Datum, Haarlinie) und
+ *            das freie Blatt der Person: Überschriften, Absätze, Listen, Zitate,
+ *            Linien — fett/kursiv/`code` und Links mitten im Satz
+ *   Dateien  Bilder und PDF stehen als ANKLICKBARE Adresse (Samet: «url olarak
+ *            yer alacak ama tıklanabilir»), nicht als Abzug
+ *   Zeiten    zuletzt je Tag eine Tabelle mit dünnen grauen Linien: welche
+ *             Aufgabe, wie lange, und die Summe des Tages
+ *   jede Seite Fusszeile: Rapport · Person · Zeitraum links, «Sayfa x / y» rechts
  *
- * Reines Zeichnen ohne Vite-Importe: die Schrift registriert der Aufrufer
- * (`fontName`), so läuft das Blatt auch im Probedruck-Skript unter Node.
+ * Reines Zeichnen: die Schrift und den Muster-Text bringt der Aufrufer mit,
+ * das Seitenverhältnis der Ecke kommt aus reportMark.ts (beides in Lockstep).
  */
+
+type Gray = number;
 
 const PAGE_W = 210;
 const PAGE_H = 297;
-const MARGIN_X = 15;
-const MARGIN_TOP = 16;
+const MX = 16;
+const TOP = 16;
+const CW = PAGE_W - MX * 2;
 const FOOTER_Y = PAGE_H - 10;
 const BOTTOM = PAGE_H - 18;
-const CONTENT_W = PAGE_W - MARGIN_X * 2;
+const PT = 0.3528;
 
-const TEXT_PT = 9;
-const HEAD_PT = 8.5;
-const PAD_X = 1.6;
-const PAD_Y = 1.5;
-const LINE_MM = TEXT_PT * 0.3528 * 1.18;
+const INK: Gray = 20;
+const MUTED: Gray = 110;
+const LINE: Gray = 215;
+const SOFT: Gray = 242;
 
-export const drawWorkReportPdf = (doc: jsPDF, report: WorkReportDocument, fontName: string): void => {
-    let y = MARGIN_TOP;
+/** Das Muster in der rechten oberen Ecke — im Seitenverhältnis von reportMark.ts. */
+const MARK_WIDTH = 66;
+const MARK = { width: MARK_WIDTH, height: (MARK_WIDTH * REPORT_MARK.height) / REPORT_MARK.width };
 
-    const font = (style: 'normal' | 'bold', size: number) => {
+const TEXT_SIZE = 9;
+const LINE_FACTOR = 1.45;
+const INDENT = 6;
+
+export const drawWorkReportPdf = (
+    doc: jsPDF,
+    report: WorkReportDocument,
+    fontName: string,
+    assets: { markSvg: string | null },
+): void => {
+    let y = TOP;
+
+    const font = (style: 'normal' | 'bold' | 'italic', size: number, gray: Gray = INK) => {
         doc.setFont(fontName, style);
         doc.setFontSize(size);
+        doc.setTextColor(gray, gray, gray);
     };
-    const rule = (width: number) => {
+    const fill = (gray: Gray) => doc.setFillColor(gray, gray, gray);
+    const rule = (x1: number, yy: number, x2: number, gray: Gray = LINE, width = 0.2) => {
+        doc.setDrawColor(gray, gray, gray);
         doc.setLineWidth(width);
-        doc.line(MARGIN_X, y, MARGIN_X + CONTENT_W, y);
+        doc.line(x1, yy, x2, yy);
+    };
+    const lineH = (size: number) => size * PT * LINE_FACTOR;
+    const split = (text: string, width: number): string[] => doc.splitTextToSize(String(text ?? ''), Math.max(4, width)) as string[];
+    /** true = neue Seite begonnen. */
+    const ensure = (height: number): boolean => {
+        if (y + height <= BOTTOM) return false;
+        doc.addPage();
+        y = TOP;
+        return true;
     };
 
-    const columnWidths = (table: WorkTable): number[] => {
-        const sum = table.columns.reduce((total, column) => total + column.width, 0) || 1;
-        return table.columns.map((column) => (column.width / sum) * CONTENT_W);
+    /* ── Text mit Auszeichnung: messen, umbrechen, zeichnen ─────────────── */
+
+    interface Piece { text: string; span: MdSpan; width: number }
+
+    const spanFont = (span: MdSpan, size: number) => {
+        doc.setFont(fontName, span.bold ? 'bold' : span.italic ? 'italic' : 'normal');
+        doc.setFontSize(size);
+    };
+    const widthOf = (text: string, span: MdSpan, size: number): number => {
+        spanFont(span, size);
+        return doc.getTextWidth(text);
     };
 
-    const wrap = (cells: string[], widths: number[]): string[][] =>
-        cells.map((cell, index) => doc.splitTextToSize(String(cell ?? ''), widths[index] - PAD_X * 2) as string[]);
-
-    const heightOf = (lines: string[][]): number =>
-        Math.max(1, ...lines.map((cell) => cell.length)) * LINE_MM + PAD_Y * 2;
-
-    const drawCells = (lines: string[][], widths: number[], aligns: Array<'left' | 'right' | undefined>) => {
-        let x = MARGIN_X;
-        lines.forEach((cell, index) => {
-            cell.forEach((text, lineIndex) => {
-                const baseline = y + PAD_Y + LINE_MM * (lineIndex + 1) - LINE_MM * 0.22;
-                if (aligns[index] === 'right') doc.text(text, x + widths[index] - PAD_X, baseline, { align: 'right' });
-                else doc.text(text, x + PAD_X, baseline);
-            });
-            x += widths[index];
-        });
-        y += heightOf(lines);
-    };
-
-    const drawHeader = (table: WorkTable, widths: number[]) => {
-        font('bold', HEAD_PT);
-        rule(0.35);
-        drawCells(wrap(table.columns.map((column) => column.header), widths), widths, table.columns.map((column) => column.align));
-        rule(0.35);
-    };
-
-    const drawTable = (table: WorkTable) => {
-        const widths = columnWidths(table);
-        const aligns = table.columns.map((column) => column.align);
-        // Titel nie allein unten auf der Seite: Titel + Kopf + eine Zeile müssen passen.
-        if (y + 24 > BOTTOM) {
-            doc.addPage();
-            y = MARGIN_TOP;
-        }
-        font('bold', 10.5);
-        doc.text(table.title, MARGIN_X, y + 4);
-        y += 6.5;
-        drawHeader(table, widths);
-
-        if (!table.rows.length) {
-            font('normal', TEXT_PT);
-            drawCells([[table.emptyText]], [CONTENT_W], [undefined]);
-            rule(0.35);
-            y += 7;
-            return;
-        }
-
-        table.rows.forEach((row: WorkRow, index) => {
-            font(row.total ? 'bold' : 'normal', TEXT_PT);
-            const lines = wrap(row.cells, widths);
-            const height = heightOf(lines);
-            if (y + height > BOTTOM) {
-                doc.addPage();
-                y = MARGIN_TOP;
-                drawHeader(table, widths);
-                font(row.total ? 'bold' : 'normal', TEXT_PT);
-            } else if (index > 0 && (row.groupStart || row.total)) {
-                rule(row.groupStart ? 0.3 : 0.15);
-            } else if (index > 0) {
-                // Zeilen innerhalb eines Tages: nur ein Hauch von Linie.
-                doc.setLineWidth(0.05);
-                doc.line(MARGIN_X + widths[0], y, MARGIN_X + CONTENT_W, y);
+    /** Zeilen aus Auszeichnungsstücken; `\n` bricht hart um. */
+    const wrapSpans = (spans: MdSpan[], width: number, size: number): Piece[][] => {
+        const lines: Piece[][] = [];
+        let line: Piece[] = [];
+        let used = 0;
+        const breakLine = () => {
+            lines.push(line);
+            line = [];
+            used = 0;
+        };
+        const place = (word: string, span: MdSpan, wordWidth: number) => {
+            const last = line[line.length - 1];
+            if (last && last.span === span) {
+                last.text += word;
+                last.width += wordWidth;
+            } else {
+                line.push({ text: word, span, width: wordWidth });
             }
-            drawCells(lines, widths, aligns);
-        });
-        rule(0.35);
-        y += 7;
+            used += wordWidth;
+        };
+        const add = (word: string, span: MdSpan) => {
+            const wordWidth = widthOf(word, span, size);
+            if (used + wordWidth > width && line.length) {
+                // Ein Leerzeichen am Zeilenende verschwindet einfach.
+                if (!word.trim()) return;
+                breakLine();
+            }
+            if (!line.length && !word.trim()) return;
+            // Ein einzelnes Wort, das breiter als die Spalte ist (eine lange
+            // Adresse), wird buchstabenweise umgebrochen statt überzustehen.
+            if (wordWidth > width) {
+                let rest = word;
+                while (rest) {
+                    let cut = rest.length;
+                    let cutWidth = widthOf(rest, span, size);
+                    while (cut > 1 && used + cutWidth > width) {
+                        cut -= 1;
+                        cutWidth = widthOf(rest.slice(0, cut), span, size);
+                    }
+                    place(rest.slice(0, cut), span, cutWidth);
+                    rest = rest.slice(cut);
+                    if (rest) breakLine();
+                }
+                return;
+            }
+            place(word, span, wordWidth);
+        };
+        for (const span of spans) {
+            if (span.text === '\n') {
+                breakLine();
+                continue;
+            }
+            for (const word of span.text.split(/(\s+)/)) {
+                if (!word) continue;
+                add(word, span);
+            }
+        }
+        if (line.length) lines.push(line);
+        return lines.length ? lines : [[]];
     };
 
-    doc.setTextColor(0, 0, 0);
-    doc.setDrawColor(0, 0, 0);
+    /** Eine fertige Zeile zeichnen (Grundlinie `baseline`); Links werden anklickbar. */
+    const drawLine = (line: Piece[], x: number, baseline: number, size: number, gray: Gray = INK) => {
+        let cursor = x;
+        for (const piece of line) {
+            spanFont(piece.span, size);
+            if (piece.span.code) {
+                fill(SOFT);
+                doc.rect(cursor - 0.6, baseline - size * PT * 0.86, piece.width + 1.2, size * PT * 1.18, 'F');
+            }
+            doc.setTextColor(gray, gray, gray);
+            doc.text(piece.text, cursor, baseline);
+            if (piece.span.href) {
+                rule(cursor, baseline + 0.7, cursor + piece.width, MUTED, 0.15);
+                doc.link(cursor, baseline - size * PT * 0.86, piece.width, size * PT * 1.2, { url: piece.span.href });
+            }
+            cursor += piece.width;
+        }
+    };
 
-    // ── Kopf ──
-    font('bold', 18);
-    doc.text(report.title, MARGIN_X, y + 6);
-    y += 11;
-    report.meta.forEach((pair) => {
-        font('normal', TEXT_PT + 0.5);
-        doc.text(pair.label, MARGIN_X, y + 3.6);
-        font('bold', TEXT_PT + 0.5);
-        doc.text(doc.splitTextToSize(pair.value, CONTENT_W - 36)[0] as string, MARGIN_X + 36, y + 3.6);
-        y += 4.8;
+    /** Ein Textstück des Blattes ausgeben (bricht über Seiten um). */
+    const writeSpans = (spans: MdSpan[], options: { x?: number; width?: number; size?: number; gray?: Gray; marker?: string }) => {
+        const x = options.x ?? MX;
+        const width = options.width ?? MX + CW - x;
+        const size = options.size ?? TEXT_SIZE;
+        const gray = options.gray ?? INK;
+        const height = lineH(size);
+        const lines = wrapSpans(spans, width, size);
+        lines.forEach((line, index) => {
+            ensure(height);
+            const baseline = y + height * 0.78;
+            if (!index && options.marker) {
+                font('normal', size, MUTED);
+                doc.text(options.marker, x - 1.8, baseline, { align: 'right' });
+            }
+            drawLine(line, x, baseline, size, gray);
+            y += height;
+        });
+    };
+
+    /* ── Kopf: Muster in der Ecke, links die Angaben ────────────────────── */
+
+    if (assets.markSvg) {
+        drawSvgArt(doc, assets.markSvg, { x: PAGE_W - MARK.width, y: 0, width: MARK.width, height: MARK.height });
+    }
+    const headWidth = PAGE_W - MARK.width - MX - 8;
+    y = TOP + 6;
+    font('bold', 17);
+    doc.text(split(report.title, headWidth)[0] ?? '', MX, y);
+    y += 9;
+    font('bold', 11.5);
+    doc.text(split(report.person, headWidth)[0] ?? '', MX, y);
+    y += 5.5;
+    font('normal', 9, INK);
+    doc.text(split(report.subtitle, headWidth)[0] ?? '', MX, y);
+    y += 5;
+    font('normal', 7.8, MUTED);
+    doc.text(split(report.meta, headWidth)[0] ?? '', MX, y);
+    y = Math.max(y + 12, MARK.height + 10);
+
+    /* ── Tag für Tag ────────────────────────────────────────────────────── */
+
+    report.days.forEach((day, index) => {
+        ensure(24);
+        if (index) y += 5;
+        rule(MX, y, MX + CW, LINE);
+        y += 5.4;
+        font('bold', 11);
+        doc.text(day.weekday, MX, y);
+        const weekdayWidth = doc.getTextWidth(day.weekday);
+        font('normal', 9, MUTED);
+        doc.text(day.dateText, MX + weekdayWidth + 4, y);
+        y += 5;
+
+        if (!day.blocks.length) {
+            font('italic', TEXT_SIZE, MUTED);
+            doc.text(day.written ? report.labels.empty : report.labels.missing, MX, y + 3);
+            y += 7;
+        }
+
+        day.blocks.forEach((block) => {
+            switch (block.kind) {
+                case 'heading': {
+                    const size = block.level === 1 ? 12 : block.level === 2 ? 10.6 : 9.6;
+                    y += 2.6;
+                    writeSpans(block.spans.map((span) => ({ ...span, bold: true })), { size });
+                    y += 1.2;
+                    break;
+                }
+                case 'list':
+                    block.items.forEach((item, position) => {
+                        writeSpans(item, {
+                            x: MX + INDENT,
+                            width: CW - INDENT,
+                            marker: block.ordered ? `${position + 1}.` : '•',
+                        });
+                    });
+                    y += 1.4;
+                    break;
+                case 'quote': {
+                    const top = y;
+                    writeSpans(block.spans, { x: MX + INDENT, width: CW - INDENT, gray: MUTED });
+                    doc.setDrawColor(LINE, LINE, LINE);
+                    doc.setLineWidth(0.7);
+                    doc.line(MX + 1.5, top + 0.6, MX + 1.5, y - 0.6);
+                    y += 1.4;
+                    break;
+                }
+                case 'rule':
+                    ensure(6);
+                    y += 2.4;
+                    rule(MX, y, MX + CW, LINE);
+                    y += 3;
+                    break;
+                case 'image': {
+                    // Kein Abzug: die Adresse steht als anklickbarer Link (Vorgabe 16.09.2026).
+                    const name = block.alt || decodeURIComponent(block.url.split('/').pop() ?? block.url);
+                    writeSpans([{ text: name, href: block.url }], { size: TEXT_SIZE });
+                    writeSpans([{ text: block.url, href: block.url }], { size: 7.2, gray: MUTED });
+                    y += 1.4;
+                    break;
+                }
+                default:
+                    writeSpans(block.spans, {});
+                    y += 1.8;
+                    break;
+            }
+        });
+
+        if (day.files.length) {
+            ensure(12);
+            y += 2.4;
+            font('bold', 8.2, MUTED);
+            doc.text(report.labels.files, MX, y + 2.6);
+            y += 5.4;
+            day.files.forEach((file) => {
+                writeSpans([{ text: file.name, href: file.url }], { x: MX + INDENT, width: CW - INDENT, size: 8.4, marker: '·' });
+                writeSpans([{ text: file.url, href: file.url }], { x: MX + INDENT, width: CW - INDENT, size: 7.2, gray: MUTED });
+                y += 1.2;
+            });
+        }
+
+        if (day.times.length) {
+            // «ince gri kenarları olan tablo» (16.09.2026): zwei Spalten, dünne graue Linien.
+            const DURATION_W = 30;
+            const titleW = CW - DURATION_W;
+            ensure(16);
+            y += 3;
+            font('bold', 8.2, MUTED);
+            doc.text(report.labels.worked, MX, y + 2.6);
+            y += 5;
+
+            /** Eine Zeile der Tabelle: zwei Zellen mit dünner grauer Kante. */
+            const gridRow = (title: string, duration: string, style: 'normal' | 'bold', gray: Gray = INK) => {
+                font(style, 8.2, gray);
+                const lines = split(title, titleW - 5);
+                const rowHeight = Math.max(6.4, lines.length * lineH(8.2) + 3);
+                ensure(rowHeight);
+                doc.setDrawColor(LINE, LINE, LINE);
+                doc.setLineWidth(0.15);
+                doc.rect(MX, y, titleW, rowHeight);
+                doc.rect(MX + titleW, y, DURATION_W, rowHeight);
+                font(style, 8.2, gray);
+                lines.forEach((text, index) => doc.text(text, MX + 2.4, y + 4.4 + index * lineH(8.2)));
+                doc.text(duration, MX + CW - 2.4, y + 4.4, { align: 'right' });
+                y += rowHeight;
+            };
+            gridRow(report.labels.task, report.labels.duration, 'bold', MUTED);
+            day.times.forEach((entry) => gridRow(entry.title, entry.duration, 'normal'));
+            gridRow(report.labels.total, day.total, 'bold');
+            y += 2;
+        }
+
+        y += 3;
     });
-    y += 3;
-    rule(0.5);
-    y += 6;
 
-    report.tables.forEach(drawTable);
+    /* ── Fusszeile auf jeder Seite ──────────────────────────────────────── */
 
-    // ── Fusszeile auf jeder Seite ──
     const pages = doc.getNumberOfPages();
     for (let page = 1; page <= pages; page += 1) {
         doc.setPage(page);
-        doc.setTextColor(0, 0, 0);
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.15);
-        doc.line(MARGIN_X, FOOTER_Y - 4, MARGIN_X + CONTENT_W, FOOTER_Y - 4);
-        font('normal', 7.5);
-        doc.text(doc.splitTextToSize(report.footerLeft, CONTENT_W - 40)[0] as string, MARGIN_X, FOOTER_Y);
-        doc.text(report.pageLabel(page, pages), MARGIN_X + CONTENT_W, FOOTER_Y, { align: 'right' });
+        rule(MX, FOOTER_Y - 4, MX + CW, LINE);
+        font('normal', 7, MUTED);
+        doc.text(split(report.footerLeft, CW - 30)[0] ?? '', MX, FOOTER_Y);
+        doc.text(report.pageLabel(page, pages), MX + CW, FOOTER_Y, { align: 'right' });
     }
 };

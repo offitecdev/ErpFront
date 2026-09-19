@@ -224,11 +224,14 @@
 
 .ofi-gv-detail-total {
     color: var(--gv-text);
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+    line-height: 1.2;
 }
+
+.ofi-gv-detail-total .ofi-gv-clock { font-size: 18px; letter-spacing: 0; }
 
 .ofi-gv-detail-work {
     margin: 8px 0 0;
@@ -255,9 +258,11 @@
 
 .ofi-gv-detail-work__time {
     flex: none;
-    font-size: 12.5px;
+    font-size: 13px;
     font-variant-numeric: tabular-nums;
 }
+
+.ofi-gv-detail-work__time.is-live { color: var(--gv-text); }
 
 .ofi-gv-detail-forecast {
     margin-top: 4px;
@@ -882,13 +887,170 @@ body > .ofi-gv-menu .ofi-gv-tblmenu__row[aria-checked="true"] .ofi-gv-picker__na
 /* Bild, Datei, fehlende Verweise */
 .ofi-gv-editor-image { margin: 6px 0; }
 
-.ofi-gv-editor-image img {
+/* Bild: Klick wählt (blauer Rahmen + Eckgriffe), kein Link, keine Hand (15.09.2026). */
+.ofi-gv-img {
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    cursor: default;
+    touch-action: manipulation;
+}
+
+.ofi-gv-img__clip {
+    position: relative;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--gv-hairline);
+    border-radius: 8px;
+}
+
+.ofi-gv-img__clip img {
     display: block;
     max-width: 100%;
     max-height: 420px;
+    object-fit: contain;
+    cursor: default;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.ofi-gv-img__clip.is-sized img { width: 100%; max-height: none; }
+.ofi-gv-img__clip.is-sized img.is-cropped { max-width: none; }
+
+.ofi-gv-img.is-selected .ofi-gv-img__clip { outline: 2px solid #0a7aff; outline-offset: 1px; }
+
+.ofi-gv-img__handle {
+    position: absolute;
+    z-index: 2;
+    width: 11px;
+    height: 11px;
+    border: 1.5px solid #0a7aff;
+    border-radius: 3px;
+    background: #fff;
+    touch-action: none;
+}
+
+.ofi-gv-img__handle.is-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.ofi-gv-img__handle.is-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.ofi-gv-img__handle.is-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.ofi-gv-img__handle.is-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+.ofi-gv-img.is-resizing,
+.ofi-gv-img.is-resizing * { user-select: none; }
+
+.ofi-gv-img__tools {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    display: flex;
+    gap: 4px;
+}
+
+#root .ofi-gv .ofi-gv-img__tool,
+body > :not(#root) .ofi-gv-img__tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    color: #1d1d1f;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: default;
+    transition: background-color 140ms ease;
+}
+
+#root .ofi-gv .ofi-gv-img__tool:hover,
+body > :not(#root) .ofi-gv-img__tool:hover { background: #fff; color: #0a7aff; }
+
+.ofi-gv-img__size {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    z-index: 2;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgba(29, 29, 31, 0.78);
+    color: #fff;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+/* Ausschnitt: ausserhalb abgedunkelt, Rahmen verschiebbar, Griffe innen an Ecken und Kanten. */
+.ofi-gv-img.is-cropping .ofi-gv-img__clip { outline: none; user-select: none; }
+
+.ofi-gv-crop {
+    position: absolute;
+    box-sizing: border-box;
+    border: 2px solid #ff3b30;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    cursor: move;
+    touch-action: none;
+}
+
+/* Kırpma kenarları resmin boyunca kırmızı kesik çizgi (Samet 15.09.2026). */
+.ofi-gv-crop__guide {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ofi-gv-crop__guide.is-h { left: 0; right: 0; height: 0; margin-top: -1px; border-top: 2px dashed #ff3b30; }
+.ofi-gv-crop__guide.is-v { top: 0; bottom: 0; width: 0; margin-left: -1px; border-left: 2px dashed #ff3b30; }
+
+.ofi-gv-crop__grip {
+    position: absolute;
+    box-sizing: border-box;
+    touch-action: none;
+}
+
+.ofi-gv-crop__grip.is-nw,
+.ofi-gv-crop__grip.is-ne,
+.ofi-gv-crop__grip.is-sw,
+.ofi-gv-crop__grip.is-se { width: 16px; height: 16px; border: 0 solid #fff; }
+
+.ofi-gv-crop__grip.is-nw { top: -1px; left: -1px; border-top-width: 3px; border-left-width: 3px; cursor: nwse-resize; }
+.ofi-gv-crop__grip.is-ne { top: -1px; right: -1px; border-top-width: 3px; border-right-width: 3px; cursor: nesw-resize; }
+.ofi-gv-crop__grip.is-sw { bottom: -1px; left: -1px; border-bottom-width: 3px; border-left-width: 3px; cursor: nesw-resize; }
+.ofi-gv-crop__grip.is-se { bottom: -1px; right: -1px; border-bottom-width: 3px; border-right-width: 3px; cursor: nwse-resize; }
+
+.ofi-gv-crop__grip.is-n,
+.ofi-gv-crop__grip.is-s { left: 50%; width: 22px; height: 12px; margin-left: -11px; cursor: ns-resize; }
+.ofi-gv-crop__grip.is-e,
+.ofi-gv-crop__grip.is-w { top: 50%; width: 12px; height: 22px; margin-top: -11px; cursor: ew-resize; }
+.ofi-gv-crop__grip.is-n { top: -1px; border-top: 3px solid #fff; }
+.ofi-gv-crop__grip.is-s { bottom: -1px; border-bottom: 3px solid #fff; }
+.ofi-gv-crop__grip.is-w { left: -1px; border-left: 3px solid #fff; }
+.ofi-gv-crop__grip.is-e { right: -1px; border-right: 3px solid #fff; }
+
+.ofi-gv-img__cropbar {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* Upload läuft: Platzhalter an der Stelle des künftigen Bildes, Ladekranz in der Mitte. */
+.ofi-gv-editor-block.is-uploading { display: flex; flex-direction: column; gap: 6px; }
+
+.ofi-gv-editor-uploading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(420px, 100%);
+    height: 180px;
+    margin: 6px 0;
     border: 1px solid var(--gv-hairline);
     border-radius: 8px;
-    object-fit: contain;
+    color: var(--gv-secondary);
+    cursor: default;
 }
 
 .ofi-gv-editor-file { max-width: 440px; margin: 4px 0; }

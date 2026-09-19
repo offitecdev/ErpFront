@@ -15,8 +15,10 @@ import {
     PopupField,
     PopupNote,
 } from '@/components/ui-shared/PopupKit';
+import { useGovernance } from '@/components/governance';
 import { t } from '@/i18n/translate';
 import { projectApi } from '@/lib/api/project';
+import { FullCancelDialog } from '@/components/orders/FullCancelDialog';
 import '@/styles/modules/projectDetail.css';
 
 /** Onay için birebir yazılması gereken sözcük — her dilde AYNI (kod gibi). */
@@ -67,6 +69,11 @@ export const ProjectSettingsMenu = ({
     const [working, setWorking] = useState(false);
     const [typed, setTyped] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
+    // Stornieren = eigenes Recht, Storno aufheben = nur Systemverwaltung (16.09.2026).
+    const { can, isSystemAdmin } = useGovernance();
+    const cancelAllowed = projectCancelled ? isSystemAdmin : can('PROJECT_CANCEL');
+    // «Gesamten Vorgang stornieren» (17.09.2026, Schritt 6).
+    const [fullCancelOpen, setFullCancelOpen] = useState(false);
 
     useEffect(() => {
         if (!open) return;
@@ -129,11 +136,23 @@ export const ProjectSettingsMenu = ({
                             <AlertTriangle size={14} /> {t('orders.lifecycle.buttonLabel')}
                         </button>
                     )}
+                    {!projectCancelled && can('PROJECT_CANCEL') && (
+                        <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { setOpen(false); setFullCancelOpen(true); }}
+                            className="ofi-tp-menu__item is-danger"
+                        >
+                            <XClose size={14} /> {t('orders.fullCancel.menuLabel')}
+                        </button>
+                    )}
                     <button
                         type="button"
                         role="menuitem"
+                        disabled={!cancelAllowed}
+                        title={cancelAllowed ? undefined : (projectCancelled ? t('governance.uncancelAdminOnly') : t('governance.noPermissionCancel'))}
                         onClick={() => { setOpen(false); setReason(''); setCancelOpen(true); }}
-                        className={`ofi-tp-menu__item ${projectCancelled ? '' : 'is-danger'}`}
+                        className={`ofi-tp-menu__item ${projectCancelled ? '' : 'is-danger'} ${cancelAllowed ? '' : 'cursor-not-allowed opacity-45'}`}
                     >
                         {projectCancelled ? <RefreshCw size={14} /> : <XClose size={14} />}
                         {projectCancelled ? t('projects.lifecycle.uncancelProject') : t('projects.lifecycle.cancelProject')}
@@ -236,6 +255,17 @@ export const ProjectSettingsMenu = ({
                     />
                 </PopupField>
             </PopupDialog>
+            {fullCancelOpen && (
+                <FullCancelDialog
+                    scope="PROJECT"
+                    id={projectId}
+                    onClose={() => setFullCancelOpen(false)}
+                    onDone={async () => {
+                        setFullCancelOpen(false);
+                        await onProjectChanged?.();
+                    }}
+                />
+            )}
         </div>
     );
 };

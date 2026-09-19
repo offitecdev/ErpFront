@@ -10,6 +10,7 @@ import { Button } from '../../../../components/ui-shared/Button';
 import { apiClient } from '../../../../lib/axios';
 import { meetingApi, type MeetingActivityDto, type MeetingKind } from '../../../../lib/api/meetings';
 import { ParticipantPickerModal, type PickedParticipant } from './ParticipantPickerModal';
+import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
 
 interface MeetingComposerModalProps {
     open: boolean;
@@ -198,12 +199,7 @@ export const MeetingComposerModal: React.FC<MeetingComposerModalProps> = ({ open
                     <div className="grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1 text-[12.5px] font-medium text-[#3F4350] dark:text-[#d9dce3]">
                             {t('crmOverview.agenda.fieldDate', { defaultValue: 'Tarih' })}
-                            <input
-                                type="date"
-                                value={draft.date}
-                                onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-                                className={inputCls}
-                            />
+                            <MacDatePicker value={draft.date} onChange={(nextDate) => setDraft((d) => ({ ...d, date: nextDate }))} className="is-field" />
                         </label>
                         <label className="flex flex-col gap-1 text-[12.5px] font-medium text-[#3F4350] dark:text-[#d9dce3]">
                             {t('crmOverview.agenda.fieldTime', { defaultValue: 'Saat' })}
