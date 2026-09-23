@@ -28,3 +28,27 @@ release
 .chrome-profile/
 .chrome-profile2/
 .chrome-live-probe/
+
+# Environment variables - never commit
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Grosse Nicht-Code-Dateien - aus der Historie entfernt, nie wieder committen
+# (Sicherung: C:\ERP\_asset-backup-23092026\)
+/src/assets/images/TeamViewer_Setup_x64.exe
+/src/assets/images/voltra_nord.zip
+/src/assets/images/voltra_nord/
+/src/assets/images/voltrannort_documents.zip
+/src/assets/images/voltrannort_documents/
+/src/assets/docs/A-2026-2019.pdf
+/src/assets/images/Diatype Font Family.zip
+/src/assets/images/font.zip
+/src/assets/images/Satoshi_Complete.zip
+/src/assets/images/FT_Regola_Neue_Unlicensed_Trial_7798eaa72c.zip
+/src/assets/images/OffiSelect - 2.zip
+/src/assets/images/Calyon_Rapor_samet_.pdf
+/src/assets/images/ERP_SİSTEM_OFFITEC_TR.pdf
+/src/assets/images/Auftrag - A-2026-13148.pdf
+/src/assets/images/Auftrag - A-2026-13267.pdf
