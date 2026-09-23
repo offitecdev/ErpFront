@@ -112,7 +112,9 @@ import {
     LuCircleAlert as Alert,
     // Personalmodul (16.08.2026): QR-Ausweis drucken, Urlaub.
     LuPrinter as Printer,
-    LuUmbrella as Umbrella
+    LuUmbrella as Umbrella,
+    // Produktion (19.09.2026).
+    LuFactory as Factory
 } from './lucideLocal';
 
 export {
@@ -228,5 +230,6 @@ export {
     Home01,
     Alert,
     Printer,
-    Umbrella
+    Umbrella,
+    Factory
 };

@@ -1,0 +1,110 @@
+/* A single capsule: equal control cells, centered symbols, no layout shifts. */
+#root .ofi-tsw-toolbar-symbol { display: none; }
+
+#root .ofi-topbar .ofi-header-tools {
+    --ofi-tools-ink: #18191c;
+    --ofi-tools-width: 44px;
+    --ofi-tools-height: 44px;
+    --ofi-tools-symbol: 20px;
+    --ofi-tools-hover: rgba(40, 48, 66, 0.07);
+    --ofi-tools-active: rgba(10, 122, 255, 0.10);
+    --ofi-tools-accent: #0868ce;
+    gap: 0;
+    padding: 2px 4px;
+    margin-left: 8px;
+    border: 1px solid rgba(80, 85, 94, 0.15);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(244, 245, 247, 0.82));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.95), 0 2px 5px rgba(24, 28, 36, 0.035);
+}
+
+html.dark #root .ofi-topbar .ofi-header-tools {
+    --ofi-tools-ink: #f0f1f4;
+    --ofi-tools-hover: rgba(255, 255, 255, 0.09);
+    --ofi-tools-active: rgba(100, 168, 255, 0.17);
+    --ofi-tools-accent: #9ccaff;
+    border-color: rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(58, 60, 65, 0.9), rgba(36, 38, 43, 0.86));
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 2px 5px rgba(0, 0, 0, 0.12);
+}
+
+#root .ofi-topbar .ofi-header-tools > div {
+    flex: 0 0 auto;
+    margin: 0;
+    line-height: 0;
+}
+
+html #root .ofi-topbar .ofi-header-tools button.ofi-hdr-ctl {
+    --ofi-tb-ink: var(--ofi-tools-ink);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: var(--ofi-tools-width) !important;
+    min-width: var(--ofi-tools-width) !important;
+    height: var(--ofi-tools-height) !important;
+    min-height: var(--ofi-tools-height) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0;
+    border: 1px solid transparent !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+@media (hover: hover) {
+    html #root .ofi-topbar .ofi-header-tools button.ofi-hdr-ctl:hover {
+        background: var(--ofi-tools-hover) !important;
+    }
+}
+
+html #root .ofi-topbar .ofi-header-tools button.ofi-hdr-ctl:is([aria-expanded="true"], .is-current, :active) {
+    --ofi-tb-ink: var(--ofi-tools-accent);
+    background: var(--ofi-tools-active) !important;
+}
+
+/* Match the utilities layer that sets the application's global SVG color. */
+@layer utilities {
+    #root .ofi-topbar .ofi-header-tools button.ofi-hdr-ctl .ofi-toolbar-symbol {
+        color: var(--ofi-tb-ink) !important;
+    }
+    #root .ofi-topbar .ofi-header-tools .ofi-toolbar-avatar > span {
+        font-size: 9px !important;
+        line-height: 1 !important;
+    }
+}
+
+#root .ofi-topbar .ofi-header-tools button.ofi-hdr-ctl > svg {
+    width: var(--ofi-tools-symbol);
+    height: var(--ofi-tools-symbol);
+    flex-shrink: 0;
+}
+
+#root .ofi-topbar .ofi-toolbar-avatar {
+    width: var(--ofi-tools-symbol) !important;
+    height: var(--ofi-tools-symbol) !important;
+    border: 1px solid currentColor;
+    background: transparent !important;
+    color: var(--ofi-tb-ink) !important;
+    font-size: 9px !important;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    box-shadow: none;
+}
+
+#root .ofi-topbar--compact .ofi-header-tools {
+    --ofi-tools-width: 32px;
+    --ofi-tools-height: 26px;
+    --ofi-tools-symbol: 18px;
+    padding: 1px 4px;
+}
+
+#root .ofi-topbar .ofi-header-tools .ofi-tsw-toolbar-symbol { display: block; }
+#root .ofi-topbar .ofi-header-tools .ofi-tsw-btn :is(.ofi-tsw-mono, .ofi-tsw-btn__label, .ofi-tsw-btn__caret),
+#root .ofi-topbar .ofi-header-tools button[data-tour="calendar"] > span { display: none; }
+
+@media (prefers-reduced-transparency: reduce) {
+    #root .ofi-topbar .ofi-header-tools { background: #f7f8fa; }
+    html.dark #root .ofi-topbar .ofi-header-tools { background: #303239; }
+}

@@ -330,6 +330,7 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                links — wie der Popover der Vorlage. */
             prefer="right"
             anchorAlign="middle"
+            popover
             className={`ofi-cal-detailcard ${enlarged ? 'is-enlarged' : ''} ${pane ? 'has-pane' : ''}`}
             closeOnOutside={!pane}
             title={event.title}
@@ -551,6 +552,11 @@ export const DetailPopup = ({ event, anchor, onClose, onNavigate, onCreateFrom, 
                                 <div className="ofi-cal-group">
                                 <Row icon={<Building02 size={15} />} label={t('calendar.detail.customer')} value={detail.customerName} />
                                 <Row icon={<Briefcase01 size={15} />} label={t('calendar.detail.project')} value={detail.projectName} />
+                                {/* DIE KOMMISSION STEHT NEBEN DEM PROJEKT
+                                    (21.09.2026). Row blendet sich selbst aus,
+                                    wenn keine erfasst ist — genau so gewollt:
+                                    keine Kommission, keine Zeile. */}
+                                <Row icon={<Hash01 size={15} />} label={t('tenders.kommission_nr')} value={detail.commissionNumber} />
                                 <Row icon={<ShoppingCart01 size={15} />} label={t('calendar.detail.order')} value={detail.orderNumber} />
                                 <Row icon={<File02 size={15} />} label={t('calendar.detail.offer')} value={detail.tenderNumber} />
                                 <Row icon={<User01 size={15} />} label={t('calendar.detail.manager')} value={detail.manager} />

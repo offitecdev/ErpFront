@@ -7,6 +7,7 @@ import { X } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import { useBackDismiss } from '@/lib/backDismiss';
 import type { FloatAnchor } from '../calendarShared';
+import { PopoverSurface } from './PopoverSurface';
 
 /* The one popup shape of the calendar module (replaces the old bottom sheets,
    user request 17.08.2026): a free-floating card that opens BESIDE the thing it
@@ -54,7 +55,7 @@ const gutterFor = (vw: number) => (vw <= PHONE_MAX ? 12 : vw <= TABLET_MAX ? 32 
 /* Place the card beside its anchor: LEFT of it if it fits, otherwise right,
    otherwise pinned to the viewport edge. Vertically it starts at the anchor's
    top and slides up just enough to stay fully visible. */
-const placeCard = (anchor: FloatAnchor | null, width: number, height: number, openAt: 'center' | 'top' = 'center', prefer: 'left' | 'right' = 'left') => {
+const placeCard = (anchor: FloatAnchor | null, width: number, height: number, openAt: 'center' | 'top' = 'center', prefer: 'left' | 'right' = 'left', popover = false) => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     if (!anchor) {
@@ -62,6 +63,24 @@ const placeCard = (anchor: FloatAnchor | null, width: number, height: number, op
             x: Math.max(MARGIN, (vw - width) / 2),
             y: openAt === 'top' ? TOP_MARGIN : Math.max(MARGIN, (vh - height) / 2),
         };
+    }
+    if (popover) {
+        const clampX = (x: number) => Math.max(MARGIN, Math.min(x, vw - width - MARGIN));
+        const clampY = (y: number) => Math.max(MARGIN, Math.min(y, vh - height - MARGIN));
+        const middleY = (anchor.top + anchor.bottom - height) / 2;
+        const right = anchor.right + 14;
+        const left = anchor.left - width - 14;
+        const fitsRight = right + width <= vw - MARGIN;
+        const fitsLeft = left >= MARGIN;
+        if (anchor.placement !== 'below') {
+            if (prefer === 'right' && fitsRight) return { x: right, y: clampY(middleY) };
+            if (fitsLeft) return { x: left, y: clampY(middleY) };
+            if (fitsRight) return { x: right, y: clampY(middleY) };
+        }
+        const below = anchor.bottom + 14;
+        const above = anchor.top - height - 14;
+        const y = below + height <= vh - MARGIN ? below : above >= MARGIN ? above : clampY(below);
+        return { x: clampX((anchor.left + anchor.right - width) / 2), y };
     }
     const y0 = Math.min(Math.max(MARGIN, anchor.top - 8), Math.max(MARGIN, vh - height - MARGIN));
     /* `prefer: 'right'` — die Karte steht RECHTS neben ihrem Anker und springt
@@ -103,6 +122,7 @@ export const FloatingCard = ({
     openAt = 'center',
     prefer = 'left',
     anchorAlign = 'top',
+    popover = false,
     leading,
     initialHeight,
     className,
@@ -114,6 +134,8 @@ export const FloatingCard = ({
        Popover neben seinem Termin (Kalender-Auskunft, 14.09.2026). Gilt nur,
        solange die Karte nicht gezogen wurde. */
     anchorAlign?: 'top' | 'middle';
+    /* Calendar bubbles flip sides at the viewport edge; toolbar anchors open below. */
+    popover?: boolean;
     open: boolean;
     onClose: () => void;
     title: ReactNode;
@@ -234,8 +256,8 @@ export const FloatingCard = ({
         // "daneben" — die Karte steht mittig, und die Messung unten rueckt sie
         // auf ihre echte Hoehe nach.
         if (!movable) setPos({ x: Math.max(gutter, (window.innerWidth - cardWidth) / 2), y: gutter });
-        else setPos(placeCard(centered ? null : (anchor ?? null), cardWidth, startHeight ?? 460, openAt, prefer));
-    }, [open, anchor, cardWidth, movable, centered, initialHeight, openAt, prefer, gutter]);
+        else setPos(placeCard(centered ? null : (anchor ?? null), cardWidth, startHeight ?? 460, openAt, prefer, popover));
+    }, [open, anchor, cardWidth, movable, centered, initialHeight, openAt, prefer, gutter, popover]);
 
     useLayoutEffect(() => {
         if (!open || !cardRef.current || dragRef.current || resizeRef.current) return;
@@ -258,6 +280,10 @@ export const FloatingCard = ({
         }
         setPos((current) => {
             if (!current) return current;
+            if (popover && anchor && !centered && !moved) {
+                const next = placeCard(anchor, cardWidth, actual, openAt, prefer, true);
+                return Math.abs(next.x - current.x) < 0.5 && Math.abs(next.y - current.y) < 0.5 ? current : next;
+            }
             const maxY = window.innerHeight - actual - MARGIN;
             /* 'middle': die Karte steht auf der Mitte ihres Ankers — erst
                jetzt, mit der GEMESSENEN Höhe, lässt sich das rechnen. Nach
@@ -271,7 +297,7 @@ export const FloatingCard = ({
         // `pos` is a dependency on purpose: the card only exists once `pos` is
         // set, so the pass that measures the real height must run right after
         // that first placement (the deps above alone would not fire it).
-    }, [open, children, width, pos, openAt, movable, gutter, cardWidth, anchor, anchorAlign, centered, moved]);
+    }, [open, children, width, pos, openAt, movable, gutter, cardWidth, anchor, anchorAlign, centered, moved, popover, prefer, viewport.h]);
 
     /* Zurück-Griff = dieses Fenster zu (Vorgabe 12.09.2026). Er steht neben
        Escape, nicht an seiner Stelle: die Taste hat die Maus, den Griff hat
@@ -300,6 +326,9 @@ export const FloatingCard = ({
                stehen im Baum aber ausserhalb. Ein Klick auf ihre Monatspfeile
                darf die Karte nicht schliessen (Vorfall 27.08.2026). */
             if (target?.closest('.ofi-quick-pop')) return;
+            /* Ein Fenster über der Karte (PopupDialog, z. B. die Zeitwalze) gehört
+               ebenfalls zu ihr — ein Klick darin schliesst die Karte nicht. */
+            if (target?.closest('[data-cal-stacked="1"]')) return;
             /* Dasselbe für ein Untenfenster über der Karte (Sprungfenster aus
                einer Liste heraus): solange es offen ist, gehört jeder Klick ihm. */
             if (target?.closest('.ofi-sheet') || document.querySelector('.ofi-sheet-backdrop')) return;
@@ -425,16 +454,22 @@ export const FloatingCard = ({
        `--ofi-arrow-top`, auf welcher Höhe — gezeichnet wird er nur von
        Stilblättern, die ihn wollen (calendarMac.css). Steht die Karte nicht
        mehr neben dem Anker (gezogen, mittig, klein), gibt es keinen. */
-    let arrow: 'left' | 'right' | null = null;
+    let arrow: 'left' | 'right' | 'top' | 'bottom' | null = null;
     let arrowTop = 0;
+    let arrowLeft = 0;
     if (movable && anchor && !centered && !moved && pos) {
         if (pos.x + cardWidth <= anchor.left + 2) arrow = 'right';
         else if (pos.x >= anchor.right - 2) arrow = 'left';
         const cardHeight = height ?? cardRef.current?.offsetHeight ?? 460;
+        if (popover && !arrow) {
+            if (pos.y >= anchor.bottom + 2) arrow = 'top';
+            else if (pos.y + cardHeight <= anchor.top - 2) arrow = 'bottom';
+        }
+        arrowLeft = Math.min(Math.max((anchor.left + anchor.right) / 2 - pos.x, 40), Math.max(40, cardWidth - 40));
         /* Der Pfeil zeigt auf die MITTE des Ankers (Vorlage: auf den Termin
            daneben), bei 'top' knapp unter dessen Oberkante. */
         const target = anchorAlign === 'middle' ? (anchor.top + anchor.bottom) / 2 : anchor.top + 14;
-        arrowTop = Math.min(Math.max(target - pos.y, 24), Math.max(24, cardHeight - 24));
+        arrowTop = Math.min(Math.max(target - pos.y, 40), Math.max(40, cardHeight - 40));
     }
 
     return createPortal(
@@ -443,9 +478,11 @@ export const FloatingCard = ({
             role="dialog"
             aria-label={typeof title === 'string' ? title : undefined}
             data-arrow={arrow ?? undefined}
+            data-connected-arrow={popover && arrow ? '' : undefined}
             className={`ofi-float-card ${compact ? 'is-compact' : ''} ${narrow ? 'is-narrow' : ''} ${className || ''}`}
-            style={{ left: pos!.x, top: pos!.y, width: cardWidth, height: height ?? undefined, zIndex: z, ...(arrow ? { ['--ofi-arrow-top' as string]: `${arrowTop}px` } : {}) }}
+            style={{ left: pos!.x, top: pos!.y, width: cardWidth, height: height ?? undefined, zIndex: z, ...(arrow ? { ['--ofi-arrow-top' as string]: `${arrowTop}px`, ['--ofi-arrow-left' as string]: `${arrowLeft}px` } : {}) }}
         >
+            {popover && arrow && <PopoverSurface side={arrow} target={arrow === 'top' || arrow === 'bottom' ? arrowLeft : arrowTop} />}
             {movable && <span className="ofi-float-card__edge is-top" onPointerDown={(event) => startResize(event, 'top')} aria-hidden />}
             {header}
             <div className={`ofi-float-card__body ${bodyClassName || ''}`}>{children}</div>

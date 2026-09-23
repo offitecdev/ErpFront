@@ -5,6 +5,7 @@ import { t } from '@/i18n/translate';
 
 import { crossesMidnight, spanOnDay } from '../calendarShared';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
+import { AppleTimePicker } from '@/components/ui-shared/AppleTimePicker';
 
 /**
  * DER EINSATZPLAN — EINE ZEILE JE TAG (24.08.2026).
@@ -177,22 +178,10 @@ export const DayPlanRows = ({ days, onChange, lockedIds = [], frozenIds = [], di
                     <div key={day.appointmentId || `${day.start.valueOf()}-${index}`} className="ofi-cal-dayrow">
                         <span className="ofi-cal-dayrow__num">{t('calendar.days.dayNumber', { index: index + 1 })}</span>
                         <MacDatePicker value={day.start.format('YYYY-MM-DD')} disabled={disabled || isFrozen(day)} onChange={(nextDate) => onChange(patchDay(days, index, { date: nextDate }))} className="is-field-sm" />
-                        <input
-                            type="time"
-                            value={day.start.format('HH:mm')}
-                            disabled={disabled || isFrozen(day)}
-                            onChange={(event) => onChange(patchDay(days, index, { from: event.target.value }))}
-                            className="ofi-cal-input"
-                        />
+                        <AppleTimePicker label={t('common.start')} value={day.start.format('HH:mm')} disabled={disabled || isFrozen(day)} onChange={(from) => onChange(patchDay(days, index, { from }))} />
                         <span className="ofi-cal-dayrow__dash">–</span>
                         <span className="ofi-cal-dayrow__end">
-                            <input
-                                type="time"
-                                value={day.end.format('HH:mm')}
-                                disabled={disabled || isFrozen(day)}
-                                onChange={(event) => onChange(patchDay(days, index, { to: event.target.value }))}
-                                className="ofi-cal-input"
-                            />
+                            <AppleTimePicker label={t('common.end')} value={day.end.format('HH:mm')} disabled={disabled || isFrozen(day)} onChange={(to) => onChange(patchDay(days, index, { to }))} />
                             {/* «+1» = die Schicht endet am nächsten Morgen. Ohne
                                 dieses Zeichen läse sich «20:00 – 02:00» wie ein
                                 Fehler; es bleibt EIN Termin. */}

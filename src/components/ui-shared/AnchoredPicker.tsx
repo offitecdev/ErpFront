@@ -40,20 +40,24 @@ const naturalHeight = (panelEl: HTMLDivElement | null): { body: number; footer: 
  * wird auf genau diesen Platz begrenzt und scrollt. Das Fenster verlässt den
  * Bildschirm nie.
  */
-const computePlacement = (anchorEl: HTMLElement, width: number, maxHeight: number, panelEl: HTMLDivElement | null, exactWidth = false): Placement => {
+const computePlacement = (anchorEl: HTMLElement, width: number, maxHeight: number, panelEl: HTMLDivElement | null, exactWidth = false, arrow = false): Placement => {
     // Savunma: kopmuş bir çapa sayfayı çökertmemeli.
     if (!anchorEl?.isConnected) return { style: { position: 'fixed', top: -9999, left: -9999, width }, bodyMax: maxHeight };
     const rect = anchorEl.getBoundingClientRect();
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
     const panelWidth = Math.min(exactWidth ? width : Math.max(rect.width, width), 420, viewportW - EDGE * 2);
-    const left = Math.min(Math.max(EDGE, rect.left), Math.max(EDGE, viewportW - panelWidth - EDGE));
+    // Callouts open symmetrically around their trigger; clamp only at the viewport edge.
+    const preferredLeft = arrow ? rect.left + (rect.width - panelWidth) / 2 : rect.left;
+    const left = Math.min(Math.max(EDGE, preferredLeft), Math.max(EDGE, viewportW - panelWidth - EDGE));
 
     const measured = naturalHeight(panelEl);
     const footer = measured?.footer ?? 0;
-    const wanted = Math.min(maxHeight, measured ? measured.body : maxHeight) + footer;
-    const spaceBelow = viewportH - rect.bottom - 2 - EDGE;
-    const spaceAbove = rect.top - 2 - EDGE;
+    const gap = arrow ? 12 : 2;
+    const frame = arrow ? 4 : 0;
+    const wanted = Math.min(maxHeight, measured ? measured.body : maxHeight) + footer + frame;
+    const spaceBelow = viewportH - rect.bottom - gap - EDGE;
+    const spaceAbove = rect.top - gap - EDGE;
 
     let up: boolean;
     if (wanted <= spaceBelow) up = false;
@@ -61,10 +65,11 @@ const computePlacement = (anchorEl: HTMLElement, width: number, maxHeight: numbe
     else up = spaceAbove > spaceBelow;
 
     const room = Math.max(up ? spaceAbove : spaceBelow, 0);
-    const bodyMax = Math.max(Math.min(maxHeight, room - footer), 48);
+    const bodyMax = Math.max(Math.min(maxHeight, room - footer - frame), 48);
     const style: CSSProperties = up
-        ? { position: 'fixed', bottom: viewportH - rect.top + 2, left, width: panelWidth, maxHeight: room }
-        : { position: 'fixed', top: rect.bottom + 2, left, width: panelWidth, maxHeight: room };
+        ? { position: 'fixed', bottom: viewportH - rect.top + gap, left, width: panelWidth, maxHeight: room }
+        : { position: 'fixed', top: rect.bottom + gap, left, width: panelWidth, maxHeight: room };
+    if (arrow) Object.assign(style, { '--ofi-selection-arrow-x': `${Math.max(24, Math.min(rect.left + rect.width / 2 - left, panelWidth - 24))}px` });
     return { style, bodyMax };
 };
 
@@ -76,6 +81,8 @@ export const AnchoredPicker = ({
     footer,
     panelClassName = '',
     exactWidth = false,
+    arrow = false,
+    ariaLabel,
     children,
 }: {
     /** Seçicinin tutunduğu hücre; null ise seçici kapalıdır. */
@@ -88,6 +95,9 @@ export const AnchoredPicker = ({
     panelClassName?: string;
     /** true = genau `width`, nicht so breit wie der Auslöser (Kalender). */
     exactWidth?: boolean;
+    /** Opt-in callout; used only by the task sheet's two selection fields. */
+    arrow?: boolean;
+    ariaLabel?: string;
     children: ReactNode;
 }) => {
     const [placement, setPlacement] = useState<Placement>({ style: { position: 'fixed', top: -9999, left: -9999 }, bodyMax: maxHeight });
@@ -101,7 +111,7 @@ export const AnchoredPicker = ({
         const measure = () => {
             frame = 0;
             setPlacement((current) => {
-                const next = computePlacement(anchorEl, width, maxHeight, panelEl, exactWidth);
+                const next = computePlacement(anchorEl, width, maxHeight, panelEl, exactWidth, arrow);
                 const same = current.bodyMax === next.bodyMax
                     && JSON.stringify(current.style) === JSON.stringify(next.style);
                 return same ? current : next;
@@ -130,7 +140,7 @@ export const AnchoredPicker = ({
             window.removeEventListener('animationend', schedule, true);
             window.removeEventListener('transitionend', schedule, true);
         };
-    }, [anchorEl, width, maxHeight, panelEl, exactWidth]);
+    }, [anchorEl, width, maxHeight, panelEl, exactWidth, arrow]);
 
     // Dışarı tıklama (panel ve çapa hariç) ya da Esc kapatır.
     useEffect(() => {
@@ -141,14 +151,18 @@ export const AnchoredPicker = ({
             if (panelEl?.contains(target) || anchorEl.contains(target)) return;
             onClose();
         };
-        const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            if (arrow) { event.preventDefault(); event.stopPropagation(); anchorEl.focus(); }
+            onClose();
+        };
         document.addEventListener('mousedown', onPointerDown);
         window.addEventListener('keydown', onKeyDown);
         return () => {
             document.removeEventListener('mousedown', onPointerDown);
             window.removeEventListener('keydown', onKeyDown);
         };
-    }, [anchorEl, panelEl, onClose]);
+    }, [anchorEl, panelEl, onClose, arrow]);
 
     if (!anchorEl) return null;
 
@@ -156,6 +170,8 @@ export const AnchoredPicker = ({
         <div
             ref={setPanelEl}
             role="dialog"
+            aria-label={ariaLabel}
+            data-callout-side={arrow ? (placement.style.bottom !== undefined ? 'above' : 'below') : undefined}
             style={placement.style}
             /* `.ofi-pop.is-list` = die Trefferliste der gemeinsamen
                Fensteroberfläche (index.css, "FENSTER-OBERFLÄCHE"): 10px, also

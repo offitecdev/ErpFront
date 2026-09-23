@@ -63,6 +63,9 @@ export type CalEventDetail = {
     manager?: string | null;
     orderNumber?: string | null;
     tenderNumber?: string | null;
+    /* Die KOMMISSION des Auftrags (Tender.commissionNumber). Sie ist optional:
+       ist keine erfasst, fehlt die Zeile im Fenster, statt leer dazustehen. */
+    commissionNumber?: string | null;
     contractTitle?: string | null;
     contractCode?: string | null;
     siteName?: string | null;
@@ -364,7 +367,7 @@ export const isTaskStatus = (status: CalStatus) => status === 'task' || status =
 
 /* Where a floating card should open. Only the STARTING point — once the card
    is dragged, its own position takes over and the anchor is never re-read. */
-export type FloatAnchor = { left: number; top: number; right: number; bottom: number };
+export type FloatAnchor = { left: number; top: number; right: number; bottom: number; placement?: 'below' };
 
 export const anchorFromRect = (rect: DOMRect): FloatAnchor => ({
     left: rect.left,

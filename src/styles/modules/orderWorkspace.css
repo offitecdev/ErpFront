@@ -1,0 +1,604 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIE EINE EINKAUFSSEITE — macOS-Reiter statt Stufenflut (22.09.2026)
+
+   Vorgabe Samet: «Detay sayfası sipariş listesinde olacak ama TAB şeklinde,
+   artık iki sayfaya ayırmıyoruz … bunlar macOS SwiftUI tasarımında üst tab
+   olacak: Satırlar · Ayarlar · Şablon Seçimi … hesaplama butonu solda, belge
+   içe aktar sağda … temiz ve hızlı çalışsın.»
+
+   Drei Bauteile, mehr braucht die Seite nicht:
+     .ofi-ows-tabs   die Reiterleiste — ein macOS-Segmentcontrol: EINE Mulde,
+                     darin eine weisse Kachel, die zum aktiven Reiter wandert.
+     .ofi-ows-bar    die Werkzeugzeile darunter: links rechnen, rechts einlesen.
+     .ofi-ows-grid   die Einstellungen in ZWEI Spalten (Vorgabe Samet).
+
+   Die Farben kommen aus dem Lager-Apple-Satz (`--la-*`, styles/lagerApple.css)
+   und fallen auf die Hausfarben zurück, wenn diese Seite ohne ihn geladen wird.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.ofi-ows {
+    --ows-surface: var(--la-surface, #fff);
+    --ows-line: var(--la-field-border, #e2e8f0);
+    --ows-text: var(--la-text, #1d1d1f);
+    --ows-mute: var(--la-text-mute, #8e8e92);
+    /* Die MULDE ist grau (macOS-Segmentcontrol), damit die weisse Kachel des
+       gewählten Reiters darin wirklich auffällt — Vorgabe Samet, 22.09.2026:
+       «neyi seçtiğimiz belli olsun, beyaz renk orada olsun, diğeri gride
+       kalsın». `#f1f2f4` war zu nah am Weiss und die Wahl unsichtbar. */
+    --ows-well: #e6e6e9;
+    --ows-accent: #0a7aff;
+}
+
+:root.dark .ofi-ows,
+.dark .ofi-ows {
+    /* Im Dunkeln dasselbe Verhältnis: die Mulde fast schwarz, die Kachel
+       deutlich heller (siehe `.is-on` weiter unten). */
+    --ows-well: rgba(255, 255, 255, 0.05);
+    --ows-line: rgba(255, 255, 255, 0.16);
+    --ows-text: #fff;
+    --ows-mute: rgba(255, 255, 255, 0.55);
+    --ows-surface: transparent;
+}
+
+/* ── DIE REITERLEISTE ────────────────────────────────────────────────────── */
+.ofi-ows-tabrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ofi-ows-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--ows-well);
+    /* Auf schmalen Schirmen darf die Leiste wandern statt umzubrechen: ein
+       Segmentcontrol, der in zwei Zeilen zerfällt, ist keiner mehr. */
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.ofi-ows-tabs::-webkit-scrollbar { display: none; }
+
+.ofi-ows-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ows-mute);
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    /* Nur Farbe und Grund bewegen sich — kein Wackeln, wie überall im Haus. */
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+/* Der NICHT gewählte Reiter ist blosse graue Schrift auf der Mulde — er trägt
+   keine eigene Fläche, sonst sähen alle gleich aus. */
+.ofi-ows-tab:hover:not(.is-on) {
+    background: rgba(15, 23, 42, 0.05);
+    color: var(--ows-text);
+}
+
+/* DER GEWÄHLTE: eine WEISSE Kachel mit Schlagschatten — das eine Bauteil, an
+   dem man ohne Nachdenken sieht, wo man steht. */
+.ofi-ows-tab.is-on {
+    background: #fff;
+    color: #1d1d1f;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+}
+
+:root.dark .ofi-ows-tab:hover:not(.is-on),
+.dark .ofi-ows-tab:hover:not(.is-on) { background: rgba(255, 255, 255, 0.07); }
+
+/* Im Dunkeln kann die Kachel nicht weiss sein — sie ist der hellste Grauton
+   des Satzes, mit voller Schrift darauf. Der Abstand zur Mulde (0.05) ist
+   derselbe wie zwischen Weiss und Hellgrau am Tag. */
+:root.dark .ofi-ows-tab.is-on,
+.dark .ofi-ows-tab.is-on {
+    background: rgba(255, 255, 255, 0.26);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+/* Die Zahl am Reiter (offene Positionen, eingelagerte Zeilen). */
+.ofi-ows-tab i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.08);
+    color: inherit;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+:root.dark .ofi-ows-tab i,
+.dark .ofi-ows-tab i { background: rgba(255, 255, 255, 0.16); }
+
+/* Turuncu = MAL KABULDE: derselbe Ton wie das Etikett in der Liste. */
+.ofi-ows-tab i.is-warn { background: rgba(249, 115, 22, 0.18); color: #c2410c; }
+:root.dark .ofi-ows-tab i.is-warn,
+.dark .ofi-ows-tab i.is-warn { background: rgba(249, 115, 22, 0.28); color: #fdba74; }
+
+/* ── DIE WERKZEUGZEILE: RECHNEN LINKS, EINLESEN RECHTS ───────────────────── */
+.ofi-ows-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ofi-ows-bar__end {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── DIE EINSTELLUNGEN: EIN STAPEL ───────────────────────────────────────
+   Vorgabe Samet (22.09.2026): «kutular çok ayrık ayrık, yani ALTA ALTA olması
+   lazım, boşluk olmasın.»
+
+   Zwei Spalten waren der Fehler — egal ob als Gitter (zeilenweise Löcher) oder
+   als ausgeglichener Fluss (ein Rest am Fuss der kürzeren Spalte): bei sechs
+   verschieden hohen Kisten bleibt IMMER Leerraum, und die Seite zerfällt. Ein
+   einziger Stapel hat keinen: jede Kiste sitzt an der Unterkante der vorigen.
+   Das ist zugleich die Form, die die macOS-Systemeinstellungen haben, und die
+   Form, für die die Zeilen dieser Kisten gebaut sind (`.ofi-ord-row`) — sie
+   brauchen eine ruhige Breite, keine über den ganzen Schirm gezogene. */
+.ofi-ows-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* Eine Formularzeile, deren Feld 1400px weit läuft, liest sich nicht mehr.
+       Dieselbe Weite hatte die schwebende Apple-Kiste, aus der sie kommt. */
+    max-width: 920px;
+}
+
+/* Eine Kiste je Thema — dieselbe Haarlinie wie die Apple-Kiste der
+   Bestelldetails, nur nicht mehr schwebend: sie steht in der Seite.
+   `break-inside: avoid` hält sie ganz: eine über zwei Spalten zerschnittene
+   Kiste wäre keine mehr. */
+.ofi-ows-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px 14px;
+    border: 1px solid var(--ows-line);
+    border-radius: 12px;
+    background: var(--ows-surface);
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+}
+
+:root.dark .ofi-ows-card,
+.dark .ofi-ows-card { background: transparent; }
+
+.ofi-ows-card > h3 {
+    margin: 0 0 2px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ows-mute);
+}
+
+/* Im Stapel ist jede Kiste gleich breit — «is-wide» trägt nur noch der
+   Anschreibenkasten und bedeutet dort nichts mehr. Die Klasse bleibt stehen,
+   damit die Vorlage sie nicht verliert, falls die zwei Spalten je zurückkommen. */
+.ofi-ows-card.is-wide { width: 100%; }
+
+/* Ein Wert, den man nur liest (Lieferantenadresse, Kreis). */
+.ofi-ows-read {
+    font-size: 12.5px;
+    color: var(--ows-mute);
+}
+
+/* ── DIE VORLAGENWAHL ────────────────────────────────────────────────────── */
+.ofi-ows-tpl {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+}
+
+.ofi-ows-tplcard {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 12px 14px;
+    border: 1px solid var(--ows-line);
+    border-radius: 11px;
+    background: var(--ows-surface);
+    color: var(--ows-text);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.ofi-ows-tplcard:hover { border-color: var(--ows-accent); }
+
+.ofi-ows-tplcard.is-on {
+    border-color: var(--ows-accent);
+    background: rgba(10, 122, 255, 0.06);
+}
+
+.ofi-ows-tplcard b { font-size: 13px; font-weight: 600; }
+.ofi-ows-tplcard small { font-size: 11.5px; color: var(--ows-mute); }
+
+/* ── STOĞA GİDENLER ──────────────────────────────────────────────────────── */
+.ofi-ows-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 56px 16px;
+    color: var(--ows-mute);
+    font-size: 13px;
+}
+
+/* ── DIE FELDER STEHEN JETZT IM #root ────────────────────────────────────
+   In der schwebenden Apple-Kiste lagen dieselben Zeilen AUSSERHALB von
+   `#root` (sie war ein Portal), und die hausweite Formularregel
+   `#root :where(input …) { background: #fff }` traf sie nie. In der Seite
+   trifft sie — weisser Grund, eigene Kante, und im Dunkelmodus weisse
+   Schrift auf Weiss. Hier steht darum die Gegenregel mit derselben Kraft
+   (ein `#root` im Selektor): die ZEILE ist das Feld, nicht das Feld. */
+#root .ofi-ows-card .ofi-ord-row :is(input, select, textarea),
+#root .ofi-ows-card .ofi-ord-text {
+    border-color: transparent;
+    background: transparent;
+    color: var(--ows-text);
+}
+#root .ofi-ows-card .ofi-ord-row :is(input, select):hover:not(:disabled):not(:focus) {
+    background: var(--la-hover, rgba(15, 23, 42, 0.04));
+}
+#root .ofi-ows-card .ofi-ord-row :is(input, select, textarea):focus,
+#root .ofi-ows-card .ofi-ord-text:focus {
+    background: var(--ofi-cal-surface, #fff);
+}
+/* Der Platzhalter bleibt ein Hinweis, kein Inhalt. */
+#root .ofi-ows-card :is(input, textarea)::placeholder { color: var(--ows-mute); }
+
+/* Ein BESCHRIFTETER Knopf in einer Tabellenzeile («Geri gönder», und die zwei
+   Knöpfe seiner Rückfrage): er darf nicht schrumpfen, sonst schneidet die
+   Zelle ihm die Schrift ab. Die Grösse kommt aus seinen eigenen Klassen —
+   `lagerApple.css` nimmt `.ofi-ows-rowbtn` von der 24px-Symbolregel aus. */
+#root .ofi-ows-rowbtn { flex: none; width: auto; }
+
+/* ── DER WEG LINKS NEBEN DEN EINSTELLUNGEN (22.09.2026) ──────────────────
+   Vorgabe Samet: «Siparişlerde ve fiyat [talebi] ayarlarında solda bir başlık
+   şeyi olması lazım, yan başlık gibi … süreç gibi görmesi lazım hepsini
+   kullanıcının, yani aşağıya indikçe o şeyin dolması gerekiyor.»
+
+   Links steht darum eine mitlaufende Leiste: jede Kiste des Stapels ist eine
+   Station, und das Band zwischen den Punkten füllt sich beim Runterscrollen.
+   Sie KLEBT (`sticky`) — sie ist das Einzige auf dieser Seite, das stehen
+   bleibt, denn sie zeigt ja gerade, wo man im Stapel steht.
+
+   Die Masse: 186px Leiste + 26px Luft + 920px Stapel (die ruhige Breite der
+   Einstellungen, siehe `.ofi-ows-grid`). Wird es enger als das, tritt die
+   Leiste ab — ein Weg, der den Formularzeilen die Breite nimmt, hilft nicht.
+   ──────────────────────────────────────────────────────────────────────── */
+.ofi-ows {
+    --ows-rail-dot: #c9c9ce;
+    --ows-rail-track: #e3e3e7;
+    --ows-rail-on: var(--la-accent, #0a7aff);
+    --ows-rail-halo: rgba(10, 122, 255, 0.18);
+}
+
+:root.dark .ofi-ows,
+.dark .ofi-ows {
+    --ows-rail-dot: #55555a;
+    --ows-rail-track: rgba(255, 255, 255, 0.14);
+    --ows-rail-halo: rgba(59, 141, 255, 0.3);
+}
+
+.ofi-ows-flow {
+    display: grid;
+    grid-template-columns: 186px minmax(0, 920px);
+    gap: 0 26px;
+    align-items: start;
+}
+
+.ofi-ows-rail {
+    position: sticky;
+    top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    min-width: 0;
+}
+
+.ofi-ows-rail__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding-left: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ows-mute);
+}
+
+/* Die Zahl sagt, die wievielte Station gerade dran ist — «3/8». */
+.ofi-ows-rail__head em {
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-ows-rail__list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* DAS BAND — die graue Haarlinie läuft von der Mitte des ersten Punktes bis
+   zur Mitte des letzten; das blaue Stück darüber wächst mit dem Scrollen.
+   Beide Masse kommen gemessen aus dem Bauteil (`--rail-*`), damit auch eine
+   zweizeilige Beschriftung die Punkte nicht verschiebt. */
+.ofi-ows-rail__track,
+.ofi-ows-rail__fill {
+    position: absolute;
+    left: 4px;
+    width: 3px;
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.ofi-ows-rail__track {
+    top: var(--rail-top, 0);
+    height: var(--rail-len, 0);
+    background: var(--ows-rail-track);
+}
+
+.ofi-ows-rail__fill {
+    top: var(--rail-top, 0);
+    height: var(--rail-fill, 0);
+    background: var(--ows-rail-on);
+}
+
+/* EINE STATION. Ein roher Knopf — er trägt keine der Knopfklassen des Hauses
+   (`styles/buttons.css` greift nur beschriftete Handlungsknöpfe), damit hier
+   kein 40px-Bedienmass landet. */
+.ofi-ows-rail__step {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 4px 6px 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    color: var(--ows-mute);
+    cursor: pointer;
+    transition: color 140ms ease;
+}
+
+.ofi-ows-rail__step:hover { color: var(--ows-text); }
+
+/* Der Punkt liegt ÜBER dem Band und ist deckend — so scheint die Linie nicht
+   durch ihn hindurch. */
+.ofi-ows-rail__mark {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 11px;
+    height: 11px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: var(--ows-rail-dot);
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ofi-ows-rail__label {
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+/* GESEHEN: Punkt blau, Beschriftung in voller Schriftfarbe. */
+.ofi-ows-rail__step[data-state="done"] { color: var(--ows-text); }
+.ofi-ows-rail__step[data-state="done"] .ofi-ows-rail__mark { background: var(--ows-rail-on); }
+
+/* HIER STEHT MAN: derselbe blaue Punkt, dazu der weiche Ring und die
+   halbfette Beschriftung — die einzige Stelle, die sich hervorhebt. */
+.ofi-ows-rail__step[data-state="now"] { color: var(--ows-text); }
+.ofi-ows-rail__step[data-state="now"] .ofi-ows-rail__label { font-weight: 600; }
+.ofi-ows-rail__step[data-state="now"] .ofi-ows-rail__mark {
+    background: var(--ows-rail-on);
+    box-shadow: 0 0 0 3.5px var(--ows-rail-halo);
+}
+
+.ofi-ows-rail__step:focus-visible {
+    outline: none;
+    border-radius: 7px;
+    box-shadow: 0 0 0 3px var(--la-focus, rgba(10, 122, 255, 0.3));
+}
+
+/* Schmaler als der Stapel + die Leiste: der Stapel bekommt die ganze Breite,
+   die Leiste tritt ab. */
+@media (max-width: 1180px) {
+    .ofi-ows-flow { display: block; }
+    .ofi-ows-rail { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-ows-rail__step,
+    .ofi-ows-rail__mark { transition: none; }
+}
+
+/* ── DIE KISTE IST DIE LISTE (22.09.2026, abends) ────────────────────────
+   Vorgabe Samet: «Alanlar daha temiz, daha Apple macOS tarzı olması lazım.»
+
+   Vorher trug jede Kiste eine ZWEITE Kiste: `.ofi-ord-group` kam aus dem
+   schwebenden Fenster mit eigener weisser Fläche, eigenem Radius und eigenem
+   Schatten — in der Seite ergab das einen Rahmen im Rahmen, und daneben
+   standen drei weitere Feldsprachen (ein 40px-Tailwind-Knopf, ein bordiertes
+   Kombinationsfeld, ein Produktionsknopf). Jetzt gilt EINE Sprache, die der
+   macOS-Systemeinstellungen:
+
+     Kiste  = Gruppe. Überschrift oben, darunter Zeilen von Kante zu Kante,
+              getrennt durch die EINGERÜCKTE Haarlinie.
+     Zeile  = 44px, Beschriftung links, Wert rechts, ohne eigenen Rahmen;
+              Grund erst beim Zeigen, blauer Ring erst beim Schreiben.
+     Fussnote = grauer Kleintext am Fuss der Gruppe (Adresse, Hinweis).
+   ──────────────────────────────────────────────────────────────────────── */
+#root .ofi-ows-card .ofi-ord-group {
+    margin: 0 -14px -14px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+/* Die letzte Zeile rundet mit der Kiste ab — sonst legt sich ihr Grund beim
+   Zeigen als rechtes Eck über die runde Ecke der Kiste. */
+#root .ofi-ows-card .ofi-ord-group > :last-child {
+    border-bottom-left-radius: 11px;
+    border-bottom-right-radius: 11px;
+}
+
+#root .ofi-ows-card .ofi-ord-row {
+    min-height: 44px;
+    padding: 0 14px;
+    gap: 14px;
+}
+
+#root .ofi-ows-card .ofi-ord-row > .ofi-ord-label {
+    min-width: 152px;
+    font-weight: 400;
+}
+
+/* Eine Zeile, die NUR einen Wert trägt (Lieferant, Gerät): das Bauteil nimmt
+   die ganze Breite — die Überschrift der Kiste ist seine Beschriftung. Die
+   Zeile gibt dafür 9px ihrer Polsterung ab: das Bauteil bringt sie selbst mit,
+   und so steht sein Text auf derselben Linie wie Überschrift und Fussnote. */
+#root .ofi-ows-card .ofi-ord-row.is-full {
+    padding: 0 5px;
+}
+#root .ofi-ows-card .ofi-ord-row.is-full > * {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Die Fussnote unter einer Gruppe: Lieferantenanschrift, Hinweis zum
+   Nummernkreis, «noch kein Gerät gewählt». Kein eigener Strich davor. */
+#root .ofi-ows-card .ofi-ord-note {
+    padding: 9px 14px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ows-mute);
+}
+
+/* EINE AUSWAHLZEILE (Nummernkreis): Wert links, Winkel rechts, ganze Zeile
+   anklickbar — die Zeile aus den Systemeinstellungen, die ein Fenster öffnet. */
+.ofi-ows-pick {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 0;
+    background: transparent;
+    color: var(--ows-text);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.ofi-ows-pick > span { flex: 1; min-width: 0; }
+.ofi-ows-pick > span.is-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+.ofi-ows-pick > svg { flex: none; color: var(--ows-mute); }
+.ofi-ows-pick:hover:not(:disabled) { background: var(--ofi-cal-hover, rgba(0, 0, 0, 0.045)); }
+.ofi-ows-pick:disabled { color: var(--ows-mute); cursor: not-allowed; }
+
+/* ── DIE FREMDEN BAUTEILE IN DER ZEILE ───────────────────────────────────
+   Das Kombinationsfeld des Lieferanten (`.ofi-cell-input`) und der Knopf
+   «Projekt & Geräte» (`.ofi-prod-assign`) bringen ihre eigene Kante mit.
+   In der Liste haben sie keine: die ZEILE ist das Feld.
+   `.ofi-cell-input` setzt Rand und Grund in `styles/controls.css` mit
+   `!important` — dagegen hilft nur dasselbe Mittel bei höherem Gewicht. */
+#root .ofi-ows-card .ofi-ord-row .ofi-cell-input {
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 9px;
+    border: 1px solid transparent !important;
+    border-radius: 9px;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ows-text);
+    font-size: 13px;
+}
+#root .ofi-ows-card .ofi-ord-row .ofi-cell-input:hover:not(:focus) {
+    border-color: transparent !important;
+    background: var(--ofi-cal-hover, rgba(0, 0, 0, 0.045)) !important;
+}
+#root .ofi-ows-card .ofi-ord-row .ofi-cell-input:focus {
+    border-color: var(--ofi-cal-accent, #0a7aff) !important;
+    background: var(--ofi-cal-surface, #fff) !important;
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint, rgba(10, 122, 255, 0.14)) !important;
+}
+#root .ofi-ows-card .ofi-ord-row.is-invalid .ofi-cell-input {
+    border-color: var(--ofi-cal-danger, #d70015) !important;
+}
+
+#root .ofi-ows-card .ofi-ord-row .ofi-prod-assign {
+    width: 100%;
+    max-width: 100%;
+    height: 34px;
+    padding: 0 9px;
+    border-color: transparent;
+    border-radius: 9px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 13px;
+    font-weight: 400;
+}
+#root .ofi-ows-card .ofi-ord-row .ofi-prod-assign:hover:not(:disabled) {
+    border-color: transparent;
+    background: var(--ofi-cal-hover, rgba(0, 0, 0, 0.045));
+}
+
+/* ── DAS ANSCHREIBEN IST EIN BLATT, KEIN FELD ────────────────────────────
+   Vorgabe Samet (22.09.2026): «Ön yazı alanı daha büyük olsun.» Der Text ist
+   neun Absätze lang; auf 132px sah man drei Zeilen davon. Jetzt steht ein
+   Blatt in der Kiste — und es lässt sich am unteren Rand weiter aufziehen. */
+#root .ofi-ows-card .ofi-ord-text {
+    min-height: 490px;
+    padding: 12px 14px 16px;
+    font-size: 13.5px;
+    line-height: 1.7;
+}

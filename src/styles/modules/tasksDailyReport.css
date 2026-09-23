@@ -49,15 +49,15 @@
     right: 16px;
     z-index: 12500;
     width: min(344px, calc(100vw - 32px));
-    border: 1px solid var(--dr-border);
+    border: 1px solid var(--ofi-ntf-border);
     border-radius: 18px;
-    background: var(--dr-glass);
-    -webkit-backdrop-filter: blur(22px) saturate(1.45);
-    backdrop-filter: blur(22px) saturate(1.45);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7), 0 6px 24px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: var(--ofi-ntf-surface);
+    -webkit-backdrop-filter: var(--ofi-ntf-blur);
+    backdrop-filter: var(--ofi-ntf-blur);
+    box-shadow: var(--ofi-ntf-shadow);
     animation: ofi-dr-slide 260ms cubic-bezier(.2, .8, .2, 1);
 }
-.dark .ofi-dr-notice { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 6px 24px rgba(0, 0, 0, 0.4); }
+.dark .ofi-dr-notice { box-shadow: var(--ofi-ntf-shadow); }
 
 .ofi-dr-notice__main {
     display: flex;

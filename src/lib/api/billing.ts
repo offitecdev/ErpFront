@@ -6,6 +6,9 @@ import type {
     CreateInvoiceInput,
     InvoiceCategory,
     InvoiceDto,
+    InvoicePageDto,
+    InvoiceSortKey,
+    InvoiceStateKey,
     InvoiceStatus,
     MyOrderDetailDto,
     MyOrderDto,
@@ -41,6 +44,34 @@ export const billingApi = {
         // Rechnungstyp — vom Server aus dem Beleg abgeleitet, nicht gespeichert.
         if (filter.category) params.set('category', filter.category);
         const res = await apiClient.get(`/billing/invoices${params.toString() ? '?' + params : ''}`);
+        return res.data;
+    },
+
+    /**
+     * EINE SEITE der Buchhaltungsliste (22.09.2026): standardmässig 20 Zeilen,
+     * sortiert nach dem letzten Vorgang. Reiter (Stand), Suche und Herkunft
+     * rechnet der Server — mit `page` antwortet er als Seite statt als Feld.
+     */
+    listInvoicesPage: async (input: {
+        page: number;
+        pageSize?: number;
+        search?: string;
+        state?: InvoiceStateKey | '';
+        category?: InvoiceCategory | '';
+        sort?: InvoiceSortKey;
+        today?: string;
+    }): Promise<InvoicePageDto> => {
+        const params = new URLSearchParams();
+        params.set('page', String(Math.max(1, input.page)));
+        params.set('pageSize', String(input.pageSize ?? 20));
+        const search = (input.search ?? '').trim();
+        if (search) params.set('search', search);
+        if (input.state) params.set('state', input.state);
+        if (input.category) params.set('category', input.category);
+        if (input.sort) params.set('sort', input.sort);
+        // Der Kalendertag der PERSON entscheidet, was überfällig ist.
+        if (input.today) params.set('today', input.today);
+        const res = await apiClient.get(`/billing/invoices?${params.toString()}`);
         return res.data;
     },
 

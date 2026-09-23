@@ -77,7 +77,7 @@ export const Button: React.FC<ButtonProps> = ({
             loading={isLoading ?? loading}
             disabled={isDisabled ?? disabled}
             htmlType={htmlType ?? legacyType ?? 'button'}
-            className={cx('transition-all duration-150 active:translate-y-px', variant === 'danger' && 'ofi-btn-danger', className)}
+            className={cx('transition-colors duration-150', variant === 'danger' && 'ofi-btn-danger', className)}
             style={style}
         >
             {children}

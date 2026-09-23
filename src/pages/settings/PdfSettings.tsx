@@ -111,6 +111,24 @@ export const PdfSettings = () => {
                             <Field label="IBAN" required className="col-span-2" hint={t('auto.swiss_qr_bill_icin_bosluksuz_veya_4_lu_gruplar_h')}>
                                 <Input value={settings.iban} onChange={(e) => setSettings({ iban: e.target.value })} placeholder={t('auto.ch00_0000_0000_0000_0000_0')} />
                             </Field>
+                            <Field label={t('settings.pdf.qrIban')} className="col-span-2" hint={t('settings.pdf.qrIbanHint')}>
+                                <Input value={settings.qrIban ?? ''} onChange={(e) => setSettings({ qrIban: e.target.value })} placeholder="CH00 3000 0000 0000 0000 0" />
+                            </Field>
+                            <Field label={t('settings.pdf.qrCreditor')} className="col-span-2" hint={t('settings.pdf.qrCreditorHint')}>
+                                <Input value={settings.qrCreditorName ?? ''} onChange={(e) => setSettings({ qrCreditorName: e.target.value })} placeholder={settings.companyName} />
+                            </Field>
+                            <Field label={t('settings.pdf.qrCreditorStreet')}>
+                                <Input value={settings.qrCreditorAddressLine1 ?? ''} onChange={(e) => setSettings({ qrCreditorAddressLine1: e.target.value })} />
+                            </Field>
+                            <Field label={t('settings.pdf.qrCreditorHouseNo')}>
+                                <Input value={settings.qrCreditorAddressLine2 ?? ''} onChange={(e) => setSettings({ qrCreditorAddressLine2: e.target.value })} />
+                            </Field>
+                            <Field label={t('settings.pdf.qrCreditorPostalCode')}>
+                                <Input value={settings.qrCreditorPostalCode ?? ''} onChange={(e) => setSettings({ qrCreditorPostalCode: e.target.value })} />
+                            </Field>
+                            <Field label={t('settings.pdf.qrCreditorCity')}>
+                                <Input value={settings.qrCreditorCity ?? ''} onChange={(e) => setSettings({ qrCreditorCity: e.target.value })} />
+                            </Field>
                             <Field label={t('auto.banka_adi')}>
                                 <Input value={settings.bankName ?? ''} onChange={(e) => setSettings({ bankName: e.target.value })} />
                             </Field>

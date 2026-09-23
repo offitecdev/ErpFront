@@ -1,7 +1,7 @@
 import { Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { isProjectModuleEnabledForTenant } from '../lib/moduleCatalog';
-import { applePage, lagerPage, lazyNamed, page } from './routeHelpers';
+import { applePage, lagerPage, lazyNamed, page, productionPage } from './routeHelpers';
 import type { RouteComponent } from './routeHelpers';
 import { TechnicianBridge } from './montageRoutes';
 import { LazyItGate } from './LazyItGate';
@@ -80,10 +80,20 @@ const StockPage = lazyNamed(() => import('../pages/inventory/StockPage'), 'Stock
 const StockMovementsPage = lazyNamed(() => import('../pages/inventory/StockMovementsPage'), 'StockMovementsPage');
 const SuppliersPage = lazyNamed(() => import('../pages/inventory/SuppliersPage'), 'SuppliersPage');
 const OrdersPage = lazyNamed(() => import('../pages/inventory/OrdersPage'), 'OrdersPage');
-const OrderCreatePage = lazyNamed(() => import('../pages/inventory/OrderCreatePage'), 'OrderCreatePage');
-const OrderDetailPage = lazyNamed(() => import('../pages/inventory/OrderDetailPage'), 'OrderDetailPage');
+/* EINE Seite für Anfrage UND Bestellung (22.09.2026): Positionen, Einstellungen,
+   Vorlage, Wareneingang, «Stoğa gidenler», PDF und Mail sind REITER. */
+const OrderWorkspacePage = lazyNamed(() => import('../pages/inventory/OrderWorkspacePage'), 'OrderWorkspacePage');
 // Mal kabul artık pop-up değil, stok ekranı gibi kendi sayfası.
-const OrderReceivePage = lazyNamed(() => import('../pages/inventory/OrderReceivePage'), 'OrderReceivePage');
+// Produktion (19.09.2026, Vorgabe Samet): Produktionsaufträge, die Projektseite
+// mit ihren zwei Reitern und die bestellten Produkte — im Kleid der Listen.
+const ProductionOrdersPage = lazyNamed(() => import('../pages/production/ProductionOrdersPage'), 'ProductionOrdersPage');
+const ProductionProjectPage = lazyNamed(() => import('../pages/production/ProductionProjectPage'), 'ProductionProjectPage');
+const ProductionLinesPage = lazyNamed(() => import('../pages/production/ProductionLinesPage'), 'ProductionLinesPage');
+// Schaltschränke (20.09.2026): die Seriennummern und der Typenkatalog.
+const PanelUnitsPage = lazyNamed(() => import('../pages/production/PanelUnitsPage'), 'PanelUnitsPage');
+const PanelUnitEditorPage = lazyNamed(() => import('../pages/production/PanelUnitEditorPage'), 'PanelUnitEditorPage');
+const PanelModelEditorPage = lazyNamed(() => import('../pages/production/PanelModelEditorPage'), 'PanelModelEditorPage');
+const CompanyTransfersPage = lazyNamed(() => import('../pages/settings/transfers/CompanyTransfersPage'), 'CompanyTransfersPage');
 // Görevler (13.09.2026, Vorgabe Samet): eigenständiges Aufgabenmodul nach dem Vorbild
 // Görevly — NICHT die CRM-Aufgaben unter /crm/tasks. Im Kleid des Lagers (lagerPage).
 const TasksModuleListPage = lazyNamed(() => import('../pages/tasks/TasksListPage'), 'TasksListPage');
@@ -137,6 +147,15 @@ const LegacyOrderRedirect = () => {
     return <Navigate to={`/sales/orders/${id}`} replace />;
 };
 
+/* Der Wareneingang ist am 22.09.2026 erst ein REITER der Einkaufsseite
+   geworden und am selben Tag stillgelegt («mal kabul bölümünü şimdilik
+   kaldır», siehe `_disabled/inventory-receive/`). Der alte Link führt darum
+   auf die Auftragsseite — nicht ins Leere. */
+const ReceiveRedirect = () => {
+    const { id } = useParams();
+    return <Navigate to={`/inventory/orders/${id}`} replace />;
+};
+
 /* Rechnungen: vom Verkauf in die Buchhaltung (16.09.2026) — der Abfrageteil
    reist mit (?type=…, ?edit=…). */
 const LegacyInvoicesRedirect = ({ to = '/accounting/invoices' }: { to?: string }) => {
@@ -164,6 +183,16 @@ const CompanyCategoriesAdminRoute = () => {
         return <Navigate to="/" replace />;
     }
     return page(CompanyCategories);
+};
+
+// Firmenübertragungen (19.09.2026): Admin-Fläche wie die Firmenkategorien —
+// woher die Produktion ihre Projekte liest, entscheidet, wer Rollen vergibt.
+const CompanyTransfersAdminRoute = () => {
+    const permissions = useAuthStore((s) => s.permissions);
+    if (!permissions.includes('roles.manage')) {
+        return <Navigate to="/" replace />;
+    }
+    return applePage(CompanyTransfersPage);
 };
 
 // Berechtigungen sind Admin-Gebiet wie die Firmenkategorien: Zugriff nur mit
@@ -319,14 +348,27 @@ export const renderAppPageRoutes = () => (
         <Route path="/inventory/suppliers" element={lagerPage(SuppliersPage)} />
         {/* Satın alma siparişleri: liste + oluşturma/düzenleme (?id= ile düzenleme). */}
         <Route path="/inventory/orders" element={lagerPage(OrdersPage)} />
-        <Route path="/inventory/orders/new" element={lagerPage(OrderCreatePage)} />
+        <Route path="/inventory/orders/new" element={lagerPage(OrderWorkspacePage)} />
         {/* Mal kabul: siparişin satırlarını stoğa aktarma ekranı ('/new' sabit
             yolundan sonra tanımlıdır, :id ile çakışmaz). */}
-        <Route path="/inventory/orders/:id/receive" element={lagerPage(OrderReceivePage)} />
+        {/* Der alte Wareneingangsweg öffnet heute den Reiter derselben Seite. */}
+        <Route path="/inventory/orders/:id/receive" element={<ReceiveRedirect />} />
         {/* Die BESTELLSEITE (08.09.2026): sie hat das alte Detail-Popup abgelöst.
             Steht NACH '/new' und nach dem Wareneingang, damit ':id' die festen
             Wege nicht schluckt. */}
-        <Route path="/inventory/orders/:id" element={lagerPage(OrderDetailPage)} />
+        <Route path="/inventory/orders/:id" element={lagerPage(OrderWorkspacePage)} />
+        {/* Produktion: die Projektseite hängt unter den Aufträgen. */}
+        <Route path="/production" element={<Navigate to="/production/orders" replace />} />
+        <Route path="/production/orders" element={productionPage(ProductionOrdersPage)} />
+        <Route path="/production/orders/:projectId" element={productionPage(ProductionProjectPage)} />
+        <Route path="/production/lines" element={productionPage(ProductionLinesPage)} />
+        {/* Schaltschränke: die Serienliste, dahinter der Typenkatalog. */}
+        <Route path="/production/panels" element={productionPage(PanelUnitsPage)} />
+        <Route path="/production/panels/new" element={productionPage(PanelUnitEditorPage)} />
+        <Route path="/production/panels/models/new" element={productionPage(PanelModelEditorPage)} />
+        <Route path="/production/panels/models/:modelId" element={productionPage(PanelModelEditorPage)} />
+        <Route path="/production/panels/:unitId" element={productionPage(PanelUnitEditorPage)} />
+        <Route path="/production/panel-models" element={<Navigate to="/production/panels?view=models" replace />} />
         {/* Görevler-Modul: feste Wege vor ':taskId'. */}
         <Route path="/tasks" element={lagerPage(TasksModuleListPage)} />
         <Route path="/tasks/board" element={lagerPage(TasksModuleBoardPage)} />
@@ -378,6 +420,7 @@ export const renderAppPageRoutes = () => (
             (Kennwortabfrage, "nur IT-Administration") — ZUSÄTZLICH zur
             jeweiligen Berechtigungsprüfung, nicht statt ihrer. */}
         <Route path="/settings/company-categories" element={<LazyItGate><CompanyCategoriesAdminRoute /></LazyItGate>} />
+        <Route path="/settings/company-transfers" element={<LazyItGate><CompanyTransfersAdminRoute /></LazyItGate>} />
         <Route path="/settings/mail" element={<LazyItGate><ProjectModuleRoute component={MailSettings} /></LazyItGate>} />
         <Route path="/settings/checklists" element={<LazyItGate><ProjectModuleRoute component={ChecklistSettings} /></LazyItGate>} />
         {/* Berechtigungen: Zugangs­daten + Modulstufen je Person — Admin-Fläche. */}

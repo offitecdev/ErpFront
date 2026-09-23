@@ -1,0 +1,17 @@
+﻿/* Shared press motion; window/menu opening and closing remain unchanged. */
+:root {
+    --motion-press-duration: 85ms;
+    --motion-release-duration: 240ms;
+    --motion-press-scale: 0.98;
+    --motion-press-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-release-ease: cubic-bezier(0.2, 1.25, 0.3, 1);
+    --ofi-btn-press-scale: var(--motion-press-scale);
+    --ofi-btn-press-ms: var(--motion-press-duration);
+}
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --motion-press-duration: 1ms;
+        --motion-release-duration: 1ms;
+        --motion-press-scale: 1;
+    }
+}

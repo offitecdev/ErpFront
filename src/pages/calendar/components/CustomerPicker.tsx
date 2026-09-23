@@ -29,8 +29,9 @@ const asRows = (payload: any): CustomerLite[] => {
     }));
 };
 
-const fetchCustomers = async (search: string, page: number, pageSize: number): Promise<{ items: CustomerLite[]; total: number }> => {
+export const fetchCustomers = async (search: string, page: number, pageSize: number, signal?: AbortSignal): Promise<{ items: CustomerLite[]; total: number }> => {
     const res = await apiClient.get('/customers', {
+        signal,
         params: {
             isActive: true,
             fields: 'list',

@@ -166,13 +166,7 @@ body > div:not(#root) :where(
     transition: background-color 9999s ease-out;
 }
 
-/* ── 3. Bedienung: Druckpunkt und Tastaturfokus ────────────
-   Der leichte Druck beim Klicken und der sichtbare Fokusrahmen für
-   die Tastatur stammen 1:1 von der Anmeldeschaltfläche. */
-#root :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(:disabled):active,
-#root button.ofi-press:not(:disabled):active {
-    transform: scale(0.985);
-}
+/* Keyboard focus stays independent of the shared pointer feedback. */
 
 #root :where(button, a[href], [role="button"], summary):focus-visible {
     outline: 2px solid var(--ofi-field-focus);
@@ -226,10 +220,6 @@ body > div:not(#root) :where(
         animation: ofi-fade 0.2s ease both;
     }
 
-    #root :where(.ant-btn, .ofi-cta, .ofi-btn-brand):not(:disabled):active,
-    #root button.ofi-press:not(:disabled):active {
-        transform: none;
-    }
 }
 
 
@@ -629,13 +619,7 @@ html.dark #root .ofi-apps-glyph .ofi-apps-dia { fill: #ffb02e; }
     transform: none;
 }
 
-/* Beim Zeigen rutschte der Pfeil ein Stück in seine Richtung. Das ist am
-   01.09.2026 gefallen — Zeigen färbt, es schiebt nicht. Beim DRÜCKEN darf
-   er weiter nachgeben: das ist der Druckpunkt, den jeder Knopf der
-   Anwendung hat, hier nur auf den Pfeil selbst gelegt. */
-#root .ofi-quickback.is-back:active .ofi-quickback__arrow {
-    transform: scale(0.92);
-}
+/* The back control uses the same delegated press as every other action. */
 
 /* Zweitfenster des Doppelbildschirms: dieselbe Schale, aber eine
    Spur kleiner — dort steht der Pfeil allein über dem Inhalt und

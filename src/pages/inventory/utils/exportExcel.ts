@@ -1,6 +1,8 @@
 import { t } from '@/i18n/translate';
 import type { PurchaseOrderRow } from '@/types/inventory';
 import { foldedExtraDiscount, itemDisplayNetPrice, orderGrandTotal } from './orderPricing';
+import { localizePurchaseCode, purchaseLangOf } from '@/utils/purchaseCode';
+import i18n from '@/i18n';
 
 /**
  * Sipariş → Excel dışa aktarımı. `xlsx` yalnızca burada ve içe aktarma
@@ -24,6 +26,8 @@ import { foldedExtraDiscount, itemDisplayNetPrice, orderGrandTotal } from './ord
  */
 export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> => {
     const XLSX = await import('xlsx');
+    // Die Mappe liest ein Mensch, kein Server: der Code steht in seiner Sprache.
+    const code = localizePurchaseCode(order.referenceNumber, purchaseLangOf(i18n.resolvedLanguage || i18n.language));
 
     // KDV artık SİPARİŞ DÜZEYİNDEDİR (tek oran, genel toplam üzerinden). Dosya
     // aynı zamanda içe aktarma şablonu olduğu için oran satır sütununa da
@@ -76,7 +80,7 @@ export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> =
 
     // Üst bilgi + boş satır + ürün tablosu tek sayfada (array-of-arrays).
     const rows: Array<Array<string | number | null>> = [
-        [t('inv.orders.columns.reference'), order.referenceNumber],
+        [t('inv.orders.columns.reference'), code],
         [t('inv.orders.columns.quoteNumber'), order.quoteNumber || ''],
         [t('inv.orders.columns.orderedBy'), order.orderedByName || ''],
         [t('inv.orders.columns.project'), order.projectName || ''],
@@ -118,14 +122,14 @@ export const exportOrderExcel = async (order: PurchaseOrderRow): Promise<void> =
         { wch: 14 },
     ];
     const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, order.referenceNumber.slice(0, 31));
+    XLSX.utils.book_append_sheet(book, sheet, code.slice(0, 31));
 
     const buffer = XLSX.write(book, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${order.referenceNumber}.xlsx`;
+    anchor.download = `${code}.xlsx`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);

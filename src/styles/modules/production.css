@@ -1,0 +1,814 @@
+/* =========================================================
+   Offitec — PRODUKTION (19.09.2026, Vorgabe Samet)
+
+   «Sauber, minimal, wie macOS und SwiftUI — und schnell.»
+
+   Das Modul trägt das Kleid der Listen (styles/listApple.css, `--la-*`):
+   Haarlinien statt Schatten, 10px-Tafeln, 28px-Bedienelemente mit 6px-Ecke,
+   EIN Systemblau, Zahlen in Tabellensatz. Fenster (Geräte, Auswahl) malen aus
+   `--ofi-cal-*` — appleModal.css stimmt diese in jedem Fenster auf dieselbe
+   Palette um. Dunkelmodus ist derselbe Variablentausch, keine zweite Kopie.
+
+   Klassen: `.ofi-prod-*`. Seiten importieren dieses Blatt selbst
+   (styles/modules — siehe css-page-module-split).
+   ========================================================= */
+
+/* ── Seite ────────────────────────────────────────────────── */
+.ofi-prod-page { display: flex; flex-direction: column; gap: 16px; width: 100%; min-width: 0; }
+
+.ofi-prod-headtools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.ofi-prod-synced {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--la-secondary);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-prod-synced.is-busy::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid var(--la-border);
+    border-top-color: var(--la-accent);
+    animation: ofi-prod-spin 0.8s linear infinite;
+}
+@keyframes ofi-prod-spin { to { transform: rotate(360deg); } }
+
+/* Ein Quadrat mit Zeichen (Aktualisieren, Alle aufklappen) — 28px wie jedes Bedienelement. */
+#root .ofi-list-apple .ofi-prod-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--la-field-border);
+    border-radius: var(--la-control-radius);
+    background: var(--la-surface);
+    color: var(--la-secondary);
+    box-shadow: var(--la-btn-shadow);
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-list-apple .ofi-prod-iconbtn:hover:not(:disabled) { background: var(--la-hover); color: var(--la-text); border-color: var(--la-field-border-hover); }
+#root .ofi-list-apple .ofi-prod-iconbtn:disabled { opacity: 0.45; cursor: default; }
+#root .ofi-list-apple .ofi-prod-iconbtn svg { width: 14px; height: 14px; }
+#root .ofi-list-apple .ofi-prod-iconbtn.is-busy svg { animation: ofi-prod-spin 0.9s linear infinite; }
+/* Derselbe Knopf MIT WORT — «Beleg» im Kopf von «Bestellte Produkte». */
+#root .ofi-list-apple .ofi-prod-iconbtn.is-wide {
+    width: auto;
+    gap: 6px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+/* Das Suchfeld der Seite: das Hausfeld, nur schmaler. */
+.ofi-prod-search { width: min(280px, 100%); }
+
+/* ── Kennzahlen: vier ruhige Kacheln ──────────────────────── */
+.ofi-prod-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+}
+.ofi-prod-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--la-border);
+    border-radius: var(--la-radius);
+    background: var(--la-surface);
+}
+.ofi-prod-kpi__label { font-size: 11.5px; font-weight: 500; color: var(--la-secondary); }
+.ofi-prod-kpi__value {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--la-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ofi-prod-kpi__sub { font-size: 11.5px; color: var(--la-secondary); font-variant-numeric: tabular-nums; }
+.ofi-prod-kpi.is-good .ofi-prod-kpi__value { color: var(--la-success); }
+.ofi-prod-kpi.is-bad .ofi-prod-kpi__value { color: var(--la-danger); }
+
+/* ── Abschnittskopf: Titel + Anzahl + Werkzeug ─────────────── */
+.ofi-prod-sectiontools { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Der Baum: Projekt → Auftrag → Gerät ───────────────────── */
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] { table-layout: fixed; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr > td { height: 38px; padding-top: 6px; padding-bottom: 6px; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-project > td {
+    height: 46px;
+    background: color-mix(in srgb, var(--la-fill) 70%, var(--la-surface));
+    border-top: 1px solid var(--la-border);
+    font-weight: 600;
+}
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-project:first-child > td { border-top: 0; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-order > td { font-weight: 500; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-muted > td { opacity: 0.55; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-clickable { cursor: pointer; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-clickable:focus-visible { outline: none; }
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tbody > tr.is-clickable:focus-visible > td { background: var(--la-accent-soft) !important; }
+/* Die flache Liste (Übersicht, Geräte, Bestellungen): ruhige 44px-Zeilen. */
+#root .ofi-list-apple table.ofi-prod-flat[data-inv-table] > tbody > tr > td { height: 44px; }
+
+.ofi-prod-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ofi-prod-cell__main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-prod-cell__sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--la-secondary);
+}
+.ofi-prod-cell__stack { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.ofi-prod-pos {
+    flex: none;
+    min-width: 22px;
+    font-size: 11.5px;
+    color: var(--la-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* Nummern und Marken. */
+.ofi-prod-num {
+    flex: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--la-text);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-prod-link { color: var(--la-accent, var(--ofi-cal-accent, #0a7aff)); text-decoration: none; }
+.ofi-prod-link:hover { text-decoration: underline; }
+.ofi-prod-tag {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 6px;
+    border: 1px solid var(--la-border);
+    border-radius: 5px;
+    background: var(--la-surface);
+    color: var(--la-secondary);
+    font-size: 10.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.ofi-prod-tag.is-addon { color: var(--la-warning); border-color: color-mix(in srgb, var(--la-warning) 35%, transparent); }
+.ofi-prod-tag.is-delivery { color: var(--la-accent); border-color: color-mix(in srgb, var(--la-accent) 30%, transparent); }
+.ofi-prod-tag.is-cancelled { color: var(--la-danger); border-color: color-mix(in srgb, var(--la-danger) 30%, transparent); }
+
+/* Zahlen rechts, in Tabellensatz. */
+.ofi-prod-money { display: block; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-prod-money.is-dim { color: var(--la-muted); }
+.ofi-prod-money.is-good { color: var(--la-success); }
+.ofi-prod-money.is-bad { color: var(--la-danger); }
+.ofi-prod-money small { margin-left: 5px; font-size: 11px; color: var(--la-secondary); }
+
+/* ── DIE GERÄTEKARTE — ein Zeichen, das man anklickt ────────── */
+.ofi-prod-device {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    min-width: 0;
+    height: 24px;
+    padding: 0 8px 0 3px;
+    border: 1px solid var(--la-border, var(--ofi-cal-border));
+    border-radius: 7px;
+    background: var(--la-surface, var(--ofi-cal-surface));
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-prod-device:hover { border-color: var(--la-accent, var(--ofi-cal-accent)); background: var(--la-accent-soft, var(--ofi-cal-accent-soft)); }
+.ofi-prod-device:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--la-focus, rgba(10, 122, 255, 0.3)); }
+.ofi-prod-device.is-static { cursor: default; }
+.ofi-prod-device.is-static:hover { border-color: var(--la-border, var(--ofi-cal-border)); background: var(--la-surface, var(--ofi-cal-surface)); }
+.ofi-prod-device__icon {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--la-accent, #0a7aff) 14%, transparent);
+    color: var(--la-accent, #0a7aff);
+}
+.ofi-prod-device__icon.is-service {
+    background: color-mix(in srgb, var(--la-warning, #b25000) 16%, transparent);
+    color: var(--la-warning, #b25000);
+}
+.ofi-prod-device__icon svg { width: 11px; height: 11px; }
+.ofi-prod-device__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--la-text, var(--ofi-cal-text));
+}
+.ofi-prod-device.is-large { height: 30px; padding-right: 10px; border-radius: 8px; }
+.ofi-prod-device.is-large .ofi-prod-device__icon { width: 22px; height: 22px; border-radius: 6px; }
+.ofi-prod-device.is-large .ofi-prod-device__icon svg { width: 13px; height: 13px; }
+.ofi-prod-device.is-large .ofi-prod-device__name { font-size: 13px; }
+
+/* Der schmale Balken: Bestellt im Verhältnis zum Verkauf. */
+.ofi-prod-bar {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    /* Die leere Spur muss man sehen — auch ohne Bestellung. */
+    background: color-mix(in srgb, var(--la-text, #1d1d1f) 10%, transparent);
+    overflow: hidden;
+}
+.ofi-prod-bar > i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 999px;
+    background: var(--la-accent, var(--ofi-cal-accent));
+}
+.ofi-prod-bar.is-over > i { background: var(--la-danger, #d70015); }
+.ofi-prod-bar.is-received > i + i { background: var(--la-success, #1f8a3b); }
+.ofi-prod-margin { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ofi-prod-margin .ofi-prod-bar { width: 56px; flex: none; }
+
+/* ── Der Segmentschalter (zwei Reiter) ─────────────────────── */
+.ofi-prod-segment {
+    display: inline-flex;
+    gap: 1px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--la-fill);
+}
+#root .ofi-list-apple .ofi-prod-segment > button {
+    height: 26px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--la-text);
+    font-size: 12.5px;
+    font-weight: 400;
+    white-space: nowrap;
+    cursor: pointer;
+}
+#root .ofi-list-apple .ofi-prod-segment > button > span { margin-left: 6px; font-size: 11px; color: var(--la-secondary); }
+#root .ofi-list-apple .ofi-prod-segment > button.is-on {
+    background: var(--la-surface);
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 6%), 0 1px 2px rgb(0 0 0 / 12%);
+    font-weight: 500;
+}
+.dark #root .ofi-list-apple .ofi-prod-segment > button.is-on { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+
+/* ── Leer, Laden, Hinweis ─────────────────────────────────── */
+.ofi-prod-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 36px 16px;
+    text-align: center;
+    color: var(--la-secondary);
+    font-size: 13px;
+}
+.ofi-prod-empty b { font-size: 14px; font-weight: 600; color: var(--la-text); }
+.ofi-prod-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--la-border);
+    border-radius: var(--la-radius);
+    background: var(--la-surface);
+    font-size: 12.5px;
+    color: var(--la-secondary);
+}
+.ofi-prod-note svg { flex: none; width: 15px; height: 15px; margin-top: 1px; }
+.ofi-prod-note.is-warn { color: var(--la-warning); border-color: color-mix(in srgb, var(--la-warning) 30%, transparent); }
+
+/* Die Kopfangaben der Projektseite. */
+.ofi-prod-projecthead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--la-secondary); }
+.ofi-prod-projecthead b { font-weight: 500; color: var(--la-text); }
+
+/* Kleine Liste der Bestellungen eines Projekts. */
+.ofi-prod-pochips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 14px; }
+.ofi-prod-pochip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--la-border);
+    border-radius: 6px;
+    background: var(--la-surface);
+    color: var(--la-text);
+    font-size: 12px;
+    text-decoration: none;
+}
+.ofi-prod-pochip:hover { border-color: var(--la-accent); }
+.ofi-prod-pochip em { font-style: normal; color: var(--la-secondary); }
+
+/* Gruppenkopf in den bestätigten Zeilen. */
+#root .ofi-list-apple table.ofi-prod-grouped[data-inv-table] > tbody > tr.is-group > td {
+    height: 44px;
+    background: color-mix(in srgb, var(--la-fill) 70%, var(--la-surface));
+    border-top: 1px solid var(--la-border);
+}
+#root .ofi-list-apple table.ofi-prod-grouped[data-inv-table] > tbody > tr.is-group:first-child > td { border-top: 0; }
+#root .ofi-list-apple table.ofi-prod-grouped[data-inv-table] > tfoot > tr > td,
+#root .ofi-list-apple table.ofi-prod-tree[data-inv-table] > tfoot > tr > td {
+    height: 40px;
+    padding: 6px 10px;
+    border-top: 1px solid var(--la-border);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+#root .ofi-list-apple :is(table.ofi-prod-grouped[data-inv-table], table.ofi-prod-tree[data-inv-table]) > tfoot > tr > td:first-child { padding-left: 16px; }
+
+/* ── Einstellungen → Firmenübertragungen ───────────────────── */
+.ofi-prod-transfer { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+.ofi-prod-groups { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
+.ofi-prod-group { border: 1px solid var(--la-border); border-radius: var(--la-radius); overflow: hidden; }
+.ofi-prod-group__head,
+.ofi-prod-group__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 0;
+    background: var(--la-surface);
+    color: var(--la-text);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-prod-group__head { font-weight: 600; background: color-mix(in srgb, var(--la-fill) 70%, var(--la-surface)); }
+.ofi-prod-group__row { padding-left: 38px; border-top: 1px solid var(--la-hairline); }
+.ofi-prod-group__row:hover,
+.ofi-prod-group__head:hover { background: var(--la-hover); }
+.ofi-prod-group__row small { margin-left: auto; font-size: 11.5px; color: var(--la-secondary); }
+.ofi-prod-check {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--la-field-border-hover, var(--ofi-cal-border));
+    border-radius: 5px;
+    background: var(--la-surface, var(--ofi-cal-surface));
+    color: #fff;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+.ofi-prod-check.is-on { border-color: var(--la-accent, var(--ofi-cal-accent)); background: var(--la-accent, var(--ofi-cal-accent)); }
+.ofi-prod-check.is-mixed { border-color: var(--la-accent, var(--ofi-cal-accent)); background: var(--la-accent, var(--ofi-cal-accent)); }
+.ofi-prod-check svg { width: 12px; height: 12px; }
+.ofi-prod-savebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--la-hairline); }
+#root .ofi-list-apple .ofi-prod-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--la-control-radius);
+    background: var(--la-accent);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+#root .ofi-list-apple .ofi-prod-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--la-accent) 88%, #000); }
+#root .ofi-list-apple .ofi-prod-primary:disabled { opacity: 0.45; cursor: default; }
+.ofi-prod-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--la-secondary); }
+.ofi-prod-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--la-muted); }
+.ofi-prod-status.is-on::before { background: var(--la-success); }
+
+/* =========================================================
+   IM LAGER — Zuordnung in Bestellmaske, Bestellseite, Wareneingang
+   ========================================================= */
+
+/* Der Knopf «Projekt & Geräte» neben dem Lieferanten. */
+#root .ofi-list-apple .ofi-prod-assign {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 360px;
+    height: 28px;
+    padding: 0 10px 0 8px;
+    border: 1px solid var(--la-field-border);
+    border-radius: var(--la-control-radius);
+    background: var(--la-surface);
+    color: var(--la-text);
+    box-shadow: var(--la-btn-shadow);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+#root .ofi-list-apple .ofi-prod-assign:hover:not(:disabled) { background: var(--la-hover); border-color: var(--la-field-border-hover); }
+#root .ofi-list-apple .ofi-prod-assign:disabled { opacity: 0.55; cursor: default; }
+#root .ofi-list-apple .ofi-prod-assign > i {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--la-success);
+}
+/* Noch nichts gewählt ist KEIN Fehler mehr (21.09.2026): der Punkt wird
+   grau, der Knopf bleibt ein gewöhnliches Feld. */
+#root .ofi-list-apple .ofi-prod-assign.is-unset { color: var(--la-secondary); }
+#root .ofi-list-apple .ofi-prod-assign.is-unset > i { background: var(--la-secondary); }
+#root .ofi-list-apple .ofi-prod-assign > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#root .ofi-list-apple .ofi-prod-assign > svg { flex: none; width: 13px; height: 13px; color: var(--la-secondary); }
+
+/* Die Zeile «Projekt / Geräte» in der Übersicht der Bestellseite. */
+.ofi-prod-assigned { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+
+/* Die Gerätewahl JE ZEILE (mehrere Geräte gewählt). Das Lager legt jeden
+   Knopf in einer Zelle auf 24px ohne Rahmen — hier wird wieder ein Feld daraus. */
+#root .ofi-list-apple table[data-inv-table] td button.ofi-prod-cellselect.ofi-prod-cellselect.ofi-prod-cellselect {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--la-text);
+    font-size: 12.5px;
+    text-align: left;
+}
+#root .ofi-list-apple table[data-inv-table] td button.ofi-prod-cellselect.ofi-prod-cellselect.ofi-prod-cellselect:hover { border-color: var(--la-field-border); background: var(--la-surface); }
+#root .ofi-list-apple table[data-inv-table] td button.ofi-prod-cellselect.ofi-prod-cellselect.ofi-prod-cellselect.is-empty { color: var(--la-danger); border-color: color-mix(in srgb, var(--la-danger) 40%, transparent); }
+@layer utilities {
+    #root .ofi-list-apple table[data-inv-table] td button.ofi-prod-cellselect.ofi-prod-cellselect.ofi-prod-cellselect { border-radius: 6px !important; }
+}
+
+/* Eine Zelle, die zur Bestätigung fehlt. */
+#root .ofi-list-apple table[data-inv-table] td.ofi-prod-missing { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--la-danger) 70%, transparent); }
+
+/* ── DIE MITLAUFENDE LEISTE DES WARENEINGANGS ────────────────
+   Vorgabe Samet: «Die Leiste mit ‹Ausgewählte senden› und den Auswahl-
+   werkzeugen muss kleben — sie bleibt auf dem Schirm und läuft beim
+   Scrollen mit.» Sie steht unten, schwebend wie eine Werkzeugleiste von
+   macOS, und ist ausserhalb der Tafel, damit ihr `overflow: hidden` sie
+   nicht festhält. */
+.ofi-prod-stickybar {
+    position: sticky;
+    bottom: 14px;
+    z-index: 30;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 auto;
+    width: min(100%, 980px);
+    padding: 8px 10px;
+    border: 1px solid var(--la-border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--la-surface) 86%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.dark .ofi-prod-stickybar { box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
+.ofi-prod-stickybar__count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--la-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.ofi-prod-stickybar__count > i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--la-accent);
+    color: #fff;
+    font-style: normal;
+    font-size: 11px;
+}
+.ofi-prod-stickybar__spacer { flex: 1 1 auto; }
+#root .ofi-list-apple .ofi-prod-stickybar button.ofi-prod-barbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--la-field-border);
+    border-radius: 7px;
+    background: var(--la-surface);
+    color: var(--la-text);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-list-apple .ofi-prod-stickybar button.ofi-prod-barbtn:hover:not(:disabled) { background: var(--la-hover); border-color: var(--la-field-border-hover); }
+#root .ofi-list-apple .ofi-prod-stickybar button.ofi-prod-barbtn.is-primary { border-color: transparent; background: var(--la-accent); color: #fff; }
+#root .ofi-list-apple .ofi-prod-stickybar button.ofi-prod-barbtn.is-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--la-accent) 88%, #000); }
+#root .ofi-list-apple .ofi-prod-stickybar button.ofi-prod-barbtn:disabled { opacity: 0.45; cursor: default; }
+#root .ofi-list-apple .ofi-prod-stickybar button.ofi-prod-barbtn svg { width: 14px; height: 14px; }
+
+/* Im Wareneingang ist die ganze Zeile anklickbar — die Auswahl sieht man. */
+#root .ofi-list-apple table.ofi-prod-selectable[data-inv-table] > tbody > tr.is-selectable { cursor: pointer; }
+
+/* =========================================================
+   FENSTER — Geräteansicht und Auswahl (Portal, `--ofi-cal-*`)
+   ========================================================= */
+
+.ofi-prod-pop { display: flex; flex-direction: column; gap: 14px; }
+.ofi-prod-pop__kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; margin: 0; font-size: 13px; }
+.ofi-prod-pop__kv dt { color: var(--ofi-cal-muted); }
+.ofi-prod-pop__kv dd { margin: 0; min-width: 0; color: var(--ofi-cal-text); overflow-wrap: anywhere; }
+.ofi-prod-pop__figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.ofi-prod-pop__figure {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 1px solid var(--ofi-cal-border-soft, var(--ofi-cal-border));
+    border-radius: 8px;
+}
+.ofi-prod-pop__figure span { font-size: 11px; color: var(--ofi-cal-muted); }
+.ofi-prod-pop__figure b { font-size: 13.5px; font-weight: 600; color: var(--ofi-cal-text); font-variant-numeric: tabular-nums; }
+.ofi-prod-pop__figure.is-good b { color: #1f8a3b; }
+.ofi-prod-pop__figure.is-bad b { color: #d70015; }
+.dark .ofi-prod-pop__figure.is-good b { color: #30d158; }
+.dark .ofi-prod-pop__figure.is-bad b { color: #ff453a; }
+.ofi-prod-pop__desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ofi-cal-muted); white-space: pre-line; }
+.ofi-prod-pop__table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ofi-prod-pop__table th {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--ofi-cal-border);
+    color: var(--ofi-cal-muted);
+    font-size: 11.5px;
+    font-weight: 500;
+    text-align: left;
+}
+.ofi-prod-pop__table td { padding: 6px 8px; border-bottom: 1px solid var(--ofi-cal-border-soft, var(--ofi-cal-border)); color: var(--ofi-cal-text); }
+.ofi-prod-pop__table tr:last-child td { border-bottom: 0; }
+.ofi-prod-pop__table .is-num { text-align: right; white-space: nowrap; }
+
+/* «3 / 12» — wie viele Geräte und Leistungen schon bestellt sind. */
+.ofi-prod-count {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 4px;
+    font-size: 12.5px;
+    color: var(--la-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-prod-count b { font-weight: 600; color: var(--la-text); }
+.ofi-prod-count.is-on b { color: var(--la-accent); }
+
+/* Die Auswahl: links die Projekte, rechts ihre Geräte. */
+.ofi-prod-picker {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    height: min(460px, 62vh);
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.ofi-prod-picker__side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--ofi-cal-border); }
+.ofi-prod-picker__search { padding: 8px; border-bottom: 1px solid var(--ofi-cal-border-soft, var(--ofi-cal-border)); }
+.ofi-prod-picker__search input { width: 100%; }
+.ofi-prod-picker__list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px; }
+.ofi-prod-picker__project {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-prod-picker__project:hover { background: var(--ofi-cal-hover); }
+.ofi-prod-picker__project.is-on { background: var(--ofi-cal-accent); color: #fff; }
+/* Angeschaut, aber nicht gewählt — nach dem Zurücknehmen der Wahl bleibt der
+   Baum dieses Projekts sichtbar (21.09.2026). */
+.ofi-prod-picker__project.is-browsing { background: var(--ofi-cal-hover); }
+.ofi-prod-picker__project b { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-prod-picker__project span { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-prod-picker__project small { font-size: 11px; color: var(--ofi-cal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-prod-picker__project.is-on small { color: rgba(255, 255, 255, 0.8); }
+.ofi-prod-picker__main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ofi-prod-picker__items { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 10px 10px; }
+/* Der Kopf eines Auftrags ist selbst ein Kästchen: er wählt alle seine Geräte. */
+.ofi-prod-picker__group + .ofi-prod-picker__group { margin-top: 6px; }
+.ofi-prod-picker__order {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 34px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    border: 0;
+    border-bottom: 1px solid var(--ofi-cal-border-soft, var(--ofi-cal-border));
+    background: transparent;
+    color: var(--ofi-cal-text);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-prod-picker__order:hover:not(:disabled) { background: var(--ofi-cal-hover); }
+.ofi-prod-picker__order:disabled { cursor: default; opacity: 0.6; }
+.ofi-prod-picker__order.is-addon { padding-left: 24px; }
+.ofi-prod-picker__muted { font-size: 11.5px; font-weight: 400; color: var(--ofi-cal-muted); white-space: nowrap; }
+.ofi-prod-picker__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ofi-cal-text);
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-prod-picker__item:hover { background: var(--ofi-cal-hover); }
+.ofi-prod-picker__item.is-on { background: color-mix(in srgb, var(--ofi-cal-accent) 7%, transparent); }
+.ofi-prod-picker__item.is-addon { padding-left: 40px; }
+.ofi-prod-picker__pos { flex: none; min-width: 24px; font-size: 11.5px; color: var(--ofi-cal-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.ofi-prod-picker__amount { min-width: 96px; text-align: right; }
+.ofi-prod-picker__item .ofi-prod-device__icon { width: 20px; height: 20px; }
+.ofi-prod-picker__item span.name { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-prod-picker__item small { flex: none; font-size: 11.5px; color: var(--ofi-cal-muted); font-variant-numeric: tabular-nums; }
+.ofi-prod-picker__hint { padding: 28px 16px; text-align: center; font-size: 12.5px; color: var(--ofi-cal-muted); }
+.ofi-prod-picker__foot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ofi-cal-muted); }
+.ofi-prod-picker__map { display: flex; flex-direction: column; gap: 6px; max-height: min(420px, 60vh); overflow-y: auto; }
+.ofi-prod-picker__mapline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+    align-items: center;
+    gap: 10px;
+    padding: 6px 2px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft, var(--ofi-cal-border));
+    font-size: 12.5px;
+}
+.ofi-prod-picker__mapline span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Das grosse Auswahlfenster: fast eine Seite hoch, links seitenweise Projekte. */
+.ofi-prod-picker.is-large {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    height: min(640px, 72vh);
+}
+.ofi-prod-picker__pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border-top: 1px solid var(--ofi-cal-border-soft, var(--ofi-cal-border));
+    font-size: 12px;
+    color: var(--ofi-cal-muted);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-prod-picker__pager button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--ofi-cal-border);
+    background: var(--ofi-cal-surface);
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+}
+.ofi-prod-picker__pager button:disabled { opacity: 0.4; cursor: default; }
+.ofi-prod-picker__pager button svg { width: 14px; height: 14px; }
+/* Oben rechts EIN Kästchen für alle Geräte und Leistungen des Projekts. */
+.ofi-prod-picker__master {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 18px;
+    border: 0;
+    border-bottom: 1px solid var(--ofi-cal-border);
+    background: color-mix(in srgb, var(--ofi-cal-hover) 60%, var(--ofi-cal-surface));
+    color: var(--ofi-cal-text);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.ofi-prod-picker__master:disabled { cursor: default; opacity: 0.6; }
+.ofi-prod-picker__master b { font-weight: 600; }
+
+@media (max-width: 720px) {
+    .ofi-prod-picker { grid-template-columns: 1fr; grid-template-rows: 200px minmax(0, 1fr); height: min(620px, 72vh); }
+    .ofi-prod-picker__side { border-right: 0; border-bottom: 1px solid var(--ofi-cal-border); }
+    .ofi-prod-pop__kv { grid-template-columns: 110px 1fr; }
+    .ofi-prod-pop__figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ofi-prod-stickybar { bottom: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-prod-device { transition: none; }
+    .ofi-prod-synced.is-busy::before,
+    #root .ofi-list-apple .ofi-prod-iconbtn.is-busy svg { animation: none; }
+}
+
+/* ── Die Ecken ─────────────────────────────────────────────
+   index.css legt JEDEM Knopf `--ofi-button-radius` mit `!important` an
+   (ungeschichtet). Nur ein `!important` in einer Schicht schlägt das — daher
+   stehen die Ecken der Knöpfe dieses Moduls hier (siehe radius-utilities). */
+@layer utilities {
+    #root .ofi-prod-iconbtn,
+    #root .ofi-prod-primary,
+    #root .ofi-prod-assign,
+    #root .ofi-prod-segment > button { border-radius: 6px !important; }
+    #root .ofi-prod-device,
+    body > :not(#root) .ofi-prod-device { border-radius: 7px !important; }
+    #root .ofi-prod-device.is-large,
+    body > :not(#root) .ofi-prod-device.is-large { border-radius: 8px !important; }
+    #root :is(.ofi-prod-group__head, .ofi-prod-group__row) { border-radius: 0 !important; }
+    #root .ofi-prod-stickybar button.ofi-prod-barbtn { border-radius: 7px !important; }
+    body > :not(#root) :is(.ofi-prod-picker__project, .ofi-prod-picker__item) { border-radius: 7px !important; }
+    body > :not(#root) .ofi-prod-picker__order { border-radius: 0 !important; }
+    body > :not(#root) .ofi-prod-picker__master { border-radius: 0 !important; }
+    body > :not(#root) .ofi-prod-picker__pager button { border-radius: 6px !important; }
+}
+
+/* Die Sammelwahl über der Gerätespalte (Bestellmaske, Wareneingang). */
+#root .ofi-list-apple table[data-inv-table] th button.ofi-prod-bulkselect.ofi-prod-bulkselect {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 6px;
+    border: 1px dashed var(--la-field-border);
+    background: transparent;
+    color: var(--la-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    text-align: left;
+}
+#root .ofi-list-apple table[data-inv-table] th button.ofi-prod-bulkselect.ofi-prod-bulkselect:hover { border-color: var(--la-accent); color: var(--la-accent); }
+.ofi-prod-devhead { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+@layer utilities {
+    #root .ofi-list-apple table[data-inv-table] th button.ofi-prod-bulkselect.ofi-prod-bulkselect { border-radius: 5px !important; }
+}
+
+/* «Ändern» neben der Zuordnung — ein Wort in Systemblau, kein Kasten. */
+#root .ofi-prod-linkbtn {
+    height: 24px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: var(--la-accent, #0a7aff);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+}
+#root .ofi-prod-linkbtn:hover { text-decoration: underline; }

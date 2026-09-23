@@ -37,10 +37,13 @@ export const supplierUnitBaseOf = (row: DraftOrderRow): number =>
 
 export const draftRowFigures = (row: DraftOrderRow) => {
     if (row.calcMode === 'SUPPLIER') {
+        // Rabatt und Rabatt 2 wirken seit dem 19.09.2026 auch hier (Server-Zwilling).
         return computeOrderLine({
             quantity: parseNum(row.quantity) ?? 0,
             grossPrice: parseNum(row.grossPrice) ?? 0,
             netPrice: supplierUnitBaseOf(row),
+            discount: parseNum(row.discount) ?? 0,
+            discount2: parseNum(row.discount2) ?? 0,
             calcMode: 'SUPPLIER',
         });
     }
@@ -113,13 +116,19 @@ export const transitionRowMode = (row: DraftOrderRow, next: OrderCalcMode): Draf
         // tutarı ÷ o tutarın yakalandığı miktar, (3) ekrandaki tutar ÷ miktar.
         const directTotal = savedDirect ? (parseNum(savedDirect.lineTotal) ?? 0) : 0;
         const directQty = savedDirect ? (parseNum(savedDirect.quantity) ?? 0) : 0;
+        // Die Rabatte der Zeile wirken im Lieferantenpreis mit (19.09.2026): ein
+        // Betrag, der sie schon enthält, wird darum durch ihren Faktor geteilt —
+        // sonst fielen sie zweimal auf die Zeile. Die frühere Basis enthält sie nicht.
+        const factor = discountFactor(parseNum(row.discount) ?? 0, parseNum(row.discount2) ?? 0) || 1;
         const base = parseNum(savedTarget?.base ?? '')
-            ?? (directTotal && directQty > 0 ? directTotal / directQty : null)
-            ?? (figures.lineTotal && quantity > 0 ? figures.lineTotal / quantity : null);
+            ?? (directTotal && directQty > 0 ? directTotal / directQty / factor : null)
+            ?? (figures.lineTotal && quantity > 0 ? figures.lineTotal / quantity / factor : null);
         // Gösterilen fiyat: tedarikçi kipinin kendi fiyatı ?? Excel/doğrudan
         // giriş fiyatı ?? (hiçbiri yoksa) tabanın kendisi.
+        // Ein direkt getippter Preis enthält die Rabatte schon — mit Rabatt ist er
+        // darum nicht der Lieferantenpreis, sondern die Basis gilt (19.09.2026).
         const display = savedTarget?.netPrice.trim()
-            || savedDirect?.netPrice.trim()
+            || (factor === 1 ? savedDirect?.netPrice.trim() : '')
             || (base !== null ? String(round2(base)) : String(figures.netUnitPrice || ''));
         return {
             ...row,

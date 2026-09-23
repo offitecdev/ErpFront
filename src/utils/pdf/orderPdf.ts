@@ -30,11 +30,13 @@ import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from '
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import type { PurchaseOrderRow } from '../../types/inventory';
 import { resolveSupplierPdfColumns, type SupplierPdfColumn } from './supplierPdfColumns';
+import { itemDisplayNetPrice } from '../../pages/inventory/utils/orderPricing';
 
 import liberationBoldUrl from '../../assets/fonts/LiberationSans-Bold.ttf?url';
 import liberationRegularUrl from '../../assets/fonts/LiberationSans-Regular.ttf?url';
 import offitecLogoUrl from '../../assets/images/offitec.png?url';
 import headerWaveUrl from '../../assets/images/header-wave.svg?url';
+import { localizePurchaseCode } from '@/utils/purchaseCode';
 
 export type OrderPdfLang = 'tr' | 'de' | 'en';
 
@@ -444,7 +446,8 @@ const buildTableLayout = (
                 return items.map((item) => ((item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—'));
             case 'net':
                 return items.map((item) => {
-                    const shown = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
+                    // Tedarikçi listesindeki fiyat; tedarikçi hesabında satır indirimleri de iner.
+                    const shown = itemDisplayNetPrice(item);
                     return shown > 0 ? fmtUnitPrice(shown) : '—';
                 });
             case 'disc':
@@ -803,10 +806,15 @@ const columnIsNumeric = (values: string[]) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildOrderPdfBytes(
-    order: PurchaseOrderRow,
+    sourceOrder: PurchaseOrderRow,
     settings: PdfCompanySettings,
     lang: OrderPdfLang = 'de'
 ): Promise<Uint8Array> {
+    // DER CODE STEHT IN DER SPRACHE DES BELEGS (Vorgabe Samet, 21.09.2026):
+    // gespeichert ist die deutsche Schreibweise (`PA-`/`BE-`), gedruckt wird
+    // `FT-`/`SP-` (tr) bzw. `PR-`/`PO-` (en). Die Kopie traegt sie durch das
+    // ganze Dokument — Fusszeile, Karte, Titel und Dateiname.
+    const order = { ...sourceOrder, referenceNumber: localizePurchaseCode(sourceOrder.referenceNumber, lang) };
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     // Der Titel ersetzt in der Vorschau (blob:-URL) die UUID als Dokumentname.
     doc.setProperties({ title: order.referenceNumber || 'Bestellung' });
@@ -920,7 +928,7 @@ export async function exportOrderPdf(
     lang: OrderPdfLang = 'de'
 ): Promise<void> {
     const bytes = await buildOrderPdfBytes(order, settings, lang);
-    downloadPdf(bytes, `${order.referenceNumber}.pdf`);
+    downloadPdf(bytes, `${localizePurchaseCode(order.referenceNumber, lang)}.pdf`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1497,8 +1505,9 @@ function drawRow(
                 drawFittedRight(doc, (item.grossPrice || 0) > 0 ? fmtUnitPrice(item.grossPrice) : '—', right, width, baseY, 'normal', fs);
                 break;
             case 'net': {
-                // Net fiyat sütununda TEDARİKÇİ LİSTESİNDEKİ fiyat görünür (varsa).
-                const shownNet = (item.displayNetPrice || 0) > 0 ? item.displayNetPrice! : (item.netPrice || 0);
+                // Net fiyat sütununda TEDARİKÇİ LİSTESİNDEKİ fiyat görünür (varsa);
+                // tedarikçi hesabında satır indirimleri de iner (19.09.2026).
+                const shownNet = itemDisplayNetPrice(item);
                 tone(shownNet);
                 drawFittedRight(doc, shownNet > 0 ? fmtUnitPrice(shownNet) : '—', right, width, baseY, 'normal', fs);
                 break;

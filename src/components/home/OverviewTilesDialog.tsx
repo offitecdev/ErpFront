@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp } from '@/components/icons/antIconCompat';
 import { PopupActions, PopupDialog } from '@/components/ui-shared/PopupKit';
 
+import { HOME_GLASS_LEVELS, type HomeGlass } from './homeAppearance';
 import {
     MAX_OVERVIEW_TILES,
     MIN_OVERVIEW_TILES,
@@ -17,8 +18,12 @@ import {
  * three groups of rows, a checkbox in front of each, and the chosen rows
  * carry their position with a pair of arrows. Changes apply at once — the
  * tiles behind the scrim rearrange while one picks — «Fertig» only closes.
+ *
+ * 21.09.2026 it also holds the material of the page: macOS 27 tunes Liquid
+ * Glass with a transparency dial, so the cards do the same — Aus · Leicht ·
+ * Voll ([[homeAppearance]]).
  */
-export const OverviewTilesDialog = ({ open, onClose, specs, tiles, onChange, onReset, isDefault }: {
+export const OverviewTilesDialog = ({ open, onClose, specs, tiles, onChange, onReset, isDefault, glass, onGlassChange }: {
     open: boolean;
     onClose: () => void;
     specs: Record<OverviewTileKey, OverviewTileSpec>;
@@ -26,6 +31,8 @@ export const OverviewTilesDialog = ({ open, onClose, specs, tiles, onChange, onR
     onChange: (next: OverviewTileKey[]) => void;
     onReset: () => void;
     isDefault: boolean;
+    glass: HomeGlass;
+    onGlassChange: (next: HomeGlass) => void;
 }) => {
     const { t } = useTranslation();
     const full = tiles.length >= MAX_OVERVIEW_TILES;
@@ -139,6 +146,33 @@ export const OverviewTilesDialog = ({ open, onClose, specs, tiles, onChange, onR
                     </section>
                 );
             })}
+
+            <section className="ofi-home-pick__group">
+                <h3 className="ofi-home-pick__caption">{t('dash.appearance.group', { defaultValue: 'Darstellung' })}</h3>
+                <div className="ofi-home-pick__panel">
+                    <span className="min-w-0 flex-1">
+                        <span className="ofi-home-pick__label">{t('dash.appearance.glass', { defaultValue: 'Glas-Karten' })}</span>
+                        <span className="ofi-home-pick__hint">
+                            {t('dash.appearance.glassHint', { defaultValue: 'Liquid Glass wie in macOS 27 — die Karten lassen die Seite durchscheinen.' })}
+                        </span>
+                    </span>
+                    <span className="ofi-home-pick__seg" role="group">
+                        {HOME_GLASS_LEVELS.map((level) => (
+                            <button
+                                key={level}
+                                type="button"
+                                aria-pressed={glass === level}
+                                className={`ofi-home-pick__segbtn ${glass === level ? 'is-on' : ''}`}
+                                onClick={() => onGlassChange(level)}
+                            >
+                                {level === 'off' && t('dash.appearance.glassOff', { defaultValue: 'Aus' })}
+                                {level === 'soft' && t('dash.appearance.glassSoft', { defaultValue: 'Leicht' })}
+                                {level === 'full' && t('dash.appearance.glassFull', { defaultValue: 'Voll' })}
+                            </button>
+                        ))}
+                    </span>
+                </div>
+            </section>
         </PopupDialog>
     );
 };

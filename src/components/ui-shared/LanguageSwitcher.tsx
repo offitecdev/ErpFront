@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LuGlobe as MdLanguage } from '@/components/icons/lucideLocal';
+import { ToolbarSymbol } from '@/components/icons/ToolbarSymbol';
 import { Check } from '../icons/antIconCompat';
 
 import { t } from '@/i18n/translate';
@@ -44,11 +44,11 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                     open ? 'bg-[#0a7aff] text-white' : 'text-slate-600 hover:bg-[#e3efff]'
                 }`}
             >
-                <MdLanguage size={17} />
+                <ToolbarSymbol name="language" />
             </button>
 
             {open && (
-                <div className="absolute top-[48px] right-0 z-50 min-w-[160px] rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200 animate-in fade-in slide-in-from-top-2">
+                <div className="ofi-lang-menu absolute top-[48px] right-0 z-50 min-w-[160px] rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200 animate-in fade-in slide-in-from-top-2">
                     <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                         {t('language.title')}
                     </div>

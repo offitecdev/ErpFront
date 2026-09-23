@@ -84,6 +84,7 @@ export const AssigneeChips = ({
                         type="button"
                         className="ofi-gv-add ofi-btn-plain"
                         aria-haspopup="listbox"
+                        aria-expanded={Boolean(anchor)}
                         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
                     >
                         <LuPlus size={12} aria-hidden />
@@ -96,6 +97,7 @@ export const AssigneeChips = ({
                         onChange={onChange}
                         excludeIds={selfId ? [selfId] : undefined}
                         multiple
+                        macSelection
                     />
                 </>
             )}
@@ -119,12 +121,13 @@ export const LabelChips = ({ ids, onChange }: { ids: string[]; onChange: (next: 
                 type="button"
                 className="ofi-gv-add ofi-btn-plain"
                 aria-haspopup="listbox"
+                aria-expanded={Boolean(anchor)}
                 onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
             >
                 <LuPlus size={12} aria-hidden />
                 {t('tasksModule.list.sheet.addLabel')}
             </button>
-            <LabelPicker anchorEl={anchor} onClose={() => setAnchor(null)} selected={ids} onChange={onChange} />
+            <LabelPicker anchorEl={anchor} onClose={() => setAnchor(null)} selected={ids} onChange={onChange} macSelection />
         </div>
     );
 };

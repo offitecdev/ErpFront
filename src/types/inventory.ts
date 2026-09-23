@@ -1,3 +1,5 @@
+import type { ProductionPurchaseAssignment, ProductionSelection } from './production';
+
 export type LocationType = 'MAIN_WAREHOUSE' | 'SUB_WAREHOUSE' | 'STATION_BUFFER' | 'PROJECT_RESERVE';
 
 export type MovementType = 'IN' | 'OUT' | 'TRANSFER' | 'RETURN' | 'ADJUSTMENT';
@@ -469,6 +471,8 @@ export interface QuickArticleItemInput {
 /** Treffer der Schnellerfassung auf einen gescannten Code. */
 export interface ScanLookupResult {
     found: boolean;
+    ambiguous?: boolean;
+    stockUnit?: { id: string; barcode: string; serialNumber: string | null } | null;
     matchedBy?: 'serial' | 'barcode' | 'code';
     article?: {
         id: string;
@@ -481,6 +485,20 @@ export interface ScanLookupResult {
         systemBarcode?: string | null;
         totalQuantity: number;
     };
+}
+
+export interface QuickStockUnitInput {
+    barcode: string;
+    serialNumber?: string | null;
+    articleId?: string;
+    /** Explicit user action only; an unknown scan must never supply this automatically. */
+    newArticle?: { schemeId: string; name: string; modelNumber?: string | null };
+}
+
+export interface QuickStockUnitResult {
+    article: NonNullable<ScanLookupResult['article']>;
+    stockUnit: NonNullable<ScanLookupResult['stockUnit']>;
+    createdArticle: boolean;
 }
 
 export interface BulkRowError {
@@ -680,6 +698,8 @@ export interface PurchaseOrderItem {
     receivedQuantity?: number;
     /** Son mal kabul zamani (ISO). */
     receivedAt?: string | null;
+    /** Produktion (19.09.2026): das Gerät des Projekts, für das die Zeile bestellt wird. */
+    productionItemId?: string | null;
 }
 
 /**
@@ -705,8 +725,23 @@ export interface PurchaseOrderTableColumn {
 export interface PurchaseOrderRow {
     id: string;
     tenantId: string;
-    /** "Bestellung" — sipariş kodu (BE-2026-001), kullanıcı düzenleyebilir. */
+    /**
+     * GÜNCEL belgenin kodu — talep aşamasında `priceRequestNumber`, sipariş
+     * aşamasından itibaren `orderNumber` ile aynıdır. Kayıtta ALMANCA yazım
+     * durur (`PA-2026-001` / `BE-2026-001`); ekranda ve PDF'te dile göre önek
+     * değişir — göstermeden önce `utils/purchaseCode.ts` üzerinden geçir.
+     * Kullanıcı elle değiştirebilir.
+     */
     referenceNumber: string;
+    /**
+     * Hangi aşamaların KENDİ belgesi var (1 talep · 2 sipariş · 3 mal kabul).
+     * Birleştirme ayrı belgeleri yan yana koyar; Şerit bunu gösterir.
+     */
+    documentStages?: number[];
+    /** Fiyat talebi kodu (`PA-2026-001`) — siparişe dönüşse de kalır, aranabilir. */
+    priceRequestNumber?: string | null;
+    /** Sipariş kodu (`BE-2026-001`) — ilk kez sipariş aşamasına geçince verilir. */
+    orderNumber?: string | null;
     /** Opsiyonel teklif numarası (PDF'te görünür). */
     quoteNumber?: string | null;
     /** "Besteller" — siparişi veren kişi. */
@@ -776,6 +811,8 @@ export interface PurchaseOrderRow {
     createdByEmpId?: string | null;
     createdAt: string;
     updatedAt: string;
+    /** Produktion (19.09.2026): Projekt + Geräte — nur wo das Modul läuft. */
+    production?: ProductionPurchaseAssignment | null;
 }
 
 export interface PurchaseOrderListPage {
@@ -790,6 +827,9 @@ export interface PurchaseOrderListQuery {
     pageSize?: number;
     search?: string;
     status?: PurchaseOrderStatus | '';
+    /* HANGİ MODÜL (22.09.2026): fiyat talepleri ve siparişler AYRI listelerdir.
+       Belirli bir durum süzgeci varsa o daha dardır ve bunun yerine geçer. */
+    kind?: 'PRICE_REQUEST' | 'ORDER';
     supplierId?: string;
     // Kolon filtreleri (tablo filtre satırı).
     reference?: string;
@@ -830,10 +870,35 @@ export interface PurchaseOrderItemInput {
     receivedAt?: string | null;
     /** Ordered template columns, including their relative width for PDF parity. */
     extras?: Array<{ key: string; name: string; value: string; width?: number }>;
+    /** Produktion (19.09.2026): das Gerät der Zeile (Pflicht, wenn mehrere gewählt sind). */
+    productionItemId?: string | null;
+}
+
+/**
+ * Ein Vorgang, mit dem sich DIESER zusammenführen lässt — der Server gibt nur
+ * die Nachbarstufe heraus (Anfrage ↔ Bestellung, Bestellung ↔ Wareneingang).
+ */
+export interface PurchaseOrderMergeCandidate {
+    id: string;
+    referenceNumber: string;
+    priceRequestNumber?: string | null;
+    orderNumber?: string | null;
+    status: PurchaseOrderStatus;
+    stage: 1 | 2 | 3;
+    supplierName: string;
+    projectName?: string | null;
+    currency: string;
+    totalNet: number;
+    itemCount: number;
+    createdAt: string;
 }
 
 export interface CreatePurchaseOrderInput {
-    /** Boş bırakılırsa sunucu BE-{yıl}-{sıra} üretir. */
+    /**
+     * Boş bırakılırsa sunucu aşamaya göre üretir: fiyat talebi `PA-{yıl}-{sıra}`,
+     * sipariş `BE-{yıl}-{sıra}`. Başka bir dilde yazılan kod (FT-/SP-/PR-/PO-)
+     * sunucuda depo yazımına çevrilir.
+     */
     referenceNumber?: string | null;
     quoteNumber?: string | null;
     orderedByName?: string | null;
@@ -859,6 +924,8 @@ export interface CreatePurchaseOrderInput {
     items: PurchaseOrderItemInput[];
     /** Ad + tutar; adı ve tutarı boş olan satırlar sunucuda atılır. */
     additionalFees?: PurchaseOrderFee[];
+    /** Produktion (19.09.2026): Projekt + Geräte — Pflicht, wo das Modul läuft. */
+    production?: ProductionSelection | null;
 }
 
 export interface UpdatePurchaseOrderInput {
@@ -881,6 +948,8 @@ export interface UpdatePurchaseOrderInput {
     orderVatCountry?: string | null;
     items?: PurchaseOrderItemInput[];
     additionalFees?: PurchaseOrderFee[];
+    /** Produktion (19.09.2026): eine neue Auswahl; ohne sie gilt die gespeicherte. */
+    production?: ProductionSelection | null;
 }
 
 // ── Ön yazı (Anschreiben) taslakları ─────────────────────────────────────────

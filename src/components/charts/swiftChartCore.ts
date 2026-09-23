@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /* The geometry and the motion of components/charts/swiftChart.tsx — kept in
    a file of its own so the component file exports only components (Vite's
@@ -93,10 +93,11 @@ const easeOut = (p: number) => 1 - (1 - p) ** 3;
  * First visibility, exactly once: a chart draws itself when it comes into
  * view, not while it is still under the fold.
  */
-export const useFirstReveal = <T extends Element>() => {
+export const useFirstReveal = <T extends Element>(enabled = true) => {
     const ref = useRef<T | null>(null);
     const [shown, setShown] = useState(false);
     useEffect(() => {
+        if (!enabled) return;
         const node = ref.current;
         const paint = () => requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
         if (!node || typeof IntersectionObserver === 'undefined') { paint(); return; }
@@ -105,15 +106,15 @@ export const useFirstReveal = <T extends Element>() => {
         }, { threshold: 0.25 });
         observer.observe(node);
         return () => observer.disconnect();
-    }, []);
-    return [ref, shown] as const;
+    }, [enabled]);
+    return [ref, !enabled || shown] as const;
 };
 
 /** 0 → 1 once `run` turns true; ease-out; instant under reduced motion. */
 export const useProgress = (run: boolean, ms: number) => {
     const [progress, setProgress] = useState(0);
     useEffect(() => {
-        if (!run) return;
+        if (!run || ms <= 0) return;
         if (prefersStill()) { setProgress(1); return; }
         const started = performance.now();
         let frame = requestAnimationFrame(function step(now: number) {
@@ -123,7 +124,7 @@ export const useProgress = (run: boolean, ms: number) => {
         });
         return () => cancelAnimationFrame(frame);
     }, [run, ms]);
-    return progress;
+    return ms <= 0 ? 1 : progress;
 };
 
 /**
@@ -135,6 +136,7 @@ export const useTweenValues = (target: Record<string, number>, ms: number) => {
     const shown = useRef(target);
     const key = JSON.stringify(target);
     useEffect(() => {
+        if (ms <= 0) { shown.current = target; return; }
         const from = { ...shown.current };
         const to = target;
         const keys = Array.from(new Set([...Object.keys(from), ...Object.keys(to)]));
@@ -155,7 +157,7 @@ export const useTweenValues = (target: Record<string, number>, ms: number) => {
         return () => cancelAnimationFrame(frame);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key, ms]);
-    return values;
+    return ms <= 0 ? target : values;
 };
 
 export const useCountUp = (target: number, run: boolean, ms: number) => {
@@ -188,6 +190,30 @@ export const barPath = (x: number, y: number, w: number, h: number, corner = 3) 
     return `M ${x} ${y + h} L ${x} ${y + r} Q ${x} ${y} ${x + r} ${y} L ${x + w - r} ${y} Q ${x + w} ${y} ${x + w} ${y + r} L ${x + w} ${y + h} Z`;
 };
 
+/**
+ * A capsule bar — rounded on BOTH ends (21.09.2026, Samet's barchart.png:
+ * the marks read as pills, the way Swift Charts draws them with a corner
+ * radius of half the bar width). The radius follows the SHORTER side, so a
+ * bar still growing out of the baseline stays a rounded sliver instead of
+ * popping into a circle.
+ */
+export const capsuleBarPath = (x: number, y: number, w: number, h: number) => {
+    if (h <= 0 || w <= 0) return '';
+    const r = Math.min(w, h) / 2;
+    const n = (value: number) => Number(value.toFixed(2));
+    return [
+        `M ${n(x + r)} ${n(y)}`,
+        `L ${n(x + w - r)} ${n(y)}`,
+        `A ${n(r)} ${n(r)} 0 0 1 ${n(x + w)} ${n(y + r)}`,
+        `L ${n(x + w)} ${n(y + h - r)}`,
+        `A ${n(r)} ${n(r)} 0 0 1 ${n(x + w - r)} ${n(y + h)}`,
+        `L ${n(x + r)} ${n(y + h)}`,
+        `A ${n(r)} ${n(r)} 0 0 1 ${n(x)} ${n(y + h - r)}`,
+        `L ${n(x)} ${n(y + r)}`,
+        `A ${n(r)} ${n(r)} 0 0 1 ${n(x + r)} ${n(y)}`,
+        'Z',
+    ].join(' ');
+};
 /** Clean axis steps — 4 gridlines between 0 and a rounded maximum. */
 export const niceMax = (raw: number, steps = 4) => {
     if (raw <= 0) return steps;
@@ -196,6 +222,32 @@ export const niceMax = (raw: number, steps = 4) => {
     const candidates = [1, 2, 2.5, 5, 10].map((m) => m * magnitude);
     const step = candidates.find((candidate) => candidate >= rough) ?? candidates[candidates.length - 1];
     return step * steps;
+};
+
+/**
+ * Width AND height of a box the layout sizes (a flex child, say) — a bar
+ * chart that fills its card reads its height from here. The element must not
+ * take its height from its own content, or the two would chase each other.
+ */
+export const useElementBox = () => {
+    const ref = useRef<HTMLDivElement>(null);
+    const [box, setBox] = useState({ width: 0, height: 0 });
+    useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const measure = (width: number, height: number) => {
+            const next = { width: Math.round(width), height: Math.round(height) };
+            setBox(current => current.width === next.width && current.height === next.height ? current : next);
+        };
+        const observer = new ResizeObserver((entries) => {
+            const rect = entries[0]?.contentRect;
+            if (rect) measure(rect.width, rect.height);
+        });
+        observer.observe(el);
+        measure(el.clientWidth, el.clientHeight);
+        return () => observer.disconnect();
+    }, []);
+    return { ref, ...box };
 };
 
 export const useElementWidth = () => {

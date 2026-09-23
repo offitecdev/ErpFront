@@ -31,6 +31,7 @@ import liberationBoldUrl from '../../assets/fonts/LiberationSans-Bold.ttf?url';
 import liberationRegularUrl from '../../assets/fonts/LiberationSans-Regular.ttf?url';
 import offitecLogoUrl from '../../assets/images/offitec.png?url';
 import headerWaveUrl from '../../assets/images/header-wave.svg?url';
+import { localizePurchaseCode } from '@/utils/purchaseCode';
 
 export type PriceRequestPdfLang = 'tr' | 'de' | 'en';
 
@@ -616,13 +617,18 @@ const columnIsNumeric = (values: string[]) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildPriceRequestPdfBytes(
-    order: PurchaseOrderRow,
+    sourceOrder: PurchaseOrderRow,
     settings: PdfCompanySettings,
     lang: PriceRequestPdfLang = 'de'
 ): Promise<Uint8Array> {
+    // DER CODE STEHT IN DER SPRACHE DES BELEGS (Vorgabe Samet, 21.09.2026):
+    // gespeichert ist die deutsche Schreibweise (`PA-`/`BE-`), gedruckt wird
+    // `FT-`/`SP-` (tr) bzw. `PR-`/`PO-` (en). Die Kopie traegt sie durch das
+    // ganze Dokument — Fusszeile, Karte, Titel und Dateiname.
+    const order = { ...sourceOrder, referenceNumber: localizePurchaseCode(sourceOrder.referenceNumber, lang) };
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     // Der Titel ersetzt in der Vorschau (blob:-URL) die UUID als Dokumentname.
-    doc.setProperties({ title: `Preisanfrage-${order.referenceNumber || ''}` });
+    doc.setProperties({ title: order.referenceNumber || 'Preisanfrage' });
     doc.viewerPreferences({ DisplayDocTitle: true });
     await registerFonts(doc);
     // Jede Zeile setzt ihre Sperrung selbst (0 Tc) — sonst erbte der Text nach
@@ -691,7 +697,7 @@ export async function exportPriceRequestPdf(
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Preisanfrage-${order.referenceNumber}.pdf`;
+    a.download = `${localizePurchaseCode(order.referenceNumber, lang)}.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -1,10 +1,5 @@
-/* Start page (pages/Home.tsx + components/home/*) in the Mac look — 10.09.2026,
-   Samet: «die Startseite so sauber, ordentlich und professionell wie die
-   Angebotsseite — ein echtes macOS/SwiftUI-Programm». The same list as
-   styles/tenderDetail.css: white panels with ONE 10 % hairline and a 10px
-   corner, no shadow, no tint, no watermark glyphs; 28px bordered push
-   buttons with a 6px corner; sentence-case titles; one system blue; the
-   charts in the Swift idiom (components/charts/swiftChart.css).
+/* Home overview: shadow-free glass, quiet hairlines, rounded groups and
+   compact system controls. Charts keep the Swift visual language.
 
    Scoped `.ofi-home` — the Home page root carries it. The palette is the
    window palette of styles/appleModal.css (`--ofi-win-*`) so page, popups
@@ -14,8 +9,9 @@
    ([[radius-utilities-flattened]]). */
 
 .ofi-home {
-    --home-radius: 10px;
-    --home-control-radius: 6px;
+    --home-radius: 18px;
+    --home-control-radius: 9px;
+    --ofi-win-font: -apple-system, BlinkMacSystemFont, 'Inter Variable', 'Segoe UI', sans-serif;
     min-width: 0;
     color: var(--ofi-win-text);
     font-family: var(--ofi-win-font);
@@ -23,32 +19,65 @@
     -webkit-font-smoothing: antialiased;
 }
 
+/* The overview uses translucent surfaces and hairlines, with no cast or inset
+   shadows. Keyboard focus stays explicit through an outline. */
+#root .ofi-home,
+#root .ofi-home *,
+#root .ofi-home *::before,
+#root .ofi-home *::after { box-shadow: none !important; text-shadow: none !important; }
+#root .ofi-home :is(button, a, [tabindex]):focus-visible {
+    outline: 2px solid var(--ofi-win-accent) !important;
+    outline-offset: -3px;
+}
+#root .ofi-home svg { filter: none; }
+/* Draw the final data once. A short opacity reveal replaces per-frame SVG
+   geometry updates and leaves the glass surface stationary. */
+@keyframes ofi-home-chart-reveal { from { opacity: 0.65; } to { opacity: 1; } }
+.ofi-home .ofi-swc { animation: ofi-home-chart-reveal 160ms ease-out; }
+.ofi-home .ofi-swc-split__seg { transition: opacity 120ms ease; }
+#root .ofi-home .ofi-home-tile__icon { color: var(--ofi-win-accent); }
+.ofi-home__clock > div > p { color: var(--ofi-win-secondary); }
+.ofi-home__clock svg { width: 148px; height: 148px; }
+.ofi-home__clock svg > circle:first-child { fill: transparent; stroke: var(--ofi-win-hairline); stroke-width: 1; }
+.ofi-home__clock svg > circle:nth-child(2) { stroke: var(--ofi-win-hairline); }
+.ofi-home__clock svg > line { stroke: var(--ofi-win-text); }
+.ofi-home__clock svg > line:last-of-type { stroke: var(--ofi-win-danger); }
+.ofi-home__clock svg > text { fill: var(--ofi-win-secondary); }
+
+@media (max-width: 640px) {
+    #root .ofi-home .ofi-home__title { font-size: 24px; }
+    .ofi-home .ofi-home__welcome { gap: 20px; margin-bottom: 24px; }
+    .ofi-home .ofi-home-card__head { flex-wrap: wrap; padding: 16px 16px 0; }
+    .ofi-home .ofi-home-card__title { white-space: normal; }
+    #root .ofi-home .ofi-home-qm__tile { width: 174px; }
+    #root .ofi-home .ofi-home-tile { padding: 14px; }
+}
+
 /* ── the welcome row ─────────────────────────────────────────────────────── */
 .ofi-home__welcome {
     display: flex;
     flex-direction: column;
-    gap: 22px;
-    margin-bottom: 28px;
-    border-bottom: 1px solid var(--ofi-win-hairline);
-    padding-bottom: 22px;
+    gap: 24px;
+    margin-bottom: 30px;
+    padding: 6px 0 0;
 }
-@media (min-width: 1280px) { .ofi-home__welcome { flex-direction: row; align-items: flex-start; } }
+@media (min-width: 1280px) { .ofi-home__welcome { flex-direction: row; align-items: center; } }
 .ofi-home__greet { flex: none; }
-@media (min-width: 1280px) { .ofi-home__greet { width: 272px; } }
+@media (min-width: 1280px) { .ofi-home__greet { width: 300px; } }
 .ofi-home__date { font-size: 12px; font-weight: 500; color: var(--ofi-win-secondary); }
 #root .ofi-home__title {
     margin-top: 6px;
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.2;
     color: var(--ofi-win-text);
 }
-#root .ofi-home__title b { font-weight: 600; color: var(--ofi-win-accent); }
+#root .ofi-home__title b { font-weight: 600; color: inherit; }
 .ofi-home__lead { margin-top: 6px; font-size: 13px; line-height: 1.45; color: var(--ofi-win-secondary); }
 
 /* ── section titles: sentence case, small, with room for one button ──────── */
-.ofi-home-section + .ofi-home-section { margin-top: 28px; }
+.ofi-home-section + .ofi-home-section { margin-top: 24px; }
 .ofi-home-stats > .ofi-home-section:first-child { margin-top: 0; }
 .ofi-home-section__head {
     display: flex;
@@ -71,13 +100,13 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    height: 28px;
-    min-height: 28px;
+    height: 30px;
+    min-height: 30px;
     border: 1px solid var(--ofi-win-field-border);
     border-radius: var(--home-control-radius);
     background: var(--ofi-win-field);
     padding: 0 10px;
-    box-shadow: var(--ofi-win-btn-shadow);
+    box-shadow: none;
     font-family: inherit;
     font-size: 12.5px;
     font-weight: 500;
@@ -101,7 +130,7 @@
     border-radius: var(--home-control-radius);
     background: var(--ofi-win-field);
     color: var(--ofi-win-secondary);
-    box-shadow: var(--ofi-win-btn-shadow);
+    box-shadow: none;
     transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 #root .ofi-home-glyph:hover:not(:disabled) { background: var(--ofi-win-hover); color: var(--ofi-win-text); }
@@ -111,14 +140,14 @@
 .ofi-home-seg {
     display: inline-flex;
     gap: 1px;
-    border-radius: 7px;
+    border-radius: 10px;
     background: var(--ofi-win-fill);
     padding: 2px;
 }
 #root .ofi-home-seg__btn {
-    height: 24px;
+    height: 26px;
     border: 0;
-    border-radius: 5px;
+    border-radius: 8px;
     background: transparent;
     padding: 0 12px;
     font-family: inherit;
@@ -130,7 +159,7 @@
 #root .ofi-home-seg__btn.is-on {
     background: var(--ofi-win-surface);
     font-weight: 500;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    box-shadow: none;
 }
 .dark #root .ofi-home-seg__btn.is-on { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
 
@@ -150,8 +179,7 @@
     justify-content: space-between;
     gap: 12px;
     min-height: 44px;
-    border-bottom: 1px solid var(--ofi-win-hairline);
-    padding: 11px 16px 10px;
+    padding: 18px 20px 0;
 }
 .ofi-home-card__title {
     overflow: hidden;
@@ -164,7 +192,11 @@
     color: var(--ofi-win-text);
 }
 .ofi-home-card__sub { margin-top: 2px; font-size: 12px; color: var(--ofi-win-secondary); }
-.ofi-home-card__body { flex: 1; min-width: 0; padding: 16px; }
+.ofi-home-card__body { flex: 1; min-width: 0; padding: 20px; }
+/* A chart card: the plot takes the whole body instead of leaving a hole
+   under itself when the neighbouring card is taller (21.09.2026). */
+.ofi-home-card__body--fill { display: flex; min-height: 0; flex-direction: column; }
+.ofi-home-card__body--fill > * { flex: 1; min-height: 0; }
 .ofi-home-error { align-items: center; gap: 10px; padding: 36px 16px; text-align: center; font-size: 13px; color: var(--ofi-win-secondary); }
 .ofi-home-empty {
     display: flex;
@@ -184,13 +216,13 @@
 @media (min-width: 1024px) { .ofi-home-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 #root .ofi-home-tile {
     display: flex;
-    min-height: 98px;
+    min-height: 116px;
     min-width: 0;
     flex-direction: column;
     border: 1px solid var(--ofi-win-border);
     border-radius: var(--home-radius);
     background: var(--ofi-win-surface);
-    padding: 13px 14px 12px;
+    padding: 16px 18px;
     text-align: left;
     font-family: inherit;
     color: var(--ofi-win-text);
@@ -213,7 +245,7 @@
 .ofi-home-tile.is-link:hover .ofi-home-tile__icon { color: var(--ofi-win-accent); }
 .ofi-home-tile__value {
     margin-top: 6px;
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1;
@@ -261,7 +293,7 @@
     height: 148px;
     border-radius: 50%;
     background: transparent;
-    box-shadow: inset 0 0 0 22px var(--ofi-win-hairline, rgba(0, 0, 0, 0.08));
+    border: 22px solid var(--ofi-win-hairline, rgba(0, 0, 0, 0.08));
 }
 @media (prefers-reduced-motion: reduce) {
     .ofi-home-bone { animation: none; }
@@ -337,7 +369,7 @@
 .ofi-home-pick__count.is-full { color: var(--ofi-win-text); font-weight: 500; }
 
 /* ── the table view of the monthly chart ─────────────────────────────────── */
-.ofi-home-tablewrap { overflow: hidden; border: 1px solid var(--ofi-win-border); border-radius: 8px; }
+.ofi-home-tablewrap { overflow-x: auto; border: 1px solid var(--ofi-win-border); border-radius: 8px; }
 #root .ofi-home-table { font-size: 13px; font-variant-numeric: tabular-nums; }
 #root .ofi-home-table th {
     height: 32px;
@@ -369,11 +401,12 @@
 .ofi-home-qm__track::-webkit-scrollbar { display: none; }
 #root .ofi-home-qm__tile {
     display: flex;
-    width: 210px;
-    height: 124px;
+    width: 190px;
+    min-height: 76px;
     flex: none;
-    flex-direction: column;
-    justify-content: space-between;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
     scroll-snap-align: start;
     border: 1px solid var(--ofi-win-border);
     border-radius: var(--home-radius);
@@ -392,10 +425,11 @@
     height: 32px;
     align-items: center;
     justify-content: center;
-    border: 1px solid var(--ofi-win-border);
-    border-radius: 7px;
-    background: var(--ofi-win-surface);
-    color: var(--ofi-win-secondary);
+    flex: none;
+    border: 0;
+    border-radius: 10px;
+    background: var(--ofi-win-accent-soft);
+    color: var(--ofi-win-accent);
 }
 .ofi-home-qm__tile:hover .ofi-home-qm__icon { color: var(--ofi-win-accent); }
 .ofi-home-qm__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -429,13 +463,21 @@
 }
 
 /* ── the right column: clock and «Anstehend» ─────────────────────────────── */
-.ofi-home__aside { margin-top: 28px; }
-@media (min-width: 1024px) { .ofi-home__aside { width: 300px; flex: none; margin-top: 0; } }
+.ofi-home__workspace { display: grid; min-width: 0; gap: 24px; }
+.ofi-home__main, .ofi-home__aside { min-width: 0; }
+@media (min-width: 1280px) {
+    .ofi-home__workspace { grid-template-columns: minmax(0, 1fr) 248px; align-items: start; }
+    .ofi-home__aside { padding-top: 40px; }
+}
+@media (min-width: 641px) and (max-width: 1279px) {
+    .ofi-home__aside { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: start; gap: 24px; }
+    .ofi-home__aside .ofi-home-up { margin-top: 0; }
+}
 .ofi-home__clock {
     border: 1px solid var(--ofi-win-border);
     border-radius: var(--home-radius);
     background: var(--ofi-win-surface);
-    padding: 18px 16px 16px;
+    padding: 20px;
 }
 .ofi-home__clock svg { filter: none; }
 .ofi-home-up { margin-top: 20px; }
@@ -527,8 +569,8 @@
 @layer utilities {
     #root .ofi-home :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock, .ofi-home-qm__none) { border-radius: var(--home-radius) !important; }
     #root .ofi-home :is(.ofi-home-btn, .ofi-home-glyph) { border-radius: var(--home-control-radius) !important; }
-    #root .ofi-home .ofi-home-seg { border-radius: 7px !important; }
-    #root .ofi-home .ofi-home-seg__btn { border-radius: 5px !important; }
+    #root .ofi-home .ofi-home-seg { border-radius: 10px !important; }
+    #root .ofi-home .ofi-home-seg__btn { border-radius: 8px !important; }
     :is(#root, body > :not(#root)) .ofi-home-pick__list { border-radius: 8px !important; }
 }
 
@@ -538,4 +580,182 @@
 }
 @media (prefers-reduced-motion: reduce) {
     .ofi-home *, .ofi-home *::before, .ofi-home *::after { transition: none !important; }
+    .ofi-home .ofi-swc { animation: none; }
+}
+
+/* ── the sheets' segmented controls and rows (21.09.2026) ─────────────────
+   The filter sheet of «Vertrieb & Konversion» and the Darstellung row of the
+   tile picker. Both live in a portal, so every rule needs the twin selector
+   ([[portal-popup-css-twin]]). */
+:is(#root, body > :not(#root)) .ofi-home-pick__seg {
+    display: inline-flex;
+    flex: none;
+    gap: 2px;
+    border-radius: 8px;
+    background: var(--ofi-win-fill);
+    padding: 2px;
+}
+:is(#root, body > :not(#root)) .ofi-home-pick__segbtn {
+    height: 26px;
+    min-width: 66px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--ofi-win-text);
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+:is(#root, body > :not(#root)) .ofi-home-pick__segbtn:hover:not(.is-on) { background: var(--ofi-win-hover); }
+:is(#root, body > :not(#root)) .ofi-home-pick__segbtn.is-on {
+    background: var(--ofi-win-surface);
+    font-weight: 500;
+    box-shadow: none;
+}
+.dark :is(#root, body > :not(#root)) .ofi-home-pick__segbtn.is-on { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+:is(#root, body > :not(#root)) .ofi-home-pick__segbtn:focus-visible { outline: 2px solid var(--ofi-win-accent); outline-offset: -2px; }
+.ofi-home-pick__panel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--ofi-win-border);
+    border-radius: 8px;
+    background: var(--ofi-win-surface);
+    padding: 10px 12px;
+}
+.ofi-home-pick__note { padding: 7px 2px 0; font-size: 11.5px; line-height: 1.4; color: var(--ofi-win-secondary); }
+.ofi-home-pick__dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 7px;
+    border-radius: 2.5px;
+    vertical-align: middle;
+}
+
+/* ── macOS 27 «Liquid Glass» (21.09.2026) ─────────────────────────────────
+   Samet: «glass kartlar da olabilir, mac os 27 tarzı», with the magazine
+   piece on macOS 27: depth, translucency, reflection — and a transparency
+   dial, because macOS 27 lets one tune how far the material opens up. The
+   dial sits in the overview's Anpassen sheet and lands here as `data-glass`
+   (Aus · Leicht · Voll, [[homeAppearance]]).
+
+   Glass only reads when something lies BEHIND it, so the page carries a very
+   quiet wash in the chart colours; the cards pick that up instead of turning
+   grey. The rest of the app keeps the white shell with one hairline
+   ([[shell-white-canvas-shadows]]) — this is the start page only. */
+.ofi-home[data-glass='soft'],
+.ofi-home[data-glass='full'] {
+    position: relative;
+    isolation: isolate;
+    --home-glass: rgba(255, 255, 255, 0.6);
+    --home-glass-hover: rgba(255, 255, 255, 0.8);
+    --home-glass-blur: 12px;
+    --home-glass-sat: 1.25;
+    --home-glass-sheen: rgba(255, 255, 255, 0.75);
+    --home-glass-line: rgba(90, 106, 129, 0.14);
+    --home-wash-1: rgba(129, 164, 201, 0.16);
+    --home-wash-2: rgba(159, 172, 191, 0.12);
+    --home-wash-3: rgba(163, 184, 200, 0.13);
+}
+.ofi-home[data-glass='full'] {
+    --home-glass: rgba(255, 255, 255, 0.42);
+    --home-glass-hover: rgba(255, 255, 255, 0.76);
+    --home-glass-blur: 18px;
+    --home-glass-sat: 1.4;
+    --home-wash-1: rgba(10, 122, 255, 0.16);
+    --home-wash-2: rgba(159, 172, 191, 0.16);
+    --home-wash-3: rgba(48, 176, 199, 0.1);
+}
+.dark .ofi-home[data-glass='soft'],
+.dark .ofi-home[data-glass='full'] {
+    --home-glass: rgba(38, 40, 44, 0.62);
+    --home-glass-hover: rgba(44, 44, 46, 0.84);
+    --home-glass-sheen: rgba(255, 255, 255, 0.1);
+    --home-glass-line: rgba(255, 255, 255, 0.12);
+    --home-wash-1: rgba(10, 132, 255, 0.2);
+    --home-wash-2: rgba(159, 172, 191, 0.12);
+    --home-wash-3: rgba(64, 200, 224, 0.12);
+}
+.dark .ofi-home[data-glass='full'] {
+    --home-glass: rgba(28, 28, 30, 0.54);
+    --home-glass-hover: rgba(44, 44, 46, 0.7);
+}
+
+/* The wash the glass refracts — three soft blooms, nothing readable. */
+.ofi-home[data-glass='soft']::before,
+.ofi-home[data-glass='full']::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    /* Only upwards: a negative bottom or side inset would add scrollable
+       overflow to the page. */
+    inset: -32px 0 0;
+    pointer-events: none;
+    background:
+        radial-gradient(680px 380px at 8% -4%, var(--home-wash-1), transparent 62%),
+        radial-gradient(620px 420px at 92% 14%, var(--home-wash-2), transparent 64%),
+        radial-gradient(760px 520px at 52% 96%, var(--home-wash-3), transparent 66%);
+}
+
+#root .ofi-home[data-glass='soft'] :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-qm__none, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock),
+#root .ofi-home[data-glass='full'] :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-qm__none, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock) {
+    border-color: var(--home-glass-line);
+    background: linear-gradient(145deg, var(--home-glass-sheen), transparent 42%) border-box, var(--home-glass);
+    -webkit-backdrop-filter: blur(var(--home-glass-blur)) saturate(var(--home-glass-sat));
+    backdrop-filter: blur(var(--home-glass-blur)) saturate(var(--home-glass-sat));
+    box-shadow: none;
+}
+/* The hover stays a fill, not a movement — the glass only gets denser. */
+#root .ofi-home[data-glass='soft'] :is(.ofi-home-tile.is-link:hover, .ofi-home-qm__tile:hover, .ofi-home-up__card:hover),
+#root .ofi-home[data-glass='full'] :is(.ofi-home-tile.is-link:hover, .ofi-home-qm__tile:hover, .ofi-home-up__card:hover) {
+    background: var(--home-glass-hover);
+}
+/* The icon chips and the segmented control ride on the same material. */
+#root .ofi-home[data-glass='soft'] :is(.ofi-home-qm__icon, .ofi-home-up__icon, .ofi-home-seg),
+#root .ofi-home[data-glass='full'] :is(.ofi-home-qm__icon, .ofi-home-up__icon, .ofi-home-seg) {
+    border-color: var(--home-glass-line);
+    background: var(--home-glass);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+#root .ofi-home[data-glass='soft'] .ofi-home-btn,
+#root .ofi-home[data-glass='full'] .ofi-home-btn {
+    border-color: var(--home-glass-line);
+    background: var(--home-glass-hover);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+/* Without backdrop-filter (older WebKit, some Windows GPUs) the cards would
+   be flat washes — they fall back to the solid surface. */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    #root .ofi-home[data-glass='soft'] :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-qm__none, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock),
+    #root .ofi-home[data-glass='full'] :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-qm__none, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock) {
+        background: var(--ofi-win-surface);
+    }
+}
+/* macOS' own «Transparenz reduzieren» wins over the dial. */
+@media (prefers-reduced-transparency: reduce) {
+    .ofi-home[data-glass='soft']::before,
+    .ofi-home[data-glass='full']::before { display: none; }
+    #root .ofi-home[data-glass='soft'] :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-qm__none, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock, .ofi-home-qm__icon, .ofi-home-up__icon, .ofi-home-seg, .ofi-home-btn),
+    #root .ofi-home[data-glass='full'] :is(.ofi-home-card, .ofi-home-tile, .ofi-home-qm__tile, .ofi-home-qm__none, .ofi-home-up__card, .ofi-home-up__pop, .ofi-home__clock, .ofi-home-qm__icon, .ofi-home-up__icon, .ofi-home-seg, .ofi-home-btn) {
+        border-color: var(--ofi-win-border);
+        background: var(--ofi-win-surface);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        box-shadow: none;
+    }
+}
+
+@layer utilities {
+    :is(#root, body > :not(#root)) .ofi-home-pick__seg { border-radius: 8px !important; }
+    :is(#root, body > :not(#root)) .ofi-home-pick__segbtn { border-radius: 6px !important; }
+    :is(#root, body > :not(#root)) .ofi-home-pick__panel { border-radius: 8px !important; }
+    :is(#root, body > :not(#root)) .ofi-home-pick__dot { border-radius: 2.5px !important; }
 }

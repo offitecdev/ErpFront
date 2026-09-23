@@ -132,6 +132,18 @@ export const PAGE_MODULES: CatalogModule[] = [
         ],
     },
     {
+        // Produktion (19.09.2026): 1 ansehen · 2 zusätzlich sofort mit dem
+        // Verkauf abgleichen. Die Projektseite (/production/orders/:id) gehört
+        // zur ersten Zeile (Serverkopie: Erp_Backend/src/shared/pageCatalog.ts).
+        key: 'production',
+        labelKey: 'nav.production',
+        pages: [
+            { key: 'production.orders', path: '/production/orders', labelKey: 'nav.productionOrders', maxLevel: 2 },
+            { key: 'production.lines', path: '/production/lines', labelKey: 'nav.productionLines', maxLevel: 1 },
+            { key: 'production.panels', path: '/production/panels', labelKey: 'nav.panels', maxLevel: 2 },
+        ],
+    },
+    {
         // Görevler (13.09.2026): 1 Teammitglied · 2 Leitung · 3 Leitung mit Löschen
         // (Serverkopie: Erp_Backend/src/shared/pageCatalog.ts).
         key: 'tasks',
@@ -167,6 +179,7 @@ export const PAGE_MODULES: CatalogModule[] = [
 export const FIXED_SETTINGS_PAGES: ReadonlyArray<{ path: string; labelKey: string; lock: 'admin' | 'it' }> = [
     { path: '/settings/authorization', labelKey: 'nav.authorizationSettings', lock: 'admin' },
     { path: '/settings/company-categories', labelKey: 'nav.companyCategories', lock: 'admin' },
+    { path: '/settings/company-transfers', labelKey: 'nav.companyTransfers', lock: 'admin' },
     { path: '/settings/mail', labelKey: 'nav.mailSettings', lock: 'it' },
     { path: '/settings/upload', labelKey: 'nav.upload', lock: 'it' },
 ];

@@ -6,13 +6,13 @@ import { toast } from 'sonner';
 import { ArrowRight } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingDots } from '@/components/ui-shared/Loader';
-import { FilterBar, SearchBox } from '@/components/ui-shared/TableKit';
 import { t } from '@/i18n/translate';
 import { billingApi } from '@/lib/api/billing';
 import type { ToBillItemDto } from '@/types/billing';
 import { apiError, fmtDate, fmtMoney } from '@/pages/sales/invoices/invoiceShared';
 
 import { kindLabel, useBillingRights } from './accountingShared';
+import { AccPager, AccSearch } from './components/AccControls';
 import '@/styles/modules/accounting.css';
 
 /**
@@ -30,6 +30,10 @@ import '@/styles/modules/accounting.css';
 
 type Tab = 'NOW' | 'SOON' | 'ALL';
 
+/** Auch die Arbeitsliste blättert 20 Zeilen (22.09.2026) — sie kommt als
+ *  gerechnete Antwort vom Server, geblättert wird darum hier. */
+const PAGE_SIZES = [20, 50, 100];
+
 export const ToBillPage = () => {
     const navigate = useNavigate();
     const { canCreate } = useBillingRights();
@@ -37,6 +41,8 @@ export const ToBillPage = () => {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('NOW');
     const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
 
     const load = useCallback(async () => {
         try {
@@ -61,13 +67,21 @@ export const ToBillPage = () => {
         return { now: of('NOW'), soon: of('SOON'), all: of(null) };
     }, [items]);
 
-    const rows = useMemo(() => {
+    const matching = useMemo(() => {
         const needle = search.trim().toLowerCase();
         return items
             .filter((row) => tab === 'ALL' || row.urgency === tab)
             .filter((row) => !needle || [row.orderNumber, row.parentNumber, row.customerName, row.projectLabel]
                 .some((value) => String(value || '').toLowerCase().includes(needle)));
     }, [items, tab, search]);
+
+    // Reiter oder Suche gewechselt: wieder bei der ersten Seite anfangen.
+    useEffect(() => { setPage(1); }, [tab, search, pageSize]);
+
+    const rows = useMemo(
+        () => matching.slice((page - 1) * pageSize, page * pageSize),
+        [matching, page, pageSize],
+    );
 
     const tile = (key: Tab, label: string, value: number, count: number, sub: string) => (
         <button
@@ -115,17 +129,19 @@ export const ToBillPage = () => {
                         </button>
                     ))}
                 </div>
-                <FilterBar>
-                    <SearchBox value={search} onChange={setSearch} placeholder={t('accounting.searchOrders')} />
-                </FilterBar>
+                <div className="acc-controls">
+                    <AccSearch value={search} onChange={setSearch} placeholder={t('accounting.searchOrders')} />
+                </div>
             </div>
 
             <section className="acc-card">
                 {loading ? (
                     <div className="acc-empty"><LoadingDots /></div>
-                ) : rows.length === 0 ? (
-                    <div className="acc-empty">{tab === 'NOW' ? t('accounting.toBill.emptyNow') : t('accounting.toBill.empty')}</div>
                 ) : (
+                    <>
+                    {rows.length === 0 ? (
+                        <div className="acc-empty">{tab === 'NOW' ? t('accounting.toBill.emptyNow') : t('accounting.toBill.empty')}</div>
+                    ) : (
                     <div className="acc-scroll">
                         <table className="acc-table" data-unstyled-table>
                             <thead>
@@ -186,6 +202,18 @@ export const ToBillPage = () => {
                             </tbody>
                         </table>
                     </div>
+                    )}
+                    {matching.length > 0 && (
+                        <AccPager
+                            page={page}
+                            pageSize={pageSize}
+                            total={matching.length}
+                            onPage={setPage}
+                            onPageSize={setPageSize}
+                            sizes={PAGE_SIZES}
+                        />
+                    )}
+                    </>
                 )}
             </section>
         </div>

@@ -1,39 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { ArrowRight, Plus } from '@/components/icons/antIconCompat';
-import { FilterBar, FilterSelect, SearchBox } from '@/components/ui-shared/TableKit';
 import { LoadingDots } from '@/components/ui-shared/Loader';
 import { t } from '@/i18n/translate';
 import { billingApi } from '@/lib/api/billing';
-import type { AccountingFiguresDto, InvoiceCategory, InvoiceDto } from '@/types/billing';
+import type { AccountingFiguresDto, InvoiceCategory, InvoicePageDto, InvoiceSortKey } from '@/types/billing';
 import {
     apiError,
     categoryLabel,
     CATEGORY_ORDER,
     fmtDate,
     fmtMoney,
-    invoiceCategory,
     invoiceRecipient,
 } from '@/pages/sales/invoices/invoiceShared';
 
 import {
+    dayOf,
     displayNumber,
     invoiceSource,
     invoiceState,
     invoiceStateLabel,
-    isCreditDocument,
-    isOverdue,
     kindLabel,
-    matchesTab,
+    SORT_ORDER,
+    sortLabel,
     STATE_TABS,
     stateLabel,
     type InvoiceState,
     useBillingRights,
 } from './accountingShared';
+import { AccPager, AccSearch, AccSelect } from './components/AccControls';
 import '@/styles/modules/accounting.css';
 
 /**
@@ -42,10 +41,19 @@ import '@/styles/modules/accounting.css';
  * Die EINE Liste aller Rechnungen an Kunden. Oben vier Zahlen — was offen ist,
  * was überfällig ist, was diesen Monat ausgestellt und was diesen Monat
  * bezahlt wurde —, darunter die Reiter des Laufs (Entwurf · Offen ·
- * Überfällig · Bezahlt · Storniert), EIN Suchfeld und EIN Filter (Herkunft).
+ * Überfällig · Bezahlt · Storniert), EIN Suchfeld und zwei Pop-up Buttons
+ * (Herkunft, Reihenfolge).
  *
  * Eine Zeile öffnet die Rechnung auf ihrer eigenen Seite; dort — und nur
  * dort — wird ausgestellt, bezahlt und storniert.
+ *
+ * ── SEITENWEISE, NEUSTES OBEN (22.09.2026) ──────────────────────────────────
+ * Vorgabe Samet: «20'şer 20'şer getirsin… son kesilen ya da işlem yapılan
+ * faturadan aşağıya doğru». Die Seite lädt darum nur EINE Seite (20 Zeilen)
+ * und sortiert nach dem LETZTEN VORGANG: was zuletzt ausgestellt, bezahlt,
+ * geändert oder storniert wurde, steht zuoberst. Reiter, Suche, Herkunft und
+ * die Zähler rechnet deshalb der Server (`GET /billing/invoices?page=…`) —
+ * die Oberfläche hat nie mehr alle Rechnungen in der Hand.
  */
 
 type Tab = 'ALL' | InvoiceState;
@@ -54,78 +62,90 @@ const TAB_PARAM: Record<string, Tab> = {
     DRAFT: 'DRAFT', OPEN: 'OPEN', OVERDUE: 'OVERDUE', PAID: 'PAID', CANCELLED: 'CANCELLED', CREDIT: 'CREDIT',
 };
 
+const PAGE_SIZES = [20, 50, 100];
+
 export const OutgoingInvoicesPage = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { canCreate } = useBillingRights();
 
-    const [invoices, setInvoices] = useState<InvoiceDto[]>([]);
+    const [result, setResult] = useState<InvoicePageDto | null>(null);
     const [loading, setLoading] = useState(true);
+    const [busy, setBusy] = useState(false);
+    // Was im Feld steht, und was der Server schon kennt (300 ms später).
     const [search, setSearch] = useState('');
+    const [query, setQuery] = useState('');
+    const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
 
-    // Reiter und Herkunft stehen in der Adresse: Kacheln der Startseite und
-    // der Weg aus der Auftragsliste führen so direkt in die passende Ansicht.
+    // Reiter, Herkunft, Reihenfolge und Seite stehen in der Adresse: die
+    // Kacheln der Startseite führen so direkt in die passende Ansicht, und der
+    // Weg zurück aus einer Rechnung landet wieder auf derselben Seite.
     const tab: Tab = TAB_PARAM[searchParams.get('status') || ''] ?? 'ALL';
     const rawType = searchParams.get('type') || '';
     const category = (CATEGORY_ORDER as string[]).includes(rawType) ? (rawType as InvoiceCategory) : '';
+    const rawSort = searchParams.get('sort') || '';
+    const sort: InvoiceSortKey = (SORT_ORDER as string[]).includes(rawSort) ? (rawSort as InvoiceSortKey) : 'activity';
+    const page = Math.max(1, Number(searchParams.get('page')) || 1);
 
-    const setParam = (key: string, value: string) => {
-        const next = new URLSearchParams(searchParams);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        setSearchParams(next, { replace: true });
-    };
+    /** Ein Wert in der Adresse; jede Änderung ausser der Seite beginnt wieder bei Seite 1. */
+    const setParam = useCallback((key: string, value: string) => {
+        setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            if (value) next.set(key, value);
+            else next.delete(key);
+            if (key !== 'page') next.delete('page');
+            return next;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    const setPage = useCallback((value: number) => setParam('page', value > 1 ? String(value) : ''), [setParam]);
+
+    // Tippen wartet: erst 300 ms nach dem letzten Zeichen fragt die Seite.
+    useEffect(() => {
+        const timer = window.setTimeout(() => setQuery(search.trim()), 300);
+        return () => window.clearTimeout(timer);
+    }, [search]);
+
+    // Eine neue Suche beginnt bei Seite 1.
+    const lastQuery = useRef(query);
+    useEffect(() => {
+        if (lastQuery.current === query) return;
+        lastQuery.current = query;
+        setPage(1);
+    }, [query, setPage]);
 
     const [serverFigures, setServerFigures] = useState<AccountingFiguresDto | null>(null);
 
-    const load = useCallback(async () => {
-        try {
-            // Liste und Kennzahlen parallel; die Kennzahlen rechnen mit echten
-            // Zahlungseingängen (Teilzahlungen) auf dem Server (Schritt 7).
-            const [list, figures] = await Promise.all([
-                billingApi.listInvoices(),
-                billingApi.figures(dayjs().format('YYYY-MM-DD')).catch(() => null),
-            ]);
-            setInvoices(list);
-            setServerFigures(figures);
-        } catch (error) {
-            toast.error(apiError(error, t('accounting.loadError')));
-        } finally {
-            setLoading(false);
-        }
+    /* Die vier Zahlen gelten für ALLE Rechnungen — sie sind der Stand der
+       Buchhaltung, nicht der gerade gefilterten Ansicht. Sie rechnen mit
+       echten Zahlungseingängen (Teilzahlungen) auf dem Server (Schritt 7). */
+    useEffect(() => {
+        let alive = true;
+        billingApi.figures(dayjs().format('YYYY-MM-DD'))
+            .then((figures) => { if (alive) setServerFigures(figures); })
+            .catch(() => undefined);
+        return () => { alive = false; };
     }, []);
 
-    useEffect(() => { void load(); }, [load]);
+    // Die Seite selbst: Zeilen, Gesamtzahl und die Zähler der Reiter.
+    useEffect(() => {
+        let alive = true;
+        setBusy(true);
+        billingApi.listInvoicesPage({
+            page,
+            pageSize,
+            search: query,
+            state: tab === 'ALL' ? '' : tab,
+            category,
+            sort,
+            today: dayjs().format('YYYY-MM-DD'),
+        })
+            .then((data) => { if (alive) setResult(data); })
+            .catch((error) => { if (alive) toast.error(apiError(error, t('accounting.loadError'))); })
+            .finally(() => { if (alive) { setLoading(false); setBusy(false); } });
+        return () => { alive = false; };
+    }, [page, pageSize, query, tab, category, sort]);
 
-    /* Die vier Zahlen gelten für ALLE Rechnungen — sie sind der Stand der
-       Buchhaltung, nicht der gerade gefilterten Ansicht. Quelle ist der
-       Server; die lokale Rechnung ist nur der Rückfall. */
-    const localFigures = useMemo(() => {
-        const month = dayjs().format('YYYY-MM');
-        let open = 0; let openCount = 0;
-        let overdue = 0; let overdueCount = 0;
-        let issuedMonth = 0; let issuedMonthCount = 0;
-        let paidMonth = 0; let paidMonthCount = 0;
-        for (const invoice of invoices) {
-            const amount = Number(invoice.amount) || 0;
-            // Offen heisst: der Kunde schuldet uns etwas — ein Gegenbeleg nie.
-            if (invoice.status === 'ISSUED' && !isCreditDocument(invoice)) {
-                const rest = invoice.openAmount ?? amount;
-                open += rest; openCount += 1;
-                if (isOverdue(invoice)) { overdue += rest; overdueCount += 1; }
-            }
-            // Ausgestellt netto: Gutschriften zählen negativ, Stornobelege
-            // nicht (ihre Rechnung ist schon als storniert draussen).
-            if ((invoice.status === 'ISSUED' || invoice.status === 'PAID') && invoice.kind !== 'STORNO'
-                && String(invoice.invoiceDate || invoice.createdAt).slice(0, 7) === month) {
-                issuedMonth += amount; issuedMonthCount += 1;
-            }
-            if (invoice.status === 'PAID' && String(invoice.paidAt || '').slice(0, 7) === month) {
-                paidMonth += amount; paidMonthCount += 1;
-            }
-        }
-        return { open, openCount, overdue, overdueCount, issuedMonth, issuedMonthCount, paidMonth, paidMonthCount };
-    }, [invoices]);
     const figures = serverFigures
         ? {
             open: serverFigures.open.amount, openCount: serverFigures.open.count,
@@ -133,50 +153,17 @@ export const OutgoingInvoicesPage = () => {
             issuedMonth: serverFigures.issuedMonth.amount, issuedMonthCount: serverFigures.issuedMonth.count,
             paidMonth: serverFigures.paidMonth.amount, paidMonthCount: serverFigures.paidMonth.count,
         }
-        : localFigures;
+        : { open: 0, openCount: 0, overdue: 0, overdueCount: 0, issuedMonth: 0, issuedMonthCount: 0, paidMonth: 0, paidMonthCount: 0 };
 
-    // Suche und Herkunft zuerst — die Reiter zählen dann innerhalb davon.
-    const scoped = useMemo(() => {
-        const needle = search.trim().toLowerCase();
-        return invoices.filter((invoice) => {
-            if (category && invoiceCategory(invoice) !== category) return false;
-            if (!needle) return true;
-            const source = invoiceSource(invoice);
-            return [
-                invoice.invoiceNumber,
-                invoiceRecipient(invoice),
-                source.primary,
-                source.secondary,
-                invoice.salespersonName,
-                String(invoice.amount),
-            ].some((value) => String(value || '').toLowerCase().includes(needle));
-        });
-    }, [invoices, search, category]);
+    const counts = result?.counts;
+    const rows = result?.items ?? [];
+    const total = result?.total ?? 0;
+    const filtered = tab !== 'ALL' || category !== '' || query !== '';
 
-    const counts = useMemo(() => {
-        const result: Record<Tab, number> = { ALL: scoped.length, DRAFT: 0, OPEN: 0, OVERDUE: 0, PAID: 0, CANCELLED: 0, CREDIT: 0 };
-        for (const invoice of scoped) {
-            const state = invoiceState(invoice);
-            result[state] += 1;
-            if (state === 'OVERDUE') result.OPEN += 1;
-        }
-        return result;
-    }, [scoped]);
-
-    const rows = useMemo(() => {
-        const list = scoped.filter((invoice) => matchesTab(invoice, tab));
-        // Überfällig: die älteste Fälligkeit zuerst — sie braucht zuerst einen Anruf.
-        if (tab === 'OVERDUE') {
-            return list.sort((a, b) => String(a.dueDate || '').localeCompare(String(b.dueDate || '')));
-        }
-        // Entwürfe zuoberst (sie warten auf jemanden), dann die neuesten.
-        return list.sort((a, b) => {
-            const draftA = a.status === 'DRAFT' ? 0 : 1;
-            const draftB = b.status === 'DRAFT' ? 0 : 1;
-            if (draftA !== draftB) return draftA - draftB;
-            return String(b.invoiceDate || b.createdAt).localeCompare(String(a.invoiceDate || a.createdAt));
-        });
-    }, [scoped, tab]);
+    const sortOptions = useMemo(
+        () => SORT_ORDER.map((key) => ({ value: key, label: sortLabel(key) })),
+        [],
+    );
 
     // Eine Kachel mit Reiter filtert danach (zweiter Klick hebt es auf);
     // «diesen Monat ausgestellt» ist eine reine Zahl ohne eigenen Reiter.
@@ -249,21 +236,30 @@ export const OutgoingInvoicesPage = () => {
                             onClick={() => setParam('status', key === 'ALL' ? '' : key)}
                         >
                             {stateLabel(key)}
-                            {counts[key] > 0 && (
-                                <span className={`acc-seg__count ${key === 'OVERDUE' ? 'is-red' : ''}`}>{counts[key]}</span>
+                            {(counts?.[key] ?? 0) > 0 && (
+                                <span className={`acc-seg__count ${key === 'OVERDUE' ? 'is-red' : ''}`}>{counts?.[key]}</span>
                             )}
                         </button>
                     ))}
                 </div>
-                <FilterBar>
-                    <SearchBox value={search} onChange={setSearch} placeholder={t('accounting.searchPlaceholder')} />
-                    <FilterSelect value={category} onChange={(value) => setParam('type', value)} label={t('accounting.sourceFilter')}>
-                        <option value="">{t('accounting.sourceAll')}</option>
-                        {CATEGORY_ORDER.map((key) => (
-                            <option key={key} value={key}>{categoryLabel(key)}</option>
-                        ))}
-                    </FilterSelect>
-                </FilterBar>
+                <div className="acc-controls">
+                    <AccSearch value={search} onChange={setSearch} placeholder={t('accounting.searchPlaceholder')} />
+                    <AccSelect
+                        value={category}
+                        onChange={(value) => setParam('type', value)}
+                        ariaLabel={t('accounting.sourceFilter')}
+                        options={[
+                            { value: '', label: t('accounting.sourceAll') },
+                            ...CATEGORY_ORDER.map((key) => ({ value: key, label: categoryLabel(key) })),
+                        ]}
+                    />
+                    <AccSelect
+                        value={sort}
+                        onChange={(value) => setParam('sort', value === 'activity' ? '' : value)}
+                        ariaLabel={t('accounting.sortLabel')}
+                        options={sortOptions}
+                    />
+                </div>
             </div>
 
             {tab === 'OVERDUE' && serverFigures && serverFigures.overdue.count > 0 && (
@@ -278,78 +274,101 @@ export const OutgoingInvoicesPage = () => {
                 </div>
             )}
 
-            <section className="acc-card">
+            <section className={`acc-card ${busy && !loading ? 'is-busy' : ''}`}>
                 {loading ? (
                     <div className="acc-empty"><LoadingDots /></div>
-                ) : rows.length === 0 ? (
-                    <div className="acc-empty">{invoices.length === 0 ? t('accounting.emptyAll') : t('accounting.emptyFiltered')}</div>
                 ) : (
-                    <div className="acc-scroll">
-                        <table className="acc-table" data-unstyled-table>
-                            <thead>
-                                <tr>
-                                    <th>{t('accounting.colNumber')}</th>
-                                    <th>{t('accounting.colCustomer')}</th>
-                                    <th>{t('accounting.colSource')}</th>
-                                    <th>{t('accounting.colKind')}</th>
-                                    <th>{t('accounting.colDate')}</th>
-                                    <th>{t('accounting.colDue')}</th>
-                                    <th className="is-num">{t('accounting.colAmount')}</th>
-                                    <th className="is-num">{t('accounting.colOpen')}</th>
-                                    <th>{t('accounting.colState')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((invoice) => {
-                                    const state = invoiceState(invoice);
-                                    const source = invoiceSource(invoice);
-                                    const cancelled = state === 'CANCELLED';
-                                    return (
-                                        <tr
-                                            key={invoice.id}
-                                            className={cancelled ? 'is-muted' : ''}
-                                            onClick={() => navigate(`/accounting/invoices/${invoice.id}`)}
-                                        >
-                                            <td>
-                                                <span className={`acc-strong ${cancelled ? 'acc-struck' : ''} ${state === 'DRAFT' ? 'acc-muted' : ''}`}>
-                                                    {displayNumber(invoice)}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span className="acc-name">{invoiceRecipient(invoice) || '—'}</span>
-                                            </td>
-                                            <td>
-                                                <span className="acc-name">{source.primary}</span>
-                                                {source.secondary && <span className="acc-line2">{source.secondary}</span>}
-                                            </td>
-                                            <td className="acc-muted">
-                                                {kindLabel(invoice.kind)}
-                                                {invoice.billedPercent > 0 && invoice.billedPercent < 100 && (
-                                                    <span className="acc-faint"> · {Math.round(invoice.billedPercent)}%</span>
-                                                )}
-                                            </td>
-                                            <td className="acc-muted">{fmtDate(invoice.invoiceDate || invoice.createdAt)}</td>
-                                            <td className={state === 'OVERDUE' ? 'acc-red' : 'acc-muted'}>
-                                                {fmtDate(invoice.dueDate)}
-                                                {state === 'OVERDUE' && (
-                                                    <span className="acc-line2 acc-red">
-                                                        {t('accounting.daysLate', { days: dayjs().startOf('day').diff(dayjs(String(invoice.dueDate).slice(0, 10)), 'day') })}
+                    <>
+                        {rows.length === 0 ? (
+                            <div className="acc-empty">{filtered ? t('accounting.emptyFiltered') : t('accounting.emptyAll')}</div>
+                        ) : (
+                        <div className="acc-scroll">
+                            <table className="acc-table" data-unstyled-table>
+                                <thead>
+                                    <tr>
+                                        <th>{t('accounting.colNumber')}</th>
+                                        <th>{t('accounting.colCustomer')}</th>
+                                        <th>{t('accounting.colSource')}</th>
+                                        <th>{t('accounting.colKind')}</th>
+                                        <th>{t('accounting.colDate')}</th>
+                                        <th>{t('accounting.colDue')}</th>
+                                        <th className="is-num">{t('accounting.colAmount')}</th>
+                                        <th className="is-num">{t('accounting.colOpen')}</th>
+                                        <th>{t('accounting.colState')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((invoice) => {
+                                        const state = invoiceState(invoice);
+                                        const source = invoiceSource(invoice);
+                                        const cancelled = state === 'CANCELLED';
+                                        // Der letzte Vorgang — nur wenn er auf einen ANDEREN Tag
+                                        // fällt als das Rechnungsdatum, erklärt er die Reihenfolge.
+                                        const invoiceDay = dayOf(invoice.invoiceDate || invoice.createdAt);
+                                        const changedDay = dayOf(invoice.activityAt);
+                                        return (
+                                            <tr
+                                                key={invoice.id}
+                                                className={cancelled ? 'is-muted' : ''}
+                                                onClick={() => navigate(`/accounting/invoices/${invoice.id}`)}
+                                            >
+                                                <td>
+                                                    <span className={`acc-strong ${cancelled ? 'acc-struck' : ''} ${state === 'DRAFT' ? 'acc-muted' : ''}`}>
+                                                        {displayNumber(invoice)}
                                                     </span>
-                                                )}
-                                            </td>
-                                            <td className={`is-num acc-strong ${Number(invoice.amount) < 0 ? 'acc-red' : ''}`}>{fmtMoney(invoice.amount)}</td>
-                                            <td className="is-num">
-                                                {(invoice.openAmount ?? 0) > 0.005
-                                                    ? <span className={state === 'OVERDUE' ? 'acc-red acc-strong' : 'acc-strong'}>{fmtMoney(invoice.openAmount)}</span>
-                                                    : <span className="acc-faint">—</span>}
-                                            </td>
-                                            <td><span className={`acc-state is-${state}`}>{invoiceStateLabel(invoice)}</span></td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className="acc-name">{invoiceRecipient(invoice) || '—'}</span>
+                                                </td>
+                                                <td>
+                                                    <span className="acc-name">{source.primary}</span>
+                                                    {source.secondary && <span className="acc-line2">{source.secondary}</span>}
+                                                </td>
+                                                <td className="acc-muted">
+                                                    {kindLabel(invoice.kind)}
+                                                    {invoice.billedPercent > 0 && invoice.billedPercent < 100 && (
+                                                        <span className="acc-faint"> · {Math.round(invoice.billedPercent)}%</span>
+                                                    )}
+                                                </td>
+                                                <td className="acc-muted">
+                                                    {fmtDate(invoice.invoiceDate || invoice.createdAt)}
+                                                    {changedDay && changedDay !== invoiceDay && (
+                                                        <span className="acc-line2 acc-faint">{t('accounting.changedOn', { date: fmtDate(invoice.activityAt) })}</span>
+                                                    )}
+                                                </td>
+                                                <td className={state === 'OVERDUE' ? 'acc-red' : 'acc-muted'}>
+                                                    {fmtDate(invoice.dueDate)}
+                                                    {state === 'OVERDUE' && (
+                                                        <span className="acc-line2 acc-red">
+                                                            {t('accounting.daysLate', { days: dayjs().startOf('day').diff(dayjs(String(invoice.dueDate).slice(0, 10)), 'day') })}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className={`is-num acc-strong ${Number(invoice.amount) < 0 ? 'acc-red' : ''}`}>{fmtMoney(invoice.amount)}</td>
+                                                <td className="is-num">
+                                                    {(invoice.openAmount ?? 0) > 0.005
+                                                        ? <span className={state === 'OVERDUE' ? 'acc-red acc-strong' : 'acc-strong'}>{fmtMoney(invoice.openAmount)}</span>
+                                                        : <span className="acc-faint">—</span>}
+                                                </td>
+                                                <td><span className={`acc-state is-${state}`}>{invoiceStateLabel(invoice)}</span></td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        )}
+                        {total > 0 && (
+                            <AccPager
+                                page={page}
+                                pageSize={pageSize}
+                                total={total}
+                                onPage={setPage}
+                                onPageSize={(size) => { setPageSize(size); setPage(1); }}
+                                sizes={PAGE_SIZES}
+                            />
+                        )}
+                    </>
                 )}
             </section>
         </div>

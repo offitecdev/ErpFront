@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { t } from '@/i18n/translate';
 import { CalendarPage } from '@/pages/calendar/CalendarPage';
 import type { MailSettingDto, ProjectDto, ProjectMaterial, ProjectSalesOrder } from '@/types/project';
 
@@ -34,6 +35,10 @@ export const AppointmentList = ({
     onChanged: () => void;
 }) => {
     const salesOrderId = orderPayloadId(order);
+    /* Die Kommission des Auftrags steht in der Kopfzeile des Anlegefensters
+       neben Kunde, Projekt und Auftrag (21.09.2026). Ist keine erfasst, faellt
+       sie aus der Zeile heraus, statt leer dazustehen. */
+    const commission = (order?.tender?.commissionNumber || '').trim();
 
     const embed = useMemo(() => ({
         prefill: {
@@ -50,7 +55,12 @@ export const AppointmentList = ({
             salesOrderId,
         },
         scope: {
-            label: [project.customer?.companyName, project.projectNumber || project.projectName, order?.orderNumber]
+            label: [
+                project.customer?.companyName,
+                project.projectNumber || project.projectName,
+                order?.orderNumber,
+                commission ? `${t('tenders.kommission_nr')} ${commission}` : null,
+            ]
                 .filter(Boolean)
                 .join(' · '),
             projectName: project.projectName,
@@ -63,6 +73,7 @@ export const AppointmentList = ({
         project.projectNumber,
         project.customer,
         order?.orderNumber,
+        commission,
         salesOrderId,
         onChanged,
     ]);

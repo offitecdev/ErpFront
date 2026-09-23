@@ -2,7 +2,7 @@
 import { companySenderLine, drawAddressBlockLines } from './addressBlock';
 import QRCode from 'qrcode';
 import { PDFDocument } from 'pdf-lib';
-import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
+import { buildQrBillPayload, formatIban, formatQrReference, formatReference, resolveQrCreditor, resolveQrCreditorAccount } from './swissQrBill';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/sales/detail/utils/markdown.utils';
 import { drawRichText, parseRichTextParagraphs } from './richTextPdf';
@@ -1032,14 +1032,23 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     // currency still render, but the QR part falls back to CHF so the code stays
     // scannable/payable.
     const qrCurrency: 'CHF' | 'EUR' = s.currency === 'EUR' ? 'EUR' : 'CHF';
+    // Konto + Referenz gehören zusammen: mit hinterlegtem QR-IBAN zahlt der
+    // Kunde darauf und mit QR-Referenz (QRR), sonst bleibt es beim
+    // Kontokorrent-IBAN mit SCOR/NON.
+    const account = resolveQrCreditorAccount(s.iban, s.qrIban, data.tenderNumber, data.referenceNumber);
+    // "Zahlbar an" = Kontoinhaber, NICHT der gewählte Mandant (siehe resolveQrCreditor).
+    const creditor = resolveQrCreditor(s);
+    const printedReference = account.referenceType === 'QRR'
+        ? formatQrReference(account.reference)
+        : formatReference(account.reference);
     const payload = buildQrBillPayload({
-        iban: s.iban,
-        creditorName: s.companyName,
-        creditorAddressLine1: s.addressLine1,
-        creditorAddressLine2: s.addressLine2,
-        creditorPostalCode: s.postalCode,
-        creditorCity: s.city,
-        creditorCountry: s.country,
+        iban: account.iban,
+        creditorName: creditor.name,
+        creditorAddressLine1: creditor.addressLine1,
+        creditorAddressLine2: creditor.addressLine2,
+        creditorPostalCode: creditor.postalCode,
+        creditorCity: creditor.city,
+        creditorCountry: creditor.country,
         amount,
         currency: qrCurrency,
         debtorName: data.customerName,
@@ -1048,8 +1057,8 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         debtorPostalCode: '',
         debtorCity: '',
         debtorCountry: 'CH',
-        referenceType: data.referenceNumber ? 'SCOR' : 'NON',
-        reference: data.referenceNumber || '',
+        referenceType: account.referenceType,
+        reference: account.reference,
         unstructuredMessage: `${L.offerTitle} ${data.tenderNumber}`,
     });
 
@@ -1077,10 +1086,10 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         doc.text(L.qrAccountPayableTo, x, yy);
         doc.setFont(FONT, 'normal');
         doc.setFontSize(8);
-        doc.text(formatIban(s.iban), x, yy + 3);
-        doc.text(s.companyName, x, yy + 7);
-        doc.text(`${s.addressLine1} ${s.addressLine2}`.replace(/\s+/g, ' ').trim(), x, yy + 10.5);
-        doc.text(`${s.postalCode} ${s.city}`, x, yy + 14);
+        doc.text(formatIban(account.iban), x, yy + 3);
+        doc.text(creditor.name, x, yy + 7);
+        doc.text(`${creditor.addressLine1} ${creditor.addressLine2}`.replace(/\s+/g, ' ').trim(), x, yy + 10.5);
+        doc.text(`${creditor.postalCode} ${creditor.city}`, x, yy + 14);
     };
     writeBlock(5, yTop + 12);
     writeBlock(118, yTop + 12);
@@ -1094,13 +1103,13 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     doc.text(qrCurrency, 67, yTop + 74);
     doc.text(amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 87, yTop + 74);
 
-    if (data.referenceNumber) {
+    if (printedReference) {
         doc.setFont(FONT, 'bold');
         doc.setFontSize(6);
         doc.text(L.qrReference, 118, yTop + 40);
         doc.setFont(FONT, 'normal');
         doc.setFontSize(8);
-        doc.text(formatReference(data.referenceNumber), 118, yTop + 43);
+        doc.text(printedReference, 118, yTop + 43);
     }
 }
 

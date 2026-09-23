@@ -192,6 +192,9 @@ export interface ProjectPickerDto {
         orderType?: string | null;
         parentSalesOrderId?: string | null;
         totalAmount?: number | null;
+        /* Die Kommission steht am Angebot des Auftrags — leer, solange keine
+           erfasst wurde (ein Zusatzauftrag hat gar keines). */
+        tender?: { commissionNumber?: string | null } | null;
     }>;
 }
 

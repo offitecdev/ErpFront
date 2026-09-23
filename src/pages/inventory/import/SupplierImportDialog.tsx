@@ -14,6 +14,7 @@ import type {
     PurchaseTemplateDocumentType, SupplierCalcConfig, SupplierOrderTemplate,
 } from '@/types/inventory';
 import '@/styles/purchaseImport.css';
+import '@/styles/purchaseImportGlass.css';
 
 import type { DraftOrderRow } from '../types';
 import { FileDeck, FileGlyph, ReadingDial } from './FileGlyphs';
@@ -702,11 +703,11 @@ const SupplierImportDialogContent = ({
     })();
 
     return (
-        <div className="ofi-poi-scrim" role="dialog" aria-modal="true">
-            <div className="ofi-poi" style={{ height: phase === 'review' ? 'min(720px, 100%)' : 'auto', maxHeight: '100%' }}>
+        <div className="ofi-poi-scrim ofi-poi-glass-scrim" role="dialog" aria-modal="true" aria-labelledby="supplier-import-title">
+            <div className="ofi-poi ofi-poi-glass" style={{ height: phase === 'review' ? 'min(720px, 100%)' : 'auto', maxHeight: '100%' }}>
                 <div className="ofi-poi-head">
                     <div className="ofi-poi-title">
-                        <b>{t('inv.aiImport.title')}</b>
+                        <b id="supplier-import-title">{t('inv.aiImport.title')}</b>
                         <span>{files.length ? files.map((entry) => entry.name).join(' · ') : t('inv.aiImport.subtitle')}</span>
                     </div>
                     {/* ── DIE DREI SCHRITTE (Vorgabe Samet, 07.09.2026) ────────

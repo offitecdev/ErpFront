@@ -131,7 +131,7 @@ export const MontageHome = () => {
                         key={to}
                         type="button"
                         onClick={() => navigate(to)}
-                        className="group relative flex h-full min-h-[190px] flex-col items-start justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-[#0066e0]/25 hover:shadow-[0_10px_28px_rgba(15,23,42,0.10)] active:translate-y-0 active:bg-slate-50 xl:min-h-0 dark:border-white/10 dark:bg-[#17191c] dark:shadow-none dark:hover:border-amber-400/30 dark:hover:bg-white/[0.04]"
+                        className="group relative flex h-full min-h-[190px] flex-col items-start justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-[#0066e0]/25 hover:shadow-[0_10px_28px_rgba(15,23,42,0.10)] active:bg-slate-50 xl:min-h-0 dark:border-white/10 dark:bg-[#17191c] dark:shadow-none dark:hover:border-amber-400/30 dark:hover:bg-white/[0.04]"
                     >
                         <span className="grid size-14 place-items-center rounded-2xl bg-[#d30f15] text-white shadow-[0_6px_16px_rgba(211,15,21,0.18)] transition-transform duration-200 group-hover:scale-105 dark:bg-amber-500 dark:text-[#151616] dark:shadow-none">
                             <Icon size={26} />

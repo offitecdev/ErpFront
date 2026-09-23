@@ -220,6 +220,10 @@ export const MonthGrid = ({ anchor, range, eventsByDay, selectedDay, now, draft,
                                         key={event.id}
                                         role="button"
                                         tabIndex={0}
+                                        /* Im Monat ist nur der Titel zu lesen — die
+                                           Nebenzeile (Kommission, Auftrag) steht im
+                                           Tooltip, damit sie auch hier erreichbar ist. */
+                                        title={[event.title, event.subtitle].filter(Boolean).join(' · ')}
                                         onPointerDown={(pointerEvent) => beginDrag(pointerEvent, { kind: 'event', event }, { start: event.start, end: event.end })}
                                         onClick={(clickEvent) => clickEvent.stopPropagation()}
                                         /* `is-timed`: ein Termin MIT Uhrzeit steht im Monat

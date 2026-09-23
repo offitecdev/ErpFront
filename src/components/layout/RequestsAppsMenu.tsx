@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useNavigate } from 'react-router-dom';
 import { create } from 'zustand';
 
-import { AppsGlyph } from '@/components/icons/AppsGlyph';
+import { ToolbarSymbol } from '@/components/icons/ToolbarSymbol';
 import { BellRinging, Mail01, Umbrella } from '@/components/icons/antIconCompat';
 import { TaskMark } from '@/components/icons/TaskMark';
 import { t } from '@/i18n/translate';
@@ -270,7 +270,7 @@ export const RequestsAppsMenu = () => {
                 title={t('apps.title')}
                 className="ofi-hdr-ctl ofi-apps-btn relative flex items-center justify-center rounded-full"
             >
-                <AppsGlyph />
+                <ToolbarSymbol name="apps" />
                 {waiting > 0 && (
                     <span
                         aria-hidden

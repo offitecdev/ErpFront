@@ -66,6 +66,27 @@ export interface InvoicePaymentDto {
     createdAt: string;
 }
 
+/**
+ * ── DIE BUCHHALTUNGSLISTE KOMMT SEITENWEISE (22.09.2026) ───────────────────
+ *
+ * Der Stand einer Rechnung ist keine Spalte («überfällig» ergibt sich aus der
+ * Fälligkeit, «Gegenbeleg» aus der Art) — der Server rechnet ihn mit derselben
+ * Regel wie die Oberfläche und schickt je Reiter einen Zähler mit.
+ */
+export type InvoiceStateKey = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PAID' | 'CANCELLED' | 'CREDIT';
+
+/** Reihenfolge der Liste. `activity` (Vorgabe) = letzter Vorgang zuoberst. */
+export type InvoiceSortKey = 'activity' | 'invoiceDate' | 'dueDate' | 'amount' | 'number';
+
+/** EINE Seite: die Zeilen, wie viele es insgesamt sind, die Zähler der Reiter. */
+export interface InvoicePageDto {
+    items: InvoiceDto[];
+    total: number;
+    page: number;
+    pageSize: number;
+    counts: Record<'ALL' | InvoiceStateKey, number>;
+}
+
 export interface AccountingFiguresDto {
     open: { amount: number; count: number };
     overdue: { amount: number; count: number };
@@ -249,6 +270,8 @@ export interface InvoiceDto {
     issuedByEmployeeId: string;
     createdAt: string;
     updatedAt: string;
+    /** Letzter Vorgang: ausgestellt, bezahlt, geändert, storniert (Listenendpunkt). */
+    activityAt?: string | null;
     lineItems?: InvoiceLineItemDto[];
     /** Vom Server abgeleitet (Listenendpunkt); ältere Antworten lassen ihn weg. */
     category?: InvoiceCategory;

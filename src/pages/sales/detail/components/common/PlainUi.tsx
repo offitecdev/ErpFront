@@ -55,7 +55,7 @@ export const PlainButton = ({
         type={type}
         disabled={disabled || loading}
         className={clsx(
-            'inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0',
+            'inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
             BUTTON_VARIANT_CLASS[variant],
             BUTTON_SIZE_CLASS[size],
             className,

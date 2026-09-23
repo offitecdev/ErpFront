@@ -149,7 +149,14 @@ html #root .ofi-list-apple :where(.text-slate-700, .text-slate-800, .text-slate-
 /* Knöpfe des Kopfes und der Werkzeugzeile: 28px-Druckknöpfe mit Haarlinie,
    6px-Ecke, weiss. Die Hauptknöpfe (`.ofi-btn-brand`, `.ant-btn-primary`,
    `.ofi-crm-btn.is-primary`) tragen das eine Systemblau. */
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios) {
+/* ── EIN SEGMENTCONTROL IST KEIN KNOPFPAAR (22.09.2026) ──────────────────
+   `.ofi-ows-tab` ist von dieser Kette AUSGENOMMEN. Der Umschalter «Siparişler
+   / Fiyat talepleri» steht mittig in der Kopfzeile (`.ofi-rise`), und das
+   Grundkleid gab BEIDEN Reitern dieselbe weisse Karte mit Haarlinie — man sah
+   nicht mehr, welcher gewählt war (Vorgabe Samet: «neyi seçtiğimiz belli
+   olsun»). Seine Farben kommen aus `styles/modules/orderWorkspace.css`:
+   graue Mulde, weisse Kachel auf dem gewählten. */
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(.ofi-ows-tab) {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -168,22 +175,22 @@ html #root .ofi-list-apple :where(.text-slate-700, .text-slate-800, .text-slate-
     white-space: nowrap;
     transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios) svg {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(.ofi-ows-tab) svg {
     width: 13px;
     height: 13px;
 }
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(:disabled):hover {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(.ofi-ows-tab):not(:disabled):hover {
     background: var(--la-hover) !important;
 }
 /* Die Spezifität WIEDERHOLT die :not()-Kette der allgemeinen Knopfregel —
    sonst verlöre der blaue Hauptknopf gegen das weisse Grundkleid. */
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios) {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(.ofi-ows-tab) {
     border-color: transparent !important;
     background: var(--la-accent) !important;
     color: #fff !important;
     -webkit-text-fill-color: #fff !important;
 }
-#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(:disabled):hover {
+#root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):is(.ofi-btn-brand, .ant-btn-primary, .ofi-crm-btn.is-primary, .ofi-cta):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-crm-iconbtn):not(.ofi-btn-ios):not(.ofi-ows-tab):not(:disabled):hover {
     background: color-mix(in srgb, var(--la-accent) 88%, #000) !important;
 }
 #root .ofi-list-apple .ofi-crm-btn.is-quiet {
@@ -572,7 +579,7 @@ html #root .ofi-list-apple :where(.text-slate-700, .text-slate-800, .text-slate-
     #root .ofi-list-apple table[data-inv-table] > thead > tr[data-filter-row] :is(input, select) { border-radius: 5px !important; }
     #root .ofi-list-apple .ofi-pager button,
     #root .ofi-list-apple .ofi-filter-slot > div > button:not(.ofi-filter),
-    #root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter),
+    #root .ofi-list-apple :is(.ofi-rise, .ofi-crm-head__actions, .ofi-filterbar__end, .ofi-crm-link, .ofi-section-card__head) :is(button, a[href]):not(.ofi-nosize):not(.ofi-search__clear):not(.ofi-filter):not(.ofi-ows-tab),
     #root .ofi-list-apple .ofi-crm-iconbtn,
     #root .ofi-list-apple .ofi-crm-btn { border-radius: var(--la-control-radius) !important; }
     #root .ofi-list-apple .ofi-status-chip { border-radius: 5px !important; }

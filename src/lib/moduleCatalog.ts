@@ -95,6 +95,20 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         },
     },
     {
+        // Produktion (19.09.2026): Produktionsaufträge. Wortgleich zur Serverkopie.
+        // Wo die Firmenkategorie das Modul führt, verlangen Preisanfrage,
+        // Bestellung und Wareneingang ein Projekt und mindestens ein Gerät.
+        key: 'production',
+        labelKey: 'nav.production',
+        labelDefault: 'Üretim',
+        menuKeys: ['production'],
+        pathPrefixes: ['/production'],
+        actions: {
+            read: ['production.view', 'panels.view'],
+            write: ['production.manage', 'panels.manage'],
+        },
+    },
+    {
         key: 'logistics',
         labelKey: 'nav.logistics',
         labelDefault: 'Lojistik',
@@ -192,7 +206,9 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         // IT-Administration und hängt an einem Kennwort, nicht an einem Recht —
         // ohne diesen längeren Präfix fiele er an das settings-Modul und eine
         // Firmenkategorie ohne 'settings' würde die IT aussperren.
-        pathPrefixes: ['/settings/company-categories', '/settings/authorization', '/settings/modules', '/settings/reminders', '/settings/upload', '/settings/two-factor'],
+        // Firmenübertragungen (19.09.2026): woher die Produktion ihre Projekte
+        // liest — dieselbe Verwaltungsfläche wie die Firmenkategorien.
+        pathPrefixes: ['/settings/company-categories', '/settings/authorization', '/settings/modules', '/settings/reminders', '/settings/upload', '/settings/two-factor', '/settings/company-transfers'],
         actions: {
             write: ['roles.manage', 'users.manage', 'tenants.create', 'tenants.update'],
         },
@@ -275,6 +291,16 @@ export const isProjectModuleEnabledForTenant = (
 ): boolean => {
     const categoryKeys = tenant?.moduleProfile?.moduleKeys;
     return !Array.isArray(categoryKeys) || categoryKeys.includes('projects');
+};
+
+/** Produktion (19.09.2026): führt die Firmenkategorie das Modul (ohne
+    Kategorie: ja)? Dieselbe Frage stellt der Server (isModuleEnabledForTenant)
+    vor Preisanfrage, Bestellung und Wareneingang. */
+export const isProductionModuleEnabledForTenant = (
+    tenant: { moduleProfile?: { moduleKeys?: string[] | null } | null } | null | undefined,
+): boolean => {
+    const categoryKeys = tenant?.moduleProfile?.moduleKeys;
+    return !Array.isArray(categoryKeys) || categoryKeys.includes('production');
 };
 
 /** Module key owning a route path, if any (for the disabled-module redirect).

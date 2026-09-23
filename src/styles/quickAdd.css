@@ -26,7 +26,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
 }
 .ofi-qa-launch:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
-.ofi-qa-launch:active { transform: scale(0.965); }
 .ofi-qa-launch svg { flex: none; }
 /* Telefon: der einzige Knopf im Kopf — gross genug für den Daumen. */
 .ofi-qa-launch.is-phone {

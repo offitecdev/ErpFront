@@ -17,20 +17,25 @@ import { create } from 'zustand';
  * den Rückweg; die Marke bleibt dabei die Marke. Die Seite selbst beginnt
  * sofort mit ihrem Inhalt.
  *
- * Diese Datei beantwortet die eine Frage, an der alles hängt: **steht die
- * angezeigte Adresse UNTER einer Hauptseite, und unter welcher?**
+ * Diese Datei beantwortet die eine Frage, an der alles hängt: **wohin führt
+ * der Pfeil von der angezeigten Seite aus?** Vorgabe Samet, 20.09.2026: beim
+ * Zurückgehen soll der Bildschirm kommen, den man davor offen hatte — und nur
+ * wenn es keinen gibt, geht es nach oben bzw. auf die Startseite. In dieser
+ * Reihenfolge:
  *
- *   1. `MAIN_PAGES` führt die Hauptseiten — Listen und Modulwurzeln. Auf ihnen
- *      bleibt der Blitz ein Blitz.
- *   2. `EXPLICIT_RULES` sind die wenigen Fälle, in denen der Rückweg NICHT die
- *      nächste Hauptseite darüber ist (die Angebotsauswertung gehört zum
- *      Angebot, nicht zur Angebotsliste).
- *   3. Sonst wird der Pfad Stück für Stück gekürzt; die erste Hauptseite, die
- *      dabei auftaucht, ist das Ziel.
- *
- * Was der Adresse allein nicht anzusehen ist — der Montage-Auftrag weiss erst
- * nach dem Laden, ob er zur Liste der offenen oder der abgeschlossenen
- * Montagen gehört —, meldet die Seite mit `usePageBackTarget()` selbst an.
+ *   1. Was die SEITE SELBST angemeldet hat (`usePageBackTarget`) — nur sie
+ *      weiss, dass die Erfassung im Vordergrund zu ihrer Fläche zurückgehört.
+ *   2. `MAIN_PAGES` führt die Hauptseiten — Listen und Modulwurzeln. Auf ihnen
+ *      bleibt der Blitz ein Blitz, der Rückweg endet also dort.
+ *   3. Der BESUCHSWEG: der zuletzt geöffnete Bildschirm (Abschnitt 4). Er hat
+ *      Vorrang vor allem, was die Adresse hergibt — wer vom Kunden ins
+ *      Angebot ging, will zum Kunden zurück und nicht in die Angebotsliste.
+ *   4. Erst wenn es keinen Bildschirm davor gibt (Lesezeichen, frisch geladene
+ *      Adresse), zählt die Adresse: `EXPLICIT_RULES` sind die wenigen Fälle,
+ *      in denen der Rückweg NICHT die nächste Hauptseite darüber ist (die
+ *      Angebotsauswertung gehört zum Angebot, nicht zur Angebotsliste), sonst
+ *      wird der Pfad Stück für Stück gekürzt.
+ *   5. Und wenn auch die Adresse schweigt: die Startseite.
  */
 
 export type BackTarget = {
@@ -38,6 +43,12 @@ export type BackTarget = {
     to: string;
     /** i18n-Schlüssel ihres Namens — für den Kurzhinweis am Pfeil. */
     labelKey?: string;
+    /**
+     * Wahr, wenn das Ziel genau einen Verlaufsschritt zurückliegt: dann geht
+     * der Pfeil `navigate(-1)` und die Liste kommt mit Suchbegriff, Seitenzahl
+     * und Scrollhöhe zurück, statt frisch zu laden.
+     */
+    historyStep?: boolean;
 };
 
 /* ── 1. Die Hauptseiten ──────────────────────────────────────────────────────
@@ -87,6 +98,11 @@ const MAIN_PAGES: Record<string, string> = {
     '/inventory/orders': 'nav.inventoryOrders',
     '/inventory/suppliers': 'nav.suppliers',
 
+    '/production/orders': 'nav.productionOrders',
+    '/production/lines': 'nav.productionLines',
+    '/production/panels': 'nav.panels',
+    '/production/panel-models': 'nav.panelModels',
+
     '/tasks': 'nav.tasksModuleList',
     '/tasks/board': 'nav.tasksModuleBoard',
     '/tasks/approvals': 'tasksModule.nav.approvals',
@@ -105,6 +121,7 @@ const MAIN_PAGES: Record<string, string> = {
     '/settings/modules': 'nav.moduleSettings',
     '/settings/mail': 'nav.mailSettings',
     '/settings/company-categories': 'nav.companyCategories',
+    '/settings/company-transfers': 'nav.companyTransfers',
     '/settings/upload': 'nav.upload',
     '/settings/two-factor': 'nav.twoFactorSettings',
     '/settings/checklists': '',
@@ -127,13 +144,10 @@ const EXPLICIT_RULES: Array<{ test: RegExp; to: (match: RegExpMatchArray) => str
         to: (match) => `/sales/quotes/${match[1]}`,
         labelKey: 'nav.tenderManagement',
     },
-    // Der Wareneingang gehört zu SEINER Bestellung, nicht zur Bestellliste:
-    // er wird von der Bestellseite aus geöffnet (Stufe 3 des Ablaufs) und
-    // führt dorthin zurück — sonst verlöre man beim Zurückgehen den Vorgang.
-    {
-        test: /^\/inventory\/orders\/(?!new$)([^/]+)\/receive$/,
-        to: (match) => `/inventory/orders/${match[1]}`,
-    },
+    /* Der Wareneingang hatte hier eine eigene Regel, solange er eine eigene
+       Seite war. Seit dem 22.09.2026 ist er ein REITER der Bestellung und die
+       alte Adresse nur noch eine Umleitung — es gibt nichts mehr, wohin diese
+       Regel zurückführen müsste. */
     // Ein Montage-Auftrag gehört zu seiner Liste. Ob das die offenen oder die
     // abgeschlossenen Montagen sind, weiss erst die geladene Seite — bis dahin
     // gilt die häufigere Herkunft (MontageOrderDetail meldet dann das genaue
@@ -181,18 +195,66 @@ export const resolveBackTarget = (pathname: string): BackTarget | null => {
     return null;
 };
 
-/* ── 3. Was die Seite selbst besser weiss ────────────────────────────────────
+/* ── 3. Der Besuchsweg und was die Seite selbst besser weiss ─────────────────
    Ein winziger Speicher statt eines Kontexts: die Kopfleiste steht ÜBER der
-   Seite im Baum, könnte einen Kontext der Seite also nie lesen. */
+   Seite im Baum, könnte einen Kontext der Seite also nie lesen. Er hält
+   zweierlei — die Anmeldung der angezeigten Seite und den BESUCHSWEG: einen
+   Stapel der geöffneten Bildschirme, auf den jeder neue kommt und von dem
+   jeder Rückschritt einen herunternimmt. Daher kommt beim Zurückgehen der
+   Schirm, den man davor offen hatte, und nicht die Seite, die in der Adresse
+   zufällig eine Stufe höher steht.
+
+   `idx` ist die Nummer, die der Router jedem Verlaufseintrag mitgibt. Liegt
+   das Ziel genau einen Schritt tiefer, wird der Rückweg zum echten
+   Verlaufsschritt — dann kommt die Liste mit Suchbegriff, Seitenzahl und
+   Scrollhöhe zurück statt frisch geladen. */
+
+/** Ein besuchter Bildschirm: seine Adresse und seine Nummer im Verlauf. */
+export type Visit = { path: string; idx: number | null };
+
+/** Die Nummer des laufenden Verlaufseintrags — `null`, wo es keine gibt. */
+const historyIndex = (): number | null => {
+    if (typeof window === 'undefined') return null;
+    const state = window.history.state as { idx?: unknown } | null;
+    return state && typeof state.idx === 'number' ? state.idx : null;
+};
+
+/** So viele Bildschirme hält der Besuchsweg zurück — mehr braucht niemand. */
+const MAX_VISITS = 50;
+
 type BackNavState = {
     /** Angemeldetes Ziel samt Adresse, für die es gilt. */
     override: (BackTarget & { path: string }) | null;
     setOverride: (value: (BackTarget & { path: string }) | null) => void;
+    /** Die Bildschirme UNTER dem angezeigten — ältester zuerst. */
+    visits: Visit[];
+    /** Der angezeigte Bildschirm. */
+    current: Visit | null;
+    /** Meldet einen Bildschirmwechsel (nur der Tracker ruft das). */
+    visit: (path: string, idx: number | null) => void;
 };
 
 export const useBackNavStore = create<BackNavState>((set) => ({
     override: null,
     setOverride: (override) => set({ override }),
+    visits: [],
+    current: null,
+    visit: (path, idx) => set((state) => {
+        // Dieselbe Adresse, nur ein neuer Verlaufseintrag (die Angebotsmaske
+        // legt einen, sobald etwas ungespeichert ist): Stapel unverändert.
+        if (state.current?.path === path) {
+            return state.current.idx === idx ? {} : { current: { path, idx } };
+        }
+        // Steht der Bildschirm schon im Stapel, wird BIS DORTHIN gekürzt statt
+        // angehängt — sonst liefen A → B → A → B ewig im Kreis.
+        const seen = state.visits.map((visit) => visit.path).lastIndexOf(path);
+        if (seen >= 0) return { visits: state.visits.slice(0, seen), current: { path, idx } };
+        const grown = state.current ? [...state.visits, state.current] : state.visits;
+        return {
+            visits: grown.length > MAX_VISITS ? grown.slice(grown.length - MAX_VISITS) : grown,
+            current: { path, idx },
+        };
+    }),
 }));
 
 /**
@@ -222,34 +284,51 @@ export const usePageBackTarget = (target: BackTarget | null | undefined) => {
     }, [to, labelKey, path]);
 };
 
-/** Der gültige Rückweg der angezeigten Seite (Anmeldung schlägt Adresse). */
+/**
+ * Der gültige Rückweg der angezeigten Seite. Reihenfolge wie oben beschrieben:
+ * Anmeldung der Seite → Hauptseite (kein Rückweg, der Blitz bleibt) →
+ * zuletzt geöffneter Bildschirm → Adresse → Startseite.
+ */
 export const useBackTarget = (): BackTarget | null => {
     const { pathname } = useLocation();
     const override = useBackNavStore((state) => state.override);
+    const visits = useBackNavStore((state) => state.visits);
+    const current = useBackNavStore((state) => state.current);
     return useMemo(() => {
         const path = normalize(pathname);
         if (override && override.path === path) return { to: override.to, labelKey: override.labelKey };
-        return resolveBackTarget(path);
-    }, [override, pathname]);
+        // Auf einer Hauptseite bleibt der Knopf der Schnellzugriff: der Rückweg
+        // endet hier, weiter zurück führt das Menü.
+        if (path in MAIN_PAGES) return null;
+
+        // Beim ersten Bild nach einem Wechsel steht im Speicher noch der eben
+        // verlassene Bildschirm als «laufender» — dann IST er der davor.
+        const previous = current && current.path !== path
+            ? current
+            : (visits.length ? visits[visits.length - 1] : null);
+        if (previous && previous.path !== path) {
+            // Liegt der Bildschirm genau einen Verlaufseintrag tiefer, kann der
+            // Pfeil einen echten Verlaufsschritt gehen — sonst wird seine
+            // Adresse angesteuert (etwa nach einer Umleitung).
+            const now = historyIndex();
+            const adjacent = previous.idx !== null && now !== null && previous.idx === now - 1;
+            return { to: previous.path, labelKey: mainPageLabelKey(previous.path), historyStep: adjacent };
+        }
+
+        // Kein Bildschirm davor — Lesezeichen, neu geladene Seite, zweites
+        // Fenster: dann sagt die Adresse, wo es hingehört, und zuletzt die
+        // Startseite. So bleibt der Pfeil überall ein Weg hinaus.
+        return resolveBackTarget(path) || { to: '/', labelKey: MAIN_PAGES['/'] };
+    }, [override, pathname, visits, current]);
 };
 
-/* ── 4. Woher die Person kam ─────────────────────────────────────────────────
-   Führt der Rückweg genau auf die zuletzt verlassene Seite, ist ein echter
-   Verlaufsschritt das bessere Werkzeug: die Liste kommt mit ihrem Suchbegriff,
-   ihrer Seitenzahl und ihrer Scrollhöhe zurück statt frisch geladen. */
-let previousPath: string | null = null;
-let currentPath: string | null = null;
+/* ── 4. Der Schreiber des Besuchswegs ───────────────────────────────────────*/
 
-/** Einmal im MainLayout aufgerufen — hält die zuletzt verlassene Adresse fest. */
+/** Einmal im MainLayout aufgerufen — schreibt den Besuchsweg fort. */
 export const useBackNavTracker = () => {
     const { pathname } = useLocation();
     const path = normalize(pathname);
     useEffect(() => {
-        if (currentPath === path) return;
-        previousPath = currentPath;
-        currentPath = path;
+        useBackNavStore.getState().visit(path, historyIndex());
     }, [path]);
 };
-
-/** Wahr, wenn `to` die Seite ist, von der aus die aktuelle geöffnet wurde. */
-export const cameFrom = (to: string): boolean => previousPath === normalize(to);

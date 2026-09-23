@@ -51,7 +51,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
 .ofi-poi-icon:hover { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); color: var(--ofi-cal-accent); }
-.ofi-poi-icon:active { transform: scale(0.94); }
 .ofi-poi-icon.is-on {
     border-color: var(--ofi-cal-accent);
     background: var(--ofi-cal-accent);
@@ -77,7 +76,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
 }
 .ofi-poi-launch:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
-.ofi-poi-launch:active { transform: scale(0.965); }
 .ofi-poi-launch:disabled { opacity: 0.45; cursor: not-allowed; }
 .ofi-poi-launch svg { flex: none; }
 
@@ -140,7 +138,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
 }
 .ofi-poi-add:hover { background: var(--ofi-cal-accent-hover); border-color: var(--ofi-cal-accent-hover); }
-.ofi-poi-add:active { transform: scale(0.965); }
 .ofi-poi-add svg { flex: none; }
 
 /* ── Das Menü unter einem Knopf ───────────────────────────────────────────
@@ -266,7 +263,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
 }
 .ofi-poi-ghost:hover { background: var(--ofi-cal-hover); border-color: var(--ofi-cal-accent); color: var(--ofi-cal-accent); }
-.ofi-poi-ghost:active { transform: scale(0.965); }
 .ofi-poi-ghost:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ── Fenster ───────────────────────────────────────────────────────────── */
@@ -419,7 +415,6 @@
 }
 .ofi-poi-x svg { width: 20px; height: 20px; stroke-width: 2.4; }
 .ofi-poi-x:hover { background: var(--ofi-cal-border); color: var(--ofi-cal-text); }
-.ofi-poi-x:active { transform: scale(0.9); }
 
 /* ── Rumpf ─────────────────────────────────────────────────────────────── */
 .ofi-poi-body {
@@ -624,7 +619,7 @@
     cursor: pointer;
     transition: transform 150ms cubic-bezier(0.2, 0.8, 0.3, 1.4), background-color 150ms ease;
 }
-.ofi-poi-imageplus:hover { transform: rotate(4deg) scale(1.04); background: var(--ofi-cal-accent-soft); }
+.ofi-poi-imageplus:hover { background: var(--ofi-cal-accent-soft); }
 .ofi-poi-imagemenu { top: calc(100% + 7px); left: 0; right: auto; }
 
 /* Persistent camera: capture can be pressed repeatedly; only Done closes it. */
@@ -703,7 +698,6 @@
     cursor: pointer;
     transition: transform 100ms ease;
 }
-.ofi-poi-shutter:active { transform: scale(0.9); }
 .ofi-poi-shutter:disabled { opacity: 0.35; cursor: not-allowed; }
 .ofi-poi-shutter > i { width: 52px; height: 52px; border-radius: inherit; background: #fff; }
 .ofi-poi-camera-done { justify-self: end; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: #fff; color: #0f172a; font-weight: 700; cursor: pointer; }
@@ -1275,7 +1269,6 @@ table.ofi-poi-table input.is-num { text-align: right; font-variant-numeric: tabu
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
 .ofi-poi-btn:hover { background: var(--ofi-cal-hover); }
-.ofi-poi-btn:active { transform: scale(0.97); }
 .ofi-poi-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 .ofi-poi-btn.is-primary {
     border-color: var(--ofi-cal-accent);
@@ -1600,7 +1593,6 @@ table.ofi-poi-table input.is-num { text-align: right; font-variant-numeric: tabu
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
 .ofi-poi-tabnav:hover { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent-tint); color: var(--ofi-cal-accent); }
-.ofi-poi-tabnav:active { transform: scale(0.92); }
 
 /* =========================================================
    PROFESSIONAL DOCUMENT ANALYZER (08.09.2026)

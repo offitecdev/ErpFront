@@ -12,6 +12,28 @@ export interface PdfCompanySettings {
     city: string;
     country: string;
     iban: string;
+    /**
+     * QR-IBAN der Bank – "nur für Erstellung QR-Rechnungen". Ist er gesetzt,
+     * zahlt der Kunde ÜBER DEN QR-CODE auf diesen IBAN, mit einer aus der
+     * Belegnummer erzeugten QR-Referenz (QRR). Leer lassen heisst: der QR-Teil
+     * läuft weiter über `iban` mit SCOR/NON.
+     */
+    qrIban?: string;
+    /**
+     * KONTOINHABER des QR-Teils - "Zahlbar an". Das Konto lautet auf die
+     * Offitec Group AG, und die Bank vergleicht diesen Namen mit dem Konto:
+     * steht dort der Name einer anderen Gesellschaft der Gruppe, weist sie die
+     * Zahlung zurueck. Deshalb ist der QR-Glaeubiger vom Absender des Belegs
+     * ENTKOPPELT - Briefkopf und Absenderzeile tragen weiterhin den Namen des
+     * gewaehlten Mandanten, der QR-Teil immer den Kontoinhaber.
+     * Leer heisst: Rueckfall auf `companyName` / die Adressfelder oben.
+     */
+    qrCreditorName?: string;
+    qrCreditorAddressLine1?: string;
+    qrCreditorAddressLine2?: string;
+    qrCreditorPostalCode?: string;
+    qrCreditorCity?: string;
+    qrCreditorCountry?: string;
     bic?: string;
     bankName?: string;
     phone?: string;
@@ -61,6 +83,8 @@ const LEGACY_ADDRESS_LINE1 = 'Cores Tower - Hohenrainstrasse';
  * ein selbst eingetragener Name bleibt unangetastet.
  */
 const LEGACY_COMPANY_NAMES = ['OffiTec Group AG', 'OffiTec Heating & Cooling'];
+/** Bis v6 vorbelegtes Konto – seit v7 gilt das Konto 8003 3475 3125 5. */
+const LEGACY_IBAN_V6 = 'CH50 8080 8005 5315 3585 1';
 const normalizeCompanyName = (value: string | null | undefined) =>
     String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
@@ -71,9 +95,21 @@ const DEFAULT_SETTINGS: PdfCompanySettings = {
     postalCode: '4133',
     city: 'Pratteln',
     country: 'CH',
-    // Gerçek firma IBAN'ı: eski 'CH00 …' yer tutucusu GEÇERSİZDİ ve QR fatura
-    // bankacılık uygulamalarında taranmıyordu (PDF alt bilgisiyle aynı hesap).
-    iban: 'CH50 8080 8005 5315 3585 1',
+    // Offitec Group AG, Raiffeisen: Kontokorrent (PDF alt bilgisiyle aynı hesap)
+    // ve AYNI hesabın QR-IBAN'ı. QR faturada QR-IBAN kullanılır — ikisi de
+    // 8003 3475 3125 5 numaralı hesaba gider.
+    iban: 'CH57 8080 8003 3475 3125 5',
+    qrIban: 'CH85 3080 8003 3475 3125 5',
+    // Hesap sahibi: Offitec Group AG (tenant `offitec-root`). QR alacağlısı
+    // burasıdır — hangi şirket seçili olursa olsun, çünkü banka adı hesapla
+    // karşılaştırır. Adres alanları açıkça yazılır: böylece TR şirketi seçili
+    // iken bile QR kısmına İsviçre adresi basar.
+    qrCreditorName: 'Offitec Group AG',
+    qrCreditorAddressLine1: 'Ceres Tower - Hohenrainstrasse',
+    qrCreditorAddressLine2: '24',
+    qrCreditorPostalCode: '4133',
+    qrCreditorCity: 'Pratteln',
+    qrCreditorCountry: 'CH',
     bic: 'RAIFCH22XXX',
     bankName: '',
     phone: '+41 55 000 00 00',
@@ -118,9 +154,15 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
             //   v5: bina adındaki yazım hatasını düzeltir ("Cores" → "Ceres" Tower).
             //   v6: firma unvanını "Offitec GmbH" yapar (eski "OffiTec Group AG"
             //       ve marka satırı "OffiTec Heating & Cooling" varsayılanları).
+            //   v7: Offitec Group AG'nin güncel Raiffeisen hesabını yazar ve QR
+            //       faturalar için QR-IBAN'ı ekler (kendi QR-IBAN'ını girmiş
+            //       olana dokunulmaz).
+            //   v8: QR alacağlısını (hesap sahibi Offitec Group AG + adresi)
+            //       ekler — daha önce seçili şirketin adı basılıyordu ve bu ad
+            //       hesapla uyuşmuyordu.
             // Adımlar yalnızca değer HÂLÂ eski varsayılana eşitse çalışır;
             // kendi metnini/adresini girmiş olan tenant'a dokunulmaz.
-            version: 6,
+            version: 8,
             migrate: (persisted: any, version: number) => {
                 if (!persisted?.settings) return persisted;
                 let s = persisted.settings as PdfCompanySettings;
@@ -165,6 +207,32 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
                     }
                 }
 
+                if (version < 7) {
+                    // Sadece ESKİ varsayılan hesap değiştirilir; kendi IBAN'ını
+                    // girmiş olan tenant'ın hesabı olduğu gibi kalır. QR-IBAN ise
+                    // henüz boşsa her durumda eklenir - QR fatura ancak onunla
+                    // QRR referansı basabilir.
+                    const storedIban = (s.iban || '').replace(/\s+/g, '');
+                    if (storedIban === LEGACY_IBAN_V6.replace(/\s+/g, '')) {
+                        s = { ...s, iban: DEFAULT_SETTINGS.iban, bic: s.bic || DEFAULT_SETTINGS.bic };
+                    }
+                    if (!(s.qrIban || '').trim()) {
+                        s = { ...s, qrIban: DEFAULT_SETTINGS.qrIban };
+                    }
+                }
+
+                if (version < 8 && !(s.qrCreditorName || '').trim()) {
+                    s = {
+                        ...s,
+                        qrCreditorName: DEFAULT_SETTINGS.qrCreditorName,
+                        qrCreditorAddressLine1: DEFAULT_SETTINGS.qrCreditorAddressLine1,
+                        qrCreditorAddressLine2: DEFAULT_SETTINGS.qrCreditorAddressLine2,
+                        qrCreditorPostalCode: DEFAULT_SETTINGS.qrCreditorPostalCode,
+                        qrCreditorCity: DEFAULT_SETTINGS.qrCreditorCity,
+                        qrCreditorCountry: DEFAULT_SETTINGS.qrCreditorCountry,
+                    };
+                }
+
                 return s === persisted.settings ? persisted : { ...persisted, settings: s };
             },
         }
@@ -180,16 +248,21 @@ export const usePdfSettingsStore = create<PdfSettingsState>()(
  *
  * Der NAME kommt aus der Firmenauswahl oben rechts: wer den Mandanten
  * wechselt, druckt ab dem nächsten Dokument den Namen dieses Mandanten — auf
- * Angebot, Auftrag, Rapport und als Gläubiger ("Zahlbar an") der
- * QR-Rechnung. Nur so trägt jede Gesellschaft der Firmengruppe ihren eigenen
- * Namen auf ihren eigenen Belegen.
+ * Angebot, Auftrag und Rapport. Nur so trägt jede Gesellschaft der
+ * Firmengruppe ihren eigenen Namen auf ihren eigenen Belegen.
+ *
+ * NICHT betroffen ist der QR-Teil: sein Gläubiger ("Zahlbar an") ist der
+ * KONTOINHABER — `qrCreditorName` + `qrCreditor*`-Adresse, also die Offitec
+ * Group AG (Mandant `offitec-root`), auf die das Raiffeisen-Konto läuft.
+ * Die Bank gleicht diesen Namen mit dem Konto ab; stünde dort der Name einer
+ * Schwestergesellschaft, würde die Zahlung zurückgewiesen.
  *
  * Die ADRESSE ist die gemeinsame aus den PDF-Einstellungen (Ceres Tower -
  * Hohenrainstrasse 24, 4133 Pratteln), AUSSER der Mandant hat eine eigene
  * (`TenantOption.companyAddress`, Spalten auf `Tenant` seit 11.09.2026): dann
- * tragen Absenderzeile und QR-Gläubiger seine Adresse, z. B. "Offitec Isıtma
- * ve Soğutma A.Ş., Maltepe Serbest Bölgesi, Sarmaşık Sok. No:2 A, 35674
- * Menemen/İzmir". IBAN, Bank und Briefkopf bleiben gemeinsam.
+ * trägt die Absenderzeile seine Adresse, z. B. "Offitec Isıtma ve Soğutma
+ * A.Ş., Maltepe Serbest Bölgesi, Sarmaşık Sok. No:2 A, 35674 Menemen/İzmir".
+ * IBAN, Bank, Briefkopf und der QR-Gläubiger bleiben gemeinsam.
  *
  * `settings.companyName` bleibt der Rückfall: solange das Profil noch nicht
  * geladen ist (Mandantenliste leer) oder kein Mandant gewählt wurde, wird der

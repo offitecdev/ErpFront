@@ -1,0 +1,168 @@
+/* Opt-in skin for the task sheet's person and label selection callouts only. */
+body > .ofi-pop.ofi-mac-selection {
+    --ofi-selection-surface: rgba(250, 251, 254, 0.74);
+    --ofi-selection-input: rgba(255, 255, 255, 0.5);
+    --ofi-selection-ink: #252528;
+    --ofi-selection-edge: rgba(100, 108, 123, 0.22);
+    --ofi-selection-stripe: rgba(50, 50, 60, 0.045);
+    --ofi-selection-hover: #e5effd;
+    --ofi-selection-muted: #77777e;
+    border: 1px solid var(--ofi-selection-edge) !important;
+    border-radius: 20px !important;
+    padding: 1px !important;
+    overflow: visible !important;
+    background: var(--ofi-selection-surface) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(1.55) !important;
+    backdrop-filter: blur(22px) saturate(1.55) !important;
+    color: var(--ofi-selection-ink);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12), 0 3px 7px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.8) !important;
+    animation: none !important;
+}
+
+html.dark body > .ofi-pop.ofi-mac-selection {
+    --ofi-selection-surface: rgba(37, 39, 45, 0.76);
+    --ofi-selection-input: rgba(255, 255, 255, 0.055);
+    --ofi-selection-ink: #f2f2f5;
+    --ofi-selection-edge: rgba(255, 255, 255, 0.24);
+    --ofi-selection-stripe: rgba(255, 255, 255, 0.045);
+    --ofi-selection-hover: #35465e;
+    --ofi-selection-muted: #aaaab3;
+    background: var(--ofi-selection-surface) !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), 0 3px 7px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+body > .ofi-mac-selection::before {
+    content: '';
+    position: absolute;
+    left: calc(var(--ofi-selection-arrow-x) - 7px);
+    top: -7px;
+    width: 14px;
+    height: 14px;
+    border-top: 1px solid var(--ofi-selection-edge);
+    border-left: 1px solid var(--ofi-selection-edge);
+    border-radius: 3px 0 0;
+    background: var(--ofi-selection-surface);
+    box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.55);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+body > .ofi-mac-selection[data-callout-side="above"]::before {
+    top: auto;
+    bottom: -7px;
+    transform: rotate(225deg);
+}
+
+body > .ofi-mac-selection > div:first-child {
+    position: relative;
+    border-radius: 18px 18px 0 0;
+    overflow: hidden;
+}
+
+body > .ofi-mac-selection .ofi-gv-picker__search {
+    position: relative;
+    flex-shrink: 0;
+    padding: 9px;
+    border-bottom: 1px solid var(--ofi-selection-stripe);
+}
+
+body > .ofi-mac-selection .ofi-gv-picker__search > svg {
+    position: absolute;
+    top: 19px;
+    left: 20px;
+    z-index: 1;
+    color: var(--ofi-selection-muted);
+    pointer-events: none;
+}
+
+body > .ofi-mac-selection .ofi-gv-picker__search input.ofi-cal-input {
+    /* The shared utilities layer reads this token for modal input corners. */
+    --ofi-win-control-radius: 999px;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 12px 0 32px !important;
+    border: 1px solid var(--ofi-selection-edge) !important;
+    border-radius: 999px !important;
+    background: var(--ofi-selection-input) !important;
+    color: var(--ofi-selection-ink) !important;
+    font-size: 13px !important;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.035) !important;
+}
+
+body > .ofi-mac-selection .ofi-gv-picker__search input:focus {
+    outline: 3px solid rgba(64, 135, 245, 0.55) !important;
+    outline-offset: 1px;
+    border-color: #6b9ee9 !important;
+}
+
+body > .ofi-mac-selection .ofi-gv-picker__list {
+    min-height: 0;
+    padding: 4px 7px 7px;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #a0a0a6 transparent;
+}
+
+body > .ofi-mac-selection button.ofi-gv-picker__row {
+    height: auto !important;
+    min-height: 34px !important;
+    gap: 9px !important;
+    padding: 6px 8px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: var(--ofi-selection-ink) !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+}
+
+body > .ofi-mac-selection button.ofi-gv-picker__row:nth-child(even) { background: var(--ofi-selection-stripe) !important; }
+body > .ofi-mac-selection button.ofi-gv-picker__row:is(:hover, :focus-visible) { background: var(--ofi-selection-hover) !important; }
+body > .ofi-mac-selection button.ofi-gv-picker__row:focus-visible { outline: 2px solid #6b9ee9 !important; outline-offset: -2px; }
+body > .ofi-mac-selection .ofi-gv-picker__row > .ofi-gv-picker__name { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+body > .ofi-mac-selection .ofi-gv-picker__hint { color: var(--ofi-selection-muted); max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+body > .ofi-mac-selection .ofi-mac-selection__check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid rgba(120, 120, 128, 0.17);
+    border-radius: 5px;
+    background: rgba(120, 120, 128, 0.17);
+}
+
+body > .ofi-mac-selection .ofi-mac-selection__check.is-selected { background: #1675ed; border-color: #1675ed; color: white; }
+body > .ofi-mac-selection .ofi-mac-selection__check > svg { color: white !important; width: 12px !important; height: 12px !important; }
+body > .ofi-mac-selection > .ofi-pop__rule { position: relative; border-color: var(--ofi-selection-stripe) !important; border-radius: 0 0 18px 18px; overflow: hidden; flex-shrink: 0; }
+body > .ofi-mac-selection .ofi-mac-selection__footer { display: flex; align-items: center; justify-content: flex-end; gap: 7px; padding: 9px; }
+
+body > .ofi-mac-selection .ofi-mac-selection__footer button {
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    border: 1px solid rgba(120, 120, 128, 0.12) !important;
+    border-radius: 7px !important;
+    background: var(--ofi-selection-stripe) !important;
+    color: var(--ofi-selection-ink) !important;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+body > .ofi-mac-selection .ofi-mac-selection__footer button:hover { background: var(--ofi-selection-hover) !important; }
+body > .ofi-mac-selection .ofi-mac-selection__footer button:focus-visible { outline: 2px solid #6b9ee9 !important; outline-offset: 2px; }
+body > .ofi-mac-selection .ofi-mac-selection__footer button:disabled { opacity: 0.45; }
+
+@media (prefers-reduced-transparency: reduce) {
+    body > .ofi-pop.ofi-mac-selection { --ofi-selection-surface: #fafafa; }
+    html.dark body > .ofi-pop.ofi-mac-selection { --ofi-selection-surface: #292a2d; }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    body > .ofi-pop.ofi-mac-selection { --ofi-selection-surface: #fafafa; }
+    html.dark body > .ofi-pop.ofi-mac-selection { --ofi-selection-surface: #292a2d; }
+}

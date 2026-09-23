@@ -23,6 +23,7 @@ import { useModuleAccess } from '../lib/useEnabledModules';
 import AnalogClock from '../components/home/AnalogClock';
 import { QuickMenuCarousel, type QuickMenuTile } from '../components/home/QuickMenuCarousel';
 import { DashboardStats } from '../components/home/DashboardStats';
+import { useHomeGlass } from '../components/home/homeAppearance';
 import { UpcomingSection } from '../components/home/UpcomingSection';
 
 // The Mac look of the start page (10.09.2026) — chunk-local, like the quote
@@ -57,6 +58,10 @@ export const Home = () => {
     const { t } = useTranslation();
     const user = useAuthStore((state) => state.user);
     const { projectModuleEnabled, isModuleEnabled, canSeePermissionItem } = useModuleAccess();
+
+    // The material of the cards — picked in the overview's sheet, painted
+    // here on the page root ([[homeAppearance]]).
+    const { glass } = useHomeGlass(user?.id);
 
     const profile = useMemo(() => getRoleProfile(user), [user]);
     const pageAccess = useAuthStore((state) => state.pageAccess);
@@ -97,12 +102,9 @@ export const Home = () => {
     };
 
     return (
-        <div className="ofi-home w-full lg:flex lg:items-start lg:gap-7">
-          <div className="min-w-0 flex-1">
-            {/* Welcome row: greeting left, the swipeable quick-menu boxes beside it.
-                `ofi-rise` (styles/refine.css) lässt Gruss und Kacheln beim
-                Öffnen kurz aufsteigen — gestaffelt wie beim Anmelden. */}
-            <div className="ofi-rise ofi-home__welcome">
+        <div className="ofi-home w-full" data-glass={glass}>
+            {/* Keep the glass panels stationary while their contents load. */}
+            <header className="ofi-home__welcome">
                 <div className="ofi-home__greet">
                     <p className="ofi-home__date">{dayjs().format('dddd, DD. MMMM YYYY')}</p>
                     <h1 className="ofi-home__title">
@@ -114,21 +116,22 @@ export const Home = () => {
                     </p>
                 </div>
                 <QuickMenuCarousel tiles={tiles} />
-            </div>
+            </header>
 
+          <div className="ofi-home__workspace">
             {/* Kennzahlen & Charts */}
-            <div className="ofi-rise ofi-rise-1">
+            <div className="ofi-home__main">
                 <DashboardStats />
             </div>
-          </div>
 
           {/* Right column: analog clock + Anstehend cards (Montagen · Besprechungen · Lieferungen) */}
-          <aside className="ofi-rise ofi-rise-2 ofi-home__aside">
+          <aside className="ofi-home__aside">
             <div className="ofi-home__clock">
                 <AnalogClock />
             </div>
             <UpcomingSection />
           </aside>
+          </div>
         </div>
     );
 };

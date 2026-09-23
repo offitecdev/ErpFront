@@ -15,7 +15,7 @@
 import { jsPDF } from 'jspdf';
 import { companySenderLine, drawAddressBlockLines, drawFittedSingleLine } from './addressBlock';
 import QRCode from 'qrcode';
-import { buildQrBillPayload, formatIban, formatReference } from './swissQrBill';
+import { buildQrBillPayload, formatIban, formatQrReference, formatReference, resolveQrCreditor, resolveQrCreditorAccount } from './swissQrBill';
 import type { PdfCompanySettings } from '../../store/pdfSettingsStore';
 import { looksLikeRichHtml, richHtmlToPlainText } from '../../pages/sales/detail/utils/markdown.utils';
 import { BULLET_INDENT, drawRichText, fontStyleOf, parseRichTextParagraphs, wrapRichParagraph } from './richTextPdf';
@@ -606,7 +606,7 @@ const CONTACT_EMAIL = 'info@offitec.ch';
 const CONTACT_WEB = 'www.offitec.ch';
 const FOOTER_BIC = 'RAIFCH22XXX';
 const FOOTER_VAT = 'CHE-201.098.592';
-const FOOTER_IBAN = 'CH50 8080 8005 5315 3585 1';
+const FOOTER_IBAN = 'CH57 8080 8003 3475 3125 5';
 
 // ── Fontlar (Türkçe karakter desteği için Arimo gömülür) ─────────────────────
 const FONT = 'Arial';
@@ -2372,14 +2372,24 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     const additionalInfo = (data.qrAdditionalInfo || '').trim()
         || `${data.docTitle || L.offerTitle} ${data.tenderNumber}`;
 
+    // Hesap ile referans birbirine bağlıdır: QR-IBAN varsa ödeme ONA ve QR
+    // referansı (QRR) ile yapılır; yoksa kontokorrent IBAN + SCOR/NON kalır.
+    // Banka uygulamaları bu eşleşme bozuksa kodu okumayı reddeder.
+    const account = resolveQrCreditorAccount(s.iban, s.qrIban, data.tenderNumber, data.referenceNumber);
+    // "Zahlbar an" = hesap sahibi, seçili şirket DEĞİL (bkz. resolveQrCreditor).
+    const creditor = resolveQrCreditor(s);
+    const printedReference = account.referenceType === 'QRR'
+        ? formatQrReference(account.reference)
+        : formatReference(account.reference);
+
     const payload = buildQrBillPayload({
-        iban: s.iban,
-        creditorName: s.companyName,
-        creditorAddressLine1: s.addressLine1,
-        creditorAddressLine2: s.addressLine2,
-        creditorPostalCode: s.postalCode,
-        creditorCity: s.city,
-        creditorCountry: s.country,
+        iban: account.iban,
+        creditorName: creditor.name,
+        creditorAddressLine1: creditor.addressLine1,
+        creditorAddressLine2: creditor.addressLine2,
+        creditorPostalCode: creditor.postalCode,
+        creditorCity: creditor.city,
+        creditorCountry: creditor.country,
         amount,
         currency: qrCurrency,
         debtorName: debtor?.name,
@@ -2388,8 +2398,8 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
         debtorPostalCode: debtor?.postalCode || '',
         debtorCity: debtor?.city || '',
         debtorCountry: debtor?.country || 'CH',
-        referenceType: data.referenceNumber ? 'SCOR' : 'NON',
-        reference: data.referenceNumber || '',
+        referenceType: account.referenceType,
+        reference: account.reference,
         unstructuredMessage: additionalInfo,
     });
 
@@ -2435,10 +2445,10 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     };
 
     const creditorLines = [
-        formatIban(s.iban),
-        s.companyName,
-        `${s.addressLine1} ${s.addressLine2}`.replace(/\s+/g, ' ').trim(),
-        `${s.postalCode} ${s.city}`,
+        formatIban(account.iban),
+        creditor.name,
+        `${creditor.addressLine1} ${creditor.addressLine2}`.replace(/\s+/g, ' ').trim(),
+        `${creditor.postalCode} ${creditor.city}`,
     ];
     const debtorLines = debtor
         ? [
@@ -2451,6 +2461,11 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     // ── Empfangsschein (sol) ────────────────────────────────────────────────
     writeLabel(L.qrAccountPayableTo, 5, yTop + 12);
     let ry = writeLines(creditorLines, 5, yTop + 15.5);
+    if (printedReference) {
+        ry += 3;
+        writeLabel(L.qrReference, 5, ry);
+        ry = writeLines([printedReference], 5, ry + 3.5);
+    }
     if (debtorLines.length > 0) {
         ry += 3;
         writeLabel(L.qrPayableBy, 5, ry);
@@ -2474,10 +2489,10 @@ async function appendQrBillPage(doc: jsPDF, data: TenderPdfData, s: PdfCompanySe
     const infoX = 118;
     writeLabel(L.qrAccountPayableTo, infoX, yTop + 12);
     let iy = writeLines(creditorLines, infoX, yTop + 15.5);
-    if (data.referenceNumber) {
+    if (printedReference) {
         iy += 3;
         writeLabel(L.qrReference, infoX, iy);
-        iy = writeLines([formatReference(data.referenceNumber)], infoX, iy + 3.5);
+        iy = writeLines([printedReference], infoX, iy + 3.5);
     }
     iy += 3;
     writeLabel(L.qrAdditionalInfo, infoX, iy);

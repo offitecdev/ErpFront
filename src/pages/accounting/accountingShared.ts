@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { t } from '@/i18n/translate';
 import { useAuthStore } from '@/store/authStore';
 import { parsePaymentStages } from '@/lib/paymentSchedule';
-import type { InvoiceDto, InvoiceKind } from '@/types/billing';
+import type { InvoiceDto, InvoiceKind, InvoiceSortKey, InvoiceStateKey } from '@/types/billing';
 import type { InvoiceOrderContext } from '@/utils/pdf/invoicePdf';
 import { invoiceRecipient } from '@/pages/sales/invoices/invoiceShared';
 
@@ -20,10 +20,20 @@ import { invoiceRecipient } from '@/pages/sales/invoices/invoiceShared';
  *   Storniert   zurückgenommen, bleibt als Beleg stehen
  */
 
-export type InvoiceState = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PAID' | 'CANCELLED' | 'CREDIT';
+/** Derselbe Satz Stände wie im Server (types/billing.ts) — EINE Quelle. */
+export type InvoiceState = InvoiceStateKey;
 
 /** Die Reiter der Liste — «Alle» zuerst, dann der Lauf einer Rechnung, am Ende die Gegenbelege. */
 export const STATE_TABS: Array<'ALL' | InvoiceState> = ['ALL', 'DRAFT', 'OPEN', 'OVERDUE', 'PAID', 'CANCELLED', 'CREDIT'];
+
+/**
+ * Wonach die Liste sortiert (22.09.2026). «Letzter Vorgang» ist die Vorgabe:
+ * was zuletzt ausgestellt, bezahlt, geändert oder storniert wurde, steht
+ * zuoberst — die Fälligkeit bleibt für das Nachfassen, der Betrag fürs Grosse.
+ */
+export const SORT_ORDER: InvoiceSortKey[] = ['activity', 'invoiceDate', 'dueDate', 'amount', 'number'];
+
+export const sortLabel = (sort: InvoiceSortKey): string => t(`accounting.sort.${sort}`);
 
 /** Storno-Rechnung oder Gutschrift (Schritt 6). */
 export const isCreditDocument = (invoice: Pick<InvoiceDto, 'kind'>): boolean =>

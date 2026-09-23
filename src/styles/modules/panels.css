@@ -1,0 +1,581 @@
+/* =========================================================
+   Offitec — SCHALTSCHRÄNKE / PANOLAR (20.09.2026, Vorgabe Baris)
+
+   Das Kleid der Produktion (styles/modules/production.css, `--la-*`):
+   Haarlinien statt Schatten, EIN Systemblau, Zahlen in Tabellensatz.
+   Dieses Blatt fügt nur hinzu, was die Schränke eigenes brauchen:
+
+     .ofi-panel-mono        die NUMMERN — sie sind das Thema, also Tabellensatz
+     .ofi-panel-numbercard  das Ergebnis der Maske: die gebildete Modellnummer
+     .ofi-panel-chip        die Stufe eines Schranks (geplant … geliefert)
+
+   Fenster malen aus `--ofi-cal-*`; appleModal.css stimmt sie um. Dunkelmodus
+   ist derselbe Variablentausch, keine zweite Kopie.
+
+   Seiten importieren dieses Blatt selbst (styles/modules — css-page-module-split).
+   ========================================================= */
+
+/* ── Nummern: alles, was eine Kennung ist, steht im Tabellensatz ─────────── */
+.ofi-panels .ofi-panel-mono,
+.ofi-panel-mono {
+    display: block;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    font-weight: 560;
+    color: var(--la-text, #1d1d1f);
+}
+.ofi-panel-mono.is-muted { font-weight: 480; color: var(--la-secondary, #8e8e92); }
+
+/* Zweite Zeile einer Zelle: leise, klein, nie fett. */
+.ofi-panel-sub {
+    display: block;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--la-secondary, #8e8e92);
+}
+.ofi-panel-sub.is-strong { font-size: 12.5px; color: var(--la-text, #1d1d1f); }
+
+/* ── Die Stufe eines Schranks ───────────────────────────────────────────── */
+.ofi-panel-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border: 1px solid var(--la-border, #e5e5ea);
+    border-radius: 6px;
+    background: var(--la-surface, #fff);
+    font-size: 11.5px;
+    color: var(--la-text, #1d1d1f);
+    white-space: nowrap;
+}
+.ofi-panel-chip.is-off { color: var(--la-secondary, #8e8e92); }
+/* Nur DREI Stufen tragen Farbe — gebaut, geliefert, storniert. Der Rest bleibt
+   grau: eine Liste, in der alles leuchtet, sagt nichts mehr. */
+.ofi-panel-chip.is-stocked { border-color: #cfe4ff; background: #f2f8ff; color: #0a63c4; }
+.ofi-panel-chip.is-shipped,
+.ofi-panel-chip.is-installed { border-color: #cdebd6; background: #f2fbf5; color: #1d7a45; }
+.ofi-panel-chip.is-cancelled { border-color: #f3d2d2; background: #fdf4f4; color: #b3261e; }
+
+html.dark .ofi-panel-chip.is-stocked {
+    border-color: rgba(59, 141, 255, 0.34);
+    background: rgba(59, 141, 255, 0.14);
+    color: #78b3ff;
+}
+html.dark .ofi-panel-chip:is(.is-shipped, .is-installed) {
+    border-color: rgba(48, 209, 88, 0.3);
+    background: rgba(48, 209, 88, 0.12);
+    color: #63dc7f;
+}
+html.dark .ofi-panel-chip.is-cancelled {
+    border-color: rgba(255, 69, 58, 0.3);
+    background: rgba(255, 69, 58, 0.12);
+    color: #ff6961;
+}
+
+/* ── Fenster und Masken ─────────────────────────────────────────────────── */
+.ofi-panel-form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ofi-panel-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+}
+@media (min-width: 720px) {
+    .ofi-panel-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.ofi-panel-grid .col-span-2 { grid-column: span 2; }
+
+.ofi-panel-caption {
+    margin-top: 2px;
+    font-size: 11px;
+    letter-spacing: 0.35px;
+    text-transform: uppercase;
+    color: var(--la-secondary, #8e8e92);
+}
+
+/* Das Ergebnis der Maske: die Modellnummer wird NICHT getippt, sie entsteht.
+   Darum steht sie gross und ruhig über den Feldern, nicht in einem Feld. */
+.ofi-panel-numbercard {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid var(--ofi-cal-border, #e5e5ea);
+    border-radius: 10px;
+    background: var(--ofi-cal-subtle, #f7f7f9);
+}
+.ofi-panel-numbercard__caption {
+    font-size: 11px;
+    letter-spacing: 0.35px;
+    text-transform: uppercase;
+    color: var(--la-secondary, #8e8e92);
+}
+.ofi-panel-numbercard__value {
+    font-size: 22px;
+    font-weight: 620;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    color: var(--la-text, #1d1d1f);
+}
+.ofi-panel-numbercard__taken { font-size: 12px; color: #b3261e; }
+
+/* Die Vorschau in der Fusszeile eines Fensters (nächste Seriennummer …). */
+.ofi-panel-preview {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--la-secondary, #8e8e92);
+}
+
+.ofi-panel-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--la-text, #1d1d1f);
+}
+.ofi-panel-check.is-off { color: var(--la-secondary, #8e8e92); }
+.ofi-panel-check input { margin-top: 2px; }
+
+/* ── Das Fenster eines Schranks ─────────────────────────────────────────── */
+.ofi-panel-pop { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* Die drei Nummern nebeneinander — Serie, Modell, Auftrag. */
+.ofi-panel-numbers {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--ofi-cal-border, #e5e5ea);
+    border-radius: 10px;
+    background: var(--ofi-cal-subtle, #f7f7f9);
+}
+.ofi-panel-numbers strong { display: block; font-size: 14px; font-weight: 600; }
+
+.ofi-panel-moves { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.ofi-panel-moves li {
+    display: grid;
+    grid-template-columns: 56px 40px 1fr 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--ofi-cal-border, #e5e5ea);
+    font-size: 12.5px;
+}
+
+.ofi-panel-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* ── Telefon ────────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+    .ofi-panel-numbers { grid-template-columns: 1fr; }
+    .ofi-panel-grid { grid-template-columns: 1fr; }
+    .ofi-panel-grid .col-span-2 { grid-column: auto; }
+}
+
+/* Popup'lar portal ile #root dışına taşındığı için küçük Apple kontrolleri burada
+   doğrudan tanımlanır. Renk, kenarlık ve yüzeyler ortak modal token'larından gelir. */
+.ofi-panel-swift-pop { min-width: 0; }
+
+.ofi-panel-popup-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--ofi-cal-border, #dedee3);
+    border-radius: 9px;
+    background: var(--ofi-cal-subtle, #f2f2f4);
+}
+.ofi-panel-popup-tabs button {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ofi-cal-muted, #6e6e73);
+    font-size: 12.5px;
+    font-weight: 560;
+}
+.ofi-panel-popup-tabs button.is-on {
+    background: var(--ofi-cal-surface, #fff);
+    color: var(--ofi-cal-text, #1d1d1f);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+}
+
+.ofi-panel-pair-grid,
+.ofi-panel-unit-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ofi-panel-pair-grid .col-span-2,
+.ofi-panel-unit-fields .col-span-2 { grid-column: 1 / -1; }
+
+.ofi-panel-swift-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border, #e5e5ea);
+    border-radius: 9px;
+    background: var(--ofi-cal-border, #e5e5ea);
+    gap: 1px;
+}
+.ofi-panel-swift-meta > div {
+    min-width: 0;
+    padding: 9px 10px;
+    background: var(--ofi-cal-surface, #fff);
+}
+.ofi-panel-swift-meta dt {
+    overflow: hidden;
+    margin-bottom: 3px;
+    color: var(--ofi-cal-muted, #8e8e93);
+    font-size: 10.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.ofi-panel-swift-meta dd {
+    overflow: hidden;
+    margin: 0;
+    color: var(--ofi-cal-text, #1d1d1f);
+    font-size: 12.5px;
+    font-weight: 560;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.ofi-panel-popup-orders {
+    overflow: hidden;
+    border: 1px solid var(--ofi-cal-border, #e5e5ea);
+    border-radius: 9px;
+}
+.ofi-panel-popup-orders .ofi-prod-link { display: inline-flex; align-items: center; gap: 4px; }
+.ofi-panels tr.is-selected td { background: color-mix(in srgb, var(--la-accent, #0a7aff) 9%, var(--la-surface, #fff)) !important; }
+
+@media (max-width: 720px) {
+    .ofi-panel-pair-grid,
+    .ofi-panel-unit-fields,
+    .ofi-panel-swift-meta { grid-template-columns: 1fr; }
+    .ofi-panel-pair-grid .col-span-2,
+    .ofi-panel-unit-fields .col-span-2 { grid-column: auto; }
+    .ofi-panel-actions { align-items: stretch; flex-direction: column; }
+}
+
+/* ── Apple / SwiftUI sayfa editörü ───────────────────────────────────────
+   Pano formları pencere değil kendi sayfasıdır. İçerik çalışma alanının sol
+   kenarından başlar; sakin ama rahat okunabilen macOS ölçülerini kullanır. */
+.ofi-panel-editor-page {
+    width: min(100%, 1020px);
+    margin: 0;
+    padding: 6px 0 36px;
+    color: var(--la-text, #1d1d1f);
+}
+.ofi-panel-page-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    margin-bottom: 16px;
+}
+.ofi-panel-page-head > div { min-width: 0; padding-top: 1px; }
+.ofi-panel-page-head h1 {
+    margin: 0;
+    font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, sans-serif;
+    font-size: 24px;
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+}
+.ofi-panel-page-head p {
+    overflow: hidden;
+    margin: 3px 0 0;
+    color: var(--la-secondary, #6e6e73);
+    font-size: 13px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.ofi-panel-page-section {
+    margin-bottom: 12px;
+    padding: 19px 20px 16px;
+    border: 1px solid var(--la-border, #dedee3);
+    border-radius: 13px;
+    background: var(--la-surface, #fff);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+.ofi-panel-page-section > header { margin-bottom: 15px; }
+.ofi-panel-page-section > header h2 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+.ofi-panel-page-section > header p {
+    margin: 3px 0 0;
+    color: var(--la-secondary, #8e8e93);
+    font-size: 12px;
+    line-height: 1.35;
+}
+.ofi-panel-page-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+}
+.ofi-panel-page-grid.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ofi-panel-page-field {
+    display: grid;
+    grid-template-rows: 19px 40px 15px;
+    gap: 3px;
+    min-width: 0;
+}
+.ofi-panel-page-field.is-wide { grid-column: 1 / -1; }
+.ofi-panel-page-field > span {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    overflow: hidden;
+    color: var(--la-text, #1d1d1f);
+    font-size: 12.5px;
+    font-weight: 580;
+    line-height: 17px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.ofi-panel-page-field > span b { color: #d70015; font-weight: 650; }
+.ofi-panel-page-field > small {
+    overflow: hidden;
+    color: var(--la-secondary, #8e8e93);
+    font-size: 10.5px;
+    line-height: 15px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.ofi-panel-page-control {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    margin: 0;
+    padding: 0 11px;
+    border: 1px solid var(--la-field-border, #c9c9ce);
+    border-radius: 10px;
+    outline: none;
+    background: color-mix(in srgb, var(--la-fill, #f8f8fa) 70%, var(--la-surface, #fff));
+    color: var(--la-text, #1d1d1f);
+    font: 400 13.5px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 3%);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+select.ofi-panel-page-control.is-select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    padding-right: 4px;
+}
+.ofi-panel-page-control:hover:not(:disabled) { border-color: var(--la-field-border-hover, #a9a9af); }
+.ofi-panel-page-control:focus {
+    border-color: #0a84ff;
+    box-shadow: 0 0 0 3px rgb(10 132 255 / 16%);
+}
+.ofi-panel-page-control:disabled { opacity: .55; background: var(--la-fill, #f5f5f7); }
+
+/* Görseldeki macOS popup-button: seçili satırda tik, odakta sistem mavisi. */
+.ofi-panel-mac-select { position: relative; z-index: 1; min-width: 0; height: 40px; }
+.ofi-panel-mac-select.is-open { z-index: 30; }
+.ofi-panel-mac-select__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    height: 40px;
+    padding: 0 9px 0 11px;
+    border: 1px solid var(--la-field-border, #c9c9ce);
+    border-radius: 10px;
+    outline: none;
+    background: color-mix(in srgb, var(--la-fill, #f4f4f6) 58%, var(--la-surface, #fff));
+    color: var(--la-text, #1d1d1f);
+    font: 400 13.5px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+    box-shadow: 0 1px 1px rgb(0 0 0 / 4%);
+}
+.ofi-panel-mac-select__trigger > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ofi-panel-mac-select__trigger > svg { flex: 0 0 auto; color: #6e6e73; }
+.ofi-panel-mac-select__trigger:hover:not(:disabled) { border-color: var(--la-field-border-hover, #a9a9af); }
+.ofi-panel-mac-select__trigger:focus-visible,
+.ofi-panel-mac-select.is-open .ofi-panel-mac-select__trigger {
+    border-color: #0a84ff;
+    box-shadow: 0 0 0 3px rgb(10 132 255 / 16%);
+}
+.ofi-panel-mac-select__trigger:disabled { opacity: .55; background: #f5f5f7; }
+.ofi-panel-mac-select__menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: max(100%, 210px);
+    max-width: min(420px, calc(100vw - 36px));
+    max-height: 260px;
+    overflow: auto;
+    padding: 4px;
+    border: 1px solid rgb(0 0 0 / 15%);
+    border-radius: 10px;
+    background: rgb(246 246 246 / 98%);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 20%), 0 2px 7px rgb(0 0 0 / 12%);
+    backdrop-filter: blur(18px) saturate(1.35);
+}
+.ofi-panel-mac-select__menu > button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 27px;
+    padding: 3px 10px 3px 25px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #1d1d1f;
+    font: 400 13px/1.25 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+    text-align: left;
+    white-space: nowrap;
+}
+.ofi-panel-mac-select__check {
+    position: absolute;
+    left: 7px;
+    display: grid;
+    place-items: center;
+    width: 14px;
+}
+.ofi-panel-mac-select__menu > button:hover,
+.ofi-panel-mac-select__menu > button:focus-visible {
+    outline: none;
+    background: #0a84ff;
+    color: #fff;
+}
+.dark .ofi-panel-page-control {
+    border-color: #56565b;
+    background: #2c2c2e;
+    color: #f5f5f7;
+    color-scheme: dark;
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 24%);
+}
+.dark .ofi-panel-page-control::placeholder { color: #8e8e93; }
+.dark .ofi-panel-page-control:hover:not(:disabled) { border-color: #737378; }
+.dark .ofi-panel-page-control:disabled { background: #242426; color: #8e8e93; }
+.dark .ofi-panel-mac-select__trigger { border-color: #56565b; background: linear-gradient(#343437, #2c2c2e); color: #f5f5f7; }
+.dark .ofi-panel-mac-select__trigger > svg { color: #a1a1a6; }
+.dark .ofi-panel-mac-select__menu { border-color: rgb(255 255 255 / 16%); background: rgb(44 44 46 / 98%); }
+.dark .ofi-panel-mac-select__menu > button { color: #f5f5f7; }
+
+.ofi-panel-page-number {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 13px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--la-border, #e5e5ea);
+}
+.ofi-panel-page-number span { color: var(--la-secondary, #8e8e93); font-size: 11px; }
+.ofi-panel-page-number strong { font-size: 19px; font-weight: 620; font-variant-numeric: tabular-nums; }
+.ofi-panel-page-number small { margin-left: auto; color: #d70015; font-size: 11px; }
+
+.ofi-panel-page-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px;
+    margin: 0 0 10px;
+    padding: 3px;
+    border: 1px solid var(--la-border, #d8d8dd);
+    border-radius: 9px;
+    background: var(--la-fill, #efeff1);
+}
+.ofi-panel-page-tabs button {
+    height: 29px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--la-secondary, #6e6e73);
+    font-size: 12px;
+    font-weight: 560;
+}
+.ofi-panel-page-tabs button.is-on {
+    background: var(--la-surface, #fff);
+    color: var(--la-text, #1d1d1f);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 11%);
+}
+.ofi-panel-page-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    margin: 0 0 10px;
+    border: 1px solid var(--la-border, #dedee3);
+    border-radius: 10px;
+    background: var(--la-border, #dedee3);
+}
+.ofi-panel-page-summary > div { min-width: 0; padding: 9px 10px; background: var(--la-surface, #fff); }
+.ofi-panel-page-summary dt { margin-bottom: 3px; color: var(--la-secondary, #8e8e93); font-size: 10px; }
+.ofi-panel-page-summary dd { overflow: hidden; margin: 0; font-size: 12px; font-weight: 560; white-space: nowrap; text-overflow: ellipsis; }
+.ofi-panel-page-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 7px; color: var(--la-text, #1d1d1f); font-size: 12px; }
+.ofi-panel-page-check input { margin-top: 2px; accent-color: #0a84ff; }
+.ofi-panel-page-check span { display: flex; flex-direction: column; }
+.ofi-panel-page-check small { margin-top: 2px; color: var(--la-secondary, #8e8e93); font-size: 10.5px; }
+.ofi-panel-page-check.is-disabled { opacity: .55; }
+
+.ofi-panel-page-notice {
+    margin: 8px 0;
+    padding: 9px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--la-border, transparent);
+    background: var(--la-fill, #f2f2f7);
+    color: var(--la-text, #3a3a3c);
+    font-size: 11.5px;
+}
+.ofi-panel-page-notice.is-danger {
+    border-color: color-mix(in srgb, var(--la-danger, #b42318) 24%, transparent);
+    background: color-mix(in srgb, var(--la-danger, #b42318) 9%, var(--la-surface, #fff));
+    color: var(--la-danger, #b42318);
+}
+.ofi-panel-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-top: 4px;
+}
+.ofi-panel-page-actions > span { flex: 1; }
+.ofi-panel-page-button,
+.ofi-panel-inline-delete button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 13px;
+    border: 1px solid var(--la-field-border, #c9c9ce);
+    border-radius: 7px;
+    background: var(--la-surface, #fff);
+    color: var(--la-text, #1d1d1f);
+    font-size: 12.5px;
+    font-weight: 560;
+    box-shadow: 0 1px 1px rgb(0 0 0 / 4%);
+}
+.ofi-panel-page-button:hover:not(:disabled),
+.ofi-panel-inline-delete button:hover:not(:disabled) { background: var(--la-hover, #f5f5f7); }
+.ofi-panel-page-button.is-primary { border-color: #087be5; background: #0a84ff; color: #fff; }
+.ofi-panel-page-button.is-primary:hover:not(:disabled) { background: #0878df; }
+.ofi-panel-page-button.is-danger,
+.ofi-panel-inline-delete button.is-danger { border-color: transparent; background: transparent; color: #d70015; box-shadow: none; }
+.ofi-panel-page-button:disabled,
+.ofi-panel-inline-delete button:disabled { cursor: default; opacity: .45; }
+.ofi-panel-inline-delete {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #b42318;
+    font-size: 11px;
+}
+.ofi-panel-inline-delete span { margin-right: 2px; }
+.ofi-panel-page-orders { overflow: hidden; border: 1px solid var(--la-border, #e5e5ea); border-radius: 9px; }
+.ofi-panel-page-orders .ofi-prod-link { display: inline-flex; align-items: center; gap: 4px; }
+.ofi-panel-page-empty,
+.ofi-panel-page-state { padding: 34px 18px; color: var(--la-secondary, #8e8e93); font-size: 12px; text-align: center; }
+
+@media (max-width: 720px) {
+    .ofi-panel-editor-page { padding-right: 2px; padding-left: 2px; }
+    .ofi-panel-page-grid,
+    .ofi-panel-page-grid.is-three,
+    .ofi-panel-page-summary { grid-template-columns: 1fr; }
+    .ofi-panel-page-field.is-wide { grid-column: auto; }
+    .ofi-panel-page-actions { align-items: stretch; flex-direction: column; }
+    .ofi-panel-page-actions > span { display: none; }
+    .ofi-panel-page-button { width: 100%; }
+    .ofi-panel-inline-delete { width: 100%; flex-wrap: wrap; }
+}

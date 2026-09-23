@@ -8,56 +8,12 @@ import { inventoryApi } from '@/lib/api/inventory';
 import { useBackDismiss } from '@/lib/backDismiss';
 import { useCalViewport } from '@/pages/calendar/calendarShared';
 import { useAuthStore } from '@/store/authStore';
-import type { ScanLookupResult, SearchItem } from '@/types/inventory';
+import type { QuickStockUnitInput, ScanLookupResult, SearchItem } from '@/types/inventory';
 import { useLanguageTick } from '../hooks/useLanguageTick';
 import { QuantityStepper } from '../components/QuantityStepper';
 
-/**
- * SCHNELLERFASSUNG PER BARCODE (10.09.2026) — ersetzt die Foto-/OCR-Erfassung
- * vom 02.09.2026 vollständig (kein Foto, kein Viereck, kein Hinweistext mehr).
- *
- * Vorgabe Samet (Spezifikation «Lager: ERP-Codes, Schnellerfassung,
- * Lagerbewegungen»):
- *   Erstdefinition — Kategorie (Klima, Elektro …) → Unterkategorie (PLC,
- *   TCL …) → Modus «Gleiches Modell» / «Verschiedene Modelle». Danach steht
- *   der nächste ERP-Code (ELK-PLC-00001) gut sichtbar da; Kategorie,
- *   Unterkategorie und Modus bleiben für die ganze Sitzung und werden NUR
- *   über den Zurück-Pfeil links oben gewechselt.
- *
- *   Je Gerät — die Kamera liest den Barcode (oder ein Handscanner tippt ihn
- *   ins Feld), dazu Modellnummer, Seriennummer, Bezeichnung. Die MENGE steht
- *   seit 11.09.2026 als Feld dabei (Nachtrag Samet): vorbelegt mit 1, von
- *   Hand tippbar oder per Mac-Stepper; nach jeder Buchung wieder 1. Nur der
- *   stille Scan auf den aktuellen Artikel («Gleiches Modell») bucht weiter
- *   genau EIN Stück je Etikett. «Gleiches Modell» füllt Modell und
- *   Bezeichnung nach dem ersten Gerät vor. Nach «Speichern» geht sofort die
- *   Kamera wieder auf.
- *
- *   ARTIKEL ZUERST (11.09.2026, Nachtrag Samet: «im Schnellerfassen direkt
- *   auf der ersten Seite unter der Modellwahl Modell, Bezeichnung und Code
- *   eingeben; dann geht der Barcode-Teil NUR für diesen Artikel auf, und
- *   jeder Scan erhöht seinen Bestand»): «Gleiches Modell» bleibt auf der
- *   Seite und klappt darunter das Formular auf — Modellnummer, Bezeichnung,
- *   der nächste ERP-Code liegt schon bei. «Weiter zum Scannen» legt den
- *   Artikel an (Menge 0 = reine Definition) und macht ihn zum AKTUELLEN
- *   Artikel; ein Treffer aus dem Lager (gleiches Modell / gleicher Name)
- *   kann stattdessen gewählt werden. Danach bucht jeder Scan die Menge aus
- *   dem Stepper (Vorgabe 1) auf genau diesen Artikel und heftet unbekannte
- *   Etiketten an. Die frühere Zwillingssuche «Bereits im Lager — Zugang
- *   buchen» im Geräteformular ist weg (Samet: «das ist zu viel»).
- *
- *   Bereits vorhandener Artikel — trifft der Scan einen Barcode, eine
- *   Seriennummer oder einen ERP-Code, erscheinen die Details mit dem Pfeil
- *   «Weiter» direkt daneben; «Weiter» bucht 1 Stück Zugang und öffnet die
- *   Kamera erneut. Scan → Anzeige → Weiter, ohne weitere Eingaben.
- *
- *   Löschen — ein EIGENER Knopf (das Segment oben): derselbe Ablauf, nur
- *   bucht «Weiter» einen Abgang (OUT, 1 Stück, Herkunft QUICK_DELETE) mit
- *   Barcode und Seriennummer in der Bewegung. Der Artikelstamm bleibt.
- *
- * Gestaltung: macOS/SwiftUI — eingerückte Listen mit Chevron, ein Segment,
- * 34px-Druckknöpfe, das eine Blau; Schritte gleiten herein (styles/
- * quickEntry.css). Das Fenster trägt `.ofi-pop`, die Mac-Fensterhülle.
+/** Model identifiers belong to Article; unique device labels belong to StockUnit.
+ * Same-model mode locks the resolved article. Each device scan receives exactly one unit.
  */
 
 type Mode = 'in' | 'delete';
@@ -343,8 +299,7 @@ export const QuickAddSheet = ({ open, onClose }: {
        das Tippen von Modell/Bezeichnung nach dem schon vorhandenen Artikel —
        ein Tipp macht ihn zum aktuellen Artikel statt einen neuen anzulegen. */
     const [matches, setMatches] = useState<{ query: string; rows: SearchItem[] }>({ query: '', rows: [] });
-    /** Der zuletzt gebuchte/angelegte Artikel — bei «Gleiches Modell» der erste Vorschlag,
-        wenn das nächste Etikett unbekannt ist (gleiches Modell, anderer Barcode). */
+    /** Locked model for subsequent devices in same-model mode. */
     const [lastArticle, setLastArticle] = useState<{ id: string; code: string; name: string; modelNumber: string | null; unit?: string } | null>(null);
     /** Menge der nächsten Buchung («Weiter», «Speichern», Zwilling) — nach jeder Buchung wieder 1. */
     const [quantity, setQuantity] = useState(1);
@@ -356,8 +311,11 @@ export const QuickAddSheet = ({ open, onClose }: {
     const scanFieldRef = useRef<HTMLInputElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
     const lookupRef = useRef(0);
+    const scanBusyRef = useRef(false);
 
-    const close = useCallback(() => onClose(added), [onClose, added]);
+    const close = useCallback(() => {
+        if (!saving && !scanBusyRef.current) onClose(added);
+    }, [onClose, added, saving]);
     useBackDismiss(open, close);
 
     /* Beim Öffnen: freigegebene Kreise laden, Seite dahinter stillhalten.
@@ -398,11 +356,10 @@ export const QuickAddSheet = ({ open, onClose }: {
         };
     }, [open]);
 
-    /* Die Zwillingssuche — nur im Formular «Artikel festlegen»: Modell, sonst
-       Bezeichnung. Das Ergebnis trägt seine Anfrage mit, damit ein verspäteter
-       Treffer nie zu einem anderen Text zeigt. */
+    /* Search while defining a model or resolving the first unknown device.
+       Keep the query with its results so late responses cannot show stale matches. */
     const defining = mode === 'in' && step === 'variant' && variant === 'same' && !lastArticle;
-    const matchQuery = defining ? (model.trim() || name.trim()) : '';
+    const matchQuery = defining || (mode === 'in' && scan.kind === 'new') ? (model.trim() || name.trim()) : '';
     useEffect(() => {
         if (matchQuery.length < MATCH_MIN) return;
         let cancelled = false;
@@ -430,8 +387,8 @@ export const QuickAddSheet = ({ open, onClose }: {
     /* ── Schritte ───────────────────────────────────────────────────────── */
     const scanning = open && (mode === 'delete' || step === 'scan');
     const go = (next: Step, dir: 'fwd' | 'back') => { setDirection(dir); setStep(next); };
-    const pickCategory = (row: CodeCategory) => { setCategory(row); setScheme(null); go('scheme', 'fwd'); };
-    const pickScheme = (row: CodeScheme) => { setScheme(row); setNextCode(row.nextCode); go('variant', 'fwd'); };
+    const pickCategory = (row: CodeCategory) => { setLastArticle(null); setRemembered(null); setCategory(row); setScheme(null); go('scheme', 'fwd'); };
+    const pickScheme = (row: CodeScheme) => { setLastArticle(null); setRemembered(null); setScheme(row); setNextCode(row.nextCode); go('variant', 'fwd'); };
     /* «Verschiedene Modelle» geht direkt zur Kamera; «Gleiches Modell» bleibt
        hier und klappt darunter «Artikel festlegen» auf. */
     const pickVariant = (row: Variant) => {
@@ -455,29 +412,36 @@ export const QuickAddSheet = ({ open, onClose }: {
     };
 
     /* ── Kamera ─────────────────────────────────────────────────────────── */
-    const paused = scan.kind !== 'idle';
+    const paused = saving || scan.kind !== 'idle';
     const focusScanField = () => window.setTimeout(() => scanFieldRef.current?.focus({ preventScroll: true }), 60);
 
     /** Ein Code ist da — von der Kamera, vom Handscanner oder getippt. */
     const takeCode = useCallback(async (raw: string) => {
         const code = raw.trim();
-        if (!code || saving) return;
+        if (!code || saving || scanBusyRef.current) return;
+        scanBusyRef.current = true;
         const job = ++lookupRef.current;
         setFormError(null);
         setScan({ kind: 'looking', code });
         try {
             const result = await inventoryApi.scanLookup(code);
             if (lookupRef.current !== job) return;
-            /* «GLEICHES MODELL» = EIN ERP-CODE (Nachtrag Samet 10.09.2026: «unter
-               demselben ERP-Code schnell Geräte mit anderem Barcode»): sobald ein
-               Artikel als AKTUELLER steht, bucht jeder Scan +1 darauf — ein
-               unbekanntes Etikett wird ihm angeheftet, sein eigenes ohnehin. Kein
-               Formular, kein «Weiter». Nur ein Scan, der einen ANDEREN bekannten
-               Artikel trifft, zeigt die Karte zur Bestätigung. */
-            const anchored = mode === 'in' && variant === 'same' && lastArticle;
-            if (anchored && (!result.found || result.article?.id === lastArticle.id)) {
-                await bookOnAnchor(lastArticle, code, !result.found);
-                return;
+            if (mode === 'in') {
+                if (result.stockUnit) {
+                    setScan({ kind: 'idle' });
+                    setFormError(t('inv.quickEntry.deviceExists'));
+                    return;
+                }
+                const anchor = variant === 'same' ? lastArticle : null;
+                if (anchor && result.found && result.article?.id !== anchor.id) {
+                    setScan({ kind: 'idle' });
+                    setFormError(t('inv.quickEntry.modelMismatch'));
+                    return;
+                }
+                if (anchor || (result.found && result.article)) {
+                    await receiveDevice({ articleId: anchor?.id ?? result.article!.id, barcode: code });
+                    return;
+                }
             }
             if (result.found && result.article) {
                 setScan({ kind: 'found', code, article: result.article });
@@ -500,6 +464,8 @@ export const QuickAddSheet = ({ open, onClose }: {
             if (lookupRef.current !== job) return;
             setScan({ kind: 'idle' });
             setFormError(responseError(error) || t('inv.quickEntry.saveFailed'));
+        } finally {
+            scanBusyRef.current = false;
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mode, remembered, saving, variant, lastArticle]);
@@ -553,9 +519,13 @@ export const QuickAddSheet = ({ open, onClose }: {
 
     /** «Weiter» auf einen erkannten Artikel: Zugang oder Abgang in der eingegebenen Menge. */
     const bookFound = async () => {
-        if (scan.kind !== 'found') return;
+        if (scan.kind !== 'found' || saving) return;
         if (!canTransfer) { setFormError(t('inv.quickEntry.noPermission')); return; }
         const { article, code } = scan;
+        if (mode === 'in') {
+            await receiveDevice({ articleId: article.id, barcode: code });
+            return;
+        }
         if (mode === 'delete' && article.totalQuantity <= 0) { setFormError(t('inv.quickEntry.noStock')); return; }
         if (mode === 'delete' && quantity > article.totalQuantity) { setFormError(t('inv.quickEntry.tooMuch', { count: article.totalQuantity, unit: article.unit })); return; }
         setSaving(true);
@@ -591,44 +561,34 @@ export const QuickAddSheet = ({ open, onClose }: {
         }
     };
 
-    /**
-     * Ein Scan auf den AKTUELLEN Artikel («Gleiches Modell»): Etikett anheften,
-     * wenn es neu ist, dann die Menge aus dem Stepper (Vorgabe 1) — ohne
-     * Karte, ohne «Weiter». Läuft aus
-     * `takeCode` heraus, darum als Ref, damit die Kamera-Rückrufe stets die
-     * aktuelle Fassung sehen.
-     */
-    const bookOnAnchorRef = useRef<(anchor: NonNullable<typeof lastArticle>, code: string, attach: boolean) => Promise<void>>(async () => undefined);
-    const bookOnAnchor = (anchor: NonNullable<typeof lastArticle>, code: string, attach: boolean) => bookOnAnchorRef.current(anchor, code, attach);
+    /** All barcode receipts use the atomic device endpoint. */
+    const receiveDeviceRef = useRef<(input: QuickStockUnitInput) => Promise<void>>(async () => undefined);
+    const receiveDevice = (input: QuickStockUnitInput) => receiveDeviceRef.current(input);
     useEffect(() => {
-        bookOnAnchorRef.current = async (anchor, code, attach) => {
+        receiveDeviceRef.current = async (input) => {
             if (!canTransfer) { setScan({ kind: 'idle' }); setFormError(t('inv.quickEntry.noPermission')); return; }
             setSaving(true);
             setFormError(null);
             try {
-                if (attach) {
-                    try { await inventoryApi.addArticleBarcode(anchor.id, code); } catch { /* Beigabe */ }
+                const result = await inventoryApi.receiveQuickStockUnit(input);
+                const article = result.article;
+                if (variant === 'same') {
+                    setLastArticle({ id: article.id, code: article.articleCode, name: article.name, modelNumber: article.modelNumber ?? null, unit: article.unit });
+                    setRemembered({ model: article.modelNumber ?? '', name: article.name });
                 }
-                const result = await inventoryApi.bulkCreateMovements([{
-                    articleId: anchor.id,
-                    movementType: 'IN',
-                    quantity,
-                    origin: 'QUICK_ADD',
-                    scannedBarcode: code,
-                    description: `${t('inv.quickEntry.logIn')} · Barcode ${code}`,
-                }]);
-                const rowError = result.errors[0]?.error;
-                if (rowError || !result.movements.length) {
-                    setScan({ kind: 'idle' });
-                    setFormError(rowError || t('inv.quickEntry.saveFailed'));
-                    return;
+                if (result.createdArticle) {
+                    setNextCode(bumpCode(article.articleCode));
+                    setFreshTick((tick) => tick + 1);
                 }
-                pushLog({ name: anchor.name, code: anchor.code, kind: 'in', quantity });
+                pushLog({ name: article.name, code: article.articleCode, kind: result.createdArticle ? 'new' : 'in', quantity: 1 });
                 setAdded((current) => current + 1);
                 rearm();
             } catch (error) {
-                setScan({ kind: 'idle' });
-                setFormError(responseError(error) || t('inv.quickEntry.saveFailed'));
+                setScan((current) => current.kind === 'new' ? current : { kind: 'idle' });
+                const code = responseCode(error);
+                setFormError(code === 'STOCK_UNIT_EXISTS' ? t('inv.quickEntry.deviceExists')
+                    : code === 'ARTICLE_MISMATCH' ? t('inv.quickEntry.modelMismatch')
+                    : responseError(error) || t('inv.quickEntry.saveFailed'));
             } finally {
                 setSaving(false);
             }
@@ -642,7 +602,7 @@ export const QuickAddSheet = ({ open, onClose }: {
      * hier schon eingebucht.
      */
     const defineAnchor = async () => {
-        if (!scheme) return;
+        if (!scheme || saving) return;
         if (!canCreate) { setFormError(t('inv.quickEntry.noPermission')); return; }
         const productName = name.trim();
         if (!productName) { setFormError(t('inv.quickEntry.nameRequired')); nameRef.current?.focus(); return; }
@@ -660,7 +620,7 @@ export const QuickAddSheet = ({ open, onClose }: {
                 setFormError(rowError?.error || t('inv.quickEntry.saveFailed'));
                 return;
             }
-            pushLog({ name: created.name, code: created.articleCode, kind: 'new' });
+            pushLog({ name: created.name, code: created.articleCode, kind: 'new', quantity: 0 });
             setLastArticle({ id: created.id, code: created.articleCode, name: created.name, modelNumber: model.trim() || null });
             setRemembered({ model: model.trim(), name: productName });
             setNextCode(bumpCode(created.articleCode));
@@ -675,6 +635,11 @@ export const QuickAddSheet = ({ open, onClose }: {
 
     /** Treffer aus dem Lager gewählt: KEIN neuer Artikel — er wird der aktuelle. */
     const pickExistingAnchor = (row: SearchItem) => {
+        if (saving || scanBusyRef.current) return;
+        if (scan.kind === 'new' && barcode.trim()) {
+            void receiveDevice({ articleId: row.id, barcode: barcode.trim(), serialNumber: serial.trim() || null });
+            return;
+        }
         setLastArticle({ id: row.id, code: row.code, name: row.name, modelNumber: row.modelNumber ?? null, ...(row.unit ? { unit: row.unit } : {}) });
         setRemembered({ model: row.modelNumber ?? model.trim(), name: row.name });
         setFormError(null);
@@ -683,10 +648,17 @@ export const QuickAddSheet = ({ open, onClose }: {
 
     /** «Speichern» im Formular: Artikel anlegen + Zugang in der eingegebenen Menge. */
     const saveNew = async () => {
-        if (scan.kind !== 'new' || !scheme) return;
+        if (scan.kind !== 'new' || !scheme || saving) return;
         if (!canCreate) { setFormError(t('inv.quickEntry.noPermission')); return; }
         const productName = name.trim();
         if (!productName) { setFormError(t('inv.quickEntry.nameRequired')); nameRef.current?.focus(); return; }
+        if (barcode.trim()) {
+            await receiveDevice({
+                barcode: barcode.trim(), serialNumber: serial.trim() || null,
+                newArticle: { schemeId: scheme.id, name: productName, modelNumber: model.trim() || null },
+            });
+            return;
+        }
         setSaving(true);
         setFormError(null);
         try {
@@ -782,7 +754,7 @@ export const QuickAddSheet = ({ open, onClose }: {
                                         <Kv label={t('inv.quickEntry.fieldModel')} value={lastArticle.modelNumber} mono />
                                     </dl>
                                     <div className="ofi-qe-card__foot">
-                                        <button type="button" className="ofi-qe-btn" onClick={() => { setLastArticle(null); setRemembered(null); }}>
+                                        <button type="button" className="ofi-qe-btn" disabled={saving || scan.kind === 'looking'} onClick={() => { setLastArticle(null); setRemembered(null); }}>
                                             {t('inv.quickEntry.anchorChange')}
                                         </button>
                                         <button type="button" className="ofi-qe-btn is-primary is-next" autoFocus onClick={() => go('scan', 'fwd')}>
@@ -833,6 +805,9 @@ export const QuickAddSheet = ({ open, onClose }: {
                                         {formError && <p className="ofi-qe__error">{formError}</p>}
                                     </form>
                                     <div className="ofi-qe-card__foot">
+                                        <button type="button" className="ofi-qe-btn" disabled={saving} onClick={() => go('scan', 'fwd')}>
+                                            {t('inv.quickEntry.scanFirst')}
+                                        </button>
                                         <button type="button" className="ofi-qe-btn is-primary is-next" disabled={saving || !canCreate} onClick={() => void defineAnchor()}>
                                             {saving ? <span className="ofi-qe__spinner" /> : null}
                                             {t('inv.quickEntry.defineNext')}
@@ -870,16 +845,16 @@ export const QuickAddSheet = ({ open, onClose }: {
                             <span className="ofi-qe__next-label">{t('inv.quickEntry.anchorTitle')}</span>
                             <span className="ofi-qe__next-code">{lastArticle.code}</span>
                             <span className="ofi-qe__anchor-name">{lastArticle.name}{lastArticle.modelNumber ? ` · ${lastArticle.modelNumber}` : ''}</span>
-                            {/* Menge je Scan (11.09.2026): 1 vorbelegt, tippbar, Mac-Stepper. */}
+                            {/* One unique device per scan. */}
                             <span className="ofi-qe__anchor-row is-qty">
                                 <span className="ofi-qe__anchor-hint">{t('inv.quickEntry.anchorScanQty')}</span>
-                                <QuantityStepper value={quantity} onChange={setQuantity} unit={lastArticle.unit} disabled={saving} />
+                                <span>1 {lastArticle.unit}</span>
                             </span>
                             <span className="ofi-qe__anchor-row">
                                 <span className="ofi-qe__anchor-hint">
-                                    {t('inv.quickEntry.anchorCount', { count: log.filter((entry) => entry.code === lastArticle.code && !entry.error && entry.kind === 'in').reduce((sum, entry) => sum + (entry.quantity ?? 1), 0) })} · {t('inv.quickEntry.anchorHint')}
+                                    {t('inv.quickEntry.anchorCount', { count: log.filter((entry) => entry.code === lastArticle.code && !entry.error && (entry.kind === 'in' || entry.kind === 'new')).reduce((sum, entry) => sum + (entry.quantity ?? 1), 0) })} · {t('inv.quickEntry.anchorHint')}
                                 </span>
-                                <button type="button" className="ofi-qe-btn is-quiet" onClick={() => { setLastArticle(null); setRemembered(null); }}>
+                                <button type="button" className="ofi-qe-btn is-quiet" disabled={saving || scan.kind === 'looking'} onClick={() => { setLastArticle(null); setRemembered(null); }}>
                                     {t('inv.quickEntry.anchorChange')}
                                 </button>
                             </span>
@@ -905,6 +880,7 @@ export const QuickAddSheet = ({ open, onClose }: {
                         <input
                             ref={scanFieldRef}
                             value={typed}
+                            disabled={saving || scan.kind !== 'idle'}
                             autoFocus={!phone}
                             autoComplete="off"
                             autoCapitalize="off"
@@ -1013,16 +989,27 @@ export const QuickAddSheet = ({ open, onClose }: {
                                     <label className="ofi-qe-field__label" htmlFor="ofi-qe-name">{t('inv.quickEntry.fieldName')}</label>
                                     <input id="ofi-qe-name" ref={nameRef} value={name} autoComplete="off" autoCapitalize="sentences" onChange={(event) => setName(event.target.value)} />
                                 </div>
+                                {visibleMatches.length > 0 && (
+                                    <div className="ofi-qe-field">
+                                        <span className="ofi-qe-field__label">{t('inv.quickEntry.defineExisting')}</span>
+                                        <div className="ofi-qe-list ofi-qe-matches">
+                                            {visibleMatches.map((row) => (
+                                                <Row key={row.id} code={row.code} name={row.name} hint={row.modelNumber ?? undefined}
+                                                    disabled={saving} onClick={() => pickExistingAnchor(row)} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="ofi-qe-field">
                                     <label className="ofi-qe-field__label" htmlFor="ofi-qe-new-qty">{t('inv.quickEntry.quantity')}</label>
-                                    <QuantityStepper id="ofi-qe-new-qty" value={quantity} onChange={setQuantity} disabled={saving} />
+                                    <QuantityStepper id="ofi-qe-new-qty" value={barcode.trim() ? 1 : quantity} onChange={setQuantity} disabled={saving || Boolean(barcode.trim())} />
                                 </div>
 
                                 {formError && <p className="ofi-qe__error">{formError}</p>}
                             </form>
                             <div className="ofi-qe-card__foot">
                                 <button type="button" className="ofi-qe-btn" disabled={saving} onClick={rearm}>{t('common.cancel')}</button>
-                                <button type="button" className="ofi-qe-btn is-primary" disabled={saving} onClick={() => void saveNew()}>
+                                <button type="button" className="ofi-qe-btn is-primary" disabled={saving || !canCreate} onClick={() => void saveNew()}>
                                     {saving ? <span className="ofi-qe__spinner" /> : <Check />}
                                     {t('inv.quickEntry.save')}
                                 </button>
@@ -1033,7 +1020,7 @@ export const QuickAddSheet = ({ open, onClose }: {
                     {scan.kind === 'idle' && (
                         <>
                             {formError && <p className="ofi-qe__error">{formError}</p>}
-                            {mode === 'in' && canCreate && (
+                            {mode === 'in' && canCreate && !(variant === 'same' && lastArticle) && (
                                 <button type="button" className="ofi-qe-btn is-block" onClick={startWithoutBarcode}>
                                     <Plus />
                                     {t('inv.quickEntry.noBarcode')}
@@ -1085,6 +1072,7 @@ export const QuickAddSheet = ({ open, onClose }: {
                         className={`ofi-qe__back ${showBack ? '' : 'is-hidden'}`}
                         aria-label={t('inv.quickEntry.back')}
                         tabIndex={showBack ? 0 : -1}
+                        disabled={saving || scan.kind === 'looking'}
                         onClick={back}
                     >
                         <ChevronLeft size={20} />
@@ -1105,17 +1093,17 @@ export const QuickAddSheet = ({ open, onClose }: {
                     {added > 0 && <span className="ofi-qe__count">{added}</span>}
                     {canTransfer && (
                         <div className="ofi-qe-seg" role="tablist" aria-label={t('inv.quickEntry.title')}>
-                            <button type="button" role="tab" aria-selected={mode === 'in'} className={`ofi-qe-seg__btn ${mode === 'in' ? 'is-on' : ''}`} onClick={() => switchMode('in')}>
+                            <button type="button" role="tab" aria-selected={mode === 'in'} className={`ofi-qe-seg__btn ${mode === 'in' ? 'is-on' : ''}`} disabled={saving || scan.kind === 'looking'} onClick={() => switchMode('in')}>
                                 <Plus />
                                 {t('inv.quickEntry.modeIn')}
                             </button>
-                            <button type="button" role="tab" aria-selected={mode === 'delete'} className={`ofi-qe-seg__btn is-danger ${mode === 'delete' ? 'is-on' : ''}`} onClick={() => switchMode('delete')}>
+                            <button type="button" role="tab" aria-selected={mode === 'delete'} className={`ofi-qe-seg__btn is-danger ${mode === 'delete' ? 'is-on' : ''}`} disabled={saving || scan.kind === 'looking'} onClick={() => switchMode('delete')}>
                                 <Trash01 />
                                 {t('inv.quickEntry.modeDelete')}
                             </button>
                         </div>
                     )}
-                    <button type="button" className="ofi-float-card__iconbtn" aria-label={t('inv.quickEntry.close')} onClick={close}>
+                    <button type="button" className="ofi-float-card__iconbtn" aria-label={t('inv.quickEntry.close')} disabled={saving || scan.kind === 'looking'} onClick={close}>
                         <X size={18} />
                     </button>
                 </header>
@@ -1127,7 +1115,7 @@ export const QuickAddSheet = ({ open, onClose }: {
                 </div>
 
                 <footer className="ofi-qe__foot">
-                    <button type="button" className="ofi-qe-btn" onClick={close}>{t('inv.quickEntry.close')}</button>
+                    <button type="button" className="ofi-qe-btn" disabled={saving || scan.kind === 'looking'} onClick={close}>{t('inv.quickEntry.close')}</button>
                 </footer>
             </section>
         </div>

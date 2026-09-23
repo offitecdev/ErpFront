@@ -108,6 +108,12 @@ export interface DraftOrderRow {
      * aktarılmış miktarını sıfırlamasın (receive endpoint'i yazar).
      */
     receivedQuantity: number;
+    /**
+     * PRODUKTION (19.09.2026): das Gerät des Produktionsprojekts, für das die
+     * Zeile bestellt wird. Bei EINEM gewählten Gerät gehört jede Zeile ihm; bei
+     * mehreren wählt die Tabelle es je Zeile (Spalte «Gerät»).
+     */
+    productionItemId?: string | null;
     receivedAt: string | null;
     error?: string | null;
 

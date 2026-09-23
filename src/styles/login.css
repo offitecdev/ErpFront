@@ -160,9 +160,6 @@ body > :not(#root) .ofi-btn-apple {
 #root .ofi-btn-apple:hover:not(:disabled),
 body > :not(#root) .ofi-btn-apple:hover:not(:disabled) { background: var(--lg-btn-bg-hover); }
 
-#root .ofi-btn-apple:active:not(:disabled),
-body > :not(#root) .ofi-btn-apple:active:not(:disabled) { transform: scale(0.97); }
-
 #root .ofi-btn-apple:disabled,
 body > :not(#root) .ofi-btn-apple:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -712,8 +709,6 @@ body > :not(#root) .ofi-btn-apple.is-loading .ofi-btn-apple__label { opacity: 0.
 
 #root .ofi-login__submit:hover:not(:disabled) { background: var(--lg-btn-bg-hover); }
 
-#root .ofi-login__submit:active:not(:disabled) { transform: scale(0.97); }
-
 #root .ofi-login__submit:disabled {
     cursor: progress;
     opacity: 0.5;
@@ -751,7 +746,6 @@ body > :not(#root) .ofi-btn-apple.is-loading .ofi-btn-apple__label { opacity: 0.
 }
 
 .ofi-login__qr-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--lg-text) 11%, transparent); }
-.ofi-login__qr-btn:active:not(:disabled) { transform: scale(0.94); }
 
 .ofi-login__qr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 

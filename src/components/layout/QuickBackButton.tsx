@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ArrowLeft, Zap } from '../icons/antIconCompat';
-import { cameFrom, useBackTarget } from '../../lib/backNav';
+import { useBackTarget } from '../../lib/backNav';
 import { useNavGuardStore } from '../../store/navGuardStore';
 import type { QuickCreateItem } from './AppSidebar';
 
@@ -29,11 +29,13 @@ import type { QuickCreateItem } from './AppSidebar';
  * — er stand überall an einer anderen Stelle und schob den Inhalt nach unten.
  * Der Rückweg sitzt jetzt immer HIER. Die Marke bleibt die Marke.
  *
- * WOHIN es geht, sagt `lib/backNav.ts`. WIE: führt der Rückweg genau auf die
- * zuletzt verlassene Seite, wird ein echter Verlaufsschritt gegangen — dann
- * kommt die Liste mit Suchbegriff, Seitenzahl und Scrollhöhe zurück statt neu
- * zu laden. Sonst wird die Adresse angesteuert; wer per Lesezeichen mitten in
- * einer Unterseite landet, hat so trotzdem einen Weg nach oben.
+ * WOHIN es geht, sagt `lib/backNav.ts`: zuerst auf den zuletzt geöffneten
+ * Bildschirm, dann auf das, was die Adresse hergibt, zuletzt auf die
+ * Startseite. WIE: liegt das Ziel genau einen Verlaufseintrag tiefer
+ * (`historyStep`), wird ein echter Verlaufsschritt gegangen — dann kommt die
+ * Liste mit Suchbegriff, Seitenzahl und Scrollhöhe zurück statt neu zu laden.
+ * Sonst wird die Adresse angesteuert; wer per Lesezeichen mitten in einer
+ * Unterseite landet, hat so trotzdem einen Weg hinaus.
  */
 
 /* Dieselbe Knopfschale wie die übrigen Werkzeuge links (Doppelbildschirm,
@@ -95,13 +97,13 @@ export const QuickBackButton: React.FC<{
         const to = back?.to;
         if (!to) return;
         const proceed = () => {
-            /* Ein Verlaufsschritt nur, wenn er WIRKLICH auf der Zielseite
+            /* Ein Verlaufsschritt nur, wenn er WIRKLICH auf dem Ziel
                herauskommt: hat die Seite selbst einen Eintrag in den Verlauf
                gelegt (die Angebotsmaske, sobald etwas ungespeichert ist), läge
                darauf wieder dieselbe Seite — «der Pfeil geht nicht zur
                Angebotsliste, er bleibt im Angebot» (Vorgabe Samet,
                12.09.2026). Dann wird die Adresse angesteuert. */
-            if (cameFrom(to) && !useNavGuardStore.getState().historyPinned) navigate(-1);
+            if (back?.historyStep && !useNavGuardStore.getState().historyPinned) navigate(-1);
             else navigate(to);
         };
         const { attempt } = useNavGuardStore.getState();
@@ -131,7 +133,7 @@ export const QuickBackButton: React.FC<{
             {open && !isBack && (
                 <div
                     role="menu"
-                    className="absolute left-0 top-12 z-[60] w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl"
+                    className="ofi-quickback__menu absolute left-0 top-12 z-[60] w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-2 dark:border-white/15 dark:bg-[#0d1220]/90 dark:shadow-[0_24px_70px_rgba(0,0,0,0.48)] dark:backdrop-blur-xl"
                 >
                     <p className="px-3 pb-1.5 pt-1 text-[12px] font-semibold text-slate-500 dark:text-white/60">
                         {quickLabel}
@@ -156,40 +158,5 @@ export const QuickBackButton: React.FC<{
                 </div>
             )}
         </div>
-    );
-};
-
-/**
- * Derselbe Pfeil für das Zweitfenster des Doppelbildschirms. Dort gibt es
- * keine Kopfleiste — also auch keinen Blitz, der sich verwandeln könnte: das
- * Feld ist entweder der Pfeil oder gar nichts. Ohne ihn käme eine Unterseite
- * im rechten Fenster nie wieder nach oben.
- */
-export const PaneBackButton: React.FC = () => {
-    const { t } = useTranslation();
-    const back = useBackTarget();
-    const navigate = useNavigate();
-    if (!back) return null;
-
-    const targetName = back.labelKey ? t(back.labelKey) : '';
-    const label = targetName ? t('nav.backTo', { page: targetName }) : t('common.back');
-
-    return (
-        <button
-            type="button"
-            title={label}
-            aria-label={label}
-            onClick={() => {
-                const proceed = () => {
-                    const { historyPinned } = useNavGuardStore.getState();
-                    if (cameFrom(back.to) && !historyPinned) navigate(-1); else navigate(back.to);
-                };
-                const { attempt } = useNavGuardStore.getState();
-                if (attempt) attempt(proceed); else proceed();
-            }}
-            className={`ofi-quickback ofi-quickback--pane is-back mb-2 ${SHELL} ${SHELL_IDLE}`}
-        >
-            <MorphGlyph />
-        </button>
     );
 };

@@ -15,8 +15,7 @@ const ToastIcon = ({ tone }: { tone: 'info' | 'success' | 'warning' | 'error' })
         warning: 'toast-icon-warning',
         error: 'toast-icon-error',
     }[tone];
-    // Das farbige Symbolquadrat eines Mac-Banners (styles/notifications.css):
-    // Haken / i / Dreieck / Ausrufezeichen in Weiss auf der Systemfarbe.
+    // One small status icon beside the shared notification glass surface.
     const Icon = { success: Check, info: InfoCircle, warning: AlertTriangle, error: AlertCircle }[tone];
 
     return (

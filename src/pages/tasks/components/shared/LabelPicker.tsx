@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { Check, Plus } from '@/components/icons/antIconCompat';
+import { Check, Plus, SearchLg } from '@/components/icons/antIconCompat';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
+import { MacSelectionCheck, MacSelectionFooter } from '@/components/ui-shared/MacSelectionParts';
 import { t } from '@/i18n/translate';
 import { tasksApi, tasksErrorMessage } from '@/lib/api/tasksModule';
 import { useIsTasksManager, useTasksModuleStore } from '../../store/tasksModuleStore';
@@ -21,11 +22,13 @@ export const LabelPicker = ({
     onClose,
     selected,
     onChange,
+    macSelection = false,
 }: {
     anchorEl: HTMLElement | null;
     onClose: () => void;
     selected: readonly string[];
     onChange: (next: string[]) => void;
+    macSelection?: boolean;
 }) => {
     const labels = useTasksModuleStore((state) => state.bootstrap?.labels) ?? NO_LABELS;
     const setLabels = useTasksModuleStore((state) => state.setLabels);
@@ -62,8 +65,18 @@ export const LabelPicker = ({
     };
 
     return (
-        <AnchoredPicker anchorEl={anchorEl} onClose={onClose} width={260} maxHeight={340} panelClassName="ofi-gv-picker">
+        <AnchoredPicker
+            anchorEl={anchorEl} onClose={onClose} width={macSelection ? 300 : 260} maxHeight={340}
+            panelClassName={`ofi-gv-picker${macSelection ? ' ofi-mac-selection' : ''}`}
+            arrow={macSelection} exactWidth={macSelection} ariaLabel={t('tasksModule.labels.search')}
+            footer={macSelection ? <MacSelectionFooter
+                allSelected={visible.every((label) => selected.includes(label.id))}
+                onSelectAll={() => onChange([...new Set([...selected, ...visible.map((label) => label.id)])])}
+                onClose={() => { anchorEl?.focus(); onClose(); }}
+            /> : undefined}
+        >
             <div className="ofi-gv-picker__search">
+                {macSelection && <SearchLg size={15} aria-hidden />}
                 <input
                     autoFocus
                     value={query}
@@ -79,7 +92,7 @@ export const LabelPicker = ({
                     className="ofi-cal-input w-full"
                 />
             </div>
-            <div className="ofi-gv-picker__list" role="listbox" aria-multiselectable>
+            <div className="ofi-gv-picker__list" role="listbox" aria-label={t('tasksModule.labels.search')} aria-multiselectable>
                 {!visible.length && !(isManager && needle) && (
                     <div className="ofi-gv-picker__hint px-2 py-3">{t('tasksModule.labels.none')}</div>
                 )}
@@ -96,9 +109,10 @@ export const LabelPicker = ({
                             className="ofi-option-row ofi-gv-picker__row"
                             onClick={() => toggle(label.id)}
                         >
+                            {macSelection && <MacSelectionCheck selected={active} />}
                             <i className={`ofi-gv-picker__dot is-${label.color}`} aria-hidden />
                             <span className="ofi-gv-picker__name">{label.name}</span>
-                            {active && <Check size={14} />}
+                            {active && !macSelection && <Check size={14} />}
                         </button>
                     );
                 })}

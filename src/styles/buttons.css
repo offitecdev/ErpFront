@@ -132,11 +132,9 @@
        um (Abschnitt 3), die Mechanik bleibt dieselbe. */
     --ofi-btn-tint-fill: rgba(10, 122, 255, 0.13);
 
-    /* Druckpunkt — seit dem Nachtrag vom 01.09.2026 die EINZIGE Bewegung,
-       die ein Knopf macht. 0.965 ist spürbar, ohne dass die Beschriftung
-       springt. */
-    --ofi-btn-press-scale: 0.965;
-    --ofi-btn-press-ms: 90ms;
+    /* Compatibility aliases for the shared motion tokens. */
+    --ofi-btn-press-scale: var(--motion-press-scale, 0.98);
+    --ofi-btn-press-ms: var(--motion-press-duration, 85ms);
 }
 
 .dark {
@@ -1002,41 +1000,8 @@ body > :not(#root) :is(
 }
 
 
-/* ═════════ 4. DRUCKPUNKT ═════════════════════════════════
-   Die spürbare Antwort beim Klicken — der Knopf gibt kurz nach und steht
-   sofort wieder. Sie gilt für JEDES `<button>`, auch für die oben
-   gesperrten: ein Reiter oder ein Schalter darf ruhig antworten, er darf
-   nur nicht wachsen. Seit dem Nachtrag vom 01.09.2026 ist das die einzige
-   Bewegung im Knopf — alles andere ist Farbe.
-
-   Zwei Teile:
-     · hier das Sichtbare — der Knopf gibt kurz nach
-     · in `lib/buttonFeedback.ts` das Fühlbare — ein 10ms-Impuls des
-       Vibrationsmotors, wenn mit dem FINGER gedrückt wird (Tablet der
-       Monteure, Telefon). Mit der Maus passiert dort nichts.
-
-   Der Weg ZURÜCK läuft bewusst ohne Übergang, und das ist keine
-   Auslassung: eine Regel `button { transition: transform … }` würde die
-   Übergänge ersetzen, die dieselben Knöpfe für Farbe und Rahmen schon
-   tragen (`transition` ist eine Kurzschreibweise, sie lässt sich nicht
-   ergänzen). Ein Knopf, der beim Loslassen sofort wieder steht, ist genau
-   das, was ein echter Knopf tut. */
-#root :is(button, a[href], [role="button"], summary):not(:disabled):not([disabled]):not([aria-disabled="true"]):active,
-body > :not(#root) :is(button, a[href], [role="button"], summary):not(:disabled):not([disabled]):not([aria-disabled="true"]):active {
-    transform: scale(var(--ofi-btn-press-scale));
-    transition: transform var(--ofi-btn-press-ms) ease;
-}
-
-/* Was den Zeiger führt, darf sich unter ihm nicht wegbewegen: die
-   Spaltengriffe der Tabellen und alles, was gerade gezogen wird. */
-#root .ofi-col-grip:active,
-#root [draggable="true"]:active,
-#root [data-dragging]:active,
-body > :not(#root) [draggable="true"]:active,
-body > :not(#root) [data-dragging]:active {
-    transform: none;
-}
-
+/* Press/release is delegated by lib/buttonFeedback.ts. The shared tokens
+   live in motion.css; no :active scale/transition competes with WAAPI. */
 
 /* ═════════ 5. WENIGER BEWEGUNG ═══════════════════════════ */
 @media (prefers-reduced-motion: reduce) {

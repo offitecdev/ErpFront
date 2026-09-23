@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
-import { Check, ChevronLeft, ChevronRight, Mail01 } from '@/components/icons/antIconCompat';
+import { Check, ChevronLeft, ChevronRight, Mail01, X } from '@/components/icons/antIconCompat';
+import i18n from '@/i18n';
 import { t } from '@/i18n/translate';
 import { crmApi } from '@/lib/api/crm';
 import { maintenanceApi } from '@/lib/api/maintenance';
@@ -23,8 +24,11 @@ import { DayPlanRows, daysValid as everyDayValid, sortDays, type DaySpan } from 
 import { CcComboField, CustomerComboField, PeopleComboField, StaticComboField, TechnicianComboField } from './CustomerPicker';
 import { InviteSendPanel, type InviteTarget } from './InviteSendPanel';
 import { PeoplePickerModal } from './PeoplePickerModal';
+import { QuickSentenceInput } from './QuickSentenceInput';
 import { ccPersonFromEmail, draftDays, gmtOffsetLabel, personName, timeZoneId, type CalLabel, type CustomerLite, type DraftEntry, type FloatAnchor, type PickedPerson } from '../calendarShared';
+import { parseCalendarQuickText } from '../calendarQuickText';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
+import { AppleTimePicker } from '@/components/ui-shared/AppleTimePicker';
 
 export type CreateKind = 'appointment' | 'meeting' | 'task';
 
@@ -46,7 +50,7 @@ export type CreatePrefill = {
  * gemessenen Höhe — und die Fläche, auf die man gerade schaut, wanderte unter
  * dem Zeiger weg.
  */
-const CARD_HEIGHT = 440;
+const CARD_HEIGHT = 620;
 
 type TechnicianRow = { id: string; firstName?: string; lastName?: string; email?: string | null; roleName?: string | null };
 
@@ -141,6 +145,8 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
     const [view, setView] = useState<'form' | 'mail'>('form');
 
     const [title, setTitle] = useState('');
+    const [quickText, setQuickText] = useState('');
+    const [titleInputText, setTitleInputText] = useState<string | null>(null);
     const [customer, setCustomer] = useState<CustomerLite | null>(null);
     const [projects, setProjects] = useState<ProjectPickerDto[] | null>(null);
     const [projectsLoading, setProjectsLoading] = useState(false);
@@ -245,6 +251,8 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
         setView('form');
         setInvite(null);
         setTitle('');
+        setQuickText('');
+        setTitleInputText(null);
         setCustomer(prefill?.customer ?? null);
         setLabelId(defaultLabelId(wanted));
         setProjects(null);
@@ -353,6 +361,20 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
     const project = useMemo(() => (projects || []).find((row) => row.id === projectId) || null, [projects, projectId]);
     const orders = topOrders(project);
 
+    /* DIE KOMMISSION NEBEN DEM PROJEKT (21.09.2026, Vorgabe Samet). Sie steht
+       am Angebot des Auftrags — steht ein Auftrag fest, ist es SEINE; davor
+       stehen die des Projekts nebeneinander, damit man beim Wählen sieht,
+       worum es geht. Ist keine erfasst, bleibt die Zeile weg. */
+    const commissionOf = (order: { tender?: { commissionNumber?: string | null } | null } | null | undefined) =>
+        (order?.tender?.commissionNumber || '').trim();
+    const commissionsOfProject = (row: ProjectPickerDto | null | undefined) =>
+        Array.from(new Set(topOrders(row).map(commissionOf).filter(Boolean)));
+    const chosenOrder = orders.find((order) => order.id === salesOrderId) || null;
+    const projectCommissions = commissionsOfProject(project);
+    const commissionText = chosenOrder
+        ? commissionOf(chosenOrder)
+        : projectCommissions.join(' · ');
+
     useEffect(() => {
         if (!project) { setSalesOrderId(null); return; }
         const available = topOrders(project);
@@ -402,6 +424,60 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
         if (Number.isNaN(h) || Number.isNaN(m)) return;
         onDraftChange({ end: start.hour(h).minute(m).second(0).millisecond(0) });
     };
+
+    const applyQuickText = (value: string, fromTitle = false) => {
+        if (fromTitle) setTitleInputText(value);
+        else { setQuickText(value); setTitleInputText(null); }
+        const folded = value.toLocaleLowerCase('tr-TR');
+        const inferredKind: CreateKind | null = /(?<![\p{L}\p{N}])(?:hatırlatıcı|hatirlatirici|hatırlatma|hatirlatma|reminder|erinnerung|aufgabe|görev|gorev)(?![\p{L}\p{N}])/u.test(folded)
+            ? 'task'
+            : /(?<![\p{L}\p{N}])(?:toplantı|toplanti|meeting|besprechung)(?![\p{L}\p{N}])/u.test(folded)
+                ? 'meeting'
+                : /(?<![\p{L}\p{N}])(?:randevu|appointment|termin)(?![\p{L}\p{N}])/u.test(folded)
+                    ? 'appointment'
+                    : null;
+        if (!fromTitle && inferredKind && inferredKind !== kind && kinds.includes(inferredKind)) {
+            if (labelId === defaultLabelId(kind)) setLabelId(defaultLabelId(inferredKind));
+            setKind(inferredKind);
+            setStep(0);
+        }
+        // Relative words (yarın / tomorrow / morgen) follow today's date,
+        // regardless of which day happened to be selected in the grid.
+        const parsed = parseCalendarQuickText(value, dayjs());
+        // Keep the original sentence visible while the saved title contains
+        // only its title words. Recognition never moves the editing caret.
+        setTitle(parsed.title);
+        if (!parsed.foundDate && !parsed.foundTime) return;
+
+        const baseDay = (parsed.date ?? start).startOf('day');
+        const startMinute = parsed.startMinutes ?? (start.hour() * 60 + start.minute());
+        const duration = Math.max(15, end.diff(start, 'minute'));
+        const nextStart = baseDay.add(startMinute, 'minute');
+        let nextEnd = parsed.endMinutes !== null
+            ? baseDay.add(parsed.endMinutes, 'minute')
+            : nextStart.add(duration, 'minute');
+        if (!nextEnd.isAfter(nextStart)) nextEnd = nextEnd.add(1, 'day');
+        onDraftChange({ start: nextStart, end: nextEnd, days: undefined });
+    };
+
+    const selectSuggestedCustomer = (picked: CustomerLite) => {
+        if (lockedScope) return;
+        if (picked.id !== customer?.id) {
+            setProjects(null);
+            setProjectId(null);
+            setSalesOrderId(null);
+        }
+        setCustomer(picked);
+    };
+    const titleSentence = <QuickSentenceInput
+        value={titleInputText ?? title}
+        onChange={(value) => applyQuickText(value, true)}
+        customer={customer}
+        onCustomer={lockedScope ? undefined : selectSuggestedCustomer}
+        placeholder={t('calendar.create.titlePlaceholder')}
+        label={t('calendar.create.titlePlaceholder')}
+        compact
+    />;
 
     /* Die Tage zurück in den Entwurf — der Block im Raster und die Zeilen hier
        sind dieselbe Sache. Ein einzelner Tag lässt `days` wieder leer, damit er
@@ -560,6 +636,21 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
         { key: 'meeting' as const, label: t('calendar.create.tabMeeting') },
         { key: 'task' as const, label: t('calendar.create.tabTask') },
     ]).filter((tab) => kinds.includes(tab.key));
+    const language = (i18n.resolvedLanguage || i18n.language || 'tr').slice(0, 2);
+    const quickCopy = language === 'de'
+        ? {
+            placeholder: 'Morgen 18:00–22:00 ABC Technologie Bestellung',
+            hint: 'Titel, Datum und Uhrzeit in einem Satz eingeben',
+        }
+        : language === 'en'
+            ? {
+                placeholder: 'Tomorrow 18:00–22:00 ABC Technology Order',
+                hint: 'Type title, date and time in one sentence',
+            }
+            : {
+                placeholder: 'Yarın Saat 18:00–22:00 ABC Teknoloji Siparişi',
+                hint: 'Başlık, tarih ve saati tek cümlede yazın',
+            };
 
     /* Picked rows sit ABOVE the search field, so the open list never hides them. */
     const chipList = (list: PickedPerson[], onRemove: (key: string) => void, showEmail: boolean) => list.length > 0 && (
@@ -580,9 +671,9 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                 <MacDatePicker value={date} onChange={(nextDate) => setDate(nextDate)} className="is-field-sm w-[150px]" />
                 {kind !== 'task' && (
                     <>
-                        <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="ofi-cal-input w-[100px]" />
+                        <AppleTimePicker label={t('common.start')} value={startTime} onChange={setStartTime} />
                         <span className="text-[13px] text-slate-400">–</span>
-                        <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="ofi-cal-input w-[100px]" />
+                        <AppleTimePicker label={t('common.end')} value={endTime} onChange={setEndTime} />
                     </>
                 )}
             </div>
@@ -641,7 +732,15 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                                     options={(projects || []).map((row) => ({
                                         id: row.id,
                                         label: row.projectName,
-                                        meta: t('calendar.wizard.orderCount', { count: topOrders(row).length }),
+                                        /* Schon beim Waehlen sichtbar: neben dem
+                                           Projekt steht seine Kommission — hat es
+                                           keine, bleibt nur die Auftragszahl. */
+                                        meta: [
+                                            t('calendar.wizard.orderCount', { count: topOrders(row).length }),
+                                            commissionsOfProject(row).length
+                                                ? `${t('tenders.kommission_nr')} ${commissionsOfProject(row).join(' · ')}`
+                                                : null,
+                                        ].filter(Boolean).join(' · '),
                                     }))}
                                     onPick={setProjectId}
                                     placeholder={customer ? t('calendar.picker.searchProject') : t('calendar.picker.customerFirst')}
@@ -649,6 +748,13 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                                 />
                             )}
                         </Field>
+                        {/* KEINE KOMMISSION, KEINE ZEILE — das Feld erscheint
+                            nur, wenn am Angebot eine erfasst ist. */}
+                        {commissionText ? (
+                            <Field label={t('tenders.kommission_nr')}>
+                                <div className="ofi-cal-readline">{commissionText}</div>
+                            </Field>
+                        ) : null}
                         <Field label={t('calendar.wizard.order')}>
                             {project && orders.length === 0 ? (
                                 <div className="ofi-cal-emptyline">{t('calendar.wizard.noOrders')}</div>
@@ -658,7 +764,13 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                                     openToken={orderComboToken}
                                     selectedId={salesOrderId}
                                     selectedLabel={orders.find((order) => order.id === salesOrderId)?.orderNumber ?? null}
-                                    options={orders.map((order) => ({ id: order.id, label: order.orderNumber, meta: order.status }))}
+                                    options={orders.map((order) => ({
+                                        id: order.id,
+                                        label: order.orderNumber,
+                                        meta: commissionOf(order)
+                                            ? `${t('tenders.kommission_nr')} ${commissionOf(order)}`
+                                            : order.status,
+                                    }))}
                                     onPick={setSalesOrderId}
                                     placeholder={project ? t('calendar.picker.searchOrder') : t('calendar.picker.projectFirst')}
                                     emptyText={t('calendar.wizard.noOrders')}
@@ -705,13 +817,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                    trotzdem farbig im Raster, nur ohne Feld hier. */
                 return (
                     <>
-                        <input
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
-                            placeholder={t('calendar.create.titlePlaceholder')}
-                            className="ofi-cal-titlefield"
-                            autoFocus
-                        />
+                        {titleSentence}
                         {timeRow}
                     </>
                 );
@@ -750,13 +856,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                    etwas zu fragen, das nachher nirgends zu sehen ist. */
                 return (
                     <>
-                        <input
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
-                            placeholder={t('calendar.create.titlePlaceholder')}
-                            className="ofi-cal-titlefield"
-                            autoFocus
-                        />
+                        {titleSentence}
                         {timeRow}
                     </>
                 );
@@ -859,7 +959,10 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
             onClose={onClose}
             closeOnBack
             anchor={anchor}
-            width={view === 'mail' ? 460 : 380}
+            popover
+            prefer="right"
+            anchorAlign="middle"
+            width={460}
             /* Angedockt ist die Karte ohnehin so hoch wie die Spalte. */
             initialHeight={docked ? undefined : CARD_HEIGHT}
             docked={docked}
@@ -867,7 +970,7 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
             onToggleExpand={onToggleExpand}
             /* Das macOS-Kleid des Anlegefensters hängt an dieser Klasse
                (calendarMac.css §10): Segmentwahl, grosser Titel, Kästen. */
-            className="ofi-cal-createcard"
+            className={`ofi-cal-createcard${view === 'form' && step === 0 && !docked ? ' has-inline-close' : ''}`}
             title={cardTitle}
             subtitle={view === 'form'
                 ? multiDay
@@ -950,8 +1053,9 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
 
             {view === 'form' && (
                 <div className="ofi-cal-createform">
-                    {step === 0 && kindTabs.length > 1 && (
-                        <div className="ofi-cal-tabs" role="tablist">
+                    {step === 0 && (
+                        <div className="ofi-cal-createhead">
+                        {kindTabs.length > 1 ? <div className="ofi-cal-tabs" role="tablist">
                             {kindTabs.map((tab) => (
                                 <button
                                     key={tab.key}
@@ -973,7 +1077,26 @@ export const CreatePopup = ({ open, anchor, prefill, kinds, draft, onDraftChange
                                     {tab.label}
                                 </button>
                             ))}
+                        </div> : <span className="ofi-cal-createhead__title">{cardTitle}</span>}
+                        {!docked && <button type="button" onClick={onClose} aria-label={t('common.close')}
+                            className="ofi-float-card__iconbtn ofi-cal-createhead__close ofi-nosize">
+                            <X size={16} />
+                        </button>}
                         </div>
+                    )}
+
+                    {step === 0 && (
+                        <section className="ofi-cal-smartentry">
+                            <QuickSentenceInput
+                                value={quickText}
+                                onChange={(value) => applyQuickText(value)}
+                                customer={customer}
+                                onCustomer={lockedScope ? undefined : selectSuggestedCustomer}
+                                placeholder={quickCopy.placeholder}
+                                label={quickCopy.hint}
+                                autoFocus
+                            />
+                        </section>
                     )}
 
                     {/* The scope the host screen fixed — shown, not asked. */}

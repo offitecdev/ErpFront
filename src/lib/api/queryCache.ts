@@ -179,7 +179,10 @@ export const invalidateTags = (tags: string[]): void => {
 
 /** Dieselbe Zuordnung wie Erp_Backend `WRITE_NAMESPACES`. */
 const WRITE_TAGS: Record<string, string[]> = {
-    inventory: ['catalog'],
+    // Wortgleich mit WRITE_NAMESPACES im Server: die Lieferantenbestellung
+    // trägt die Produktionszuordnung und die bestätigten Zeilen.
+    inventory: ['catalog', 'production'],
+    production: ['production'],
     articles: ['catalog'],
     tenders: ['catalog', 'customers', 'tender', 'calendar'],
     'sales-orders': ['catalog', 'customers', 'tender', 'calendar'],

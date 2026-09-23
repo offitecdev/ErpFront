@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { Check } from '@/components/icons/antIconCompat';
+import { Check, SearchLg } from '@/components/icons/antIconCompat';
 import { AnchoredPicker } from '@/components/ui-shared/AnchoredPicker';
+import { MacSelectionCheck, MacSelectionFooter } from '@/components/ui-shared/MacSelectionParts';
 import { t } from '@/i18n/translate';
 import type { DirectoryPerson } from '@/types/tasksModule';
 import { useTasksModuleStore } from '../../store/tasksModuleStore';
@@ -22,6 +23,7 @@ export const PeoplePicker = ({
     allowNone = false,
     onlyIds,
     excludeIds,
+    macSelection = false,
 }: {
     anchorEl: HTMLElement | null;
     onClose: () => void;
@@ -31,6 +33,7 @@ export const PeoplePicker = ({
     allowNone?: boolean;
     onlyIds?: readonly string[];
     excludeIds?: readonly string[];
+    macSelection?: boolean;
 }) => {
     const loadDirectory = useTasksModuleStore((state) => state.loadDirectory);
     const directory = useTasksModuleStore((state) => state.directory);
@@ -59,8 +62,18 @@ export const PeoplePicker = ({
     };
 
     return (
-        <AnchoredPicker anchorEl={anchorEl} onClose={onClose} width={280} maxHeight={360} panelClassName="ofi-gv-picker">
+        <AnchoredPicker
+            anchorEl={anchorEl} onClose={onClose} width={macSelection ? 300 : 280} maxHeight={360}
+            panelClassName={`ofi-gv-picker${macSelection ? ' ofi-mac-selection' : ''}`}
+            arrow={macSelection} exactWidth={macSelection} ariaLabel={t('tasksModule.people.search')}
+            footer={macSelection && multiple ? <MacSelectionFooter
+                allSelected={people.every((person) => selected.includes(person.id))}
+                onSelectAll={() => onChange([...new Set([...selected, ...people.map((person) => person.id)])])}
+                onClose={() => { anchorEl?.focus(); onClose(); }}
+            /> : undefined}
+        >
             <div className="ofi-gv-picker__search">
+                {macSelection && <SearchLg size={15} aria-hidden />}
                 <input
                     autoFocus
                     value={query}
@@ -70,7 +83,7 @@ export const PeoplePicker = ({
                     className="ofi-cal-input w-full"
                 />
             </div>
-            <div className="ofi-gv-picker__list" role="listbox" aria-multiselectable={multiple || undefined}>
+            <div className="ofi-gv-picker__list" role="listbox" aria-label={t('tasksModule.people.search')} aria-multiselectable={multiple || undefined}>
                 {allowNone && (
                     <button
                         type="button"
@@ -96,10 +109,11 @@ export const PeoplePicker = ({
                             className="ofi-option-row ofi-gv-picker__row"
                             onClick={() => toggle(person.id)}
                         >
+                            {macSelection && <MacSelectionCheck selected={active} />}
                             <span className="ofi-gv-picker__name">{person.name}</span>
                             {/* Die echte Rolle aus dem System (14.09.2026, Samet) — nicht «Yönetici» für jede Leitungsberechtigung. */}
                             {person.roleName && <span className="ofi-gv-picker__hint">{person.roleName}</span>}
-                            {active && <Check size={14} />}
+                            {active && !macSelection && <Check size={14} />}
                         </button>
                     );
                 })}

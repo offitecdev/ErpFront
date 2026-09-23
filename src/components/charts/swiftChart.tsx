@@ -76,8 +76,8 @@ export const SectorRing = ({
     className,
     label,
 }: SectorRingProps) => {
-    const [rootRef, shown] = useFirstReveal<HTMLDivElement>();
-    const sweep = useProgress(animate ? shown : true, 760);
+    const [rootRef, shown] = useFirstReveal<HTMLDivElement>(animate);
+    const sweep = useProgress(shown, animate ? 760 : 0);
     const targets: Record<string, number> = {};
     slices.forEach((slice) => { targets[slice.key] = Math.max(0, slice.value); });
     const tweened = useTweenValues(targets, animate ? 320 : 0);
@@ -188,6 +188,8 @@ export const SwiftLegend = ({ slices, total, format = (v) => String(v), share = 
 
 export type SwiftDonutProps = {
     slices: SwiftSlice[];
+    /** Disable geometry tweening for dashboards with several simultaneous charts. */
+    animate?: boolean;
     /** Headline under the total in the hole (e.g. "Angebote"). */
     centerLabel: string;
     format?: (value: number) => string;
@@ -208,7 +210,7 @@ export type SwiftDonutProps = {
  * the others fade, the hole shows that part's figure and share. Clicking pins
  * it (a second click releases). Nothing moves.
  */
-export const SwiftDonut = ({ slices, centerLabel, format = (v) => String(v), formatTotal, size = 176, thickness = 26, layout = 'column', emptyLabel, className, aside }: SwiftDonutProps) => {
+export const SwiftDonut = ({ slices, centerLabel, format = (v) => String(v), formatTotal, size = 176, thickness = 26, layout = 'column', emptyLabel, className, aside, animate = true }: SwiftDonutProps) => {
     const [hot, setHot] = useState<string | null>(null);
     const [pinned, setPinned] = useState<string | null>(null);
     const activeKey = hot ?? pinned;
@@ -220,6 +222,7 @@ export const SwiftDonut = ({ slices, centerLabel, format = (v) => String(v), for
     return (
         <div className={`ofi-swc ofi-swc-donut is-${layout} ${className || ''}`}>
             <SectorRing
+                animate={animate}
                 slices={slices}
                 size={size}
                 thickness={thickness}
@@ -304,6 +307,7 @@ export const SwiftGauge = ({ percent, size = 96, thickness = 10, color, children
 
 export type SwiftSplitProps = {
     segments: SwiftSlice[];
+    animate?: boolean;
     format?: (value: number) => string;
     emptyLabel?: string;
     /** A line under the bar that names the whole (e.g. the total). */
@@ -315,11 +319,11 @@ export type SwiftSplitProps = {
  * segments by a hairline of surface, legend rows underneath. Hover or click a
  * segment (or its row) and the others fade; the row carries the figure.
  */
-export const SwiftSplit = ({ segments, format = (v) => String(v), emptyLabel, caption }: SwiftSplitProps) => {
+export const SwiftSplit = ({ segments, format = (v) => String(v), emptyLabel, caption, animate = true }: SwiftSplitProps) => {
     const [hot, setHot] = useState<string | null>(null);
     const [pinned, setPinned] = useState<string | null>(null);
-    const [rootRef, shown] = useFirstReveal<HTMLDivElement>();
-    const progress = useProgress(shown, 640);
+    const [rootRef, shown] = useFirstReveal<HTMLDivElement>(animate);
+    const progress = useProgress(shown, animate ? 640 : 0);
     const activeKey = hot ?? pinned;
     const total = segments.reduce((sum, segment) => sum + segment.value, 0);
     const visible = segments.filter((segment) => segment.value > 0);

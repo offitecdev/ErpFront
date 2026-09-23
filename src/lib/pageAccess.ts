@@ -43,6 +43,8 @@ const RETIRED_PAGE_KEYS: Readonly<Record<string, string>> = {
     'personnel.approvals': 'personnel.requestsIncoming',
     'personnel.incoming': 'personnel.requestsIncoming',
     'sales.invoices': 'accounting.invoices',
+    // Pano modelleri artık Pano Merkezi içindeki ikinci sekmedir.
+    'production.panelModels': 'production.panels',
 };
 
 /**
@@ -78,6 +80,10 @@ const PAGE_LEVEL_FALLBACKS: Readonly<Record<string, string>> = {
     // Die PDF-Einstellungen gestalten die Offerte — wer Offerten führt, behält sie.
     'settings.pdf': 'sales.quotes',
     'accounting.toBill': 'accounting.invoices',
+    // Die Produktion liest die Lieferantenbestellungen — wer sie führt,
+    // sieht die Produktionsaufträge (19.09.2026).
+    'production.orders': 'inventory.orders',
+    'production.lines': 'inventory.orders',
 };
 
 /**

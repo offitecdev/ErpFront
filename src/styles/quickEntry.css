@@ -79,7 +79,6 @@
     transition: background-color 120ms ease, opacity 160ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .ofi-qe__back:hover { background: var(--ofi-cal-hover); }
-.ofi-qe__back:active { transform: scale(0.94); }
 .ofi-qe__back.is-hidden { opacity: 0; pointer-events: none; transform: translateX(-6px); }
 .ofi-qe__titles { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
 .ofi-qe__title {
@@ -197,7 +196,7 @@
 }
 .ofi-qe-row:last-child { border-bottom: 0; }
 .ofi-qe-row:hover { background: var(--ofi-cal-hover); }
-.ofi-qe-row:active { transform: scale(0.992); background: var(--ofi-cal-fill, rgba(0, 0, 0, 0.05)); }
+.ofi-qe-row:active { background: var(--ofi-cal-fill, rgba(0, 0, 0, 0.05)); }
 .ofi-qe-row:disabled { cursor: default; opacity: 0.5; }
 .ofi-qe-row__code {
     flex: none;
@@ -457,7 +456,6 @@
 }
 .ofi-qe-btn svg { width: 14px; height: 14px; flex: none; }
 .ofi-qe-btn:hover:not(:disabled) { background: var(--ofi-cal-hover); }
-.ofi-qe-btn:active:not(:disabled) { transform: scale(0.97); }
 .ofi-qe-btn:disabled { opacity: 0.45; cursor: default; }
 .ofi-qe-btn.is-primary {
     border-color: var(--ofi-cal-accent);

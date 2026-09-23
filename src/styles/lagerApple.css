@@ -219,8 +219,11 @@
 #root .ofi-list-apple.ofi-lager .ofi-ord-bin > b { font-family: var(--la-font); font-size: 12px; font-weight: 600; }
 #root .ofi-list-apple.ofi-lager .ofi-ord-foot { gap: 8px; padding: 8px 12px; border-top-color: var(--la-hairline); }
 #root .ofi-list-apple.ofi-lager .ofi-ord-ask { font-size: 12.5px; }
-/* Zeilensymbole in Zellen (Papierkorb, Stift): 24px, ohne Rahmen. */
-#root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand) {
+/* Zeilensymbole in Zellen (Papierkorb, Stift): 24px, ohne Rahmen.
+   AUSGENOMMEN die BESCHRIFTETEN Zeilenknoepfe (`.ofi-ows-rowbtn`, etwa
+   «Geri gönder» im Reiter «Stoğa gidenler»): 24px würde ihre Schrift
+   abschneiden — sie sind keine Symbole. */
+#root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand):not(.ofi-ows-rowbtn) {
     width: 24px;
     height: 24px;
     min-height: 24px;
@@ -229,7 +232,7 @@
     border-radius: 5px !important;
     background: transparent;
 }
-#root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand):hover { background: var(--la-fill); }
+#root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand):not(.ofi-ows-rowbtn):hover { background: var(--la-fill); }
 
 /* ── 2. Segmente: Ein/Aus und die Reiter der Auftragsseite ───────────────── */
 #root .ofi-list-apple.ofi-lager .ofi-togglegroup {
@@ -272,6 +275,17 @@
     border: 0 !important;
     border-radius: 8px !important;
     background: var(--la-fill);
+
+    /* Der gewaehlte Reiter traegt eine TOENUNG des Systemblaus, keine volle
+       Flaeche (Vorgabe Samet, 21.09.2026: «arka plani lacivert oluyor, boyle
+       olmamasi lazim — hoverli acik mavi, apple mavisi»). Die volle Flaeche
+       bleibt der Haupthandlung der Seite vorbehalten. */
+    --la-tab-tint: rgba(10, 122, 255, 0.14);
+    --la-tab-tint-hover: rgba(10, 122, 255, 0.07);
+}
+.dark #root .ofi-list-apple.ofi-lager .ofi-lager-tabs {
+    --la-tab-tint: rgba(59, 141, 255, 0.26);
+    --la-tab-tint-hover: rgba(59, 141, 255, 0.14);
 }
 #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button {
     height: 24px !important;
@@ -286,14 +300,19 @@
     font-size: 12.5px !important;
     font-weight: 400 !important;
 }
-#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button:hover { background: transparent !important; color: var(--la-text) !important; }
+#root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button:not(.is-aside):hover {
+    background: var(--la-tab-tint-hover) !important;
+    color: var(--la-accent) !important;
+    -webkit-text-fill-color: var(--la-accent) !important;
+}
 #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button[aria-current="page"],
 #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button[aria-current="page"]:hover {
-    background: var(--la-surface) !important;
-    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 6%), 0 1px 2px rgb(0 0 0 / 12%) !important;
+    background: var(--la-tab-tint) !important;
+    color: var(--la-accent) !important;
+    -webkit-text-fill-color: var(--la-accent) !important;
+    box-shadow: none !important;
     font-weight: 500 !important;
 }
-.dark #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button[aria-current="page"] { background: rgba(255, 255, 255, 0.16) !important; box-shadow: none !important; }
 #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button.is-aside { margin-left: auto; color: var(--la-secondary) !important; -webkit-text-fill-color: var(--la-secondary) !important; }
 #root .ofi-list-apple.ofi-lager .ofi-lager-tabs > button.is-aside:hover { color: var(--la-text) !important; -webkit-text-fill-color: var(--la-text) !important; }
 
@@ -527,7 +546,7 @@
     #root .ofi-list-apple.ofi-lager label[class*="border-b"] > :is(input, select),
     #root .ofi-list-apple.ofi-lager .ofi-filterbar > .flex[class*="bg-slate-50"] { border-radius: var(--la-control-radius) !important; }
     #root .ofi-list-apple.ofi-lager table[data-inv-table]:not([data-lager-form]) td :is(input:not([type="checkbox"]), select),
-    #root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand) { border-radius: 5px !important; }
+    #root .ofi-list-apple.ofi-lager table[data-inv-table] td button:not(.ofi-btn-brand):not(.ofi-ows-rowbtn) { border-radius: 5px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

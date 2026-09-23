@@ -15,9 +15,19 @@ import { useThemeStore } from '../../store/themeStore';
 import { useAuthStore } from '../../store/authStore';
 import { cx } from '../../lib/utils/cx';
 import { useDashboardStats } from './useDashboardStats';
-import { CHART_PALETTE, ConversionDonut, MonthlyBarChart, StackedSplit, chf0, type ChartMode } from './DashboardCharts';
+import { CHART_PALETTE, ConversionDonut, MonthlyBarChart, StackedSplit, chf0, compactNumber, type ChartMode, type MonthlySeries } from './DashboardCharts';
 import { buildOverviewTiles, useOverviewTiles, type OverviewTileKey, type OverviewTileSpec } from './overviewTiles';
 import { OverviewTilesDialog } from './OverviewTilesDialog';
+import { SalesFiltersDialog } from './SalesFiltersDialog';
+import {
+    buildConversionSlices,
+    buildSalesSeries,
+    describeSalesFilters,
+    rangePoints,
+    useSalesFilters,
+    visibleSeriesKeys,
+} from './salesFilters';
+import { useHomeGlass } from './homeAppearance';
 
 /* ── The start page in the Mac look (10.09.2026) ────────────────────────────
    Samet: «die Startseite so sauber und aufgeräumt wie die Angebotsseite —
@@ -26,7 +36,12 @@ import { OverviewTilesDialog } from './OverviewTilesDialog';
    hairline and a 10px corner, no shadow, no watermark glyphs, no dot grids,
    sentence-case section titles, 28px bordered push buttons, one system blue.
    The chrome lives in styles/home.css (`.ofi-home-*`); this file only says
-   what stands where. */
+   what stands where.
+
+   21.09.2026 — «Vertrieb & Konversion» carries its own Anpassen button now:
+   Zeitraum, Kennzahl, Serien and the donut's slices ([[salesFilters]]). The
+   cards may wear the macOS 27 Liquid Glass material; the level is picked in
+   the overview's sheet and painted on the page root ([[homeAppearance]]). */
 
 export const SectionHeader: React.FC<{ label: string; action?: React.ReactNode }> = ({ label, action }) => (
     <div className="ofi-home-section__head">
@@ -40,8 +55,10 @@ export const Card: React.FC<{
     subtitle?: string;
     actions?: React.ReactNode;
     className?: string;
+    /** A chart card adds ofi-home-card__body--fill so the plot stretches. */
+    bodyClassName?: string;
     children: React.ReactNode;
-}> = ({ title, subtitle, actions, className, children }) => (
+}> = ({ title, subtitle, actions, className, bodyClassName, children }) => (
     <section className={cx('ofi-home-card', className)}>
         {(title || actions) && (
             <header className="ofi-home-card__head">
@@ -52,7 +69,7 @@ export const Card: React.FC<{
                 {actions && <div className="shrink-0">{actions}</div>}
             </header>
         )}
-        <div className="ofi-home-card__body">{children}</div>
+        <div className={cx('ofi-home-card__body', bodyClassName)}>{children}</div>
     </section>
 );
 
@@ -202,9 +219,35 @@ export const DashboardStats: React.FC = () => {
     const { summary, charts, loading, denied, error, refresh } = useDashboardStats();
     const [monthlyView, setMonthlyView] = useState<'chart' | 'table'>('chart');
     const [pickOpen, setPickOpen] = useState(false);
+    const [salesOpen, setSalesOpen] = useState(false);
     const { tiles, setTiles, reset, isDefault } = useOverviewTiles(userId);
+    const { filters, setFilters, reset: resetFilters, isDefault: filtersAreDefault } = useSalesFilters(userId);
+    const { glass, setGlass } = useHomeGlass(userId);
 
     const specs = useMemo(() => (summary ? buildOverviewTiles(summary, t) : null), [summary, t]);
+
+    /* ── the filtered slice of the history the section draws ───────────── */
+    const palette = useMemo(
+        () => ({ navy: colors.navy, orange: colors.orange, muted: colors.gray, rest: colors.rest }),
+        [colors],
+    );
+    const points = useMemo(
+        () => (charts ? rangePoints(charts.monthly, filters.range) : []),
+        [charts, filters.range],
+    );
+    const seriesSpecs = useMemo(() => buildSalesSeries(points, t, palette), [points, t, palette]);
+    const lines = useMemo<MonthlySeries[]>(
+        () => visibleSeriesKeys(filters).map((key) => ({
+            key,
+            label: seriesSpecs[key].label,
+            color: seriesSpecs[key].color,
+        })),
+        [filters, seriesSpecs],
+    );
+    const sliceSpecs = useMemo(() => (summary ? buildConversionSlices(summary, t, palette) : null), [summary, t, palette]);
+    const isAmount = filters.metric === 'amount';
+    const chartTitle = lines.map((line) => line.label).join(' & ');
+    const filterLine = describeSalesFilters(filters, t);
 
     // No business view permission at all: the dashboard quietly stays a
     // quick-access page instead of showing an error the user cannot fix.
@@ -256,20 +299,33 @@ export const DashboardStats: React.FC = () => {
                         onChange={setTiles}
                         onReset={reset}
                         isDefault={isDefault}
+                        glass={glass}
+                        onGlassChange={setGlass}
                     />
                 </section>
             )}
 
-            {/* ── Vertrieb: 12-month history + conversion ────────────────── */}
+            {/* ── Vertrieb: the history and the conversion, both filtered ── */}
             {(charts || summary) && (
                 <section className="ofi-home-section">
-                    <SectionHeader label={t('dash.sectionSales', { defaultValue: 'Vertrieb & Konversion' })} />
+                    <SectionHeader
+                        label={t('dash.sectionSales', { defaultValue: 'Vertrieb & Konversion' })}
+                        /* The sheet needs the summary's slices — without it the
+                           button would open nothing, so it stays away. */
+                        action={summary && sliceSpecs ? (
+                            <button type="button" className="ofi-home-btn" onClick={() => setSalesOpen(true)}>
+                                <Sliders02 size={13} />
+                                {t('dash.customize.button', { defaultValue: 'Anpassen' })}
+                            </button>
+                        ) : undefined}
+                    />
                     <div className="grid gap-4 xl:grid-cols-3">
                         {charts && (
                             <Card
                                 className="xl:col-span-2"
-                                title={t('dash.monthly.title', { defaultValue: 'Angebote & Aufträge — 12 Monate' })}
-                                subtitle={t('dash.clickHint', { defaultValue: 'Für Details auf einen Monat klicken' })}
+                                bodyClassName={monthlyView === 'chart' ? 'ofi-home-card__body--fill' : undefined}
+                                title={chartTitle}
+                                subtitle={`${filterLine} · ${t('dash.clickHint', { defaultValue: 'Für Details auf einen Monat klicken' })}`}
                                 actions={(
                                     <Segmented
                                         options={[
@@ -282,7 +338,14 @@ export const DashboardStats: React.FC = () => {
                                 )}
                             >
                                 {monthlyView === 'chart' ? (
-                                    <MonthlyBarChart points={charts.monthly} mode={mode} />
+                                    <MonthlyBarChart
+                                        points={points}
+                                        mode={mode}
+                                        series={lines}
+                                        title={chartTitle}
+                                        format={isAmount ? chf0 : undefined}
+                                        axisFormat={isAmount ? compactNumber : undefined}
+                                    />
                                 ) : (
                                     <div className="ofi-home-tablewrap">
                                         <table data-inv-table data-unstyled-table data-no-col-resize className="ofi-home-table w-full">
@@ -297,7 +360,7 @@ export const DashboardStats: React.FC = () => {
                                             </thead>
                                             <tbody>
                                                 {/* Newest month first — the table reads top-down as "what just happened". */}
-                                                {[...charts.monthly].reverse().map((row) => (
+                                                {[...points].reverse().map((row) => (
                                                     <tr key={row.month}>
                                                         <td>{row.month}</td>
                                                         <td className="text-right">{row.tenders}</td>
@@ -312,7 +375,7 @@ export const DashboardStats: React.FC = () => {
                                 )}
                             </Card>
                         )}
-                        {summary && (
+                        {summary && sliceSpecs && (
                             <Card
                                 title={t('dash.conv.title', { defaultValue: 'Konversion' })}
                                 subtitle={t('dash.conv.subtitle', { defaultValue: 'Was aus den Angeboten wird' })}
@@ -320,38 +383,32 @@ export const DashboardStats: React.FC = () => {
                                 <ConversionDonut
                                     mode={mode}
                                     centerLabel={t('dash.kpi.quotes', { defaultValue: 'Angebote' })}
-                                    slices={[
-                                        {
-                                            key: 'project',
-                                            label: t('dash.conv.quoteToProject', { defaultValue: 'Angebot → Projekt' }),
-                                            count: summary.conversion.toProject,
-                                            color: colors.navy,
-                                        },
-                                        {
-                                            key: 'delivery',
-                                            label: t('dash.conv.quoteToDelivery', { defaultValue: 'Angebot → Lieferauftrag' }),
-                                            count: summary.conversion.toDelivery,
-                                            color: colors.orange,
-                                        },
-                                        ...(summary.conversion.converted - summary.conversion.toProject - summary.conversion.toDelivery > 0
-                                            ? [{
-                                                key: 'otherConverted',
-                                                label: t('dash.conv.otherConverted', { defaultValue: 'Andere Aufträge' }),
-                                                count: summary.conversion.converted - summary.conversion.toProject - summary.conversion.toDelivery,
-                                                color: mode === 'dark' ? '#98989d' : '#8e8e93',
-                                            }]
-                                            : []),
-                                        {
-                                            key: 'open',
-                                            label: t('dash.conv.open', { defaultValue: 'Noch offen' }),
-                                            count: Math.max(0, summary.conversion.tenders - summary.conversion.converted),
-                                            color: colors.rest,
-                                        },
-                                    ]}
+                                    slices={filters.slices
+                                        .map((key) => sliceSpecs[key])
+                                        // A zero "Andere Aufträge" slice says nothing — it stays out.
+                                        .filter((slice) => slice.key !== 'otherConverted' || slice.count > 0)
+                                        .map((slice) => ({
+                                            key: slice.key,
+                                            label: slice.label,
+                                            count: slice.count,
+                                            color: slice.color,
+                                        }))}
                                 />
                             </Card>
                         )}
                     </div>
+                    {summary && sliceSpecs && (
+                        <SalesFiltersDialog
+                            open={salesOpen}
+                            onClose={() => setSalesOpen(false)}
+                            filters={filters}
+                            onChange={setFilters}
+                            onReset={resetFilters}
+                            isDefault={filtersAreDefault}
+                            series={seriesSpecs}
+                            slices={sliceSpecs}
+                        />
+                    )}
                 </section>
             )}
 

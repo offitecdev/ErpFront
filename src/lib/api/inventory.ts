@@ -2,6 +2,7 @@ import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import { itGateHeaders } from '../itGate';
 import { cachedQuery, peekQueryState, refreshQuery } from './queryCache';
 import type {
+    PurchaseOrderMergeCandidate,
     InventoryLocation,
     InventoryArticle,
     ArticleStockSummary,
@@ -314,9 +315,13 @@ export const inventoryApi = {
         return res.data;
     },
 
+    receiveQuickStockUnit: async (input: import('@/types/inventory').QuickStockUnitInput): Promise<import('@/types/inventory').QuickStockUnitResult> => {
+        const res = await apiClient.post('/inventory/stock-units/quick', input);
+        return res.data;
+    },
+
     /**
-     * Einen weiteren Barcode an einen vorhandenen Artikel heften (dasselbe
-     * Modell, anderes Etikett). Wird er der erste, ist er der Hauptbarcode.
+     * Product/model barcodes only; individual device labels use receiveQuickStockUnit.
      */
     addArticleBarcode: async (articleId: string, barcode: string): Promise<{ ok: boolean; primary: boolean }> => {
         const res = await apiClient.post(`/inventory/articles/${articleId}/barcodes`, { barcode });
@@ -471,6 +476,7 @@ export const purchaseOrdersApi = {
         query.set('pageSize', String(params.pageSize ?? 20));
         if (params.search) query.set('search', params.search);
         if (params.status) query.set('status', params.status);
+        if (params.kind) query.set('kind', params.kind);
         if (params.supplierId) query.set('supplierId', params.supplierId);
         if (params.reference) query.set('reference', params.reference);
         if (params.quote) query.set('quote', params.quote);
@@ -521,6 +527,43 @@ export const purchaseOrdersApi = {
      */
     revertReceive: async (id: string): Promise<{ revertedMovements: number; order: PurchaseOrderRow }> => {
         const res = await apiClient.post(`/inventory/purchase-orders/${id}/receive/revert`);
+        return res.data;
+    },
+
+    /**
+     * GERİ GÖNDER — «Stoğa gidenler» sekmesindeki tek satır (22.09.2026).
+     * O satırın giriş hareketleri geri sarılır, bakiye düşer ve satır yeniden
+     * mal kabul listesine çıkar. Son satır da geri gelince sipariş MAL
+     * KABULDEN çıkar.
+     */
+    revertReceiveLine: async (id: string, index: number): Promise<{ revertedMovements: number; order: PurchaseOrderRow }> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/receive/revert-line`, { index });
+        return res.data;
+    },
+
+    /**
+     * FİYAT TALEBİNİ SİPARİŞE DÖNÜŞTÜR — talep LİSTEDE KALIR, sunucu YENİ bir
+     * sipariş kaydı açar ve onu döner (22.09.2026: artık tek bir sürecin
+     * aşama değişimi değil, iki ayrı kayıt).
+     */
+    convertToOrder: async (id: string): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/convert-to-order`);
+        return res.data;
+    },
+
+    /**
+     * ZUSAMMENFÜHREN (21.09.2026): die Vorgänge der NACHBARSTUFE, mit denen
+     * sich dieser vereinen lässt — und das Vereinen selbst. Die Nummer DIESES
+     * Vorgangs bleibt die gültige; der andere geht in ihm auf und verschwindet.
+     */
+    mergeCandidates: async (id: string, search?: string): Promise<{ stage: 1 | 2 | 3; orders: PurchaseOrderMergeCandidate[] }> => {
+        const query = search ? `?search=${encodeURIComponent(search)}` : '';
+        const res = await apiClient.get(`/inventory/purchase-orders/${id}/merge-candidates${query}`);
+        return res.data;
+    },
+
+    merge: async (id: string, sourceId: string): Promise<PurchaseOrderRow & { mergedFrom: string }> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/merge`, { sourceId });
         return res.data;
     },
 

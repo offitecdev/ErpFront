@@ -237,6 +237,41 @@ html.dark .ofi-cal-page:not(.is-expanded) { box-shadow: 0 8px 28px rgba(0, 0, 0,
 #root .ofi-cal-page .ofi-cal-toolsearch input::placeholder { color: var(--ofi-cal-muted); }
 html.dark .ofi-cal-page .ofi-cal-toolsearch { background: rgba(255, 255, 255, 0.06); }
 
+/* macOS Calendar toolbar controls: round glass buttons and a capsule view
+   selector. The plus keeps the existing create/menu behaviour. */
+.ofi-cal-page .ofi-cal-topbar {
+    min-height: 58px;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 78%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.55);
+    backdrop-filter: blur(24px) saturate(1.55);
+}
+#root .ofi-cal-page .ofi-cal-navbtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px !important;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 76%, transparent);
+}
+#root .ofi-cal-page .ofi-cal-createbtn {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px !important;
+    background: color-mix(in srgb, var(--ofi-cal-surface) 72%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), var(--ofi-mac-btn-shadow);
+}
+#root .ofi-cal-page .ofi-cal-createbtn svg:first-child { width: 19px; height: 19px; }
+.ofi-cal-page .ofi-cal-viewgroup,
+.ofi-cal-page .ofi-cal-modegroup { border-radius: 999px; padding: 3px; }
+#root .ofi-cal-page .ofi-cal-viewgroup button,
+#root .ofi-cal-page .ofi-cal-modegroup button { height: 30px; border-radius: 999px !important; }
+.ofi-cal-page .ofi-cal-createmenu {
+    border-color: rgba(255, 255, 255, 0.68);
+    background: color-mix(in srgb, var(--ofi-cal-surface) 76%, transparent);
+    -webkit-backdrop-filter: blur(28px) saturate(1.65);
+    backdrop-filter: blur(28px) saturate(1.65);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), var(--ofi-cal-shadow-soft);
+}
+html.dark .ofi-cal-page .ofi-cal-createmenu { border-color: rgba(255, 255, 255, 0.14); }
+
 /* ── 4. Titelzeile «September 2026» ‹ Heute › ─────────────────────────────── */
 .ofi-cal-titlerow {
     display: flex;
@@ -624,4 +659,3 @@ html .ofi-cal-page .ofi-cal-monthcell .ofi-ucal-chip--draft.is-timed { backgroun
     .ofi-cal-page .ofi-cal-daybtn__num { font-size: 12.5px; height: 22px; min-width: 22px; }
     .ofi-cal-page:not(.is-expanded) .ofi-cal-scroll { max-height: calc(100dvh - 230px); }
 }
-

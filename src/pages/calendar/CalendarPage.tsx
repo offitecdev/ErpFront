@@ -102,6 +102,17 @@ const maintenanceParticipants = (task: any): CalParticipant[] => dedupeParticipa
         .map((tech: any) => ({ id: tech.id, name: personName(tech), role: tech.roleName, email: tech.email, phone: tech.phone })),
 ]);
 
+/* DIE KOMMISSION EINES TERMINS (21.09.2026, Vorgabe Samet: «neben dem Projekt
+   soll die Kommission stehen — ist keine erfasst, steht dort auch nichts»).
+   Sie hängt am Angebot des Auftrags; ein Termin ohne Auftrag (oder ein
+   Zusatzauftrag, der gar kein Angebot hat) fällt auf das Angebot des Projekts
+   zurück. Leer bleibt leer — nie ein Platzhalter. */
+const appointmentCommission = (appointment: any): string => (
+    appointment?.salesOrder?.tender?.commissionNumber
+    || appointment?.project?.tender?.commissionNumber
+    || ''
+).trim();
+
 const buildOrderDetail = (appointment: any): CalEventDetail => ({
     status: appointment.status,
     notes: appointment.notes,
@@ -115,6 +126,7 @@ const buildOrderDetail = (appointment: any): CalEventDetail => ({
     manager: personName(appointment.project?.manager) || undefined,
     orderNumber: appointment.salesOrder?.orderNumber,
     tenderNumber: appointment.salesOrder?.tender?.tenderNumber ?? appointment.project?.tender?.tenderNumber ?? null,
+    commissionNumber: appointmentCommission(appointment) || null,
     inviteSentAt: appointment.inviteSentAt ?? null,
 });
 
@@ -406,6 +418,7 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                 const endTime = appointment.endTime ? dayjs(appointment.endTime) : startTime.add(1, 'hour');
                 const orderNumber = appointment.salesOrder?.orderNumber;
                 const customerName = appointment.project?.customer?.companyName;
+                const commission = appointmentCommission(appointment);
                 const technicians = orderParticipants(appointment).map((person) => person.name);
                 const projectId = appointment.project?.id;
                 const appointmentId = appointment.id;
@@ -414,7 +427,13 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                     category: 'appointments',
                     refId: appointment.id,
                     title: customerName || (orderNumber ? t('calendar.order', { number: orderNumber }) : t('calendar.orders')),
-                    subtitle: orderNumber ? t('calendar.order', { number: orderNumber }) : undefined,
+                    /* Die Kommission steht VOR der Auftragsnummer: auf einer
+                       schmalen Karte wird hinten abgeschnitten, und sie ist
+                       das, was auf dem Bauplatz gesucht wird. */
+                    subtitle: [
+                        commission ? `${t('tenders.kommission_nr')} ${commission}` : null,
+                        orderNumber ? t('calendar.order', { number: orderNumber }) : null,
+                    ].filter(Boolean).join(' · ') || undefined,
                     meta: technicians.length ? `${t('calendar.technician')}: ${technicians.join(', ')}` : undefined,
                     start: startTime,
                     end: endTime,
@@ -947,7 +966,7 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                 onClick={() => {
                     if (!singleKind) { setCreateMenuOpen((current) => !current); return; }
                     const rect = createButtonRef.current?.getBoundingClientRect();
-                    openCreate({ kind: singleKind }, rect ? anchorFromRect(rect) : null);
+                    openCreate({ kind: singleKind }, rect ? { ...anchorFromRect(rect), placement: 'below' } : null);
                 }}
                 /* Das Plus der Vorlage (14.09.2026): nur das Zeichen, der
                    Name steht als `aria-label`/`title` — wie in Apples
@@ -968,7 +987,7 @@ export const CalendarPage = ({ embed }: { embed?: CalendarEmbed } = {}) => {
                             type="button"
                             onClick={() => {
                                 const rect = createButtonRef.current?.getBoundingClientRect();
-                                openCreate({ kind: item.key }, rect ? anchorFromRect(rect) : null);
+                                openCreate({ kind: item.key }, rect ? { ...anchorFromRect(rect), placement: 'below' } : null);
                             }}
                         >
                             <span className={`ofi-ucal-dot ${item.dot}`} />

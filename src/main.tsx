@@ -33,6 +33,12 @@ import './styles/updateWindow.css'
 // die Mitteilungszentrale unter der Glocke lesen die Fenstertafel von oben.
 import './styles/notifications.css'
 import './styles/headerMac.css'
+// Optional sidebar-free desktop view: a compact, text-first macOS glass menu.
+// It loads after the standard header skin and only activates through its
+// `.ofi-topbar--compact` marker, so the existing sidebar view is untouched.
+import './styles/topNavigation.css'
+import './styles/headerToolbar.css'
+import './styles/motion.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint
 import { initInstallPrompt } from './lib/pwa/installPrompt'
@@ -55,21 +61,15 @@ registerServiceWorker()
 // table without its card chrome and then restyle it.
 installTableChrome()
 
-// Die beiden folgenden Erweiterungen sind reine BEDIENUNG — die Ziehgriffe an
-// den Spaltenkanten und der Druckpunkt unter dem Finger. Beide hängen einen
-// MutationObserver an das Dokument, der während des ganzen Startaufbaus bei
-// jeder DOM-Änderung mitläuft; auf der gedrosselten Messung fiel das mitten in
-// das Fenster, aus dem Lighthouse die Total Blocking Time bildet. Sie werden
-// darum erst eingehängt, wenn der Aufbau durch ist — vor dem ersten Klick oder
-// dem ersten Ziehen ist das sicher geschehen.
+// Delegated pointer feedback is cheap and must cover the very first click.
+installButtonFeedback()
+
+// Defer the table resize observer; pointer feedback above needs no observer.
 const installInteractionLayers = () => {
     // Every table gets drag-resizable columns, with no per-table wiring — the
     // tables that declare their own columns in React keep theirs (see
     // hooks/useColumnWidths), this picks up all the rest.
     installAutoColumnResize()
-    // Der Druckpunkt ist sichtbar (styles/buttons.css); auf Tablet und Telefon
-    // kommt hier der kurze Impuls des Vibrationsmotors dazu.
-    installButtonFeedback()
 }
 const whenIdle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
     .requestIdleCallback

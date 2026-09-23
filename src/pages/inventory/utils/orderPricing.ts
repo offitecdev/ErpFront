@@ -99,7 +99,7 @@ export interface OrderLineFigures {
  * HESAP KİPLERİ (`calcMode`, 2026-08-01 — `directCopy`'nin genellemesi):
  *   AUTO     → yukarıdaki hesap (varsayılan).
  *   DIRECT   → hesap yok: net fiyat + satır tutarı GÖNDERİLDİĞİ GİBİ (eski
- *              directCopy — OrderCreatePage kendi rowFigures dalını kullanır).
+ *              directCopy — OrderWorkspacePage kendi rowFigures dalını kullanır).
  *   SUPPLIER → tedarikçi hesabı: NET BİRİM FİYAT SABİT, indirim kilitli; satır
  *              tutarı miktarla orantılı (miktar × sabit net fiyat).
  */
@@ -121,16 +121,22 @@ export const computeOrderLine = (input: {
         // fiyatı 3 ondalık taşıyabilir ve 2 haneye yuvarlanmış fiyatla çarpmak
         // tutarı kaydırıyordu (18.9766 × 3 = 56.93, ama 18.98 × 3 = 56.94).
         // Yalnızca SONUÇ tutarlar (satır tutarı / KDV) para olarak yuvarlanır.
+        // RABATTE WIRKEN MIT (19.09.2026, Vorgabe Samet: «girilen indirimler
+        // tedarikçi hesaplamalarına ve satır toplamlarına yansımalı»): der
+        // Lieferantenpreis bleibt die Basis, Rabatt und Rabatt 2 fallen der
+        // Reihe nach auf den Betrag. Ohne Rabatt ist der Faktor 1 — alte
+        // Bestellungen rechnen gleich. ⚠ Server-Zwilling: normalizePurchaseOrderItems.
         const netUnit = input.netPrice || 0;
         const quantity = input.quantity || 0;
         const gross = input.grossPrice || netUnit;
+        const factor = discountFactor(input.discount, input.discount2, input.discount3);
         const subtotal = round2(quantity * gross);
-        const lineTotal = round2(quantity * netUnit);
+        const lineTotal = round2(quantity * netUnit * factor);
         const lineVat = round2(lineTotal * (clampPercent(input.vatRate) / 100));
         return {
             subtotal,
             lineTotal,
-            netUnitPrice: netUnit,
+            netUnitPrice: netUnit * factor,
             discountAmount: round2(subtotal - lineTotal),
             lineVat,
             lineGross: round2(lineTotal + lineVat),
@@ -184,9 +190,17 @@ export const impliedDiscountPercent = (item: {
 export const itemDisplayNetPrice = (item: {
     netPrice?: number | null;
     displayNetPrice?: number | null;
+    calcMode?: OrderLineCalcMode | null;
+    discount?: number | null;
+    discount2?: number | null;
+    discount3?: number | null;
 }): number => {
     const display = Number(item.displayNetPrice);
-    return Number.isFinite(display) && display > 0 ? display : (Number(item.netPrice) || 0);
+    const shown = Number.isFinite(display) && display > 0 ? display : (Number(item.netPrice) || 0);
+    // Tedarikçi hesabında satır indirimleri gösterilen net fiyata da iner
+    // (19.09.2026): «Nettopreis» her kipte indirimlerden SONRAKİ fiyattır.
+    if (item.calcMode !== 'SUPPLIER') return shown;
+    return shown * discountFactor(item.discount ?? 0, item.discount2 ?? 0, item.discount3 ?? 0);
 };
 
 // ── Ek ücretler ─────────────────────────────────────────────────────────────

@@ -1,0 +1,76 @@
+/* Yalnızca Üretim modülünün ortak macOS popup-button menüsü. */
+#root [data-production-select-scope] select:not([multiple]):not([size]) {
+    border-radius: 10px !important;
+}
+.dark #root [data-production-select-scope] select:not([multiple]):not([size]) {
+    border-color: #56565b !important;
+    background-color: #2c2c2e !important;
+    color: #f5f5f7 !important;
+    color-scheme: dark;
+}
+
+.ofi-production-mac-menu {
+    position: fixed;
+    z-index: 2147483000;
+    max-height: 292px;
+    overflow: auto;
+    padding: 4px;
+    border: 1px solid rgb(0 0 0 / 15%);
+    border-radius: 10px;
+    background: rgb(246 246 246 / 98%);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 22%), 0 2px 8px rgb(0 0 0 / 12%);
+    backdrop-filter: blur(18px) saturate(1.35);
+    transform-origin: top center;
+    animation: ofi-production-mac-in 90ms ease-out;
+}
+.ofi-production-mac-menu.is-above { transform: translateY(-100%); transform-origin: bottom center; }
+.ofi-production-mac-menu__group {
+    padding: 5px 9px 3px 25px;
+    color: #6e6e73;
+    font: 600 10px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+}
+.ofi-production-mac-menu button[role="option"] {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 28px;
+    padding: 3px 10px 3px 25px;
+    border: 0 !important;
+    border-radius: 6px !important;
+    outline: none;
+    background: transparent !important;
+    color: #1d1d1f !important;
+    font: 400 13px/1.25 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif !important;
+    text-align: left;
+    white-space: nowrap;
+    box-shadow: none !important;
+}
+.ofi-production-mac-menu button[role="option"]:hover:not(:disabled),
+.ofi-production-mac-menu button[role="option"]:focus-visible:not(:disabled) {
+    background: #0a84ff !important;
+    color: #fff !important;
+}
+.ofi-production-mac-menu button[role="option"]:disabled { opacity: .42; }
+.ofi-production-mac-menu__check {
+    position: absolute;
+    left: 7px;
+    display: grid;
+    place-items: center;
+    width: 14px;
+}
+.dark .ofi-production-mac-menu {
+    border-color: rgb(255 255 255 / 16%);
+    background: rgb(44 44 46 / 98%);
+}
+.dark .ofi-production-mac-menu button[role="option"] { color: #f5f5f7 !important; }
+.dark .ofi-production-mac-menu__group { color: #aeaeb2; }
+
+@keyframes ofi-production-mac-in {
+    from { opacity: 0; scale: .985; }
+    to { opacity: 1; scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-production-mac-menu { animation: none; }
+}

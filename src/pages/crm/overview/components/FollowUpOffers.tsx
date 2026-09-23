@@ -137,7 +137,7 @@ export const FollowUpOffers: React.FC<FollowUpOffersProps> = ({ tenders, ordered
                                     e.stopPropagation();
                                     toggleImportant(tender.id);
                                 }}
-                                className={`shrink-0 text-[16px] leading-none transition-transform hover:scale-110 ${
+                                className={`shrink-0 text-[16px] leading-none transition-colors ${
                                     starred ? 'text-amber-500' : 'text-[#C4C7CE] hover:text-amber-400 dark:text-white/25'
                                 }`}
                             >

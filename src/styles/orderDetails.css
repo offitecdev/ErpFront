@@ -48,7 +48,6 @@
     background: var(--ofi-cal-accent-tint);
     color: var(--ofi-cal-accent);
 }
-.ofi-ord-pencil:active { transform: scale(0.94); }
 /* Der Stift ist seit dem 08.09.2026 ein SCHALTER: er öffnet den
    Detailabschnitt und klappt ihn wieder zu. Solange der Abschnitt offen ist,
    trägt er die Akzentfarbe — sonst sähe man dem Knopf nicht an, dass er
@@ -101,8 +100,7 @@
     box-shadow: var(--ofi-cal-shadow-soft);
     transition: background-color 140ms ease, transform 120ms cubic-bezier(0.2, 0.8, 0.3, 1.4);
 }
-.ofi-ord-plus:hover { background: var(--ofi-cal-accent-hover); transform: scale(1.08); }
-.ofi-ord-plus:active { transform: scale(0.9); }
+.ofi-ord-plus:hover { background: var(--ofi-cal-accent-hover); }
 .ofi-ord-plus svg { flex: none; }
 
 /* ── DAS FENSTER ──────────────────────────────────────────────────────────
@@ -176,7 +174,6 @@
     transition: background-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
 .ofi-ord-x:hover { color: var(--ofi-cal-text); }
-.ofi-ord-x:active { transform: scale(0.9); }
 /* Ein leeres Gegenstück links, damit der Titel wirklich mittig sitzt. */
 .ofi-ord-ghost { flex: none; width: 30px; }
 
@@ -235,7 +232,7 @@
     cursor: pointer;
     transition: color 140ms ease, background-color 140ms ease, transform 100ms ease;
 }
-.ofi-ord-visibility:hover { background: var(--ofi-cal-accent-tint); transform: scale(1.06); }
+.ofi-ord-visibility:hover { background: var(--ofi-cal-accent-tint); }
 .ofi-ord-visibility.is-off { color: var(--ofi-cal-faint); }
 /* Die Trennlinie ist EINGERÜCKT — sie beginnt dort, wo die Beschriftung
    beginnt, nicht an der Kante. Genau daran erkennt man die Liste. */
@@ -365,8 +362,7 @@
     cursor: pointer;
     transition: transform 110ms cubic-bezier(0.2, 0.8, 0.3, 1.4), filter 140ms ease;
 }
-.ofi-ord-dot:hover { filter: brightness(1.08); transform: scale(1.12); }
-.ofi-ord-dot:active { transform: scale(0.88); }
+.ofi-ord-dot:hover { filter: brightness(1.08); }
 .ofi-ord-dot.is-remove { background: #ff453a; }
 .ofi-ord-dot.is-add { background: #34c759; }
 
@@ -412,7 +408,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
 .ofi-ord-pills button:hover { border-color: var(--ofi-cal-accent); color: var(--ofi-cal-accent); }
-.ofi-ord-pills button:active { transform: scale(0.94); }
 .ofi-ord-pills button.is-on {
     border-color: var(--ofi-cal-accent);
     background: var(--ofi-cal-accent);
@@ -472,7 +467,6 @@
     transition: background-color 140ms ease, transform 90ms ease;
 }
 .ofi-ord-done:hover { background: var(--ofi-cal-accent-hover); }
-.ofi-ord-done:active { transform: scale(0.96); }
 .ofi-ord-done:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
 /* ── DER PAPIERKORB IN DER TABELLENLEISTE (09.09.2026) ────────────────────
@@ -495,7 +489,6 @@
     transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 90ms ease;
 }
 .ofi-ord-bin:hover { border-color: var(--ofi-cal-danger); color: var(--ofi-cal-danger); }
-.ofi-ord-bin:active { transform: scale(0.94); }
 .ofi-ord-bin:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
 .ofi-ord-bin > b {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -929,7 +922,6 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
     background: var(--ofi-cal-accent-tint);
     color: var(--ofi-cal-accent);
 }
-.ofi-ord-calcbtn:active:not(:disabled) { transform: scale(0.96); }
 .ofi-ord-calcbtn:disabled { opacity: 0.45; cursor: not-allowed; }
 .ofi-ord-calcbtn.is-on {
     border-color: var(--ofi-cal-accent);
@@ -1211,8 +1203,6 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
     color: var(--ofi-cal-on-accent);
 }
 .ofi-mail-send:hover:not(:disabled) { background: var(--ofi-cal-accent-hover); }
-.ofi-mail-tool:active:not(:disabled),
-.ofi-mail-send:active:not(:disabled) { transform: scale(0.96); }
 .ofi-mail-tool:disabled,
 .ofi-mail-send:disabled { opacity: 0.42; cursor: not-allowed; }
 
@@ -1298,7 +1288,7 @@ body > :not(#root) :is(.ofi-ord, .ofi-ord-plate, .ofi-poi) :is(input, textarea):
     cursor: pointer;
     transition: transform 110ms ease, filter 140ms ease;
 }
-.ofi-mail-plus:hover { filter: brightness(1.08); transform: scale(1.08); }
+.ofi-mail-plus:hover { filter: brightness(1.08); }
 
 .ofi-mail-body {
     display: block;

@@ -682,3 +682,192 @@ textarea.acc-input { height: auto; min-height: 64px; padding: 6px 8px; resize: v
 @media (max-width: 1180px) {
     .acc-flow .acc-proposal { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* =========================================================
+   BEDIENTEILE IM MAC-KLEID (22.09.2026)
+
+   Vorgabe Samet: «direkt iOS/Mac SwiftUI olmalı, ayrıca
+   dropdownlarda aynı olmalı — Apple Mac style». Die
+   Buchhaltung benutzt darum NICHT die app-weiten
+   Listenfelder (40px, marineblauer 2px-Rand, `<select>` des
+   Systems), sondern:
+
+     .acc-search   das Suchfeld der Finder-Leiste
+     .acc-select   der «Pop-up Button» mit ⌄
+     .acc-menu     sein Menü (portalisiert, siehe unten)
+     .acc-pager    die Fusszeile «1–20 von 68»
+   ========================================================= */
+.acc-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Suchfeld: graue Mulde, Lupe links, ⌫ sobald etwas steht ─ */
+.acc-search {
+    position: relative;
+    display: inline-flex;
+    width: 260px;
+    max-width: 100%;
+    height: 30px;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px 0 9px;
+    border-radius: 8px;
+    background: var(--acc-group);
+    box-shadow: inset 0 0 0 1px transparent;
+    transition: background-color .15s, box-shadow .15s;
+}
+.acc-search:focus-within {
+    background: var(--acc-surface);
+    box-shadow: inset 0 0 0 1px var(--acc-accent), 0 0 0 3px var(--acc-focus);
+}
+.acc-search__glass { flex: 0 0 auto; color: var(--acc-tertiary); }
+/* index.css hebt jedes Feld über `#root :where(input…)` auf 40px — hier gilt
+   das Mass der Mac-Leiste. `:where()` zählt nichts, diese Regel gewinnt. */
+#root .acc .acc-search__input {
+    width: 100%;
+    min-width: 0;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 13px;
+    color: var(--acc-text);
+    outline: none;
+}
+#root .acc .acc-search__input:focus { border: 0; box-shadow: none; }
+#root .acc .acc-search__input::placeholder { color: var(--acc-tertiary); }
+/* Das eigene Kreuz der Suchfelder von Safari/Chrome weicht unserem Knopf. */
+.acc-search__input::-webkit-search-cancel-button,
+.acc-search__input::-webkit-search-decoration { display: none; -webkit-appearance: none; }
+.acc-search__clear {
+    display: grid;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--acc-rail);
+    color: var(--acc-secondary);
+    transition: background-color .15s, color .15s;
+}
+.acc-search__clear:hover { background: var(--acc-field); color: var(--acc-text); }
+
+/* ── Pop-up Button (das Apple-Gegenstück zum <select>) ────── */
+.acc-select {
+    display: inline-flex;
+    max-width: 240px;
+    height: 30px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 7px 0 10px;
+    border: 1px solid var(--acc-field);
+    border-radius: 8px;
+    background: var(--acc-surface);
+    box-shadow: var(--acc-seg-shadow);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--acc-text);
+    white-space: nowrap;
+    transition: background-color .15s, border-color .15s, box-shadow .15s;
+}
+.acc-select:hover { background: var(--acc-hover); }
+.acc-select.is-open {
+    border-color: var(--acc-accent);
+    box-shadow: 0 0 0 3px var(--acc-focus);
+}
+.acc-select__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.acc-select__chev { flex: 0 0 auto; color: var(--acc-secondary); }
+
+/* ── Menü des Pop-up Buttons ──────────────────────────────────
+   Es hängt am portalierten `AnchoredPicker` und steht darum
+   AUSSERHALB von `#root` und von `.acc` — seine Regeln dürfen
+   weder geschachtelt noch mit `#root` geschrieben werden
+   (Falle «Portal-Popups brauchen einen CSS-Zwilling»). Die
+   Fläche kommt von `.ofi-pop`; hier wird sie zum Mac-Menü.
+   Die Zeilenfüllung malt `.ofi-option-row` (index.css) — die
+   EINE Hover-Farbe der App, nie eine eigene. */
+/* Flaeche, Kante und Schatten malt .ofi-pop.is-list (appleModal.css) — mit
+   !important, und das ist richtig so: es gibt EIN Fenster fuer die ganze
+   App. Eine eigene Flaeche hier waere nicht nur tote Regel, sie kostete
+   auch: das backdrop-filter dieser Tafel kam im Dunkeln als WEISSE Flaeche
+   heraus. Hier steht darum nur, was das Menue selbst angeht. */
+.ofi-pop.acc-menu { min-width: 180px; }
+.acc-menu__list { display: flex; min-width: 0; flex-direction: column; overflow-y: auto; }
+.acc-menu__row {
+    display: flex;
+    width: 100%;
+    min-height: 28px;
+    align-items: center;
+    padding: 3px 10px 3px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 400;
+    color: #1d1d1f;
+    text-align: left;
+}
+html.dark .acc-menu__row { color: #f5f5f7; }
+.acc-menu__row.is-on { font-weight: 500; }
+.acc-menu__check { display: grid; flex: 0 0 20px; place-items: center; width: 20px; }
+.acc-menu__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Fusszeile der Tafel: «1–20 von 68» ‹ 1 2 3 › 20 pro Seite ─ */
+.acc-pager {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    border-top: 1px solid var(--acc-hairline);
+    font-size: 12.5px;
+    color: var(--acc-secondary);
+}
+.acc-pager__range { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.acc-pager__steps { display: inline-flex; align-items: center; justify-self: center; gap: 2px; }
+.acc-pager__arrow,
+.acc-pager__page {
+    display: grid;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    place-items: center;
+    border-radius: 7px;
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--acc-text);
+    font-variant-numeric: tabular-nums;
+    transition: background-color .15s, color .15s;
+}
+.acc-pager__arrow:hover:not(:disabled),
+.acc-pager__page:hover:not(.is-on) { background: var(--acc-hover); }
+.acc-pager__arrow:disabled { cursor: default; color: var(--acc-tertiary); }
+.acc-pager__page.is-on { background: var(--acc-accent); color: #fff; }
+.acc-pager__gap { padding: 0 2px; color: var(--acc-tertiary); }
+.acc-pager > .acc-select { justify-self: end; }
+
+/* Beim Blättern bleibt die Tafel stehen und wird nur leiser — ein
+   Platzhalter statt der Zeilen liesse die Seite bei jedem Klick springen. */
+.acc-card.is-busy { opacity: .55; pointer-events: none; transition: opacity .12s; }
+
+@media (max-width: 900px) {
+    .acc-controls { width: 100%; }
+    .acc-search { flex: 1 1 180px; width: auto; }
+}
+@media (max-width: 760px) {
+    .acc-pager {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        row-gap: 6px;
+    }
+    .acc-pager__steps { order: 3; width: 100%; justify-content: center; }
+}

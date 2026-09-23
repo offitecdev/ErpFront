@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import { t } from '@/i18n/translate';
+import { ToolbarSymbol } from '@/components/icons/ToolbarSymbol';
 import { useAuthStore } from '@/store/authStore';
 import type { TenantOption } from '@/store/authStore';
 import '@/styles/tenantSwitcher.css';
@@ -138,6 +139,7 @@ export const TenantSwitcher = ({ className = '' }: { className?: string }) => {
                 title={active.tenantName}
                 className={`ofi-hdr-ctl ofi-hdr-ctl--wide ofi-glass-ctl ofi-tsw-btn${open ? ' is-open' : ''}`}
             >
+                <ToolbarSymbol name="company" className="ofi-tsw-toolbar-symbol" />
                 <Monogram tenant={active} />
                 {/* Die Beschriftung (Vorgabe 28.08.2026: «es soll eine
                     Beschriftung haben»): der Firmenname steht wieder in der

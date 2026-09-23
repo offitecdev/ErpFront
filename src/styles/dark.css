@@ -763,8 +763,8 @@ html.dark body,
 /* ── Toasts ── */
 .dark .offitec-toaster [data-sonner-toast],
 .dark .offitec-toast {
-  background: var(--ofi-d-surface-2) !important;
-  border-color: var(--ofi-d-border) !important;
+  background: var(--ofi-ntf-surface) !important;
+  border-color: var(--ofi-ntf-border) !important;
   color: var(--ofi-d-text) !important;
 }
 .dark .offitec-toaster [data-title],

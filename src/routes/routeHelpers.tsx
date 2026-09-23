@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { PageSkeleton } from '../components/ui-shared/PageSkeleton';
+import { ProductionMacSelectMenu } from '../components/ui-shared/GlobalMacSelectMenu';
 import { attemptChunkReload, clearChunkReloadGuard } from '../lib/chunkReload';
 
 /* ── Route helpers ──
@@ -115,6 +116,20 @@ export const applePage = (Component: RouteComponent) => (
     <Suspense fallback={<RouteFallback />}>
         <AppleListSkin>
             <Component />
+        </AppleListSkin>
+    </Suspense>
+);
+
+/* Üretim kendi popup-button dilini kullanır. Kapsam işareti ve menü burada
+   yalnızca /production rotalarına takılır; takvim ve diğer modüllerdeki
+   select alanlarının mevcut davranışı ve görünümü değişmez. */
+export const productionPage = (Component: RouteComponent) => (
+    <Suspense fallback={<RouteFallback />}>
+        <AppleListSkin>
+            <div data-production-select-scope style={{ display: 'contents' }}>
+                <Component />
+            </div>
+            <ProductionMacSelectMenu />
         </AppleListSkin>
     </Suspense>
 );

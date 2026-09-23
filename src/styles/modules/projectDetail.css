@@ -628,11 +628,17 @@ a.ofi-prj-contact__text:hover { color: var(--ofi-cal-accent); text-decoration: u
 .ofi-prj-card__actions { display: inline-flex; flex: none; align-items: center; gap: 8px; }
 
 /* ── Auftragsbestätigung ───────────────────────────────────────────────────
-   Der Beleg, der an den KUNDEN geht — also trägt der Knopf die Marken­farbe
-   des Kundendokuments (Marineblau), so wie der Verkaufs-Knopf daneben das Rot
-   seines Ausdrucks trägt. Gleiche Form wie jener (30 px, 6 px Radius, eine
-   Haarlinie), gleiche Bewegung beim Überfahren: nur die Farbe unterscheidet
-   die beiden, und genau daran erkennt man vor dem Klick, was herauskommt.
+   Der Beleg, der an den KUNDEN geht. Gleiche Form wie der Nachtrag-Knopf
+   darunter (30 px, 6 px Radius, eine Haarlinie), gleiche Bewegung beim
+   Überfahren: nur die Farbe unterscheidet die beiden, und genau daran
+   erkennt man vor dem Klick, was herauskommt.
+
+   KEIN MARINEBLAU MEHR (Vorgabe Samet, 21.09.2026: «sipariş modülünde …
+   pdf lacivert arka planı olamaz»). Der Knopf trug im Hellen einen
+   blauvioletten Verlauf und im Dunkeln eine marineblaue Füllung — eine
+   zweite Blaufamilie neben dem einen Apple-Blau der Anwendung
+   (#0a7aff, siehe styles/refine.css). Geblieben ist genau dieses Blau:
+   Bernstein = Nachtrag, Blau = Auftragsbestätigung.
 
    Er steht auf ZWEI Flächen — auf der Projektübersicht in `.ofi-prj-card__actions`
    und in der Auftragsansicht im Kopf einer weissen `Card` — darum hängt er an
@@ -643,9 +649,9 @@ a.ofi-prj-contact__text:hover { color: var(--ofi-cal-accent); text-decoration: u
     flex: none;
     align-items: center;
     gap: 7px;
-    border: 1px solid #c9d0ea;
+    border: 1px solid #cfe0f7;
     border-radius: 6px !important;
-    background: linear-gradient(135deg, #fbfcff, #eaeefb);
+    background: linear-gradient(135deg, #fbfdff, #e9f2fe);
     padding: 0 11px;
     font-size: 12px;
     font-weight: 600;
@@ -661,8 +667,8 @@ a.ofi-prj-contact__text:hover { color: var(--ofi-cal-accent); text-decoration: u
                 box-shadow 140ms ease;
 }
 #root .ofi-ordconf-btn:hover:not(:disabled) {
-    border-color: #0a7aff;
-    background: linear-gradient(135deg, #0066e0, #3f4a92);
+    border-color: #0066e0;
+    background: linear-gradient(135deg, #0a7aff, #0066e0);
     color: #fff;
     box-shadow: 0 2px 10px rgba(10, 122, 255, 0.32);
 }
@@ -677,13 +683,13 @@ a.ofi-prj-contact__text:hover { color: var(--ofi-cal-accent); text-decoration: u
     cursor: default;
 }
 .dark #root .ofi-ordconf-btn {
-    border-color: rgba(160, 175, 235, 0.42);
-    background: rgba(70, 85, 170, 0.18);
-    color: #b9c4ef;
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.07);
+    color: #8fc2ff;
 }
 .dark #root .ofi-ordconf-btn:hover:not(:disabled) {
-    border-color: #8b9ae0;
-    background: linear-gradient(135deg, #2a3269, #4a58a8);
+    border-color: #0a7aff;
+    background: linear-gradient(135deg, #0a7aff, #0066e0);
     color: #fff;
 }
 
@@ -775,14 +781,14 @@ body > :not(#root) .ofi-addon-pdf-btn--lg svg { width: 17px; height: 17px; }
 /* Der Hinweis unter den Feldern trägt dieselbe Tönung wie das Dokument, damit
    das Fenster nicht zwei Farbfamilien gleichzeitig zeigt. */
 .ofi-ordconf-hint {
-    border-color: #d7dcf1 !important;
-    background: #f4f6fd !important;
+    border-color: #d5e6fb !important;
+    background: #f1f7fe !important;
     color: #0a7aff !important;
 }
 .dark .ofi-ordconf-hint {
-    border-color: rgba(150, 165, 230, 0.28) !important;
-    background: rgba(70, 85, 170, 0.14) !important;
-    color: #b9c4ef !important;
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background: rgba(10, 122, 255, 0.13) !important;
+    color: #8fc2ff !important;
 }
 
 /* Das Fenster der Meldungen — dieselbe Karte, nur unten aufsteigend. */

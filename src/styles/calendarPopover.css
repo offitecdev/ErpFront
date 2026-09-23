@@ -4,7 +4,10 @@
 .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) {
     --ofi-modal-radius: 26px;
     --ofi-glass: rgba(250, 250, 249, 0.76);
-    --ofi-glass-box: rgba(120, 120, 128, 0.065);
+    --ofi-glass-box: rgba(120, 120, 128, 0.035);
+    --ofi-win-field: rgba(120, 120, 128, 0.025);
+    --ofi-win-field-border: transparent;
+    --ofi-win-field-border-hover: rgba(120, 120, 128, 0.16);
     --ofi-glass-line: rgba(60, 60, 67, 0.075);
     --ofi-glass-track: rgba(118, 118, 128, 0.14);
     --ofi-glass-icon: #b1b2b3;
@@ -33,7 +36,9 @@
 }
 html.dark .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) {
     --ofi-glass: rgba(43, 43, 45, 0.8);
-    --ofi-glass-box: rgba(255, 255, 255, 0.065);
+    --ofi-glass-box: rgba(255, 255, 255, 0.035);
+    --ofi-win-field: rgba(255, 255, 255, 0.025);
+    --ofi-win-field-border-hover: rgba(255, 255, 255, 0.16);
     --ofi-glass-line: rgba(255, 255, 255, 0.075);
     --ofi-glass-track: rgba(255, 255, 255, 0.12);
     --ofi-glass-icon: #969699;
@@ -91,13 +96,69 @@ html.dark .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) {
     width: 13px;
     height: 26px;
     margin-top: -13px;
-    background: var(--ofi-win-border);
+    background: var(--ofi-arrow-border, var(--ofi-win-border));
     z-index: -1;
 }
 .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='left']::before { left: -12px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
 .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='left']::after { left: -13px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
 .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='right']::before { right: -12px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
 .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='right']::after { right: -13px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard):is([data-arrow='top'], [data-arrow='bottom'])::before,
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard):is([data-arrow='top'], [data-arrow='bottom'])::after {
+    left: var(--ofi-arrow-left, 50%);
+    top: auto;
+    width: 24px;
+    height: 12px;
+    margin: 0 0 0 -12px;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard):is([data-arrow='top'], [data-arrow='bottom'])::after {
+    width: 26px;
+    height: 13px;
+    margin-left: -13px;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='top']::before { top: -12px; clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='top']::after { top: -13px; clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='bottom']::before { bottom: -12px; clip-path: polygon(0 0, 50% 100%, 100% 0); }
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-arrow='bottom']::after { bottom: -13px; clip-path: polygon(0 0, 50% 100%, 100% 0); }
+
+/* One glass silhouette for the card and its rounded pointer. The SVG traces
+   only the outside boundary; there is no border across the pointer's base. */
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-connected-arrow][data-arrow]:not(.is-docked) {
+    background: transparent !important;
+    border-color: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-connected-arrow]::before,
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard)[data-connected-arrow]::after { content: none; }
+.ofi-cal-popover-surface {
+    position: absolute;
+    left: -15px;
+    top: -15px;
+    z-index: -1;
+    pointer-events: none;
+}
+.ofi-cal-popover-surface__glass {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.15)), var(--ofi-glass);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    backdrop-filter: blur(18px) saturate(1.5);
+}
+.ofi-cal-popover-surface__outline {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    fill: none;
+    filter: drop-shadow(0 3px 6px rgba(31, 24, 22, 0.2)) drop-shadow(0 10px 18px rgba(31, 24, 22, 0.12));
+}
+.ofi-cal-popover-surface__edge { stroke: rgba(60, 60, 67, 0.26); stroke-width: 0.75; }
+html.dark .ofi-cal-popover-surface__rim { opacity: 0.3; }
+html.dark .ofi-cal-popover-surface__edge { stroke: rgba(0, 0, 0, 0.4); }
+html.dark .ofi-cal-popover-surface__glass {
+    background: linear-gradient(145deg, rgba(75, 75, 80, 0.1), rgba(20, 20, 23, 0.04)), var(--ofi-glass);
+}
 
 /* 34px capsule, no inset padding around the red selected segment. */
 :is(.ofi-float-card.ofi-cal-detailcard, .ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-newtask__marks, .ofi-cal-tabs) {
@@ -397,3 +458,418 @@ body > :not(#root) .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard) 
     font-size: 12.5px !important;
 }
 :is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-field__box textarea { min-height: 60px !important; font-size: 12.5px !important; border-radius: 8px !important; }
+/* Der gelesene Wert (Kommission) steht auf derselben Zeilenhoehe wie die
+   Felder darueber und darunter — sonst huepft die Reihe im Fenster. */
+:is(.ofi-float-card.ofi-cal-createcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-field__box .ofi-cal-readline { min-height: 30px; font-size: 12.5px; color: var(--ofi-win-primary); }
+
+/* macOS Calendar quick-create sheet (20.09.2026)
+   The material has to remain visibly translucent over the calendar.  The
+   previous two milky layers compounded to an almost opaque panel, so the blur
+   existed technically but could not be seen. */
+.ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard):not(.is-docked) {
+    --ofi-modal-radius: 24px;
+    --ofi-glass: rgba(250, 249, 247, 0.62);
+    --ofi-arrow-border: rgba(255, 255, 255, 0.8);
+    --ofi-glass-box: rgba(120, 120, 128, 0.035);
+    --ofi-glass-line: rgba(60, 60, 67, 0.12);
+    --ofi-glass-track: rgba(118, 118, 128, 0.13);
+    overflow: visible;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
+        var(--ofi-glass) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    backdrop-filter: blur(18px) saturate(1.5);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.94),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.23),
+        0 14px 38px rgba(31, 24, 22, 0.12),
+        0 3px 10px rgba(31, 24, 22, 0.07);
+}
+
+html.dark .ofi-float-card:is(.ofi-cal-detailcard, .ofi-cal-createcard):not(.is-docked) {
+    --ofi-glass: rgba(34, 34, 37, 0.64);
+    --ofi-arrow-border: rgba(255, 255, 255, 0.18);
+    --ofi-glass-box: rgba(255, 255, 255, 0.035);
+    --ofi-glass-track: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.18);
+    background:
+        linear-gradient(145deg, rgba(75, 75, 80, 0.1), rgba(20, 20, 23, 0.04)),
+        var(--ofi-glass) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) {
+    --ofi-win-accent: #0a84ff;
+    --ofi-win-accent-hover: #0077ed;
+    --ofi-win-accent-soft: rgba(10, 132, 255, 0.14);
+    --ofi-win-accent-tint: rgba(10, 132, 255, 0.08);
+    --ofi-win-focus: rgba(10, 132, 255, 0.25);
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-float-card__grip {
+    padding: 10px 12px 6px 18px;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-float-card__body {
+    background: transparent !important;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-createform {
+    position: relative;
+    padding: 0 16px 12px 28px;
+}
+
+/* The slim yellow calendar colour rail from the native quick-entry sheet. */
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-createform::before {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    top: 42px;
+    bottom: 14px;
+    left: 13px;
+    width: 5px;
+    min-height: 86px;
+    border-radius: 999px;
+    background: #ffd000;
+    box-shadow: 0 0 0 1px rgba(255, 186, 0, 0.12), 0 2px 8px rgba(255, 188, 0, 0.2);
+    pointer-events: none;
+}
+
+/* Native segmented control: selection is frosted white, never a red pill. */
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tabs {
+    height: 36px;
+    margin-bottom: 14px;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    background: rgba(118, 118, 128, 0.24);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.035);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    backdrop-filter: blur(18px) saturate(1.25);
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tab {
+    height: 30px;
+    color: #2c2c2e !important;
+    -webkit-text-fill-color: currentColor;
+    font: 500 14px/18px var(--ofi-win-font);
+    transition: background-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tab:hover:not(.is-active) {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tab.is-active {
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: #1c1c1e !important;
+    -webkit-text-fill-color: #1c1c1e;
+    font-weight: 600;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+html.dark body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tabs {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(118, 118, 128, 0.48);
+}
+
+html.dark body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tab {
+    color: rgba(255, 255, 255, 0.78) !important;
+}
+
+html.dark body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tab.is-active {
+    background: rgba(255, 255, 255, 0.91) !important;
+    color: #151517 !important;
+    -webkit-text-fill-color: #151517;
+    box-shadow: 0 1px 7px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) :is(
+    .ofi-cal-field__box,
+    .ofi-cal-titlefield,
+    .ofi-cal-mailtoggle,
+    .ofi-cal-scopeline,
+    .ofi-cal-emptyline
+) {
+    border-color: transparent;
+    background: var(--ofi-glass-box);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+html.dark body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) :is(
+    .ofi-cal-field__box,
+    .ofi-cal-titlefield,
+    .ofi-cal-mailtoggle,
+    .ofi-cal-scopeline,
+    .ofi-cal-emptyline
+) {
+    border-color: rgba(255, 255, 255, 0.09);
+    background: var(--ofi-glass-box);
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-titlefield {
+    min-height: 48px;
+    padding: 11px 13px;
+    border-radius: 14px;
+    font: 600 21px/25px var(--ofi-win-font);
+    letter-spacing: -0.45px;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-float-card__footer {
+    border-top-color: rgba(60, 60, 67, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-float-card__footer {
+    border-top-color: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* Native Calendar quick entry: the segmented control is the first visible
+   row, while close remains a small overlay control in the corner. */
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) > .ofi-float-card__grip {
+    position: absolute;
+    z-index: 8;
+    top: 11px;
+    right: 11px;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    pointer-events: none;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) > .ofi-float-card__grip > .min-w-0,
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) > .ofi-float-card__grip > .ofi-float-card__gripicon,
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) > .ofi-float-card__grip > button:first-child {
+    display: none;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) > .ofi-float-card__grip :is(button, .ofi-float-card__actions) {
+    pointer-events: auto;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-createform {
+    padding-top: 11px;
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tabs {
+    width: calc(100% - 36px);
+    height: 38px;
+    margin-bottom: 12px;
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-tab {
+    height: 32px;
+    font-size: 14.5px;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-createform::before {
+    top: 62px;
+    bottom: 18px;
+}
+
+.ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-createform:not(:has(> .ofi-cal-createhead))::before {
+    top: 18px;
+}
+
+/* Keep the close control in the same layout row as the kind selector.
+   The shared portal selectors above carry #root specificity even in a portal;
+   use that same scope for both text-fill and colour, in either theme. */
+.ofi-float-card.ofi-cal-createcard.has-inline-close > .ofi-float-card__grip {
+    display: none;
+}
+
+.ofi-cal-createhead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin-bottom: 12px;
+}
+
+.ofi-float-card.ofi-cal-createcard:is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-createhead > .ofi-cal-tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    height: 36px;
+    margin: 0;
+    padding: 2px;
+    box-sizing: border-box;
+    align-items: stretch;
+    background: rgba(118, 118, 128, 0.24);
+}
+
+.ofi-float-card.ofi-cal-createcard:is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-tabs > .ofi-cal-tab {
+    height: 32px;
+    min-height: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--ofi-win-text) !important;
+    -webkit-text-fill-color: currentColor !important;
+}
+
+.ofi-float-card.ofi-cal-createcard:is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-tabs > .ofi-cal-tab[aria-selected='true'] {
+    background: rgba(255, 255, 255, 0.94) !important;
+    color: #1c1c1e !important;
+    -webkit-text-fill-color: #1c1c1e !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.ofi-float-card.ofi-cal-createcard:is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-createhead > .ofi-cal-createhead__close {
+    position: static;
+    flex: 0 0 32px;
+    display: inline-grid;
+    place-items: center;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: var(--ofi-win-text) !important;
+    background: rgba(118, 118, 128, 0.15);
+}
+
+.ofi-cal-createhead__title {
+    flex: 1;
+    min-width: 0;
+    color: var(--ofi-win-text);
+    font-size: 13px;
+}
+
+.ofi-cal-smartentry {
+    position: relative;
+    margin: 0 0 12px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    border-radius: 17px;
+    background: var(--ofi-glass-box);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+.ofi-cal-sentence { position: relative; min-width: 0; --sentence-size: 21px; --sentence-leading: 28px; }
+.ofi-cal-sentence.is-compact { --sentence-size: 16px; --sentence-leading: 24px; margin-bottom: 10px; }
+
+/* Native text editing over a non-interactive mirror: identical typography
+   keeps token underlines aligned through typing, wrapping and scrolling. */
+.ofi-float-card.ofi-cal-createcard:is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-sentence > :is(.ofi-cal-sentence__input, .ofi-cal-sentence__mirror) {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 14px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    font: 500 var(--sentence-size)/var(--sentence-leading) var(--ofi-win-font) !important;
+    letter-spacing: -0.3px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    text-align: left;
+    box-shadow: none !important;
+    scrollbar-width: none;
+}
+.ofi-cal-sentence__mirror { position: absolute; inset: 0; overflow: hidden; pointer-events: none; color: var(--ofi-win-text); }
+.ofi-float-card.ofi-cal-createcard:is(#root *, body > :not(#root), body > :not(#root) *) .ofi-cal-sentence__input {
+    position: relative;
+    z-index: 1;
+    resize: none;
+    outline: none;
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    caret-color: var(--ofi-win-text);
+}
+.ofi-cal-sentence:focus-within { box-shadow: inset 0 0 0 1px var(--ofi-win-focus); border-radius: 12px; }
+.ofi-cal-sentence__input::placeholder { color: var(--ofi-win-secondary) !important; -webkit-text-fill-color: var(--ofi-win-secondary) !important; opacity: 0.7; }
+.ofi-cal-sentence__input::selection { background: rgba(10, 132, 255, 0.2); }
+.ofi-cal-sentence__mirror mark {
+    padding: 0;
+    background: transparent;
+    color: #c92b2b;
+    -webkit-text-fill-color: #c92b2b;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
+}
+html.dark .ofi-cal-sentence__mirror mark { color: #ff8078; -webkit-text-fill-color: #ff8078; }
+
+.ofi-cal-sentence-menu__list { overflow-y: auto; padding: 4px; }
+.ofi-cal-sentence-menu__option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--ofi-win-text, #1c1c1e);
+}
+.ofi-cal-sentence-menu__option[aria-selected='true'] { background: rgba(10, 132, 255, 0.13); }
+.ofi-cal-sentence-menu__option strong { display: block; font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.ofi-cal-sentence-menu__option small { display: block; margin-top: 2px; font-size: 11px; color: var(--ofi-win-secondary, #777); overflow-wrap: anywhere; }
+.ofi-cal-sentence-menu__status { padding: 8px 10px; color: var(--ofi-win-secondary, #777); font-size: 12px; }
+html.dark .ofi-cal-sentence-menu__option[aria-selected='true'] { background: rgba(74, 155, 255, 0.2); }
+
+/* Each form section is its own frosted row, as in the reference sheet. */
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-field {
+    padding-bottom: 10px;
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-field__label {
+    padding: 2px 10px 5px;
+    color: var(--ofi-win-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+}
+
+body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-field__box {
+    min-height: 48px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: var(--ofi-glass-box) !important;
+    padding: 10px 12px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+html.dark .ofi-cal-smartentry {
+    border-color: transparent;
+    background: var(--ofi-glass-box);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html.dark body > .ofi-float-card.ofi-cal-createcard:not(.is-docked) .ofi-cal-field__box {
+    border-color: transparent;
+    background: var(--ofi-glass-box) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* A grouped row supplies the material; its editor should not add a white tile.
+   Keep the native focus border/ring and the sentence mirror's transparent ink. */
+.ofi-float-card:is(.ofi-cal-createcard, .ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) .ofi-macdp {
+    background: var(--ofi-glass-box) !important;
+    border-color: transparent;
+}
+.ofi-float-card:is(.ofi-cal-createcard, .ofi-cal-detailcard):is(#root *, body > :not(#root), body > :not(#root) *) :is(.ofi-cal-field__box, .ofi-cal-group) :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+    textarea,
+    select,
+    .ofi-cal-input
+) {
+    background: transparent !important;
+}
+
+@media (max-width: 640px) {
+    .ofi-cal-sentence { --sentence-size: 18px; --sentence-leading: 24px; }
+}

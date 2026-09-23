@@ -399,3 +399,274 @@
 #root .ofi-codes-gate.is-primary { border-color: var(--ofi-cal-accent); background: var(--ofi-cal-accent); color: var(--ofi-cal-on-accent, #fff); font-weight: 600; }
 #root .ofi-codes-gate.is-primary:hover:not(:disabled) { background: var(--ofi-cal-accent-hover, #0066e0); }
 #root .ofi-codes-gate:disabled { opacity: 0.45; }
+
+/* ══ CODE-EINSTELLUNGEN: ZELLEN, REITER, ZURÜCKSETZEN (22.09.2026) ══════════
+   Der ERP-Code besteht aus 2–4 ZELLEN und einem Zähler:
+   ELK-PANO-PLC-H-00400. Die Einstellung hat dafür drei eigene Reiter, damit
+   jede Tabelle die ganze Breite hat — nebeneinander passten die Spalten nicht
+   (Samet: «bunlar sütunlar sığmıyor»).
+
+   ACHTUNG Fenster: die Zellenreihe, die Vorschau und der Schalter stehen in
+   einem PORTAL (`body > :not(#root)`), nicht unter `#root`. Regeln, die gegen
+   globale Formularregeln ankommen müssen, stehen deshalb ZWEIMAL — einmal je
+   Wurzel. Klassen ohne `#root`-Vorsatz gelten ohnehin überall. */
+
+.ofi-codes { display: flex; min-width: 0; flex-direction: column; gap: 14px; }
+.ofi-codes-stack { display: flex; min-width: 0; flex-direction: column; gap: 14px; }
+
+/* Die drei Reiter dieser Einstellung — Googles Unterstrich wie das Band
+   darüber, nur eine Stufe leiser. */
+.ofi-codes-subtabs {
+    display: flex;
+    min-width: 0;
+    gap: 2px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+}
+#root .ofi-codes-subtab {
+    position: relative;
+    flex: none;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    padding: 8px 12px 9px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+    transition: color 120ms ease;
+}
+#root .ofi-codes-subtab:hover { color: var(--ofi-cal-text); }
+#root .ofi-codes-subtab.is-active { color: var(--ofi-cal-accent); font-weight: 600; }
+#root .ofi-codes-subtab.is-active::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--ofi-cal-accent);
+}
+
+/* Die Kategorie als Pille über der Kreistabelle — sie IST die erste Zelle. */
+.ofi-codes-chips {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-bottom: 1px solid var(--ofi-cal-border-soft);
+    padding: 10px 16px;
+}
+#root .ofi-codes-catchip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    height: 28px;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 999px !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 10px;
+    font-size: 12px;
+    color: var(--ofi-cal-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-codes-catchip:hover { background: var(--ofi-cal-hover); }
+#root .ofi-codes-catchip.is-active {
+    border-color: var(--ofi-cal-accent);
+    background: var(--ofi-cal-accent-tint);
+    color: var(--ofi-cal-accent);
+}
+.ofi-codes-catchip__code { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 600; }
+.ofi-codes-catchip__name { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ofi-cal-muted); }
+#root .ofi-codes-catchip.is-active .ofi-codes-catchip__name { color: inherit; }
+.ofi-codes-catchip__n { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ofi-cal-faint); }
+
+/* ── Die Zellenreihe im Fenster ────────────────────────────────────────── */
+.ofi-codes-cells {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+}
+.ofi-codes-cellbox { display: inline-flex; align-items: center; gap: 2px; }
+.ofi-codes-cells__dash { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; color: var(--ofi-cal-faint); }
+
+.ofi-codes-cell,
+#root .ofi-codes-cell,
+body > :not(#root) .ofi-codes-cell {
+    display: inline-flex;
+    width: 4.25rem;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ofi-cal-border);
+    border-radius: 7px !important;
+    background: var(--ofi-cal-surface);
+    padding: 0 6px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: center;
+    color: var(--ofi-cal-text);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+/* Die erste Zelle gehört der Kategorie: sie steht fest. */
+.ofi-codes-cell.is-fixed,
+#root .ofi-codes-cell.is-fixed,
+body > :not(#root) .ofi-codes-cell.is-fixed {
+    border-style: dashed;
+    background: var(--ofi-cal-hover);
+    color: var(--ofi-cal-muted);
+}
+/* Die fünfte Zelle ist der Zähler — er wird nicht getippt, er läuft. */
+.ofi-codes-cell.is-counter,
+#root .ofi-codes-cell.is-counter,
+body > :not(#root) .ofi-codes-cell.is-counter {
+    width: auto;
+    min-width: 4.25rem;
+    border-style: dashed;
+    background: transparent;
+    font-weight: 500;
+    color: var(--ofi-cal-faint);
+}
+#root .ofi-codes-cell.is-input:focus,
+body > :not(#root) .ofi-codes-cell.is-input:focus {
+    border-color: var(--ofi-cal-accent) !important;
+    box-shadow: 0 0 0 1px var(--ofi-cal-accent) !important;
+    outline: none;
+}
+#root .ofi-codes-cell.is-input:disabled,
+body > :not(#root) .ofi-codes-cell.is-input:disabled { color: var(--ofi-cal-muted); }
+
+#root .ofi-codes-cellx,
+body > :not(#root) .ofi-codes-cellx {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px !important;
+    background: transparent;
+    color: var(--ofi-cal-faint);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-codes-cellx:hover,
+body > :not(#root) .ofi-codes-cellx:hover { background: rgba(185, 28, 28, 0.1); color: var(--ofi-cal-danger); }
+
+#root .ofi-codes-celladd,
+body > :not(#root) .ofi-codes-celladd {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    gap: 4px;
+    border: 1px dashed var(--ofi-cal-border);
+    border-radius: 7px !important;
+    background: transparent;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ofi-cal-muted);
+    white-space: nowrap;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+#root .ofi-codes-celladd:hover,
+body > :not(#root) .ofi-codes-celladd:hover { border-color: var(--ofi-cal-accent); color: var(--ofi-cal-accent); }
+
+/* Die Vorschau oben im Fenster: das Ergebnis, bevor man es speichert. */
+.ofi-codes-preview {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 14px;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 8px;
+    background: var(--ofi-cal-hover);
+    padding: 10px 14px;
+}
+.ofi-codes-preview__label { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; color: var(--ofi-cal-muted); }
+.ofi-codes-preview__code {
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ofi-cal-text);
+}
+
+.ofi-codes-two { display: grid; min-width: 0; gap: 12px; grid-template-columns: 1fr 1fr; }
+.ofi-cal-input.is-mono,
+#root .ofi-cal-input.is-mono,
+body > :not(#root) .ofi-cal-input.is-mono {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-weight: 600;
+}
+
+/* Der Schalter «bestehende Artikel mitnehmen». */
+.ofi-codes-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    padding: 2px 0 8px;
+    font-size: 13px;
+    color: var(--ofi-cal-text);
+    cursor: pointer;
+}
+.ofi-codes-switch input { width: 15px; height: 15px; accent-color: var(--ofi-cal-accent); }
+.ofi-codes-text { margin-bottom: 10px; font-size: 13px; line-height: 1.5; color: var(--ofi-cal-text); }
+
+/* ── Die Zellen als Abzeichen in der Tabelle ───────────────────────────── */
+.ofi-codes-chipline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+.ofi-codes-chip {
+    display: inline-flex;
+    height: 21px;
+    align-items: center;
+    border: 1px solid var(--ofi-cal-border-soft);
+    border-radius: 5px;
+    background: var(--ofi-cal-hover);
+    padding: 0 6px;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-codes-chip.is-first { border-color: var(--ofi-cal-border); background: transparent; }
+.ofi-codes-chip.is-counter { border-style: dashed; background: transparent; font-weight: 500; color: var(--ofi-cal-faint); }
+
+.ofi-codes-next {
+    display: block;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ofi-cal-text);
+}
+.ofi-codes-sub { display: block; font-size: 11px; color: var(--ofi-cal-faint); }
+
+/* ── Die Möglichkeiten des Zurücksetzens ───────────────────────────────── */
+.ofi-codes-options { display: flex; min-width: 0; flex-direction: column; }
+.ofi-codes-option {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--ofi-cal-line);
+    padding: 14px 16px;
+}
+.ofi-codes-option:last-child { border-bottom: 0; }
+.ofi-codes-option__text { min-width: 14rem; flex: 1; }
+.ofi-codes-option__title { font-size: 13px; font-weight: 600; color: var(--ofi-cal-text); }
+.ofi-codes-option__hint { margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--ofi-cal-muted); }
+.ofi-codes-option.is-danger .ofi-codes-option__title { color: var(--ofi-cal-danger); }
+#root .ofi-codes-gate.is-danger { border-color: rgba(185, 28, 28, 0.35); color: var(--ofi-cal-danger); }
+#root .ofi-codes-gate.is-danger:hover:not(:disabled) { background: rgba(185, 28, 28, 0.1); }
+
+@media (max-width: 720px) {
+    .ofi-codes-two { grid-template-columns: 1fr; }
+}

@@ -85,7 +85,7 @@ const CONTACT_EMAIL = 'info@offitec.ch';
 const CONTACT_WEB = 'www.offitec.ch';
 const FOOTER_BIC = 'RAIFCH22XXX';
 const FOOTER_VAT = 'CHE-201.098.592';
-const FOOTER_IBAN = 'CH50 8080 8005 5315 3585 1';
+const FOOTER_IBAN = 'CH57 8080 8003 3475 3125 5';
 
 // ── Fontlar ──────────────────────────────────────────────────────────────────
 export const FONT = 'Arial';

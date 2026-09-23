@@ -210,7 +210,6 @@
     transition: background-color 140ms ease, transform 90ms ease;
 }
 .ofi-nw__primary:hover { background: var(--ofi-win-accent-hover); }
-.ofi-nw__primary:active { transform: scale(0.985); }
 .ofi-nw__primary:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--ofi-win-focus); }
 
 @media (max-width: 640px) {
