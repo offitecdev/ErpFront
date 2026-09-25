@@ -1,4 +1,5 @@
 import type { TranslationTree } from './manualTranslations';
+import { directInvoiceTranslations } from './directInvoiceTranslations';
 
 export const SUPPORTED_LANGUAGES = ['tr', 'en', 'de'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -54,5 +55,5 @@ export const loadResource = async (language: SupportedLanguage): Promise<Transla
         manualLoaders[language](),
         taskOnboardingLoaders[language](),
     ]);
-    return mergeTranslations(mergeTranslations(locale.default, manual.default), taskOnboarding.default);
+    return mergeTranslations(mergeTranslations(mergeTranslations(locale.default, manual.default), taskOnboarding.default), directInvoiceTranslations[language]);
 };

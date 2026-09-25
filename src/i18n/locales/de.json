@@ -1001,7 +1001,14 @@
             "colCodeBlock": "Belegnummer",
             "companyNumberHint": "Die Firmen-Nr. bestimmt den Block in den Belegnummern dieser Firma (4 → AN-2026-40001) und ist unabhängig von der Modulkategorie. Eine Änderung wirkt nur auf Künftig erzeugte Nummern; bereits vergebene bleiben unverändert.",
             "errorCompanyNumber": "Die Firmen-Nr. muss eine ganze Zahl zwischen 0 und 99 sein.",
-            "numberSaved": "Firmen-Nr. aktualisiert."
+            "numberSaved": "Firmen-Nr. aktualisiert.",
+            "colCompanyType": "Firmentyp",
+            "typeNone": "Kein Typ",
+            "typeProduction": "Produktion",
+            "typeProject": "Projekt",
+            "typeSales": "Verkauf",
+            "typeSaved": "Firmentyp aktualisiert.",
+            "companyTypeHint": "Der Firmentyp (A Produktion · B Projekt · C Verkauf) bestimmt die Pflichtfelder im Formular «Neues Produkt»: Projekt- und Verkaufsfirmen verlangen zusätzlich Produkttyp und Lieferant, eine Produktionsfirma nur die Bezeichnung."
         },
         "pdf": {
             "breadcrumb": "Einstellungen › PDF & Angebotsvorlage",

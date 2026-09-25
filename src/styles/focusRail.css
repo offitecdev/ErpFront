@@ -1,0 +1,234 @@
+/* =========================================================
+   DIE SCHMALE LEISTE DER GERÄTESEITE (24.09.2026, Vorgabe Samet)
+
+   «Bütün sidebar ikonları küçülecek, baya minimal küçüklükte, çok az
+    bir yerde … üst barda headerda bir şey kalmayacak; bildirim, dil
+    ve profil küçülsün ve sidebar'a eklensin. Sadece bu ürün sayfasına
+    özel.»
+
+   `AppSidebar variant="slim"` — dasselbe Element wie die 84px-Leiste,
+   48px breit, nur Zeichen; beim Wechsel auf die Geräteseite wird es
+   schmaler statt neu zu erscheinen. Unten Glocke, Sprache und Profil
+   aus MainLayout (`focusTools`) — dieselben Knöpfe wie in der
+   Kopfleiste, hier nur kleiner, ohne Karte, und ihre Menüs gehen nach
+   RECHTS auf. Die Mitteilungszentrale erfährt davon über die Marke
+   `html.ofi-focus-nav`.
+
+   Steht in main.tsx nach headerMac/topNavigation/headerToolbar,
+   ausserhalb jeder Schicht; `!important` nur dort, wo index.css,
+   buttons.css oder Tailwind die Knöpfe selbst mit Nachdruck belegen.
+   ========================================================= */
+
+/* Die Leiste wird beim Wechsel schmaler, statt zu springen. */
+#root .ofi-rail {
+    transition: width 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+#root .ofi-rail-slim__brand {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    height: 50px;
+}
+
+#root .ofi-rail-slim__nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 2px 0 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+#root .ofi-rail-slim__nav::-webkit-scrollbar { display: none; }
+
+#root .ofi-rail-slim__list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+/* ── Der Rückweg über dem Startseiten-Zeichen ─────────────────
+   «Açık mavi, yine Apple mavisi» — ein runder hellblauer Knopf mit
+   blauem Pfeil. Rund, damit er nicht mit dem gewählten Modul (eckige
+   hellblaue Kachel) verwechselt wird. */
+#root .ofi-rail-slim__lead {
+    display: flex;
+    justify-content: center;
+    padding-bottom: 6px;
+}
+#root .ofi-rail-slim__back {
+    display: grid !important;
+    place-items: center;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: #e3efff !important;
+    box-shadow: none !important;
+    color: #0a7aff !important;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease !important;
+}
+#root .ofi-rail-slim__back:hover { background: #d3e5ff !important; color: #0066e0 !important; }
+#root .ofi-rail-slim__back:active { background: #c4dcff !important; }
+#root .ofi-rail-slim__back:focus-visible { outline: 2px solid rgba(10, 122, 255, 0.45); outline-offset: 2px; }
+html.dark #root .ofi-rail-slim__back { background: rgba(10, 132, 255, 0.22) !important; color: #64aaff !important; }
+html.dark #root .ofi-rail-slim__back:hover { background: rgba(10, 132, 255, 0.32) !important; color: #8cc0ff !important; }
+
+/* ── Die Modulzeichen ─────────────────────────────────────── */
+#root .ofi-rail-slim__item {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    color: rgba(29, 29, 31, 0.62);
+    text-decoration: none;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-rail-slim__item:hover { background: rgba(0, 0, 0, 0.05); color: #1d1d1f; }
+#root .ofi-rail-slim__item.is-active { background: #e3efff; color: #0a7aff; }
+#root .ofi-rail-slim__item:focus-visible { outline: 2px solid rgba(10, 122, 255, 0.45); outline-offset: 1px; }
+html.dark #root .ofi-rail-slim__item { color: rgba(245, 245, 247, 0.62); }
+html.dark #root .ofi-rail-slim__item:hover { background: rgba(255, 255, 255, 0.07); color: #ffffff; }
+html.dark #root .ofi-rail-slim__item.is-active { background: rgba(255, 255, 255, 0.10); color: #e6cf9e; }
+#root .ofi-rail-slim__lock {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    opacity: 0.6;
+}
+
+/* ── Glocke, Sprache, Profil ───────────────────────────────── */
+#root .ofi-rail-slim__tools {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 0 12px;
+}
+/* Ein kurzer Strich trennt Module und Werkzeuge — wie im Dock. */
+#root .ofi-rail-slim__tools::before {
+    content: '';
+    width: 20px;
+    height: 1px;
+    margin-bottom: 6px;
+    border-radius: 1px;
+    background: rgba(0, 0, 0, 0.1);
+}
+html.dark #root .ofi-rail-slim__tools::before { background: rgba(255, 255, 255, 0.12); }
+#root .ofi-rail-slim__tools > * { margin: 0 !important; }
+
+#root .ofi-rail-slim__tools button.ofi-hdr-ctl {
+    display: grid !important;
+    place-items: center;
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: rgba(29, 29, 31, 0.62) !important;
+    transition: background-color 120ms ease, color 120ms ease !important;
+}
+#root .ofi-rail-slim__tools button.ofi-hdr-ctl:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #1d1d1f !important;
+}
+#root .ofi-rail-slim__tools button.ofi-hdr-ctl[aria-expanded="true"] {
+    background: #e3efff !important;
+    color: #0a7aff !important;
+}
+html.dark #root .ofi-rail-slim__tools button.ofi-hdr-ctl { color: rgba(245, 245, 247, 0.62) !important; }
+html.dark #root .ofi-rail-slim__tools button.ofi-hdr-ctl:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: #ffffff !important;
+}
+html.dark #root .ofi-rail-slim__tools button.ofi-hdr-ctl[aria-expanded="true"] {
+    background: rgba(255, 255, 255, 0.10) !important;
+    color: #e6cf9e !important;
+}
+#root .ofi-rail-slim__tools .ofi-toolbar-symbol { width: 17px; height: 17px; }
+
+/* Die Zahl an der Glocke — kleiner, in die Ecke des kleineren Feldes. */
+#root .ofi-rail-slim__tools button.ofi-hdr-ctl > span.ofi-nosize.absolute {
+    top: 2px !important;
+    right: 2px !important;
+    transform: scale(0.84);
+    transform-origin: top right;
+}
+
+/* Die Menüs gehen nach RECHTS auf, unten bündig mit ihrem Knopf. */
+#root .ofi-rail--slim :is(.ofi-lang-menu, .ofi-profile-menu) {
+    top: auto !important;
+    right: auto !important;
+    bottom: 0 !important;
+    left: calc(100% + 14px) !important;
+    transform-origin: bottom left;
+    animation-name: ofi-focus-menu-in !important;
+}
+@keyframes ofi-focus-menu-in {
+    from { opacity: 0; transform: translateX(-4px) scale(0.985); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Der Werkzeugtipp neben einem Zeichen ─────────────────── */
+.ofi-rail-tip {
+    position: fixed;
+    z-index: 70;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    color: #1d1d1f;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translateY(-50%);
+    animation: ofi-rail-tip-in 120ms ease-out both;
+}
+html.dark .ofi-rail-tip {
+    background: rgba(44, 44, 46, 0.97);
+    box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 4px 14px rgba(0, 0, 0, 0.5);
+    color: #f5f5f7;
+}
+@keyframes ofi-rail-tip-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ── Die Mitteilungszentrale: unten links neben der Glocke ─── */
+html.ofi-focus-nav .ofi-nc {
+    top: auto;
+    right: auto;
+    bottom: 12px;
+    left: 58px;
+    max-height: calc(100vh - 24px);
+    transform-origin: bottom left;
+}
+@media (max-width: 640px) {
+    html.ofi-focus-nav .ofi-nc {
+        right: 8px;
+        left: 56px;
+        width: auto;
+        max-width: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #root .ofi-rail { transition: none; }
+    .ofi-rail-tip,
+    #root .ofi-rail--slim :is(.ofi-lang-menu, .ofi-profile-menu) { animation: none !important; }
+}

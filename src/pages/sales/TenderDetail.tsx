@@ -39,7 +39,8 @@ import { useMoneyFormat } from './detail/utils/useMoneyFormat';
 import { toCurrencyCode } from '../../utils/currency';
 
 import { t } from '@/i18n/translate';
-import type { ArticleQuickPick } from '@/types/inventory';
+import { invalidateTags } from '@/lib/api/queryCache';
+import type { ArticleDetail, ArticleQuickPick } from '@/types/inventory';
 
 import type {
     ManualProductForm,
@@ -84,6 +85,7 @@ import { useTenderProfitability } from './detail/hooks/useTenderProfitability';
 import { useTenderChatter } from './detail/hooks/useTenderChatter';
 import { useTenderOrderDecision } from './detail/hooks/useTenderOrderDecision';
 import { useTenderLineStaging } from './detail/hooks/useTenderLineStaging';
+import { useTenderStockPrompt } from './detail/hooks/useTenderStockPrompt';
 import { TenderDetailLoadingSkeleton } from './detail/components/TenderDetailLoadingSkeleton';
 import { OspOriginCard } from './detail/components/OspOriginCard';
 import { TenderRevertTraceCard } from '@/components/orders/RevertTraceCard';
@@ -95,6 +97,7 @@ import { documentEventsApi } from '@/lib/api/documentEvents';
 import { TenderDetailHeader } from './detail/components/TenderDetailHeader';
 import { TenderWorkspaceTabs } from './detail/components/TenderWorkspaceTabs';
 import { TenderLineTable } from './detail/components/lines/TenderLineTable';
+import { TenderStockPrompt } from './detail/components/lines/TenderStockPrompt';
 import { RESET_DRAFT_EVENT } from './detail/components/TenderLineInputs';
 import { TenderCustomerSection } from './detail/components/customer/TenderCustomerSection';
 import { TenderCustomerCard, type TenderCardGroup } from './detail/components/customer/TenderCustomerCard';
@@ -471,7 +474,6 @@ export const TenderDetail = () => {
         dismissProjectCreated,
     } = useTenderOrderDecision({
         tender: detail?.tender,
-        isDirty,
         overtimeHourlyRate,
         fetchDetail,
         navigate,
@@ -576,6 +578,48 @@ export const TenderDetail = () => {
         applyLineText(positionId, field, value);
         return true;
     }, [applyLineText]);
+
+    // "Add to stock?" (Samet, 23.09.2026): a free line — a name the catalogue
+    // does not know — is offered to the stock right beside the row. "Add" opens
+    // the product form in a new tab; once it saves, the line is linked to the
+    // new article here. The X keeps the free line. See useTenderStockPrompt.
+    const canCreateArticles = permissions.includes('inventory.articles.create');
+    const linkRowToCreatedArticle = useCallback((rowId: string, article: ArticleDetail) => {
+        const row = localPositionsRef.current.find((position) => position.id === rowId);
+        if (!row || row.sourceArticleId) return;
+        // What the line already carries stays wherever the new card has
+        // nothing: no sale price on the card keeps the line's price, no
+        // description keeps the line's own text; quantity is never touched.
+        fillRowFromProduct(
+            rowId,
+            {
+                id: article.id,
+                articleCode: article.articleCode,
+                name: article.name,
+                description: article.description ?? null,
+                unit: article.unit,
+                salePrice: article.salePrice,
+            },
+            {
+                name: row.shortDescription,
+                description: row.longDescription ?? '',
+                ...(row.unit ? { unit: row.unit } : {}),
+                unitPrice: Number(row.unitPrice ?? 0),
+                discount: Number(row.discount ?? 0),
+                taxRate: Number(row.taxRate ?? fallbackTaxRate),
+            },
+        );
+        // The article was written in the other tab: this tab's catalogue cache
+        // never heard of it, so the next search would miss it.
+        invalidateTags(['catalog']);
+        toast.success(t('tenders.stockPrompt.linked', { name: article.name }));
+    }, [fallbackTaxRate, fillRowFromProduct]);
+    const stockPrompt = useTenderStockPrompt({
+        enabled: detail?.tender.status === 'Draft' && canManage && canCreateArticles,
+        localPositionsRef,
+        stableRowKeys,
+        onCreated: linkRowToCreatedArticle,
+    });
 
     // Default the Projekt- and Lieferadresse to the customer's primary address
     // while they are empty (the user can still pick another one per row).
@@ -2148,6 +2192,9 @@ export const TenderDetail = () => {
                         const row = localPositionsRef.current.find((position) => position.id === productDropdown.rowId);
                         if ((row?.shortDescription || '') !== name) {
                             applyLineText(productDropdown.rowId, 'shortDescription', name);
+                            // A name the catalogue does not know: offer it to the
+                            // stock (a renamed article line keeps its article).
+                            if (!row?.sourceArticleId) stockPrompt.ask(productDropdown.rowId, name);
                         }
                         setProductDropdown(null);
                     }}
@@ -2161,6 +2208,17 @@ export const TenderDetail = () => {
                     }}
                 />
                 </Suspense>
+            )}
+
+            {/* "Add to stock?" beside a free line — rendered outside the table so
+                its clicks never reach the row's select / long-press handlers. */}
+            {stockPrompt.askingRowKey && (
+                <TenderStockPrompt
+                    rowKey={stockPrompt.askingRowKey}
+                    resolveRowId={stockPrompt.resolveRowId}
+                    onAdd={stockPrompt.add}
+                    onDismiss={stockPrompt.dismiss}
+                />
             )}
 
             {productPickerOpen && (

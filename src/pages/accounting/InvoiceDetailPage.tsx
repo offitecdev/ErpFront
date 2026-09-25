@@ -323,7 +323,7 @@ export const InvoiceDetailPage = () => {
             <div className="acc-detail">
                 <div className="acc-preview">
                     {pdfState === 'ready' && pdfUrl
-                        ? <iframe src={pdfUrl} title={displayNumber(invoice)} />
+                        ? <iframe src={`${pdfUrl}#toolbar=0`} title={displayNumber(invoice)} />
                         : (
                             <div className="acc-preview__state">
                                 {pdfState === 'error' ? t('billing.pdfError') : <LoadingDots />}

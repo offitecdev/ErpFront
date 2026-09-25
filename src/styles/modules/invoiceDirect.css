@@ -1,0 +1,280 @@
+/* ── DIREKTRECHNUNG IM KLEID DER PANO-SEITEN (25.09.2026) ─────────────────────
+   Vorgabe Samet: «serbest fatura oluşturma tıpkı üretimdeki ya da teklifteki
+   gibi daha temiz olması lazım … kocaman glass butonlar olmasın … seçimler
+   üretimdeki seçim tasarımında olacak».
+
+   Die Seite trägt darum die Bauteile von «Seri numarası üret»
+   (pages/production/components/PanelEditorKit + styles/modules/panels.css,
+   das VOR dieser Datei lädt): weisse Tafeln mit einer Haarlinie, Beschriftung
+   über dem Feld, 40px-Felder, der macOS-Pop-up-Knopf für jede Auswahl und die
+   kleinen 34px-Knöpfe. Die Route hängt wie die Produktion in der Apple-Hülle
+   (`applePage` → `.ofi-list-apple`: Inter und die `--la-*`-Werte für hell und
+   dunkel).
+
+   Hier steht nur, was die Rechnung darüber hinaus braucht. Kein Glas, keine
+   Unschärfe, kein Verlauf: der 620px breite Schrittstreifen mit
+   `backdrop-filter`, die 22px-Karte und die 45px-Segmente sind ersatzlos weg. */
+
+/* ── Kopf: Titel links, die drei Schritte rechts daneben ───────────────────── */
+/* Doppelte Klasse: panels.css kann im gebauten Paket NACH dieser Datei laden,
+   und `.ofi-panel-page-head` setzt `align-items: flex-start`. */
+.ofi-panel-page-head.direct-head {
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 10px;
+}
+.direct-head > div { flex: 1 1 280px; }
+
+/* Die Schritte — graue Rinne, weisses Segment, wie die Reiter der Pano-Seite
+   (`.ofi-panel-page-tabs`). */
+.direct-steps {
+    display: inline-flex;
+    flex: none;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--la-border, #d8d8dd);
+    border-radius: 9px;
+    background: var(--la-fill, #efeff1);
+}
+.direct-steps > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 26px;
+    padding: 0 11px 0 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--la-secondary, #6e6e73);
+    font-size: 12px;
+    font-weight: 560;
+    white-space: nowrap;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+.direct-steps > button:hover:not(:disabled):not(.is-on) { color: var(--la-text, #1d1d1f); }
+.direct-steps > button.is-on {
+    background: var(--la-surface, #fff);
+    color: var(--la-text, #1d1d1f);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 11%);
+}
+.direct-steps > button:disabled { cursor: default; opacity: .45; }
+.direct-steps__n {
+    display: grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: rgb(120 120 128 / 16%);
+    font-size: 10.5px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+.direct-steps > button.is-on .direct-steps__n { background: #0a84ff; color: #fff; }
+.direct-steps > button.is-done .direct-steps__n { background: rgb(10 132 255 / 12%); color: #0a84ff; }
+.dark .direct-steps > button.is-on { background: #3a3a3c; box-shadow: 0 1px 2px rgb(0 0 0 / 45%); }
+
+/* ── Aufbau ─────────────────────────────────────────────────────────────── */
+.direct-form { min-width: 0; margin: 0; padding: 0; border: 0; }
+
+/* Empfänger: die Felder links, rechts die Adresse, wie sie im Fenster steht. */
+.direct-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 12px;
+    align-items: start;
+}
+.direct-split > aside { position: sticky; top: 12px; min-width: 0; }
+
+/* Eine Tafel mit einer leisen Handlung rechts im Kopf. */
+.direct-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+.direct-section-head > div { min-width: 0; }
+.direct-link {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #0a7aff;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.direct-link:hover:not(:disabled) { background: rgb(10 122 255 / 9%); }
+.direct-link:disabled { color: var(--la-muted, #a1a1a6); cursor: default; }
+.dark .direct-link { color: #3b8dff; }
+.dark .direct-link:disabled { color: var(--la-muted, #6e6e73); }
+
+/* ── Felder ─────────────────────────────────────────────────────────────── */
+/* Mehrzeilig: die mittlere Zeile wächst mit dem Kasten. */
+.direct-invoice .direct-textfield { grid-template-rows: 19px auto 15px; }
+.direct-invoice textarea.ofi-panel-page-control {
+    height: auto;
+    min-height: 60px;
+    padding: 9px 11px;
+    line-height: 1.5;
+    resize: vertical;
+}
+.direct-invoice .ofi-panel-page-control[aria-invalid="true"] { border-color: #d70015; }
+/* Dunkel: der app-weite Feldgrund (`#root :where(input, textarea)` in
+   index.css, weiss) wiegt über `#root` schwerer als `.dark
+   .ofi-panel-page-control` — ohne diese Regel stand heller Text auf einem
+   WEISSEN Feld. */
+.dark #root .direct-invoice :is(input, textarea).ofi-panel-page-control {
+    border-color: #56565b;
+    background: #2c2c2e;
+    color: #f5f5f7;
+}
+.dark #root .direct-invoice :is(input, textarea).ofi-panel-page-control:focus { border-color: #0a84ff; }
+/* Die Hülle zieht um jedes fokussierte Feld noch einen Rahmen — die Felder
+   tragen ihren blauen Ring selbst, zwei Ringe wären einer zu viel. */
+#root .direct-invoice .ofi-panel-page-control:focus-visible { outline: none; }
+
+/* Der Empfänger: ein Feld zum Tippen mit dem ⌃⌄ des Pop-up-Knopfes; die Liste
+   ist dessen macOS-Menü (`.ofi-panel-mac-select__menu`). */
+.direct-combo > input.ofi-panel-page-control { padding-right: 30px; }
+.direct-combo__chevron {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    color: #6e6e73;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+.direct-combo__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.direct-combo__meta {
+    flex: none;
+    margin-left: auto;
+    padding-left: 18px;
+    color: #8e8e93;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.direct-combo .ofi-panel-mac-select__menu > button.is-active { background: #0a84ff; color: #fff; }
+.direct-combo .ofi-panel-mac-select__menu > button:is(:hover, .is-active) .direct-combo__meta { color: rgb(255 255 255 / 82%); }
+.direct-combo__state {
+    padding: 6px 10px 6px 25px;
+    color: #8e8e93;
+    font: 400 12.5px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif;
+    white-space: normal;
+}
+.dark .direct-combo__chevron,
+.dark .direct-combo__meta,
+.dark .direct-combo__state { color: #a1a1a6; }
+
+/* Die Belegnummer mit dem Knopf «automatische Nummer» IM Feld. */
+.direct-number { position: relative; min-width: 0; }
+.direct-number > input { padding-right: 40px; }
+.direct-number > button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--la-secondary, #6e6e73);
+}
+.direct-number > button:hover { background: var(--la-hover, rgb(0 0 0 / 4%)); color: var(--la-text, #1d1d1f); }
+
+/* Das Datumsfeld im Kleid der übrigen Felder (statt der grauen iOS-Kapsel). */
+.direct-invoice .ofi-macdp.is-field {
+    box-sizing: border-box;
+    height: 40px;
+    border: 1px solid var(--la-field-border, #c9c9ce);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--la-fill, #f8f8fa) 70%, var(--la-surface, #fff));
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 3%);
+}
+.direct-invoice .ofi-macdp.is-field:hover:not(.is-disabled) {
+    border-color: var(--la-field-border-hover, #a9a9af);
+    background: color-mix(in srgb, var(--la-fill, #f8f8fa) 70%, var(--la-surface, #fff));
+}
+.direct-invoice .ofi-macdp.is-field.is-open {
+    border-color: #0a84ff;
+    box-shadow: 0 0 0 3px rgb(10 132 255 / 16%);
+}
+html body #root .direct-invoice .ofi-macdp.is-field > input.ofi-macdp__input {
+    padding: 0 11px !important;
+    font-size: 13.5px !important;
+}
+.dark .direct-invoice .ofi-macdp.is-field,
+.dark .direct-invoice .ofi-macdp.is-field:hover:not(.is-disabled) {
+    border-color: #56565b;
+    background: #2c2c2e;
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 24%);
+}
+
+/* Die beiden Schalter des PDFs — Häkchen wie «Eski pano» der Pano-Seite. */
+.direct-checks { display: grid; gap: 10px; margin-top: 2px; }
+.direct-checks .ofi-panel-page-check { margin-top: 0; }
+
+/* Die Adresse, wie sie im Fenster des Briefes steht. */
+.direct-address { overflow-wrap: anywhere; }
+.direct-address__sender {
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--la-border, #e5e5ea);
+    color: var(--la-secondary, #6e6e73);
+    font-size: 10px;
+    line-height: 1.45;
+}
+.direct-address > strong {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--la-text, #1d1d1f);
+    font-size: 13px;
+    font-weight: 600;
+}
+.direct-address > strong.is-empty { color: var(--la-muted, #a1a1a6); font-weight: 500; }
+.direct-address > p:last-child {
+    margin: 0;
+    color: var(--la-text, #1d1d1f);
+    font-size: 12.5px;
+    line-height: 1.6;
+    white-space: pre-line;
+}
+
+/* Belegangaben oben: die Zusammenfassung der Pano-Seite. */
+.direct-invoice .direct-summary { margin-bottom: 12px; }
+
+/* ── Die Belegfläche ────────────────────────────────────────────────────────
+   Sie steht in `.ofi-invp-page` (die Tabelle im Kleid der Offerte,
+   invoiceMac.css) und bekommt dort Rand und Grund; Ecke und Schatten wie die
+   Tafeln der Seite. Die Ecke muss in `@layer utilities`: das Modul setzt
+   seine mit `!important` in derselben Schicht. */
+.direct-document { margin-bottom: 12px; }
+html #root .direct-invoice .direct-document > section.document-workspace {
+    border-color: var(--la-border, #dedee3) !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 4%) !important;
+}
+@layer utilities {
+    html #root .direct-invoice .direct-document > section.document-workspace { border-radius: 13px !important; }
+}
+
+/* MwSt. wieder entfernen — der kleine Knopf neben dem Satz in der Summe. */
+.document-vat-remove { display: inline-flex; align-items: center; justify-content: center; width: 23px; height: 23px; border-radius: 6px; margin-left: 7px; color: var(--doc-muted); }
+.document-vat-remove:hover { background: var(--doc-surface-strong); }
+
+/* ── Schmale Fenster ────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .direct-split { grid-template-columns: minmax(0, 1fr); }
+    .direct-split > aside { position: static; }
+}
+@media (max-width: 720px) {
+    .direct-steps { width: 100%; }
+    .direct-steps > button { flex: 1; justify-content: center; padding: 0 6px; }
+}

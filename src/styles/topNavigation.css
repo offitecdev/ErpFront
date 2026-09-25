@@ -508,6 +508,15 @@ html.dark #root .ofi-mac-dock :is(.ofi-hdr-ctl, button.ofi-header-icon-button, .
     color: #fff !important;
 }
 
+#root .ofi-mac-dock button.ofi-language-switcher[aria-expanded="true"] {
+    background: rgba(10, 122, 255, 0.10) !important;
+    color: #0a7aff !important;
+}
+html.dark #root .ofi-mac-dock button.ofi-language-switcher[aria-expanded="true"] {
+    background: rgba(100, 168, 255, 0.17) !important;
+    color: #9ccaff !important;
+}
+
 /* Die Beschriftungen der breiten Felder (Kalender, Firma) fallen weg … */
 #root .ofi-mac-dock .ofi-hdr-ctl--wide > span:not(.ofi-tsw-mono):not(.ofi-nosize) { display: none; }
 #root .ofi-mac-dock .ofi-tsw-btn__label,

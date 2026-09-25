@@ -217,3 +217,64 @@ export interface ProductionSyncResult {
     orders?: number;
     items?: number;
 }
+
+/* ── Prozess-Stufe «Geräte» (24.09.2026) — GET /production/projects/:id/devices ── */
+
+/** Die bestätigte Bestellung der Projektfirma, die das Gerät gebracht hat. */
+export interface ProductionDeviceIntake {
+    purchaseOrderId: string;
+    referenceNumber: string;
+    sourceTenantName: string | null;
+    status: string;
+    quantity: number;
+}
+
+export interface ProductionDeviceRow {
+    id: string;
+    kind: ProductionItemKind;
+    positionNumber: string | null;
+    name: string;
+    description: string | null;
+    articleCode: string | null;
+    quantity: number;
+    unit: string | null;
+    salesOrderNumber: string | null;
+    orderKind: ProductionOrderKind | null;
+    intake: ProductionDeviceIntake[];
+}
+
+/**
+ * Die Projekttabelle (24.09.2026, Vorgabe Samet: «proje bilgileri tablo
+ * halinde, daha fazla detay»): Aufträge, eingegangene Bestellungen und was die
+ * Quelle über Leitung, Termine und Adressen weiss.
+ */
+export interface ProductionProjectDetails {
+    managerName: string | null;
+    salespersonName: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    deliveryDate: string | null;
+    installationAddress: string | null;
+    deliveryAddress: string | null;
+    commissionNumber: string | null;
+    customerReference: string | null;
+    orders: Array<{
+        id: string;
+        orderNumber: string;
+        orderKind: ProductionOrderKind;
+        orderDate: string | null;
+        /** ORDERED | CANCELLED */
+        status: string;
+        isActive: boolean;
+    }>;
+    intake: Array<{ purchaseOrderId: string; referenceNumber: string; sourceTenantName: string | null }>;
+    syncedAt: string | null;
+}
+
+export interface ProductionProjectDevices {
+    project: ProductionProject & { sourceTenantName: string | null };
+    devices: ProductionDeviceRow[];
+    counts: { devices: number; services: number };
+    /** Fehlt bei einem Server, der die Tabelle noch nicht kennt. */
+    details?: ProductionProjectDetails;
+}

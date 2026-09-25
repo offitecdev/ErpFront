@@ -49,10 +49,11 @@ import { useGuardedNavigate } from '../../store/navGuardStore';
 import { useBackNavTracker } from '../../lib/backNav';
 import { hrefFor, isModifiedClick } from '../../lib/navLink';
 import { NotificationCenter } from './NotificationCenter';
-import { AppSidebar, SIDEBAR_RAIL_WIDTH, type QuickCreateItem } from './AppSidebar';
+import { AppSidebar, SIDEBAR_RAIL_WIDTH, SIDEBAR_SLIM_WIDTH, type QuickCreateItem } from './AppSidebar';
 import { TopModuleNav } from './TopModuleNav';
 import { BottomModuleNav } from './BottomModuleNav';
 import { QuickBackButton } from './QuickBackButton';
+import { RailBackButton } from './RailBackButton';
 import { RequestsAppsMenu } from './RequestsAppsMenu';
 import { TenantSwitcher } from './TenantSwitcher';
 import { WorkspaceTabsProvider, WorkspaceTabLauncher, WorkspaceTabStrip } from './WorkspaceTabs';
@@ -656,6 +657,18 @@ const IS_SPLIT_PANE = typeof window !== 'undefined' && window.name === SPLIT_PAN
 const NAVIGATION_MODE_KEY = 'offitec:navigation-mode';
 type NavigationMode = 'sidebar' | 'top' | 'bottom';
 
+/* ── DER EIGENE RAHMEN DER GERÄTESEITE (24.09.2026, Vorgabe Samet) ─────────
+   «Bütün sidebar ikonları küçülecek … üst tab olmayacak, şimşek gidecek, +
+   gidecek, çift ekran gidecek, tenant seçimi gidecek; takvim zaten sidebarda
+   var; bildirim, dil, profil küçülsün ve sidebar'a eklensin — üst barda bir
+   şey kalmayacak. Sadece bu ürün sayfasına özel.»
+   Auf dieser EINEN Adresse zeichnet der Rahmen keine Kopfleiste, keine Reiter
+   und kein Dock, sondern die schmale Leiste (`AppSidebar variant="slim"`) mit
+   Glocke, Sprache und Profil unten — in jeder Navigationsart, auch auf dem
+   Telefon. Alles andere bleibt, wie es war. */
+const DEVICE_FOCUS_PATH = /^\/production\/orders\/[^/]+\/devices\/[^/]+\/?$/;
+const isDeviceFocusPath = (pathname: string): boolean => DEVICE_FOCUS_PATH.test(pathname);
+
 /* ── İç Layout ── */
 const MainLayoutInner: React.FC = () => {
     const navigate = useNavigate();
@@ -1053,7 +1066,7 @@ const MainLayoutInner: React.FC = () => {
        While armed, picking a page from the side menu fills the secondary
        (right) pane instead of navigating; the current page stays on the left. */
     const handleSidebarNavigate = (path: string) => {
-        if (splitMode && !isMobile && path !== location.pathname + location.search) {
+        if (splitMode && !isMobile && !focusChrome && path !== location.pathname + location.search) {
             openSecondary(path);
             return;
         }
@@ -1154,10 +1167,15 @@ const MainLayoutInner: React.FC = () => {
     // stehen weiter auf dem grauen Untergrund der Anwendung, sonst verloeren
     // ihre weissen Karten den Rand.
     const hideMenuRail = hideSidebar || isTechnicianWorkspace;
+    /* Die Geräteseite der Produktion trägt ihren eigenen Rahmen (siehe
+       `isDeviceFocusPath`): schmale Leiste, keine Kopfleiste. Sie sticht
+       jede Navigationsart aus — Seitenleiste, Kopfmenü und Dock. */
+    const focusChrome = !hideMenuRail && isDeviceFocusPath(location.pathname);
     // The alternate navigation is desktop-only. Phones and touch-first native
     // tablets keep their existing drawer, where a permanent sidebar does not
     // exist in the first place.
     const useTopModuleNavigation = !hideMenuRail
+        && !focusChrome
         && navigationMode === 'top'
         && !isMobile
         && !useNativeTouchDrawer;
@@ -1165,11 +1183,16 @@ const MainLayoutInner: React.FC = () => {
        Schreibtisch-Breakpoint noch an der Touch-Erkennung — nur daran, ob die
        Kapsel überhaupt Platz hat (siehe `isDockViewport`). */
     const useBottomModuleNavigation = !hideMenuRail
+        && !focusChrome
         && navigationMode === 'bottom'
         && isDockViewport;
     const showDesktopSidebar = !hideMenuRail
+        && !focusChrome
         && navigationMode === 'sidebar'
         && !useNativeTouchDrawer;
+    // Die geteilte Ansicht bleibt eingeschaltet, zeigt sich auf der Geräteseite
+    // aber nicht — «çift ekran gidecek»; zurück auf einer anderen Seite ist sie wieder da.
+    const showSplit = isSplit && !focusChrome;
 
     /* Die Mitteilungszentrale hängt in einem PORTAL am `body` (NotificationCenter)
        und sieht die Dock-Ansicht darum nicht. Diese Marke am Wurzelelement sagt
@@ -1180,6 +1203,14 @@ const MainLayoutInner: React.FC = () => {
         root.classList.toggle('ofi-dock-nav', useBottomModuleNavigation);
         return () => root.classList.remove('ofi-dock-nav');
     }, [useBottomModuleNavigation]);
+
+    /* Dasselbe für die schmale Leiste der Geräteseite: die Zentrale geht dort
+       unten links neben der Glocke auf (styles/focusRail.css). */
+    useEffect(() => {
+        const root = document.documentElement;
+        root.classList.toggle('ofi-focus-nav', focusChrome);
+        return () => root.classList.remove('ofi-focus-nav');
+    }, [focusChrome]);
 
     // ── Secondary-pane shell: just the page, full width of the iframe ──
     if (IS_SPLIT_PANE) {
@@ -1217,69 +1248,10 @@ const MainLayoutInner: React.FC = () => {
        Gezeichnet werden sie beide Male gleich; das Dock gibt ihnen über
        `.ofi-mac-dock` nur sein eigenes Mass und lässt ihre Menüs nach
        OBEN aufklappen (styles/topNavigation.css). */
-    const headerTools = (<>
-        {/* ANTRÄGE statt Suche (Vorgabe 26.08.2026): an dieser
-            Stelle stand der Lupenknopf — eine ZWEITAUSGABE, denn
-            dieselbe Suche steht weiterhin oben im Menü. Der Platz
-            gehört jetzt dem Apps-Zeichen: es führt in die Anträge
-            UND trägt den farbigen Punkt, sobald etwas auf die
-            angemeldete Person wartet. Beim Monteur entfällt es
-            wie alles andere Kopfwerkzeug. */}
-        {!isTechnicianWorkspace && <RequestsAppsMenu />}
-
-        {/* ── Unternehmenswahl ──────────────────────────────
-            Vorgabe 28.08.2026: hier stand ein 190px breites
-            Auswahlfeld mit Rahmen und getipptem Pfeil — das
-            breiteste Ding im Kopf für eine Sache, die man an
-            den meisten Tagen nie anfasst. Geblieben ist das
-            farbige Kürzel der aktiven Firma; Name, Kategorie
-            und die Wahl selbst stehen im KOPF des Menüs, das
-            es öffnet (TenantSwitcher.tsx). */}
-        {tenants.length > 0 && <TenantSwitcher className="mr-1 hidden sm:block" />}
-
-        {/* Im DOCK steht der Kalender schon als Modulzeichen — ein zweites
-            Kalenderfeld daneben wäre derselbe Weg zweimal. */}
-        {!useTopModuleNavigation && !useBottomModuleNavigation && <div className="relative mr-1">
-            <button
-                type="button"
-                onClick={() => navigate('/calendar')}
-                /* Marke für den Rundgang der Ankündigung —
-                   siehe components/updates/WhatsNewPopup.tsx. */
-                data-tour="calendar"
-                /* Der Kalender traegt dieselbe Scheibe wie das
-                   Firmenfeld (Vorgabe 28.08.2026: «der Kalender
-                   koennte wie das Firmenfeld aussehen», und
-                   danach ausdruecklich «dieselbe Kante»). Auch
-                   auf der offenen Kalenderseite: dort bleibt die
-                   Kante genau dieselbe, nur die Fuellung wird
-                   markenfarben getoent (`is-current`) — sonst
-                   truege ausgerechnet der aktive Knopf einen
-                   anderen Rand als sein Nachbar.
-                   KEIN `rounded-full` (Vorgabe 28.08.2026: «die
-                   Kante des Kalenderknopfes soll auch wie die des
-                   Firmenfeldes sein»): das Firmenfeld traegt die
-                   Knopfkante der Anwendung — index.css zwingt
-                   JEDEM Knopf ohne diese Markierung
-                   `--ofi-button-radius` (10px) mit `!important`
-                   auf, und das schlaegt auch die 999px, die
-                   `.ofi-tsw-btn` fuer sich notiert. Mit der
-                   Markierung war der Kalender als einziger eine
-                   Pille neben lauter 10px-Kanten. Ohne sie greift
-                   bei beiden dieselbe Regel, und sie koennen gar
-                   nicht mehr auseinanderlaufen. */
-                className={`ofi-hdr-ctl ofi-hdr-ctl--wide ofi-glass-ctl inline-flex select-none items-center gap-2 px-3.5 text-[13px] font-semibold transition-colors ${
-                    location.pathname.startsWith('/calendar')
-                        ? 'is-current text-[#0a7aff] dark:text-[#e6cf9e]'
-                        : 'text-slate-700 dark:text-slate-100'
-                }`}
-                aria-label={t('nav.calendar')}
-                aria-current={location.pathname.startsWith('/calendar') ? 'page' : undefined}
-            >
-                <CalendarOutlined style={{ fontSize: 16 }} />
-                <span className="hidden sm:inline">{t('nav.calendar')}</span>
-            </button>
-        </div>}
-
+    /* Glocke und Profil stehen einzeln, weil die schmale Leiste der
+       Geräteseite nur SIE (mit der Sprache) übernimmt — Anträge, Firma und
+       Kalender bleiben dort weg (Vorgabe Samet, 24.09.2026). */
+    const bellTool = (
         <button
             type="button"
             onClick={() => setIsNotificationPanelOpen((value) => !value)}
@@ -1294,7 +1266,8 @@ const MainLayoutInner: React.FC = () => {
                 </span>
             )}
         </button>
-        <LanguageSwitcher />
+    );
+    const profileTool = (
         <div className="relative" ref={dropdownRef}>
             <button
                 type="button"
@@ -1304,9 +1277,9 @@ const MainLayoutInner: React.FC = () => {
                 className="ofi-hdr-ctl ofi-header-profile flex items-center justify-center rounded-full transition-colors hover:bg-[#e3efff]"
             >
                 {user ? (
-                    <PersonAvatar id={user.id} name={userName || user.email} size={useTopModuleNavigation ? 22 : 30} tone="subtle" ring={false} className="ofi-nosize ofi-toolbar-avatar" />
+                    <PersonAvatar id={user.id} name={userName || user.email} size={focusChrome ? 24 : useTopModuleNavigation ? 22 : 30} tone="subtle" ring={false} className="ofi-nosize ofi-toolbar-avatar" />
                 ) : (
-                    <div className={`ofi-nosize flex items-center justify-center rounded-full bg-[#0a7aff] font-semibold text-white ring-2 ring-[#e3efff] ${useTopModuleNavigation ? 'size-5 text-[9px]' : 'size-8 text-[12px]'}`}>
+                    <div className={`ofi-nosize flex items-center justify-center rounded-full bg-[#0a7aff] font-semibold text-white ring-2 ring-[#e3efff] ${focusChrome ? 'size-6 text-[10px]' : useTopModuleNavigation ? 'size-5 text-[9px]' : 'size-8 text-[12px]'}`}>
                         <UserOutlined style={{ fontSize: 14 }} />
                     </div>
                 )}
@@ -1395,6 +1368,83 @@ const MainLayoutInner: React.FC = () => {
                 </div>
             )}
         </div>
+    );
+
+    const headerTools = (<>
+        {/* ANTRÄGE statt Suche (Vorgabe 26.08.2026): an dieser
+            Stelle stand der Lupenknopf — eine ZWEITAUSGABE, denn
+            dieselbe Suche steht weiterhin oben im Menü. Der Platz
+            gehört jetzt dem Apps-Zeichen: es führt in die Anträge
+            UND trägt den farbigen Punkt, sobald etwas auf die
+            angemeldete Person wartet. Beim Monteur entfällt es
+            wie alles andere Kopfwerkzeug. */}
+        {!isTechnicianWorkspace && <RequestsAppsMenu />}
+
+        {/* ── Unternehmenswahl ──────────────────────────────
+            Vorgabe 28.08.2026: hier stand ein 190px breites
+            Auswahlfeld mit Rahmen und getipptem Pfeil — das
+            breiteste Ding im Kopf für eine Sache, die man an
+            den meisten Tagen nie anfasst. Geblieben ist das
+            farbige Kürzel der aktiven Firma; Name, Kategorie
+            und die Wahl selbst stehen im KOPF des Menüs, das
+            es öffnet (TenantSwitcher.tsx). */}
+        {tenants.length > 0 && <TenantSwitcher className="mr-1 hidden sm:block" />}
+
+        {/* Im DOCK steht der Kalender schon als Modulzeichen — ein zweites
+            Kalenderfeld daneben wäre derselbe Weg zweimal. */}
+        {!useTopModuleNavigation && !useBottomModuleNavigation && <div className="relative mr-1">
+            <button
+                type="button"
+                onClick={() => navigate('/calendar')}
+                /* Marke für den Rundgang der Ankündigung —
+                   siehe components/updates/WhatsNewPopup.tsx. */
+                data-tour="calendar"
+                /* Der Kalender traegt dieselbe Scheibe wie das
+                   Firmenfeld (Vorgabe 28.08.2026: «der Kalender
+                   koennte wie das Firmenfeld aussehen», und
+                   danach ausdruecklich «dieselbe Kante»). Auch
+                   auf der offenen Kalenderseite: dort bleibt die
+                   Kante genau dieselbe, nur die Fuellung wird
+                   markenfarben getoent (`is-current`) — sonst
+                   truege ausgerechnet der aktive Knopf einen
+                   anderen Rand als sein Nachbar.
+                   KEIN `rounded-full` (Vorgabe 28.08.2026: «die
+                   Kante des Kalenderknopfes soll auch wie die des
+                   Firmenfeldes sein»): das Firmenfeld traegt die
+                   Knopfkante der Anwendung — index.css zwingt
+                   JEDEM Knopf ohne diese Markierung
+                   `--ofi-button-radius` (10px) mit `!important`
+                   auf, und das schlaegt auch die 999px, die
+                   `.ofi-tsw-btn` fuer sich notiert. Mit der
+                   Markierung war der Kalender als einziger eine
+                   Pille neben lauter 10px-Kanten. Ohne sie greift
+                   bei beiden dieselbe Regel, und sie koennen gar
+                   nicht mehr auseinanderlaufen. */
+                className={`ofi-hdr-ctl ofi-hdr-ctl--wide ofi-glass-ctl inline-flex select-none items-center gap-2 px-3.5 text-[13px] font-semibold transition-colors ${
+                    location.pathname.startsWith('/calendar')
+                        ? 'is-current text-[#0a7aff] dark:text-[#e6cf9e]'
+                        : 'text-slate-700 dark:text-slate-100'
+                }`}
+                aria-label={t('nav.calendar')}
+                aria-current={location.pathname.startsWith('/calendar') ? 'page' : undefined}
+            >
+                <CalendarOutlined style={{ fontSize: 16 }} />
+                <span className="hidden sm:inline">{t('nav.calendar')}</span>
+            </button>
+        </div>}
+
+        {bellTool}
+        <LanguageSwitcher />
+        {profileTool}
+    </>);
+
+    /* Die schmale Leiste der Geräteseite (`focusChrome`): nur Glocke, Sprache
+       und Profil — «bildirim küçült, dil küçük, profili küçült ve sidebar'a
+       ekle». Ihr Mass und ihre Menüs nach rechts: styles/focusRail.css. */
+    const focusTools = (<>
+        {bellTool}
+        <LanguageSwitcher />
+        {profileTool}
     </>);
 
     return (
@@ -1416,10 +1466,19 @@ const MainLayoutInner: React.FC = () => {
             // dark.css an ihm den Dunkelgrund festmacht). Kopf und Leiste
             // trennen sich von der Seite durch ihren Schatten, nicht durch Ton.
             className={`min-h-screen font-sans text-[#1D1D1F] lg:flex lg:h-screen [--app-shell-inset:0px] ${useTopModuleNavigation ? '[--app-header-height:32px]' : useBottomModuleNavigation ? '[--app-header-height:0px]' : '[--app-header-height:4rem]'} ${hideSidebar ? 'bg-white dark:bg-[#0f1114]' : 'bg-[#f6f8fb]'} ${showDesktopSidebar ? 'lg:[--app-shell-inset:84px]' : 'lg:[--app-shell-inset:0px]'}`}
+            /* Geräteseite: die schmale Leiste auf jeder Breite, keine Kopfleiste. */
+            style={focusChrome
+                ? ({ '--app-shell-inset': `${SIDEBAR_SLIM_WIDTH}px`, '--app-header-height': '0px' } as React.CSSProperties)
+                : undefined}
         >
             {/* ── Sidebar (Evernote-style rail: hover-peek, flyout side-tabs, no footer) ── */}
-            {showDesktopSidebar && <AppSidebar
-                variant="desktop"
+            {/* Dasselbe Element wird auf der Geräteseite zur schmalen Leiste —
+                es bleibt stehen und wird nur schmaler. */}
+            {(showDesktopSidebar || focusChrome) && <AppSidebar
+                variant={focusChrome ? 'slim' : 'desktop'}
+                footer={focusChrome ? focusTools : undefined}
+                // Ohne Kopfleiste kein Blitz-Pfeil: der Rückweg steht in der Leiste.
+                lead={focusChrome ? <RailBackButton /> : undefined}
                 sections={visibleMenuSections}
                 activeUrl={activeUrl}
                 permissions={permissions}
@@ -1430,7 +1489,7 @@ const MainLayoutInner: React.FC = () => {
             />}
 
             {/* ── Mobile sidebar drawer ── */}
-            {!hideMenuRail && <div
+            {!hideMenuRail && !focusChrome && <div
                 className={`fixed inset-0 z-[80] ${useNativeTouchDrawer ? '' : 'lg:hidden'} ${isMobileSidebarOpen ? '' : 'pointer-events-none'}`}
                 aria-hidden={!isMobileSidebarOpen}
             >
@@ -1479,7 +1538,10 @@ const MainLayoutInner: React.FC = () => {
             />}
 
             {/* ── Ana İçerik ── */}
-            <div className={`flex min-w-0 flex-1 flex-col ${useBottomModuleNavigation ? '' : useTopModuleNavigation ? 'pt-[32px]' : 'pt-16'}`}>
+            <div
+                className={`flex min-w-0 flex-1 flex-col ${useBottomModuleNavigation || focusChrome ? '' : useTopModuleNavigation ? 'pt-[32px]' : 'pt-16'}`}
+                style={focusChrome ? { paddingLeft: SIDEBAR_SLIM_WIDTH } : undefined}
+            >
 
                 {/* Header — the top slice of the shell. Weiss wie die Seite; die
                     Kante ist der Schatten nach unten (`.ofi-topbar`, refine.css).
@@ -1489,7 +1551,7 @@ const MainLayoutInner: React.FC = () => {
                     21.09.2026: «üst bar tamamen kalksın»): dort trägt das Dock
                     unten die Module UND die Werkzeuge, und der Seiteninhalt
                     beginnt ganz oben am Fensterrand. */}
-                {!useBottomModuleNavigation && <header data-tour="topbar" className={`ofi-topbar fixed left-0 right-0 top-0 z-50 flex items-center justify-between ofi-shell-white ${useTopModuleNavigation ? 'ofi-topbar--compact' : 'h-16 pl-2 pr-3 sm:pr-5'} ${showDesktopSidebar ? 'lg:left-[84px]' : ''}`}>
+                {!useBottomModuleNavigation && !focusChrome && <header data-tour="topbar" className={`ofi-topbar fixed left-0 right-0 top-0 z-50 flex items-center justify-between ofi-shell-white ${useTopModuleNavigation ? 'ofi-topbar--compact' : 'h-16 pl-2 pr-3 sm:pr-5'} ${showDesktopSidebar ? 'lg:left-[84px]' : ''}`}>
                     {useTopModuleNavigation ? (
                         <div className="flex min-w-0 flex-1 items-center">
                             <a
@@ -1603,12 +1665,12 @@ const MainLayoutInner: React.FC = () => {
                         ref={pageScrollRef}
                         // See the pane branch above — lets a page freeze the scrollport.
                         data-page-scrollport
-                        style={isSplit && !isMobile ? { width: `${splitRatio}%` } : undefined}
-                        className={`${isSplit && !isMobile
+                        style={showSplit && !isMobile ? { width: `${splitRatio}%` } : undefined}
+                        className={`${showSplit && !isMobile
                             ? `min-w-0 flex-1 overflow-hidden lg:flex-none lg:flex-shrink-0 lg:border-r lg:border-slate-200/70 ${isResizingPanes ? 'pointer-events-none select-none' : ''}`
                             : 'flex-1 overflow-auto px-[var(--page-gutter)] py-[var(--page-pad-y)] [scrollbar-gutter:stable] [--page-gutter:0.75rem] [--page-pad-y:1.25rem] sm:[--page-gutter:1.25rem] lg:[--page-gutter:1.25rem] lg:[--page-pad-y:1.5rem]'} ${useBottomModuleNavigation ? 'ofi-bottom-nav-scroll' : ''}`}
                     >
-                        {isSplit && !isMobile ? (
+                        {showSplit && !isMobile ? (
                             <PrimaryPane
                                 path={primaryRoute}
                                 onLocationChange={reportPrimaryLocation}
@@ -1623,7 +1685,7 @@ const MainLayoutInner: React.FC = () => {
                     {/* Divider: drag anywhere on the strip to resize the two screens;
                         the middle buttons swap them or drop back to single-page view
                         (the left page remains). */}
-                    {isSplit && (
+                    {showSplit && (
                         <div
                             className="absolute inset-y-0 z-30 hidden w-4 -translate-x-1/2 lg:block"
                             style={{ left: `${splitRatio}%` }}
@@ -1661,7 +1723,7 @@ const MainLayoutInner: React.FC = () => {
                     {/* Split view is a desktop feature — the secondary pane is hidden
                         on mobile. While dragging the divider the iframe must not
                         swallow pointer events, or the drag would stick. */}
-                    {isSplit && (
+                    {showSplit && (
                         <div className={`hidden lg:block lg:min-w-0 lg:flex-1 overflow-hidden ${isResizingPanes ? 'pointer-events-none select-none' : ''}`}>
                             <SecondaryPane
                                 onClose={handleExitSplit}

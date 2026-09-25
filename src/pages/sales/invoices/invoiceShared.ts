@@ -118,7 +118,6 @@ export const articlePrice = (article: { salePrice?: number; baseCost?: number })
  * `textarea` lässt es wachsen.
  */
 export const FIELD_INPUT_CLASS = 'ofi-invp-input';
-export const FIELD_TEXTAREA_CLASS = 'ofi-invp-input';
 /** Zahlenfeld: rechtsbündig mit Tabellenziffern. */
 export const FIELD_NUM_CLASS = 'ofi-invp-input is-num';
 

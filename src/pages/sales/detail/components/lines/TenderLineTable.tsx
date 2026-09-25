@@ -622,7 +622,9 @@ export const TenderLineTable = ({
                                             <Tag01 size={13} />
                                         </button>
                                     )}
-                                    <div className="min-w-0 flex-1">
+                                    {/* `data-line-name`: the "add to stock?" bubble points its
+                                        arrow at this cell's text (TenderStockPrompt). */}
+                                    <div className="min-w-0 flex-1" data-line-name>
                                         {!isDescription && (
                                             isDraft ? (
                                                 <BufferedTextInput

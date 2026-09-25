@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { downloadInvoiceBlob } from '@/lib/invoiceDocument';
 
 import { FileDownload02 } from '@/components/icons/antIconCompat';
 import { InvoicePopup } from '@/components/billing/InvoicePopup';
@@ -22,6 +23,7 @@ export const InvoicePdfPopup = ({
     loading,
     onClose,
     onDownload,
+    filename,
 }: {
     open: boolean;
     title: string;
@@ -30,6 +32,7 @@ export const InvoicePdfPopup = ({
     loading: boolean;
     onClose: () => void;
     onDownload?: () => void;
+    filename?: string;
 }) => {
     const [url, setUrl] = useState<string | null>(null);
 
@@ -50,8 +53,8 @@ export const InvoicePdfPopup = ({
             size="wide"
             fill
             onClose={onClose}
-            footer={onDownload ? (
-                <button type="button" className="ofi-inv-btn is-primary" disabled={!blob} onClick={onDownload}>
+            footer={onDownload || filename ? (
+                <button type="button" className="ofi-inv-btn is-primary" disabled={!blob} onClick={onDownload || (() => { if (blob && filename) downloadInvoiceBlob(blob, filename); })}>
                     <FileDownload02 size={14} />
                     {t('billing.downloadBtn')}
                 </button>
@@ -59,7 +62,7 @@ export const InvoicePdfPopup = ({
         >
             {loading && <div className="ofi-invp-pdfstate">{t('common.loading')}</div>}
             {!loading && !url && <div className="ofi-invp-pdfstate">{t('billing.pdfError')}</div>}
-            {!loading && url && <iframe src={url} title={title} className="ofi-invp-pdfframe" />}
+            {!loading && url && <iframe src={`${url}#toolbar=0`} title={title} className="ofi-invp-pdfframe" />}
         </InvoicePopup>
     );
 };

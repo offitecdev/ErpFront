@@ -49,6 +49,11 @@ export type QuickCreateItem = {
    legt sich beim Zeigen darüber, es schiebt die Seite nie zur Seite. */
 export const SIDEBAR_RAIL_WIDTH = 84;
 export const SIDEBAR_PANEL_WIDTH = 232;
+/* Die SCHMALE Leiste (24.09.2026, Vorgabe Samet für die Geräteseite der
+   Produktion: «bütün sidebar ikonları küçülecek, baya minimal, çok az bir
+   yerde»): nur Zeichen, keine Beschriftung, unten Glocke, Sprache und Profil.
+   MainLayout stellt den Inhalt um genau dieses Mass ein. */
+export const SIDEBAR_SLIM_WIDTH = 48;
 /* Wo das Untermenü oben ansetzt. NICHT als Zahl: die Kopfleiste ist `h-16`
    = 4rem, und `html` steht auf 14px — das sind 56px, nicht 64. Die feste 64
    liess einen 8px breiten Streifen Seitengrund zwischen Kopf und Klappfeld
@@ -94,8 +99,13 @@ type AppSidebarProps = {
     /** Rail KİLİTLİ dar kalır (takvim + ana sayfa): hover paneli hiç açılmaz. */
     quickCreateItems: QuickCreateItem[];
     onQuickCreate: (item: QuickCreateItem) => void;
-    /** Mobile drawer renders the always-expanded accordion (no rail / panel). */
-    variant?: 'desktop' | 'mobile';
+    /** Mobile drawer renders the always-expanded accordion (no rail / panel);
+        `slim` is the narrow icon-only rail of a focus page (Geräteseite). */
+    variant?: 'desktop' | 'mobile' | 'slim';
+    /** Nur `slim`: die Werkzeuge der fehlenden Kopfleiste, unten in der Leiste. */
+    footer?: React.ReactNode;
+    /** Nur `slim`: was ÜBER dem ersten Modul steht — der Rückweg der Seite. */
+    lead?: React.ReactNode;
 };
 
 /**
@@ -117,9 +127,16 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     quickCreateItems,
     onQuickCreate,
     variant = 'desktop',
+    footer,
+    lead,
 }) => {
     const { t } = useTranslation();
     const isMobile = variant === 'mobile';
+    const isSlim = variant === 'slim';
+    const railWidth = isSlim ? SIDEBAR_SLIM_WIDTH : SIDEBAR_RAIL_WIDTH;
+    /* Die schmale Leiste hat keine Beschriftung — beim Zeigen nennt ein
+       kleines Schild rechts daneben den Namen (Mac-Werkzeugtipp). */
+    const [tip, setTip] = useState<{ label: string; top: number } | null>(null);
 
     /** Which group's submenu the desktop panel shows (hover/click intent). */
     const [panelKey, setPanelKey] = useState<string | null>(null);
@@ -436,17 +453,31 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
        the emulated mouseleave run would snatch the panel away mid-tap. */
     const hoverProps = isTouch ? {} : { onMouseEnter: cancelClose, onMouseLeave: scheduleClose };
 
+    /* Werkzeugtipp der schmalen Leiste: rechts neben dem Zeichen, solange kein
+       Untermenü offen steht — das nennt den Namen dann selbst. */
+    const showTip = (element: HTMLElement, label: string) => {
+        if (!isSlim || touchInputRef.current) return;
+        const rect = element.getBoundingClientRect();
+        setTip({ label, top: rect.top + rect.height / 2 });
+    };
+    const hideTip = () => setTip(null);
+
     return (
         <>
             {/* The rail — full-height slice of the shell. Seit 09.09.2026 ist
                 die Seite darunter weiss wie die Leiste selbst; die Trennung
-                ist der Schatten nach rechts (`.ofi-rail`, styles/refine.css). */}
+                ist der Schatten nach rechts (`.ofi-rail`, styles/refine.css).
+                DIE SCHMALE LEISTE (`slim`, 24.09.2026) ist dasselbe Element in
+                48px — nur Zeichen, unten die Werkzeuge der Kopfleiste, die es
+                auf ihrer Seite nicht gibt (styles/focusRail.css). */}
             <aside
                 ref={asideRef}
                 {...hoverProps}
                 /* `ofi-fade`: die Leiste blendet beim Start einmal ein — der
                    ruhige Auftakt der Anmeldeseite, weitergetragen. */
-                className="ofi-fade ofi-shell-white ofi-rail hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[84px] lg:flex-col"
+                className={isSlim
+                    ? 'ofi-shell-white ofi-rail ofi-rail--slim fixed inset-y-0 left-0 z-50 flex w-[48px] flex-col'
+                    : 'ofi-fade ofi-shell-white ofi-rail hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[84px] lg:flex-col'}
             >
                 {/* Brand icon — same height as the header so the card corner is
                     seamless. Das Zeichen bleibt das Zeichen (Vorgabe 28.08.2026):
@@ -456,13 +487,23 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     href={hrefFor('/')}
                     aria-label="Offitec"
                     onClick={(e) => { if (isModifiedClick(e)) return; e.preventDefault(); go('/'); }}
-                    className="flex h-16 shrink-0 items-center justify-center"
+                    className={isSlim ? 'ofi-rail-slim__brand' : 'flex h-16 shrink-0 items-center justify-center'}
                 >
-                    <img src="/fav4.svg" alt="Offitec" width={36} height={36} decoding="async" fetchPriority="high" className="size-9" />
+                    <img
+                        src="/fav4.svg"
+                        alt="Offitec"
+                        width={isSlim ? 24 : 36}
+                        height={isSlim ? 24 : 36}
+                        decoding="async"
+                        fetchPriority="high"
+                        className={isSlim ? 'size-6' : 'size-9'}
+                    />
                 </a>
 
-                <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4 pt-1">
-                    <div className="flex flex-col gap-1">
+                <nav className={isSlim ? 'ofi-rail-slim__nav' : 'flex-1 overflow-y-auto overflow-x-hidden px-2 pb-4 pt-1'}>
+                    <div className={isSlim ? 'ofi-rail-slim__list' : 'flex flex-col gap-1'}>
+                        {/* Der Rückweg über dem Startseiten-Zeichen (Geräteseite). */}
+                        {isSlim && lead && <div className="ofi-rail-slim__lead">{lead}</div>}
                         {items.map(({ section, children }) => {
                             const Icon = section.icon;
                             const isSingle = section.type === 'single';
@@ -474,13 +515,16 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                             const target = isSingle ? section.path : children[0]?.key;
                             if (!target) return null;
                             const locked = !isSingle && isLocked(section.key);
+                            const label = t(section.label);
                             return (
                                 <a
                                     key={section.key}
                                     href={hrefFor(target)}
+                                    aria-label={isSlim ? label : undefined}
                                     onClick={(e) => {
                                         if (isModifiedClick(e)) return;
                                         e.preventDefault();
+                                        hideTip();
                                         if (locked) { askPassword(section.key); return; }
                                         // No hover on a tablet: a tap on a module opens
                                         // its submenu (tapping again closes it), so the
@@ -495,20 +539,40 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                                         }
                                         go(target);
                                     }}
-                                    onMouseEnter={() => { if (touchInputRef.current) return; if (!isSingle && !locked) scheduleOpen(section.key); else cancelOpen(); }}
-                                    onMouseLeave={cancelOpen}
-                                    className={`relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
+                                    onMouseEnter={(e) => {
+                                        if (touchInputRef.current) return;
+                                        showTip(e.currentTarget, label);
+                                        if (!isSingle && !locked) { scheduleOpen(section.key); return; }
+                                        cancelOpen();
+                                        // Schmale Leiste: ein Eintrag ohne Untermenü schliesst
+                                        // das offene, damit sein Tipp zu sehen ist.
+                                        if (isSlim) setPanelKey(null);
+                                    }}
+                                    onMouseLeave={() => { cancelOpen(); hideTip(); }}
+                                    className={isSlim
+                                        ? `ofi-rail-slim__item ${active ? 'is-active' : ''}`.trim()
+                                        : `relative flex w-full flex-col items-center gap-1 rounded-xl px-1 py-2.5 text-center transition-colors duration-150 ${active ? RAIL_BTN_ACTIVE : RAIL_BTN_IDLE}`}
                                 >
-                                    <Icon size={23} className="shrink-0" />
-                                    {locked && <Lock01 size={11} aria-hidden className="absolute right-3 top-2 opacity-60" />}
+                                    <Icon size={isSlim ? 17 : 23} className="shrink-0" />
+                                    {locked && (
+                                        <Lock01
+                                            size={isSlim ? 8 : 11}
+                                            aria-hidden
+                                            className={isSlim ? 'ofi-rail-slim__lock' : 'absolute right-3 top-2 opacity-60'}
+                                        />
+                                    )}
                                     {/* Nicht 14px: die Beschriftung sitzt in einer 84px breiten
                                         Leiste, dort schneidet schon „Buchhaltung“ bei 12px an. */}
-                                    <span className="w-full truncate text-[12px] font-semibold leading-tight">{t(section.label)}</span>
+                                    {!isSlim && <span className="w-full truncate text-[12px] font-semibold leading-tight">{label}</span>}
                                 </a>
                             );
                         })}
                     </div>
                 </nav>
+
+                {/* Glocke, Sprache, Profil — ausserhalb der blätternden Liste,
+                    sonst schnitte sie die Menüs der Werkzeuge ab. */}
+                {isSlim && footer && <div className="ofi-rail-slim__tools">{footer}</div>}
             </aside>
 
             {/* The submenu panel — the "second box", flush against the rail. */}
@@ -516,11 +580,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                 <div
                     ref={panelRef}
                     id="oi-sidebar-panel"
-                    style={{ left: SIDEBAR_RAIL_WIDTH, top: HEADER_OFFSET, width: SIDEBAR_PANEL_WIDTH }}
+                    style={{ left: railWidth, top: HEADER_OFFSET, width: SIDEBAR_PANEL_WIDTH }}
                     {...hoverProps}
                     /* Immer schwebend: Schatten (refine.css, `#oi-sidebar-panel`)
                        + Einblenden, weil die Seite darunter stehen bleibt. */
-                    className="ofi-shell-white fixed bottom-0 z-[45] hidden flex-col animate-in fade-in slide-in-from-left-2 duration-150 lg:flex"
+                    className={`ofi-shell-white fixed bottom-0 z-[45] flex-col animate-in fade-in slide-in-from-left-2 duration-150 ${isSlim ? 'flex' : 'hidden lg:flex'}`}
                 >
                     {/* The panel butts straight against the header (top =
                         --app-header-height), so the title starts tight — extra
@@ -562,6 +626,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             )}
 
             {gatePrompt}
+
+            {isSlim && tip && !panelVisible && (
+                <div className="ofi-rail-tip" role="tooltip" style={{ top: tip.top, left: railWidth + 8 }}>
+                    {tip.label}
+                </div>
+            )}
 
             {/* Kein Anheft-Griff mehr (16.08.2026): das Untermenü öffnet nur
                 beim Zeigen und legt sich über die Seite — sie rückt nie zur

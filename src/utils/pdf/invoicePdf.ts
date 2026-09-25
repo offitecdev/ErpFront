@@ -1,4 +1,5 @@
 import { parsePaymentStages as parseInvoicePaymentStages } from '@/lib/paymentSchedule';
+import { downloadInvoiceBlob, INVOICE_INTRO, readInvoiceDocument } from '@/lib/invoiceDocument';
 /**
  * ── FATURA PDF ───────────────────────────────────────────────────────────────
  * Modern teklif şablonunun (tenderPdfModern) fatura sürümü. Şablonun kendisi
@@ -12,8 +13,7 @@ import { parsePaymentStages as parseInvoicePaymentStages } from '@/lib/paymentSc
  *  - ZWISCHEN  → tek satır: "Zwischenzahlung von 15.00%" + sipariş referansı.
  *  - SCHLUSS   → tek satır: "Restbetrag 25.00%" + daha önce verrechnet oran.
  *
- * Son sayfa her zaman İsviçre QR faturasıdır (Empfangsschein + Zahlteil, ortada
- * İsviçre haçı); "Zusätzliche Informationen" satırına fatura numarası yazılır.
+ * QR seçiliyse son sayfaya ödeme bölümü eklenir; açıklamasında belge numarası yer alır.
  */
 import { tenderApi } from '@/lib/api/tender';
 import { buildTree, flattenTenderTreeForPdf } from '@/pages/sales/detail/tenderDetailUtils';
@@ -26,7 +26,6 @@ import {
     seedTotalDiscounts,
     type TenderDiscountEntry,
 } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
-import { lineTotalWithTax } from '@/pages/sales/detail/tenderDetailUtils';
 import { billingApi } from '@/lib/api/billing';
 import { ALL_SECTIONS, invoiceDiscounts, parseInvoiceSections } from '@/pages/sales/invoices/invoiceShared';
 import { computeTenderPricingSummary } from '@/pages/sales/detail/utils/tenderPricing.utils';
@@ -174,6 +173,10 @@ const pdfLineDiscounts = (line: InvoiceLineItemDto, base: number) => {
  * (`lineTotalWithTax`), während der Summenblock darunter Netto/MWST/Total
  * trennt. Genau diese Lesart gilt hier — sonst stünden in derselben Spalte
  * zweier Belege zwei verschiedene Zahlen.
+ *
+ * ⚠ 24.09.2026: gerechnet wird mit dem Satz der RECHNUNG selbst, nicht über
+ * `lineTotalWithTax` — die liest 0 % als «nicht gesetzt» und schlug 8.1 % auf,
+ * so dass eine Rechnung ohne MwSt. in der Preisspalte trotzdem Steuer zeigte.
  */
 const buildDirectPositions = (
     invoice: InvoiceDto,
@@ -225,8 +228,9 @@ const buildDirectPositions = (
                 discount: Number(line.discount) || undefined,
                 discounts: pdfLineDiscounts(line, round2((Number(line.quantity) || 0) * (Number(line.unitAmount) || 0))),
                 taxRate: vatRate,
-                // Betragsspalte = Zeilenbetrag MIT Steuer, wie auf der Offerte.
-                lineTotal: round2(lineTotalWithTax(net, vatRate)),
+                // Betragsspalte = Zeilenbetrag MIT Steuer, wie auf der Offerte;
+                // bei 0 % (oder ausgeschalteter MwSt.) ist das der Nettobetrag.
+                lineTotal: round2(net * (1 + vatRate / 100)),
             };
         }),
         totals: {
@@ -467,16 +471,28 @@ export async function buildInvoicePdfBytes(
     rawCtx: InvoiceOrderContext,
     settings: PdfCompanySettings,
     onProgress?: (p: TenderPdfProgress) => void,
-    lang: PdfLang = 'de',
+    requestedLang?: PdfLang,
 ): Promise<Uint8Array> {
     const direct = isDirectInvoice(invoice);
     const credit = isCreditDocument(invoice);
+    const options = readInvoiceDocument(invoice);
+    const lang = requestedLang ?? (direct ? options.language : 'de');
     // Der Steuersatz der Direktrechnung ist EINGEFROREN: ein später geänderter
     // Firmenwert darf eine gestellte Rechnung nicht rückwirkend verschieben.
-    const vatRate = direct && invoice.vatRate != null
-        ? Number(invoice.vatRate)
-        : Number(settings.vatRate) || 8.1;
-    const title = invoiceKindTitle(invoice.kind);
+    // Ohne MwSt. rechnet sie mit 0 % — Zeilen wie Summe (Vorgabe Samet 24.09.2026).
+    const vatRate = direct && !options.vatEnabled
+        ? 0
+        : direct && invoice.vatRate != null
+            ? Number(invoice.vatRate)
+            : Number(settings.vatRate) || 8.1;
+    const title = direct && !credit
+        ? ({ de: 'Rechnung', en: 'Proforma Invoice', tr: 'Fatura' } as const)[lang]
+        : invoiceKindTitle(invoice.kind);
+    const labels = {
+        de: { number: 'Rechnungs-Nr.', date: 'Rechnungsdatum', contact: 'Contact', commission: 'Kommission', due: 'Fälligkeit' },
+        en: { number: 'Proforma Invoice', date: 'Invoice Date', contact: 'Contact', commission: 'Commission', due: 'Due Date' },
+        tr: { number: 'Fatura No.', date: 'Fatura Tarihi', contact: 'Contact', commission: 'Komisyon', due: 'Vade Tarihi' },
+    }[lang];
     // Eine Direktrechnung hat keine Offerte — nichts nachzuladen.
     const ctx = direct ? rawCtx : await enrichContextFromTender(rawCtx);
 
@@ -508,6 +524,18 @@ export async function buildInvoicePdfBytes(
         ? await attachDirectPositionImages(body.positions)
         : body.positions;
 
+    // Englische Rechnung: die Spalten heissen «Pos · Detail · Pcs · U. Price ·
+    // Vat · Price» (Vorgabe Samet 24.09.2026). Die Rabattspalte trägt nur dann
+    // einen Namen, wenn eine Zeile wirklich einen Rabatt hat; die MwSt.-Spalte
+    // steht immer da (0 % ohne MwSt.).
+    const english = lang === 'en';
+    const hasLineDiscount = positions.some((row) =>
+        (row.discount ?? 0) > 0 || (row.discounts ?? []).some((entry) => (entry?.amount ?? 0) > 0));
+    const englishLabels: TenderPdfData['labels'] = english
+        ? { colPos: 'Pos', colDesc: 'Detail', colQty: 'Pcs', colUnitPrice: 'U. Price', colDiscount: hasLineDiscount ? 'Discount' : '', colTax: 'Vat', colPrice: 'Price', vat: 'Vat' }
+        : undefined;
+    const showVat = !direct || options.vatEnabled || english;
+
     const infoRows: NonNullable<TenderPdfData['infoRows']> = credit
         ? [
             { label: 'Beleg-Nr.', value: invoice.invoiceNumber, emphasize: true },
@@ -517,11 +545,11 @@ export async function buildInvoicePdfBytes(
             { label: 'Kommission', value: invoice.commissionNumber || ctx.commissionNumber || '' },
         ]
         : [
-            { label: 'Rechnungs-Nr.', value: invoice.invoiceNumber, emphasize: true },
-            { label: 'Rechnungsdatum', value: fmtDay(invoice.invoiceDate || invoice.createdAt) },
-            { label: 'Salesperson', value: invoice.salespersonName || ctx.salespersonName || '' },
-            { label: 'Kommission', value: invoice.commissionNumber || ctx.commissionNumber || '' },
-            { label: 'Fälligkeit', value: fmtDay(invoice.dueDate) },
+            { label: labels.number, value: invoice.invoiceNumber, emphasize: true },
+            { label: labels.date, value: fmtDay(invoice.invoiceDate || invoice.createdAt) },
+            { label: labels.contact, value: invoice.salespersonName || ctx.salespersonName || '' },
+            { label: labels.commission, value: invoice.commissionNumber || ctx.commissionNumber || '' },
+            { label: labels.due, value: fmtDay(invoice.dueDate) },
         ];
 
     const data: TenderPdfData = {
@@ -535,8 +563,11 @@ export async function buildInvoicePdfBytes(
         // Einleitungstext über der Positionstabelle ("Für die ausgeführten
         // Arbeiten erlauben wir uns zu berechnen:") — er steht auf Seite 1
         // unter dem Titel, genau wie der Einleitungstext der Offerte.
-        coverLetter: direct ? (invoice.introText || null) : null,
-        positions,
+        coverLetter: direct ? (invoice.introText || INVOICE_INTRO[lang]) : null,
+        positions: direct ? positions.map(row => ({ ...row, hideTax: !showVat })) : positions,
+        showVat,
+        labels: englishLabels,
+        showFooter: !direct || options.showFooter,
         grandTotal: round2(Number(invoice.amount) || 0),
         totals: body.totals,
         // Zahlungsplan des AUFTRAGS — nur auf der Vollrechnung sinnvoll: eine
@@ -550,13 +581,14 @@ export async function buildInvoicePdfBytes(
         // Karte der Abschnitt „Schlusstext": entfernt heisst, sie fällt weg.
         showPaymentTerms: !credit && sections.closing,
         paymentTermsText: direct && !credit ? (invoice.closingText || null) : null,
+        paymentTermsLabel: direct && lang === 'en' ? 'Payment Term' : undefined,
         // Abschnitt „Positionen" entfernt: keine Tabelle, nur die Summe.
         hidePositionsTable: direct && !credit && !sections.positions,
         // Die Absenderzeile des Belegs. Sie ist beim Erstellen aus den
         // Mandanteneinstellungen vorbelegt und dann eingefroren — der
         // QR-Gläubiger bleibt davon unberührt (er muss zum Konto passen).
         senderLine: direct ? (invoice.senderAddress || null) : null,
-        qrBillEnabled: !credit,
+        qrBillEnabled: !credit && (!direct || options.showQr),
         lang,
         docTitle: title,
         infoRows,
@@ -566,7 +598,7 @@ export async function buildInvoicePdfBytes(
         qrAdditionalInfo: invoice.invoiceNumber,
     };
 
-    return buildTenderPdfBytes(data, settings, onProgress);
+    return buildTenderPdfBytes(data, { ...settings, vatRate }, onProgress);
 }
 
 export async function exportInvoicePdf(
@@ -578,12 +610,5 @@ export async function exportInvoicePdf(
     const bytes = await buildInvoicePdfBytes(invoice, ctx, settings, onProgress);
     onProgress?.({ stage: 'download' });
     const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${invoice.invoiceNumber}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadInvoiceBlob(blob, invoice.invoiceNumber);
 }

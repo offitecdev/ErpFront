@@ -7,6 +7,7 @@ import { inventoryApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
 import type { SupplierRow } from '@/types/inventory';
 import { AddressFields, AddressLines } from '@/components/ui-shared/AddressFields';
+import { SelectMenu } from '@/components/ui-shared/SelectMenu';
 import { EMPTY_ADDRESS, toAddressForm, toAddressPayload } from '@/components/ui-shared/addressForm';
 import type { AddressFormValue } from '@/components/ui-shared/addressForm';
 import { BottomSheet } from './components/BottomSheet';
@@ -14,6 +15,7 @@ import { CELL_INPUT_CLASS, ColResizeHandle, FilterBar, Pager, ResizableCols, Sea
 import { useColumnWidths } from '@/hooks/useColumnWidths';
 import { useLanguageTick } from './hooks/useLanguageTick';
 import { SUPPLIERS_PAGE_SIZE, useSuppliersList } from './hooks/useSuppliersList';
+import { allVatCountries, fmtPercent, vatRatesForCountry } from './utils/orderPricing';
 
 /**
  * Tedarikçi formu. Adres AYRI BİLEŞENLERLE girilir (`AddressFormValue`) —
@@ -25,6 +27,10 @@ interface SupplierFormState extends AddressFormValue {
     contactName: string;
     email: string;
     phone: string;
+    /** KDV: '' = belirtilmedi, 'yes' = ülke + oran siparişe aktarılır, 'no' = KDV yok. */
+    vatLiable: '' | 'yes' | 'no';
+    vatCountry: string;
+    vatRate: string;
 }
 
 const emptyForm: SupplierFormState = {
@@ -32,8 +38,20 @@ const emptyForm: SupplierFormState = {
     contactName: '',
     email: '',
     phone: '',
+    vatLiable: '',
+    vatCountry: '',
+    vatRate: '',
     ...EMPTY_ADDRESS,
 };
+
+const parseRate = (value: string): number | null => {
+    const parsed = Number(value.replace(',', '.'));
+    return value.trim() && Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : null;
+};
+
+const PILL = 'rounded-md border px-3 py-1.5 text-[12.5px] font-medium transition-colors';
+const PILL_ON = 'border-[#0a7aff] bg-[#0a7aff] text-white';
+const PILL_OFF = 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:text-white/80 dark:hover:bg-white/5';
 
 /**
  * Tedarikçiler — "+" ile alttan yükselen pencerede yeni kayıt/düzenleme
@@ -67,6 +85,7 @@ export const SuppliersPage = () => {
     const [editing, setEditing] = useState<SupplierRow | null>(null);
     const [form, setForm] = useState<SupplierFormState>(emptyForm);
     const [saving, setSaving] = useState(false);
+    const [vatCountries] = useState(() => allVatCountries());
 
     useEffect(() => {
         if (!panelOpen) return;
@@ -76,6 +95,9 @@ export const SuppliersPage = () => {
                 contactName: editing.contactName || '',
                 email: editing.email || '',
                 phone: editing.phone || '',
+                vatLiable: editing.vatLiable === true ? 'yes' : editing.vatLiable === false ? 'no' : '',
+                vatCountry: editing.vatCountry || '',
+                vatRate: editing.vatRate != null ? String(editing.vatRate) : '',
                 ...toAddressForm(editing),
             }
             : emptyForm);
@@ -90,14 +112,23 @@ export const SuppliersPage = () => {
             toast.error(t('inv.suppliers.nameRequired'));
             return;
         }
+        const vatRate = parseRate(form.vatRate);
+        if (form.vatLiable === 'yes' && vatRate === null) {
+            toast.error(t('inv.suppliers.vatRateRequired'));
+            return;
+        }
         setSaving(true);
         try {
+            const vatLiable = form.vatLiable === 'yes';
             const payload = {
                 companyName,
                 contactName: form.contactName.trim() || null,
                 email: form.email.trim() || null,
                 phone: form.phone.trim() || null,
                 ...toAddressPayload(form),
+                vatLiable: vatLiable ? true : form.vatLiable === 'no' ? false : null,
+                vatCountry: vatLiable ? (form.vatCountry.trim() || null) : null,
+                vatRate: vatLiable ? vatRate : null,
             };
             if (editing) {
                 await inventoryApi.updateSupplier(editing.id, payload);
@@ -241,7 +272,7 @@ export const SuppliersPage = () => {
                 title={editing ? t('inv.suppliers.editTitle') : t('inv.suppliers.createTitle')}
                 subtitle={editing ? editing.companyName : undefined}
                 width={720}
-                height={620}
+                height={700}
                 footer={(
                     <>
                         <span className="text-[11.5px] text-slate-400 dark:text-white/50">
@@ -281,6 +312,80 @@ export const SuppliersPage = () => {
                             labels={{ address: t('address.sectionTitle') }}
                         />
                     </div>
+                    {/* KDV (24.09.2026): «Ja» → Land + Satz gehen beim Wählen
+                        des Lieferanten automatisch in die Lagerbestellung,
+                        «Nein» → die Bestellung rechnet mit 0 %. Nichts
+                        gewählt → die Bestellung behält ihren Vorgabesatz. */}
+                    <div className="flex flex-col gap-2 sm:col-span-2">
+                        <span className="text-[12px] font-semibold text-slate-600 dark:text-white/70">
+                            {t('inv.suppliers.vatLiable')}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {(['yes', 'no'] as const).map((choice) => (
+                                <button
+                                    key={choice}
+                                    type="button"
+                                    aria-pressed={form.vatLiable === choice}
+                                    onClick={() => setForm((current) => {
+                                        const next = current.vatLiable === choice ? '' : choice;
+                                        if (next !== 'yes' || current.vatCountry) return { ...current, vatLiable: next };
+                                        // Erstes «Ja»: Land und erster Satz vorbelegt.
+                                        const fallback = vatRatesForCountry(current.country);
+                                        return { ...current, vatLiable: next, vatCountry: fallback.label, vatRate: String(fallback.rates[0] ?? 0) };
+                                    })}
+                                    className={`${PILL} ${form.vatLiable === choice ? PILL_ON : PILL_OFF}`}
+                                >
+                                    {t(choice === 'yes' ? 'inv.suppliers.vatYes' : 'inv.suppliers.vatNo')}
+                                </button>
+                            ))}
+                        </div>
+                        <span className="text-[11.5px] text-slate-400 dark:text-white/50">{t('inv.suppliers.vatHint')}</span>
+                    </div>
+                    {form.vatLiable === 'yes' && (
+                        <>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[12px] font-semibold text-slate-600 dark:text-white/70">{t('inv.orders.vatColumn.country')}</span>
+                                <SelectMenu
+                                    ariaLabel={t('inv.orders.vatColumn.country')}
+                                    value={form.vatCountry}
+                                    listWidth={260}
+                                    options={[
+                                        ...(form.vatCountry && !vatCountries.some((entry) => entry.label === form.vatCountry)
+                                            ? [{ value: form.vatCountry, label: form.vatCountry }]
+                                            : []),
+                                        ...vatCountries.map((entry) => ({ value: entry.label, label: entry.label })),
+                                    ]}
+                                    onChange={(next) => setForm((current) => {
+                                        const entry = vatCountries.find((candidate) => candidate.label === next);
+                                        return { ...current, vatCountry: next, vatRate: entry?.rates.length ? String(entry.rates[0]) : current.vatRate };
+                                    })}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[12px] font-semibold text-slate-600 dark:text-white/70">{t('inv.orders.vatColumn.rates')}</span>
+                                <span className="flex flex-wrap items-center gap-1.5">
+                                    {(vatCountries.find((entry) => entry.label === form.vatCountry)?.rates ?? []).map((rate) => (
+                                        <button
+                                            key={rate}
+                                            type="button"
+                                            onClick={() => setForm((current) => ({ ...current, vatRate: String(rate) }))}
+                                            className={`${PILL} ${parseRate(form.vatRate) === rate ? PILL_ON : PILL_OFF}`}
+                                        >
+                                            {fmtPercent(rate)}
+                                        </button>
+                                    ))}
+                                    <input
+                                        value={form.vatRate}
+                                        onChange={(event) => setForm((current) => ({ ...current, vatRate: event.target.value }))}
+                                        inputMode="decimal"
+                                        aria-label={t('inv.orders.vatColumn.custom')}
+                                        className={`${CELL_INPUT_CLASS} w-20 text-right font-mono`}
+                                    />
+                                    <span className="text-slate-400">%</span>
+                                </span>
+                            </div>
+                        </>
+                    )}
                 </div>
             </BottomSheet>
         </div>

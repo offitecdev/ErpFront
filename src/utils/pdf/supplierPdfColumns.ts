@@ -28,6 +28,8 @@
  * diese Liste — Titel, Masse und Zeilen sehen dieselben Spalten.
  */
 import type { PurchaseOrderRow, TemplateLabel } from '../../types/inventory';
+import type { PurchaseDocLang } from '../purchaseCode';
+import { displayColumnName } from '../standardOrderColumns';
 
 /** Die feste Rolle einer Spalte — `extra` ist eine freie Spalte der Vorlage. */
 export type SupplierPdfColumnKind = 'desc' | 'qty' | 'gross' | 'net' | 'disc' | 'vat' | 'price' | 'extra';
@@ -53,6 +55,8 @@ export interface SupplierPdfColumnOptions {
     hidden: Set<string>;
     /** Hoechstzahl freier Spalten auf dem Blatt (A4 hochkant: sechs). */
     maxExtras: number;
+    /** Sprache des Blatts — die Standardvorlage (`std…`) benennt ihre Spalten danach. */
+    lang?: PurchaseDocLang;
 }
 
 /** Welche feste Spalte eine Zuordnung der Vorlage bedeutet. */
@@ -100,8 +104,8 @@ export function resolveSupplierPdfColumns(order: PurchaseOrderRow, options: Supp
 
     // 1) Die Vorlage, Spalte fuer Spalte — Name und Platz sind ihre.
     for (const column of order.tableColumns ?? []) {
-        const name = String(column?.name ?? '').trim();
         const key = String(column?.key ?? '').trim();
+        const name = options.lang ? displayColumnName(key, column?.name, options.lang) : String(column?.name ?? '').trim();
         if (!name || !key) continue;
         if (column.label) {
             const kind = LABEL_KIND[column.label];

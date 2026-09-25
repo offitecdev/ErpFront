@@ -78,6 +78,53 @@ export const DotRing = ({
 );
 
 /**
+ * DER MAC-KREISEL — zwölf Speichen, die vorderste dunkel, dahinter
+ * verblassend, in zwölf Sprüngen gedreht: der Ladekreisel von macOS
+ * (NSProgressIndicator). Vorgabe Samet, 24.09.2026, für die Geräteseite der
+ * Produktion: «sayfa yüklenirken Apple macOS loading'i olacak, ama hızlı».
+ *
+ * Er steht mitten in einer SEITE, die sich gerade aufbaut — für Fenster und
+ * Masken bleibt der Punktekranz, für Knöpfe der Ring. Speichen und Winkel
+ * liegen in CSS (`.ofi-macspin` in `index.css`), die Farbe ist `currentColor`.
+ */
+export const MacSpinner = ({
+    size = 30,
+    label,
+    className = '',
+}: {
+    /** Kantenlänge in Pixel. */
+    size?: number;
+    label?: string;
+    className?: string;
+}) => (
+    <span
+        role="status"
+        aria-live="polite"
+        className={`ofi-macspin ${className}`}
+        style={{ '--ofi-macspin-size': `${size}px` } as CSSProperties}
+    >
+        {Array.from({ length: 12 }, (_, index) => (
+            <i key={index} aria-hidden="true" style={{ '--ofi-macspin-i': index } as CSSProperties} />
+        ))}
+        <span className="sr-only">{label ?? t('common.loading')}</span>
+    </span>
+);
+
+/**
+ * Der Mac-Kreisel mitten in einer SEITE, die sich aufbaut — genau so hoch wie
+ * das Fenster abzüglich der Polster der Seite. Route (solange das Stück lädt)
+ * und Seite (solange die Daten kommen) zeigen dasselbe, damit nichts springt.
+ */
+export const MacSpinnerScreen = () => (
+    <div
+        className="flex items-center justify-center"
+        style={{ minHeight: 'calc(100dvh - 2 * var(--page-pad-y, 1.5rem))' }}
+    >
+        <MacSpinner size={30} />
+    </div>
+);
+
+/**
  * Der Punktekranz mitten in einer Fläche, die ihre Höhe behalten soll — der
  * Ladezustand einer Maske, bevor ihr Inhalt da ist.
  */

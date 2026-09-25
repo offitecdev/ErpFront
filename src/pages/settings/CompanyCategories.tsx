@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/ui-shared/EmptyState';
 import { Checkbox } from '../../components/ui-shared/Checkbox';
 import { useAuthStore } from '../../store/authStore';
 import { moduleProfileApi, type ModuleProfileDto } from '../../lib/api/moduleProfiles';
+import { COMPANY_TYPES, COMPANY_TYPE_LETTER, companyTypeLabel, type CompanyType } from '../../lib/companyType';
 import { MODULE_CATALOG } from '../../lib/moduleCatalog';
 
 import { t } from '@/i18n/translate';
@@ -46,6 +47,7 @@ export const CompanyCategories: React.FC = () => {
     // değer store'dan gelir, taslak yalnızca düzenleme sürerken tutulur.
     const [numberDraft, setNumberDraft] = useState<Record<string, string>>({});
     const [savingNumberId, setSavingNumberId] = useState<string | null>(null);
+    const [savingTypeId, setSavingTypeId] = useState<string | null>(null);
 
     const fetchProfiles = async () => {
         try {
@@ -162,6 +164,24 @@ export const CompanyCategories: React.FC = () => {
         }
     };
 
+    /**
+     * Şirket türü (A Üretim / B Proje / C Satış) seçildiği anda kaydedilir.
+     * Store tazelenir ki yeni ürün formu türü hemen görsün.
+     */
+    const assignType = async (tenantId: string, raw: string) => {
+        const companyType = (COMPANY_TYPES as readonly string[]).includes(raw) ? raw as CompanyType : null;
+        setSavingTypeId(tenantId);
+        try {
+            await moduleProfileApi.setTenantType(tenantId, companyType);
+            toast.success(t('settings.companyCategories.typeSaved'));
+            await fetchProfile();
+        } catch (error: any) {
+            toast.error(error.response?.data?.error || t('dashboard.actionFailed'));
+        } finally {
+            setSavingTypeId(null);
+        }
+    };
+
     const moduleLabel = (key: string) => {
         const moduleDef = MODULE_CATALOG.find((m) => m.key === key);
         return moduleDef ? t(moduleDef.labelKey, { defaultValue: moduleDef.labelDefault }) : key;
@@ -231,12 +251,15 @@ export const CompanyCategories: React.FC = () => {
                 <Card title={t('settings.companyCategories.mappingTitle', { defaultValue: 'Şirket Eşleme' })} noPadding>
                     <p className="border-b border-slate-100 px-4 py-2.5 text-[11.5px] text-slate-500">
                         {t('settings.companyCategories.companyNumberHint', { defaultValue: 'Şirket No, o şirketin belge kodlarındaki bloğu belirler (4 → AN-2026-40001) ve modül kategorisinden bağımsızdır. Değiştirmek yalnızca BUNDAN SONRA üretilecek kodları etkiler; dağıtılmış kodlar olduğu gibi kalır.' })}
+                        {' '}
+                        {t('settings.companyCategories.companyTypeHint')}
                     </p>
                     <div className="overflow-x-auto">
                         <table className="w-full text-[12.5px]">
                             <thead className="text-[10.5px] text-slate-500 bg-slate-50/60 border-b border-slate-100 uppercase tracking-wider">
                                 <tr>
                                     <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCompany', { defaultValue: 'Şirket' })}</th>
+                                    <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCompanyType')}</th>
                                     <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCompanyNumber', { defaultValue: 'Şirket No' })}</th>
                                     <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCodeBlock', { defaultValue: 'Belge kodu' })}</th>
                                     <th className="px-4 py-2.5 text-left font-semibold">{t('settings.companyCategories.colCategory', { defaultValue: 'Kategori' })}</th>
@@ -250,6 +273,24 @@ export const CompanyCategories: React.FC = () => {
                                             <td className="px-4 py-2.5 font-semibold text-slate-900">
                                                 {tenant.parentTenantId ? <span className="mr-1 text-slate-400">↳</span> : null}
                                                 {tenant.tenantName}
+                                            </td>
+                                            {/* Şirket türü şirketin HEMEN yanında: A Üretim, B Proje,
+                                                C Satış. Seçildiği anda kaydedilir. */}
+                                            <td className="px-4 py-2.5">
+                                                <Select
+                                                    aria-label={t('settings.companyCategories.colCompanyType')}
+                                                    value={tenant.companyType ?? ''}
+                                                    disabled={savingTypeId === tenant.id}
+                                                    onChange={(e) => void assignType(tenant.id, e.target.value)}
+                                                    className="min-w-[150px] max-w-[190px]"
+                                                >
+                                                    <option value="">{t('settings.companyCategories.typeNone')}</option>
+                                                    {COMPANY_TYPES.map((type) => (
+                                                        <option key={type} value={type}>
+                                                            {COMPANY_TYPE_LETTER[type]} · {companyTypeLabel(type)}
+                                                        </option>
+                                                    ))}
+                                                </Select>
                                             </td>
                                             {/* Şirket numarası = belge kodundaki blok. Kategoriden
                                                 bağımsız olduğu için burada, şirket satırında durur. */}

@@ -24,7 +24,9 @@ const scopeForView = (view: ProjectDetailView): ProjectDetailScope => {
             return 'addons';
         // Positions fetches its own light tender detail. Billing fetches invoice
         // summaries itself. Both can reuse the already-loaded overview read model.
+        // «Siparişlerim» (procurement) loads its own procurement read model.
         case 'positions':
+        case 'procurement':
         case 'billing':
         case 'overview':
         default:

@@ -863,6 +863,7 @@ export async function buildOrderPdfBytes(
         ],
         hidden: new Set([...hidden, 'code']),
         maxExtras: PDF_MAX_EXTRA_COLUMNS,
+        lang,
     }).map((column) => ({ ...column, caption: upper(column.caption) }));
     const layout = buildTableLayout(doc, order, columns, fmt);
     // Bleibt unter dem Anschreiben genug Platz, beginnt die Tabelle dort;

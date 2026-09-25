@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FocusEvent } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlertTriangle, Check, CheckCircle, ChevronLeft, ChevronRight, File05, Minus, Plus, RefreshCcw01, Save01, Settings01, ShoppingCart01, SquareDivide, Trash01, Zap } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingDots } from '@/components/ui-shared/Loader';
 import { BotLoadingPanel } from '@/components/ui-shared/OffitecBot';
 import { t } from '@/i18n/translate';
-import { purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
+import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
 import { usePurchaseTemplateStore } from '@/store/purchaseTemplateStore';
@@ -90,7 +90,8 @@ import '@/styles/orderDetails.css';
 import '@/styles/purchaseImport.css';
 import { PurchaseCode, usePurchaseLang } from '@/components/ui-shared/PurchaseCode';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
-import type { PurchaseOrderRow } from '@/types/inventory';
+import type { PurchaseLineSource, PurchaseOrderRow } from '@/types/inventory';
+import { displayTemplateTitle, isStandardColumns } from '@/utils/standardOrderColumns';
 /* Die Reiter, die ihre Daten ERST BEIM ÖFFNEN holen. (Wareneingang und
    «Stoğa gidenler» ruhen seit dem 22.09.2026 — siehe
    `_disabled/inventory-receive/README.md`.) */
@@ -153,7 +154,27 @@ type OrderMode = 'ORDER' | 'PRICE_REQUEST';
 type WorkspaceTab = 'lines' | 'settings' | 'template' | 'pdf' | 'mail';
 
 /** Rückfragen der Kopfzeile — jede gehört genau einem Knopf. */
-type PageAsk = 'delete' | 'convert' | null;
+type PageAsk = 'delete' | 'convert' | 'toRequest' | null;
+
+/**
+ * PROJEDEN AÇILAN BOŞ FORM (24.09.2026): proje detayındaki «Siparişe Git»,
+ * türü olmayan ya da hizmet olan pozisyonda BOŞ bir sipariş formu açar —
+ * projenin adı dolu, şablon standart. Satın alınacak ürünün tedarikçisi
+ * yoksa satır da hazır gelir (tedarikçi elle seçilir).
+ */
+export interface ProjectOrderPrefill {
+    projectId: string;
+    projectLabel: string;
+    line?: {
+        articleId: string | null;
+        code: string | null;
+        name: string;
+        unit: string | null;
+        quantity: number;
+        price: number;
+        source: PurchaseLineSource;
+    } | null;
+}
 
 /** Der zuletzt gewählte Nummernkreis des Wareneingangs (je Browser gemerkt). */
 const RECEIPT_SCHEME_KEY = 'offitec:inv-receive:scheme:v1';
@@ -225,6 +246,12 @@ export const OrderWorkspacePage = () => {
        Art dort entsteht, sagt `?kind=request` — die Liste hat zwei Knöpfe. */
     const { id: routeId } = useParams<{ id: string }>();
     const [searchParams] = useSearchParams();
+    const location = useLocation();
+    /** Projeden gelen boş form (yalnızca yeni kayıtta okunur). */
+    const projectPrefill = (location.state as { projectPrefill?: ProjectOrderPrefill } | null)?.projectPrefill ?? null;
+    /* Sipariş ⇄ fiyat talebi geçişi AYNI kaydı değiştirir (24.09.2026) — adres
+       aynı kalır, bu sayaç kaydı yeniden yükletir. */
+    const [reloadTick, setReloadTick] = useState(0);
     const editId = routeId && routeId !== 'new' ? routeId : null;
     const newKind: OrderMode = searchParams.get('kind') === 'request' ? 'PRICE_REQUEST' : 'ORDER';
     const permissions = useAuthStore((state) => state.permissions);
@@ -363,7 +390,8 @@ export const OrderWorkspacePage = () => {
     const [productionCleared, setProductionCleared] = useState(false);
     const [reference, setReference] = useState('');
     const [quoteNumber, setQuoteNumber] = useState('');
-    const [projectName, setProjectName] = useState('');
+    // Projeden açılan boş formda projenin adı baştan dolu (24.09.2026).
+    const [projectName, setProjectName] = useState(() => (!editId && projectPrefill?.projectLabel) || '');
     // "Besteller" — siparişi veren kişi; oturumdaki kullanıcının tam adıyla dolar.
     const [orderedByName, setOrderedByName] = useState('');
     /**
@@ -468,7 +496,23 @@ export const OrderWorkspacePage = () => {
         name: '',
         email: null,
     });
-    const [rows, setRows] = useState<DraftOrderRow[]>([]);
+    /* PROJEDEN HAZIR SATIR (24.09.2026): tedarikçisi olmayan «Satın Alınacak»
+       ürün, satırı dolu bir formla gelir — tedarikçi elle seçilir. */
+    const [rows, setRows] = useState<DraftOrderRow[]>(() => {
+        const line = !editId ? projectPrefill?.line : null;
+        if (!line) return [];
+        return [{
+            ...emptyRow('DIRECT'),
+            articleId: line.articleId,
+            code: line.code ?? '',
+            name: line.name,
+            unit: line.unit ?? '',
+            quantity: String(line.quantity),
+            grossPrice: line.price ? String(line.price) : '',
+            netPrice: line.price ? String(line.price) : '',
+            source: line.source,
+        }];
+    });
     /**
      * ── ZEILEN AUSWÄHLEN UND WEGWERFEN (Vorgabe Samet, 09.09.2026) ───────────
      * «Ein Papierkorb, um Zeilen zu löschen — auch mehrere auf einmal.»
@@ -533,6 +577,30 @@ export const OrderWorkspacePage = () => {
     const fmtMoney = (value?: number | null) => fmtMoneyIn(value, currency);
     const [customVatLabel, setCustomVatLabel] = useState('');
     const [customVatRate, setCustomVatRate] = useState('');
+    /* TEDARİKÇİNİN KDV'Sİ (24.09.2026): seçilen tedarikçi KDV'ye tabiyse
+       ülke + oranı siparişe aktarılır, tabi değilse oran 0 olur; tedarikçide
+       hiçbir şey seçilmemişse sipariş kendi varsayılanında kalır. Yüklenen
+       kaydın KENDİ tedarikçisi atlanır — kayıttaki oran elle değiştirilmiş
+       olabilir, açmak onu ezmemeli. */
+    const vatSupplierRef = useRef<string | null>(null);
+    useEffect(() => {
+        const supplierId = supplier.id;
+        if (!supplierId || supplierId === vatSupplierRef.current) return;
+        vatSupplierRef.current = supplierId;
+        let cancelled = false;
+        inventoryApi.getSupplierVat(supplierId)
+            .then((vat) => {
+                if (cancelled || vat.vatLiable == null) return;
+                if (!vat.vatLiable) {
+                    setOrderVatRate('0');
+                    return;
+                }
+                if (vat.vatCountry) setOrderVatCountry(vat.vatCountry);
+                setOrderVatRate(String(vat.vatRate ?? 0));
+            })
+            .catch(() => { /* KDV gelmezse sipariş kendi oranında kalır */ });
+        return () => { cancelled = true; };
+    }, [supplier.id]);
 
     // Yeni siparişte "Besteller" alanı oturumdaki kullanıcının tam adıyla dolar;
     // kullanıcı üzerine yazabilir (düzenlemede kaydın kendi değeri korunur).
@@ -570,6 +638,7 @@ export const OrderWorkspacePage = () => {
                 // kalır); varsa kullanıcının kendi metni yüklenir.
                 setCoverCustom(order.coverLetter?.trim() ? order.coverLetter : null);
                 setEditReference(localizePurchaseCode(order.referenceNumber, poLang));
+                vatSupplierRef.current = order.supplierId ?? null;
                 setSupplier({
                     id: order.supplierId ?? null,
                     name: order.supplierName,
@@ -670,6 +739,7 @@ export const OrderWorkspacePage = () => {
                         receivedQuantity: item.receivedQuantity ?? 0,
                         receivedAt: item.receivedAt ?? null,
                         productionItemId: item.productionItemId ?? null,
+                        source: item.source ?? null,
                         extras: Object.fromEntries((item.extras ?? []).map((entry) => [entry.key, entry.value])),
                     };
                 }));
@@ -698,7 +768,7 @@ export const OrderWorkspacePage = () => {
             })
             .finally(() => { if (!cancelled) setLoadingOrder(false); });
         return () => { cancelled = true; };
-    }, [editId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [editId, reloadTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── ÖN YAZI TASLAKLARI ───────────────────────────────────────────────────
     // Liste SUNUCUDA sayfalanır (15'erli): taslak eklendikçe yeni sayfa açılır,
@@ -809,15 +879,22 @@ export const OrderWorkspacePage = () => {
        Eine Vorlage gehoert keinem Lieferanten mehr (11.09.2026): es gilt die
        von Hand gewaehlte, sonst die Vorgabe der Dokumentart, sonst die erste.
        Gibt es keine, gibt es auch keine Tabelle — die Vorlage ist Pflicht. */
+    /* STANDART KAYIT → STANDART ŞABLON (24.09.2026): projeden açılan ya da
+       sipariş ⇄ talep arasında dönen kayıt standart sütunlarla kaydedilmiştir;
+       el ile başka şablon seçilmedikçe tablo da onunla açılır. */
+    const standardRecord = Boolean(projectPrefill && !editId) || isStandardColumns(loadedOrder?.tableColumns);
     useEffect(() => {
         let cancelled = false;
         purchaseOrdersApi.listSupplierTemplates(null, templateDocumentType)
             .then((items) => {
                 if (cancelled) return;
                 setCalcTemplates(items);
+                const standard = standardRecord && !activeTemplateId
+                    ? items.find((entry) => isStandardColumns(entry.config.columns))
+                    : undefined;
                 const chosen = items.find((entry) => entry.id === (activeTemplateId ?? preferredTemplateId));
                 const general = items.find((entry) => entry.isDefault);
-                const active = chosen ?? general ?? items[0] ?? null;
+                const active = standard ?? chosen ?? general ?? items[0] ?? null;
                 setActiveTemplate(active);
                 if (active && active.id !== preferredTemplateId) {
                     selectPreferredTemplate(templateDocumentType, active.id);
@@ -829,7 +906,7 @@ export const OrderWorkspacePage = () => {
             })
             .catch(() => { if (!cancelled) { setActiveTemplate(null); setAiConfig(defaultCalcConfig()); setTemplatesLoaded(true); } });
         return () => { cancelled = true; };
-    }, [templateTick2, activeTemplateId, templateDocumentType]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [templateTick2, activeTemplateId, templateDocumentType, standardRecord]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * ── DIE VORLAGE IST DIE TABELLE (Vorgabe Samet, 11.09.2026) ─────────────
@@ -1144,6 +1221,7 @@ export const OrderWorkspacePage = () => {
                 lineTotal: 0,
                 ...(extras.length ? { extras } : {}),
                 ...(productionOn ? { productionItemId: row.productionItemId ?? null } : {}),
+                ...(row.source ? { source: row.source } : {}),
                 // Mal kabul durumu aynen geri gönderilir (sunucu kırparak korur).
                 receivedQuantity: row.receivedQuantity,
                 receivedAt: row.receivedAt,
@@ -1202,6 +1280,8 @@ export const OrderWorkspacePage = () => {
             ...(row.calcMode === 'DIRECT' ? { directCopy: true, lineTotal: figures.lineTotal } : {}),
             // Produktion: das Gerät der Zeile (der Server prüft es gegen die Auswahl).
             ...(productionOn ? { productionItemId: row.productionItemId ?? null } : {}),
+            // Proje kaynağı AYNEN geri gider — birleştirme ve «Siparişlerim» ona bakar.
+            ...(row.source ? { source: row.source } : {}),
         };
     };
 
@@ -1438,7 +1518,35 @@ export const OrderWorkspacePage = () => {
             if (filledRows.length) await save();
             const created = await purchaseOrdersApi.convertToOrder(editId);
             toast.success(t('inv.orders.convertedToast'));
-            navigate(`/inventory/orders/${created.id}`);
+            // Siparişten gelmiş talep YERİNDE döner (aynı kayıt): yeniden yükle.
+            if (created.id === editId) {
+                setTab('lines');
+                setReloadTick((tick) => tick + 1);
+            } else {
+                navigate(`/inventory/orders/${created.id}`);
+            }
+        } catch (error) {
+            toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
+        } finally {
+            setPageBusy(null);
+        }
+    };
+
+    /* ══ «FİYAT TALEBİ ALMAK İSTİYORUM» (Vorgabe Samet, 24.09.2026) ═════════
+       «Sipariş ekranında fiyat talebi almak istiyorum butonu olsun, tıklayınca
+       sipariş geri fiyat talebine dönsün, fiyat talebi açılsın.» AYNI kayıt
+       talebe döner (standart talep şablonu: ÜRÜN - MALZEME / MİKTAR); talep
+       ekranındaki «Siparişe dönüştür» onu aynı numarayla geri çevirir. */
+    const convertToRequest = async () => {
+        if (!editId) return;
+        setPageBusy('toRequest');
+        try {
+            if (filledRows.length && !linesLocked) await save();
+            await purchaseOrdersApi.convertToRequest(editId);
+            toast.success(t('inv.orders.toRequestToast'));
+            setTab('lines');
+            setActiveTemplateId(null);
+            setReloadTick((tick) => tick + 1);
         } catch (error) {
             toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
         } finally {
@@ -1490,6 +1598,7 @@ export const OrderWorkspacePage = () => {
         setPageAsk(null);
         if (kind === 'delete') void deleteRecord();
         if (kind === 'convert') void convertToOrder();
+        if (kind === 'toRequest') void convertToRequest();
     };
 
 
@@ -1771,7 +1880,12 @@ export const OrderWorkspacePage = () => {
 
     const askText = pageAsk === 'delete'
         ? t(priceless ? 'inv.orders.deleteRequestConfirm' : 'inv.orders.deleteOrderRecordConfirm')
-        : t('inv.orders.convertConfirm');
+        : (pageAsk === 'toRequest' ? t('inv.orders.toRequestConfirm') : t('inv.orders.convertConfirm'));
+    /* HANGİ PROJEDEN GELDİ (24.09.2026): satırlardan biri bir projenin
+       pozisyonundan geldiyse başlıkta projenin adı durur ve projeye götürür. */
+    const sourceProjectId = loadedOrder?.items.find((item) => item.source?.projectId)?.source?.projectId
+        ?? (!editId ? projectPrefill?.projectId : undefined)
+        ?? null;
 
     /* ── DER WEG DURCH DIE EINSTELLUNGEN (22.09.2026, Vorgabe Samet) ──────
        «Siparişlerde ve fiyat [talebi] ayarlarında solda bir başlık şeyi olması
@@ -1818,6 +1932,16 @@ export const OrderWorkspacePage = () => {
                             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}>
                                 {t(statusMeta.labelKey)}
                             </span>
+                        )}
+                        {sourceProjectId && (projectName.trim() || loadedOrder?.projectName) && (
+                            <Link
+                                to={`/projects/${sourceProjectId}`}
+                                className="ofi-ows-projectchip"
+                                title={t('inv.orders.fromProject')}
+                            >
+                                <span>{t('inv.orders.fromProject')}</span>
+                                <b>{projectName.trim() || loadedOrder?.projectName}</b>
+                            </Link>
                         )}
                     </span>
                 )}
@@ -1869,6 +1993,21 @@ export const OrderWorkspacePage = () => {
                                 {t('inv.orders.actions.confirmOrder')}
                             </button>
                         )}
+                        {/* FİYAT TALEBİ ALMAK İSTİYORUM — die Bestellung wird
+                            wieder eine Preisanfrage (derselbe Datensatz). */}
+                        {editId && canTransfer && !priceless && !awaitingGoods && (
+                            <button
+                                type="button"
+                                disabled={saving || pageBusy !== null}
+                                onClick={() => setPageAsk('toRequest')}
+                                className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3.5 text-[12.5px] font-semibold text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/20 dark:text-white/80"
+                            >
+                                {pageBusy === 'toRequest'
+                                    ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                    : <File05 size={15} />}
+                                {t('inv.orders.actions.wantPriceRequest')}
+                            </button>
+                        )}
                         {/* SİPARİŞE DÖNÜŞTÜR — die Anfrage BLEIBT, daneben
                             entsteht eine Bestellung und sie öffnet sich. */}
                         {editId && priceless && canTransfer && (
@@ -1902,13 +2041,13 @@ export const OrderWorkspacePage = () => {
             {/* Die Rückfrage steht IN der Seite, gleich unter ihrem Knopf. */}
             {pageAsk && (
                 <div className={`flex flex-wrap items-center gap-3 rounded-xl border px-3.5 py-3 ${
-                    pageAsk === 'convert'
+                    pageAsk !== 'delete'
                         ? 'border-slate-200 bg-slate-50/70 dark:border-white/15 dark:bg-white/[0.04]'
                         : 'border-red-200 bg-red-50/60 dark:border-red-500/30 dark:bg-red-500/10'
                 }`}
                 >
                     <span className={`flex min-w-0 flex-1 items-start gap-2 text-[12.5px] ${
-                        pageAsk === 'convert' ? 'text-slate-700 dark:text-white/80' : 'font-medium text-red-700 dark:text-red-200'
+                        pageAsk !== 'delete' ? 'text-slate-700 dark:text-white/80' : 'font-medium text-red-700 dark:text-red-200'
                     }`}
                     >
                         <AlertTriangle size={15} className="mt-px shrink-0" />
@@ -1926,7 +2065,7 @@ export const OrderWorkspacePage = () => {
                             type="button"
                             onClick={runPageAsk}
                             className={`flex h-9 items-center rounded-md px-3.5 text-[12.5px] font-semibold text-white transition-colors ${
-                                pageAsk === 'convert' ? 'bg-[#0a7aff] hover:bg-[#0066e0]' : 'bg-red-600 hover:bg-red-700'
+                                pageAsk !== 'delete' ? 'bg-[#0a7aff] hover:bg-[#0066e0]' : 'bg-red-600 hover:bg-red-700'
                             }`}
                         >
                             {t('common.confirm')}
@@ -2340,7 +2479,7 @@ export const OrderWorkspacePage = () => {
                                         }}
                                     >
                                         <b>
-                                            {activeTemplate?.id === template.id && <Check size={13} />} {template.title}
+                                            {activeTemplate?.id === template.id && <Check size={13} />} {displayTemplateTitle(template.title, template.config.columns, poLang)}
                                         </b>
                                         <small>{t('inv.aiImport.columnCount', { count: template.config.columns.length })}</small>
                                     </button>

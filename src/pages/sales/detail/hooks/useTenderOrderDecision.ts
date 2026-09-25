@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -14,7 +14,6 @@ import { bytesToBase64 } from '../tenderDetailUtils';
 
 type UseTenderOrderDecisionParams = {
     tender: TenderListItem | undefined;
-    isDirty: boolean;
     overtimeHourlyRate: number;
     fetchDetail: (id: string, silent?: boolean) => Promise<void>;
     navigate: NavigateFunction;
@@ -76,7 +75,7 @@ const sendOrderConfirmation = async (tenderId: string, salesOrder: SalesOrderDto
 // existing-project search, and the submit/approve/create-project handlers. The
 // resulting project id (freshly created or already linked) is surfaced as
 // `projectId` so the caller can drive its sales-order UI.
-export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fetchDetail, navigate, saveAll }: UseTenderOrderDecisionParams) => {
+export const useTenderOrderDecision = ({ tender, overtimeHourlyRate, fetchDetail, navigate, saveAll }: UseTenderOrderDecisionParams) => {
     const [projectCreateLoading, setProjectCreateLoading] = useState(false);
     const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
     // When set, the "Project created successfully" popup is shown, offering to
@@ -98,6 +97,12 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
 
     const projectId = tender?.projectId || createdProjectId;
 
+    // The LATEST save function — a field that commits on blur (customer name,
+    // addresses, …) stages its edit in the same click that hits Approve, so the
+    // `saveAll` captured by that click's render may still think nothing is dirty.
+    const saveAllRef = useRef(saveAll);
+    saveAllRef.current = saveAll;
+
     useEffect(() => {
         if (!orderDecisionOpen || !attachExistingProject) return;
         const timer = window.setTimeout(() => {
@@ -113,9 +118,14 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
 
     // Approve/order flows persist pending edits automatically — clicking them
     // acts as a save, so no separate manual Save step is required.
+    // The still-focused field is blurred first so its commit lands, then the
+    // save runs from the next render. Nothing staged = nothing sent; staged
+    // edits on an already saved tender are sent as an update (same Save path).
     const flushPendingEdits = async (): Promise<boolean> => {
-        if (!isDirty) return true;
-        return saveAll();
+        const active = document.activeElement as HTMLElement | null;
+        if (active && active !== document.body) active.blur();
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.setTimeout(resolve, 0)));
+        return saveAllRef.current();
     };
 
     const openOrderDecision = async () => {
@@ -152,6 +162,9 @@ export const useTenderOrderDecision = ({ tender, isDirty, overtimeHourlyRate, fe
         setProjectCreateLoading(true);
         setOrderDecisionLoading(true);
         try {
+            // Whatever was edited while the dialog was open is saved as well —
+            // the order is always built from the stored tender.
+            if (!(await flushPendingEdits())) return;
             const res = await projectApi.createSalesOrderFromTender({
                 tenderId: tender.id,
                 mode: finalMode,

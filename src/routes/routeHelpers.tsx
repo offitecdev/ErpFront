@@ -83,11 +83,16 @@ const createPreloadable = <P extends object>(
     return Object.assign(Preloadable, { preload });
 };
 
-export const lazyNamed = (loader: () => Promise<unknown>, exportName: string): PreloadableRoute =>
+/** `placeholder`: was die Route zeigt, solange ihr Stück lädt — sonst das Skelett. */
+export const lazyNamed = (
+    loader: () => Promise<unknown>,
+    exportName: string,
+    placeholder?: RouteComponent,
+): PreloadableRoute =>
     createPreloadable<Record<string, never>>(
         loader,
         (mod) => mod[exportName] as RouteComponent,
-        () => <PageSkeleton />,
+        placeholder ?? (() => <PageSkeleton />),
     );
 
 const RouteFallback = () => <PageSkeleton />;

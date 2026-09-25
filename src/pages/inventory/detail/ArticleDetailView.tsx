@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -17,42 +17,50 @@ import { RichTextMarkdownEditor } from '@/pages/sales/detail/components/RichText
 import { richTextToHtml } from '@/pages/sales/detail/utils/markdown.utils';
 import { t } from '@/i18n/translate';
 import { inventoryApi } from '@/lib/api/inventory';
+import { companyRequiresArticleKindAndSupplier, useCurrentCompanyType } from '@/lib/companyType';
 import { useAuthStore } from '@/store/authStore';
-import { CELL_INPUT_CLASS, SectionCard, TableStateRow } from '../components/primitives';
+import { FormRow, RequiredFieldsAlert } from '../components/ArticleFormParts';
+import { ArticleKindSegment } from '../components/ArticleKindSegment';
 import { StockInPopup, type StockInArticle } from '../components/StockInPopup';
+import { SupplierMultiSelect } from '../components/SupplierMultiSelect';
 import { useLanguageTick } from '../hooks/useLanguageTick';
+import { articleKindLabel } from '../utils/articleKind';
+import { focusFirstInvalid } from '../utils/formFocus';
 import { fmtMoney, fmtQty, fmtUnitCost } from '../utils/format';
 import { ArticleImagePanel } from './ArticleImagePanel';
-import { buildDetailPatch, draftFromDetail, type DetailDraft } from './detailPatch';
+import { buildDetailPatch, draftFromDetail, kindOfDetail, type DetailDraft } from './detailPatch';
 import { ArticleMovementsView } from './ArticleMovementsView';
 import { ArticleSuppliersView } from './ArticleSuppliersView';
 import { useArticleDetail } from './useArticleDetail';
+// Yeni ürün sayfasıyla AYNI form dili (satır = alan, üç sütun).
+import '@/styles/orderDetails.css';
+import '@/styles/modules/orderWorkspace.css';
+import '@/styles/articleForm.css';
 
-/** Etiket/değer satırı — detay tablosunun tek satırı. */
-const Row = ({ label, children, mono = false }: { label: string; children: React.ReactNode; mono?: boolean }) => (
-    <tr className="transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
-        <th scope="row" className="w-56 text-left align-top text-[12.5px] font-semibold text-slate-500 dark:text-white/60">
-            {label}
-        </th>
-        <td className={`text-slate-800 dark:text-white ${mono ? 'font-mono text-[13px]' : ''}`}>{children}</td>
-    </tr>
-);
+const errorBody = (error: unknown) =>
+    (error as { response?: { data?: { error?: string; code?: string } } })?.response?.data;
 
-const errorMessage = (error: unknown, fallback: string) =>
-    (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
+type TextKey = 'name' | 'modelNumber' | 'serialNumber' | 'supplierBarcode' | 'salePrice';
 
 /**
- * Ürün / malzeme detayı — listeden bir satıra tıklayınca açılan tam sayfa.
+ * Ürün / malzeme detayı — listeden bir satıra tıklayınca (ve yeni ürün
+ * kaydedilince) açılan tam sayfa.
  *
- * Veri disiplini: sayfa açılırken YALNIZCA başlık tablosu çekilir
- * (`/articles/:id/detail`). Tedarikçi listesi ve hareket geçmişi bu yanıtta
- * yoktur; ikisi de kendi SEKMESİNE geçildiğinde monte olan bileşenle, kendi
- * ucundan yüklenir. Görsel de ayrı uçtan gelir (base64 blob başlık isteğine
- * binmesin).
+ * 23.09.2026 (Samet): «ürün detay ekranı da aynı şekilde olması lazım» — yeni
+ * ürün sayfasıyla AYNI üç sütun: Ürün (ad, model, seri, barkod, tedarikçiler)
+ * · Tür ve fiyat (tür, birim, satış fiyatı, stok ve maliyet) · Görsel;
+ * açıklama altta. ERP kodu alanı burada da şimdilik yok. Zorunluluk da
+ * aynıdır: ürün adı her zaman; proje ve satış şirketlerinde tür ve en az bir
+ * tedarikçi. Eksik kalınca kaydetme reddedilir ve formun üstünde eksikler
+ * adıyla sayılır.
  *
- * Kaydetme: alanlar, açıklama ve görsel TEK "Kaydet" düğmesiyle, TEK istekte
- * (`PATCH /articles/:id/detail`) gider. Böylece alanları yazıp görseli düşüren
- * yarım kayıt oluşamaz; yalnızca DEĞİŞEN alanlar gönderilir.
+ * Veri disiplini: sayfa açılırken YALNIZCA başlık çekilir
+ * (`/articles/:id/detail`, tedarikçi adlarıyla birlikte). Hareket geçmişi ve
+ * tedarikçi maliyetleri kendi SEKMESİNE geçildiğinde kendi ucundan yüklenir.
+ * Görsel de ayrı uçtan gelir (base64 blob başlık isteğine binmesin).
+ *
+ * Kaydetme: alanlar, tedarikçiler, açıklama ve görsel TEK "Kaydet" düğmesiyle,
+ * TEK istekte (`PATCH /articles/:id/detail`) gider — yalnızca DEĞİŞENLER.
  */
 export const ArticleDetailView = ({ copyPrefix }: {
     /** 'inv.products'. */
@@ -65,6 +73,12 @@ export const ArticleDetailView = ({ copyPrefix }: {
     const permissions = useAuthStore((state) => state.permissions);
     const canUpdate = permissions.includes('inventory.articles.update');
     const canTransfer = permissions.includes('inventory.transfer');
+
+    // Proje/satış şirketinde tür ve tedarikçi zorunludur. Sunucu da sorar;
+    // bu sekmede şirket türü eski kaldıysa cevabı buraya taşınır.
+    const companyType = useCurrentCompanyType();
+    const [serverStrict, setServerStrict] = useState(false);
+    const strict = companyRequiresArticleKindAndSupplier(companyType) || serverStrict;
 
     /* ZUGANG BUCHEN (11.09.2026, Samet): dasselbe Plus wie in der Liste, hier
        im Kopf. Nach der Buchung springt der Bestand im Detail nach, und die
@@ -101,13 +115,32 @@ export const ArticleDetailView = ({ copyPrefix }: {
     // undefined = değişmedi, string = yeni görsel, null = kaldırıldı.
     const [pendingImage, setPendingImage] = useState<string | null | undefined>(undefined);
 
+    // Zorunlu alan uyarısı ilk kaydetme denemesinden sonra görünür — ürün
+    // başına; başka ürüne geçince kaybolur.
+    const [errorsFor, setErrorsFor] = useState<string | null>(null);
+    const showErrors = Boolean(detail && errorsFor === detail.id);
+    const formRef = useRef<HTMLDivElement>(null);
+
     const editDraft = (patchDraft: Partial<DetailDraft>) => {
         if (!detail || !draft) return;
         setEdited({ articleId: detail.id, draft: { ...draft, ...patchDraft } });
     };
 
-    const codeLabel = t('inv.columns.serialCode');
     const nameLabel = t('inv.columns.productName');
+    const kindLabel = t('inv.newProduct.kind');
+    const supplierLabel = t('inv.columns.supplier');
+
+    const missing = {
+        name: Boolean(draft && !draft.name.trim()),
+        kind: Boolean(draft && strict && !draft.articleKind),
+        suppliers: Boolean(draft && strict && !draft.suppliers.length),
+    };
+    const missingLabels = [
+        missing.name && nameLabel,
+        missing.kind && kindLabel,
+        missing.suppliers && supplierLabel,
+    ].filter((label): label is string => Boolean(label));
+    const invalid = (field: keyof typeof missing) => showErrors && missing[field];
 
     /** Yalnızca DEĞİŞEN alanlar — hiçbiri değişmediyse `null` (düğme pasif). */
     const patch = useMemo(
@@ -118,7 +151,13 @@ export const ArticleDetailView = ({ copyPrefix }: {
     const dirty = patch !== null;
 
     const save = async () => {
-        if (!id || !patch) return;
+        if (!id || !patch || !detail) return;
+        if (missingLabels.length) {
+            setErrorsFor(detail.id);
+            toast.error(t('inv.newProduct.missingFields', { fields: missingLabels.join(', ') }));
+            focusFirstInvalid(formRef.current);
+            return;
+        }
         setSaving(true);
         try {
             const updated = await inventoryApi.saveArticleDetail(id, patch);
@@ -126,12 +165,22 @@ export const ArticleDetailView = ({ copyPrefix }: {
             // geçirdiği için gösterilen değer kaydedilenle birebir aynı olur.
             // İstatistikler ayrı uçtan geldiği için hızlı PATCH yanıtındaki ana
             // alanları mevcut hesaplanmış değerlerin üzerine birleştir.
-            setDetail((current) => current ? { ...current, ...updated } : updated);
+            setDetail((current) => current
+                // Tek tedarikçi (24.09.2026): sekmedeki sayı alım geçmişini de
+                // sayar, yanıttaki tek kayıtla ezilmez.
+                ? { ...current, ...updated }
+                : updated);
             setEdited(null);
             setPendingImage(undefined);
+            setErrorsFor(null);
             toast.success(t('inv.detail.saved'));
         } catch (err) {
-            toast.error(errorMessage(err, t('inv.detail.saveFailed')));
+            const body = errorBody(err);
+            if (body?.code === 'KIND_REQUIRED' || body?.code === 'SUPPLIER_REQUIRED') {
+                setServerStrict(true);
+                setErrorsFor(detail.id);
+            }
+            toast.error(body?.error || t('inv.detail.saveFailed'));
         } finally {
             setSaving(false);
         }
@@ -140,6 +189,7 @@ export const ArticleDetailView = ({ copyPrefix }: {
     const reset = () => {
         setEdited(null);
         setPendingImage(undefined);
+        setErrorsFor(null);
     };
 
     const generateBarcode = async () => {
@@ -150,17 +200,25 @@ export const ArticleDetailView = ({ copyPrefix }: {
             setDetail((current) => current ? { ...current, ...updated } : updated);
             toast.success(t('inv.detail.barcodeGenerated', { code: updated.systemBarcode ?? '' }));
         } catch (err) {
-            toast.error(errorMessage(err, t('inv.detail.barcodeGenerateFailed')));
+            toast.error(errorBody(err)?.error || t('inv.detail.barcodeGenerateFailed'));
         } finally {
             setGenerating(false);
         }
     };
 
-    const field = (key: keyof DetailDraft, extraClass = '') => ({
+    const textField = (key: TextKey) => ({
+        id: `article-detail-${key}`,
         value: draft?.[key] ?? '',
         onChange: (event: React.ChangeEvent<HTMLInputElement>) => editDraft({ [key]: event.target.value }),
-        className: `${CELL_INPUT_CLASS} ${extraClass}`,
+        autoComplete: 'off',
     });
+
+    /** Yetkisi olmayan kullanıcı için değer: satırın alanı gibi hizalı düz metin. */
+    const readValue = (value: React.ReactNode, mono = false) => (
+        <span className={`ofi-article-form__value${mono ? ' font-mono' : ''}`}>{value || '—'}</span>
+    );
+
+    const shownKind = detail ? kindOfDetail(detail) : null;
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -247,158 +305,130 @@ export const ArticleDetailView = ({ copyPrefix }: {
                 <ArticleMovementsView key={movementsTick} articleId={detail.id} unit={detail.unit} />
             ) : tab === 'suppliers' && detail ? (
                 <ArticleSuppliersView articleId={detail.id} unit={detail.unit} />
+            ) : (loading || !detail || !draft) ? (
+                <div className="ofi-ows ofi-article-form">
+                    <section className="ofi-ows-card">
+                        <div className="flex min-h-40 items-center justify-center text-[12.5px] text-slate-500 dark:text-white/60">
+                            {loading ? <Spinner size="sm" /> : (error || t('inv.detail.notFound'))}
+                        </div>
+                    </section>
+                </div>
             ) : (
-                // İki sütun: solda detay tablosu, sağda görsel.
-                // Dar ekranda görsel tablonun altına iner.
-                <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-                    <div className="flex min-w-0 flex-col gap-4">
-                        <SectionCard title={t(`${copyPrefix}.detailTitle`)}>
-                            {/* Etiket/değer tablosu: başlık satırı olmadığı için
-                                sürükleme tutamacı taşıyamaz — yalnızca çizgiler. */}
-                            <table data-inv-table data-grid-lines data-unstyled-table data-lager-form className="w-full">
-                                <tbody>
-                                    {(loading || !detail || !draft) && (
-                                        <TableStateRow colSpan={2} loading={loading} emptyText={error || t('inv.detail.notFound')} />
-                                    )}
-                                    {!loading && detail && draft && (
-                                        <>
-                                            <Row label={codeLabel} mono={!canUpdate}>
-                                                {canUpdate
-                                                    ? <input aria-label={codeLabel} {...field('articleCode', 'font-mono max-w-xs')} />
-                                                    : detail.articleCode}
-                                            </Row>
-                                            <Row label={nameLabel}>
-                                                {canUpdate
-                                                    ? <input aria-label={nameLabel} {...field('name', 'max-w-md')} />
-                                                    : detail.name}
-                                            </Row>
-                                            {/* Reihenfolge (10.09.2026): ERP-Code, Bezeichnung,
-                                                Modellnummer, Seriennummer, Barcode. Modell = die
-                                                Rolle des alten Produktcodes (zehn Geräte, eine
-                                                Modellnummer); die Serie ist je Gerät eindeutig. */}
-                                            <Row label={t('inv.columns.modelNumber')} mono={!canUpdate}>
-                                                {canUpdate
-                                                    ? <input aria-label={t('inv.columns.modelNumber')} {...field('modelNumber', 'font-mono max-w-xs')} />
-                                                    : (detail.modelNumber || '—')}
-                                            </Row>
-                                            <Row label={t('inv.columns.serialNumber')} mono={!canUpdate}>
-                                                {canUpdate
-                                                    ? <input aria-label={t('inv.columns.serialNumber')} {...field('serialNumber', 'font-mono max-w-xs')} />
-                                                    : (detail.serialNumber || '—')}
-                                            </Row>
-                                            <Row label={t('inv.columns.barcode')} mono={!canUpdate}>
-                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                                                    {canUpdate
-                                                        ? <input aria-label={t('inv.detail.barcodeSupplier')} placeholder={t('inv.detail.barcodeSupplier')} {...field('supplierBarcode', 'font-mono max-w-xs')} />
-                                                        : <span>{detail.supplierBarcode || (detail.systemBarcode ? '' : t('inv.detail.barcodeNone'))}</span>}
-                                                    {detail.systemBarcode ? (
-                                                        <span className="inline-flex items-center gap-1.5 font-mono text-[12.5px] text-slate-500 dark:text-white/60" title={t('inv.detail.barcodeSystem')}>
-                                                            <QrCode size={13} aria-hidden />
-                                                            {detail.systemBarcode}
-                                                        </span>
-                                                    ) : canUpdate && (
-                                                        /* Kein Systembarcode: der Knopf erzeugt einen —
-                                                           ausdrücklich nur hier, nie automatisch. */
-                                                        <button
-                                                            type="button"
-                                                            disabled={generating}
-                                                            onClick={() => void generateBarcode()}
-                                                            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-300 px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:opacity-40 dark:border-white/20 dark:text-white/70"
-                                                        >
-                                                            {generating ? <Spinner size="sm" /> : <QrCode size={13} aria-hidden />}
-                                                            {t('inv.detail.barcodeGenerate')}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </Row>
-                                            {/* Ürün/hizmet anahtarı (kullanıcı isteği 2026-08-14):
-                                                yeni kayıt ÜRÜN olarak doğar, buradan hizmete çevrilir.
-                                                Ortak Kaydet ile diğer alanlarla birlikte yazılır. */}
-                                            <Row label={t('inv.detail.kind')}>
-                                                {canUpdate ? (
-                                                    <div className="flex items-center gap-1 py-0.5">
-                                                        {(['PRODUCT', 'SERVICE'] as const).map((kind) => (
-                                                            <button
-                                                                key={kind}
-                                                                type="button"
-                                                                onClick={() => editDraft({ itemType: kind })}
-                                                                aria-pressed={draft.itemType === kind}
-                                                                className={`rounded-[3px] border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
-                                                                    draft.itemType === kind
-                                                                        ? 'border-[#0a7aff] bg-[#0a7aff] text-white dark:border-[#e6cf9e] dark:bg-[#e6cf9e] dark:text-[#151616]'
-                                                                        : 'border-slate-200 bg-white text-slate-500 hover:text-slate-800 dark:border-white/15 dark:bg-transparent dark:text-white/60'
-                                                                }`}
-                                                            >
-                                                                {t(kind === 'PRODUCT' ? 'inv.detail.kindProduct' : 'inv.detail.kindService')}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    t(detail.itemType === 'SERVICE' ? 'inv.detail.kindService' : 'inv.detail.kindProduct')
-                                                )}
-                                            </Row>
-                                            <Row label={t('inv.columns.unit')}>
-                                                {canUpdate
-                                                    ? (
-                                                        <UnitSelect
-                                                            value={draft.unit}
-                                                            onChange={(next) => editDraft({ unit: next })}
-                                                            className="max-w-[12rem]"
-                                                        />
-                                                    )
-                                                    : detail.unit}
-                                            </Row>
-                                            {/* Stok, ortalama maliyet ve sipariş adedi TÜRETİLMİŞ
-                                                değerlerdir — hareketlerden gelir, elle düzenlenmez.
-                                                Etiket "Lagerbestand" (kullanıcı isteği). */}
-                                            <Row label={t('inv.detail.warehouseStock')} mono>
-                                                {fmtQty(detail.totalQuantity)} {detail.unit}
-                                            </Row>
-                                            <Row label={t('inv.detail.averageUnitCost')} mono>
-                                                {detail.averageUnitCost === undefined ? '—' : fmtUnitCost(detail.averageUnitCost)}
-                                            </Row>
-                                            <Row label={t('inv.columns.salePrice')} mono={!canUpdate}>
-                                                {canUpdate
-                                                    ? <input inputMode="decimal" aria-label={t('inv.columns.salePrice')} {...field('salePrice', 'font-mono max-w-[10rem]')} />
-                                                    : fmtMoney(detail.salePrice)}
-                                            </Row>
-                                            {/* Siparişi olmayan ürün 0 gösterir — boş bırakılmaz. */}
-                                            <Row label={t('inv.detail.openOrderQuantity')} mono>
-                                                {detail.openOrderQuantity === undefined
-                                                    ? '—'
-                                                    : `${fmtQty(detail.openOrderQuantity)} ${detail.unit}`}
-                                            </Row>
-                                            <Row label={t('inv.columns.description')}>
-                                                <div className="max-w-2xl py-1">
-                                                    {canUpdate ? (
-                                                        <RichTextMarkdownEditor
-                                                            value={draft.description}
-                                                            onChange={(next) => editDraft({ description: next })}
-                                                            minHeight={96}
-                                                            placeholder={t('inv.detail.descriptionPlaceholder')}
-                                                            className="w-full"
-                                                        />
-                                                    ) : (
-                                                        // Yetkisi olmayan kullanıcı düzenleyemez; eski düz metin
-                                                        // kayıtları da aynı dönüştürücüden geçip biçimli görünür.
-                                                        <div
-                                                            className="ofi-rich-text text-[13px] leading-6 text-slate-800 dark:text-white"
-                                                            dangerouslySetInnerHTML={{ __html: richTextToHtml(detail.description ?? '') }}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </Row>
-                                        </>
-                                    )}
-                                </tbody>
-                            </table>
-                        </SectionCard>
-                    </div>
+                <div ref={formRef} className="ofi-ows ofi-article-form flex flex-col gap-3">
+                    {showErrors && <RequiredFieldsAlert missing={missingLabels} />}
 
-                    {/* Görsel depodaki kalıcı adresinden gelir (eski kayıtlarda
-                        binary uçtan). Seçim burada yalnızca BEKLETİLİR, yazma
-                        ortak Kaydet ile olur. */}
-                    {detail && (
+                    <div className="ofi-article-form__grid">
+                        {/* 1 — Ürün: tedarikçi barkodun hemen altında (Samet). */}
+                        <section className="ofi-ows-card">
+                            <h3>{t('inv.newProduct.sectionProduct')}</h3>
+                            <div className="ofi-ord-group">
+                                <FormRow label={nameLabel} htmlFor="article-detail-name" required={canUpdate} invalid={invalid('name')}>
+                                    {canUpdate
+                                        ? <input {...textField('name')} placeholder={nameLabel} aria-required="true" aria-invalid={invalid('name') || undefined} />
+                                        : readValue(detail.name)}
+                                </FormRow>
+                                {/* Reihenfolge (10.09.2026): Bezeichnung, Modellnummer,
+                                    Seriennummer, Barcode. Modell = die Rolle des alten
+                                    Produktcodes (zehn Geräte, eine Modellnummer); die
+                                    Serie ist je Gerät eindeutig. */}
+                                <FormRow label={t('inv.columns.modelNumber')} htmlFor="article-detail-modelNumber">
+                                    {canUpdate
+                                        ? <input {...textField('modelNumber')} className="is-mono font-mono" />
+                                        : readValue(detail.modelNumber, true)}
+                                </FormRow>
+                                <FormRow label={t('inv.columns.serialNumber')} htmlFor="article-detail-serialNumber">
+                                    {canUpdate
+                                        ? <input {...textField('serialNumber')} className="is-mono font-mono" />
+                                        : readValue(detail.serialNumber, true)}
+                                </FormRow>
+                                <FormRow label={t('inv.columns.barcode')} htmlFor="article-detail-supplierBarcode">
+                                    {canUpdate
+                                        ? <input {...textField('supplierBarcode')} className="is-mono font-mono" placeholder={t('inv.detail.barcodeSupplier')} />
+                                        : readValue(detail.supplierBarcode, true)}
+                                </FormRow>
+                                <FormRow label={supplierLabel} required={canUpdate && strict} invalid={invalid('suppliers')}>
+                                    <SupplierMultiSelect
+                                        id="article-detail-suppliers"
+                                        value={draft.suppliers}
+                                        onChange={(suppliers) => editDraft({ suppliers })}
+                                        single
+                                        disabled={!canUpdate}
+                                        invalid={invalid('suppliers')}
+                                        ariaLabel={supplierLabel}
+                                    />
+                                </FormRow>
+                                {/* Systembarcode: nur auf Knopfdruck, nie automatisch. */}
+                                <FormRow label={t('inv.detail.barcodeSystem')}>
+                                    {detail.systemBarcode ? (
+                                        <span className="ofi-article-form__value inline-flex items-center gap-1.5 font-mono">
+                                            <QrCode size={13} aria-hidden />
+                                            {detail.systemBarcode}
+                                        </span>
+                                    ) : canUpdate ? (
+                                        <div className="ofi-article-form__value">
+                                            <button
+                                                type="button"
+                                                disabled={generating}
+                                                onClick={() => void generateBarcode()}
+                                                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-300 px-2.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-[#0066e0] hover:text-[#0066e0] disabled:opacity-40 dark:border-white/20 dark:text-white/70"
+                                            >
+                                                {generating ? <Spinner size="sm" /> : <QrCode size={13} aria-hidden />}
+                                                {t('inv.detail.barcodeGenerate')}
+                                            </button>
+                                        </div>
+                                    ) : readValue(t('inv.detail.barcodeNone'))}
+                                </FormRow>
+                            </div>
+                        </section>
+
+                        {/* 2 — Tür ve fiyat. Stok, ortalama maliyet ve açık sipariş
+                            TÜRETİLMİŞ değerlerdir — hareketlerden gelir, elle
+                            düzenlenmez. Siparişi olmayan ürün 0 gösterir. */}
+                        <section className="ofi-ows-card">
+                            <h3>{t('inv.newProduct.sectionType')}</h3>
+                            <div className="ofi-ord-group">
+                                <FormRow label={kindLabel} required={canUpdate && strict} invalid={invalid('kind')}>
+                                    {canUpdate ? (
+                                        <ArticleKindSegment
+                                            value={draft.articleKind}
+                                            onChange={(articleKind) => editDraft({ articleKind })}
+                                            invalid={invalid('kind')}
+                                            allowClear={!strict}
+                                        />
+                                    ) : readValue(shownKind ? articleKindLabel(shownKind) : t('inv.detail.kindProduct'))}
+                                </FormRow>
+                                <FormRow label={t('inv.columns.unit')}>
+                                    {canUpdate ? (
+                                        <UnitSelect
+                                            value={draft.unit}
+                                            onChange={(next) => editDraft({ unit: next })}
+                                            ariaLabel={t('inv.columns.unit')}
+                                            className="min-w-0 flex-1"
+                                        />
+                                    ) : readValue(detail.unit)}
+                                </FormRow>
+                                <FormRow label={t('inv.columns.salePrice')} htmlFor="article-detail-salePrice">
+                                    {canUpdate
+                                        ? <input {...textField('salePrice')} inputMode="decimal" className="is-num" />
+                                        : readValue(fmtMoney(detail.salePrice))}
+                                </FormRow>
+                                <FormRow label={t('inv.detail.warehouseStock')}>
+                                    {readValue(`${fmtQty(detail.totalQuantity)} ${detail.unit}`)}
+                                </FormRow>
+                                <FormRow label={t('inv.detail.averageUnitCost')}>
+                                    {readValue(detail.averageUnitCost === undefined ? '—' : fmtUnitCost(detail.averageUnitCost))}
+                                </FormRow>
+                                <FormRow label={t('inv.detail.openOrderQuantity')}>
+                                    {readValue(detail.openOrderQuantity === undefined
+                                        ? '—'
+                                        : `${fmtQty(detail.openOrderQuantity)} ${detail.unit}`)}
+                                </FormRow>
+                            </div>
+                        </section>
+
+                        {/* 3 — Görsel: depodaki kalıcı adresinden gelir (eski
+                            kayıtlarda binary uçtan). Seçim burada yalnızca
+                            BEKLETİLİR, yazma ortak Kaydet ile olur. */}
                         <ArticleImagePanel
                             canUpdate={canUpdate}
                             articleId={detail.id}
@@ -407,7 +437,27 @@ export const ArticleDetailView = ({ copyPrefix }: {
                             pending={pendingImage}
                             onPick={setPendingImage}
                         />
-                    )}
+                    </div>
+
+                    <section className="ofi-ows-card">
+                        <h3>{t('inv.columns.description')}</h3>
+                        {canUpdate ? (
+                            <RichTextMarkdownEditor
+                                value={draft.description}
+                                onChange={(next) => editDraft({ description: next })}
+                                minHeight={96}
+                                placeholder={t('inv.detail.descriptionPlaceholder')}
+                                className="w-full"
+                            />
+                        ) : (
+                            // Yetkisi olmayan kullanıcı düzenleyemez; eski düz metin
+                            // kayıtları da aynı dönüştürücüden geçip biçimli görünür.
+                            <div
+                                className="ofi-rich-text text-[13px] leading-6 text-slate-800 dark:text-white"
+                                dangerouslySetInnerHTML={{ __html: richTextToHtml(detail.description ?? '') }}
+                            />
+                        )}
+                    </section>
                 </div>
             )}
         </div>

@@ -40,9 +40,7 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                 aria-label={t('language.changeLanguage')}
                 aria-expanded={open}
                 onClick={() => setOpen((o) => !o)}
-                className={`ofi-hdr-ctl flex items-center justify-center rounded-full transition-colors ${
-                    open ? 'bg-[#0a7aff] text-white' : 'text-slate-600 hover:bg-[#e3efff]'
-                }`}
+                className="ofi-hdr-ctl ofi-language-switcher flex items-center justify-center rounded-full text-slate-600 transition-colors"
             >
                 <ToolbarSymbol name="language" />
             </button>

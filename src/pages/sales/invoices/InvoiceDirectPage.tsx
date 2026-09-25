@@ -1,109 +1,50 @@
-import { DocumentWorkspace } from '@/components/sales-document/DocumentWorkspace';
-import { documentLineAmount, documentLineStarted, documentLineValid, documentNumber, emptyDocumentLine, type DocumentLine } from '@/components/sales-document/documentLines';
-import { paymentStagesValid, serializePaymentStages, type PaymentStage } from '@/lib/paymentSchedule';
-import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
-import { UnsavedChangesPopup } from '@/pages/sales/detail/popups/UnsavedChangesPopup';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-
-import { Eye, RefreshCcw01, Receipt } from '@/components/icons/antIconCompat';
+import { ArrowLeft, ArrowRight, Eye, RefreshCcw01, Receipt } from '@/components/icons/antIconCompat';
+import { DocumentWorkspace } from '@/components/sales-document/DocumentWorkspace';
+import { documentLineAmount, documentLineStarted, documentLineValid, documentNumber, emptyDocumentLine, type DocumentLine } from '@/components/sales-document/documentLines';
 import { MacDatePicker } from '@/components/ui-shared/MacDatePicker';
-import { SectionCard } from '@/components/ui-shared/TableKit';
-import { StatusChip } from '@/components/ui-shared/StatusBadge';
+import i18n from '@/i18n';
 import { t } from '@/i18n/translate';
 import { billingApi } from '@/lib/api/billing';
-import { parsePaymentStages } from '@/lib/paymentSchedule';
-import {
-    applyDiscounts,
-    MAX_LINE_DISCOUNTS,
-    parseDiscountList,
-    serializeDiscountList,
-    type TenderDiscountEntry,
-} from '@/pages/sales/detail/utils/tenderDiscounts.utils';
+import { INVOICE_INTRO, invoiceLanguage, readInvoiceDocument, type InvoiceDocumentLanguage, type InvoiceDocumentOptions } from '@/lib/invoiceDocument';
+import { parsePaymentStages, paymentStagesValid, serializePaymentStages, type PaymentStage } from '@/lib/paymentSchedule';
+import { useUnsavedChangesGuard } from '@/pages/sales/detail/hooks/useUnsavedChangesGuard';
+import { UnsavedChangesPopup } from '@/pages/sales/detail/popups/UnsavedChangesPopup';
+import { PanelMacSelect, PanelPageActions, PanelPageField, PanelPageNotice } from '@/pages/production/components/PanelEditorKit';
+import { applyDiscounts, MAX_LINE_DISCOUNTS, parseDiscountList, serializeDiscountList, type TenderDiscountEntry } from '@/pages/sales/detail/utils/tenderDiscounts.utils';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
-import type { DirectInvoiceLineInput, InvoiceDto, InvoiceSectionFlags } from '@/types/billing';
+import type { DirectInvoiceLineInput, InvoiceDto } from '@/types/billing';
 import { formatAddressLines } from '@/utils/address';
 import { companySenderLine } from '@/utils/pdf/addressBlock';
-
+import { DirectSection, DirectSteps, DirectTextField } from './components/DirectInvoiceKit';
 import { InvoicePdfPopup } from './components/InvoicePdfPopup';
-import {
-    InvoiceField,
-    InvoicePageHeader,
-    InvoiceProgress,
-    InvoiceStepFoot,
-    type WizardStep,
-} from './components/InvoiceFormBits';
-import { CustomerPickCell, type CustomerPick } from './components/InvoiceLinePicker';
-import {
-    ALL_SECTIONS,
-    apiError,
-    invoiceDiscounts,
-    FIELD_INPUT_CLASS,
-    FIELD_TEXTAREA_CLASS,
-    fmtMoney,
-    isoToday,
-    round2,
-} from './invoiceShared';
-import '@/styles/modules/invoicePages.css';
+import { CustomerPickField, type CustomerPick } from './components/InvoiceLinePicker';
+import { ALL_SECTIONS, apiError, invoiceDiscounts, parseInvoiceSections, isoToday, round2 } from './invoiceShared';
+// Das Kleid der Pano-Seiten (Vorgabe Samet 25.09.2026, «tıpkı üretimdeki
+// gibi»): Tafeln, Felder, Pop-up-Knopf und Knöpfe — invoiceDirect.css lädt
+// danach und ergänzt nur, was die Rechnung darüber hinaus braucht.
+import '@/styles/modules/panels.css';
+import '@/styles/modules/invoiceDirect.css';
 
-/**
- * ── DIREKTRECHNUNG (`/accounting/invoices/new/direct`) ────────────────────────────
- *
- * Vorgabe Samet: „eine Rechnung direkt erstellen — kein Fenster, eine Seite mit
- * Zurück-Knopf. Produkte wie im Angebot wählen oder von Hand eintippen, Preise
- * setzen. Man muss sich das PDF als leere Vorlage vorstellen, die wir selbst
- * ausfüllen." Und: Schritt für Schritt statt einer langen Seite —
- *
- *   1 Empfänger   Absenderzeile (aus den Mandanteneinstellungen vorbelegt, aber
- *                 änderbar) und der Empfänger: Bestandskunde oder frei erfasst.
- *   2 Beleg       DIE DREI ABSCHNITTE — Positionen · Rabatt · Schlusstext.
- *                 Jeder einzelne darf entfernt werden und ist dann auch nicht
- *                 mehr im PDF (Vorgabe Samet, 05.09.2026).
- *   3 Rechnung    Datum, Fälligkeit, Verkäufer, Einleitungstext — Vorschau und
- *                 erstellen.
- *
- * Sie hängt an keinem Auftrag und an keinem Projekt: Empfänger, Steuersatz,
- * Einleitungstext, Rabatte und Schlusstext stehen auf der Rechnung SELBST (es
- * gibt keine Offerte, aus der sie nachgeladen werden könnten), und die
- * Positionen SIND der Betrag. Ihre Rechnungsart ist deshalb immer die
- * GESAMTRECHNUNG — das steht im dritten Schritt als Marke, damit es nicht
- * erraten werden muss.
- *
- * Preise sind netto — dieselbe Lesart wie im Angebot; die Rabatte greifen
- * NACHEINANDER auf die Zwischensumme, die MWST rechnet auf dem Ergebnis. Die
- * Vorschau baut das ECHTE Dokument aus dem Entwurf, bevor irgendetwas
- * gespeichert ist.
- */
-
-const emptyLine = emptyDocumentLine;
 const num = (value: string) => documentNumber(value) || 0;
-const lineAmount = documentLineAmount;
-const lineDiscounts = (line: DocumentLine) => line.discounts;
+const validNumber = (value: string) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value.trim());
+const CONTROL = 'ofi-panel-page-control';
 
 export const InvoiceDirectPage = () => {
     const navigate = useNavigate();
-    /* `?edit=<id>` — dieselbe Maske schreibt eine BESTEHENDE Direktrechnung
-       neu (Vorgabe Samet 05.09.2026). Nummer und Zahlungsstand bleiben beim
-       Beleg; hier wird nur sein Inhalt bearbeitet. */
     const [searchParams] = useSearchParams();
     const editId = searchParams.get('edit');
     const settings = usePdfSettings();
-
     const [step, setStep] = useState(0);
-
-    /* Die Absenderzeile ist aus den MANDANTENEINSTELLUNGEN vorbelegt (die
-       Firmenangaben des gewählten Mandanten, siehe `usePdfSettings`), bleibt
-       aber änderbar — und wird mit der Rechnung EINGEFROREN. Eine später
-       geänderte Firmenadresse schreibt eine gestellte Rechnung nicht um.
-
-       Sie betrifft nur die gedruckte Zeile: der Gläubiger des QR-Zahlteils
-       kommt weiterhin aus den Einstellungen, weil er mit dem Bankkonto
-       übereinstimmen MUSS — sonst wäre der Einzahlungsschein nicht mehr
-       gültig. */
+    const [editing, setEditing] = useState<InvoiceDto | null>(null);
+    const [loading, setLoading] = useState(Boolean(editId));
+    const [saving, setSaving] = useState(false);
+    const saveLock = useRef(false);
+    const baseline = useRef<string | null>(null);
     const defaultSender = useMemo(() => companySenderLine(settings), [settings]);
     const [senderAddress, setSenderAddress] = useState(defaultSender);
-
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [recipientName, setRecipientName] = useState('');
     const [street, setStreet] = useState('');
@@ -111,532 +52,306 @@ export const InvoiceDirectPage = () => {
     const [postalCode, setPostalCode] = useState('');
     const [city, setCity] = useState('');
     const [country, setCountry] = useState('');
-
     const [invoiceDate, setInvoiceDate] = useState(isoToday);
     const [dueDate, setDueDate] = useState(isoToday);
-    // Die Fälligkeit folgt dem Rechnungsdatum, bis sie von Hand gesetzt wurde.
     const [dueTouched, setDueTouched] = useState(false);
     const [salesperson, setSalesperson] = useState('');
     const [commission, setCommission] = useState('');
-    const [introText, setIntroText] = useState(() => t('invoices.introDefault'));
+    const [pdfLanguage, setPdfLanguage] = useState<InvoiceDocumentLanguage>(() => invoiceLanguage(i18n.resolvedLanguage || i18n.language));
+    const [introText, setIntroText] = useState(() => INVOICE_INTRO[pdfLanguage]);
     const [notes, setNotes] = useState('');
-    const [vatRateText, setVatRateText] = useState(() => String(Number(settings.vatRate) || 8.1));
-
-    /* ── Die drei Abschnitte ───────────────────────────────────────────────
-       Welche gedruckt werden. Ein ausgeschalteter Abschnitt behält seinen
-       Inhalt (Entfernen ist keine Löschung), wird aber weder gerechnet noch
-       gedruckt. */
-    /* Die drei Abschnitte gibt es als SCHALTER nicht mehr (Vorgabe Samet
-       05.09.2026: ein Kasten, keine nummerierten Abschnitte). Das Feld bleibt
-       im Beleg, damit ältere Rechnungen unverändert drucken — eine neue
-       Direktrechnung führt schlicht alle drei. */
-    const sections: InvoiceSectionFlags = ALL_SECTIONS;
-
-    const [lines, setLines] = useState<DocumentLine[]>(() => [emptyLine()]);
+    const [vatEnabled, setVatEnabled] = useState(false);
+    const [vatRateText, setVatRateText] = useState(() => String(settings.vatRate ?? 8.1));
+    const [showQr, setShowQr] = useState(true);
+    const [showFooter, setShowFooter] = useState(true);
+    const [customNumber, setCustomNumber] = useState<string | null>(null);
+    const [suggestedNumber, setSuggestedNumber] = useState<string | null>(null);
+    const [numberLoading, setNumberLoading] = useState(false);
+    const [numberRetry, setNumberRetry] = useState(0);
+    const invoiceNumber = customNumber ?? suggestedNumber ?? '';
+    const [sections, setSections] = useState(ALL_SECTIONS);
+    const [lines, setLines] = useState<DocumentLine[]>(() => [emptyDocumentLine()]);
     const [stages, setStages] = useState<PaymentStage[]>([]);
     const [discounts, setDiscounts] = useState<TenderDiscountEntry[]>([]);
-    // Der Schlusstext steht als Vorschlag da: die Zahlungsbedingung aus den
-    // Firmeneinstellungen — der Satz, den die Rechnung sonst ohnehin drucken
-    // würde. Wer ihn leert, druckt genau diesen Vorgabesatz.
     const [closingText, setClosingText] = useState(() => (settings.paymentTerms || '').trim());
-
-    const [saving, setSaving] = useState(false);
-    /* Seit der Buchhaltung (16.09.2026, Schritt 5) entsteht die Rechnung als
-       ENTWURF ohne Nummer — die Vorschau schreibt darum «Entwurf»; die
-       RE-Nummer kommt erst beim Ausstellen auf der Rechnungsseite. */
-
-    /* Bearbeiten: den Beleg holen und die Maske damit fuellen. Der Server
-       liefert ihn mit Zeilen; Rabatte und Zahlungsplan stehen als JSON darin. */
-    const [editing, setEditing] = useState<InvoiceDto | null>(null);
-    useEffect(() => {
-        if (!editId) return undefined;
-        let cancelled = false;
-        void (async () => {
-            try {
-                const found = await billingApi.getInvoice(editId).catch(() => null);
-                if (cancelled) return;
-                if (!found) { toast.error(t('crm.order_not_found')); navigate('/accounting/invoices'); return; }
-                setEditing(found);
-                setCustomerId(found.customerId ?? null);
-                setRecipientName(found.recipientName || found.customer?.companyName || '');
-                setStreet((found.recipientAddress || '').split('\n')[0] || '');
-                setCity((found.recipientAddress || '').split('\n').slice(1).join(' ').trim());
-                setInvoiceDate((found.invoiceDate || found.createdAt || '').slice(0, 10));
-                setDueDate((found.dueDate || found.invoiceDate || '').slice(0, 10));
-                setSalesperson(found.salespersonName || '');
-                setCommission(found.commissionNumber || '');
-                setIntroText(found.introText || '');
-                setNotes(found.notes || '');
-                setVatRateText(String(found.vatRate ?? settings.vatRate ?? 8.1));
-                setClosingText(found.closingText || '');
-                setSenderAddress(found.senderAddress || defaultSender);
-                setDiscounts(invoiceDiscounts(found));
-                setStages(parsePaymentStages(found.paymentStages ?? null) ?? []);
-                setLines((found.lineItems || []).length
-                    ? (found.lineItems || []).map((item) => ({
-                        ...emptyLine(),
-                        id: item.id,
-                        articleId: item.sourceId ?? null,
-                        description: item.description,
-                        longDescription: item.longDescription || '',
-                        unit: item.unit || '',
-                        quantity: String(item.quantity ?? 1),
-                        unitPrice: String(item.unitAmount ?? 0),
-                        discounts: parseDiscountList(item.discounts ?? null, MAX_LINE_DISCOUNTS),
-                    }))
-                    : [emptyLine()]);
-                // Ein geladener Beleg ist der Ausgangsstand — sonst fragte die
-                // Maske beim Verlassen nach, ohne dass jemand etwas tippte.
-                setStep(1);
-            } catch (error) {
-                if (!cancelled) toast.error(apiError(error, t('billing.invoiceError')));
-            } finally {
-                /* nichts weiter: die Maske steht schon, sie füllt sich nur. */
-            }
-        })();
-        return () => { cancelled = true; };
-        // Absichtlich nur beim Aufbau: die Maske wird je Rechnung neu betreten.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editId]);
-
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
-    const snapshot = JSON.stringify({ senderAddress, customerId, recipientName, street, supplement, postalCode, city, country, invoiceDate, dueDate, salesperson, commission, introText, notes, vatRateText, sections, lines, discounts, closingText, stages });
-    const [initialSnapshot] = useState(snapshot);
-    const guard = useUnsavedChangesGuard(snapshot !== initialSnapshot);
+    useEffect(() => {
+        if (!editId) return;
+        let cancelled = false;
+        void billingApi.getInvoice(editId).then(found => {
+            if (cancelled) return;
+            const options = readInvoiceDocument(found);
+            setEditing(found);
+            setCustomerId(found.customerId ?? null);
+            setRecipientName(found.recipientName || found.customer?.companyName || '');
+            // Preserve all address lines on older invoices, and structured fields on new ones.
+            setStreet(options.recipientFields?.street ?? found.recipientAddress ?? '');
+            setSupplement(options.recipientFields?.supplement ?? '');
+            setPostalCode(options.recipientFields?.postalCode ?? '');
+            setCity(options.recipientFields?.city ?? '');
+            setCountry(options.recipientFields?.country ?? '');
+            setInvoiceDate((found.invoiceDate || found.createdAt).slice(0, 10));
+            setDueDate((found.dueDate || found.invoiceDate || found.createdAt).slice(0, 10));
+            setDueTouched(true);
+            setSalesperson(found.salespersonName || '');
+            setCommission(found.commissionNumber || '');
+            setPdfLanguage(options.language);
+            setIntroText(found.introText || INVOICE_INTRO[options.language]);
+            setNotes(found.notes || '');
+            setVatEnabled(options.vatEnabled);
+            setVatRateText(String(found.vatRate ?? settings.vatRate ?? 8.1));
+            setShowQr(options.showQr);
+            setShowFooter(options.showFooter);
+            setCustomNumber(found.invoiceNumber || null);
+            setClosingText(found.closingText || '');
+            setSenderAddress(found.senderAddress || defaultSender);
+            setSections(parseInvoiceSections(found.sections));
+            setDiscounts(invoiceDiscounts(found));
+            setStages(parsePaymentStages(found.paymentStages ?? null) ?? []);
+            setLines(found.lineItems?.length ? found.lineItems.map(item => ({
+                ...emptyDocumentLine(), id: item.id, articleId: item.sourceId ?? null,
+                description: item.description, longDescription: item.longDescription || '', unit: item.unit || '',
+                quantity: String(item.quantity ?? 1), unitPrice: String(item.unitAmount ?? 0),
+                discounts: parseDiscountList(item.discounts ?? null, MAX_LINE_DISCOUNTS),
+            })) : [emptyDocumentLine()]);
+            baseline.current = null;
+            setLoading(false);
+        }).catch(error => {
+            if (!cancelled) { toast.error(apiError(error, t('billing.invoiceError'))); navigate('/accounting/invoices'); }
+        });
+        return () => { cancelled = true; };
+        // Hydrate once per document; company setting changes must not overwrite it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editId]);
 
-    const vatRate = Math.max(0, num(vatRateText));
+    useEffect(() => {
+        if (loading || editing?.invoiceNumber) return;
+        let cancelled = false;
+        setNumberLoading(true);
+        setSuggestedNumber(null);
+        void billingApi.nextInvoiceNumber({ language: pdfLanguage, year: Number(invoiceDate.slice(0, 4)) }).then(number => {
+            if (!cancelled) { setSuggestedNumber(number); setNumberLoading(false); }
+        });
+        return () => { cancelled = true; };
+    }, [loading, editing?.invoiceNumber, pdfLanguage, invoiceDate, numberRetry]);
 
-    /* Zwischensumme → Rabatte (der Reihe nach, jeder auf den Rest des vorigen)
-       → Netto → MWST → Total. Ist der Rabattabschnitt entfernt, wird der Stapel
-       gar nicht erst angewendet: der Betrag steigt dann, und genau das ist der
-       Sinn des Entfernens. */
-    const subtotal = useMemo(() => round2(lines.reduce((sum, line) => sum + lineAmount(line), 0)), [lines]);
-    // Eigenes `useMemo`: eine bedingt gebaute Liste wäre bei JEDEM Rendern eine
-    // neue Kennung und machte die Erinnerung darunter wertlos.
-    const activeDiscounts = useMemo(
-        () => (sections.discount ? discounts : []),
-        [sections.discount, discounts],
-    );
-    const breakdown = useMemo(() => applyDiscounts(subtotal, activeDiscounts), [subtotal, activeDiscounts]);
-    const netTotal = round2(breakdown.remaining);
-    const vatTotal = round2((netTotal * vatRate) / 100);
-    const grossTotal = round2(netTotal + vatTotal);
-
-    /* Ein Bestandskunde füllt den Empfängerblock aus seiner Adresse; danach darf
-       jedes Feld noch von Hand geändert werden — die Rechnung friert ihren
-       Empfänger ohnehin als Text ein und folgt späteren Kundenänderungen nicht. */
-    const pickCustomer = (customer: CustomerPick) => {
-        setCustomerId(customer.id);
-        setRecipientName(customer.companyName);
-        setStreet(customer.address || '');
-        setSupplement(customer.addressSupplement || '');
-        setPostalCode(customer.postalCode || '');
-        setCity(customer.city || '');
-        setCountry(customer.country || '');
-    };
-
-    /* Der Empfängerblock des Belegs: die Adresse wird aus ihren Bestandteilen
-       zu GANZEN ZEILEN gefaltet — genau so steht sie im PDF und genau so liest
-       der QR-Zahlteil den Schuldner. */
-    const recipientAddress = useMemo(
-        () => formatAddressLines({ street, addressSupplement: supplement, postalCode, city, country }).join('\n'),
-        [street, supplement, postalCode, city, country],
-    );
-
-    const filledLines = useMemo(() => lines.filter((line) => line.description.trim()), [lines]);
-
-    const payload = () => ({
-        customerId,
-        paymentStages: stages,
-        recipientName: recipientName.trim(),
-        recipientAddress: recipientAddress || null,
-        introText: introText.trim() || null,
-        invoiceDate,
-        dueDate: dueDate || invoiceDate,
-        salespersonName: salesperson.trim() || null,
-        commissionNumber: commission.trim() || null,
-        vatRate,
-        notes: notes.trim() || null,
-        // Die drei Abschnitte: der Server rechnet den Rabatt nur, wenn sein
-        // Abschnitt eingeschaltet ist, und speichert genau diese Schalter.
-        sections,
-        discounts: activeDiscounts,
-        closingText: sections.closing ? (closingText.trim() || null) : null,
-        // Sie wird IMMER mitgespeichert, auch unverändert: die Rechnung soll
-        // in einem Jahr noch den Absender zeigen, mit dem sie gestellt wurde —
-        // nicht den, der dann in den Einstellungen steht.
-        senderAddress: senderAddress.trim() || null,
-        lines: filledLines.map<DirectInvoiceLineInput>((line) => ({
-            description: line.description.trim(),
-            longDescription: line.longDescription.trim() || null,
-            quantity: num(line.quantity),
-            unitAmount: num(line.unitPrice),
-            unit: line.unit.trim() || null,
-            discounts: lineDiscounts(line),
-            articleId: line.articleId,
-        })),
-    });
-
+    const documentOptions: InvoiceDocumentOptions = { language: pdfLanguage, showQr, showFooter, vatEnabled, recipientFields: { street, supplement, postalCode, city, country } };
+    const snapshot = JSON.stringify({ senderAddress, customerId, recipientName, invoiceDate, dueDate, salesperson, commission, introText, notes, vatRateText, sections, lines, discounts, closingText, stages, documentOptions, customNumber });
+    if (!loading && baseline.current === null) baseline.current = snapshot;
+    const guard = useUnsavedChangesGuard(!loading && baseline.current !== snapshot);
+    const vatValid = !vatEnabled || (vatRateText.trim() !== '' && Number.isFinite(documentNumber(vatRateText)) && num(vatRateText) >= 0 && num(vatRateText) <= 100);
+    const vatRate = vatEnabled && vatValid ? num(vatRateText) : 0;
+    const subtotal = round2(lines.reduce((sum, line) => sum + documentLineAmount(line), 0));
+    const activeDiscounts = sections.discount ? discounts : [];
+    const netTotal = round2(applyDiscounts(subtotal, activeDiscounts).remaining);
+    const grossTotal = round2(netTotal + round2(netTotal * vatRate / 100));
+    const fmtMoney = (value: number) => new Intl.NumberFormat(pdfLanguage === 'de' ? 'de-CH' : pdfLanguage === 'tr' ? 'tr-TR' : 'en-GB', { style: 'currency', currency: settings.currency }).format(value);
+    const recipientAddress = [...street.split(/\r?\n/).map(line => line.trim()).filter(Boolean), ...formatAddressLines({ addressSupplement: supplement, postalCode, city, country })].join('\n');
+    const filledLines = lines.filter(line => line.description.trim());
     const recipientReady = Boolean(recipientName.trim());
-    const linesReady = filledLines.length > 0 && grossTotal > 0 && lines.filter(documentLineStarted).every(documentLineValid);
+    const linesReady = filledLines.length > 0 && grossTotal > 0 && Number.isFinite(grossTotal) && lines.filter(documentLineStarted).every(documentLineValid) && vatValid;
     const furthest = recipientReady ? (linesReady ? 2 : 1) : 0;
 
-    const validate = (): boolean => {
-        if (!recipientReady) {
-            toast.error(t('invoices.needRecipient'));
-            setStep(0);
-            return false;
-        }
-        if (!linesReady) {
-            toast.error(t('invoices.needLines'));
-            setStep(1);
-            return false;
-        }
-        if (stages.length && !paymentStagesValid(stages)) {
-            toast.error(t('crm.addon.paymentIncompleteShort'));
-            setStep(1);
-            return false;
-        }
+    const pickCustomer = (customer: CustomerPick) => {
+        setCustomerId(customer.id); setRecipientName(customer.companyName);
+        setStreet(customer.address || ''); setSupplement(customer.addressSupplement || '');
+        setPostalCode(customer.postalCode || ''); setCity(customer.city || ''); setCountry(customer.country || '');
+    };
+    const changeLanguage = (next: InvoiceDocumentLanguage) => {
+        if (!introText.trim() || Object.values(INVOICE_INTRO).includes(introText.trim())) setIntroText(INVOICE_INTRO[next]);
+        setPdfLanguage(next);
+    };
+    const payload = () => ({
+        customerId, invoiceNumber: customNumber === null ? null : customNumber.trim(), documentOptions,
+        paymentStages: stages, recipientName: recipientName.trim(), recipientAddress: recipientAddress || null,
+        introText: introText.trim() || null, invoiceDate, dueDate: dueDate || invoiceDate,
+        salespersonName: salesperson.trim() || null, commissionNumber: commission.trim() || null,
+        vatRate, notes: notes.trim() || null, sections, discounts: activeDiscounts,
+        closingText: sections.closing ? closingText.trim() || null : null, senderAddress: senderAddress.trim() || null,
+        lines: filledLines.map<DirectInvoiceLineInput>(line => ({
+            description: line.description.trim(), longDescription: line.longDescription.trim() || null,
+            quantity: num(line.quantity), unitAmount: num(line.unitPrice), unit: line.unit.trim() || null,
+            discounts: line.discounts, articleId: line.articleId,
+        })),
+    });
+    const validate = () => {
+        if (!recipientReady) { toast.error(t('invoices.needRecipient')); setStep(0); return false; }
+        if (!vatValid) { toast.error(t('invoices.err.VAT_INVALID')); setStep(1); return false; }
+        if (!linesReady) { toast.error(t('invoices.needLines')); setStep(1); return false; }
+        if (stages.length && !paymentStagesValid(stages)) { toast.error(t('crm.addon.paymentIncompleteShort')); setStep(1); return false; }
+        if (!validNumber(invoiceNumber)) { toast.error(t(invoiceNumber ? 'invoices.err.NUMBER_INVALID' : 'directInvoice.numberUnavailable')); setStep(2); return false; }
+        if (!invoiceDate || !dueDate || dueDate < invoiceDate) { toast.error(t('invoices.err.DUE_BEFORE_DATE')); setStep(2); return false; }
         return true;
     };
 
-    /**
-     * Vorschau des Entwurfs: aus den Feldern wird eine Rechnung GEBAUT, wie der
-     * Server sie speichern würde, und durch denselben Generator geschickt.
-     * Gezeigt wird damit das echte Dokument — nur die Nummer fehlt noch, denn
-     * die vergibt der Server erst beim Erstellen. Weil auch die Abschnitte
-     * mitgehen, zeigt die Vorschau schon, was das Entfernen eines Abschnitts
-     * auf dem Papier bedeutet.
-     */
     const preview = async () => {
-        if (!validate()) return;
-        setPreviewOpen(true);
-        setPreviewBlob(null);
-        setPreviewLoading(true);
+        if (previewLoading || !validate()) return;
+        setPreviewOpen(true); setPreviewBlob(null); setPreviewLoading(true);
         try {
             const body = payload();
             const draft: InvoiceDto = {
-                id: 'draft',
-                tenantId: '',
-                customerId,
-                projectId: null,
-                salesOrderId: null,
-                invoiceNumber: editing?.invoiceNumber || t('invoices.draftNumber'),
-                billingType: 'FULL',
-                kind: 'RECHNUNG',
-                invoiceDate: body.invoiceDate,
-                dueDate: body.dueDate,
-                salespersonName: body.salespersonName,
-                commissionNumber: body.commissionNumber,
-                billedPercent: 100,
-                baseAmount: netTotal,
-                amount: grossTotal,
-                status: 'ISSUED',
-                notes: body.notes,
-                recipientName: body.recipientName,
-                recipientAddress: body.recipientAddress,
-                introText: body.introText,
-                paymentStages: serializePaymentStages(stages),
-                vatRate,
-                sections: JSON.stringify(sections),
-                discounts: serializeDiscountList(activeDiscounts),
-                closingText: body.closingText,
-                senderAddress: body.senderAddress,
-                issuedByEmployeeId: '',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                category: 'DIRECT',
-                // Die Zeilen des Entwurfs tragen dieselben Felder, die der
-                // Server speichern würde — inklusive Beschreibung und
-                // Zeilenrabatt, damit die Vorschau die Tabelle zeigt, die
-                // gedruckt wird.
+                id: 'preview', tenantId: '', customerId, projectId: null, salesOrderId: null,
+                invoiceNumber, billingType: 'FULL', kind: 'RECHNUNG', invoiceDate, dueDate,
+                salespersonName: body.salespersonName, commissionNumber: body.commissionNumber,
+                billedPercent: 100, baseAmount: netTotal, amount: grossTotal, status: 'ISSUED', notes: body.notes,
+                recipientName: body.recipientName, recipientAddress: body.recipientAddress, introText: body.introText,
+                paymentStages: serializePaymentStages(stages), vatRate,
+                sections: JSON.stringify({ ...sections, document: documentOptions }), discounts: serializeDiscountList(activeDiscounts),
+                closingText: body.closingText, senderAddress: body.senderAddress, issuedByEmployeeId: '',
+                createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), category: 'DIRECT',
                 lineItems: filledLines.map((line, index) => ({
-                    id: `draft-${index}`,
-                    invoiceId: 'draft',
-                    description: line.description.trim(),
-                    longDescription: line.longDescription.trim() || null,
-                    sourceType: line.articleId ? 'EXTRA_MATERIAL' : 'MANUAL',
-                    sourceId: line.articleId ?? null,
-                    quantity: num(line.quantity),
-                    unitAmount: num(line.unitPrice),
-                    // NETTO nach Zeilenrabatt — genau wie serverseitig.
-                    lineTotal: lineAmount(line),
-                    discounts: serializeDiscountList(lineDiscounts(line)),
+                    id: `preview-${index}`, invoiceId: 'preview', description: line.description.trim(),
+                    longDescription: line.longDescription.trim() || null, sourceType: line.articleId ? 'EXTRA_MATERIAL' : 'MANUAL',
+                    sourceId: line.articleId ?? null, quantity: num(line.quantity), unitAmount: num(line.unitPrice),
+                    lineTotal: documentLineAmount(line), discounts: serializeDiscountList(line.discounts),
                     discount: applyDiscounts(num(line.quantity) * num(line.unitPrice), line.discounts).combinedPercent || null,
-                    unit: line.unit.trim() || null,
-                    sortOrder: index,
+                    unit: line.unit.trim() || null, sortOrder: index,
                 })),
             };
             const { buildInvoicePdfBytes } = await import('@/utils/pdf/invoicePdf');
-            const bytes = await buildInvoicePdfBytes(draft, { orderNumber: '—' }, settings);
+            const bytes = await buildInvoicePdfBytes(draft, { orderNumber: '' }, settings);
             setPreviewBlob(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' }));
-        } catch (e) {
-            toast.error(apiError(e, t('billing.pdfError')));
-        } finally {
-            setPreviewLoading(false);
-        }
+        } catch (error) { toast.error(apiError(error, t('billing.pdfError'))); }
+        finally { setPreviewLoading(false); }
     };
 
     const create = async (exit = true) => {
-        if (saving || !validate()) return false;
-        setSaving(true);
+        if (saveLock.current || !validate()) return false;
+        saveLock.current = true; setSaving(true);
         try {
-            // Neu = ein ENTWURF; ausgestellt wird auf der Rechnungsseite.
             const { invoice } = editId
-                ? await billingApi.updateDirectInvoice(editId, payload())
-                : await billingApi.createDirectInvoice({ ...payload(), draft: true });
-            toast.success(invoice.status === 'DRAFT'
-                ? t('accounting.draftSaved')
-                : t('invoices.saved', { number: invoice.invoiceNumber }));
+                ? await billingApi.updateDirectInvoice(editId, { ...payload(), draft: false })
+                : await billingApi.createDirectInvoice({ ...payload(), draft: false });
+            baseline.current = snapshot;
+            toast.success(t('invoices.saved', { number: invoice.invoiceNumber }));
             if (exit) navigate(`/accounting/invoices/${invoice.id}`, { replace: true });
             return true;
-        } catch (e) {
-            toast.error(apiError(e, t('billing.invoiceError')));
-            return false;
-        } finally {
-            setSaving(false);
-        }
+        } catch (error) { toast.error(apiError(error, t('billing.invoiceError'))); return false; }
+        finally { saveLock.current = false; setSaving(false); }
     };
 
-    // Neu: weiter zur Vorschau (Entwurf); Ändern: speichern.
-    const saveLabel = editId ? t('common.save') : t('accounting.toPreview');
-
-    const STEPS: WizardStep[] = [
-        { key: 'recipient', label: t('invoices.stepRecipient'), hint: t('invoices.stepHintRecipient') },
-        { key: 'document', label: t('invoices.stepDocument'), hint: t('invoices.stepHintDocument') },
-        { key: 'invoice', label: t('invoices.stepDetails'), hint: t('invoices.stepHintInvoice') },
-    ];
+    const stepLabels = [t('invoices.stepRecipient'), t('invoices.stepDocument'), t('invoices.stepDetails')];
+    const titleKeys = ['recipient', 'document', 'details'];
+    const finalLabel = saving ? t('directInvoice.issuing') : editing?.status !== 'DRAFT' && editId ? t('common.save') : t('directInvoice.issue');
+    const pdfLanguages: Array<{ value: InvoiceDocumentLanguage; label: string }> = [{ value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }, { value: 'tr', label: 'Türkçe' }];
+    const leave = () => guard.attempt(() => navigate(editId ? `/accounting/invoices/${editId}` : '/accounting/invoices/new'));
 
     return (
-        <div className="ofi-invp-page">
-            {/* Der Fortschritt steht NEBEN dem Titel: ein schmaler Balken mit
-                drei Marken statt der früheren Leiter mit Erklärsätzen
-                (Vorgabe Samet 05.09.2026). */}
-            <InvoicePageHeader
-                title={editing ? `${t('common.edit')} ${editing.invoiceNumber}` : t('invoices.directTitle')}
-                actions={<InvoiceProgress steps={STEPS} current={step} furthest={furthest} onGo={setStep} />}
-            />
-
-            {step === 0 && (
-                <SectionCard>
-                    {/* Absender: vorbelegt aus den Mandanteneinstellungen, hier
-                        änderbar — und mit der Rechnung eingefroren. */}
-                    <div className="ofi-invp-grid ofi-invp-grid--split">
-                        {/* EIN Feld für EINE Zeile: der Beleg druckt den Absender
-                            als einzelne Zeile über dem Empfängerblock (sie
-                            schrumpft, wenn sie lang wird, aber sie bricht nie um)
-                            — ein Absatzfeld würde Umbrüche versprechen, die das
-                            PDF nicht halten kann. */}
-                        <InvoiceField label={t('invoices.senderAddress')} hint={t('invoices.senderHint')} wide>
-                            <input
-                                className={FIELD_INPUT_CLASS}
-                                value={senderAddress}
-                                onChange={(event) => setSenderAddress(event.target.value)}
-                            />
-                        </InvoiceField>
-                        <div className="ofi-invp-senderfoot">
-                            <button
-                                type="button"
-                                className="ofi-invp-sec__restore"
-                                disabled={senderAddress.trim() === defaultSender}
-                                onClick={() => setSenderAddress(defaultSender)}
-                            >
-                                <RefreshCcw01 size={13} />
-                                {t('invoices.senderReset')}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="ofi-invp-grid ofi-invp-grid--split">
-                        <InvoiceField label={t('invoices.recipientPick')} hint={t('invoices.createDirectHint')}>
-                            <CustomerPickCell
-                                value={recipientName}
-                                onChange={(next) => {
-                                    setRecipientName(next);
-                                    // Sobald der Name von Hand geändert wird, ist der
-                                    // Empfänger kein Bestandskunde mehr.
-                                    setCustomerId(null);
-                                }}
-                                onPick={pickCustomer}
-                            />
-                        </InvoiceField>
-                        <InvoiceField label={t('address.street')}>
-                            <input className={FIELD_INPUT_CLASS} value={street} onChange={(e) => setStreet(e.target.value)} />
-                        </InvoiceField>
-                        <InvoiceField label={t('address.supplement')}>
-                            <input className={FIELD_INPUT_CLASS} value={supplement} onChange={(e) => setSupplement(e.target.value)} />
-                        </InvoiceField>
-                        <InvoiceField label={t('address.postalCode')}>
-                            <input className={FIELD_INPUT_CLASS} value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
-                        </InvoiceField>
-                        <InvoiceField label={t('address.city')}>
-                            <input className={FIELD_INPUT_CLASS} value={city} onChange={(e) => setCity(e.target.value)} />
-                        </InvoiceField>
-                        <InvoiceField label={t('address.country')}>
-                            <input className={FIELD_INPUT_CLASS} value={country} onChange={(e) => setCountry(e.target.value)} />
-                        </InvoiceField>
-                    </div>
-
-                    <InvoiceStepFoot
-                        stepIndex={0}
-                        stepCount={STEPS.length}
-                        onBack={() => navigate(editId ? `/accounting/invoices/${editId}` : '/accounting/invoices/new')}
-                        onNext={() => setStep(1)}
-                        nextDisabled={!recipientReady}
-                        finalLabel={saveLabel}
-                        onFinal={() => void create()}
-                    />
-                </SectionCard>
-            )}
-
-            {step === 1 && (
-                <SectionCard>
-                    {/* EIN Kasten: die Zeilen, und darüber Anschreiben,
-                        Zahlungsplan, Schlusstext und Rabatt als Reiter. Die
-                        drei nummerierten Abschnitte sind entfallen — was der
-                        Beleg trägt, steht in der Fläche selbst. */}
-                    <DocumentWorkspace
-                        lines={lines}
-                        onChange={setLines}
-                        coverLetter={introText}
-                        onCoverLetterChange={setIntroText}
-                        stages={stages}
-                        onStagesChange={setStages}
-                        discounts={discounts}
-                        onDiscountsChange={setDiscounts}
-                        closingText={closingText}
-                        onClosingTextChange={setClosingText}
-                        closingPlaceholder={(settings.paymentTerms || '').trim() || t('invoices.closingPlaceholder')}
-                        vat={{ rate: vatRate, onRateChange: (rate) => setVatRateText(String(rate)) }}
-                        formatMoney={fmtMoney}
-                        readOnly={saving}
-                    />
-
-                    <InvoiceStepFoot
-                        stepIndex={1}
-                        stepCount={STEPS.length}
-                        onBack={() => setStep(0)}
-                        onNext={() => setStep(2)}
-                        nextDisabled={!linesReady}
-                        finalLabel={saveLabel}
-                        onFinal={() => void create()}
-                    />
-                </SectionCard>
-            )}
-
-            {step === 2 && (
-                <SectionCard>
-                    {/* Die Rechnungsart steht als Marke da, statt erraten zu
-                        werden: eine Direktrechnung ist immer eine Gesamtrechnung. */}
-                    <div className="ofi-invp-pad">
-                        <div className="ofi-invp-tiles">
-                            <div className="ofi-invp-tile">
-                                <div className="ofi-invp-tile__label">{t('billing.kindLabel')}</div>
-                                <div className="ofi-invp-tile__value">
-                                    <StatusChip variant="approved">{t('billing.kind_RECHNUNG')}</StatusChip>
+        <div className="ofi-panel-editor-page direct-invoice">
+            <header className="ofi-panel-page-head direct-head">
+                <div>
+                    <h1>{editing ? `${t('common.edit')} ${editing.invoiceNumber || t('invoices.draftNumber')}` : t('invoices.directTitle')}</h1>
+                    <p>{t(`directInvoice.${titleKeys[step]}Hint`)}</p>
+                </div>
+                <DirectSteps labels={stepLabels} current={step} furthest={furthest} disabled={loading || saving} onGo={setStep} ariaLabel={t('invoices.directTitle')} />
+            </header>
+            {loading ? <div className="ofi-panel-page-state">{t('directInvoice.loading')}</div> : (<>
+                <fieldset className="direct-form" disabled={saving} aria-busy={saving}>
+                    {step === 0 && <div className="direct-split">
+                        <div>
+                            <DirectSection title={t('directInvoice.recipient')}>
+                                <div className="ofi-panel-page-grid">
+                                    <PanelPageField label={t('invoices.recipientPick')} required wide hint={customerId ? t('directInvoice.customerLinked') : recipientName.trim() ? t('directInvoice.customerFree') : undefined}>
+                                        <CustomerPickField value={recipientName} selectedId={customerId} onChange={next => { setRecipientName(next); setCustomerId(null); }} onPick={pickCustomer} />
+                                    </PanelPageField>
+                                    <DirectTextField label={t('address.street')}><textarea rows={2} className={CONTROL} value={street} onChange={e => setStreet(e.target.value)} /></DirectTextField>
+                                    <PanelPageField label={t('address.supplement')} wide><input className={CONTROL} value={supplement} onChange={e => setSupplement(e.target.value)} /></PanelPageField>
+                                    <PanelPageField label={t('address.postalCode')}><input className={CONTROL} autoComplete="postal-code" value={postalCode} onChange={e => setPostalCode(e.target.value)} /></PanelPageField>
+                                    <PanelPageField label={t('address.city')}><input className={CONTROL} autoComplete="address-level2" value={city} onChange={e => setCity(e.target.value)} /></PanelPageField>
+                                    <PanelPageField label={t('address.country')}><input className={CONTROL} autoComplete="country-name" value={country} onChange={e => setCountry(e.target.value)} /></PanelPageField>
                                 </div>
-                            </div>
-                            <div className="ofi-invp-tile">
-                                <div className="ofi-invp-tile__label">{t('invoices.colCustomer')}</div>
-                                <div className="ofi-invp-tile__value">{recipientName || '—'}</div>
-                            </div>
-                            <div className="ofi-invp-tile">
-                                <div className="ofi-invp-tile__label">{t('invoices.stepDocument')}</div>
-                                <div className="ofi-invp-tile__value">
-                                    {t('invoices.sectionCount', {
-                                        on: Object.values(sections).filter(Boolean).length,
-                                        total: 3,
-                                    })}
+                            </DirectSection>
+                            <DirectSection title={t('directInvoice.sender')} description={t('directInvoice.senderHint')}
+                                action={<button type="button" className="direct-link" disabled={senderAddress.trim() === defaultSender} onClick={() => setSenderAddress(defaultSender)}><RefreshCcw01 size={13} />{t('invoices.senderReset')}</button>}>
+                                <div className="ofi-panel-page-grid">
+                                    <PanelPageField label={t('invoices.senderAddress')} wide><input className={CONTROL} value={senderAddress} onChange={e => setSenderAddress(e.target.value)} /></PanelPageField>
                                 </div>
-                            </div>
-                            <div className="ofi-invp-tile is-open">
-                                <div className="ofi-invp-tile__label">{t('invoices.grossTotal')}</div>
-                                <div className="ofi-invp-tile__value">{fmtMoney(grossTotal)}</div>
-                            </div>
+                            </DirectSection>
                         </div>
-                    </div>
-
-                    <div className="ofi-invp-grid ofi-invp-grid--4">
-                        <InvoiceField label={t('billing.invoiceDate')}>
-                            <MacDatePicker
-                                className="is-block"
-                                value={invoiceDate}
-                                ariaLabel={t('billing.invoiceDate')}
-                                onChange={(next) => {
-                                    setInvoiceDate(next);
-                                    if (!dueTouched || dueDate < next) setDueDate(next);
-                                }}
-                            />
-                        </InvoiceField>
-                        <InvoiceField label={t('billing.dueDate')}>
-                            <MacDatePicker
-                                className="is-block"
-                                value={dueDate}
-                                min={invoiceDate}
-                                ariaLabel={t('billing.dueDate')}
-                                onChange={(next) => { setDueTouched(true); setDueDate(next); }}
-                            />
-                        </InvoiceField>
-                        <InvoiceField label={t('billing.salesperson')}>
-                            <input className={FIELD_INPUT_CLASS} value={salesperson} onChange={(e) => setSalesperson(e.target.value)} />
-                        </InvoiceField>
-                        <InvoiceField label={t('billing.commission')}>
-                            <input className={FIELD_INPUT_CLASS} value={commission} onChange={(e) => setCommission(e.target.value)} />
-                        </InvoiceField>
-                    </div>
-                    <div className="ofi-invp-grid ofi-invp-grid--split">
-                        <InvoiceField label={t('invoices.introText')} hint={t('invoices.directKindFix')} wide>
-                            <textarea
-                                className={FIELD_TEXTAREA_CLASS}
-                                value={introText}
-                                onChange={(event) => setIntroText(event.target.value)}
-                            />
-                        </InvoiceField>
-                        <InvoiceField label={t('invoices.notes')} wide>
-                            <textarea
-                                className={FIELD_TEXTAREA_CLASS}
-                                value={notes}
-                                onChange={(event) => setNotes(event.target.value)}
-                            />
-                        </InvoiceField>
-                    </div>
-
-                    <InvoiceStepFoot
-                        stepIndex={2}
-                        stepCount={STEPS.length}
-                        onBack={() => setStep(1)}
-                        onNext={() => undefined}
-                        finalLabel={saveLabel}
-                        finalIcon={<Receipt size={14} />}
-                        finalDisabled={saving || !linesReady}
-                        onFinal={() => void create()}
-                        extra={
-                            <button
-                                type="button"
-                                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-[12.5px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/20 dark:bg-transparent dark:text-white dark:hover:bg-white/10"
-                                onClick={() => void preview()}
-                            >
-                                <Eye size={14} />
-                                {t('invoices.previewBtn')}
-                            </button>
-                        }
-                    />
-                </SectionCard>
-            )}
-
-            <UnsavedChangesPopup open={guard.isOpen} saving={saving} onCancel={guard.cancel} onDiscard={guard.proceed}
-                onSave={() => void create(false).then((saved) => { if (saved) guard.proceed(); })} />
-            <InvoicePdfPopup
-                open={previewOpen}
-                title={t('invoices.previewTitle', { number: editing?.invoiceNumber || t('invoices.draftNumber') })}
-                subtitle={`${t('invoices.category_DIRECT')} · ${fmtMoney(grossTotal)}`}
-                blob={previewBlob}
-                loading={previewLoading}
-                onClose={() => { setPreviewOpen(false); setPreviewBlob(null); }}
-            />
+                        <aside>
+                            <DirectSection title={t('directInvoice.addressPreview')}>
+                                <div className="direct-address">
+                                    <p className="direct-address__sender">{senderAddress || '—'}</p>
+                                    <strong className={recipientName ? undefined : 'is-empty'}>{recipientName || t('directInvoice.recipient')}</strong>
+                                    <p>{recipientAddress || '—'}</p>
+                                </div>
+                            </DirectSection>
+                        </aside>
+                    </div>}
+                    {step === 1 && <>
+                        {/* `.ofi-invp-page` bringt der Belegtabelle das Kleid der
+                            Offerte (Spaltenlinien, 26px-Zellen, invoiceMac.css). */}
+                        <div className="ofi-invp-page direct-document">
+                            <DocumentWorkspace lines={lines} onChange={setLines} coverLetter={introText} onCoverLetterChange={setIntroText}
+                                stages={stages} onStagesChange={setStages} discounts={discounts} onDiscountsChange={setDiscounts}
+                                closingText={closingText} onClosingTextChange={setClosingText} closingLabel={t('directInvoice.paymentTerm')} closingPlaceholder={t('directInvoice.paymentPlaceholder')}
+                                vat={{ rate: vatRate, text: vatRateText, enabled: vatEnabled, onEnabledChange: setVatEnabled, onTextChange: setVatRateText, onRateChange: rate => setVatRateText(String(rate)) }}
+                                formatMoney={fmtMoney} readOnly={saving} />
+                        </div>
+                        {!vatValid && <PanelPageNotice danger>{t('invoices.err.VAT_INVALID')}</PanelPageNotice>}
+                    </>}
+                    {step === 2 && <>
+                        <dl className="ofi-panel-page-summary direct-summary">
+                            <div><dt>{t('directInvoice.number')}</dt><dd>{invoiceNumber || '—'}</dd></div>
+                            <div><dt>{t('directInvoice.recipient')}</dt><dd>{recipientName || '—'}</dd></div>
+                            <div><dt>{t('directInvoice.documentTitle')}</dt><dd>{t('directInvoice.positions', { count: filledLines.length })}</dd></div>
+                            <div><dt>{t('invoices.grossTotal')}</dt><dd>{fmtMoney(grossTotal)}</dd></div>
+                        </dl>
+                        <DirectSection title={t('directInvoice.detailsTitle')}>
+                            <div className="ofi-panel-page-grid">
+                                <PanelPageField label={t('directInvoice.number')} hint={t('directInvoice.numberHint')} required wide>
+                                    <div className="direct-number">
+                                        <input className={CONTROL} value={invoiceNumber} maxLength={64} placeholder={numberLoading ? '…' : 'PI-2026-003'} onChange={e => setCustomNumber(e.target.value)} aria-invalid={Boolean(invoiceNumber && !validNumber(invoiceNumber))} />
+                                        {!editing?.invoiceNumber && <button type="button" title={t('directInvoice.autoNumber')} aria-label={t('directInvoice.autoNumber')} onClick={() => { setCustomNumber(null); setNumberRetry(n => n + 1); }}><RefreshCcw01 size={14} /></button>}
+                                    </div>
+                                </PanelPageField>
+                                <PanelPageField label={t('billing.invoiceDate')}><MacDatePicker className="is-field" value={invoiceDate} ariaLabel={t('billing.invoiceDate')} onChange={next => { setInvoiceDate(next); if (!dueTouched || dueDate < next) setDueDate(next); }} /></PanelPageField>
+                                <PanelPageField label={t('billing.dueDate')}><MacDatePicker className="is-field" value={dueDate} min={invoiceDate} ariaLabel={t('billing.dueDate')} onChange={next => { setDueTouched(true); setDueDate(next); }} /></PanelPageField>
+                                <PanelPageField label={t('directInvoice.contact')}><input className={CONTROL} value={salesperson} onChange={e => setSalesperson(e.target.value)} /></PanelPageField>
+                                <PanelPageField label={t('billing.commission')}><input className={CONTROL} value={commission} onChange={e => setCommission(e.target.value)} /></PanelPageField>
+                            </div>
+                            {!invoiceNumber && !numberLoading && <PanelPageNotice danger>{t('directInvoice.numberUnavailable')}</PanelPageNotice>}
+                        </DirectSection>
+                        <DirectSection title={t('directInvoice.textsTitle')} description={t('directInvoice.textsHint')}>
+                            <div className="ofi-panel-page-grid">
+                                <DirectTextField label={t('directInvoice.paymentTerm')}><textarea className={CONTROL} rows={3} value={closingText} placeholder={t('directInvoice.paymentPlaceholder')} onChange={e => setClosingText(e.target.value)} /></DirectTextField>
+                                <DirectTextField label={t('invoices.introText')}><textarea className={CONTROL} rows={3} value={introText} onChange={e => setIntroText(e.target.value)} /></DirectTextField>
+                                <DirectTextField label={t('invoices.notes')}><textarea className={CONTROL} rows={2} value={notes} onChange={e => setNotes(e.target.value)} /></DirectTextField>
+                            </div>
+                        </DirectSection>
+                        <DirectSection title={t('directInvoice.pdfSettings')}>
+                            <div className="ofi-panel-page-grid">
+                                <PanelPageField label={t('directInvoice.language')}>
+                                    <PanelMacSelect value={pdfLanguage} onChange={next => changeLanguage(next as InvoiceDocumentLanguage)} ariaLabel={t('directInvoice.language')} options={pdfLanguages} />
+                                </PanelPageField>
+                            </div>
+                            <div className="direct-checks">
+                                <label className="ofi-panel-page-check"><input type="checkbox" checked={showQr} onChange={e => setShowQr(e.target.checked)} /><span>{t('directInvoice.qr')}<small>{t('directInvoice.qrHint')}</small></span></label>
+                                <label className="ofi-panel-page-check"><input type="checkbox" checked={showFooter} onChange={e => setShowFooter(e.target.checked)} /><span>{t('directInvoice.footer')}<small>{t('directInvoice.footerHint')}</small></span></label>
+                            </div>
+                        </DirectSection>
+                    </>}
+                </fieldset>
+                {/* Die Knöpfe der Pano-Seite: rechts, klein, EIN Blau (die
+                    Schritte zurück/weiter stehen nebeneinander wie im
+                    Mac-Assistenten). */}
+                <PanelPageActions>
+                    <span />
+                    <button type="button" className="ofi-panel-page-button" onClick={() => (step ? setStep(step - 1) : leave())}>
+                        <ArrowLeft size={15} />{step === 0 ? t('invoices.cancelBtn') : t('invoices.stepBack')}
+                    </button>
+                    {step === 2 && <button type="button" className="ofi-panel-page-button" disabled={saving || previewLoading || !validNumber(invoiceNumber)} onClick={() => void preview()}><Eye size={15} />{t('invoices.previewBtn')}</button>}
+                    {step < 2
+                        ? <button type="button" className="ofi-panel-page-button is-primary" disabled={saving || (step === 0 ? !recipientReady : !linesReady)} onClick={() => setStep(step + 1)}>{t('invoices.stepNext')}<ArrowRight size={15} /></button>
+                        : <button type="button" className="ofi-panel-page-button is-primary" disabled={saving || !linesReady || !validNumber(invoiceNumber)} onClick={() => void create()}><Receipt size={15} />{finalLabel}</button>}
+                </PanelPageActions>
+            </>)}
+            <UnsavedChangesPopup open={guard.isOpen} saving={saving} onCancel={guard.cancel} onDiscard={guard.proceed} onSave={() => void create(false).then(saved => { if (saved) guard.proceed(); })} />
+            <InvoicePdfPopup open={previewOpen} title={t('invoices.previewTitle', { number: invoiceNumber })} filename={invoiceNumber}
+                subtitle={`${t('invoices.category_DIRECT')} · ${fmtMoney(grossTotal)}`} blob={previewBlob} loading={previewLoading} onClose={() => { setPreviewOpen(false); setPreviewBlob(null); }} />
         </div>
     );
 };

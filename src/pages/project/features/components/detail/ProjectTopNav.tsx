@@ -9,6 +9,7 @@ import {
     PackagePlus,
     Coins01 as Wallet,
     Receipt as ReceiptText,
+    ShoppingCart01,
 } from '@/components/icons/antIconCompat';
 import { t } from '@/i18n/translate';
 import type {
@@ -41,6 +42,14 @@ const getGroups = (): Group[] => [
         section: 'positions',
         label: () => t('auto.pozisyon_ozeti'),
         icon: <List size={15} />,
+        subs: [],
+    },
+    {
+        // «Siparişlerim» (Vorgabe Samet, 24.09.2026): Pozisyon Özeti'nin tam
+        // yanında AYRI bir sekme — Pozisyon Özeti olduğu gibi kalır.
+        section: 'procurement',
+        label: () => t('projects.procurement.myOrders'),
+        icon: <ShoppingCart01 size={15} />,
         subs: [],
     },
     {
@@ -149,6 +158,8 @@ export const ProjectTopNav = ({
                         <button
                             type="button"
                             role="tab"
+                            // Her sekmenin kimliği (24.09.2026) — adresteki `?section=` ile aynı.
+                            id={`ofi-prj-tab-${group.section}`}
                             aria-selected={active}
                             aria-haspopup={hasSubs || undefined}
                             aria-expanded={hasSubs ? open : undefined}

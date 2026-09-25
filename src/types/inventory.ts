@@ -15,6 +15,14 @@ export type ArticleStatus = 'ACTIVE' | 'INACTIVE' | 'IN_SUPPLY' | 'IN_PRODUCTION
  */
 export type ItemType = 'PRODUCT' | 'SERVICE';
 
+/**
+ * ÜRÜN TÜRÜ (23.09.2026) — yeni ürün formundaki üçlü seçim: Üretilecek /
+ * Satın Alınacak / Ek Hizmet. `itemType` bundan türer (SERVICE → SERVICE, diğer
+ * ikisi → PRODUCT); sunucudaki `shared/articleKind.ts` ile aynı liste.
+ */
+export const ARTICLE_KINDS = ['MANUFACTURED', 'RESALE', 'SERVICE'] as const;
+export type ArticleKind = typeof ARTICLE_KINDS[number];
+
 export interface InventoryLocation {
     id: string;
     tenantId: string;
@@ -157,6 +165,13 @@ export interface ArticleDetail {
     description?: string | null;
     salePrice: number;
     itemType: ItemType;
+    /** Üçlü ürün türü; null = seçilmemiş (eski kayıtlar). */
+    articleKind?: ArticleKind | null;
+    /**
+     * Ürünün tedarikçileri (23.09.2026) — detay formundaki çoklu seçim.
+     * Tercih edilen önce; `locked` = alım geçmişi var, formdan çıkarılamaz.
+     */
+    suppliers?: ArticleSupplierLink[];
     /**
      * GÖRSELİN KALICI ADRESİ (assets.demo.offitec.ch) — takvimdeki randevu
      * belgeleriyle aynı yol. Dosya R2'de durur; bu alan doğrudan <img src>
@@ -197,9 +212,24 @@ export interface ArticleDetailPatch {
     salePrice?: number;
     /** Ürün/hizmet anahtarı — detay ekranındaki "Typ" satırı. */
     itemType?: ItemType;
+    /** Üçlü ürün türü; sunucu `itemType`'ı da ondan türetir. */
+    articleKind?: ArticleKind | null;
+    /** Tedarikçilerin TAM listesi; ilki tercih edilen (bkz. SingleArticleInput). */
+    suppliers?: SupplierRefInput[];
     description?: string | null;
     imageUrl?: string | null;
 }
+
+/** Ürünün bağlı tedarikçisi — detay formundaki bir belirteç. */
+export interface ArticleSupplierLink {
+    supplierId: string;
+    companyName: string;
+    /** Alım geçmişi var: formdan çıkarılamaz. */
+    locked: boolean;
+}
+
+/** Formdan giden tedarikçi: kayıtlı olan kimliğiyle, yeni yazılan adıyla. */
+export type SupplierRefInput = { supplierId: string } | { supplierName: string };
 
 /** Ürün görseli üst sınırı — sunucudaki denetimle aynı değer. */
 export const ARTICLE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
@@ -324,6 +354,10 @@ export interface SupplierRow {
     state?: string | null;
     country?: string | null;
     notes?: string | null;
+    /** KDV: null = belirtilmedi, false = KDV yok, true = ülke + oran siparişe aktarılır. */
+    vatLiable?: boolean | null;
+    vatCountry?: string | null;
+    vatRate?: number | null;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -518,6 +552,32 @@ export interface BulkArticlesResult {
     errors: BulkRowError[];
 }
 
+/**
+ * YENİ ÜRÜN FORMU (23.09.2026) — `/articles/single`. ERP kodu yoktur: sunucu
+ * geçici AA-BB kodunu verir. Tedarikçilerin ilki tercih edilen tedarikçidir;
+ * kayıtlı olan kimliğiyle, yeni yazılan adıyla gider.
+ */
+export interface SingleArticleInput {
+    name: string;
+    articleKind?: ArticleKind | null;
+    suppliers: SupplierRefInput[];
+    modelNumber?: string | null;
+    serialNumber?: string | null;
+    barcode?: string | null;
+    unit?: string | null;
+    salePrice?: number;
+    purchasePrice?: number;
+    /** Başlangıç stoğu — varsayılan 0 (ürün yalnızca tanımlanır). */
+    quantity?: number;
+    description?: string | null;
+    imageUrl?: string | null;
+}
+
+export interface SingleArticleResult extends BulkArticlesResult {
+    /** Kaydedilen ürün, detay ucuyla aynı gövdede (birim, fiyat, açıklama). */
+    article?: ArticleDetail | null;
+}
+
 export interface BulkMovementItemInput {
     articleId?: string | null;
     articleCode?: string | null;
@@ -700,6 +760,20 @@ export interface PurchaseOrderItem {
     receivedAt?: string | null;
     /** Produktion (19.09.2026): das Gerät des Projekts, für das die Zeile bestellt wird. */
     productionItemId?: string | null;
+    /** Proje kaynağı (24.09.2026) — projenin pozisyonundan «Siparişe Git». */
+    source?: PurchaseLineSource | null;
+}
+
+/**
+ * SATIRIN PROJE KAYNAĞI (24.09.2026): proje + pozisyon; üretim şirketine
+ * giden satırda üretim şirketinin kimliği de.
+ */
+export interface PurchaseLineSource {
+    projectId: string;
+    positionId: string | null;
+    producerTenantId: string | null;
+    /** «Siparişlerim»de Türsüzler'den ELLE açılan siparişin satırı (U1, U2 …). */
+    manual?: boolean;
 }
 
 /**

@@ -1001,7 +1001,14 @@
             "colCodeBlock": "Belge kodu",
             "companyNumberHint": "Şirket No, o şirketin belge kodlarındaki bloğu belirler (4 → AN-2026-40001) ve modül kategorisinden bağımsızdır. Değiştirmek yalnızca bundan sonra üretilecek kodları etkiler; dağıtılmış kodlar olduğu gibi kalır.",
             "errorCompanyNumber": "Şirket numarası 0 ile 99 arasında bir tam sayı olmalıdır.",
-            "numberSaved": "Şirket numarası güncellendi."
+            "numberSaved": "Şirket numarası güncellendi.",
+            "colCompanyType": "Şirket Türü",
+            "typeNone": "Tür seçilmedi",
+            "typeProduction": "Üretim",
+            "typeProject": "Proje",
+            "typeSales": "Satış",
+            "typeSaved": "Şirket türü güncellendi.",
+            "companyTypeHint": "Şirket Türü (A Üretim · B Proje · C Satış) yeni ürün formunda hangi alanların zorunlu olduğunu belirler: Proje ve Satış şirketlerinde ürün türü ve tedarikçi de zorunludur, Üretim şirketinde yalnızca ürün adı."
         },
         "pdf": {
             "breadcrumb": "Ayarlar › PDF & Teklif Şablonu",

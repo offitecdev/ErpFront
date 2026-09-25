@@ -643,3 +643,119 @@ html #root .ofi-prj-page.ofi-prj-apple :where(.text-slate-700, .text-slate-800, 
     #root .ofi-prj-page.ofi-prj-apple *::before,
     #root .ofi-prj-page.ofi-prj-apple *::after { transition: none !important; }
 }
+
+/* ═══ SİPARİŞLERİM — Pozisyon Özeti'nin yanındaki ayrı sekme (24.09.2026) ══
+   Tablo TEDARİKÇİYE GÖRE gruplanır: grubun başında bir satır — birleştirilmiş
+   ilk hücrede SOLA yaslı tedarikçi + parantez içinde türü, «Sipariş»
+   sütununda «Siparişe Git» / «Sipariş oluştur» + kodlar (hepsi aynı hizada),
+   altında ürünleri: Talep · Stok (altında «… stoktan») · Siparişte (altında
+   «… fiyat talebinde») · Eksik · Sipariş. «Türsüzler» başlığındaki «Sipariş
+   oluştur» Mac tarzı işaretleri açar (.ofi-proc-check); oluşan sipariş
+   Türsüzler'in üstünde aynı gri başlıkla «U1», «U2» … olarak durur. */
+/* Grubun başlık satırı: ad SOLA yaslı (birleştirilmiş ilk hücre), düğmeler
+   «Sipariş» sütununda — bütün grupların düğmeleri aynı hizada başlar. */
+.ofi-prj-apple .ofi-proc-group > td {
+    padding: 9px 12px;
+    background: var(--quote-fill, #f5f5f7);
+    text-align: left;
+    vertical-align: middle;
+}
+.ofi-prj-apple .ofi-proc-group__name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+}
+.ofi-prj-apple .ofi-proc-group__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px 8px;
+}
+.ofi-prj-apple .ofi-proc-group__title { font-size: 13px; font-weight: 600; color: var(--quote-text, #1d1d1f); }
+.ofi-prj-apple .ofi-proc-group__kind { font-size: 12px; color: var(--quote-secondary, #6e6e73); }
+/* U-grubu (Türsüzler'den elle açılan sipariş): tedarikçi henüz seçilmedi. */
+.ofi-prj-apple .ofi-proc-group__kind.is-unset { font-style: italic; }
+.ofi-prj-apple .ofi-proc-group__hint { font-size: 11.5px; color: var(--quote-secondary, #6e6e73); }
+.ofi-prj-apple .ofi-proc-group .ofi-prj-btn { gap: 6px; white-space: nowrap; }
+.ofi-prj-apple .ofi-proc-stack { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.ofi-prj-apple .ofi-proc-stack small {
+    font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+    font-size: 10.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--quote-secondary, #6e6e73);
+}
+.ofi-prj-apple .ofi-proc-stack small.is-stock { color: var(--quote-success, #1f9d55); }
+.ofi-prj-apple .ofi-proc-stack small.is-request { color: var(--quote-warning, #b26b00); }
+.ofi-prj-apple .ofi-proc-ordercell { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.ofi-prj-apple .ofi-proc-supplier { font-size: 12px; color: var(--quote-text, #1d1d1f); white-space: nowrap; }
+.ofi-prj-apple .ofi-proc-supplier.is-unset { color: var(--quote-secondary, #6e6e73); font-style: italic; }
+.ofi-prj-apple .ofi-proc-checkcell { width: 44px; text-align: center; }
+
+/* Mac tarzı işaret kutusu — 16px, 4px köşe, seçilince mavi zemin + beyaz tik.
+   Tik bir SVG arka planıdır (girişlerde ::after her tarayıcıda çizilmez). */
+#root .ofi-prj-page.ofi-prj-apple input[type="checkbox"].ofi-proc-check {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid #aeaeb2;
+    border-radius: 4px;
+    background: var(--quote-surface, #fff) center / 11px 11px no-repeat;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.05);
+    vertical-align: middle;
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+#root .ofi-prj-page.ofi-prj-apple input[type="checkbox"].ofi-proc-check:checked {
+    border-color: var(--quote-accent, #0a7aff);
+    background-color: var(--quote-accent, #0a7aff);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.6 6.3 5 8.6 9.4 3.6' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+:root.dark #root .ofi-prj-page.ofi-prj-apple input[type="checkbox"].ofi-proc-check:not(:checked) {
+    border-color: rgba(255, 255, 255, 0.34);
+}
+#root .ofi-prj-page.ofi-prj-apple input[type="checkbox"].ofi-proc-check:focus-visible {
+    outline: 2px solid rgba(10, 122, 255, 0.35);
+    outline-offset: 1px;
+}
+#root .ofi-prj-page.ofi-prj-apple input[type="checkbox"].ofi-proc-check:disabled { opacity: 0.35; cursor: not-allowed; }
+.ofi-prj-apple .ofi-proc-instock { display: inline-flex; align-items: center; gap: 6px; }
+.ofi-prj-apple :is(.ofi-proc-instock, .ofi-proc-table td) .ofi-prj-state { white-space: nowrap; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-proc-plus {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    min-width: 0;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--quote-border);
+    border-radius: 5px;
+    background: var(--quote-surface);
+    color: var(--quote-accent);
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-proc-plus:hover { background: var(--quote-accent); border-color: var(--quote-accent); color: #fff; }
+.ofi-prj-apple .ofi-proc-codes { display: inline-flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+#root .ofi-prj-page.ofi-prj-apple .ofi-proc-code {
+    height: 20px;
+    min-width: 0;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--quote-fill);
+    color: var(--quote-text);
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 20px;
+}
+#root .ofi-prj-page.ofi-prj-apple .ofi-proc-code:hover { color: var(--quote-accent); }
+
+/* «Yine de sipariş» penceresi — portalda durur, #root dışında. */
+.ofi-proc-popup__hint { margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--ofi-cal-muted, #6e6e73); }
+.ofi-proc-popup__code { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace; font-size: 11px; opacity: 0.85; }

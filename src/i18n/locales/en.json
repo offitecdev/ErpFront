@@ -1001,7 +1001,14 @@
             "colCodeBlock": "Document code",
             "companyNumberHint": "The company number sets the block used in that company's document codes (4 → AN-2026-40001) and is independent of the module category. Changing it affects only codes issued from now on; codes already issued stay as they are.",
             "errorCompanyNumber": "The company number must be a whole number between 0 and 99.",
-            "numberSaved": "Company number updated."
+            "numberSaved": "Company number updated.",
+            "colCompanyType": "Company type",
+            "typeNone": "No type",
+            "typeProduction": "Production",
+            "typeProject": "Project",
+            "typeSales": "Sales",
+            "typeSaved": "Company type updated.",
+            "companyTypeHint": "The company type (A Production · B Project · C Sales) decides which fields the new-product form requires: project and sales companies also need the product type and a supplier, a production company only the product name."
         },
         "pdf": {
             "breadcrumb": "Settings › PDF & Offer Template",

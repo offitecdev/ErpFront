@@ -1,0 +1,338 @@
+/* =========================================================
+   Offitec — DIE GERÄTESEITE DER PRODUKTION (24.09.2026, Vorgabe Samet)
+
+   «Ürünün ismi üstte yazacak, hemen altında ince bir süreç — güzel
+    görünsün, macOS tab gibi, orijinal … final bayrak olsun, bir tane
+    bayrak noktası … büyük bir alan olması lazım tüm içerikler için.»
+
+   Kopf (Name des Geräts) · dünne Prozessleiste im Kleid eines
+   macOS-Segmentschalters mit der Fahne als Zielpunkt · die freie
+   Fläche der Stufe, die den Rest des Fensters füllt. Farben aus dem Listenkleid
+   (`--la-*`, styles/listApple.css); der Dunkelmodus ist derselbe
+   Variablentausch plus die wenigen Flächen, die macOS dort anders malt.
+   Klassen: `.ofi-pdev*`. Die Seite importiert dieses Blatt selbst.
+   ========================================================= */
+
+.ofi-pdev-page {
+    --ofi-pdev-canvas: #ffffff;
+    gap: 6px;
+    /* Die Seite füllt das Fenster: Kopf und Leiste oben, die Tafel nimmt
+       den Rest (`flex: 1` unten) — «büyük bir alan». */
+    min-height: calc(100dvh - 2 * var(--page-pad-y, 1.5rem));
+    animation: ofi-pdev-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.dark .ofi-pdev-page { --ofi-pdev-canvas: #0f1113; }
+
+@keyframes ofi-pdev-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Kopf: EINE kleine Zeile (Samet: «tek satır, küçük boy, baya küçük»,
+   dann «küçük punto … o başlığı küçücük yapın») ──
+   Name · leise Angaben · rechts das Projekt. 20px hoch — der Platz
+   gehört der Fläche darunter. */
+.ofi-pdev-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 20px;
+    padding: 0 2px;
+    white-space: nowrap;
+}
+#root .ofi-list-apple .ofi-pdev-head__title {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 18px;
+    color: var(--la-text);
+    text-overflow: ellipsis;
+}
+#root .ofi-list-apple .ofi-pdev-head__meta {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0 6px;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 11.5px;
+    color: var(--la-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-pdev-head__meta > span { flex: 0 0 auto; }
+.ofi-pdev-head__meta > span::before {
+    content: '·';
+    margin-right: 6px;
+    color: var(--la-muted);
+}
+#root .ofi-list-apple .ofi-pdev-head__meta em {
+    margin-left: 5px;
+    padding: 0 4px;
+    border: 0.5px solid var(--la-field-border);
+    border-radius: 4px;
+    font-style: normal;
+    font-size: 10px;
+    color: var(--la-secondary);
+}
+
+/* Zu welchem Projekt das Gerät gehört — ein leiser Verweis, kein Knopf. */
+#root .ofi-list-apple .ofi-pdev-head__project {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    max-width: 40%;
+    height: 20px;
+    margin-left: auto;
+    padding: 0 7px 0 2px;
+    border-radius: 6px;
+    color: var(--la-secondary);
+    text-decoration: none;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-list-apple .ofi-pdev-head__project:hover { background: var(--la-fill); color: var(--la-text); }
+#root .ofi-list-apple .ofi-pdev-head__projnum {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--la-fill);
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--la-secondary);
+    font-variant-numeric: tabular-nums;
+}
+#root .ofi-list-apple .ofi-pdev-head__projname {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 11.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ── Die Prozessleiste ─────────────────────────────────────
+   Ein macOS-Segmentschalter: eine flache graue Rinne, das gewählte
+   Segment als weisses Feld darauf. Damit er einen WEG zeigt und keine
+   Reiter, tragen die Segmente ihre Nummer, zwischen ihnen steht eine
+   feine Spitze, und hinter der Rinne führt eine gepunktete Linie zur
+   Fahne. 32px hoch — «ince». Beim Blättern bleibt sie oben stehen. */
+.ofi-pdev-steps {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    margin: 0 calc(var(--page-gutter, 1rem) * -1);
+    padding: 4px var(--page-gutter, 1rem);
+    background: color-mix(in srgb, var(--ofi-pdev-canvas) 84%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+}
+.ofi-pdev-steps__scroll {
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.ofi-pdev-steps__scroll::-webkit-scrollbar { display: none; }
+
+.ofi-pdev-steps__track {
+    display: flex;
+    flex: 1 0 auto;
+    align-items: center;
+    height: 32px;
+    padding: 2px;
+    border-radius: 9px;
+    background: rgba(118, 118, 128, 0.12);
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.dark .ofi-pdev-steps__track {
+    background: rgba(118, 118, 128, 0.24);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.05);
+}
+
+#root .ofi-list-apple .ofi-pdev-steps__seg {
+    display: inline-flex;
+    flex: 1 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 28px;
+    min-height: 0;
+    padding: 0 12px 0 8px;
+    border: 0;
+    border-radius: 7px !important;
+    background: transparent;
+    color: var(--la-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-list-apple .ofi-pdev-steps__seg:hover { background: rgba(255, 255, 255, 0.55); color: var(--la-text); }
+.dark #root .ofi-list-apple .ofi-pdev-steps__seg:hover { background: rgba(255, 255, 255, 0.06); }
+#root .ofi-list-apple .ofi-pdev-steps__seg[aria-selected="true"] {
+    background: #ffffff;
+    color: var(--la-text);
+    font-weight: 600;
+    box-shadow:
+        0 0 0 0.5px rgba(0, 0, 0, 0.05),
+        0 1px 2px rgba(0, 0, 0, 0.12),
+        0 3px 8px -4px rgba(0, 0, 0, 0.14);
+}
+.dark #root .ofi-list-apple .ofi-pdev-steps__seg[aria-selected="true"] {
+    background: #636366;
+    color: #ffffff;
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Die Nummer der Stufe — ein feiner Ring, blau gefüllt, wo man steht. */
+.ofi-pdev-steps__num {
+    display: inline-flex;
+    flex: 0 0 18px;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-secondary) 45%, transparent);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--la-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-pdev-steps__seg[aria-selected="true"] .ofi-pdev-steps__num {
+    background: var(--la-accent);
+    box-shadow: none;
+    color: #ffffff;
+}
+.ofi-pdev-steps__label { white-space: nowrap; }
+
+/* Die Zuweisungen sieht nur die Leitung — der kleine Schild sagt es. */
+.ofi-pdev-steps__admin {
+    display: inline-flex;
+    margin-left: -2px;
+    color: var(--la-muted);
+}
+.ofi-pdev-steps__seg[aria-selected="true"] .ofi-pdev-steps__admin { color: var(--la-accent); }
+.dark .ofi-pdev-steps__seg[aria-selected="true"] .ofi-pdev-steps__admin { color: #cfe3ff; }
+
+/* Die Spitze zwischen zwei Stufen. */
+.ofi-pdev-steps__sep {
+    display: inline-flex;
+    flex: 0 0 auto;
+    margin: 0 1px;
+    color: var(--la-muted);
+}
+
+/* ── Die Fahne: der Zielpunkt ──────────────────────────── */
+.ofi-pdev-steps__rope {
+    flex: 0 0 28px;
+    height: 0;
+    margin: 0 4px 0 8px;
+    border-top: 2px dotted color-mix(in srgb, var(--la-secondary) 50%, transparent);
+}
+#root .ofi-list-apple .ofi-pdev-steps__finish {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    min-height: 0;
+    padding: 0 10px 0 2px;
+    border: 0;
+    border-radius: 16px !important;
+    background: transparent;
+    color: var(--la-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 140ms ease;
+}
+.ofi-pdev-steps__flag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--la-surface);
+    box-shadow:
+        inset 0 0 0 1.5px color-mix(in srgb, var(--la-secondary) 38%, transparent),
+        0 1px 2px rgba(0, 0, 0, 0.06);
+    color: var(--la-secondary);
+    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+#root .ofi-list-apple .ofi-pdev-steps__finish:hover { color: var(--la-text); }
+.ofi-pdev-steps__finish:hover .ofi-pdev-steps__flag {
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--la-text) 55%, transparent), 0 1px 2px rgba(0, 0, 0, 0.08);
+    color: var(--la-text);
+}
+#root .ofi-list-apple .ofi-pdev-steps__finish[aria-selected="true"] { color: var(--la-text); font-weight: 600; }
+.ofi-pdev-steps__finish[aria-selected="true"] .ofi-pdev-steps__flag,
+.ofi-pdev-steps__finish[aria-selected="true"]:hover .ofi-pdev-steps__flag {
+    background: var(--la-accent);
+    box-shadow: 0 0 0 3px var(--la-accent-soft), 0 1px 3px color-mix(in srgb, var(--la-accent) 40%, transparent);
+    color: #ffffff;
+}
+
+#root .ofi-list-apple :is(.ofi-pdev-steps__seg, .ofi-pdev-steps__finish):focus-visible {
+    outline: 2px solid var(--la-focus);
+    outline-offset: 1px;
+}
+
+/* Was nicht passt, rückt zusammen (`data-fit`, gemessen in DeviceProcessBar):
+   1 = engere Abstände, 2 = die nicht gewählten Stufen nur mit Nummer. */
+#root .ofi-list-apple .ofi-pdev-steps__scroll[data-fit="1"] .ofi-pdev-steps__seg,
+#root .ofi-list-apple .ofi-pdev-steps__scroll[data-fit="2"] .ofi-pdev-steps__seg {
+    gap: 5px;
+    padding: 0 8px 0 5px;
+}
+.ofi-pdev-steps__scroll:is([data-fit="1"], [data-fit="2"]) .ofi-pdev-steps__sep { margin: 0; }
+.ofi-pdev-steps__scroll:is([data-fit="1"], [data-fit="2"]) .ofi-pdev-steps__rope { flex-basis: 16px; margin: 0 3px 0 6px; }
+#root .ofi-list-apple .ofi-pdev-steps__scroll[data-fit="2"] .ofi-pdev-steps__seg:not([aria-selected="true"]) { padding: 0 5px; }
+.ofi-pdev-steps__scroll[data-fit="2"] .ofi-pdev-steps__seg:not([aria-selected="true"]) :is(.ofi-pdev-steps__label, .ofi-pdev-steps__admin) {
+    display: none;
+}
+
+/* ── Die Fläche der Stufe: der Rest des Fensters ─────────────
+   «Başlık olmayacak … kare içinde de olmayacak, direkt orası boş olsun»
+   — kein Kopf, kein Rahmen, kein Grund: einfach der freie Platz unter
+   der Leiste, der den Rest des Fensters füllt. */
+.ofi-pdev-panel {
+    flex: 1 1 auto;
+    min-height: 420px;
+}
+
+/* Gerät nicht gefunden: der Weg zum Projekt. */
+#root .ofi-list-apple .ofi-pdev-missing {
+    align-self: flex-start;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--la-accent);
+    text-decoration: none;
+}
+#root .ofi-list-apple .ofi-pdev-missing:hover { text-decoration: underline; }
+
+/* ── Schmale Schirme: das Projekt rutscht unter den Namen ───── */
+@media (max-width: 760px) {
+    .ofi-pdev-head { flex-wrap: wrap; height: auto; row-gap: 2px; }
+    #root .ofi-list-apple .ofi-pdev-head__meta { flex-basis: 100%; order: 2; }
+    #root .ofi-list-apple .ofi-pdev-head__meta > span:first-child::before { content: none; }
+    #root .ofi-list-apple .ofi-pdev-head__project { order: 3; max-width: 100%; margin-left: 0; }
+    .ofi-pdev-panel { min-height: 320px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-pdev-page { animation: none; }
+}

@@ -1,0 +1,367 @@
+/* ═══ YENİ ÜRÜN — ÜÇ SÜTUN (23.09.2026) ═══════════════════════════════════
+   Vorgabe Samet: «ERP KODU alanını kaldırıyoruz … üç sütun olsun, alt alta
+   olmasın … Apple kolaylığında, daha hızlı bir arayüz, macOS SwiftUI».
+
+   Drei gleich hohe Kisten nebeneinander — Produkt · Typ & Preis · Bild —
+   darunter die Beschreibung über die ganze Breite. Die Kisten sprechen die
+   Formularsprache der Bestellseite (styles/orderDetails.css +
+   modules/orderWorkspace.css): Zeile = Feld, eingerückte Haarlinie, Grund
+   erst beim Zeigen, blauer Ring erst beim Schreiben. Unter 1280px zwei
+   Spalten (das Bild dann darunter über beide), unter 768px eine. */
+
+.ofi-article-form__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+}
+
+.ofi-article-form__grid > * { min-width: 0; }
+
+@media (max-width: 1279px) {
+    .ofi-article-form__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ofi-article-form__grid > :nth-child(3) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+    .ofi-article-form__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Gleich hohe Kisten: kein Loch unter der kürzeren (Vorgabe 22.09.2026). */
+#root .ofi-article-form .ofi-article-form__grid > .ofi-ows-card,
+#root .ofi-article-form .ofi-article-form__grid > .ofi-section-card { height: 100%; }
+
+/* Dieselbe Ecke wie die Bildkiste: die Lager-Haut zwingt jede umrandete
+   Tafel auf `--la-radius` (10px, lagerApple.css) — die Formularkisten folgen. */
+#root .ofi-article-form .ofi-ows-card { border-radius: var(--la-radius, 10px); }
+#root .ofi-article-form .ofi-ows-card .ofi-ord-group > :last-child {
+    border-bottom-left-radius: 9px;
+    border-bottom-right-radius: 9px;
+}
+
+/* In einer Drittelspalte ist die 152px-Beschriftung der Bestellseite zu breit. */
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row > .ofi-ord-label {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 2px;
+    min-width: 112px;
+    max-width: 132px;
+}
+
+/* ── Zeile = Feld, ruhig und IN der Zeile (Vorgabe Samet 24.09.2026: «hover
+   olunca çok hover oluyor ve diğer satıra taşıyor … her label input onu
+   ayarlayalım») ─────────────────────────────────────────────────────────────
+   Die hausweite Formularregel (`#root :where(input…)`, index.css) gibt jedem
+   Feld min-height 40px und refine.css einen 4px-Fokusring: in der 44px-Zeile
+   stiess das Feld an die Haarlinien, der Ring lief über sie in die Nachbar-
+   zeile, und schon das Zeigen färbte das ganze Feld grau. Hier: Feld 32px,
+   6px Luft oben und unten in der Zeile; Zeigen färbt nichts (ein macOS-
+   Textfeld reagiert nicht aufs Zeigen); beim Schreiben ein 3px-Ring, der
+   innerhalb der Zeile bleibt. Gilt für Neues Produkt UND Produktdetail. */
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row {
+    min-height: 44px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row :is(input, select):not([type="checkbox"]):not([type="radio"]),
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row .ofi-cell-input {
+    height: 32px !important;
+    min-height: 32px !important;
+}
+
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row :is(input, select):hover:not(:focus),
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row .ofi-cell-input:hover:not(:focus) {
+    border-color: transparent !important;
+    background: transparent !important;
+}
+
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row.is-invalid :is(input, select):hover:not(:focus) {
+    border-color: var(--ofi-cal-danger, #d70015) !important;
+}
+
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row :is(input, select, textarea):focus,
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row .ofi-cell-input:focus {
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint, rgba(10, 122, 255, 0.14)) !important;
+}
+
+/* Pflichtfeld: der rote Stern hinter der Beschriftung — nur, wo die Firma
+   das Feld verlangt (Projekt/Verkauf: Typ + Lieferant; immer: Name). */
+#root .ofi-article-form .ofi-ord-label .ofi-article-form__req {
+    color: var(--ofi-cal-danger, #d70015);
+    font-weight: 600;
+}
+
+/* Fehlt ein Pflichtfeld beim Speichern: Beschriftung rot, Feld mit rotem Ring. */
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row.is-invalid > .ofi-ord-label { color: var(--ofi-cal-danger, #d70015); }
+#root .ofi-article-form .ofi-ows-card .ofi-ord-row.is-invalid :is(input, select, textarea) {
+    border-color: var(--ofi-cal-danger, #d70015);
+    background: var(--ofi-cal-surface, #fff);
+}
+
+/* ── Typ: das Segment füllt die Zeile, drei gleich breite Felder ────────── */
+#root .ofi-article-form .ofi-kind-seg {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+}
+
+#root .ofi-article-form .ofi-kind-seg > .ofi-ows-tab {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    height: 28px;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#root .ofi-article-form .ofi-kind-seg.is-invalid { box-shadow: 0 0 0 1.5px var(--ofi-cal-danger, #d70015); }
+#root .ofi-article-form .ofi-kind-seg > .ofi-ows-tab:focus-visible { outline: 2px solid var(--la-focus, rgba(10, 122, 255, 0.35)); outline-offset: 1px; }
+
+/* ── Lieferanten: das Token-Feld (NSTokenField) ─────────────────────────── */
+.ofi-sup-field {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    /* So hoch wie die Textfelder der Zeile (32px) — und wie sie ohne
+       Färbung beim Zeigen. */
+    min-height: 32px;
+    padding: 4px 5px 4px 7px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ofi-sup-field.is-open,
+.ofi-sup-field:focus-within {
+    border-color: var(--ofi-cal-accent, #0a7aff);
+    background: var(--ofi-cal-surface, #fff);
+    box-shadow: 0 0 0 3px var(--ofi-cal-accent-tint, rgba(10, 122, 255, 0.14));
+}
+
+.ofi-sup-field.is-invalid { border-color: var(--ofi-cal-danger, #d70015); }
+
+.ofi-sup-placeholder {
+    flex: 1;
+    min-width: 0;
+    padding: 0 2px;
+    color: var(--ows-mute, #8e8e92);
+    font-size: 13px;
+}
+
+.ofi-sup-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    max-width: 100%;
+    height: 22px;
+    padding: 0 3px 0 9px;
+    border-radius: 999px;
+    background: rgba(10, 122, 255, 0.12);
+    color: #0a55c8;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: default;
+}
+
+.ofi-sup-token > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ofi-sup-token > em {
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 400;
+    opacity: 0.7;
+}
+
+#root .ofi-sup-token > button,
+#root .ofi-sup-field > .ofi-sup-open {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+#root .ofi-sup-token > button { width: 16px; height: 16px; }
+#root .ofi-sup-token > button:hover { background: rgba(10, 122, 255, 0.2); }
+
+#root .ofi-sup-field > .ofi-sup-open {
+    width: 22px;
+    height: 22px;
+    margin-left: auto;
+    color: var(--ofi-cal-accent, #0a7aff);
+}
+
+#root .ofi-sup-field > .ofi-sup-open:hover { background: var(--ofi-cal-accent-tint, rgba(10, 122, 255, 0.12)); }
+
+/* Mit Einkaufshistorie (Produktdetail): kein X — die Historie bleibt. */
+.ofi-sup-token.is-locked { padding-right: 9px; }
+
+:root.dark .ofi-sup-token,
+.dark .ofi-sup-token { background: rgba(59, 141, 255, 0.22); color: #cfe2ff; }
+
+/* ── Das Lieferanten-Popover (Portal) — Grundform der macSelection-Liste ── */
+body > .ofi-mac-selection.ofi-sup-picker {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+}
+
+body > .ofi-mac-selection.ofi-sup-picker .ofi-gv-picker__row {
+    display: flex !important;
+    align-items: center;
+    width: 100%;
+    text-align: left !important;
+    cursor: pointer;
+}
+
+body > .ofi-mac-selection.ofi-sup-picker .ofi-gv-picker__row > .ofi-gv-picker__name {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+body > .ofi-mac-selection.ofi-sup-picker .ofi-sup-picker__new { color: var(--ofi-win-accent, #0a7aff) !important; }
+body > .ofi-mac-selection.ofi-sup-picker .ofi-gv-picker__row.is-locked { cursor: default; }
+
+body > .ofi-mac-selection.ofi-sup-picker .ofi-sup-picker__plus {
+    display: inline-flex;
+    flex: 0 0 18px;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+}
+
+body > .ofi-mac-selection.ofi-sup-picker .ofi-sup-picker__state {
+    display: flex;
+    justify-content: center;
+    padding: 16px 10px;
+    color: var(--ofi-selection-muted);
+    font-size: 12.5px;
+}
+
+/* ── Die Bildkiste trägt dieselbe Überschrift wie die beiden Formularkisten ── */
+#root .ofi-list-apple .ofi-article-form .ofi-section-card { border-color: var(--ows-line) !important; }
+
+#root .ofi-list-apple .ofi-article-form .ofi-section-card__head {
+    min-height: 0;
+    padding: 12px 14px 2px;
+    border-bottom: 0;
+    background: transparent;
+}
+
+#root .ofi-list-apple .ofi-article-form .ofi-section-card__head span {
+    color: var(--ows-mute);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* ── Pflichtfeld-Warnung (Vorgabe Samet 23.09.2026: «zorunlu alanları
+   girmeyince uyarı vermeli») — über den Kisten, nennt die fehlenden Felder
+   beim Namen und schrumpft, während sie gefüllt werden. ─────────────────── */
+.ofi-article-form__alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(215, 0, 21, 0.26);
+    border-radius: 10px;
+    background: rgba(215, 0, 21, 0.06);
+    color: #b0000f;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.4;
+    animation: ofi-article-alert-in 180ms ease-out;
+}
+
+.ofi-article-form__alert > svg { flex: none; }
+
+:root.dark .ofi-article-form__alert,
+.dark .ofi-article-form__alert {
+    border-color: rgba(255, 105, 97, 0.35);
+    background: rgba(255, 69, 58, 0.12);
+    color: #ff9f99;
+}
+
+@keyframes ofi-article-alert-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-article-form__alert { animation: none; }
+}
+
+/* Nur lesbare Werte (Bestand, Kosten): wie ein Feld eingerückt, ohne Rahmen. */
+.ofi-article-form__value {
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+    color: var(--ows-text);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-article-form__value.is-muted { color: var(--ows-mute); }
+
+/* ── Aus der Offerte geöffnet: der Hinweis unter dem Kopf ─────────────── */
+.ofi-article-form__note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(10, 122, 255, 0.2);
+    border-radius: 10px;
+    background: rgba(10, 122, 255, 0.06);
+    color: var(--ows-text);
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+
+.ofi-article-form__note > svg { flex: none; color: var(--ofi-cal-accent, #0a7aff); }
+
+:root.dark .ofi-article-form__note,
+.dark .ofi-article-form__note { border-color: rgba(59, 141, 255, 0.3); background: rgba(59, 141, 255, 0.12); }
+
+/* Das X im Kopf (xmark.circle.fill): schliesst den Tab und fragt die Offerte
+   erneut. */
+#root .ofi-article-form__close {
+    --ofi-circle-x-glyph: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(60, 60, 67, 0.32);
+    cursor: pointer;
+    transition: color 120ms ease, transform 80ms ease;
+}
+
+#root .ofi-article-form__close:hover { color: rgba(60, 60, 67, 0.52); }
+#root .ofi-article-form__close:active { transform: scale(0.94); }
+
+:root.dark #root .ofi-article-form__close,
+.dark #root .ofi-article-form__close { --ofi-circle-x-glyph: #1c1c1e; color: rgba(235, 235, 245, 0.36); }

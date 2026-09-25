@@ -6,6 +6,7 @@ import type { RouteComponent } from './routeHelpers';
 import { TechnicianBridge } from './montageRoutes';
 import { LazyItGate } from './LazyItGate';
 import { loadTaskDetailPage } from '../pages/tasks/taskRouteLoaders';
+import { MacSpinnerScreen } from '../components/ui-shared/Loader';
 
 /* ── Shared page-route table ──
    Rendered by AppRouter inside MainLayout, and again by the split view's
@@ -87,7 +88,14 @@ const OrderWorkspacePage = lazyNamed(() => import('../pages/inventory/OrderWorks
 // Produktion (19.09.2026, Vorgabe Samet): Produktionsaufträge, die Projektseite
 // mit ihren zwei Reitern und die bestellten Produkte — im Kleid der Listen.
 const ProductionOrdersPage = lazyNamed(() => import('../pages/production/ProductionOrdersPage'), 'ProductionOrdersPage');
-const ProductionProjectPage = lazyNamed(() => import('../pages/production/ProductionProjectPage'), 'ProductionProjectPage');
+const ProductionProjectPage = lazyNamed(() => import('../pages/production/project/ProductionProjectPage'), 'ProductionProjectPage');
+// Die Geräteseite (24.09.2026): eigener Rahmen ohne Kopfleiste (MainLayout,
+// `isDeviceFocusPath`); solange ihr Stück lädt, steht schon der Mac-Kreisel.
+const ProductionDevicePage = lazyNamed(
+    () => import('../pages/production/device/ProductionDevicePage'),
+    'ProductionDevicePage',
+    MacSpinnerScreen,
+);
 const ProductionLinesPage = lazyNamed(() => import('../pages/production/ProductionLinesPage'), 'ProductionLinesPage');
 // Schaltschränke (20.09.2026): die Seriennummern und der Typenkatalog.
 const PanelUnitsPage = lazyNamed(() => import('../pages/production/PanelUnitsPage'), 'PanelUnitsPage');
@@ -317,7 +325,9 @@ export const renderAppPageRoutes = () => (
         <Route path="/accounting" element={<Navigate to="/accounting/invoices" replace />} />
         <Route path="/accounting/invoices" element={page(OutgoingInvoicesPage)} />
         <Route path="/accounting/invoices/new" element={page(NewInvoicePage)} />
-        <Route path="/accounting/invoices/new/direct" element={page(InvoiceDirectPage)} />
+        {/* Die Direktrechnung steht im Kleid der Pano-Seiten (25.09.2026) und
+            darum in derselben Apple-Hülle wie die Produktion. */}
+        <Route path="/accounting/invoices/new/direct" element={applePage(InvoiceDirectPage)} />
         <Route path="/accounting/invoices/:id" element={page(InvoiceDetailPage)} />
         <Route path="/accounting/to-bill" element={page(ToBillPage)} />
         <Route path="/sales/invoices" element={<LegacyInvoicesRedirect />} />
@@ -361,6 +371,7 @@ export const renderAppPageRoutes = () => (
         <Route path="/production" element={<Navigate to="/production/orders" replace />} />
         <Route path="/production/orders" element={productionPage(ProductionOrdersPage)} />
         <Route path="/production/orders/:projectId" element={productionPage(ProductionProjectPage)} />
+        <Route path="/production/orders/:projectId/devices/:deviceId" element={productionPage(ProductionDevicePage)} />
         <Route path="/production/lines" element={productionPage(ProductionLinesPage)} />
         {/* Schaltschränke: die Serienliste, dahinter der Typenkatalog. */}
         <Route path="/production/panels" element={productionPage(PanelUnitsPage)} />

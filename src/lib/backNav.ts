@@ -157,12 +157,50 @@ const EXPLICIT_RULES: Array<{ test: RegExp; to: (match: RegExpMatchArray) => str
         to: () => '/montage/orders/active',
         labelKey: 'montage.home.active',
     },
+    // Die Geräteseite der Produktion (24.09.2026) gehört zu IHREM Projekt —
+    // nicht zur Projektliste, auch wenn sie als Lesezeichen geöffnet wurde.
+    {
+        test: /^\/production\/orders\/([^/]+)\/devices\/[^/]+$/,
+        to: (match) => `/production/orders/${match[1]}`,
+        labelKey: 'production.project.title',
+    },
 ];
 
 /** Abfrageteil weg, Schrägstrich am Ende weg — '/crm/customers/' == '/crm/customers'. */
 const normalize = (pathname: string): string => {
     const clean = (pathname.split('?')[0] || '').replace(/\/+$/, '');
     return clean || '/';
+};
+
+/**
+ * ── BILDSCHIRME MIT REITERN (Vorgabe Samet, 24.09.2026) ─────────────────────
+ * «Proje taplarının her birinin id'si olmalı; geriye bastıkça aralarında geri
+ *  gitmeli, ve bu sayfadan geriye basınca o tab'a gitmeli.»
+ *
+ * Die Projektseite trägt ihren Reiter in der Adresse (`?section=…&sub=…`).
+ * Für den Besuchsweg ist JEDER Reiter ein eigener Bildschirm: so führt der
+ * Pfeil von «Siparişlerim» zurück auf «Pozisyon Özeti», und aus einer
+ * Bestellung zurück genau auf den Reiter, aus dem sie geöffnet wurde. Alle
+ * anderen Seiten bleiben, wie sie waren: für sie zählt nur der Pfad.
+ */
+const TABBED_SCREENS: Array<{ test: RegExp; params: string[]; defaults: Record<string, string> }> = [
+    // `/projects/:id` — nicht die alten Umleitungen `/projects/flow` und `/projects/installation`.
+    { test: /^\/projects\/(?!flow$|installation$)[^/]+$/, params: ['section', 'sub'], defaults: { section: 'overview' } },
+];
+
+/** Der Schlüssel eines Bildschirms: der Pfad, bei Reiterseiten samt Reiter. */
+export const screenKey = (pathname: string, search = ''): string => {
+    const path = normalize(pathname);
+    const rule = TABBED_SCREENS.find((entry) => entry.test.test(path));
+    if (!rule) return path;
+    const source = new URLSearchParams(search);
+    const kept = new URLSearchParams();
+    for (const name of rule.params) {
+        const value = source.get(name) || rule.defaults[name];
+        if (value) kept.set(name, value);
+    }
+    const query = kept.toString();
+    return query ? `${path}?${query}` : path;
 };
 
 /** Der Name einer Hauptseite — leer, wenn die Adresse keine ist. */
@@ -290,12 +328,14 @@ export const usePageBackTarget = (target: BackTarget | null | undefined) => {
  * zuletzt geöffneter Bildschirm → Adresse → Startseite.
  */
 export const useBackTarget = (): BackTarget | null => {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const override = useBackNavStore((state) => state.override);
     const visits = useBackNavStore((state) => state.visits);
     const current = useBackNavStore((state) => state.current);
     return useMemo(() => {
         const path = normalize(pathname);
+        // Reiterseiten: der angezeigte Bildschirm ist Pfad + Reiter.
+        const screen = screenKey(pathname, search);
         if (override && override.path === path) return { to: override.to, labelKey: override.labelKey };
         // Auf einer Hauptseite bleibt der Knopf der Schnellzugriff: der Rückweg
         // endet hier, weiter zurück führt das Menü.
@@ -303,10 +343,10 @@ export const useBackTarget = (): BackTarget | null => {
 
         // Beim ersten Bild nach einem Wechsel steht im Speicher noch der eben
         // verlassene Bildschirm als «laufender» — dann IST er der davor.
-        const previous = current && current.path !== path
+        const previous = current && current.path !== screen
             ? current
             : (visits.length ? visits[visits.length - 1] : null);
-        if (previous && previous.path !== path) {
+        if (previous && previous.path !== screen) {
             // Liegt der Bildschirm genau einen Verlaufseintrag tiefer, kann der
             // Pfeil einen echten Verlaufsschritt gehen — sonst wird seine
             // Adresse angesteuert (etwa nach einer Umleitung).
@@ -319,16 +359,17 @@ export const useBackTarget = (): BackTarget | null => {
         // Fenster: dann sagt die Adresse, wo es hingehört, und zuletzt die
         // Startseite. So bleibt der Pfeil überall ein Weg hinaus.
         return resolveBackTarget(path) || { to: '/', labelKey: MAIN_PAGES['/'] };
-    }, [override, pathname, visits, current]);
+    }, [override, pathname, search, visits, current]);
 };
 
 /* ── 4. Der Schreiber des Besuchswegs ───────────────────────────────────────*/
 
 /** Einmal im MainLayout aufgerufen — schreibt den Besuchsweg fort. */
 export const useBackNavTracker = () => {
-    const { pathname } = useLocation();
-    const path = normalize(pathname);
+    const { pathname, search } = useLocation();
+    // Reiterseiten zählen jeden Reiter als eigenen Bildschirm (siehe screenKey).
+    const screen = screenKey(pathname, search);
     useEffect(() => {
-        useBackNavStore.getState().visit(path, historyIndex());
-    }, [path]);
+        useBackNavStore.getState().visit(screen, historyIndex());
+    }, [screen]);
 };

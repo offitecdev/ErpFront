@@ -12,6 +12,9 @@ import { ProjectOverviewTab } from './tabs/ProjectOverviewTab';
 const LazyProjectPositionsTab = lazy(() =>
     import('../../../ProjectPositionsTab').then((module) => ({ default: module.ProjectPositionsTab })),
 );
+const LazyProjectProcurementTab = lazy(() =>
+    import('../../../ProjectProcurementTab').then((module) => ({ default: module.ProjectProcurementTab })),
+);
 const LazyBookingSection = lazy(() =>
     import('./booking/BookingSection').then((module) => ({ default: module.BookingSection })),
 );
@@ -122,6 +125,8 @@ export const renderProjectSection = (args: RenderSectionArgs): ReactNode => {
             );
         case 'positions':
             return deferredSection(<LazyProjectPositionsTab project={project} />);
+        case 'procurement':
+            return deferredSection(<LazyProjectProcurementTab project={project} />);
         case 'planning':
             return deferredSection(
                 <LazyBookingSection

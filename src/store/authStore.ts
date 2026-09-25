@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { apiClient, getShared } from '../lib/axios';
 import { takePrefetched } from '../lib/bootPrefetch';
 import { clearPersonPhotos } from '../lib/personPhotos';
+import type { CompanyType } from '../lib/companyType';
 
 interface User {
     id: string;
@@ -37,6 +38,11 @@ export interface TenantOption {
      * AN-2026-40001). 0 = bloksuz. Modül kategorisinden bağımsızdır.
      */
     companyNumber?: number;
+    /**
+     * Şirket türü — A Üretim / B Proje / C Satış. Yeni ürün formunun zorunlu
+     * alanlarını belirler; null/undefined = seçilmedi (yalnızca ürün adı).
+     */
+    companyType?: CompanyType | null;
     /**
      * Şirketin kendi adresi — PDF gönderici satırı ve QR fatura alacaklısı.
      * null/undefined = PDF ayarlarındaki ortak adres basılır.

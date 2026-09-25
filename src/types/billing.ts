@@ -612,6 +612,8 @@ export interface DirectInvoiceLineInput {
  * SIND der Betrag (Preise netto, `vatRate` schlägt darauf).
  */
 export interface CreateDirectInvoiceInput {
+    invoiceNumber?: string | null;
+    documentOptions?: import('../lib/invoiceDocument').InvoiceDocumentOptions;
     paymentStages?: import('@/lib/paymentSchedule').PaymentStage[] | null;
     customerId?: string | null;
     recipientName: string;

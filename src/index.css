@@ -880,6 +880,45 @@ main input[type="checkbox"],
   .ofi-dotring { animation-duration: 3.2s; }
 }
 
+/* Der Mac-Kreisel (24.09.2026) — siehe MacSpinner in ui-shared/Loader.tsx.
+   Zwölf Speichen im Kreis, die vorderste am dunkelsten; die blasseren folgen
+   ihr GEGEN den Uhrzeigersinn, denn gedreht wird mit ihm: so läuft der Kopf
+   vorn und der Schweif hinterher wie beim Kreisel von macOS. Zwölf Sprünge
+   je Umdrehung — fliessend gedreht verschwämmen die Speichen. */
+@keyframes ofi-macspin-turn {
+  to { transform: rotate(360deg); }
+}
+.ofi-macspin {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--ofi-macspin-size, 30px);
+  height: var(--ofi-macspin-size, 30px);
+  color: #1d1d1f;
+  animation: ofi-macspin-turn 0.96s steps(12) infinite;
+}
+.dark .ofi-macspin { color: #f5f5f7; }
+.ofi-macspin > i {
+  position: absolute;
+  inset: 0;
+  transform: rotate(calc(var(--ofi-macspin-i) * -30deg));
+}
+.ofi-macspin > i::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 9%;
+  height: 28%;
+  margin-left: -4.5%;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: calc(0.78 - var(--ofi-macspin-i) * 0.055);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ofi-macspin { animation-duration: 3.6s; }
+}
+
 /* Laufende Punkte hinter einem Ladehinweis ("Daten werden geladen" • • •) —
    siehe LoadingDots in ui-shared/Loader.tsx. Die Punkte bleiben als Zeichen
    stehen und pulsieren nur, damit die Textbreite NICHT springt. Jeder Punkt

@@ -38,6 +38,10 @@ import './styles/headerMac.css'
 // `.ofi-topbar--compact` marker, so the existing sidebar view is untouched.
 import './styles/topNavigation.css'
 import './styles/headerToolbar.css'
+// Die schmale Leiste der Geräteseite (24.09.2026): Glocke, Sprache und Profil
+// wohnen dort unten in der Leiste — nach den Kopfleisten-Kleidern, damit ihre
+// kleinen Felder gegen deren Masse gewinnen.
+import './styles/focusRail.css'
 import './styles/motion.css'
 import { initI18n } from './i18n'
 import './store/themeStore' // applies persisted light/dark theme before first paint

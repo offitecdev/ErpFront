@@ -1,4 +1,5 @@
-import type { ArticleDetail, ArticleDetailPatch, ItemType } from '@/types/inventory';
+import type { ArticleDetail, ArticleDetailPatch, ArticleKind } from '@/types/inventory';
+import type { SupplierPick } from '../components/SupplierMultiSelect';
 import { parseNum } from '../utils/format';
 
 /** Düzenlenebilir alanların taslak hâli — hepsi metin, kaydederken çevrilir. */
@@ -11,10 +12,23 @@ export interface DetailDraft {
     supplierBarcode: string;
     unit: string;
     salePrice: string;
-    /** Ürün/hizmet anahtarı — varsayılan PRODUCT, detaydan değiştirilir. */
-    itemType: ItemType;
+    /**
+     * Üçlü ürün türü (23.09.2026) — eski Ürün/Hizmet anahtarının yerinde.
+     * Sunucu ürün/hizmet ayrımını bundan türetir; null = seçilmemiş.
+     */
+    articleKind: ArticleKind | null;
+    /** Tedarikçiler (23.09.2026) — ilki tercih edilen; yeni yazılan yalnızca adıyla. */
+    suppliers: SupplierPick[];
     description: string;
 }
+
+/**
+ * Kayıtlı tür; türü seçilmemiş eski bir HİZMET "Ek Hizmet" olarak görünür —
+ * taslak da karşılaştırma da bu aynı değerden başlar, açılışta sahte
+ * değişiklik doğmaz.
+ */
+export const kindOfDetail = (detail: ArticleDetail): ArticleKind | null =>
+    detail.articleKind ?? (detail.itemType === 'SERVICE' ? 'SERVICE' : null);
 
 /** Sunucudaki kayıttan taslak üretir (ekranın başlangıç değerleri). */
 export const draftFromDetail = (detail: ArticleDetail): DetailDraft => ({
@@ -25,7 +39,8 @@ export const draftFromDetail = (detail: ArticleDetail): DetailDraft => ({
     supplierBarcode: detail.supplierBarcode ?? '',
     unit: detail.unit,
     salePrice: String(detail.salePrice ?? 0),
-    itemType: detail.itemType === 'SERVICE' ? 'SERVICE' : 'PRODUCT',
+    articleKind: kindOfDetail(detail),
+    suppliers: (detail.suppliers ?? []).map((link) => ({ supplierId: link.supplierId, name: link.companyName })),
     description: detail.description ?? '',
 });
 
@@ -65,7 +80,17 @@ export const buildDetailPatch = (
     const salePrice = parseNum(draft.salePrice) ?? 0;
     if (salePrice !== (detail.salePrice ?? 0)) patch.salePrice = salePrice;
 
-    if (draft.itemType !== (detail.itemType === 'SERVICE' ? 'SERVICE' : 'PRODUCT')) patch.itemType = draft.itemType;
+    if (draft.articleKind !== kindOfDetail(detail)) patch.articleKind = draft.articleKind;
+
+    // Tedarikçiler TAM liste olarak gider — sıra da anlamlıdır (ilki tercih edilen).
+    const savedSuppliers = (detail.suppliers ?? []).map((link) => link.supplierId);
+    const suppliersSame = draft.suppliers.length === savedSuppliers.length
+        && draft.suppliers.every((pick, index) => pick.supplierId === savedSuppliers[index]);
+    if (!suppliersSame) {
+        patch.suppliers = draft.suppliers.map((pick) => (pick.supplierId
+            ? { supplierId: pick.supplierId }
+            : { supplierName: pick.name }));
+    }
 
     if (draft.description !== (detail.description ?? '')) patch.description = draft.description;
 

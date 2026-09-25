@@ -63,6 +63,7 @@ export interface TenderPdfData {
          */
         discounts?: TenderPdfDiscount[];
         taxRate?: number;
+        hideTax?: boolean;
         lineTotal?: number;
         total?: number;
         isParent?: boolean;
@@ -97,6 +98,7 @@ export interface TenderPdfData {
      * Platz, an dem er steht (siehe `showPaymentTerms` für das Abschalten).
      */
     paymentTermsText?: string | null;
+    paymentTermsLabel?: string;
     /**
      * true: die Positionstabelle wird NICHT gezeichnet — der Beleg springt vom
      * Titel direkt auf den Summenblock. Der Abschnitt „Positionen" einer
@@ -113,6 +115,10 @@ export interface TenderPdfData {
     senderLine?: string | null;
     referenceNumber?: string;
     qrBillEnabled?: boolean;
+    showFooter?: boolean;
+    showVat?: boolean;
+    /** Belgeye özel etiketler (ör. İngilizce faturanın sütun adları); dil tablosunun üstüne yazılır. */
+    labels?: Partial<PdfStrings>;
     /** PDF dili (indirmeden önce seçilir). Varsayılan: Almanca. */
     lang?: PdfLang;
     /** Opsiyonel içerik blokları — boş olanlar atlanır. */
@@ -848,11 +854,12 @@ async function renderTenderPdfBytes(
     onProgress?: (p: TenderPdfProgress) => void
 ): Promise<Uint8Array> {
     const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    doc.setProperties({ title: data.tenderNumber, subject: data.docTitle || '', creator: 'Offitec' });
     await registerFonts(doc);
     const logo = await loadLogo(doc);
     const wave = await loadHeaderWave(WAVE_W, WAVE_H);
     const fmt = fmtMoneyForCurrency(settings.currency);
-    const L = I18N[data.lang ?? 'de'];
+    const L = { ...I18N[data.lang ?? 'de'], ...(data.showVat === false ? { colTax: '' } : {}), ...data.labels };
     data = { ...data, tenderNumber: data.tenderNumber };
 
     // ── SAYFA 1: Kapak & giriş ───────────────────────────────────────────────
@@ -954,7 +961,7 @@ async function renderTenderPdfBytes(
     for (let i = 1; i <= contentPageCount; i++) {
         doc.setPage(i);
         drawPageHeader(doc, logo, wave, settings);
-        drawPageFooter(doc, i, contentPageCount, L);
+        if (data.showFooter !== false) drawPageFooter(doc, i, contentPageCount, L);
     }
 
     return new Uint8Array(doc.output('arraybuffer'));
@@ -1496,7 +1503,10 @@ function normalizePdfText(text: string, options?: { dropCatalogCodes?: boolean }
         .replace(/­/g, '')
         .split(/\r?\n/)
         .map((line) => normalizeTrackedLetters(line));
-    return (options?.dropCatalogCodes ? lines.filter((line) => !looksLikeCatalogCode(line)) : lines)
+    const kept = options?.dropCatalogCodes ? lines.filter((line) => !looksLikeCatalogCode(line)) : lines;
+    // Besteht der Titel NUR aus einem Code («WWRC-95.2CI513»), IST der Code der
+    // Name — sonst stünde die Zeile ohne Bezeichnung da (24.09.2026).
+    return (kept.some((line) => line.trim()) ? kept : lines)
         .join('\n')
         .trim();
 }
@@ -1719,7 +1729,7 @@ function drawNumerics(doc: jsPDF, pos: TenderPdfData['positions'][number], baseY
     const unitPrice = pos.unitPrice ?? 0;
     const discount = pos.discount ?? 0;
     const taxRate = pos.taxRate ?? 0;
-    const fallbackLineTotal = qty * unitPrice * (1 - discount / 100) * (1 + (taxRate || 8.1) / 100);
+    const fallbackLineTotal = qty * unitPrice * (1 - discount / 100) * (1 + taxRate / 100);
     const total = pos.lineTotal ?? (!pos.isParent ? (pos.total ?? fallbackLineTotal) : 0);
     // Kapitel/Titel satırında Menge · E. Preis · Rabatt · MwSt. · Preis sütunları
     // HİÇ çizilmez (kullanıcı isteği): başlık bir fiyat satırı gibi görünmemeli.
@@ -1747,7 +1757,7 @@ function drawNumerics(doc: jsPDF, pos: TenderPdfData['positions'][number], baseY
         drawFittedRight(doc, line, C_DISC_R, W_DISC, baseY + index * DISC_LINE_H, 'normal');
     });
     doc.setTextColor(...C.LABEL);
-    drawFittedRight(doc, fmtVatRate(taxRate || 8.1), C_VAT_R, W_VAT, baseY, 'normal');
+    if (!pos.hideTax) drawFittedRight(doc, fmtVatRate(taxRate), C_VAT_R, W_VAT, baseY, 'normal');
     doc.setTextColor(...C.TEXT);
     // Auch ein negativer Betrag gehört in die Spalte: sonst stünde eine
     // Ausgleichszeile ohne Zahl da und die Spalte ginge nicht auf (der
@@ -1999,7 +2009,7 @@ function measureTermsCard(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings
  */
 function measureTotalsBlock(doc: jsPDF, data: TenderPdfData, s: PdfCompanySettings, L: PdfStrings): number {
     const discountRows = (data.totals?.discounts ?? []).filter((entry) => (entry?.amount ?? 0) > 0).length;
-    const rowCount = (discountRows > 0 ? 1 + discountRows : 0) + 2; // [Zwischensumme + Rabatte] + Netto + MwSt.
+    const rowCount = (discountRows > 0 ? 1 + discountRows : 0) + 1 + (data.showVat === false ? 0 : 1);
     const totalsH = rowCount * TOTALS_ROW_H + 1 + TOTALS_BAND_H;
     const termsH = wantsPaymentTerms(data) ? measureTermsCard(doc, data, s, L) : 0;
     return Math.max(totalsH, termsH) + 4;
@@ -2026,7 +2036,7 @@ function drawTermsCard(doc: jsPDF, y: number, data: TenderPdfData, s: PdfCompany
     doc.setFont(FONT, 'bold');
     doc.setFontSize(8.4);
     doc.setTextColor(...C.NAVY);
-    doc.text(L.paymentTerms, textX, y + TERMS_PAD + 2.6);
+    doc.text(data.paymentTermsLabel || L.paymentTerms, textX, y + TERMS_PAD + 2.6);
 
     doc.setFont(FONT, 'normal');
     doc.setFontSize(FS_BASE);
@@ -2102,7 +2112,7 @@ function drawTotals(
         // toplamı ayrıca yazmak aynı indirimi iki kez veriyormuş gibi okunuyordu.
     }
     totalRow(L.net, fmt(net));
-    totalRow(`${L.vat} ${fmtVatRate(s.vatRate)}`, fmt(vat));
+    if (data.showVat !== false) totalRow(`${L.vat} ${fmtVatRate(s.vatRate)}`, fmt(vat));
 
     // Genel toplam: sert blok yerine yumuşak tonlu bant + lacivert vurgu.
     // Bant, ekrandaki büyütülmüş toplam satırıyla uyumlu olsun diye eskisinden

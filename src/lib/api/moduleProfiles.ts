@@ -1,4 +1,5 @@
 import { apiClient } from '../axios';
+import type { CompanyType } from '../companyType';
 
 /** Company category ("Numara" profile): a bundle of enabled module keys. */
 export interface ModuleProfileDto {
@@ -41,5 +42,10 @@ export const moduleProfileApi = {
      */
     setTenantNumber: async (tenantId: string, companyNumber: number): Promise<void> => {
         await apiClient.patch('/module-profiles/assign/tenant-number', { tenantId, companyNumber });
+    },
+
+    /** Şirket türü (A Üretim / B Proje / C Satış); null türü temizler. */
+    setTenantType: async (tenantId: string, companyType: CompanyType | null): Promise<void> => {
+        await apiClient.patch('/module-profiles/assign/tenant-type', { tenantId, companyType });
     },
 };

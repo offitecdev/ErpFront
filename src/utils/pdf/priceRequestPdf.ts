@@ -653,6 +653,7 @@ export async function buildPriceRequestPdfBytes(
         fixed: ['qty'],
         hidden: new Set([...(order.hiddenColumnKeys ?? []), 'code']),
         maxExtras: PDF_MAX_EXTRA_COLUMNS,
+        lang,
     }).map((column) => ({ ...column, caption: upper(column.caption) }));
     const layout = buildTableLayout(doc, order, columns);
     const st: TableState = { y: 0 };

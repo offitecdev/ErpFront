@@ -90,9 +90,9 @@ export const billingApi = {
      * Erfassungsmaske. Sie bewegt den Zähler NICHT: vergeben wird sie erst
      * beim Erstellen, darum ist sie eine Auskunft und keine Reservierung.
      */
-    nextInvoiceNumber: async (): Promise<string | null> => {
+    nextInvoiceNumber: async (direct?: { language: string; year: number }): Promise<string | null> => {
         try {
-            const res = await apiClient.get('/billing/invoices/next-number');
+            const res = await apiClient.get('/billing/invoices/next-number', { params: direct ? { direct: true, ...direct } : undefined });
             return res.data?.invoiceNumber ?? null;
         } catch {
             return null;
@@ -111,9 +111,8 @@ export const billingApi = {
      * jeder andere Status löscht es serverseitig wieder.
      */
     /**
-     * Eine Direktrechnung als GANZES neu schreiben. Nummer und Zahlungsstand
-     * bleiben beim Beleg — der Server lässt weder eine bezahlte noch eine
-     * stornierte Rechnung ändern.
+     * Eine Direktrechnung mitsamt Belegnummer und PDF-Einstellungen ändern.
+     * Bezahlte und stornierte Rechnungen bleiben gesperrt.
      */
     updateDirectInvoice: async (id: string, input: CreateDirectInvoiceInput): Promise<{ message: string; invoice: InvoiceDto }> => {
         const res = await apiClient.put(`/billing/invoices/${id}/direct`, input);

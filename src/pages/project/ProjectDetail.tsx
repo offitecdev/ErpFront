@@ -19,7 +19,7 @@ import {
     hasAddonAttention,
 } from './features/utils/projectTotals';
 import { getAwaitingTechnicianAppointments } from './features/utils/projectAppointments';
-import { type ProjectDetailView, viewForSection, viewFromSearch } from './features/types/projectDetailNavigation';
+import { type ProjectDetailView, sameView, searchForView, viewForSection, viewFromSearch } from './features/types/projectDetailNavigation';
 
 import { t } from '@/i18n/translate';
 import { lazyToast as toast } from '@/lib/lazyToast';
@@ -42,18 +42,24 @@ const LazyProjectOrderPickerModal = lazy(() =>
 export const ProjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { search } = useLocation();
+    const { pathname, search } = useLocation();
     const { user, permissions } = useAuthStore();
-    // ?section=&sub= — Benachrichtigungen landen direkt im passenden Bereich.
-    const [activeView, setActiveView] = useState<ProjectDetailView>(() => viewFromSearch(search));
-    // Ein weiterer Sprung (andere Benachrichtigung, gleiche Seite) wechselt den
-    // Bereich mit — Zustand beim Rendern nachziehen, wie React es für "Wert
-    // hängt an einer Prop" vorsieht (kein Effekt, kein Zusatz-Render).
-    const [seenSearch, setSeenSearch] = useState(search);
-    if (seenSearch !== search) {
-        setSeenSearch(search);
-        if (new URLSearchParams(search).has('section')) setActiveView(viewFromSearch(search));
-    }
+    /* ── DER REITER STEHT IN DER ADRESSE (Vorgabe Samet, 24.09.2026) ────────
+       «Proje taplarının her birinin id'si olmalı, geriye bastıkça aralarında
+       geri gitmeli, ve bu sayfadan geriye basınca o tab'a gitmeli.»
+       Die Ansicht wird aus `?section=&sub=` GELESEN, nicht als Zustand
+       gehalten: jeder Reiterwechsel legt einen Verlaufseintrag an, «Zurück»
+       (Browser wie Pfeil in der Kopfleiste, siehe lib/backNav.ts) geht von
+       Reiter zu Reiter, und wer aus einer Bestellung zurückkommt, landet auf
+       dem Reiter, aus dem er sie geöffnet hat. Benachrichtigungen springen
+       wie bisher mit derselben Adresse direkt in den Bereich. */
+    const activeView = useMemo<ProjectDetailView>(() => viewFromSearch(search), [search]);
+    const setActiveView = useCallback((next: ProjectDetailView | ((view: ProjectDetailView) => ProjectDetailView)) => {
+        const current = viewFromSearch(search);
+        const view = typeof next === 'function' ? next(current) : next;
+        if (sameView(view, current)) return;
+        navigate({ pathname, search: searchForView(view, search) });
+    }, [navigate, pathname, search]);
     const { project, materials, mailSettings, loading, sectionLoading, loadError, load, invalidate } = useProjectDetailData(id, activeView);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [showComplete, setShowComplete] = useState(false);
@@ -136,12 +142,12 @@ export const ProjectDetail = () => {
                 view.section === 'overview' || view.section === 'billing' ? view : { section: 'overview' }
             ));
         }
-    }, [salesOrders]);
+    }, [salesOrders, setActiveView]);
 
     const handleCreateAddon = useCallback((parentOrderId: string) => {
         setSelectedOrderId(parentOrderId);
         setActiveView(viewForSection('addons'));
-    }, []);
+    }, [setActiveView]);
 
     const handleReload = useCallback(() => load(true), [load]);
 

@@ -1,6 +1,9 @@
 import { apiClient, getShared, MAIL_REQUEST_TIMEOUT_MS } from '../axios';
 import { itGateHeaders } from '../itGate';
 import { cachedQuery, peekQueryState, refreshQuery } from './queryCache';
+import i18n from '@/i18n';
+import { purchaseLangOf } from '@/utils/purchaseCode';
+import { localizeStandardTemplate } from '@/utils/standardOrderColumns';
 import type {
     PurchaseOrderMergeCandidate,
     InventoryLocation,
@@ -33,6 +36,8 @@ import type {
     BulkArticleItemInput,
     QuickArticleItemInput,
     BulkArticlesResult,
+    SingleArticleInput,
+    SingleArticleResult,
     BulkMovementItemInput,
     BulkMovementsResult,
     ScanLookupResult,
@@ -309,6 +314,16 @@ export const inventoryApi = {
         return res.data;
     },
 
+    /**
+     * Yeni ürün formu (23.09.2026): TEK ürün, ERP kodu olmadan (sunucu geçici
+     * AA-BB kodunu verir), birden fazla tedarikçi ve üçlü ürün türüyle. Proje
+     * ve satış şirketlerinde tür ve tedarikçi sunucuda da zorunludur.
+     */
+    createSingleArticle: async (input: SingleArticleInput): Promise<SingleArticleResult> => {
+        const res = await apiClient.post('/inventory/articles/single', input);
+        return res.data;
+    },
+
     /** Gescannten Code (Barcode / Seriennummer / ERP-Code) einem Artikel zuordnen. */
     scanLookup: async (code: string): Promise<ScanLookupResult> => {
         const res = await apiClient.get(`/inventory/articles/scan-lookup?code=${encodeURIComponent(code)}`);
@@ -400,6 +415,12 @@ export const inventoryApi = {
 
     getSupplier: async (id: string): Promise<SupplierRow> => {
         const res = await apiClient.get(`/inventory/suppliers/${id}`);
+        return res.data;
+    },
+
+    // Sipariş ekranı: seçilen tedarikçinin yalnızca KDV ayarı.
+    getSupplierVat: async (id: string): Promise<Pick<SupplierRow, 'id' | 'vatLiable' | 'vatCountry' | 'vatRate'>> => {
+        const res = await apiClient.get(`/inventory/suppliers/${id}/vat`);
         return res.data;
     },
 
@@ -552,6 +573,16 @@ export const purchaseOrdersApi = {
     },
 
     /**
+     * SİPARİŞ → FİYAT TALEBİ (24.09.2026, «Fiyat talebi almak istiyorum»):
+     * AYNI kayıt talebe döner; sipariş numarası saklı kalır ve talep yeniden
+     * siparişe dönüştürülünce geri gelir.
+     */
+    convertToRequest: async (id: string): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/convert-to-request`);
+        return res.data;
+    },
+
+    /**
      * ZUSAMMENFÜHREN (21.09.2026): die Vorgänge der NACHBARSTUFE, mit denen
      * sich dieser vereinen lässt — und das Vereinen selbst. Die Nummer DIESES
      * Vorgangs bleibt die gültige; der andere geht in ihm auf und verschwindet.
@@ -667,7 +698,9 @@ export const purchaseOrdersApi = {
         if (supplierId) params.set('supplierId', supplierId);
         const query = `?${params.toString()}`;
         const res = await apiClient.get(`/inventory/purchase-orders/supplier-templates${query}`);
-        return res.data?.items ?? [];
+        // STANDART ŞABLON seçili dilde (24.09.2026): adı ve sütun başlıkları.
+        const lang = purchaseLangOf(i18n.resolvedLanguage || i18n.language);
+        return ((res.data?.items ?? []) as SupplierOrderTemplate[]).map((item) => localizeStandardTemplate(item, lang));
     },
 
     createSupplierTemplate: async (input: {

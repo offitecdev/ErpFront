@@ -1,0 +1,145 @@
+/* ═══ "ADD TO STOCK?" — THE BUBBLE BESIDE A QUOTE LINE (23.09.2026) ═══════════
+   Samet: the macOS popover from modalls.png, turned SIDEWAYS and as narrow
+   as the row — no search field; an Apple-blue "Ekle" and the circled X
+   (SF Symbol xmark.circle.fill) next to it.
+
+   The bubble is portalled to <body> (the line table clips and scrolls), so
+   its colours live in their own variables instead of the `--quote-*` tokens,
+   which only exist inside the quote page. */
+
+body > .ofi-stock-ask {
+    --ofi-stock-ask-surface: rgba(250, 251, 254, 0.94);
+    --ofi-stock-ask-edge: rgba(100, 108, 123, 0.24);
+    --ofi-stock-ask-ink: #1d1d1f;
+    --ofi-stock-ask-accent: #0a7aff;
+    --ofi-stock-ask-accent-hover: #0066e0;
+    --ofi-stock-ask-close: rgba(60, 60, 67, 0.3);
+    --ofi-stock-ask-close-hover: rgba(60, 60, 67, 0.5);
+    --ofi-circle-x-glyph: #fff;
+    position: fixed;
+    z-index: 1000;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 5px 0 12px;
+    border: 1px solid var(--ofi-stock-ask-edge);
+    border-radius: 10px;
+    background: var(--ofi-stock-ask-surface);
+    -webkit-backdrop-filter: blur(22px) saturate(1.55);
+    backdrop-filter: blur(22px) saturate(1.55);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.13), 0 2px 6px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+    color: var(--ofi-stock-ask-ink);
+    font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+    font-size: 12.5px;
+    line-height: 1;
+    white-space: nowrap;
+    transform-origin: left center;
+    animation: ofi-stock-ask-in 170ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+body > .ofi-stock-ask[data-side='left'] { transform-origin: right center; }
+
+/* The arrow: a rotated square on the edge, same fill, two sides carrying
+   the border line — it points at the name in the row. */
+body > .ofi-stock-ask::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    width: 11px;
+    height: 11px;
+    margin-top: -5.5px;
+    border-bottom: 1px solid var(--ofi-stock-ask-edge);
+    border-left: 1px solid var(--ofi-stock-ask-edge);
+    border-radius: 0 0 0 2px;
+    background: var(--ofi-stock-ask-surface);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+body > .ofi-stock-ask[data-side='left']::before {
+    right: -6px;
+    left: auto;
+    transform: rotate(225deg);
+}
+
+body > .ofi-stock-ask .ofi-stock-ask__text {
+    font-weight: 500;
+    letter-spacing: -0.005em;
+}
+
+/* "Ekle" — the small macOS default button in system blue. */
+body > .ofi-stock-ask .ofi-stock-ask__add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    min-width: 48px;
+    margin: 0;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--ofi-stock-ask-accent);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), inset 0 0.5px 0 rgba(255, 255, 255, 0.25);
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease, transform 80ms ease;
+}
+
+body > .ofi-stock-ask .ofi-stock-ask__add:hover { background: var(--ofi-stock-ask-accent-hover); }
+body > .ofi-stock-ask .ofi-stock-ask__add:active { transform: scale(0.97); }
+body > .ofi-stock-ask .ofi-stock-ask__add:focus-visible { outline: 3px solid rgba(10, 122, 255, 0.35); outline-offset: 1px; }
+
+/* The circled X (xmark.circle.fill): grey disc, white cross. */
+body > .ofi-stock-ask .ofi-stock-ask__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ofi-stock-ask-close);
+    cursor: pointer;
+    transition: color 120ms ease, transform 80ms ease;
+}
+
+body > .ofi-stock-ask .ofi-stock-ask__close:hover { color: var(--ofi-stock-ask-close-hover); }
+body > .ofi-stock-ask .ofi-stock-ask__close:active { transform: scale(0.94); }
+body > .ofi-stock-ask .ofi-stock-ask__close:focus-visible { outline: 2px solid rgba(10, 122, 255, 0.45); outline-offset: 1px; }
+body > .ofi-stock-ask .ofi-stock-ask__close svg { display: block; }
+
+html.dark body > .ofi-stock-ask {
+    --ofi-stock-ask-surface: rgba(44, 44, 48, 0.94);
+    --ofi-stock-ask-edge: rgba(255, 255, 255, 0.16);
+    --ofi-stock-ask-ink: #f2f2f5;
+    --ofi-stock-ask-accent: #3b8dff;
+    --ofi-stock-ask-accent-hover: #5c9fff;
+    --ofi-stock-ask-close: rgba(235, 235, 245, 0.34);
+    --ofi-stock-ask-close-hover: rgba(235, 235, 245, 0.55);
+    --ofi-circle-x-glyph: #1c1c1e;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+@keyframes ofi-stock-ask-in {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body > .ofi-stock-ask { animation: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    body > .ofi-stock-ask { --ofi-stock-ask-surface: #fafafa; }
+    html.dark body > .ofi-stock-ask { --ofi-stock-ask-surface: #2c2c30; }
+}

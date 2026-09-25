@@ -1,3 +1,4 @@
+import type { PurchaseLineSource } from '@/types/inventory';
 // UI-seviyesi tipler — yeni tablo tabanlı envanter modülü.
 // API/veri tipleri src/types/inventory.ts içinde yaşar; burada yalnızca
 // sayfaların ve bileşenlerin kendi satır/sihirbaz modelleri tutulur.
@@ -114,6 +115,12 @@ export interface DraftOrderRow {
      * mehreren wählt die Tabelle es je Zeile (Spalte «Gerät»).
      */
     productionItemId?: string | null;
+    /**
+     * PROJE KAYNAĞI (24.09.2026): satır bir projenin pozisyonundan «Siparişe
+     * Git» ile geldiyse proje/pozisyon burada durur ve kayıtta AYNEN geri
+     * gönderilir — birleştirme ve «Siparişlerim» bunu okur.
+     */
+    source?: PurchaseLineSource | null;
     receivedAt: string | null;
     error?: string | null;
 

@@ -29,6 +29,9 @@
  */
 
 import { t } from '@/i18n/translate';
+import i18n from '@/i18n';
+import { purchaseLangOf } from '@/utils/purchaseCode';
+import { displayColumnName } from '@/utils/standardOrderColumns';
 import type {
     AiExtractedRow,
     OrderCalcMode,
@@ -217,7 +220,8 @@ export const tableColumnsFromTemplate = (
         columns.push({
             id: column.label ? LABEL_TO_COLUMN[column.label] : column.key,
             key: column.key,
-            name: column.name,
+            // Standart şablonun sütunu (24.09.2026): başlık o anki dilde.
+            name: displayColumnName(column.key, column.name, purchaseLangOf(i18n.resolvedLanguage || i18n.language)),
             type: column.type,
             width: column.width,
             label: column.label ?? null,

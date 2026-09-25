@@ -12,6 +12,7 @@ import type {
     ProductionPickerProject,
     ProductionProject,
     ProductionProjectDetail,
+    ProductionProjectDevices,
     ProductionPurchaseAssignment,
     ProductionSelection,
     ProductionSettings,
@@ -41,6 +42,8 @@ export const productionApi = {
 
     overview: () => get<ProductionOverview>('/production/overview'),
     project: (id: string) => get<ProductionProjectDetail>(`/production/projects/${id}`),
+    /** Prozess-Stufe «Geräte» eines Produktionsprojekts (24.09.2026). */
+    devices: (id: string) => get<ProductionProjectDevices>(`/production/projects/${id}/devices`),
     lines: (params: { projectId?: string; search?: string } = {}) => get<ProductionLinesPage>('/production/lines', params),
     item: (id: string) => get<ProductionItemDetail>(`/production/items/${id}`),
 
@@ -85,6 +88,12 @@ export const readProductionProject = (
 
 export const refreshProductionProject = (id: string) =>
     refreshQuery(`production:project:${id}`, () => productionApi.project(id), PAGE_CACHE);
+
+export const readProductionDevices = (
+    id: string,
+    onValue: (value: ProductionProjectDevices, fresh: boolean) => void,
+    onError?: (error: unknown) => void,
+) => readQuery(`production:devices:${id}`, () => productionApi.devices(id), PAGE_CACHE, onValue, onError);
 
 export const readProductionLines = (
     params: { projectId?: string; search?: string },

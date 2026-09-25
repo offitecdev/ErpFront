@@ -48,6 +48,7 @@ export function DocumentWorkspace({
     discounts, onDiscountsChange,
     closingText, onClosingTextChange, closingPlaceholder,
     vat,
+    closingLabel,
     formatMoney, readOnly = false,
     minderung,
 }: {
@@ -64,8 +65,9 @@ export function DocumentWorkspace({
     closingText?: string;
     onClosingTextChange?: (value: string) => void;
     closingPlaceholder?: string;
+    closingLabel?: string;
     /** MwSt-Satz; fehlt er, rechnet die Fläche ohne Steuerzeile (Nachtrag). */
-    vat?: { rate: number; onRateChange: (value: number) => void };
+    vat?: { rate: number; onRateChange: (value: number) => void; enabled?: boolean; onEnabledChange?: (enabled: boolean) => void; text?: string; onTextChange?: (value: string) => void };
     formatMoney: (value: number) => string;
     readOnly?: boolean;
     /**
@@ -113,7 +115,8 @@ export function DocumentWorkspace({
     const subtotal = lines.reduce((sum, line) => sum + documentLineAmount(line), 0);
     const breakdown = signedDiscounts(subtotal, discounts);
     const netTotal = Math.round((breakdown.remaining + Number.EPSILON) * 100) / 100;
-    const vatTotal = vat ? Math.round(((netTotal * vat.rate) / 100 + Number.EPSILON) * 100) / 100 : 0;
+    const vatActive = Boolean(vat && vat.enabled !== false);
+    const vatTotal = vatActive && vat ? Math.round(((netTotal * vat.rate) / 100 + Number.EPSILON) * 100) / 100 : 0;
     const grossTotal = Math.round((netTotal + vatTotal + Number.EPSILON) * 100) / 100;
 
     /* Immer nur EIN Bereich offen (Vorgabe): der Knopf schliesst seinen eigenen
@@ -147,7 +150,7 @@ export function DocumentWorkspace({
             <div className="document-tabs">
                 {tab('letter', <FileText size={15} />, t('documentEditor.coverLetter'))}
                 {tab('plan', <CalendarDays size={15} />, t('billing.paymentScheduleTab'), stages.length)}
-                {onClosingTextChange ? tab('closing', <FileCheck02 size={15} />, t('invoices.section_closing')) : null}
+                {onClosingTextChange ? tab('closing', <FileCheck02 size={15} />, closingLabel || t('invoices.section_closing')) : null}
                 {tab('discount', <Plus size={15} />, t('tenders.total_discount'), discounts.length)}
             </div>
 
@@ -165,7 +168,7 @@ export function DocumentWorkspace({
                         <textarea
                             className="document-panel-field"
                             rows={3}
-                            aria-label={t('invoices.section_closing')}
+                            aria-label={closingLabel || t('invoices.section_closing')}
                             placeholder={closingPlaceholder}
                             value={closingText ?? ''}
                             readOnly={readOnly}
@@ -256,13 +259,18 @@ export function DocumentWorkspace({
                     {/* «Netto» steht nur, wenn es etwas ANDERES sagt als die
                         Endsumme — ohne MwSt. und ohne Nachlass wäre es dieselbe
                         Zahl zweimal (Nachtrag). */}
-                    {(vat || breakdown.applied.some((entry) => entry.amount !== 0)) && (
+                    {(vatActive || breakdown.applied.some((entry) => entry.amount !== 0)) && (
                         <div className="document-total-row">
                             <dt>{t('invoices.netTotal')}</dt>
                             <dd>{formatMoney(netTotal)}</dd>
                         </div>
                     )}
-                    {vat && (
+                    {vat && !vatActive && vat.onEnabledChange && (
+                        <div className="document-total-row">
+                            <dt><button type="button" className="document-button" disabled={readOnly} onClick={() => vat.onEnabledChange?.(true)}><Plus size={14} />{t('directInvoice.addVat')}</button></dt>
+                        </div>
+                    )}
+                    {vat && vatActive && (
                         <div className="document-total-row">
                             <dt>
                                 {t('invoices.vat')}
@@ -271,11 +279,12 @@ export function DocumentWorkspace({
                                     inputMode="decimal"
                                     aria-label={t('invoices.vatRate')}
                                     readOnly={readOnly}
-                                    value={String(vat.rate)}
+                                    value={vat.text ?? String(vat.rate)}
                                     onFocus={(event) => event.currentTarget.select()}
-                                    onChange={(event) => vat.onRateChange(Number(event.target.value.replace(',', '.')) || 0)}
+                                    onChange={(event) => vat.onTextChange ? vat.onTextChange(event.target.value) : vat.onRateChange(Number(event.target.value.replace(',', '.')) || 0)}
                                 />
                                 %
+                                {vat.onEnabledChange && <button type="button" className="document-vat-remove" aria-label={t('directInvoice.removeVat')} disabled={readOnly} onClick={() => vat.onEnabledChange?.(false)}><Minus size={13} /></button>}
                             </dt>
                             <dd>{formatMoney(vatTotal)}</dd>
                         </div>
