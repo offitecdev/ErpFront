@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FocusEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AlertTriangle, Check, CheckCircle, ChevronLeft, ChevronRight, File05, Minus, Plus, RefreshCcw01, Save01, Settings01, ShoppingCart01, SquareDivide, Trash01, Zap } from '@/components/icons/antIconCompat';
+import { AlertTriangle, Check, CheckCircle, ChevronLeft, ChevronRight, Copy01, File05, Minus, Plus, RefreshCcw01, Save01, Settings01, ShoppingCart01, SquareDivide, Trash01, Zap } from '@/components/icons/antIconCompat';
 import { InventoryListHeader } from '@/components/inventory/InventoryListHeader';
 import { LoadingDots } from '@/components/ui-shared/Loader';
 import { BotLoadingPanel } from '@/components/ui-shared/OffitecBot';
 import { t } from '@/i18n/translate';
+import { canPickRequestSuppliers } from '@/lib/access';
 import { inventoryApi, purchaseOrdersApi, supplyApi } from '@/lib/api/inventory';
 import { useAuthStore } from '@/store/authStore';
 import { usePdfSettings } from '@/store/pdfSettingsStore';
@@ -156,6 +157,9 @@ type WorkspaceTab = 'lines' | 'settings' | 'template' | 'pdf' | 'mail';
 /** Rückfragen der Kopfzeile — jede gehört genau einem Knopf. */
 type PageAsk = 'delete' | 'convert' | 'toRequest' | null;
 
+/** Fiyat talebindeki bir tedarikçi, düzenlenirken (adres yalnızca gösterim). */
+type RequestSupplierDraft = { id: string | null; name: string; email: string | null; address: string | null };
+
 /**
  * PROJEDEN AÇILAN BOŞ FORM (24.09.2026): proje detayındaki «Siparişe Git»,
  * türü olmayan ya da hizmet olan pozisyonda BOŞ bir sipariş formu açar —
@@ -256,6 +260,7 @@ export const OrderWorkspacePage = () => {
     const newKind: OrderMode = searchParams.get('kind') === 'request' ? 'PRICE_REQUEST' : 'ORDER';
     const permissions = useAuthStore((state) => state.permissions);
     const user = useAuthStore((state) => state.user);
+    const isSystemAdmin = useAuthStore((state) => state.isSystemAdmin);
     const pdfSettings = usePdfSettings();
     const canTransfer = permissions.includes('inventory.transfer');
     const canCreateArticles = permissions.includes('inventory.articles.create');
@@ -303,6 +308,8 @@ export const OrderWorkspacePage = () => {
     const [loadedOrder, setLoadedOrder] = useState<PurchaseOrderRow | null>(null);
     /** Rückfragen der Kopfzeile — ein Streifen, kein Fenster. */
     const [pageAsk, setPageAsk] = useState<PageAsk>(null);
+    /** Çok tedarikçili talep siparişe dönerken: siparişin tedarikçisi (sıra). */
+    const [convertSupplierIndex, setConvertSupplierIndex] = useState(0);
     const [pageBusy, setPageBusy] = useState<string | null>(null);
 
     /**
@@ -496,6 +503,21 @@ export const OrderWorkspacePage = () => {
         name: '',
         email: null,
     });
+    /* ── FİYAT TALEBİNİN TEDARİKÇİLERİ (Vorgabe Samet, 25.09.2026) ──────────
+       «Fiyat taleplerinde birden fazla tedarikçi ekleyebilelim, her tedarikçi
+       için ayrı bir PDF oluşsun — yöneticide ve muhasebede; diğerleri için
+       tedarikçi yeri olmasın.» Talepte `supplier` KULLANILMAZ: liste budur,
+       ilki sunucuda `supplier*` alanlarına yazılır. Sipariş eskisi gibi. */
+    const [requestSuppliers, setRequestSuppliers] = useState<RequestSupplierDraft[]>([]);
+    const [supplierDraft, setSupplierDraft] = useState('');
+    const canPickSuppliers = canPickRequestSuppliers(user, isSystemAdmin);
+    const addRequestSupplier = (next: RequestSupplierDraft) => {
+        if (!next.id && !next.name.trim()) return;
+        setRequestSuppliers((current) => (current.some((entry) => (next.id ? entry.id === next.id : !entry.id && entry.name.trim().toLowerCase() === next.name.trim().toLowerCase()))
+            ? current
+            : [...current, { ...next, name: next.name.trim() }]));
+        setSupplierDraft('');
+    };
     /* PROJEDEN HAZIR SATIR (24.09.2026): tedarikçisi olmayan «Satın Alınacak»
        ürün, satırı dolu bir formla gelir — tedarikçi elle seçilir. */
     const [rows, setRows] = useState<DraftOrderRow[]>(() => {
@@ -644,6 +666,12 @@ export const OrderWorkspacePage = () => {
                     name: order.supplierName,
                     email: order.supplierEmail ?? null,
                 });
+                setRequestSuppliers((order.requestSuppliers ?? []).map((entry) => ({
+                    id: entry.supplierId,
+                    name: entry.supplierName,
+                    email: entry.supplierEmail,
+                    address: entry.supplierAddress,
+                })));
                 // Her satır KENDİ hesap kipiyle yüklenir (kip satır başınadır):
                 // aksi hâlde tablo tutarları yeniden türetir ve kayıtta duran
                 // (elle girilmiş / tedarikçi hesabından gelen) tutarlar değişirdi.
@@ -1049,9 +1077,18 @@ export const OrderWorkspacePage = () => {
             .then((result) => {
                 const best = result.suppliers[0];
                 if (!best) return;
-                setSupplier((current) => (current.id || current.name.trim()
-                    ? current
-                    : { id: best.supplierId, name: best.companyName, email: best.email ?? null }));
+                // Talepte tedarikçi yalnızca yetkili rolde ve liste boşken önerilir.
+                if (priceless) {
+                    if (canPickSuppliers) {
+                        setRequestSuppliers((current) => (current.length
+                            ? current
+                            : [{ id: best.supplierId, name: best.companyName, email: best.email ?? null, address: null }]));
+                    }
+                } else {
+                    setSupplier((current) => (current.id || current.name.trim()
+                        ? current
+                        : { id: best.supplierId, name: best.companyName, email: best.email ?? null }));
+                }
                 setRows((current) => current.map((row) => (row.key === rowKey && row.articleId === article.id
                     ? {
                         ...row,
@@ -1375,6 +1412,18 @@ export const OrderWorkspacePage = () => {
        (22.09.2026): eine Bestellung fällt nicht mehr auf die Anfrage zurück.
        Gelöscht wird der DATENSATZ, und die Anfrage lebt ohnehin getrennt
        weiter — siehe `deleteRecord`. */
+    /** Kaydın çözülmüş tedarikçi listesi (id, e-posta, adres) ekrana döner. */
+    const syncRequestSuppliers = (row: PurchaseOrderRow) => {
+        if (!isPriceRequestStage(row.status) || !canPickSuppliers) return;
+        setRequestSuppliers((row.requestSuppliers ?? []).map((entry) => ({
+            id: entry.supplierId,
+            name: entry.supplierName,
+            email: entry.supplierEmail,
+            address: entry.supplierAddress,
+        })));
+        setSupplierDraft('');
+    };
+
     const save = async (): Promise<string | null> => {
         if (!filledRows.length) return null;
         /* Ohne gueltige Vorlage gibt es keine Tabelle — und nichts zu speichern. */
@@ -1383,7 +1432,8 @@ export const OrderWorkspacePage = () => {
             return null;
         }
 
-        if (!supplier.id && !supplier.name.trim()) {
+        // Tedarikçi yalnızca SİPARİŞTE zorunlu; fiyat talebi onsuz da kaydedilir.
+        if (!priceless && !supplier.id && !supplier.name.trim()) {
             /* Unter dem Feld steht kein Fehlertext mehr (der «viele einzelne
                Text» ist weg) — ohne Hinweis bliebe das Speichern stumm. */
             setSupplierError(t('inv.orders.supplierRequired'));
@@ -1439,9 +1489,24 @@ export const OrderWorkspacePage = () => {
                 // Und die Spalten der Vorlage selbst: das PDF schreibt ihre Namen
                 // als Titel und haelt ihre Reihenfolge (Vorgabe Samet, 11.09.2026).
                 tableColumns: tableColumnsSnapshot(aiConfig),
-                supplierId: supplier.id,
-                supplierName: supplier.name.trim(),
-                supplierEmail: supplier.email,
+                /* Talep: yetkili rol LİSTEYİ gönderir (yazılı kalmış ad da
+                   eklenir), diğer roller hiçbir tedarikçi alanı göndermez. */
+                ...(priceless
+                    ? (canPickSuppliers
+                        ? {
+                            requestSuppliers: [
+                                ...requestSuppliers,
+                                ...(supplierDraft.trim() && !requestSuppliers.some((entry) => entry.name.trim().toLowerCase() === supplierDraft.trim().toLowerCase())
+                                    ? [{ id: null, name: supplierDraft.trim(), email: null, address: null }]
+                                    : []),
+                            ].map((entry) => ({ supplierId: entry.id, supplierName: entry.name, supplierEmail: entry.email })),
+                        }
+                        : {})
+                    : {
+                        supplierId: supplier.id,
+                        supplierName: supplier.name.trim(),
+                        supplierEmail: supplier.email,
+                    }),
                 // KDV SİPARİŞ DÜZEYİNDE: tek oran, (net + ek ücretler) üzerinden.
                 // Fiyat talebinde tutar yoktur → oran 0 gider.
                 vatMode: 'TOTAL' as const,
@@ -1469,6 +1534,7 @@ export const OrderWorkspacePage = () => {
                 // PDF, Mail und Wareneingang arbeiten mit dem GESPEICHERTEN Stand.
                 setLoadedOrder(updated);
                 setEditStatus(updated.status);
+                syncRequestSuppliers(updated);
                 toast.success(t('inv.orders.updatedToast'));
                 drawnCheck.show();
             } else {
@@ -1486,7 +1552,7 @@ export const OrderWorkspacePage = () => {
                 }]);
                 const row = created.orders[0] ?? null;
                 savedId = row?.id ?? null;
-                if (row) { setLoadedOrder(row); setEditStatus(row.status); }
+                if (row) { setLoadedOrder(row); setEditStatus(row.status); syncRequestSuppliers(row); }
                 toast.success(t(priceless
                     ? 'inv.orders.priceRequestCreatedToast'
                     : 'inv.orders.orderDraftCreatedToast'));
@@ -1516,7 +1582,11 @@ export const OrderWorkspacePage = () => {
         setPageBusy('convert');
         try {
             if (filledRows.length) await save();
-            const created = await purchaseOrdersApi.convertToOrder(editId);
+            // Sipariş TEK tedarikçilidir: çok tedarikçili talepte seçilen gider.
+            const created = await purchaseOrdersApi.convertToOrder(
+                editId,
+                (loadedOrder?.requestSuppliers?.length ?? 0) > 1 ? convertSupplierIndex : undefined,
+            );
             toast.success(t('inv.orders.convertedToast'));
             // Siparişten gelmiş talep YERİNDE döner (aynı kayıt): yeniden yükle.
             if (created.id === editId) {
@@ -1547,6 +1617,26 @@ export const OrderWorkspacePage = () => {
             setTab('lines');
             setActiveTemplateId(null);
             setReloadTick((tick) => tick + 1);
+        } catch (error) {
+            toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
+        } finally {
+            setPageBusy(null);
+        }
+    };
+
+    /* ══ KOPYA AÇ (Vorgabe Samet, 25.09.2026) ═══════════════════════════════
+       «Fiyat taleplerinin ve siparişlerin de başka kopyaları açılabilsin ama
+       taslak olarak açılması lazım.» Der Server legt einen neuen ENTWURF
+       derselben Art an; offene Änderungen werden vorher gespeichert, sonst
+       kopierte er einen alten Stand. Keine Rückfrage — es entsteht nur etwas. */
+    const duplicateRecord = async () => {
+        if (!editId) return;
+        setPageBusy('duplicate');
+        try {
+            if (filledRows.length && !linesLocked) await save();
+            const created = await purchaseOrdersApi.duplicate(editId);
+            toast.success(t(priceless ? 'inv.orders.duplicatedRequestToast' : 'inv.orders.duplicatedOrderToast'));
+            navigate(`/inventory/orders/${created.id}`);
         } catch (error) {
             toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
         } finally {
@@ -1899,7 +1989,8 @@ export const OrderWorkspacePage = () => {
        zeichnet die Seite bei jedem Sprachwechsel neu. */
     const settingsSteps: FlowStep[] = [
         { id: 'details', label: t('inv.orders.detailsTitle'), on: true },
-        { id: 'supplier', label: t('inv.columns.supplier'), on: true },
+        // Talepte tedarikçi yalnızca Administrator + muhasebe içindir.
+        { id: 'supplier', label: t(priceless ? 'inv.orders.requestSuppliers.title' : 'inv.columns.supplier'), on: !priceless || canPickSuppliers },
         { id: 'production', label: t('production.assign.label'), on: productionOn },
         { id: 'codeRange', label: t('inv.orders.receive.codeRange'), on: true },
         { id: 'fees', label: t('inv.orders.fees.title'), on: !priceless },
@@ -1958,6 +2049,20 @@ export const OrderWorkspacePage = () => {
                                     ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                                     : <Trash01 size={15} />}
                                 {t(priceless ? 'inv.orders.deleteRequest' : 'inv.orders.deleteOrderRecord')}
+                            </button>
+                        )}
+                        {/* KOPYA AÇ — neuer Entwurf derselben Art, neue Nummer. */}
+                        {editId && canTransfer && (
+                            <button
+                                type="button"
+                                disabled={saving || pageBusy !== null}
+                                onClick={() => void duplicateRecord()}
+                                className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-3.5 text-[12.5px] font-semibold text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/20 dark:text-white/80"
+                            >
+                                {pageBusy === 'duplicate'
+                                    ? <span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                    : <Copy01 size={15} />}
+                                {t('inv.orders.actions.duplicate')}
                             </button>
                         )}
         {/* ONAYI GERİ AL — die Gegenhandlung, nicht eine zweite Frage. */}
@@ -2053,6 +2158,24 @@ export const OrderWorkspacePage = () => {
                         <AlertTriangle size={15} className="mt-px shrink-0" />
                         <span>{askText}</span>
                     </span>
+                    {/* Sipariş tek tedarikçilidir: çok tedarikçili talepte hangisi? */}
+                    {pageAsk === 'convert' && (loadedOrder?.requestSuppliers?.length ?? 0) > 1 && (
+                        <span className="flex items-center gap-2 text-[12.5px] text-slate-600 dark:text-white/70">
+                            {t('inv.orders.requestSuppliers.convertWith')}
+                            <SelectMenu
+                                className="ofi-ord-menu"
+                                buttonClassName="ofi-ord-select"
+                                ariaLabel={t('inv.orders.requestSuppliers.convertWith')}
+                                value={String(Math.min(convertSupplierIndex, (loadedOrder?.requestSuppliers?.length ?? 1) - 1))}
+                                listWidth={260}
+                                options={(loadedOrder?.requestSuppliers ?? []).map((entry, index) => ({
+                                    value: String(index),
+                                    label: entry.supplierName,
+                                }))}
+                                onChange={(next) => setConvertSupplierIndex(Number(next))}
+                            />
+                        </span>
+                    )}
                     <span className="flex items-center gap-2">
                         <button
                             type="button"
@@ -2181,6 +2304,58 @@ export const OrderWorkspacePage = () => {
                             Er stand bisher oben neben der Tabelle; jetzt steht er
                             hier, wo alles Übrige entschieden wird. Getippt öffnet
                             sich die kurze Liste, «Tüm tedarikçiler …» das Fenster. */}
+                        {/* ── DIE LIEFERANTEN DER PREISANFRAGE (25.09.2026) ───────
+                            Nur Administrator + Buchhaltung; jeder Lieferant
+                            bekommt sein eigenes PDF und seine eigene Mail. Alle
+                            anderen Rollen sehen diese Kiste gar nicht. */}
+                        {priceless && canPickSuppliers && (
+                            <section className="ofi-ows-card" data-flow-step="supplier">
+                                <h3>{t('inv.orders.requestSuppliers.title')}</h3>
+                                <div className="ofi-ord-group">
+                                    {requestSuppliers.map((entry, index) => (
+                                        <div key={`${entry.id ?? entry.name}-${index}`} className="ofi-ord-row">
+                                            <button
+                                                type="button"
+                                                className="ofi-ord-dot is-remove"
+                                                onClick={() => setRequestSuppliers((current) => current.filter((_, at) => at !== index))}
+                                                title={t('inv.orders.requestSuppliers.remove')}
+                                                aria-label={t('inv.orders.requestSuppliers.remove')}
+                                            >
+                                                <Minus size={13} />
+                                            </button>
+                                            <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
+                                            {(entry.email || entry.address) && (
+                                                <span className="min-w-0 max-w-[55%] truncate text-[12px] text-slate-500 dark:text-white/55" title={[entry.email, entry.address].filter(Boolean).join('\n')}>
+                                                    {entry.email || entry.address?.split('\n').join(', ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <div className="ofi-ord-row">
+                                        <button
+                                            type="button"
+                                            className="ofi-ord-dot is-add"
+                                            onClick={() => addRequestSupplier({ id: null, name: supplierDraft, email: null, address: null })}
+                                            disabled={!supplierDraft.trim()}
+                                            title={t('inv.orders.requestSuppliers.add')}
+                                            aria-label={t('inv.orders.requestSuppliers.add')}
+                                        >
+                                            <Plus size={13} />
+                                        </button>
+                                        <SupplierComboCell
+                                            value={supplierDraft}
+                                            onChange={setSupplierDraft}
+                                            onSelect={(choice) => addRequestSupplier({ id: choice.supplierId, name: choice.supplierName, email: null, address: null })}
+                                            onOpenAll={() => setSupplierPickerOpen(true)}
+                                            viewAllLabel={`${t('inv.orders.allSuppliers')} …`}
+                                            placeholder={t('inv.orders.requestSuppliers.placeholder')}
+                                        />
+                                    </div>
+                                    <div className="ofi-ord-note">{t('inv.orders.requestSuppliers.hint')}</div>
+                                </div>
+                            </section>
+                        )}
+                        {!priceless && (
                         <section className="ofi-ows-card" data-flow-step="supplier">
                             <h3>{t('inv.columns.supplier')}</h3>
                             <div className="ofi-ord-group">
@@ -2207,6 +2382,7 @@ export const OrderWorkspacePage = () => {
                             </div>
                             {supplierError && <span className="ofi-ord-err">{supplierError}</span>}
                         </section>
+                        )}
 
                         {/* ── PROJEKT UND GERÄT ───────────────────────────────────
                             Freiwillig (21.09.2026) und seit heute NUR hier: die
@@ -2940,6 +3116,10 @@ export const OrderWorkspacePage = () => {
                 open={supplierPickerOpen}
                 onClose={() => setSupplierPickerOpen(false)}
                 onPick={(picked) => {
+                    if (priceless) {
+                        addRequestSupplier({ id: picked.id, name: picked.companyName, email: picked.email ?? null, address: null });
+                        return;
+                    }
                     setSupplier({ id: picked.id, name: picked.companyName, email: picked.email ?? null });
                     setSupplierError(null);
                 }}

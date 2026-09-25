@@ -18,6 +18,13 @@ type OrderDecisionPopupProps = {
     // Delivery order: mandatory delivery date (YYYY-MM-DD).
     deliveryDate: string;
     onDeliveryDateChange: (value: string) => void;
+    /**
+     * Die Offerte hat keine Kundschaft: dann fragt das Fenster nach einem
+     * Namen — mit ihm legt der Server den Kunden an (25.09.2026).
+     */
+    askCustomerName: boolean;
+    customerName: string;
+    onCustomerNameChange: (value: string) => void;
     projectSearch: string;
     onProjectSearchChange: (value: string) => void;
     projectSearchLoading: boolean;
@@ -54,6 +61,9 @@ export const OrderDecisionPopup = ({
     onAttachExistingChange,
     deliveryDate,
     onDeliveryDateChange,
+    askCustomerName,
+    customerName,
+    onCustomerNameChange,
     projectSearch,
     onProjectSearchChange,
     projectSearchLoading,
@@ -78,6 +88,22 @@ export const OrderDecisionPopup = ({
             </PopupActions>
         )}
     >
+        {askCustomerName && (
+            <div className="pb-3">
+                <PopupField label={t('tenders.order_customer_name')} required>
+                    <input
+                        autoFocus
+                        className="ofi-cal-input w-full"
+                        value={customerName}
+                        maxLength={190}
+                        onChange={(event) => onCustomerNameChange(event.target.value)}
+                        placeholder={t('tenders.customer_adi_yazin')}
+                    />
+                </PopupField>
+                <p className="pt-1.5 text-[12.5px]" style={{ color: 'var(--ofi-cal-muted)' }}>{t('tenders.order_customer_name_hint')}</p>
+            </div>
+        )}
+
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2" role="radiogroup">
             <button
                 type="button"

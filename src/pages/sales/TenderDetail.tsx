@@ -458,6 +458,8 @@ export const TenderDetail = () => {
         setAttachExistingProject,
         orderDeliveryDate,
         setOrderDeliveryDate,
+        orderCustomerName,
+        setOrderCustomerName,
         notifyRecipient,
         projectSearch,
         setProjectSearch,
@@ -2141,6 +2143,9 @@ export const TenderDetail = () => {
                 onAttachExistingChange={setAttachExistingProject}
                 deliveryDate={orderDeliveryDate}
                 onDeliveryDateChange={setOrderDeliveryDate}
+                askCustomerName={!tender.customerId && !String(tender.customerName ?? '').trim()}
+                customerName={orderCustomerName}
+                onCustomerNameChange={setOrderCustomerName}
                 notifyRecipient={notifyRecipient}
                 projectSearch={projectSearch}
                 onProjectSearchChange={setProjectSearch}

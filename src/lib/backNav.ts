@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigationType } from 'react-router-dom';
 import { create } from 'zustand';
 
 /**
@@ -268,8 +268,11 @@ type BackNavState = {
     visits: Visit[];
     /** Der angezeigte Bildschirm. */
     current: Visit | null;
-    /** Meldet einen Bildschirmwechsel (nur der Tracker ruft das). */
-    visit: (path: string, idx: number | null) => void;
+    /**
+     * Meldet einen Bildschirmwechsel (nur der Tracker ruft das). `replaced`:
+     * der Wechsel hat den Verlaufseintrag ERSETZT (Umleitung).
+     */
+    visit: (path: string, idx: number | null, replaced?: boolean) => void;
 };
 
 export const useBackNavStore = create<BackNavState>((set) => ({
@@ -277,7 +280,7 @@ export const useBackNavStore = create<BackNavState>((set) => ({
     setOverride: (override) => set({ override }),
     visits: [],
     current: null,
-    visit: (path, idx) => set((state) => {
+    visit: (path, idx, replaced = false) => set((state) => {
         // Dieselbe Adresse, nur ein neuer Verlaufseintrag (die Angebotsmaske
         // legt einen, sobald etwas ungespeichert ist): Stapel unverändert.
         if (state.current?.path === path) {
@@ -287,6 +290,13 @@ export const useBackNavStore = create<BackNavState>((set) => ({
         // angehängt — sonst liefen A → B → A → B ewig im Kreis.
         const seen = state.visits.map((visit) => visit.path).lastIndexOf(path);
         if (seen >= 0) return { visits: state.visits.slice(0, seen), current: { path, idx } };
+        /* Ersetzt statt angehängt: den verlassenen Bildschirm gibt es im
+           Verlauf nicht mehr, er ist darum auch kein Rückweg. «Neues Angebot»
+           (/sales/quotes/new) legt den Entwurf an und springt mit `replace`
+           ins Angebot — der Pfeil führte zurück auf /new und legte gleich
+           noch ein Angebot an (Vorgabe Samet, 25.09.2026: zurück in die
+           Angebotsliste). */
+        if (replaced) return { current: { path, idx } };
         const grown = state.current ? [...state.visits, state.current] : state.visits;
         return {
             visits: grown.length > MAX_VISITS ? grown.slice(grown.length - MAX_VISITS) : grown,
@@ -369,7 +379,10 @@ export const useBackNavTracker = () => {
     const { pathname, search } = useLocation();
     // Reiterseiten zählen jeden Reiter als eigenen Bildschirm (siehe screenKey).
     const screen = screenKey(pathname, search);
+    const navigationType = useNavigationType();
     useEffect(() => {
-        useBackNavStore.getState().visit(screen, historyIndex());
+        useBackNavStore.getState().visit(screen, historyIndex(), navigationType === 'REPLACE');
+        // Nur beim Bildschirmwechsel melden; die Art des Wechsels gehört zu ihm.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [screen]);
 };

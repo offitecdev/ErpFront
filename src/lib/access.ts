@@ -18,6 +18,15 @@ const collectRoleNames = (user: AnyUser): string[] =>
         .filter((r): r is string => Boolean(r))
         .map((r) => r.toLowerCase());
 
+/**
+ * FİYAT TALEBİNİN TEDARİKÇİLERİ (Vorgabe Samet, 25.09.2026): yalnızca
+ * Administrator ve muhasebe rolü seçer (birden fazla da olabilir); diğer
+ * rollerde talepte tedarikçi alanı hiç yoktur. Sunucu aynı kuralı
+ * `poCanPickRequestSuppliers` ile ayrıca uygular — ikisi birlikte değişir.
+ */
+export const canPickRequestSuppliers = (user: AnyUser, isSystemAdmin: boolean): boolean =>
+    isSystemAdmin || collectRoleNames(user).some((role) => /muhasebe|buchhalt|accounting/i.test(role));
+
 export const getRoleProfile = (user: AnyUser): RoleProfile => {
     const roles = collectRoleNames(user);
     if (roles.some((r) => r.includes('teknisyen') || r.includes('techniker') || r.includes('technician'))) {

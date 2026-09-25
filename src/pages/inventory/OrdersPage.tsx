@@ -241,8 +241,17 @@ export const OrdersPage = () => {
                                         <td className="max-w-0 truncate text-slate-800 dark:text-white" title={order.projectName || undefined}>
                                             {order.projectName || '—'}
                                         </td>
-                                        <td className="max-w-0 truncate text-slate-500 dark:text-white/60" title={order.supplierName}>
+                                        {/* Çok tedarikçili fiyat talebi: ilki + kalanların sayısı. */}
+                                        <td
+                                            className="max-w-0 truncate text-slate-500 dark:text-white/60"
+                                            title={(order.requestSuppliers?.length ?? 0) > 1
+                                                ? order.requestSuppliers!.map((entry) => entry.supplierName).join(', ')
+                                                : order.supplierName}
+                                        >
                                             {order.supplierName}
+                                            {(order.requestSuppliers?.length ?? 0) > 1 && (
+                                                <span className="ml-1 font-semibold text-slate-400 dark:text-white/45">+{order.requestSuppliers!.length - 1}</span>
+                                            )}
                                         </td>
                                         <td className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">{order.itemCount}</td>
                                         <td className="text-right font-mono text-[13px] text-slate-700 dark:text-white/80">

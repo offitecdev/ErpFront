@@ -170,8 +170,12 @@ export const useUnsavedChangesGuard = (when: boolean, options?: UnsavedChangesGu
     }, []);
 
     // Gate a navigation the caller triggers itself (e.g. a Back button handler).
+    // While a decision is already being carried out (after "Don't save"), the
+    // navigation it runs passes straight through: the header back arrow of the
+    // module strip continues via the guarded navigate, which lands here again
+    // while the page is still dirty — and asked a second time.
     const attempt = useCallback((proceedFn: Proceed) => {
-        if (!whenRef.current) {
+        if (!whenRef.current || bypassRef.current) {
             proceedFn();
             return;
         }

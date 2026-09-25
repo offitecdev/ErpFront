@@ -567,8 +567,18 @@ export const purchaseOrdersApi = {
      * sipariş kaydı açar ve onu döner (22.09.2026: artık tek bir sürecin
      * aşama değişimi değil, iki ayrı kayıt).
      */
-    convertToOrder: async (id: string): Promise<PurchaseOrderRow> => {
-        const res = await apiClient.post(`/inventory/purchase-orders/${id}/convert-to-order`);
+    convertToOrder: async (id: string, supplierIndex?: number): Promise<PurchaseOrderRow> => {
+        // Çok tedarikçili talep: sipariş hangi tedarikçiyle açılacak (yoksa ilki).
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/convert-to-order`, { supplierIndex });
+        return res.data;
+    },
+
+    /**
+     * KOPYA AÇ (25.09.2026): aynı türde (talep ya da sipariş) YENİ bir TASLAK
+     * kayıt — yeni numara, mail/mal kabul/proje bağı taşınmaz. Kaynak değişmez.
+     */
+    duplicate: async (id: string): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/duplicate`);
         return res.data;
     },
 
@@ -604,8 +614,8 @@ export const purchaseOrdersApi = {
     },
 
     /** «Mail manuell gesendet» — setzt oder entfernt das Häkchen (wirkt wie eine Sendung). */
-    setMailManual: async (id: string, sent: boolean, recipient?: string | null): Promise<PurchaseOrderRow> => {
-        const res = await apiClient.post(`/inventory/purchase-orders/${id}/mail-manual`, { sent, recipient: recipient ?? undefined });
+    setMailManual: async (id: string, sent: boolean, recipient?: string | null, supplierIndex?: number): Promise<PurchaseOrderRow> => {
+        const res = await apiClient.post(`/inventory/purchase-orders/${id}/mail-manual`, { sent, recipient: recipient ?? undefined, supplierIndex });
         return res.data;
     },
 

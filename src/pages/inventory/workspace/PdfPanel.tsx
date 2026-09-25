@@ -6,6 +6,7 @@ import type { PurchaseOrderRow } from '@/types/inventory';
 import type { OrderPdfLang } from '@/utils/pdf/orderPdf';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
 import { SectionCard } from '../components/primitives';
+import { orderForSupplier, requestSuppliersOf, supplierPdfFileName } from '../utils/requestSuppliers';
 
 const PDF_LANGS: OrderPdfLang[] = ['de', 'tr', 'en'];
 
@@ -24,9 +25,47 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
     const [url, setUrl] = useState<string | null>(null);
     const [busy, setBusy] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    /* JEDER LIEFERANT SEIN BLATT (25.09.2026): bei mehreren Lieferanten einer
+       Preisanfrage wählt man hier, wessen PDF man sieht. */
+    const suppliers = requestSuppliersOf(order, priceRequest);
+    const multi = suppliers.length > 1;
+    const [supplierIndex, setSupplierIndex] = useState(0);
+    const activeIndex = Math.min(supplierIndex, Math.max(suppliers.length - 1, 0));
+    const [bulkBusy, setBulkBusy] = useState(false);
 
     // Der Dateiname trägt den Code in der Sprache des DOKUMENTS.
-    const fileName = `${localizePurchaseCode(order.referenceNumber, lang)}.pdf`;
+    const code = localizePurchaseCode(order.referenceNumber, lang);
+    const fileName = supplierPdfFileName(code, suppliers[activeIndex], multi);
+
+    const buildBytes = async (target: PurchaseOrderRow) => (priceRequest
+        ? (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(target, settings, lang)
+        : (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(target, settings, lang));
+
+    const downloadBlob = (href: string, name: string) => {
+        const anchor = document.createElement('a');
+        anchor.href = href;
+        anchor.download = name;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+    };
+
+    /** Alle Blätter nacheinander herunterladen — eines je Lieferant. */
+    const downloadAll = async () => {
+        setBulkBusy(true);
+        try {
+            for (const supplier of suppliers) {
+                const bytes = await buildBytes(orderForSupplier(order, supplier));
+                const href = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' }));
+                downloadBlob(href, supplierPdfFileName(code, supplier, true));
+                setTimeout(() => URL.revokeObjectURL(href), 4000);
+            }
+        } catch (err) {
+            setError((err as Error)?.message || 'error');
+        } finally {
+            setBulkBusy(false);
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -35,9 +74,7 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
         queueMicrotask(() => { if (!cancelled) { setBusy(true); setError(null); } });
         (async () => {
             // Immer dynamisch: der PDF-Bauer wiegt mehr als die halbe Seite.
-            const bytes = priceRequest
-                ? await (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(order, settings, lang)
-                : await (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(order, settings, lang);
+            const bytes = await buildBytes(orderForSupplier(order, suppliers[activeIndex]));
             if (cancelled) return;
             objectUrl = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' }));
             setUrl(objectUrl);
@@ -50,7 +87,7 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
             setUrl(null);
         };
         // `updatedAt` erneuert die Vorschau nach einer Änderung.
-    }, [order.id, order.updatedAt, lang, priceRequest]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [order.id, order.updatedAt, lang, priceRequest, activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <SectionCard
@@ -66,20 +103,23 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
                     <button
                         type="button"
                         disabled={!url}
-                        onClick={() => {
-                            if (!url) return;
-                            const anchor = document.createElement('a');
-                            anchor.href = url;
-                            anchor.download = fileName;
-                            document.body.appendChild(anchor);
-                            anchor.click();
-                            anchor.remove();
-                        }}
+                        onClick={() => { if (url) downloadBlob(url, fileName); }}
                         className="flex items-center gap-1 rounded-md bg-[#0a7aff] px-2.5 py-1 text-[11.5px] font-semibold text-white transition-colors hover:bg-[#0066e0] disabled:opacity-50"
                     >
                         <FileDownload02 size={13} />
                         {t('common.download')}
                     </button>
+                    {multi && (
+                        <button
+                            type="button"
+                            disabled={bulkBusy}
+                            onClick={() => void downloadAll()}
+                            className="flex items-center gap-1 rounded-md border border-[#0a7aff]/30 px-2.5 py-1 text-[11.5px] font-semibold text-[#0a7aff] transition-colors hover:bg-[#0a7aff] hover:text-white disabled:opacity-50 dark:border-white/30 dark:text-white dark:hover:bg-white/15"
+                        >
+                            <FileDownload02 size={13} />
+                            {t('inv.orders.requestSuppliers.downloadAll', { count: suppliers.length })}
+                        </button>
+                    )}
                     <div className="ofi-lager-tabs flex items-center gap-1 rounded-md border border-slate-200 p-0.5 dark:border-white/15">
                         {PDF_LANGS.map((entry) => (
                             <button
@@ -100,6 +140,26 @@ export const PdfPanel = ({ order, priceRequest }: { order: PurchaseOrderRow; pri
                 </div>
             )}
         >
+            {multi && (
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 px-3 py-2 dark:border-white/10" role="tablist" aria-label={t('inv.orders.requestSuppliers.title')}>
+                    {suppliers.map((supplier, index) => (
+                        <button
+                            key={`${supplier.supplierId ?? supplier.supplierName}-${index}`}
+                            type="button"
+                            role="tab"
+                            aria-selected={index === activeIndex}
+                            onClick={() => setSupplierIndex(index)}
+                            className={`rounded-md px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                                index === activeIndex
+                                    ? 'bg-[#0a7aff]/10 text-[#0a7aff] dark:bg-[#3b8dff]/25 dark:text-[#5c9fff]'
+                                    : 'text-slate-600 hover:bg-[#0a7aff]/[0.06] hover:text-[#0066e0] dark:text-white/65 dark:hover:bg-white/10 dark:hover:text-white'
+                            }`}
+                        >
+                            {supplier.supplierName}
+                        </button>
+                    ))}
+                </div>
+            )}
             <div className="h-[70vh] min-h-[420px] overflow-hidden bg-slate-100 dark:bg-white/5">
                 {busy || !url ? (
                     <div className="flex h-full items-center justify-center text-[13px] text-slate-500 dark:text-white/60">

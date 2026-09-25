@@ -11,6 +11,7 @@ import { personKey, type PickedPerson } from '@/pages/calendar/calendarShared';
 import { localizePurchaseCode } from '@/utils/purchaseCode';
 import { fmtDateTime } from '../utils/format';
 import { stageMailState } from '../utils/orderStatus';
+import { orderForSupplier, requestSuppliersOf, supplierPdfFileName } from '../utils/requestSuppliers';
 import '@/styles/orderDetails.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,11 +56,22 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
     const [draftsState, setDraftsState] = useState<'idle' | 'loading' | 'error'>('loading');
     const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
 
+    /* JEDER LIEFERANT SEINE MAIL (25.09.2026): trägt die Preisanfrage mehrere
+       Lieferanten, geht jede Mail an EINEN — mit SEINEM PDF im Anhang und
+       seinem eigenen Häkchen «gesendet». */
+    const suppliers = requestSuppliersOf(order, priceRequest);
+    const multi = suppliers.length > 1;
+    const [supplierIndex, setSupplierIndex] = useState(0);
+    const activeIndex = Math.min(supplierIndex, Math.max(suppliers.length - 1, 0));
+    const active = suppliers[activeIndex];
+    const target = orderForSupplier(order, active);
+
     const pdfLang = 'de' as const;
-    const fileName = `${localizePurchaseCode(order.referenceNumber, pdfLang)}.pdf`;
-    const mailState = stageMailState(order);
-    const isResend = Boolean(order.emailSentAt);
-    const canSend = Boolean(to.trim() || order.supplierEmail);
+    const fileName = supplierPdfFileName(localizePurchaseCode(order.referenceNumber, pdfLang), active, multi);
+    const mailState = active ? (active.emailSentAt ? 'SENT' : 'NOT_SENT') : stageMailState(order);
+    const sentAt = active ? active.emailSentAt : order.emailSentAt;
+    const isResend = Boolean(sentAt);
+    const canSend = Boolean(to.trim() || target.supplierEmail);
 
     /* Die Felder werden EINMAL je Vorgang und Belegart gefüllt, damit ein selbst
        geschriebener Text nicht bei jeder Antwort des Servers verschwindet. */
@@ -69,20 +81,31 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
         const base = priceRequest
             ? t('inv.orders.mail.subjectPriceRequest', { number })
             : t('inv.orders.mail.subject', { number });
-        setTo(order.supplierEmail ?? '');
+        setRecipient();
         setSubject(order.revision > 0 && order.emailSentAt ? `${base} (${t('inv.orders.updatedTag')})` : base);
         setMessage(t(priceRequest ? 'inv.orders.mail.defaultMessagePriceRequest' : 'inv.orders.mail.defaultMessage'));
-        const supplierMail = (order.supplierEmail ?? '').trim();
+    };
+    /** An wen die Mail geht (+ CC-Startliste) — folgt dem gewählten Lieferanten. */
+    const setRecipient = () => {
+        setTo(target.supplierEmail ?? '');
+        const supplierMail = (target.supplierEmail ?? '').trim();
         setCc(supplierMail
             ? [{
                 key: personKey('EMAIL', supplierMail.toLowerCase()),
                 type: 'EMAIL',
-                name: order.supplierName || supplierMail,
+                name: target.supplierName || supplierMail,
                 email: supplierMail,
             }]
             : []);
         setCcDraft('');
     };
+    // Anderer Lieferant gewählt: Betreff und Text bleiben, Empfänger wechselt.
+    const recipientFor = useRef(activeIndex);
+    useEffect(() => {
+        if (recipientFor.current === activeIndex) return;
+        recipientFor.current = activeIndex;
+        setRecipient();
+    }, [activeIndex]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
         const key = `${order.id}:${priceRequest ? 'REQ' : 'ORD'}`;
         if (seededFor.current === key) return;
@@ -164,7 +187,12 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
     const toggleManualSent = async (next: boolean) => {
         setBusy('manual');
         try {
-            const updated = await purchaseOrdersApi.setMailManual(order.id, next, to.trim() || order.supplierEmail || null);
+            const updated = await purchaseOrdersApi.setMailManual(
+                order.id,
+                next,
+                to.trim() || target.supplierEmail || null,
+                active ? activeIndex : undefined,
+            );
             onOrderChanged(updated);
             toast.success(t(next ? 'inv.orders.mail.manualMarked' : 'inv.orders.mail.manualCleared'));
         } catch (err) {
@@ -178,13 +206,14 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
         setBusy('send');
         try {
             const bytes = priceRequest
-                ? await (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(order, settings, pdfLang)
-                : await (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(order, settings, pdfLang);
+                ? await (await import('@/utils/pdf/priceRequestPdf')).buildPriceRequestPdfBytes(target, settings, pdfLang)
+                : await (await import('@/utils/pdf/orderPdf')).buildOrderPdfBytes(target, settings, pdfLang);
             const result = await purchaseOrdersApi.sendMail(order.id, {
                 to: to.trim() || undefined,
                 ccEmails: cc.map((person) => person.email).filter((email): email is string => Boolean(email)),
                 subject: subject.trim(),
                 message,
+                ...(active ? { supplierIndex: activeIndex } : {}),
                 attachments: [{
                     filename: fileName,
                     contentType: 'application/pdf',
@@ -226,8 +255,8 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                 : mailState === 'LAST_KNOWN'
                     ? t('inv.orders.flow.mailLastSent')
                     : t('inv.orders.mailNotSent')}
-            {mailState !== 'NOT_SENT' && order.emailSentAt && (
-                <span className="font-normal opacity-80">· {fmtDateTime(order.emailSentAt)}</span>
+            {mailState !== 'NOT_SENT' && sentAt && (
+                <span className="font-normal opacity-80">· {fmtDateTime(sentAt)}</span>
             )}
         </span>
     );
@@ -306,6 +335,31 @@ export const MailPanel = ({ order, priceRequest, onOrderChanged }: {
                 </header>
 
                 <div className="ofi-mail-fields">
+                    {multi && (
+                        <div className="ofi-mail-field">
+                            <span>{t('inv.orders.requestSuppliers.mailTo')}</span>
+                            <span className="ofi-mail-chips" role="tablist">
+                                {suppliers.map((supplier, index) => (
+                                    <button
+                                        key={`${supplier.supplierId ?? supplier.supplierName}-${index}`}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={index === activeIndex}
+                                        disabled={busy !== null}
+                                        onClick={() => setSupplierIndex(index)}
+                                        className={`rounded-md px-2 py-0.5 text-[12px] font-semibold transition-colors ${
+                                            index === activeIndex
+                                                ? 'bg-[#0a7aff]/10 text-[#0a7aff] dark:bg-[#3b8dff]/25 dark:text-[#5c9fff]'
+                                                : 'text-slate-600 hover:bg-[#0a7aff]/[0.06] dark:text-white/65 dark:hover:bg-white/10'
+                                        }`}
+                                        title={supplier.emailSentAt ? t('inv.orders.flow.mailSent') : t('inv.orders.mailNotSent')}
+                                    >
+                                        {supplier.emailSentAt ? '✓ ' : ''}{supplier.supplierName}
+                                    </button>
+                                ))}
+                            </span>
+                        </div>
+                    )}
                     <label className="ofi-mail-field">
                         <span>{t('inv.orders.mail.to')}</span>
                         <input

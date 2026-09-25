@@ -90,6 +90,8 @@ export const useTenderOrderDecision = ({ tender, overtimeHourlyRate, fetchDetail
     // Teslimat siparişinde zorunlu teslim tarihi (YYYY-MM-DD); teklifin
     // "Lieferdatum" (internalDeliveryDate) değerinden doldurulur.
     const [orderDeliveryDate, setOrderDeliveryDate] = useState('');
+    // Offerte ohne Kundschaft: der Name wird im Auftragsfenster verlangt.
+    const [orderCustomerName, setOrderCustomerName] = useState('');
     const [projectSearch, setProjectSearch] = useState('');
     const [projectSearchLoading, setProjectSearchLoading] = useState(false);
     const [projectSearchResults, setProjectSearchResults] = useState<ProjectDto[]>([]);
@@ -137,6 +139,7 @@ export const useTenderOrderDecision = ({ tender, overtimeHourlyRate, fetchDetail
         setProjectSearch('');
         setProjectSearchResults([]);
         setOrderDeliveryDate(tender.internalDeliveryDate ? tender.internalDeliveryDate.slice(0, 10) : '');
+        setOrderCustomerName('');
         setOrderDecisionOpen(true);
     };
 
@@ -159,6 +162,14 @@ export const useTenderOrderDecision = ({ tender, overtimeHourlyRate, fetchDetail
             return;
         }
 
+        // Ohne Kundschaft kein Auftrag — aber der Name genügt, er wird im
+        // Fenster getippt und vom Server als Kunde angelegt.
+        const needsCustomerName = !tender.customerId && !String(tender.customerName ?? '').trim();
+        if (needsCustomerName && !orderCustomerName.trim()) {
+            toast.error(t('tenders.order_customer_name_required'));
+            return;
+        }
+
         setProjectCreateLoading(true);
         setOrderDecisionLoading(true);
         try {
@@ -171,6 +182,7 @@ export const useTenderOrderDecision = ({ tender, overtimeHourlyRate, fetchDetail
                 projectId: finalMode === 'PROJECT_EXISTING' ? selectedExistingProject?.id : undefined,
                 deliveryDate: finalMode === 'INVOICE' ? orderDeliveryDate : undefined,
                 overtimeHourlyRate,
+                customerName: needsCustomerName ? orderCustomerName.trim() : undefined,
             });
             if (res.project?.id) setCreatedProjectId(res.project.id);
             // Der Server antwortet mit einem fest verdrahteten türkischen Satz.
@@ -264,6 +276,8 @@ export const useTenderOrderDecision = ({ tender, overtimeHourlyRate, fetchDetail
         setAttachExistingProject,
         orderDeliveryDate,
         setOrderDeliveryDate,
+        orderCustomerName,
+        setOrderCustomerName,
         // Nur die Frage "geht überhaupt etwas hinaus?" für den Auftragsdialog —
         // die Adresse selbst wird dort nicht angezeigt.
         notifyRecipient: tender?.customerEmail || null,

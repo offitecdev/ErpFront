@@ -796,6 +796,23 @@ export interface PurchaseOrderTableColumn {
     type: 'text' | 'number';
 }
 
+/** Fiyat talebindeki bir tedarikçi — kendi mail damgasıyla. */
+export interface PurchaseRequestSupplier {
+    supplierId: string | null;
+    supplierName: string;
+    supplierEmail: string | null;
+    supplierAddress: string | null;
+    emailSentAt: string | null;
+    emailRecipient: string | null;
+}
+
+/** Kaydederken gönderilen tedarikçi: bilinen id ile, yeni ad ile. */
+export interface PurchaseRequestSupplierInput {
+    supplierId: string | null;
+    supplierName: string;
+    supplierEmail?: string | null;
+}
+
 export interface PurchaseOrderRow {
     id: string;
     tenantId: string;
@@ -853,6 +870,11 @@ export interface PurchaseOrderRow {
     supplierName: string;
     supplierEmail?: string | null;
     supplierAddress?: string | null;
+    /**
+     * FİYAT TALEBİNİN TEDARİKÇİLERİ (25.09.2026) — her biri kendi PDF'ini ve
+     * mailini alır; ilki `supplier*` alanlarının aynısıdır. Siparişte boş.
+     */
+    requestSuppliers?: PurchaseRequestSupplier[];
     items: PurchaseOrderItem[];
     /** Sipariş düzeyindeki ek ücretler (eski kayıtlarda boş dizi). */
     additionalFees: PurchaseOrderFee[];
@@ -991,6 +1013,8 @@ export interface CreatePurchaseOrderInput {
     supplierId?: string | null;
     supplierName?: string;
     supplierEmail?: string | null;
+    /** Fiyat talebi: tedarikçi listesi (Administrator + muhasebe). */
+    requestSuppliers?: PurchaseRequestSupplierInput[];
     currency?: string;
     vatMode?: OrderVatMode;
     orderVatRate?: number;
@@ -1016,6 +1040,8 @@ export interface UpdatePurchaseOrderInput {
     supplierId?: string | null;
     supplierName?: string;
     supplierEmail?: string | null;
+    /** Fiyat talebi: tedarikçi listesi (Administrator + muhasebe). */
+    requestSuppliers?: PurchaseRequestSupplierInput[];
     currency?: string;
     vatMode?: OrderVatMode;
     orderVatRate?: number;
@@ -1105,6 +1131,8 @@ export interface SendPurchaseOrderMailInput {
     subject: string;
     message?: string;
     attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+    /** Çok tedarikçili talep: mailin gittiği tedarikçinin sırası. */
+    supplierIndex?: number;
 }
 
 export interface SendPurchaseOrderMailResult {

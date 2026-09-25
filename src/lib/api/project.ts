@@ -270,6 +270,8 @@ export const projectApi = {
         // Teklifin `internalDeliveryDate` alanina yazilir.
         deliveryDate?: string;
         overtimeHourlyRate?: number;
+        /** Nur wenn die Offerte keine Kundschaft hat: der im Fenster getippte Name. */
+        customerName?: string;
     }): Promise<{
         message: string;
         salesOrder: SalesOrderDto;
