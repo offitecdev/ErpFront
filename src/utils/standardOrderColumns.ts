@@ -20,6 +20,8 @@ const LANGS: PurchaseDocLang[] = ['tr', 'de', 'en'];
 
 const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
     tr: {
+        stdErp: 'ERP Kodu',
+        stdModel: 'Model',
         stdProduct: 'Ürün - Malzeme',
         stdQty: 'Miktar',
         stdUnitPrice: 'Birim Fiyat',
@@ -27,6 +29,8 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdAmount: 'Tutar',
     },
     de: {
+        stdErp: 'ERP-Code',
+        stdModel: 'Modell',
         stdProduct: 'Produkt - Material',
         stdQty: 'Menge',
         stdUnitPrice: 'Einzelpreis',
@@ -34,6 +38,8 @@ const NAMES: Record<PurchaseDocLang, Record<string, string>> = {
         stdAmount: 'Betrag',
     },
     en: {
+        stdErp: 'ERP code',
+        stdModel: 'Model',
         stdProduct: 'Product - Material',
         stdQty: 'Quantity',
         stdUnitPrice: 'Unit Price',

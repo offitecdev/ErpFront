@@ -15,6 +15,11 @@
 
 .ofi-pdev-page {
     --ofi-pdev-canvas: #ffffff;
+    /* Die Prozessleiste klebt an der Oberkante der Rollfläche und ist dann
+       48 px hoch (8 + 2 + 32 + 2 + 4, s. `.ofi-pdev-steps`). Was in der Tafel
+       ebenfalls klebt — die Leiste der BOM —, setzt an ihrer Unterkante an;
+       `top` zählt ab dem Innenabstand der Rollfläche, darum ohne ihn. */
+    --ofi-pdev-sticky-top: calc(48px - var(--page-pad-y, 0px));
     gap: 6px;
     /* Die Seite füllt das Fenster: Kopf und Leiste oben, die Tafel nimmt
        den Rest (`flex: 1` unten) — «büyük bir alan». */
@@ -126,10 +131,13 @@
    Fahne. 32px hoch — «ince». Beim Blättern bleibt sie oben stehen. */
 .ofi-pdev-steps {
     position: sticky;
-    top: 0;
+    /* An der OBERKANTE der Rollfläche, über ihren Innenabstand hinweg: am Rand
+       des Abstands rollten die Zeilen im Streifen darüber sichtbar weiter.
+       Oben 4 px mehr Luft aus dem Abstand zum Kopf — in Ruhe steht sie wie vorher. */
+    top: calc(var(--page-pad-y, 0px) * -1);
     z-index: 6;
-    margin: 0 calc(var(--page-gutter, 1rem) * -1);
-    padding: 4px var(--page-gutter, 1rem);
+    margin: -4px calc(var(--page-gutter, 1rem) * -1) 0;
+    padding: 8px var(--page-gutter, 1rem) 4px;
     background: color-mix(in srgb, var(--ofi-pdev-canvas) 84%, transparent);
     -webkit-backdrop-filter: saturate(180%) blur(16px);
     backdrop-filter: saturate(180%) blur(16px);
@@ -305,11 +313,78 @@
     display: none;
 }
 
+/* ── Mekanik / Elektrik: ein kleiner Mac-Aufklappknopf in der Kopfzeile ─────
+   27.09.2026, Vorgabe Samet: «şu kısımda dropdown, tek seçim, mac os —
+   ek satır yapma». Ein <select> (das Menü malt GlobalMacSelectMenu), rechts
+   vor dem Projekt; die Zeile wird dafür 24px statt 20px hoch. */
+.ofi-pdev-head.has-control { height: 24px; }
+.ofi-pdev-head__control { display: inline-flex; flex: none; align-items: center; margin-left: auto; }
+#root .ofi-list-apple .ofi-pdev-head.has-control .ofi-pdev-head__project { margin-left: 6px; }
+
+.ofi-pdev-area { position: relative; display: inline-flex; align-items: center; }
+.ofi-pdev-area__icon {
+    position: absolute;
+    left: 8px;
+    z-index: 1;
+    display: inline-flex;
+    color: #6e6e73;
+    pointer-events: none;
+}
+.ofi-pdev-area.is-electrical .ofi-pdev-area__icon { color: #b77900; }
+.dark .ofi-pdev-area__icon { color: #aeaeb2; }
+.dark .ofi-pdev-area.is-electrical .ofi-pdev-area__icon { color: #ffcc4d; }
+#root .ofi-list-apple [data-production-select-scope] .ofi-pdev-head select.ofi-pdev-area__select:not([multiple]):not([size]) {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 22px;
+    min-height: 22px;
+    margin: 0;
+    padding: 0 24px 0 25px;
+    border: 1px solid rgba(0, 0, 0, 0.14) !important;
+    border-radius: 6px !important;
+    /* Die Doppelspitze ⌃⌄ des Mac-Aufklappknopfs. */
+    background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' fill='none' stroke='%236e6e73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 5 2l2.5 2.5M2.5 7.5 5 10l2.5-2.5'/%3E%3C/svg%3E") no-repeat right 7px center / 9px 11px !important;
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08) !important;
+    color: var(--la-text, #1d1d1f) !important;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 20px;
+    cursor: default;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+#root .ofi-list-apple [data-production-select-scope] .ofi-pdev-head select.ofi-pdev-area__select:not([multiple]):not([size]):hover {
+    border-color: rgba(0, 0, 0, 0.26) !important;
+}
+#root .ofi-list-apple [data-production-select-scope] .ofi-pdev-head select.ofi-pdev-area__select:not([multiple]):not([size]):focus-visible {
+    border-color: var(--la-accent, #0a7aff) !important;
+    outline: none;
+    box-shadow: 0 0 0 3px var(--la-accent-soft, rgba(10, 122, 255, 0.2)) !important;
+}
+.dark #root .ofi-list-apple [data-production-select-scope] .ofi-pdev-head select.ofi-pdev-area__select:not([multiple]):not([size]) {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    background-color: #2c2c2e !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' fill='none' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 5 2l2.5 2.5M2.5 7.5 5 10l2.5-2.5'/%3E%3C/svg%3E") !important;
+    color: #f5f5f7 !important;
+}
+
+/* Eigene Aufgaben an einer Stufe: ein kleiner blauer Punkt. */
+.ofi-pdev-steps__mine {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: var(--la-accent, #0a7aff);
+}
+.ofi-pdev-steps__seg[aria-selected="true"] .ofi-pdev-steps__mine { box-shadow: 0 0 0 2px var(--la-accent-soft, rgba(10, 122, 255, 0.18)); }
+
 /* ── Die Fläche der Stufe: der Rest des Fensters ─────────────
    «Başlık olmayacak … kare içinde de olmayacak, direkt orası boş olsun»
    — kein Kopf, kein Rahmen, kein Grund: einfach der freie Platz unter
    der Leiste, der den Rest des Fensters füllt. */
 .ofi-pdev-panel {
+    /* Die Glaskarte der Aufgaben liegt ÜBER dem Inhalt der Stufe (27.09.2026). */
+    position: relative;
     flex: 1 1 auto;
     min-height: 420px;
 }
@@ -330,6 +405,10 @@
     #root .ofi-list-apple .ofi-pdev-head__meta { flex-basis: 100%; order: 2; }
     #root .ofi-list-apple .ofi-pdev-head__meta > span:first-child::before { content: none; }
     #root .ofi-list-apple .ofi-pdev-head__project { order: 3; max-width: 100%; margin-left: 0; }
+    /* Der Aufklappknopf rückt neben das Projekt in dessen Zeile. */
+    .ofi-pdev-head.has-control { height: auto; }
+    .ofi-pdev-head__control { order: 3; margin-left: 0; }
+    #root .ofi-list-apple .ofi-pdev-head.has-control .ofi-pdev-head__project { order: 4; margin-left: 6px; }
     .ofi-pdev-panel { min-height: 320px; }
 }
 

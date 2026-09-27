@@ -35,6 +35,8 @@ import {
     Home01 as HomeOutlined,
     XClose as CloseOutlined,
 } from '../icons/antIconCompat';
+// Depo (26.09.2026) — das Lagerhaus der Produktionsfirma.
+import { LuWarehouse as WarehouseIcon } from 'react-icons/lu';
 import {
     ADMIN_PERMISSION_NAMES,
     PERMISSION_TO_MODULE,
@@ -337,6 +339,27 @@ const MENU_SECTIONS: MenuSection[] = [
             { key: '/production/orders', label: 'nav.productionOrders', permission: 'production.view' },
             { key: '/production/lines', label: 'nav.productionLines', permission: 'production.view' },
             { key: '/production/panels', label: 'nav.panels', permission: 'panels.view' },
+            // Görevlendirme şablonları (26.09.2026): lesen alle mit Produktion,
+            // bearbeiten nur die Administratorrolle (die Seite sagt es).
+            { key: '/production/task-templates', label: 'nav.productionTaskTemplates', permission: 'production.view' },
+            // BOM (27.09.2026): Vorlagen und die Einstellungen des Moduls.
+            { key: '/production/bom-templates', label: 'nav.productionBomTemplates', permission: 'production.view' },
+            { key: '/production/settings', label: 'nav.productionSettings', permission: 'production.view' },
+        ],
+    },
+    {
+        // Depo (26.09.2026, Vorgabe Samet): das eigene Lager der Produktions-
+        // firma — «sadece üretim türündeki şirketlerde çıkmalıdır». Gehört zur
+        // Produktion (moduleCatalog: menuKey `warehouse` am Modul production);
+        // die Firmenart prüft `visibleMenuSections` (companyType PRODUCTION).
+        type: 'group',
+        key: 'warehouse',
+        label: 'nav.warehouse',
+        icon: WarehouseIcon,
+        items: [
+            { key: '/warehouse/products', label: 'nav.warehouseProducts', permission: 'production.view' },
+            // Ayarlar (26.09.2026): Hauptkategorien/Materialgruppen, Etikett, Excel-Aktarım.
+            { key: '/warehouse/settings', label: 'nav.warehouseSettings', permission: 'production.view' },
         ],
     },
     {
@@ -667,7 +690,19 @@ type NavigationMode = 'sidebar' | 'top' | 'bottom';
    Glocke, Sprache und Profil unten — in jeder Navigationsart, auch auf dem
    Telefon. Alles andere bleibt, wie es war. */
 const DEVICE_FOCUS_PATH = /^\/production\/orders\/[^/]+\/devices\/[^/]+\/?$/;
-const isDeviceFocusPath = (pathname: string): boolean => DEVICE_FOCUS_PATH.test(pathname);
+/* Das Depo (26.09.2026) trägt denselben Rahmen — Liste UND Produktkarte:
+   «Bu liste ve ürün detayı çok büyük olduğu için üretimde cihaz ekranı
+   nasılsa burada da böyle olması lazım: yan bar küçülmesi lazım ve üst tab
+   yok olması lazım.» */
+const WAREHOUSE_PATH = /^\/warehouse(?:\/|$)/;
+/* Die Görevlendirme-Vorlagen (26.09.2026) ebenso: «aynı üretim depo modülü
+   nasılsa o şekilde olması lazım» — zwei Spalten brauchen die ganze Breite. */
+const TASK_TEMPLATES_PATH = /^\/production\/task-templates\/?$/;
+/* Die BOM-Vorlagen und die Produktionseinstellungen (27.09.2026) ebenso:
+   «üretimdeki gibi küçülecek, solda küçük menüler, üstte menü yok». */
+const BOM_PAGES_PATH = /^\/production\/(?:bom-templates|settings)\/?$/;
+const isDeviceFocusPath = (pathname: string): boolean =>
+    DEVICE_FOCUS_PATH.test(pathname) || WAREHOUSE_PATH.test(pathname) || TASK_TEMPLATES_PATH.test(pathname) || BOM_PAGES_PATH.test(pathname);
 
 /* ── İç Layout ── */
 const MainLayoutInner: React.FC = () => {
@@ -743,12 +778,19 @@ const MainLayoutInner: React.FC = () => {
        ('/' -> /montage) -- ein einziger Ausdruck, sonst schieben sich die
        Weiterleitungen gegenseitig hin und her. */
     const isTechnicianWorkspace = useMontageIsWorkspace();
+    /* Die Firmenart der gewählten Firma (26.09.2026): das Depo erscheint nur in
+       einer Produktionsfirma («sadece üretim türündeki şirketlerde»). */
+    const isProductionCompany = useMemo(
+        () => tenants.find((tenant) => tenant.id === selectedTenantId)?.companyType === 'PRODUCTION',
+        [tenants, selectedTenantId],
+    );
     const visibleMenuSections = useMemo(() => {
         // Ein Monteur hat kein Menue: sein Arbeitsplatz ist der eine rote
         // Bildschirm, und der traegt seine Wege selbst (die vier Kacheln).
         if (isTechnicianWorkspace) return [];
         return MENU_SECTIONS.flatMap((section): MenuSection[] => {
             if (section.feature === 'projects' && !projectModuleEnabled) return [];
+            if (section.key === 'warehouse' && !isProductionCompany) return [];
             if (section.type === 'single') {
                 return isMenuSectionEnabled(section.key, enabledModules) ? [section] : [];
             }
@@ -782,7 +824,7 @@ const MainLayoutInner: React.FC = () => {
             if (!items.length) return [];
             return [{ ...section, items }];
         });
-    }, [projectModuleEnabled, enabledModules, packageModules, pageAccess, isTechnicianWorkspace, isSystemAdmin, permissions]);
+    }, [projectModuleEnabled, enabledModules, packageModules, pageAccess, isTechnicianWorkspace, isSystemAdmin, permissions, isProductionCompany]);
     /* Seitenwächter (17.08.2026): eine gesperrte Seite darf auch über die
        Adresszeile nicht aufgehen. Ohne Regeln (leere Karte) greift nichts —
        siehe lib/pageAccess.ts. Der Server bleibt die eigentliche Schranke.
@@ -1037,6 +1079,13 @@ const MainLayoutInner: React.FC = () => {
         const moduleKey = moduleForPath(location.pathname);
         if (moduleKey && !isModuleKeyEnabled(moduleKey, enabledModules)) navigate('/');
     }, [location.pathname, navigate, enabledModules]);
+
+    // Das Depo gibt es nur in Produktionsfirmen — auch über die Adresszeile
+    // oder nach einem Firmenwechsel auf der Seite (der Server sagt dasselbe).
+    useEffect(() => {
+        if (!WAREHOUSE_PATH.test(location.pathname) || !tenants.length) return;
+        if (!isProductionCompany) navigate('/', { replace: true });
+    }, [location.pathname, tenants.length, isProductionCompany, navigate]);
 
     const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
     const unreadNotificationCount = unreadCount;

@@ -101,6 +101,25 @@ const ProductionLinesPage = lazyNamed(() => import('../pages/production/Producti
 const PanelUnitsPage = lazyNamed(() => import('../pages/production/PanelUnitsPage'), 'PanelUnitsPage');
 const PanelUnitEditorPage = lazyNamed(() => import('../pages/production/PanelUnitEditorPage'), 'PanelUnitEditorPage');
 const PanelModelEditorPage = lazyNamed(() => import('../pages/production/PanelModelEditorPage'), 'PanelModelEditorPage');
+// Görevlendirme şablonları (26.09.2026, Vorgabe Samet): Vorlagen der Aufgaben
+// (Beispiel «Chiller»), die die Administratorrolle auf ein Gerät lädt. Im
+// Rahmen des Depos (MainLayout `isDeviceFocusPath`).
+const TaskTemplatesPage = lazyNamed(() => import('../pages/production/tasks/TaskTemplatesPage'), 'TaskTemplatesPage');
+// BOM (27.09.2026, Vorgabe Samet): die BOM-Vorlagen und die Produktions-
+// einstellungen (Höchstzahl BOM je Gerät und Bereich) — beide im Rahmen der
+// Geräteseite («solda küçük menüler, üstte menü yok»).
+const BomTemplatesPage = lazyNamed(() => import('../pages/production/bom/templates/BomTemplatesPage'), 'BomTemplatesPage');
+const ProductionSettingsPage = lazyNamed(() => import('../pages/production/bom/ProductionSettingsPage'), 'ProductionSettingsPage');
+// Depo (26.09.2026, Vorgabe Samet): das eigene Lager der Produktionsfirma —
+// Produktkarten. Im Rahmen der Geräteseite (MainLayout `isDeviceFocusPath`).
+const WarehouseProductsPage = lazyNamed(() => import('../pages/warehouse/WarehouseProductsPage'), 'WarehouseProductsPage');
+const WarehouseProductPage = lazyNamed(
+    () => import('../pages/warehouse/WarehouseProductPage'),
+    'WarehouseProductPage',
+    MacSpinnerScreen,
+);
+// Depo › Ayarlar (26.09.2026, zweiter Durchgang): Kategorien/Gruppen, Etikett, Excel-Aktarım.
+const WarehouseSettingsPage = lazyNamed(() => import('../pages/warehouse/WarehouseSettingsPage'), 'WarehouseSettingsPage');
 const CompanyTransfersPage = lazyNamed(() => import('../pages/settings/transfers/CompanyTransfersPage'), 'CompanyTransfersPage');
 // Görevler (13.09.2026, Vorgabe Samet): eigenständiges Aufgabenmodul nach dem Vorbild
 // Görevly — NICHT die CRM-Aufgaben unter /crm/tasks. Im Kleid des Lagers (lagerPage).
@@ -380,6 +399,15 @@ export const renderAppPageRoutes = () => (
         <Route path="/production/panels/models/:modelId" element={productionPage(PanelModelEditorPage)} />
         <Route path="/production/panels/:unitId" element={productionPage(PanelUnitEditorPage)} />
         <Route path="/production/panel-models" element={<Navigate to="/production/panels?view=models" replace />} />
+        <Route path="/production/task-templates" element={productionPage(TaskTemplatesPage)} />
+        <Route path="/production/bom-templates" element={productionPage(BomTemplatesPage)} />
+        <Route path="/production/settings" element={productionPage(ProductionSettingsPage)} />
+        {/* Depo: die Produktkarten ('/new' vor ':id'). */}
+        <Route path="/warehouse" element={<Navigate to="/warehouse/products" replace />} />
+        <Route path="/warehouse/products" element={productionPage(WarehouseProductsPage)} />
+        <Route path="/warehouse/products/new" element={productionPage(WarehouseProductPage)} />
+        <Route path="/warehouse/products/:id" element={productionPage(WarehouseProductPage)} />
+        <Route path="/warehouse/settings" element={productionPage(WarehouseSettingsPage)} />
         {/* Görevler-Modul: feste Wege vor ':taskId'. */}
         <Route path="/tasks" element={lagerPage(TasksModuleListPage)} />
         <Route path="/tasks/board" element={lagerPage(TasksModuleBoardPage)} />

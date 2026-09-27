@@ -9,6 +9,8 @@ type Props = {
     stages: DeviceStage[];
     current: DeviceStageId;
     onSelect: (id: DeviceStageId) => void;
+    /** Stufen, an denen die lesende Person eigene Aufgaben hat (blauer Punkt, 26.09.2026). */
+    mine?: ReadonlySet<DeviceStageId>;
 };
 
 /**
@@ -31,7 +33,7 @@ type Props = {
  * zeigt bei den nicht gewählten Stufen nur noch die Nummer (der Name steht im
  * Tipp). Erst wenn auch das nicht reicht (Telefon), läuft die Leiste seitlich.
  */
-export const DeviceProcessBar = ({ stages, current, onSelect }: Props) => {
+export const DeviceProcessBar = ({ stages, current, onSelect, mine }: Props) => {
     const listRef = useRef<HTMLDivElement>(null);
     const trackRef = useRef<HTMLDivElement>(null);
     const steps = stages.filter((stage) => !stage.finish);
@@ -143,6 +145,9 @@ export const DeviceProcessBar = ({ stages, current, onSelect }: Props) => {
                                         <AdminGlyph size={12} />
                                     </span>
                                 )}
+                                {mine?.has(stage.id) && (
+                                    <span className="ofi-pdev-steps__mine" title={t('productionTasks.people.mineStage')} />
+                                )}
                             </button>
                         </Fragment>
                     ))}
@@ -156,6 +161,9 @@ export const DeviceProcessBar = ({ stages, current, onSelect }: Props) => {
                                 <FlagGlyph size={12} strokeWidth={2} />
                             </span>
                             <span className="ofi-pdev-steps__label">{t(finish.labelKey)}</span>
+                            {mine?.has(finish.id) && (
+                                <span className="ofi-pdev-steps__mine" title={t('productionTasks.people.mineStage')} />
+                            )}
                         </button>
                     </>
                 )}

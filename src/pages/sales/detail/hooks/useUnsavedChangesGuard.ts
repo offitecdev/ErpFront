@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isBackDismissPop } from '../../../../lib/backDismiss';
 import { useNavGuardStore } from '../../../../store/navGuardStore';
 
 type Proceed = () => void;
+
+/** Marks the guard's own history entry (same URL as the page) in `history.state`. */
+const SENTINEL = 'ofiUnsavedSentinel';
+const onSentinel = () => Boolean((window.history.state as Record<string, unknown> | null)?.[SENTINEL]);
+const pushSentinel = () => window.history.pushState({ [SENTINEL]: 1 }, '', window.location.href);
 
 type UnsavedChangesGuardOptions = {
     /**
@@ -135,7 +141,7 @@ export const useUnsavedChangesGuard = (when: boolean, options?: UnsavedChangesGu
     useEffect(() => {
         if (!when || sentinelPushedRef.current) return;
         sentinelPushedRef.current = true;
-        window.history.pushState(null, '', window.location.href);
+        pushSentinel();
         /* Ab jetzt liegt ein Eintrag mit DERSELBEN Adresse auf dem Stapel. Der
            Zurück-Pfeil im Kopf darf darum keinen Verlaufsschritt mehr gehen —
            er käme auf diesem Eintrag heraus und bliebe im Angebot statt in die
@@ -152,8 +158,18 @@ export const useUnsavedChangesGuard = (when: boolean, options?: UnsavedChangesGu
     useEffect(() => {
         const onPop = () => {
             if (!whenRef.current || bypassRef.current) return;
+            // A popup's own history entry (lib/backDismiss) coming off the
+            // stack — closed by hand, e.g. the barcode scanner after a read, or
+            // closed by this very Back press — is not an attempt to leave. Its
+            // traversal may have jumped back over our sentinel, though (the page
+            // turned dirty while the popup's entry was still on top), so one
+            // goes back on top: the next real Back must still be caught.
+            if (isBackDismissPop()) {
+                if (!onSentinel()) pushSentinel();
+                return;
+            }
             // Re-push so we stay put while the modal decides what to do.
-            window.history.pushState(null, '', window.location.href);
+            pushSentinel();
             openPrompt(() => {
                 bypassRef.current = true;
                 window.history.go(-2);

@@ -6,16 +6,23 @@ import { t } from '@/i18n/translate';
 import { productionErrorOf, readProductionDevices } from '@/lib/api/production';
 import { useBackTarget } from '@/lib/backNav';
 import { hrefFor, isModifiedClick } from '@/lib/navLink';
+import { useStaffDirectory } from '@/pages/crm/hooks/useStaffDirectory';
 import { useLanguageTick } from '@/pages/inventory/hooks/useLanguageTick';
 import { useAuthStore } from '@/store/authStore';
+import { useNavGuardStore } from '@/store/navGuardStore';
 import type { ProductionProjectDevices } from '@/types/production';
+import type { TaskArea, TaskPerson } from '@/types/productionTasks';
 import '@/styles/modules/production.css';
 import '@/styles/modules/productionDevice.css';
+import '@/styles/modules/productionTasks.css';
 
+import { areaFromParam, areaParam, staffName } from '../tasks/taskModel';
+import { AreaSelect } from './AreaSelect';
 import { DeviceHeader } from './DeviceHeader';
 import { DeviceProcessBar } from './DeviceProcessBar';
 import { DeviceStagePanel } from './DeviceStagePanel';
 import { deviceStageFrom, visibleDeviceStages, type DeviceStageId } from './deviceStages';
+import { useDeviceTasks } from './useDeviceTasks';
 
 /**
  * ── DIE GERÄTESEITE DER PRODUKTION (24.09.2026) ─────────────────────────────
@@ -56,6 +63,7 @@ export const ProductionDevicePage = () => {
     const navigate = useNavigate();
     const back = useBackTarget();
     const isAdmin = useAuthStore((state) => state.isSystemAdmin);
+    const meId = useAuthStore((state) => state.user?.id ?? null);
     const [data, setData] = useState<ProductionProjectDevices | null>(null);
     const [error, setError] = useState<string | null>(null);
     const waited = useMinimumWait(deviceId, LOADING_MIN_MS);
@@ -66,18 +74,65 @@ export const ProductionDevicePage = () => {
         (failure) => setError(productionErrorOf(failure).message || t('production.loadFailed')),
     ), [projectId]);
 
-    const stages = useMemo(() => visibleDeviceStages(isAdmin), [isAdmin]);
-    const stage = deviceStageFrom(params.get('stage'), stages);
-    const select = (id: DeviceStageId) =>
-        setParams(id === stages[0].id ? {} : { stage: id }, { replace: true });
+    /* Görevlendirme (26.09.2026): die Aufgaben des Geräts und — für die
+       Administratorrolle — das Personalverzeichnis der Auswahl. */
+    const tasks = useDeviceTasks(deviceId);
+    const { staff, loading: staffLoading } = useStaffDirectory(isAdmin);
+
+    /* Bereich und Stufe stehen in der Adresse (`?area=electrical&stage=…`);
+       ohne Angabe gilt die Mekanik und ihre erste Stufe. */
+    const area = areaFromParam(params.get('area'));
+    const stages = useMemo(() => visibleDeviceStages(isAdmin, area), [isAdmin, area]);
+    const stage = deviceStageFrom(params.get('stage'), stages, area);
+    const writeParams = (nextArea: TaskArea, nextStage: DeviceStageId, nextStages = stages) =>
+        setParams(() => {
+            const query = new URLSearchParams();
+            if (nextArea === 'ELECTRICAL') query.set('area', areaParam(nextArea));
+            if (nextStage !== nextStages[0].id) query.set('stage', nextStage);
+            return query;
+        }, { replace: true });
+    /* Stufe und Bereich wechseln durch die Wache ungespeicherter Änderungen
+       (27.09.2026, BOM: «başka aşamaya geçerken kaydedilmemiş değişiklikler var
+       demesi lazım») — ohne offene Änderungen geht es sofort. */
+    const guarded = (go: () => void) => {
+        const { attempt } = useNavGuardStore.getState();
+        if (attempt) attempt(go);
+        else go();
+    };
+    const select = (id: DeviceStageId) => guarded(() => writeParams(area, id));
+    // Beim Wechsel des Bereichs bleibt die Stelle des Weges («Cihaz seçimi» ↔ «Devre tasarımı»).
+    const selectArea = (next: TaskArea) => guarded(() => {
+        const nextStages = visibleDeviceStages(isAdmin, next);
+        writeParams(next, deviceStageFrom(stage.id, nextStages, next).id, nextStages);
+    });
+
+    /* Namen der Personen: die des Servers zuerst (mit «ausgetreten»), dann das Verzeichnis. */
+    const names = useMemo(() => {
+        const map = new Map<string, TaskPerson>();
+        for (const person of tasks.data?.people ?? []) map.set(person.id, person);
+        for (const row of staff) {
+            if (!map.has(row.id)) map.set(row.id, { id: row.id, name: staffName(row) || row.email || row.id, active: true });
+        }
+        return map;
+    }, [tasks.data?.people, staff]);
+
+    /* Wo die lesende Person selbst Aufgaben hat — ein blauer Punkt in der Leiste. */
+    const mine = useMemo(() => {
+        const stagesWithMine = new Set<DeviceStageId>();
+        if (!meId) return stagesWithMine;
+        for (const task of tasks.data?.tasks ?? []) {
+            if (task.area === area && task.assigneeIds.includes(meId)) stagesWithMine.add(task.stage);
+        }
+        return stagesWithMine;
+    }, [tasks.data?.tasks, meId, area]);
 
     // Zurück zum Projekt: kam man eben von dort, ist es ein echter
     // Verlaufsschritt (die Karten stehen dann wieder an ihrer Stelle).
     const projectPath = `/production/orders/${projectId}`;
-    const openProject = () => {
+    const openProject = () => guarded(() => {
         if (back?.to === projectPath && back.historyStep) navigate(-1);
         else navigate(projectPath);
-    };
+    });
 
     const shown = data && data.project.id === projectId ? data : null;
     const device = shown?.devices.find((row) => row.id === deviceId) ?? null;
@@ -103,9 +158,27 @@ export const ProductionDevicePage = () => {
 
     return (
         <div className="ofi-prod-page ofi-pdev-page">
-            <DeviceHeader device={device} project={shown.project} projectPath={projectPath} onOpenProject={openProject} />
-            <DeviceProcessBar stages={stages} current={stage.id} onSelect={select} />
-            <DeviceStagePanel key={stage.id} stage={stage} />
+            <DeviceHeader
+                device={device}
+                project={shown.project}
+                projectPath={projectPath}
+                onOpenProject={openProject}
+                control={<AreaSelect value={area} onChange={selectArea} shares={tasks.data?.plan?.areaShares ?? null} />}
+            />
+            <DeviceProcessBar stages={stages} current={stage.id} onSelect={select} mine={mine} />
+            <DeviceStagePanel
+                key={`${area}:${stage.id}`}
+                deviceId={deviceId}
+                stage={stage}
+                stages={stages}
+                area={area}
+                handle={tasks}
+                names={names}
+                isAdmin={isAdmin}
+                meId={meId}
+                staff={staff}
+                staffLoading={staffLoading}
+            />
         </div>
     );
 };

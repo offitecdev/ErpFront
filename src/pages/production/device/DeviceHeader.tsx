@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 
 import { t } from '@/i18n/translate';
 import { hrefFor, isModifiedClick } from '@/lib/navLink';
@@ -11,6 +11,12 @@ type Props = {
     project: ProductionProjectDevices['project'];
     projectPath: string;
     onOpenProject: () => void;
+    /**
+     * Rechts vor dem Projekt: die Wahl Mekanik / Elektrik als kleines
+     * Mac-Aufklappmenü (27.09.2026: «şu kısımda dropdown, tek seçim, mac os;
+     * ek satır yapma»).
+     */
+    control?: ReactNode;
 };
 
 /**
@@ -20,7 +26,7 @@ type Props = {
  * dem es gehört — ein Klick darauf führt dorthin. Alles Übrige der Seite
  * gehört der grossen, leeren Fläche darunter.
  */
-export const DeviceHeader = ({ device, project, projectPath, onOpenProject }: Props) => {
+export const DeviceHeader = ({ device, project, projectPath, onOpenProject, control }: Props) => {
     const meta = [
         device.positionNumber ? `${t('production.device.position')} ${device.positionNumber}` : '',
         device.articleCode ?? '',
@@ -34,7 +40,7 @@ export const DeviceHeader = ({ device, project, projectPath, onOpenProject }: Pr
     };
 
     return (
-        <header className="ofi-pdev-head">
+        <header className={`ofi-pdev-head ${control ? 'has-control' : ''}`}>
             <h1 className="ofi-pdev-head__title" title={device.name}>{device.name}</h1>
             <span className="ofi-pdev-head__meta">
                 {meta.map((part) => <span key={part}>{part}</span>)}
@@ -45,6 +51,7 @@ export const DeviceHeader = ({ device, project, projectPath, onOpenProject }: Pr
                     </span>
                 )}
             </span>
+            {control && <span className="ofi-pdev-head__control">{control}</span>}
             <a
                 className="ofi-pdev-head__project"
                 href={hrefFor(projectPath)}

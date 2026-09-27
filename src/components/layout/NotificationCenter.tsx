@@ -51,6 +51,12 @@ const glyphFor = (type: string): { tone: Tone; icon: React.ReactNode } => {
     if (kind === 'TASK_ASSIGNED') return { tone: 'blue', icon: <ListChecks size={18} /> };
     // Görevler-Modul: jede TASKS_*-Meldung trägt dasselbe Listenzeichen.
     if (kind.startsWith('TASKS_')) return { tone: 'blue', icon: <ListChecks size={18} /> };
+    // Depo (26.09.2026): Excel-Aktarım — wartet auf Freigabe / übernommen / abgelehnt.
+    if (kind === 'WAREHOUSE_IMPORT_REQUESTED') return { tone: 'orange', icon: <FileCheck02 size={18} /> };
+    if (kind === 'WAREHOUSE_IMPORT_DONE') return { tone: 'green', icon: <FileCheck02 size={18} /> };
+    if (kind === 'WAREHOUSE_IMPORT_REJECTED') return { tone: 'red', icon: <AlertCircle size={18} /> };
+    // Üretim · Görevlendirme (26.09.2026): eine Aufgabe eines Geräts zugewiesen.
+    if (kind === 'PRODUCTION_TASK_ASSIGNED') return { tone: 'blue', icon: <ListChecks size={18} /> };
     if (kind.includes('SIGNATURE')) return { tone: 'indigo', icon: <Edit01 size={18} /> };
     if (kind.includes('REPORT')) return { tone: 'green', icon: <FileCheck02 size={18} /> };
     if (kind.includes('MAINTENANCE') || kind.includes('INSTALLATION')) return { tone: 'orange', icon: <Wrench size={18} /> };

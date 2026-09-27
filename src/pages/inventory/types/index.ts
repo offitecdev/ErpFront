@@ -121,6 +121,11 @@ export interface DraftOrderRow {
      * gönderilir — birleştirme ve «Siparişlerim» bunu okur.
      */
     source?: PurchaseLineSource | null;
+    /**
+     * BOM (27.09.2026): die Zeile kam aus «Sipariş oluştur» einer BOM — die
+     * Kennung der BOM-Zeile geht bei jedem Speichern unverändert zurück.
+     */
+    bomLineId?: string | null;
     receivedAt: string | null;
     error?: string | null;
 

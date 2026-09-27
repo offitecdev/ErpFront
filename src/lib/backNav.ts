@@ -102,6 +102,12 @@ const MAIN_PAGES: Record<string, string> = {
     '/production/lines': 'nav.productionLines',
     '/production/panels': 'nav.panels',
     '/production/panel-models': 'nav.panelModels',
+    '/production/task-templates': 'nav.productionTaskTemplates',
+    '/production/bom-templates': 'nav.productionBomTemplates',
+    '/production/settings': 'nav.productionSettings',
+
+    '/warehouse/products': 'nav.warehouseProducts',
+    '/warehouse/settings': 'nav.warehouseSettings',
 
     '/tasks': 'nav.tasksModuleList',
     '/tasks/board': 'nav.tasksModuleBoard',

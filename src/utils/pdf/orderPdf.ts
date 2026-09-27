@@ -68,6 +68,10 @@ interface OrderPdfStrings {
     serialShort: string;
     /** Kapak kartındaki ALICI ADI satırının etiketi (Empfänger). */
     recipient: string;
+    /** BOM-Revision der Bestellung (27.09.2026): Kartenzeile, Zeilenhinweis, entfernte Positionen. */
+    revision: string;
+    revisionWas: string;
+    revisionRemoved: string;
 }
 
 const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
@@ -101,6 +105,9 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         pageOf: '/',
         serialShort: 'Seri No',
         recipient: 'Alıcı',
+        revision: 'Revizyon',
+        revisionWas: 'Rev. {n} ile değişti — önceki: {before}',
+        revisionRemoved: 'Revizyon {n} ile iptal edilen pozisyonlar',
     },
     de: {
         // BELGE ALMANCADA "BESTELLUNG"DUR (kullanıcı isteği 2026-08-03; arada
@@ -133,6 +140,9 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         pageOf: 'von',
         serialShort: 'Serien-Nr.',
         recipient: 'Empfänger',
+        revision: 'Revision',
+        revisionWas: 'Geändert mit Rev. {n} — bisher: {before}',
+        revisionRemoved: 'Mit Revision {n} stornierte Positionen',
     },
     en: {
         docTitle: 'Purchase Order',
@@ -161,6 +171,9 @@ const I18N: Record<OrderPdfLang, OrderPdfStrings> = {
         pageOf: 'of',
         serialShort: 'Serial No.',
         recipient: 'Recipient',
+        revision: 'Revision',
+        revisionWas: 'Changed in rev. {n} — previously: {before}',
+        revisionRemoved: 'Items cancelled in revision {n}',
     },
 };
 
@@ -830,8 +843,21 @@ export async function buildOrderPdfBytes(
     // Die Tabelle traegt ihre Titel in Grossbuchstaben (Referenz).
     const upper = (label: string) => label.toLocaleUpperCase(captionLocale(label, lang));
 
+    /* BOM-REVISION (27.09.2026, Vorgabe Samet: «aynı numara, revizyon +1 …
+       PDF'te «Revizyon 1» ve değişen satırlar işaretli»): dieselbe Nummer, dazu
+       die Revision in Karte und Titel; geänderte Positionen tragen ihren
+       früheren Wert, stornierte stehen unter den Summen. */
+    const revision = order.bomOrigin?.revision && order.bomOrigin.revision.number > 0 ? order.bomOrigin.revision : null;
+    const revisionOf = new Map((revision?.changes ?? []).filter((line) => line.after > 0).map((line) => [line.bomLineId, line]));
+    const items: PdfItem[] = order.items.map((item) => {
+        const change = revision ? revisionOf.get(String((item as { bomLineId?: unknown }).bomLineId ?? '')) : undefined;
+        if (!change || !revision) return item;
+        const before = `${fmtQty(change.before)}${change.unitBefore ? ` ${change.unitBefore}` : ''}`;
+        return { ...item, revisionNote: L.revisionWas.replace('{n}', String(revision.number)).replace('{before}', before) };
+    });
+
     // ── Seite 1: Karte, Adressen, Titel, Anschreiben ─────────────────────────
-    const letterEnd = drawCoverPage(doc, order, settings, L);
+    const letterEnd = drawCoverPage(doc, order, settings, L, revision);
 
     // ── Sipariş satırları ────────────────────────────────────────────────────
     // Kolon düzeni siparişin kendisine göre kurulur: brüt fiyat / indirim /
@@ -876,7 +902,7 @@ export async function buildOrderPdfBytes(
         st.y = drawTableHeader(doc, CONTENT_TOP_REST, layout);
     }
 
-    order.items.forEach((item, index) => {
+    items.forEach((item, index) => {
         const h = measureRow(doc, item, L, layout);
         if (st.y + h > CONTENT_BOTTOM || CONTENT_BOTTOM - st.y < MIN_ROW_START) {
             newTablePage(doc, st, layout);
@@ -911,6 +937,36 @@ export async function buildOrderPdfBytes(
         y += 6;
     }
     drawTotals(doc, y, order, fmt, L, hasGrossRow, hasVatRow, fees);
+
+    // Mit der Revision stornierte Positionen — der Lieferant soll sehen, was wegfällt.
+    const removed = (revision?.changes ?? []).filter((line) => line.after <= 0);
+    if (revision && removed.length) {
+        const lineH = 4.2;
+        let ry = y + totalsBlockHeight + 7;
+        if (ry + 6 + removed.length * lineH > CONTENT_BOTTOM) {
+            doc.addPage();
+            ry = CONTENT_TOP_REST;
+        }
+        doc.setFont(FONT, 'bold');
+        doc.setFontSize(8.2);
+        doc.setTextColor(...COLOR_NAVY);
+        doc.text(L.revisionRemoved.replace('{n}', String(revision.number)), ML, ry);
+        ry += 5;
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(7.6);
+        for (const line of removed) {
+            if (ry > CONTENT_BOTTOM) {
+                doc.addPage();
+                ry = CONTENT_TOP_REST;
+            }
+            doc.setTextColor(...COLOR_TEXT);
+            const name = doc.splitTextToSize(oneLine(line.name), CONTENT_W - 40)[0] as string;
+            doc.text(name, ML, ry);
+            doc.setTextColor(...COLOR_CAPTION);
+            doc.text(`${fmtQty(line.before)}${line.unitBefore ? ` ${line.unitBefore}` : ''} → 0`, ML + CONTENT_W, ry, { align: 'right' });
+            ry += lineH;
+        }
+    }
 
     // ── Antet & alt bilgi dekorasyonu (tüm sayfalar) ─────────────────────────
     const pageCount = doc.getNumberOfPages();
@@ -1144,9 +1200,16 @@ function drawDocTitle(doc: jsPDF, title: string, number: string, y: number) {
 }
 
 /** Seite 1 bis zum Anschreiben; gibt die Grundlinie seiner letzten Zeile zurueck. */
-function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySettings, L: OrderPdfStrings): number {
+function drawCoverPage(
+    doc: jsPDF,
+    order: PurchaseOrderRow,
+    s: PdfCompanySettings,
+    L: OrderPdfStrings,
+    revision: { number: number; createdAt: string | null } | null = null,
+): number {
     const rows = ([
         [L.orderNumber, order.referenceNumber, true],
+        [L.revision, revision ? [String(revision.number), fmtDateShort(revision.createdAt)].filter(Boolean).join(' · ') : '', true],
         [L.orderedBy, oneLine(order.orderedByName || ''), false],
         [L.orderDate, fmtDateShort(order.createdAt), false],
         [L.quoteNumber, oneLine(order.quoteNumber || ''), false],
@@ -1158,7 +1221,7 @@ function drawCoverPage(doc: jsPDF, order: PurchaseOrderRow, s: PdfCompanySetting
     const addrBottom = drawSenderAndSupplier(doc, order, s);
 
     const titleY = Math.max(cardBottom, addrBottom) + 12;
-    drawDocTitle(doc, L.docTitle, order.referenceNumber, titleY);
+    drawDocTitle(doc, L.docTitle, revision ? `${order.referenceNumber} · Rev. ${revision.number}` : order.referenceNumber, titleY);
 
     // ÖN YAZI (Anschreiben): siparişin kendi metni, yoksa standart metin — ikisi
     // de AYNI yoldan basılır (2026-08-21); arayüzdeki
@@ -1351,6 +1414,8 @@ function drawFittedRight(
 }
 
 type OrderItem = PurchaseOrderRow['items'][number];
+/** Eine Position, wie das Blatt sie zeichnet — mit dem Hinweis einer BOM-Revision. */
+type PdfItem = OrderItem & { revisionNote?: string };
 
 /**
  * Açıklama hücresi: ürün adı (tablonun TEK puntosunda) + seri no ikinci
@@ -1359,7 +1424,7 @@ type OrderItem = PurchaseOrderRow['items'][number];
  */
 function buildRowLines(
     doc: jsPDF,
-    item: OrderItem,
+    item: PdfItem,
     L: OrderPdfStrings,
     layout: TableLayout,
 ): { title: string[]; meta: string[] } {
@@ -1376,6 +1441,11 @@ function buildRowLines(
         doc.setFont(FONT, 'normal');
         doc.setFontSize(layout.fs * 0.92);
         meta = doc.splitTextToSize(serial.includes(':') ? serial : `${L.serialShort}: ${serial}`, descW) as string[];
+    }
+    if (item.revisionNote) {
+        doc.setFont(FONT, 'normal');
+        doc.setFontSize(layout.fs * 0.92);
+        meta = [...meta, ...(doc.splitTextToSize(item.revisionNote, descW) as string[])];
     }
     return { title, meta };
 }
@@ -1414,7 +1484,7 @@ function descBlockH(title: string[], meta: string[], layout: TableLayout): numbe
     return (title.length - 1) * layout.lh + (meta.length ? META_GAP + meta.length * layout.lh * 0.92 : 0);
 }
 
-function measureRow(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: TableLayout): number {
+function measureRow(doc: jsPDF, item: PdfItem, L: OrderPdfStrings, layout: TableLayout): number {
     const { title, meta } = buildRowLines(doc, item, L, layout);
     // Die eigenen Textspalten brechen in ihrer Spalte um, die Rabatte stehen
     // ALT ALTA — die hoechste Zelle bestimmt die Zeile. Alle Zellen teilen
@@ -1430,7 +1500,7 @@ function measureRow(doc: jsPDF, item: OrderItem, L: OrderPdfStrings, layout: Tab
 
 function drawRow(
     doc: jsPDF,
-    item: OrderItem,
+    item: PdfItem,
     index: number,
     y: number,
     rowH: number,

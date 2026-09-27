@@ -38,6 +38,7 @@ import {
     extraKeyAliases,
     extrasFromItems,
     hiddenKeysForTemplate,
+    isTextFile,
     remapRowExtras,
     tableColumnsFromTemplate,
     tableColumnsSnapshot,
@@ -101,12 +102,27 @@ import { PdfPanel } from './workspace/PdfPanel';
 import { FlowRail, type FlowStep } from './workspace/FlowRail';
 import { MailPanel } from './workspace/MailPanel';
 import '@/styles/modules/orderWorkspace.css';
+// BOM der Produktion (27.09.2026): Regeln, Band und die KI, die ihre Tabelle füllt.
+import { productionBomErrorText } from '@/lib/api/productionBom';
+import { BomOrderBanner, BomSendLocked } from '@/pages/production/bom/order/BomOrderParts';
+import { BOM_ERP_KEY, BOM_MODEL_KEY, bomColumnsSnapshot, isBomLockedColumn, orderBomColumns } from '@/pages/production/bom/order/bomColumns';
+import { BomTableAiDialog } from '@/pages/production/bom/order/BomTableAiDialog';
+import type { TableAiChange, TableAiColumn, TableAiLabel, TableAiRow } from '@/pages/production/bom/order/tableAiPlan';
 
 let rowSeed = 0;
 let feeSeed = 0;
 
 /** Boş ek ücret satırı — detay penceresindeki "ek ücret ekle" bunu ekler. */
 const emptyFee = (): DraftOrderFee => ({ key: `fee-${feeSeed += 1}`, name: '', amount: '' });
+
+/** BOM: das Feld der Bestellzeile, das eine zugeordnete Vorlagenspalte füllt. */
+const BOM_FILL_FIELD: Record<TableAiLabel, 'grossPrice' | 'netPrice' | 'discount' | 'discount2' | 'lineTotal'> = {
+    grossPrice: 'grossPrice',
+    netPrice: 'netPrice',
+    discount: 'discount',
+    discount2: 'discount2',
+    total: 'lineTotal',
+};
 
 const INPUT_BASE_CLASS = 'h-9 rounded-md border border-slate-200 bg-white px-2.5 text-[13px] font-normal normal-case tracking-normal shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-slate-700 focus:border-[#0066e0] focus:outline-none dark:border-white/20 dark:bg-transparent dark:text-white';
 /* Bestelldetails, Zusatzkosten, Steuer und Anschreiben tragen KEINE eigenen
@@ -306,6 +322,18 @@ export const OrderWorkspacePage = () => {
     });
     const [schemeOpen, setSchemeOpen] = useState(false);
     const [loadedOrder, setLoadedOrder] = useState<PurchaseOrderRow | null>(null);
+    /* BOM (27.09.2026, Vorgabe Samet): ein Beleg aus einer BOM trägt ihre
+       Regeln — feste Zeilen, die Vorlage gilt DIREKT (keine eigenen Spalten
+       mehr: «yeni sütun ekleme olmayacak, direkt şablon uygulanacak»), die KI
+       füllt nur die leeren Zellen ihrer Spalten; ohne Angebotsnummer des
+       Lieferanten kein PDF/Mail, ohne Angebotsnummer UND Angebots-PDF keine
+       Bestätigung; eine BOM-Preisanfrage wird nie zur Bestellung. Der Server
+       prüft dasselbe (BomPurchaseGuard). */
+    const bomOrigin = loadedOrder?.bomOrigin ?? null;
+    const bomRecord = Boolean(bomOrigin);
+    const bomOrder = bomOrigin?.kind === 'ORDER';
+    /** Das offene Fenster «Tabloyu yapay zekâ ile doldur» — samt dem, was auf der Seite eingefügt wurde. */
+    const [bomFill, setBomFill] = useState<{ prompt: string; files: File[] } | null>(null);
     /** Rückfragen der Kopfzeile — ein Streifen, kein Fenster. */
     const [pageAsk, setPageAsk] = useState<PageAsk>(null);
     /** Çok tedarikçili talep siparişe dönerken: siparişin tedarikçisi (sıra). */
@@ -768,6 +796,7 @@ export const OrderWorkspacePage = () => {
                         receivedAt: item.receivedAt ?? null,
                         productionItemId: item.productionItemId ?? null,
                         source: item.source ?? null,
+                        bomLineId: item.bomLineId ?? null,
                         extras: Object.fromEntries((item.extras ?? []).map((entry) => [entry.key, entry.value])),
                     };
                 }));
@@ -980,23 +1009,17 @@ export const OrderWorkspacePage = () => {
         setCalcMode(next);
         setRows((current) => current.map((row) => transitionRowMode(row, next)));
     };
-    /* ── STRG+V AUF DER SEITE (Vorgabe Samet, 11.09.2026) ─────────────────
-       Ein Bildschirmfoto oder kopierte Zeilen, ausserhalb eines Feldes
-       eingefuegt, oeffnen den Beleg-Import schon mit dem Eingefuegten —
-       fuer die Bestellung wie fuer die Preisanfrage. Ohne gueltige Vorlage
-       nicht: dann ist auch der Import-Knopf aus. */
-    usePasteToImport(templateReady && !aiOpen && !templatesOpen, (files) => {
-        setPastedFiles(files);
-        setAiOpen(true);
-    });
     /* ── KEIN ERP-CODE IN PREISANFRAGE UND BESTELLUNG (Vorgabe Samet, 19.09.2026) ──
        «Der ERP-Code entsteht erst im Wareneingang, automatisch — für ALLE
        Bestellungen.» Die feste Code-Spalte fehlt darum hier; eine Zeile, die an
        einem Katalogartikel hängt, trägt dessen Code weiter still mit. */
-    const tableColumns = useMemo(
-        () => (templateReady ? tableColumnsFromTemplate(aiConfig, loadedExtraColumns).filter((column) => !column.fixed) : []),
-        [templateReady, aiConfig, loadedExtraColumns],
-    );
+    const tableColumns = useMemo(() => {
+        const columns = templateReady ? tableColumnsFromTemplate(aiConfig, loadedExtraColumns).filter((column) => !column.fixed) : [];
+        // BOM-Beleg: «ERP kodu, ürün adı, …» — der ERP-Code steht vorn, wie im PDF;
+        // die Preisanfrage trägt statt seiner das Modell, gleich nach dem Namen.
+        if (!bomRecord) return columns;
+        return orderBomColumns(columns);
+    }, [templateReady, aiConfig, loadedExtraColumns, bomRecord]);
     /** Die freien Spalten — ihre Werte werden als eigene Angaben gespeichert. */
     const extraColumns = useMemo(
         () => tableColumns
@@ -1004,6 +1027,52 @@ export const OrderWorkspacePage = () => {
             .map((column) => ({ key: column.key, name: column.name, type: column.type, width: column.width, label: null })),
         [tableColumns],
     );
+
+    /* ── WAS DIE SEITE GERADE IST ──────────────────────────────────────────
+       Kein Auswahlbildschirm mehr und kein Schrittband: der Status sagt, ob
+       dies eine ANFRAGE oder eine BESTELLUNG ist, und danach richten sich die
+       Reiter. */
+    const status = editStatus ?? (priceless ? 'DRAFT' : 'ORDER_DRAFT');
+    const statusMeta = ORDER_STATUS_META[status] ?? ORDER_STATUS_META.ORDER_DRAFT;
+    /* Ein vollständig eingelagerter Vorgang wird nicht mehr geschrieben — seine
+       Buchungen sind gemacht. Er öffnet sich trotzdem: PDF, Mail und «Stoğa
+       gidenler» braucht man gerade dann. Zurück geht es über «Geri gönder». */
+    const linesLocked = !isEditableStage(status);
+
+    /* ── BOM: DIE VORLAGE GILT, DIE KI FÜLLT (Vorgabe Samet, 27.09.2026) ───
+       «Üretim siparişlerinde yeni sütun ekleme olmayacak, direkt şablon
+       uygulanacak … şablondaki boş [hücreler] attığımız PDF, görsel şu bu ile
+       otomatik eşleşip dolduracak — fiyat talebinde de böyle.» Füllen darf die
+       KI jede Spalte der Tabelle ausser ERP-Code, Name und Menge: die Zeilen
+       sind fest. Nur für Belege aus einer BOM — jeder andere Beleg behält den
+       Beleg-Import, der die Liste ersetzt. */
+    const bomFillColumns = useMemo<TableAiColumn[]>(() => (bomRecord
+        ? tableColumns
+            .filter((column) => !column.fixed && !isBomLockedColumn(column.id) && column.label !== 'productName' && column.label !== 'quantity')
+            .map((column) => ({ key: column.key, name: column.name, type: column.type, label: (column.label as TableAiLabel | null) ?? null }))
+        : []), [bomRecord, tableColumns]);
+    const bomFillReady = Boolean(editId && loadedOrder) && templateReady && !linesLocked && bomFillColumns.length > 0;
+    /** Das Fenster öffnen — Eingefügtes vorweg: Zeilen und Text ins Textfeld, Bilder und Dateien als Beleg. */
+    const openBomFill = async (files: File[] = []) => {
+        const texts = files.filter(isTextFile);
+        const prompt = texts.length ? (await Promise.all(texts.map((file) => file.text()))).join('\n').trim() : '';
+        setBomFill({ prompt, files: files.filter((file) => !isTextFile(file)) });
+    };
+
+    /* ── STRG+V AUF DER SEITE (Vorgabe Samet, 11.09.2026) ─────────────────
+       Ein Bildschirmfoto oder kopierte Zeilen, ausserhalb eines Feldes
+       eingefuegt, oeffnen den Beleg-Import schon mit dem Eingefuegten —
+       fuer die Bestellung wie fuer die Preisanfrage. Ohne gueltige Vorlage
+       nicht: dann ist auch der Import-Knopf aus. Ein BOM-Beleg öffnet statt
+       dessen «Tabloyu yapay zekâ ile doldur» — seine Zeilen bleiben stehen. */
+    usePasteToImport(templateReady && !aiOpen && !templatesOpen && !bomFill && (!bomRecord || bomFillReady), (files) => {
+        if (bomRecord) {
+            void openBomFill(files);
+            return;
+        }
+        setPastedFiles(files);
+        setAiOpen(true);
+    });
     /* Eine geladene Bestellung, deren eigene Angabe in der Vorlage unter
        demselben Namen steht: der Wert wandert unter den Schluessel der
        Vorlage, sonst staende die Spalte da und die Zelle bliebe leer.
@@ -1259,6 +1328,7 @@ export const OrderWorkspacePage = () => {
                 ...(extras.length ? { extras } : {}),
                 ...(productionOn ? { productionItemId: row.productionItemId ?? null } : {}),
                 ...(row.source ? { source: row.source } : {}),
+                ...(row.bomLineId ? { bomLineId: row.bomLineId } : {}),
                 // Mal kabul durumu aynen geri gönderilir (sunucu kırparak korur).
                 receivedQuantity: row.receivedQuantity,
                 receivedAt: row.receivedAt,
@@ -1319,6 +1389,7 @@ export const OrderWorkspacePage = () => {
             ...(productionOn ? { productionItemId: row.productionItemId ?? null } : {}),
             // Proje kaynağı AYNEN geri gider — birleştirme ve «Siparişlerim» ona bakar.
             ...(row.source ? { source: row.source } : {}),
+            ...(row.bomLineId ? { bomLineId: row.bomLineId } : {}),
         };
     };
 
@@ -1366,7 +1437,7 @@ export const OrderWorkspacePage = () => {
             markApprovalGaps(approvalGapsFromDetails(failure.details));
         }
         if (failure.code === 'PROJECT_REQUIRED' || failure.code === 'ITEMS_REQUIRED') setPickerOpen(true);
-        toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
+        toast.error(bomRecord ? productionBomErrorText(error) : productionErrorText(error, t('inv.orders.saveFailed')));
     };
 
     /* ── DIE ZUORDNUNG ÜBERNEHMEN ────────────────────────────────────────────
@@ -1488,11 +1559,17 @@ export const OrderWorkspacePage = () => {
                 hiddenColumnKeys: hiddenKeysForTemplate(aiConfig),
                 // Und die Spalten der Vorlage selbst: das PDF schreibt ihre Namen
                 // als Titel und haelt ihre Reihenfolge (Vorgabe Samet, 11.09.2026).
-                tableColumns: tableColumnsSnapshot(aiConfig),
+                /* BOM: die gewählte Vorlage gilt DIREKT (27.09.2026: «direkt şablon
+                   uygulanacak») — vorn bleibt die ERP-Spalte der Bestellung, nach
+                   dem Namen das Modell der Preisanfrage, wie im PDF. */
+                tableColumns: bomRecord
+                    ? bomColumnsSnapshot(tableColumnsSnapshot(aiConfig), loadedOrder?.tableColumns, { erpAlways: bomOrder })
+                    : tableColumnsSnapshot(aiConfig),
                 /* Talep: yetkili rol LİSTEYİ gönderir (yazılı kalmış ad da
-                   eklenir), diğer roller hiçbir tedarikçi alanı göndermez. */
+                   eklenir), diğer roller hiçbir tedarikçi alanı göndermez —
+                   BOM talebi de göndermez: tedarikçisi BOM'da seçildi. */
                 ...(priceless
-                    ? (canPickSuppliers
+                    ? (canPickSuppliers && !bomRecord
                         ? {
                             requestSuppliers: [
                                 ...requestSuppliers,
@@ -1532,7 +1609,9 @@ export const OrderWorkspacePage = () => {
                     ...(reference.trim() ? { referenceNumber: reference.trim() } : {}),
                 });
                 // PDF, Mail und Wareneingang arbeiten mit dem GESPEICHERTEN Stand.
-                setLoadedOrder(updated);
+                // Die Antwort kennt die BOM-Herkunft nicht — sie bleibt, wie sie war
+                // (sonst stünden nach «Kaydet» «Kopya aç» und «Siparişe dönüştür» da).
+                setLoadedOrder(bomOrigin ? { ...updated, bomOrigin } : updated);
                 setEditStatus(updated.status);
                 syncRequestSuppliers(updated);
                 toast.success(t('inv.orders.updatedToast'));
@@ -1673,13 +1752,84 @@ export const OrderWorkspacePage = () => {
         setPageBusy(key);
         try {
             const updated = await purchaseOrdersApi.setStatus(editId, next);
-            setLoadedOrder(updated);
+            // Die Antwort kennt die BOM-Herkunft nicht — sie bleibt, wie sie war.
+            setLoadedOrder(bomOrigin ? { ...updated, bomOrigin } : updated);
             setEditStatus(updated.status);
             toast.success(message);
         } catch (error) {
-            toast.error(productionErrorText(error, t('inv.orders.saveFailed')));
+            toast.error(bomRecord ? productionBomErrorText(error) : productionErrorText(error, t('inv.orders.saveFailed')));
         } finally {
             setPageBusy(null);
+        }
+    };
+
+    /** Nach dem Hochladen des Angebots: die Herkunft (Angebot, Bedingungen) neu lesen. */
+    const refreshBomOrigin = () => {
+        if (!editId) return;
+        void purchaseOrdersApi.get(editId)
+            .then((fresh) => setLoadedOrder((current) => (current ? { ...current, bomOrigin: fresh.bomOrigin ?? null } : fresh)))
+            .catch(() => undefined);
+    };
+
+    /* ── BOM: DIE TABELLE PER KI FÜLLEN (27.09.2026) ─────────────────────
+       Die KI antwortet je Stelle der GESPEICHERTEN Bestellung; die Zeile der
+       Tabelle findet sich über ihre BOM-Zeile (und weil die Zeilen fest sind,
+       zur Not über dieselbe Stelle). */
+    const bomRowAt = (index: number): DraftOrderRow | undefined => {
+        const lineId = loadedOrder?.items[index]?.bomLineId;
+        return (lineId ? rows.find((row) => row.bomLineId === lineId) : undefined) ?? rows[index];
+    };
+    const bomCellOf = (row: DraftOrderRow, column: TableAiColumn): string => (column.label
+        ? row[BOM_FILL_FIELD[column.label]]
+        : row.extras?.[column.key] ?? '');
+    /** Die Zeilen, wie das Fenster sie zeigt: was jede Zelle jetzt trägt. Nettopreis
+        und Betrag nimmt nur die manuelle Eingabe an — sonst rechnet die Zeile sie selbst. */
+    const bomFillRows = (): TableAiRow[] => (loadedOrder?.items ?? []).flatMap((item, index) => {
+        const row = bomRowAt(index);
+        if (!row) return [];
+        return [{
+            index,
+            code: row.extras?.stdErp || row.code || item.code || null,
+            name: row.name,
+            quantity: `${row.quantity}${row.unit ? ` ${row.unit}` : ''}`,
+            current: Object.fromEntries(bomFillColumns.map((column) => [column.key, bomCellOf(row, column)])),
+            locked: row.calcMode === 'DIRECT'
+                ? []
+                : bomFillColumns.filter((column) => column.label === 'netPrice' || column.label === 'total').map((column) => column.key),
+        }];
+    });
+    /** Die Werte in die Tabelle — gespeichert wird danach mit «Kaydet», wie immer. */
+    const applyBomFill = (changes: TableAiChange[]) => {
+        const byKey = new Map(bomFillColumns.map((column) => [column.key, column]));
+        const writes = new Map<string, Record<string, string>>();
+        for (const change of changes) {
+            const row = bomRowAt(change.index);
+            if (row) writes.set(row.key, { ...(writes.get(row.key) ?? {}), ...change.values });
+        }
+        const count = changes.reduce((sum, change) => sum + Object.keys(change.values).length, 0);
+        setRows((current) => current.map((row) => {
+            const values = writes.get(row.key);
+            if (!values) return row;
+            let next: DraftOrderRow = { ...row, error: null };
+            const extras = { ...(row.extras ?? {}) };
+            let priced = false;
+            for (const [key, value] of Object.entries(values)) {
+                const column = byKey.get(key);
+                if (!column) continue;
+                if (column.label) {
+                    next = { ...next, [BOM_FILL_FIELD[column.label]]: value };
+                    priced = true;
+                } else {
+                    extras[key] = value;
+                }
+            }
+            next = { ...next, extras };
+            // Die Preise des Belegs sind der neue Ausgangspunkt — «Geri çağır» kehrt zu ihnen zurück.
+            return priced ? { ...next, origin: captureRowOrigin(next) } : next;
+        }));
+        if (count) {
+            toast.success(t('productionBom.ai.applied', { count }));
+            drawnCheck.show();
         }
     };
 
@@ -1746,6 +1896,8 @@ export const OrderWorkspacePage = () => {
 
     /** Die Überschrift — der Name, den die Vorlage der Spalte gibt. */
     const columnLabel = (id: OrderColumnId): string => {
+        if (id === BOM_ERP_KEY) return t('productionBom.columns.erpCode');
+        if (id === BOM_MODEL_KEY) return t('productionBom.columns.modelNumber');
         const column = columnById.get(id);
         if (column) return column.fixed ? kindLabels.code : column.name;
         return id;
@@ -1763,6 +1915,8 @@ export const OrderWorkspacePage = () => {
         if (id === 'name') return undefined;
         const extra = extraByKey.get(id);
         const stored = (grid.widths as Record<string, number>)[id];
+        // Der ERP-Code einer BOM-Zeile (MAK-SASE-00004) braucht seine Breite ganz.
+        if (id === 'stdErp') return { width: Math.max(150, extra?.width ?? stored ?? 150) };
         return { width: extra ? (extra.width ?? stored ?? 120) : stored };
     };
 
@@ -1785,6 +1939,13 @@ export const OrderWorkspacePage = () => {
         rowSupplier: boolean,
         rowChanged: boolean,
     ): React.ReactNode => {
+        // BOM: Code, Modell, Name und Menge sind fest («satır ekleyemiyoruz»).
+        if (bomRecord && isBomLockedColumn(id)) {
+            const text = id === BOM_ERP_KEY ? (row.extras?.[BOM_ERP_KEY] ?? row.code)
+                : id === BOM_MODEL_KEY ? row.extras?.[BOM_MODEL_KEY]
+                    : id === 'name' ? row.name : row.quantity;
+            return <span className={`ofi-bom-wscell${id === 'quantity' ? ' is-num' : ''}${id === BOM_ERP_KEY ? ' is-code' : ''}`}>{text || '—'}</span>;
+        }
         // ── Eine eigene Angabe der Vorlage: frei änderbar wie jede Zelle. ────
         const extra = extraByKey.get(id);
         if (extra) {
@@ -1938,16 +2099,6 @@ export const OrderWorkspacePage = () => {
         }
     };
 
-    /* ── WAS DIE SEITE GERADE IST ──────────────────────────────────────────
-       Kein Auswahlbildschirm mehr und kein Schrittband: der Status sagt, ob
-       dies eine ANFRAGE oder eine BESTELLUNG ist, und danach richten sich die
-       Reiter. */
-    const status = editStatus ?? (priceless ? 'DRAFT' : 'ORDER_DRAFT');
-    const statusMeta = ORDER_STATUS_META[status] ?? ORDER_STATUS_META.ORDER_DRAFT;
-    /* Ein vollständig eingelagerter Vorgang wird nicht mehr geschrieben — seine
-       Buchungen sind gemacht. Er öffnet sich trotzdem: PDF, Mail und «Stoğa
-       gidenler» braucht man gerade dann. Zurück geht es über «Geri gönder». */
-    const linesLocked = !isEditableStage(status);
     const headerCode = loadedOrder?.referenceNumber ?? (editReference || '');
     const tabs: Array<{ key: WorkspaceTab; label: string; badge?: number; warn?: boolean }> = [
         { key: 'lines', label: t('inv.orders.tabs.lines'), badge: filledRows.length },
@@ -1990,8 +2141,8 @@ export const OrderWorkspacePage = () => {
     const settingsSteps: FlowStep[] = [
         { id: 'details', label: t('inv.orders.detailsTitle'), on: true },
         // Talepte tedarikçi yalnızca Administrator + muhasebe içindir.
-        { id: 'supplier', label: t(priceless ? 'inv.orders.requestSuppliers.title' : 'inv.columns.supplier'), on: !priceless || canPickSuppliers },
-        { id: 'production', label: t('production.assign.label'), on: productionOn },
+        { id: 'supplier', label: t(priceless ? 'inv.orders.requestSuppliers.title' : 'inv.columns.supplier'), on: !priceless || canPickSuppliers || bomRecord },
+        { id: 'production', label: t('production.assign.label'), on: productionOn && !bomRecord },
         { id: 'codeRange', label: t('inv.orders.receive.codeRange'), on: true },
         { id: 'fees', label: t('inv.orders.fees.title'), on: !priceless },
         { id: 'vat', label: t('inv.orders.columns.vat'), on: !priceless },
@@ -2052,7 +2203,7 @@ export const OrderWorkspacePage = () => {
                             </button>
                         )}
                         {/* KOPYA AÇ — neuer Entwurf derselben Art, neue Nummer. */}
-                        {editId && canTransfer && (
+                        {editId && canTransfer && !bomRecord && (
                             <button
                                 type="button"
                                 disabled={saving || pageBusy !== null}
@@ -2088,7 +2239,8 @@ export const OrderWorkspacePage = () => {
                         {editId && canTransfer && !priceless && !awaitingGoods && (
                             <button
                                 type="button"
-                                disabled={saving || pageBusy !== null}
+                                disabled={saving || pageBusy !== null || (bomOrder && (!quoteNumber.trim() || !bomOrigin?.quoteFile))}
+                                title={bomOrder && (!quoteNumber.trim() || !bomOrigin?.quoteFile) ? t('productionBom.origin.confirmNeeds') : undefined}
                                 onClick={() => void setOrderStatus('TO_BE_STOCKED', 'confirm', t('inv.orders.awaitingGoodsToast'))}
                                 className="flex h-9 items-center gap-1.5 rounded-md border border-orange-300 px-3.5 text-[12.5px] font-semibold text-orange-700 transition-colors hover:bg-orange-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-orange-400/40 dark:text-orange-300 dark:hover:bg-orange-500"
                             >
@@ -2099,8 +2251,11 @@ export const OrderWorkspacePage = () => {
                             </button>
                         )}
                         {/* FİYAT TALEBİ ALMAK İSTİYORUM — die Bestellung wird
-                            wieder eine Preisanfrage (derselbe Datensatz). */}
-                        {editId && canTransfer && !priceless && !awaitingGoods && (
+                            wieder eine Preisanfrage (derselbe Datensatz). Nicht für
+                            eine BOM-Bestellung: sie gibt es erst nach der Freigabe der
+                            BOM, und danach wird nicht mehr angefragt (27.09.2026: «bom
+                            onaylandıktan sonra fiyat talebi alınamaz»). */}
+                        {editId && canTransfer && !priceless && !awaitingGoods && !bomOrder && (
                             <button
                                 type="button"
                                 disabled={saving || pageBusy !== null}
@@ -2115,7 +2270,7 @@ export const OrderWorkspacePage = () => {
                         )}
                         {/* SİPARİŞE DÖNÜŞTÜR — die Anfrage BLEIBT, daneben
                             entsteht eine Bestellung und sie öffnet sich. */}
-                        {editId && priceless && canTransfer && (
+                        {editId && priceless && canTransfer && bomOrigin?.kind !== 'REQUEST' && (
                             <button
                                 type="button"
                                 disabled={saving || pageBusy !== null}
@@ -2142,6 +2297,27 @@ export const OrderWorkspacePage = () => {
                     </div>
                 )}
             />
+
+            {bomOrigin && editId && (
+                <BomOrderBanner
+                    origin={bomOrigin}
+                    purchaseOrderId={editId}
+                    savedQuoteNumber={loadedOrder?.quoteNumber ?? null}
+                    onChanged={refreshBomOrigin}
+                />
+            )}
+
+            {bomFill && editId && loadedOrder && (
+                <BomTableAiDialog
+                    purchaseOrderId={editId}
+                    columns={bomFillColumns}
+                    rows={bomFillRows()}
+                    initialPrompt={bomFill.prompt}
+                    initialFiles={bomFill.files}
+                    onApply={applyBomFill}
+                    onClose={() => setBomFill(null)}
+                />
+            )}
 
             {/* Die Rückfrage steht IN der Seite, gleich unter ihrem Knopf. */}
             {pageAsk && (
@@ -2242,16 +2418,39 @@ export const OrderWorkspacePage = () => {
                         </button>
                     )}
                     <span className="ofi-ows-bar__end">
-                        <button
-                            type="button"
-                            className="ofi-poi-launch is-alive"
-                            disabled={!templateReady}
-                            title={templateReady ? undefined : t('inv.aiImport.templateRequiredTitle')}
-                            onClick={() => setAiOpen(true)}
-                        >
-                            <Zap size={14} />
-                            {t('inv.aiImport.importButton')}
-                        </button>
+                        {/* BOM: an der Stelle des Beleg-Imports — derselbe Knopf,
+                            aber er füllt die Tabelle, statt sie zu ersetzen. Eine
+                            BOM-Preisanfrage (Name · Modell · Menge) hat nichts zu
+                            füllen — dort steht er nur, wenn ihre Vorlage mehr trägt. */}
+                        {bomRecord ? (!bomOrder && !bomFillColumns.length ? null : (
+                            <button
+                                type="button"
+                                className="ofi-poi-launch is-alive"
+                                disabled={!bomFillReady}
+                                title={!templateReady
+                                    ? t('inv.aiImport.templateRequiredTitle')
+                                    : linesLocked
+                                        ? t('inv.orders.editCompleted')
+                                        : !bomFillColumns.length
+                                            ? t('productionBom.ai.noColumns', { tab: t('inv.orders.tabs.template') })
+                                            : t('productionBom.ai.fillButtonTitle')}
+                                onClick={() => void openBomFill()}
+                            >
+                                <Zap size={14} />
+                                {t('productionBom.ai.fillButton')}
+                            </button>
+                        )) : (
+                            <button
+                                type="button"
+                                className="ofi-poi-launch is-alive"
+                                disabled={!templateReady}
+                                title={templateReady ? undefined : t('inv.aiImport.templateRequiredTitle')}
+                                onClick={() => setAiOpen(true)}
+                            >
+                                <Zap size={14} />
+                                {t('inv.aiImport.importButton')}
+                            </button>
+                        )}
                     </span>
                 </div>
             )}
@@ -2293,10 +2492,17 @@ export const OrderWorkspacePage = () => {
                                     <span className="ofi-ord-label">{t('inv.orders.columns.project')}</span>
                                     <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
                                 </label>
-                                <label className="ofi-ord-row">
-                                    <span className="ofi-ord-label">{t('inv.orders.columns.quoteNumber')}</span>
-                                    <input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="is-mono" />
-                                </label>
+                                {/* Eine BOM-Preisanfrage kennt keine Angebots-/Bestellnummer
+                                    (27.09.2026: «sipariş numarası ekleme gibi şeyler olmayacak»). */}
+                                {!(bomRecord && !bomOrder) && (
+                                    <label className="ofi-ord-row">
+                                        <span className="ofi-ord-label">
+                                            {t('inv.orders.columns.quoteNumber')}
+                                            {bomOrder && <b className="ofi-bom-req" title={t('productionBom.purchase.quoteNumberHint')}>*</b>}
+                                        </span>
+                                        <input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="is-mono" />
+                                    </label>
+                                )}
                             </div>
                         </section>
 
@@ -2308,7 +2514,7 @@ export const OrderWorkspacePage = () => {
                             Nur Administrator + Buchhaltung; jeder Lieferant
                             bekommt sein eigenes PDF und seine eigene Mail. Alle
                             anderen Rollen sehen diese Kiste gar nicht. */}
-                        {priceless && canPickSuppliers && (
+                        {priceless && canPickSuppliers && !bomRecord && (
                             <section className="ofi-ows-card" data-flow-step="supplier">
                                 <h3>{t('inv.orders.requestSuppliers.title')}</h3>
                                 <div className="ofi-ord-group">
@@ -2355,6 +2561,28 @@ export const OrderWorkspacePage = () => {
                                 </div>
                             </section>
                         )}
+                        {/* Eine BOM-Preisanfrage gehört GENAU einem Lieferanten (27.09.2026:
+                            «fiyat talepleri ayrı ayrı tedarikçiler üzerinden açılsın») — hier
+                            nur zu sehen; ein weiterer Lieferant bekommt seine eigene Anfrage
+                            aus der BOM. Der Server lässt die Liste ebenso stehen. */}
+                        {priceless && bomRecord && (
+                            <section className="ofi-ows-card" data-flow-step="supplier">
+                                <h3>{t('inv.orders.requestSuppliers.title')}</h3>
+                                <div className="ofi-ord-group">
+                                    {requestSuppliers.map((entry, index) => (
+                                        <div key={`${entry.id ?? entry.name}-${index}`} className="ofi-ord-row">
+                                            <span className="min-w-0 flex-1 truncate font-medium">{entry.name}</span>
+                                            {(entry.email || entry.address) && (
+                                                <span className="min-w-0 max-w-[55%] truncate text-[12px] text-slate-500 dark:text-white/55" title={[entry.email, entry.address].filter(Boolean).join('\n')}>
+                                                    {entry.email || entry.address?.split('\n').join(', ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <div className="ofi-ord-note">{t('productionBom.origin.requestOneSupplier')}</div>
+                                </div>
+                            </section>
+                        )}
                         {!priceless && (
                         <section className="ofi-ows-card" data-flow-step="supplier">
                             <h3>{t('inv.columns.supplier')}</h3>
@@ -2387,7 +2615,7 @@ export const OrderWorkspacePage = () => {
                         {/* ── PROJEKT UND GERÄT ───────────────────────────────────
                             Freiwillig (21.09.2026) und seit heute NUR hier: die
                             Positionstabelle trägt keine Gerätespalte mehr. */}
-                        {productionOn && (
+                        {productionOn && !bomRecord && (
                             <section className="ofi-ows-card" data-flow-step="production">
                                 <h3>{t('production.assign.label')}</h3>
                                 <div className="ofi-ord-group">
@@ -2671,14 +2899,17 @@ export const OrderWorkspacePage = () => {
                 tablara bastıkça veri gelecek, tüm veriler asla aynı anda
                 yüklenmesin». Jeder holt sein Zeug selbst und arbeitet mit dem
                 GESPEICHERTEN Stand. */}
-            {activeTab === 'pdf' && loadedOrder && (
+            {(activeTab === 'pdf' || activeTab === 'mail') && loadedOrder && bomOrder && !(loadedOrder.quoteNumber ?? '').trim() && (
+                <BomSendLocked />
+            )}
+            {activeTab === 'pdf' && loadedOrder && !(bomOrder && !(loadedOrder.quoteNumber ?? '').trim()) && (
                 <PdfPanel order={loadedOrder} priceRequest={priceless} />
             )}
-            {activeTab === 'mail' && loadedOrder && (
+            {activeTab === 'mail' && loadedOrder && !(bomOrder && !(loadedOrder.quoteNumber ?? '').trim()) && (
                 <MailPanel
                     order={loadedOrder}
                     priceRequest={priceless}
-                    onOrderChanged={(next) => { setLoadedOrder(next); setEditStatus(next.status); }}
+                    onOrderChanged={(next) => { setLoadedOrder(bomOrigin ? { ...next, bomOrigin } : next); setEditStatus(next.status); }}
                 />
             )}
 
@@ -2834,14 +3065,14 @@ export const OrderWorkspacePage = () => {
                                             </td>
                                         ))}
                                         <td className="text-center">
-                                            <button
+                                            {!bomRecord && <button
                                                 type="button"
                                                 aria-label={t('inv.bulkProducts.removeRow')}
                                                 onClick={() => removeRows([row.key])}
                                                 className="flex size-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/15"
                                             >
                                                 <Trash01 size={13} />
-                                            </button>
+                                            </button>}
                                         </td>
                                     </tr>
                                 );
@@ -2856,7 +3087,7 @@ export const OrderWorkspacePage = () => {
                     leerer Tabelle, denn dort wird er am dringendsten gebraucht
                     — und nur noch als Symbol. Die neue Zeile rechnet mit der
                     aktiven Vorlage, wie zuvor. */}
-                <div className="ofi-ord-foot">
+                <div className={`ofi-ord-foot${bomRecord ? ' is-bom-locked' : ''}`}>
                     <button
                         type="button"
                         onClick={addRow}

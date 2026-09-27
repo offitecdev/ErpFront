@@ -1,0 +1,1205 @@
+/* =========================================================
+   Offitec — ÜRETİM · GÖREVLENDİRME (26.09.2026, Vorgabe Samet)
+
+   «Apple mac ui, swift ui tasarımı olması lazım — aynı üretim depo modülü
+    nasılsa o şekilde; temiz ve profesyonel görünüm … her aşamada büyük
+    olmayacak şekilde görevlendirme kartı.»
+
+   Dasselbe Kleid wie das Depo (styles/modules/warehouse.css): Systemblau
+   als einziges Blau, Haarlinien, 8px-Felder und -Knöpfe, gruppierte Tafeln
+   wie die Systemeinstellungen, Quellliste mit blauer Auswahl, jede zweite
+   Zeile hellgrau. Dazu die kleinen Karten der Stufen.
+
+   Klassen: `.ofi-ptk-*`. `.ofi-ptk` trägt nur die Farben (Seite, Tafel der
+   Geräteseite), `.ofi-ptk-pop` dasselbe in Fenstern (Portal), und die
+   Auswahlliste hängt als `body > .ofi-mac-selection.ofi-ptk-picker` am Körper.
+   ========================================================= */
+
+/* ── 0. Farben ───────────────────────────────────────────── */
+.ofi-ptk,
+.ofi-ptk-pop,
+.ofi-ptk-seg {
+    --ptk-surface: var(--la-surface, #fff);
+    --ptk-text: var(--la-text, #1d1d1f);
+    --ptk-secondary: var(--la-secondary, #6e6e73);
+    --ptk-muted: var(--la-muted, #a1a1a6);
+    --ptk-border: rgba(0, 0, 0, 0.1);
+    --ptk-hairline: rgba(0, 0, 0, 0.065);
+    --ptk-accent: #0a7aff;
+    --ptk-accent-hover: #0068e0;
+    --ptk-accent-press: #0058c2;
+    --ptk-accent-soft: rgba(10, 122, 255, 0.1);
+    --ptk-accent-text: #0a55c8;
+    --ptk-ring: rgba(10, 122, 255, 0.24);
+    --ptk-zebra: #f4f5f7;
+    --ptk-row-hover: #e9f2ff;
+    --ptk-fill: rgba(0, 0, 0, 0.045);
+    --ptk-fill-strong: rgba(0, 0, 0, 0.075);
+    --ptk-field: #fff;
+    --ptk-field-border: rgba(0, 0, 0, 0.15);
+    --ptk-field-border-hover: rgba(0, 0, 0, 0.28);
+    --ptk-ctl-border: var(--ofi-ctl-border, #c3c6cd);
+    --ptk-danger: #d70015;
+    --ptk-success: #1f8a3b;
+    --ptk-warning: #b25000;
+    --ptk-warning-soft: rgba(255, 149, 0, 0.12);
+    --ptk-mech: #6e6e73;
+    --ptk-elec: #b77900;
+    --ptk-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.08);
+    --ptk-card-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.06);
+    --ptk-font: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--ptk-font);
+    font-feature-settings: 'cv11', 'calt';
+    color: var(--ptk-text);
+}
+
+.dark .ofi-ptk,
+.dark .ofi-ptk-pop,
+.dark .ofi-ptk-seg,
+html.dark .ofi-ptk-pop {
+    --ptk-surface: #1c1c1e;
+    --ptk-text: #f5f5f7;
+    --ptk-secondary: #a1a1a6;
+    --ptk-muted: #6e6e73;
+    --ptk-border: rgba(255, 255, 255, 0.1);
+    --ptk-hairline: rgba(255, 255, 255, 0.07);
+    --ptk-accent: #3b8dff;
+    --ptk-accent-hover: #5c9fff;
+    --ptk-accent-press: #2f7ae6;
+    --ptk-accent-soft: rgba(59, 141, 255, 0.18);
+    --ptk-accent-text: #9cc3ff;
+    --ptk-ring: rgba(59, 141, 255, 0.4);
+    --ptk-zebra: rgba(255, 255, 255, 0.035);
+    --ptk-row-hover: rgba(59, 141, 255, 0.14);
+    --ptk-fill: rgba(255, 255, 255, 0.07);
+    --ptk-fill-strong: rgba(255, 255, 255, 0.11);
+    --ptk-field: #232325;
+    --ptk-field-border: rgba(255, 255, 255, 0.16);
+    --ptk-field-border-hover: rgba(255, 255, 255, 0.3);
+    --ptk-ctl-border: rgba(255, 255, 255, 0.16);
+    --ptk-danger: #ff453a;
+    --ptk-success: #30d158;
+    --ptk-warning: #ffb340;
+    --ptk-warning-soft: rgba(255, 159, 10, 0.16);
+    --ptk-mech: #aeaeb2;
+    --ptk-elec: #ffcc4d;
+    --ptk-shadow: none;
+    --ptk-card-shadow: none;
+}
+
+/* ── 1. Die Seite der Vorlagen: füllt das Fenster, zwei Spalten ── */
+.ofi-ptk.is-templates {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 1680px;
+    min-width: 0;
+    height: calc(100dvh - 2 * var(--page-pad-y, 1.5rem));
+    min-height: 560px;
+    animation: ofi-ptk-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes ofi-ptk-in {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: none; }
+}
+
+.ofi-ptk-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    min-width: 0;
+}
+#root .ofi-ptk .ofi-ptk-head__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 20px;
+    color: var(--ptk-text);
+    white-space: nowrap;
+}
+.ofi-ptk-head__count { font-size: 12px; color: var(--ptk-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-head__actions { display: inline-flex; flex: none; align-items: center; gap: 8px; margin-left: auto; }
+
+.ofi-ptk-split {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(240px, 290px) minmax(0, 1fr);
+    gap: 18px;
+    min-height: 0;
+}
+.ofi-ptk-main {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0 2px 24px;
+    scrollbar-width: thin;
+}
+
+/* ── 2. Knöpfe: 32px, weiss mit Haarlinie; EIN Blau ────────── */
+#root .ofi-ptk .ofi-ptk-btn,
+body > :not(#root) .ofi-ptk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--ptk-field-border);
+    border-radius: 8px !important;
+    background: var(--ptk-surface);
+    box-shadow: var(--ptk-shadow);
+    color: var(--ptk-text);
+    font-family: var(--ptk-font);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 80ms ease;
+}
+#root .ofi-ptk .ofi-ptk-btn svg,
+body > :not(#root) .ofi-ptk-btn svg { width: 15px; height: 15px; flex: none; }
+#root .ofi-ptk .ofi-ptk-btn:hover:not(:disabled),
+body > :not(#root) .ofi-ptk-btn:hover:not(:disabled) { background: var(--ptk-fill); border-color: var(--ptk-field-border-hover); }
+#root .ofi-ptk .ofi-ptk-btn:active:not(:disabled),
+body > :not(#root) .ofi-ptk-btn:active:not(:disabled) { transform: scale(0.98); }
+#root .ofi-ptk .ofi-ptk-btn:disabled,
+body > :not(#root) .ofi-ptk-btn:disabled { opacity: 0.45; cursor: default; }
+#root .ofi-ptk .ofi-ptk-btn:focus-visible,
+body > :not(#root) .ofi-ptk-btn:focus-visible { outline: 3px solid var(--ptk-ring); outline-offset: 1px; }
+#root .ofi-ptk .ofi-ptk-btn.is-primary,
+body > :not(#root) .ofi-ptk-btn.is-primary {
+    border-color: var(--ptk-accent);
+    background: var(--ptk-accent);
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+}
+#root .ofi-ptk .ofi-ptk-btn.is-primary:hover:not(:disabled),
+body > :not(#root) .ofi-ptk-btn.is-primary:hover:not(:disabled) { border-color: var(--ptk-accent-hover); background: var(--ptk-accent-hover); }
+#root .ofi-ptk .ofi-ptk-btn.is-primary:active:not(:disabled),
+body > :not(#root) .ofi-ptk-btn.is-primary:active:not(:disabled) { background: var(--ptk-accent-press); }
+#root .ofi-ptk .ofi-ptk-btn.is-primary svg,
+body > :not(#root) .ofi-ptk-btn.is-primary svg { color: #fff; }
+#root .ofi-ptk .ofi-ptk-btn.is-quiet,
+body > :not(#root) .ofi-ptk-btn.is-quiet { border-color: transparent; background: transparent; box-shadow: none; color: var(--ptk-secondary); }
+#root .ofi-ptk .ofi-ptk-btn.is-quiet:hover:not(:disabled),
+body > :not(#root) .ofi-ptk-btn.is-quiet:hover:not(:disabled) { background: var(--ptk-fill); border-color: transparent; color: var(--ptk-text); }
+#root .ofi-ptk .ofi-ptk-btn.is-danger-hover:hover:not(:disabled),
+body > :not(#root) .ofi-ptk-btn.is-danger-hover:hover:not(:disabled) { color: var(--ptk-danger); }
+#root .ofi-ptk .ofi-ptk-btn.is-icon,
+body > :not(#root) .ofi-ptk-btn.is-icon { width: 32px; padding: 0; }
+#root .ofi-ptk .ofi-ptk-btn.is-small,
+body > :not(#root) .ofi-ptk-btn.is-small { height: 28px; min-height: 28px; padding: 0 10px; font-size: 12.5px; }
+#root .ofi-ptk .ofi-ptk-btn.is-small.is-icon,
+body > :not(#root) .ofi-ptk-btn.is-small.is-icon { width: 28px; padding: 0; }
+#root .ofi-ptk .ofi-ptk-btn.is-small svg,
+body > :not(#root) .ofi-ptk-btn.is-small svg { width: 14px; height: 14px; }
+
+/* ── 3. Hinweise, Zustände, Laden ─────────────────────────── */
+.ofi-ptk-note {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--ptk-border);
+    border-radius: 10px;
+    background: var(--ptk-surface);
+    color: var(--ptk-secondary);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+.ofi-ptk-note > svg { flex: none; width: 15px; height: 15px; margin-top: 1px; }
+.ofi-ptk-note > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-ptk-note > span > b { font-weight: 600; }
+.ofi-ptk-note.is-warn { border-color: color-mix(in srgb, var(--ptk-warning) 32%, transparent); background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-note.is-error { border-color: color-mix(in srgb, var(--ptk-danger) 30%, transparent); color: var(--ptk-danger); }
+.ofi-ptk-note__line { color: var(--ptk-text); opacity: 0.86; }
+
+.ofi-ptk-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 64px 16px;
+    text-align: center;
+    color: var(--ptk-secondary);
+    font-size: 13px;
+    line-height: 1.45;
+}
+.ofi-ptk-state > svg { width: 30px; height: 30px; color: var(--ptk-muted); stroke-width: 1.5; }
+.ofi-ptk-state > b { font-size: 14px; font-weight: 600; color: var(--ptk-text); }
+.ofi-ptk-state > span { max-width: 420px; }
+.ofi-ptk-state > .ofi-ptk-btn { margin-top: 8px; }
+.ofi-ptk-state.is-error > b { color: var(--ptk-danger); }
+.ofi-ptk-state.is-small { padding: 24px 14px; }
+.ofi-ptk-state.is-small > svg { width: 24px; height: 24px; }
+.ofi-ptk-state.is-wide { grid-column: 1 / -1; border: 1px dashed var(--ptk-border); border-radius: 12px; }
+/* Die leere Görevlendirme-Tafel eines Geräts: ruhig, mittig, ein Knopf. */
+.ofi-ptk-state.is-board { padding: 72px 16px; }
+.ofi-ptk-state__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 6px;
+    border-radius: 14px;
+    background: var(--ptk-accent-soft);
+    color: var(--ptk-accent);
+}
+.ofi-ptk-state__icon > svg { width: 26px; height: 26px; }
+
+.ofi-ptk-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--ptk-fill-strong);
+    border-top-color: var(--ptk-accent);
+    border-radius: 50%;
+    animation: ofi-ptk-spin 0.8s linear infinite;
+}
+@keyframes ofi-ptk-spin { to { transform: rotate(360deg); } }
+.ofi-ptk-skel {
+    display: block;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--ptk-fill-strong);
+    animation: ofi-ptk-pulse 1.3s ease-in-out infinite;
+}
+@keyframes ofi-ptk-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+}
+
+.ofi-ptk-dot { padding: 0 5px; color: var(--ptk-muted); }
+.ofi-ptk-tag {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border: 0.5px solid var(--ptk-field-border);
+    border-radius: 5px;
+    color: var(--ptk-secondary);
+    font-size: 10.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ── 4. Links: Suche und Quellliste der Vorlagen ──────────── */
+.ofi-ptk-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+#root .ofi-ptk .ofi-ptk-search {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 4px 0 10px;
+    border: 1px solid var(--ptk-ctl-border);
+    border-radius: 9px;
+    background: var(--ptk-field);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-ptk .ofi-ptk-search:focus-within { border-color: var(--ptk-accent); box-shadow: 0 0 0 3px var(--ptk-ring); }
+#root .ofi-ptk .ofi-ptk-search__glass { flex: none; width: 15px; height: 15px; color: var(--ptk-muted); }
+#root .ofi-ptk .ofi-ptk-search > input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none !important;
+    outline: none;
+    color: var(--ptk-text);
+    font-size: 13px;
+}
+#root .ofi-ptk .ofi-ptk-search > input::placeholder { color: var(--ptk-muted); font-style: normal; }
+#root .ofi-ptk .ofi-ptk-search__clear {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50% !important;
+    background: var(--ptk-fill-strong);
+    color: var(--ptk-secondary);
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-search__clear svg { width: 11px; height: 11px; }
+
+.ofi-ptk-list {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid var(--ptk-border);
+    border-radius: 12px;
+    background: var(--ptk-surface);
+    scrollbar-width: thin;
+}
+#root .ofi-ptk .ofi-ptk-listrow {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    padding: 7px 10px 7px 11px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-text);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+#root .ofi-ptk .ofi-ptk-listrow + .ofi-ptk-listrow { border-top: 1px solid var(--ptk-hairline); }
+#root .ofi-ptk .ofi-ptk-listrow:nth-child(even):not(.is-selected) { background: var(--ptk-zebra); }
+#root .ofi-ptk .ofi-ptk-listrow:hover:not(.is-selected):not(.is-skeleton) { background: var(--ptk-row-hover); }
+#root .ofi-ptk .ofi-ptk-listrow.is-selected { background: var(--ptk-accent); color: #fff; -webkit-text-fill-color: #fff; }
+#root .ofi-ptk .ofi-ptk-listrow.is-skeleton { cursor: default; }
+#root .ofi-ptk .ofi-ptk-listrow:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: -2px; }
+.ofi-ptk-listrow__icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--ptk-accent-soft);
+    color: var(--ptk-accent);
+}
+.ofi-ptk-listrow__icon > svg { width: 15px; height: 15px; }
+.ofi-ptk-listrow.is-selected .ofi-ptk-listrow__icon { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.ofi-ptk-listrow__text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-ptk-listrow__text > b { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-listrow__text > small {
+    overflow: hidden;
+    font-size: 11.5px;
+    color: var(--ptk-secondary);
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-ptk-listrow.is-selected .ofi-ptk-listrow__text > small,
+.ofi-ptk-listrow.is-selected .ofi-ptk-dot { color: rgba(255, 255, 255, 0.82); -webkit-text-fill-color: rgba(255, 255, 255, 0.82); }
+.ofi-ptk-listrow.is-selected .ofi-ptk-tag { border-color: rgba(255, 255, 255, 0.5); color: #fff; }
+.ofi-ptk-listrow.is-new .ofi-ptk-listrow__text > small { font-style: italic; }
+.ofi-ptk-listrow__warn { display: inline-flex; flex: none; color: var(--ptk-warning); }
+.ofi-ptk-listrow__warn > svg { width: 15px; height: 15px; }
+.ofi-ptk-listrow.is-selected .ofi-ptk-listrow__warn { color: #ffd98a; }
+.ofi-ptk-side__hint { margin: 0; padding: 0 4px; font-size: 11.5px; line-height: 1.45; color: var(--ptk-secondary); }
+
+/* ── 5. Rechts: die Vorlage ────────────────────────────────── */
+.ofi-ptk-editor { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ofi-ptk-editor__head { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 38px; }
+#root .ofi-ptk input.ofi-ptk-titleinput {
+    /* So breit wie der Name — der Zustand steht gleich dahinter. */
+    field-sizing: content;
+    flex: 0 1 auto;
+    min-width: 160px;
+    max-width: 560px;
+    height: 36px;
+    min-height: 36px;
+    margin-left: -8px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: 8px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-text);
+    font-family: var(--ptk-font);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.018em;
+    transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-ptk input.ofi-ptk-titleinput:hover:not(:disabled):not(:focus) { background: var(--ptk-fill); }
+#root .ofi-ptk input.ofi-ptk-titleinput:focus { border-color: var(--ptk-accent); background: var(--ptk-field); outline: none; box-shadow: 0 0 0 3px var(--ptk-ring); }
+#root .ofi-ptk input.ofi-ptk-titleinput:disabled { opacity: 1; -webkit-text-fill-color: var(--ptk-text); }
+#root .ofi-ptk input.ofi-ptk-titleinput::placeholder { color: var(--ptk-muted); font-weight: 500; }
+.ofi-ptk-status {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 9px 0 7px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.ofi-ptk-status > svg { width: 14px; height: 14px; }
+.ofi-ptk-status.is-ok { background: color-mix(in srgb, var(--ptk-success) 12%, transparent); color: var(--ptk-success); }
+.ofi-ptk-status.is-warn { background: var(--ptk-warning-soft); color: var(--ptk-warning); }
+.ofi-ptk-editor__actions { display: inline-flex; flex: none; align-items: center; gap: 6px; margin-left: auto; }
+.ofi-ptk-dirty { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; font-size: 12px; color: var(--ptk-secondary); white-space: nowrap; }
+.ofi-ptk-dirty::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ptk-warning); }
+.ofi-ptk-editor__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 0;
+    margin: -8px 0 0;
+    font-size: 12px;
+    color: var(--ptk-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-editor__meta > .ofi-ptk-tag { margin-left: 8px; }
+.ofi-ptk-editor__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 4px; }
+
+/* Gruppierte Tafel wie die Systemeinstellungen. */
+.ofi-ptk-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#root .ofi-ptk .ofi-ptk-group__title { margin: 0; padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--ptk-secondary); }
+.ofi-ptk-group__box { border: 1px solid var(--ptk-border); border-radius: 12px; background: var(--ptk-surface); }
+
+.ofi-ptk-arearow {
+    display: grid;
+    grid-template-columns: minmax(120px, 170px) auto minmax(70px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    min-height: 48px;
+    padding: 7px 14px;
+    font-size: 13px;
+}
+.ofi-ptk-arearow + .ofi-ptk-arearow { border-top: 1px solid var(--ptk-hairline); }
+.ofi-ptk-arearow__name { display: inline-flex; align-items: center; gap: 9px; min-width: 0; font-weight: 500; }
+.ofi-ptk-areaicon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--ptk-fill);
+    color: var(--ptk-mech);
+}
+.ofi-ptk-areaicon.is-electrical { background: color-mix(in srgb, var(--ptk-elec) 14%, transparent); color: var(--ptk-elec); }
+.ofi-ptk-arearow__share { display: inline-flex; align-items: center; gap: 8px; color: var(--ptk-secondary); font-size: 12.5px; white-space: nowrap; }
+.ofi-ptk-arearow__tasks { color: var(--ptk-secondary); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-arearow__sum { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-arearow__sum > svg { width: 15px; height: 15px; flex: none; }
+.ofi-ptk-arearow__sum.is-ok { color: var(--ptk-success); }
+.ofi-ptk-arearow__sum.is-warn { color: var(--ptk-warning); }
+.ofi-ptk-arearow__sum.is-unused { color: var(--ptk-muted); }
+.ofi-ptk-arearow.is-total { min-height: 40px; background: var(--ptk-zebra); border-radius: 0 0 11px 11px; }
+.ofi-ptk-arearow.is-total .ofi-ptk-arearow__name { font-weight: 600; }
+.ofi-ptk-arearow__totalvalue { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ofi-ptk-arearow__note { grid-column: 3 / -1; justify-self: end; font-size: 12px; color: var(--ptk-success); }
+.ofi-ptk-arearow.is-total.is-warn .ofi-ptk-arearow__totalvalue,
+.ofi-ptk-arearow.is-total.is-warn .ofi-ptk-arearow__note { color: var(--ptk-warning); }
+
+/* Felder: 32px, Haarlinie, 8px-Ecke, blauer Ring. */
+#root .ofi-ptk :is(input, select).ofi-ptk-input,
+body > :not(#root) :is(input, select).ofi-ptk-input {
+    width: 100%;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--ptk-field-border);
+    border-radius: 8px !important;
+    background: var(--ptk-field);
+    box-shadow: none;
+    color: var(--ptk-text);
+    font-family: var(--ptk-font);
+    font-size: 13px;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-ptk :is(input, select).ofi-ptk-input:hover:not(:disabled):not(:focus),
+body > :not(#root) :is(input, select).ofi-ptk-input:hover:not(:disabled):not(:focus) { border-color: var(--ptk-field-border-hover); }
+#root .ofi-ptk :is(input, select).ofi-ptk-input:focus,
+body > :not(#root) :is(input, select).ofi-ptk-input:focus { border-color: var(--ptk-accent) !important; outline: none; box-shadow: 0 0 0 3px var(--ptk-ring); }
+#root .ofi-ptk :is(input, select).ofi-ptk-input:disabled,
+body > :not(#root) :is(input, select).ofi-ptk-input:disabled { background: var(--ptk-fill); color: var(--ptk-secondary); }
+#root .ofi-ptk input.ofi-ptk-input::placeholder,
+body > :not(#root) input.ofi-ptk-input::placeholder { color: var(--ptk-muted); font-style: normal; }
+#root .ofi-ptk .ofi-ptk-input.is-invalid,
+body > :not(#root) .ofi-ptk-input.is-invalid { border-color: var(--ptk-danger); }
+#root .ofi-ptk .ofi-ptk-input.is-num,
+body > :not(#root) .ofi-ptk-input.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+body > :not(#root) .ofi-ptk-input.is-code { font-weight: 600; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
+
+/* Prozentfeld: Zahl + «%» im selben Rahmen. */
+.ofi-ptk-percent { position: relative; display: inline-flex; align-items: center; width: 96px; }
+.ofi-ptk-percent.is-compact { width: 76px; }
+#root .ofi-ptk .ofi-ptk-percent > input.ofi-ptk-input,
+body > :not(#root) .ofi-ptk-percent > input.ofi-ptk-input { padding-right: 24px; }
+.ofi-ptk-percent > span { position: absolute; right: 10px; color: var(--ptk-secondary); font-size: 12.5px; pointer-events: none; }
+#root .ofi-ptk .ofi-ptk-percent.is-invalid > input.ofi-ptk-input,
+body > :not(#root) .ofi-ptk-percent.is-invalid > input.ofi-ptk-input { border-color: var(--ptk-danger); }
+
+.ofi-ptk-legend { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; font-size: 11.5px; color: var(--ptk-secondary); }
+.ofi-ptk-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.ofi-ptk-legend > span::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--ptk-text); opacity: 0.75; }
+.ofi-ptk-legend__overall::before { background: var(--ptk-muted) !important; opacity: 1 !important; }
+
+/* ── 6. Mekanik | Elektrik — ein macOS-Segmentschalter ───────── */
+.ofi-ptk-seg {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    height: 32px;
+    padding: 2px;
+    border-radius: 9px;
+    background: rgba(118, 118, 128, 0.12);
+    box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.dark .ofi-ptk-seg { background: rgba(118, 118, 128, 0.24); box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.05); }
+#root .ofi-ptk-seg .ofi-ptk-seg__btn,
+body > :not(#root) .ofi-ptk-seg .ofi-ptk-seg__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    min-height: 0;
+    padding: 0 12px 0 10px;
+    border: 0;
+    border-radius: 7px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-secondary);
+    font-family: var(--ptk-font);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+#root .ofi-ptk-seg .ofi-ptk-seg__btn:hover,
+body > :not(#root) .ofi-ptk-seg .ofi-ptk-seg__btn:hover { background: rgba(255, 255, 255, 0.55); color: var(--ptk-text); }
+.dark #root .ofi-ptk-seg .ofi-ptk-seg__btn:hover { background: rgba(255, 255, 255, 0.06); }
+#root .ofi-ptk-seg .ofi-ptk-seg__btn[aria-selected="true"],
+body > :not(#root) .ofi-ptk-seg .ofi-ptk-seg__btn[aria-selected="true"] {
+    background: #fff;
+    color: var(--ptk-text);
+    font-weight: 600;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.12), 0 3px 8px -4px rgba(0, 0, 0, 0.14);
+}
+.dark #root .ofi-ptk-seg .ofi-ptk-seg__btn[aria-selected="true"],
+html.dark body > :not(#root) .ofi-ptk-seg .ofi-ptk-seg__btn[aria-selected="true"] {
+    background: #636366;
+    color: #fff;
+    box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+#root .ofi-ptk-seg .ofi-ptk-seg__btn:focus-visible,
+body > :not(#root) .ofi-ptk-seg .ofi-ptk-seg__btn:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 1px; }
+.ofi-ptk-seg__btn > svg { flex: none; color: var(--ptk-mech); }
+.ofi-ptk-seg__btn:last-child > svg { color: var(--ptk-elec); }
+.ofi-ptk-seg__share {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--ptk-fill);
+    color: var(--ptk-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-seg__btn[aria-selected="true"] .ofi-ptk-seg__share { background: var(--ptk-accent-soft); color: var(--ptk-accent-text); }
+.ofi-ptk-seg__warn { width: 7px; height: 7px; border-radius: 50%; background: var(--ptk-warning); }
+
+/* ── 7. Die Karten der Stufen ──────────────────────────────── */
+/* Spalten wie ein Mauerwerk: jede Karte so hoch wie ihr Inhalt, keine Lücken
+   neben einer kurzen Karte. Die Nummer auf der Karte sagt die Reihenfolge. */
+.ofi-ptk-grid {
+    columns: 460px;
+    column-gap: 12px;
+}
+.ofi-ptk-grid > * {
+    break-inside: avoid;
+    margin-bottom: 12px;
+}
+/* In der Vorlage wird gelesen und geschrieben: breitere Karten, auf dem
+   Laptop eine Spalte, auf grossen Schirmen zwei. */
+.ofi-ptk-grid.is-template { columns: 560px; }
+.ofi-ptk-grid > .ofi-ptk-state.is-wide { column-span: all; }
+
+.ofi-ptk-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--ptk-border);
+    border-radius: 12px;
+    background: var(--ptk-surface);
+    box-shadow: var(--ptk-card-shadow);
+}
+.ofi-ptk-card.is-skeleton { gap: 12px; padding: 14px; }
+.ofi-ptk-card__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 6px 12px 6px 10px;
+    border-bottom: 1px solid var(--ptk-hairline);
+}
+.ofi-ptk-card.is-empty .ofi-ptk-card__head { border-bottom: 0; }
+.ofi-ptk-stagenum {
+    display: inline-flex;
+    flex: 0 0 20px;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--ptk-accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-card.is-empty .ofi-ptk-stagenum { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ptk-secondary) 45%, transparent); color: var(--ptk-secondary); }
+.ofi-ptk-stagenum.is-flag { background: var(--ptk-surface); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ptk-secondary) 40%, transparent); color: var(--ptk-secondary); }
+#root .ofi-ptk .ofi-ptk-card__title,
+body > :not(#root) .ofi-ptk-card__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--ptk-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ofi-ptk-card.is-empty .ofi-ptk-card__title { color: var(--ptk-secondary); font-weight: 500; }
+.ofi-ptk-card__sum { display: inline-flex; flex: none; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-card__sum > b { font-size: 12.5px; font-weight: 600; color: var(--ptk-text); }
+.ofi-ptk-card__sum > small { font-size: 11px; color: var(--ptk-secondary); }
+.ofi-ptk-card__empty { margin: 0; padding: 0 12px 11px 38px; font-size: 12px; color: var(--ptk-muted); }
+
+/* Die Zeilen einer Karte teilen sich die Spalten (subgrid), und die Spalte
+   der Personen ist überall gleich breit (zwei Kapseln + «+n»): so stehen
+   die Prozente in JEDER Karte an derselben Stelle untereinander — der Name
+   nimmt den Rest. */
+.ofi-ptk-card__list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px 216px;
+    column-gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.ofi-ptk-card__list.is-template { grid-template-columns: minmax(0, 1fr) 40px 44px 216px; }
+.ofi-ptk-task {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+    column-gap: 8px;
+    min-height: 36px;
+    padding: 2px 8px 2px 10px;
+    font-size: 13px;
+}
+.ofi-ptk-task + .ofi-ptk-task { border-top: 1px solid var(--ptk-hairline); }
+.ofi-ptk-task:nth-child(even) { background: var(--ptk-zebra); }
+.ofi-ptk-task.is-mine { box-shadow: inset 3px 0 0 var(--ptk-accent); }
+
+.ofi-ptk-task__main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#root .ofi-ptk .ofi-ptk-task__main.is-button,
+body > :not(#root) .ofi-ptk-task__main.is-button {
+    width: 100%;
+    height: 30px;
+    min-height: 0;
+    margin-left: -4px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 6px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-text);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+#root .ofi-ptk .ofi-ptk-task__main.is-button:hover { background: var(--ptk-row-hover); }
+#root .ofi-ptk .ofi-ptk-task__main.is-button:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 0; }
+.ofi-ptk-code {
+    flex: 0 0 auto;
+    min-width: 36px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ptk-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-task__name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-mine {
+    flex: none;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--ptk-accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.ofi-ptk-weight,
+.ofi-ptk-overall { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-weight { font-size: 12.5px; font-weight: 600; color: var(--ptk-text); }
+.ofi-ptk-overall { font-size: 11.5px; color: var(--ptk-muted); }
+
+/* Die Personen einer Aufgabe: Kapseln, oder «Kişi ata». */
+#root .ofi-ptk .ofi-ptk-people,
+body > :not(#root) .ofi-ptk-people {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    min-width: 0;
+    height: 28px;
+    min-height: 0;
+    padding: 0 4px;
+    border: 1px solid transparent;
+    border-radius: 7px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-text);
+    font-family: var(--ptk-font);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+#root .ofi-ptk button.ofi-ptk-people:hover,
+body > :not(#root) button.ofi-ptk-people:hover { background: var(--ptk-fill); }
+#root .ofi-ptk button.ofi-ptk-people.is-open,
+body > :not(#root) button.ofi-ptk-people.is-open { border-color: var(--ptk-accent); background: var(--ptk-accent-soft); }
+#root .ofi-ptk button.ofi-ptk-people:focus-visible,
+body > :not(#root) button.ofi-ptk-people:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 1px; }
+#root .ofi-ptk button.ofi-ptk-people.is-empty,
+body > :not(#root) button.ofi-ptk-people.is-empty { color: var(--ptk-accent); font-weight: 500; }
+#root .ofi-ptk button.ofi-ptk-people.is-empty:hover,
+body > :not(#root) button.ofi-ptk-people.is-empty:hover { background: var(--ptk-accent-soft); }
+.ofi-ptk-people > svg { flex: none; width: 14px; height: 14px; }
+.ofi-ptk-people.is-busy { opacity: 0.6; }
+#root .ofi-ptk .ofi-ptk-people.is-static { cursor: default; }
+.ofi-ptk-people__none { color: var(--ptk-muted); }
+/* Im Fenster steht das Feld links und darf breiter werden. */
+body > :not(#root) .ofi-ptk-form .ofi-ptk-people {
+    justify-content: flex-start;
+    width: 100%;
+    height: 34px;
+    padding: 0 8px;
+    border-color: var(--ptk-field-border);
+    background: var(--ptk-field);
+}
+
+.ofi-ptk-chips { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
+.ofi-ptk-person {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    height: 22px;
+    padding: 0 7px 0 2px;
+    border-radius: 11px;
+    background: var(--ptk-fill);
+    color: var(--ptk-text);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.ofi-ptk-person__dot {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ptk-secondary) 26%, transparent);
+    color: var(--ptk-text);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.ofi-ptk-person__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ofi-ptk-person.is-me { background: var(--ptk-accent-soft); color: var(--ptk-accent-text); }
+.ofi-ptk-person.is-me .ofi-ptk-person__dot { background: var(--ptk-accent); color: #fff; }
+.ofi-ptk-person.is-inactive { color: var(--ptk-muted); text-decoration: line-through; }
+.ofi-ptk-person.is-more { padding: 0 7px; color: var(--ptk-secondary); font-variant-numeric: tabular-nums; }
+
+#root .ofi-ptk .ofi-ptk-addtask {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 5px;
+    height: 30px;
+    min-height: 0;
+    margin: 2px 6px 6px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 7px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-accent);
+    font-family: var(--ptk-font);
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+}
+#root .ofi-ptk .ofi-ptk-addtask:hover { background: var(--ptk-accent-soft); }
+#root .ofi-ptk .ofi-ptk-addtask svg { width: 14px; height: 14px; }
+
+/* Stufen ohne Aufgaben: kleine Knöpfe unter den Karten. */
+.ofi-ptk-emptystages { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ofi-ptk-emptystages__label { margin-right: 4px; font-size: 12px; color: var(--ptk-secondary); }
+#root .ofi-ptk .ofi-ptk-stagechip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    min-height: 0;
+    padding: 0 10px 0 8px;
+    border: 1px dashed var(--ptk-field-border-hover);
+    border-radius: 14px !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-secondary);
+    font-family: var(--ptk-font);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+#root .ofi-ptk .ofi-ptk-stagechip:hover { border-color: var(--ptk-accent); border-style: solid; background: var(--ptk-accent-soft); color: var(--ptk-accent); }
+#root .ofi-ptk .ofi-ptk-stagechip svg { width: 13px; height: 13px; }
+
+/* ── 8. Die Görevlendirme-Tafel am Gerät ──────────────────── */
+.ofi-ptk-board { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; animation: ofi-ptk-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.ofi-ptk-planbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    min-height: 44px;
+    padding: 6px 8px 6px 12px;
+    border: 1px solid var(--ptk-border);
+    border-radius: 12px;
+    background: var(--ptk-surface);
+    font-size: 12.5px;
+}
+.ofi-ptk-planbar__template { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.ofi-ptk-planbar__template > svg { flex: none; width: 16px; height: 16px; color: var(--ptk-accent); }
+.ofi-ptk-planbar__template > b { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-planbar__meta { color: var(--ptk-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ofi-ptk-planbar__count {
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--ptk-fill);
+    color: var(--ptk-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.ofi-ptk-planbar__count.is-done { background: color-mix(in srgb, var(--ptk-success) 12%, transparent); color: var(--ptk-success); }
+.ofi-ptk-planbar__actions { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+
+/* ── Auf den übrigen Stufen: die GLASKARTE der Aufgaben (27.09.2026) ──────
+   «Küçük kart, glass, tıklanıp açılıp X ile kapanmalı, sağa sola doğru
+    açılmalı, içeriğin önüne geçmeli ama pop-up gibi değil.» Sie liegt oben
+   links ÜBER der Fläche der Stufe (kein Schleier); zu ist sie ein kleines
+   Plättchen, auf ist sie die Görevlendirme-Karte der Stufe. Das Glas ist
+   dasselbe wie das der macOS-Auswahl (styles/macSelection.css). */
+.ofi-ptk-floatwrap {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    pointer-events: none;
+}
+.ofi-ptk-float {
+    --float-surface: rgba(250, 251, 254, 0.74);
+    --float-edge: rgba(100, 108, 123, 0.22);
+    --float-stripe: rgba(50, 50, 60, 0.045);
+    --float-hover: rgba(10, 122, 255, 0.08);
+    position: relative;
+    width: max-content;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--float-edge);
+    border-radius: 16px;
+    background: var(--float-surface);
+    -webkit-backdrop-filter: blur(22px) saturate(1.55);
+    backdrop-filter: blur(22px) saturate(1.55);
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.12),
+        0 3px 7px rgba(0, 0, 0, 0.08),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+    pointer-events: auto;
+    animation: ofi-ptk-float-in 260ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.ofi-ptk-float.is-open { width: min(660px, 100%); }
+.dark .ofi-ptk-float {
+    --float-surface: rgba(37, 39, 45, 0.76);
+    --float-edge: rgba(255, 255, 255, 0.18);
+    --float-stripe: rgba(255, 255, 255, 0.045);
+    --float-hover: rgba(59, 141, 255, 0.16);
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.38),
+        0 3px 7px rgba(0, 0, 0, 0.22),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+@keyframes ofi-ptk-float-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .ofi-ptk-float { --float-surface: #fafafa; }
+    .dark .ofi-ptk-float { --float-surface: #292a2d; }
+}
+
+/* Zu: das Plättchen. */
+#root .ofi-ptk .ofi-ptk-float__summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 280px;
+    min-height: 54px;
+    margin: 0;
+    padding: 8px 12px 8px 9px;
+    border: 0;
+    border-radius: 0 !important;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ptk-text);
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 140ms ease;
+}
+#root .ofi-ptk .ofi-ptk-float__summary:hover { background: var(--float-hover); }
+#root .ofi-ptk .ofi-ptk-float__summary:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: -2px; }
+.ofi-ptk-float__icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--ptk-accent);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(10, 122, 255, 0.35);
+}
+.ofi-ptk-float__icon > svg { width: 18px; height: 18px; }
+.ofi-ptk-float__text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 1px; min-width: 0; }
+.ofi-ptk-float__text > b { font-size: 13px; font-weight: 600; letter-spacing: -0.005em; }
+.ofi-ptk-float__text > small {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--ptk-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.ofi-ptk-float__text > small > em {
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--ptk-accent);
+    color: #fff;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 600;
+}
+.ofi-ptk-float__faces { display: inline-flex; flex: none; align-items: center; padding-left: 4px; }
+.ofi-ptk-float__face {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: -6px;
+    border: 2px solid var(--float-surface);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ptk-secondary) 30%, #ffffff);
+    color: var(--ptk-text);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.ofi-ptk-float__face:first-child { margin-left: 0; }
+.dark .ofi-ptk-float__face { background: #48484a; border-color: #2c2d31; }
+.ofi-ptk-float__face.is-me { background: var(--ptk-accent); color: #fff; }
+.ofi-ptk-float__face.is-more { background: var(--ptk-fill-strong); color: var(--ptk-secondary); font-size: 9.5px; }
+.ofi-ptk-float__chevron { flex: none; width: 16px; height: 16px; color: var(--ptk-muted); transition: transform 160ms ease, color 160ms ease; }
+.ofi-ptk-float__summary:hover .ofi-ptk-float__chevron { transform: translateX(2px); color: var(--ptk-accent); }
+
+/* Auf: die Karte der Stufe im Glas — ohne eigenen Rahmen, mit ✕. */
+.ofi-ptk-float__inner { min-width: 0; }
+.ofi-ptk-float .ofi-ptk-card {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.ofi-ptk-float .ofi-ptk-card__head { min-height: 46px; padding: 8px 10px 8px 12px; border-bottom-color: var(--float-stripe); }
+.ofi-ptk-float .ofi-ptk-task + .ofi-ptk-task { border-top-color: var(--float-stripe); }
+.ofi-ptk-float .ofi-ptk-task:nth-child(even) { background: var(--float-stripe); }
+#root .ofi-ptk .ofi-ptk-card__close,
+body > :not(#root) .ofi-ptk-card__close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    min-height: 0;
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 50% !important;
+    background: var(--ptk-fill-strong);
+    box-shadow: none;
+    color: var(--ptk-secondary);
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+#root .ofi-ptk .ofi-ptk-card__close:hover { background: color-mix(in srgb, var(--ptk-text) 16%, transparent); color: var(--ptk-text); }
+#root .ofi-ptk .ofi-ptk-card__close:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: 1px; }
+#root .ofi-ptk .ofi-ptk-card__close svg { width: 13px; height: 13px; }
+
+/* ── 9. Fenster: Aufgabe bearbeiten, Vorlage laden ─────────── */
+.ofi-ptk-pop { font-size: 13px; }
+.ofi-ptk-form { display: flex; flex-direction: column; gap: 16px; padding: 2px 0 4px; }
+.ofi-ptk-form__row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.ofi-ptk-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ofi-ptk-field.is-grow { flex: 1 1 200px; }
+.ofi-ptk-form__row.is-code > .ofi-ptk-field:first-child { flex: 0 0 104px; }
+.ofi-ptk-field.is-weight { flex: 0 0 110px; }
+.ofi-ptk-field.is-weight .ofi-ptk-percent { width: 100%; }
+.ofi-ptk-field.is-overall { flex: 0 0 auto; }
+.ofi-ptk-field__label { font-size: 12px; font-weight: 500; color: var(--ptk-secondary); }
+.ofi-ptk-field__error { font-size: 11.5px; color: var(--ptk-danger); }
+.ofi-ptk-field__hint { font-size: 11.5px; line-height: 1.45; color: var(--ptk-secondary); }
+.ofi-ptk-readout {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--ptk-fill);
+    color: var(--ptk-text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ofi-ptk-loaddialog { display: flex; flex-direction: column; gap: 10px; }
+.ofi-ptk-choices { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--ptk-border); border-radius: 12px; }
+body > :not(#root) .ofi-ptk-choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: 0 !important;
+    background: var(--ptk-surface);
+    box-shadow: none;
+    color: var(--ptk-text);
+    font-family: var(--ptk-font);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+body > :not(#root) .ofi-ptk-choice + .ofi-ptk-choice { border-top: 1px solid var(--ptk-hairline); }
+body > :not(#root) .ofi-ptk-choice:nth-child(even) { background: var(--ptk-zebra); }
+body > :not(#root) .ofi-ptk-choice:hover:not(:disabled) { background: var(--ptk-row-hover); }
+body > :not(#root) .ofi-ptk-choice.is-selected { background: var(--ptk-accent-soft); }
+body > :not(#root) .ofi-ptk-choice:disabled { cursor: default; opacity: 0.6; }
+body > :not(#root) .ofi-ptk-choice:focus-visible { outline: 2px solid var(--ptk-ring); outline-offset: -2px; }
+.ofi-ptk-choice__radio {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--ptk-field-border-hover);
+    border-radius: 50%;
+    background: var(--ptk-field);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.ofi-ptk-choice.is-selected .ofi-ptk-choice__radio { border: 5px solid var(--ptk-accent); background: #fff; }
+.ofi-ptk-choice__text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.ofi-ptk-choice__text > b { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ofi-ptk-choice__text > small { font-size: 11.5px; color: var(--ptk-secondary); font-variant-numeric: tabular-nums; }
+.ofi-ptk-choice__warn { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: 11.5px; color: var(--ptk-warning); }
+.ofi-ptk-choice__warn > svg { width: 13px; height: 13px; }
+body > :not(#root) a.ofi-ptk-link { color: var(--ofi-cal-accent, #0a7aff); font-size: 12.5px; font-weight: 500; text-decoration: none; }
+body > :not(#root) a.ofi-ptk-link:hover { text-decoration: underline; }
+
+/* ── 10. Die Personenauswahl (Portal, macSelection-Kleid) ─── */
+body > .ofi-mac-selection.ofi-ptk-picker { display: flex; flex-direction: column; font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-gv-picker__search input.ofi-cal-input { display: block; width: 100% !important; box-sizing: border-box; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-gv-picker__list { display: flex; flex-direction: column; overflow-y: auto; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-gv-picker__row { display: flex !important; align-items: center; width: 100%; text-align: left !important; cursor: pointer; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-gv-picker__row > .ofi-gv-picker__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-gv-picker__hint { flex: none; font-size: 11.5px; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-ptk-picker__state { padding: 14px 10px; font-size: 12.5px; color: var(--ofi-selection-muted); text-align: center; }
+body > .ofi-mac-selection.ofi-ptk-picker .ofi-mac-selection__footer { justify-content: space-between; }
+
+/* ── 11. Schmale Fenster ──────────────────────────────────── */
+@media (max-width: 1100px) {
+    .ofi-ptk-arearow { grid-template-columns: minmax(110px, 1fr) auto; }
+    .ofi-ptk-arearow__tasks { display: none; }
+    .ofi-ptk-arearow__sum { grid-column: 1 / -1; justify-content: flex-start; }
+    .ofi-ptk-arearow__note { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 900px) {
+    .ofi-ptk.is-templates { height: auto; min-height: 0; }
+    .ofi-ptk-split { grid-template-columns: minmax(0, 1fr); }
+    .ofi-ptk-list { max-height: 260px; }
+    .ofi-ptk-main { overflow: visible; }
+    .ofi-ptk-legend { display: none; }
+}
+@media (max-width: 560px) {
+    /* Der Kopf behält den Knopf: der Titel darf kürzer werden, die Zahl geht. */
+    #root .ofi-ptk .ofi-ptk-head__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .ofi-ptk-head__count { display: none; }
+    .ofi-ptk-editor__head { flex-wrap: wrap; }
+    #root .ofi-ptk input.ofi-ptk-titleinput { flex-basis: 100%; max-width: none; font-size: 18px; }
+    .ofi-ptk-editor__actions { margin-left: 0; }
+    .ofi-ptk-card__list,
+    .ofi-ptk-card__list.is-template { grid-template-columns: minmax(0, 1fr) 40px; }
+    .ofi-ptk-task { padding-bottom: 4px; }
+    .ofi-ptk-overall { display: none; }
+    #root .ofi-ptk .ofi-ptk-people { grid-column: 1 / -1; justify-content: flex-start; }
+    .ofi-ptk-planbar__actions { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ofi-ptk.is-templates,
+    .ofi-ptk-board,
+    .ofi-ptk-stagetasks { animation: none; }
+}

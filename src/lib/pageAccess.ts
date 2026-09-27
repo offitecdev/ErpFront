@@ -84,6 +84,15 @@ const PAGE_LEVEL_FALLBACKS: Readonly<Record<string, string>> = {
     // sieht die Produktionsaufträge (19.09.2026).
     'production.orders': 'inventory.orders',
     'production.lines': 'inventory.orders',
+    // Das Depo gehört zur Produktion — wer ihre Projekte sieht, sieht auch
+    // die Produktkarten (26.09.2026).
+    'warehouse.products': 'production.orders',
+    'warehouse.settings': 'production.orders',
+    // Die Görevlendirme-Vorlagen gehören zur Produktion (26.09.2026).
+    'production.taskTemplates': 'production.orders',
+    // BOM-Vorlagen und Produktionseinstellungen (27.09.2026) ebenso.
+    'production.bomTemplates': 'production.orders',
+    'production.settings': 'production.orders',
 };
 
 /**

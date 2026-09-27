@@ -141,6 +141,24 @@ export const PAGE_MODULES: CatalogModule[] = [
             { key: 'production.orders', path: '/production/orders', labelKey: 'nav.productionOrders', maxLevel: 2 },
             { key: 'production.lines', path: '/production/lines', labelKey: 'nav.productionLines', maxLevel: 1 },
             { key: 'production.panels', path: '/production/panels', labelKey: 'nav.panels', maxLevel: 2 },
+            // Görevlendirme şablonları (26.09.2026): nur ansehen — bearbeiten und
+            // auf ein Gerät laden darf allein die Administratorrolle.
+            { key: 'production.taskTemplates', path: '/production/task-templates', labelKey: 'nav.productionTaskTemplates', maxLevel: 1 },
+            // BOM (27.09.2026): Vorlagen ansehen; pflegen darf «Produktion
+            // verwalten» bzw. die Administratorrolle (das prüft der Server).
+            { key: 'production.bomTemplates', path: '/production/bom-templates', labelKey: 'nav.productionBomTemplates', maxLevel: 1 },
+            { key: 'production.settings', path: '/production/settings', labelKey: 'nav.productionSettings', maxLevel: 1 },
+        ],
+    },
+    {
+        // Depo (26.09.2026): das eigene Lager der Produktionsfirma — liest und
+        // schreibt mit den Rechten der Produktion. 1 ansehen · 2 bearbeiten
+        // (Serverkopie: Erp_Backend/src/shared/pageCatalog.ts).
+        key: 'warehouse',
+        labelKey: 'nav.warehouse',
+        pages: [
+            { key: 'warehouse.products', path: '/warehouse/products', labelKey: 'nav.warehouseProducts', maxLevel: 2 },
+            { key: 'warehouse.settings', path: '/warehouse/settings', labelKey: 'nav.warehouseSettings', maxLevel: 2 },
         ],
     },
     {

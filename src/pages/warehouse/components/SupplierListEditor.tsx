@@ -1,0 +1,101 @@
+import { X } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { t } from '@/i18n/translate';
+
+import { isBlankRow, withBlankRow, type SupplierRow } from '../supplierRows';
+import { sameText } from '../warehouseText';
+import { BarcodeInput } from './BarcodeInput';
+import { SupplierSelect, type SupplierValue } from './SupplierSelect';
+
+/**
+ * ── DIE LIEFERANTEN DER KARTE (dritter/vierter Durchgang, 26.09.2026) ───────
+ *
+ * «Bir ürün kartında birden fazla tedarikçi olabilir» — und neben jedem
+ * Lieferanten SEIN Barcode des Produkts: «bu tedarikçi ürün kodu değil
+ * aslında bu ürün barkodu olması lazım … barkod okutma yeri de tedarikçi
+ * yanında, orada buton olacak.»
+ *
+ * Eine kleine Tabelle in der Tafel: je Zeile ein Lieferant (aus der
+ * Lieferantenliste der Firma oder frei geschrieben) und rechts daneben sein
+ * Barcode — tippen, mit dem Handscanner lesen oder über die Kamera im Feld.
+ * Am Ende steht immer eine leere Zeile bereit («hep bir boş input olması
+ * lazım»); sobald sie etwas trägt, kommt die nächste. Derselbe Lieferant
+ * zweimal wird abgewiesen. Der erste Lieferant steht in der Liste der Karten.
+ */
+export const SupplierListEditor = ({
+    rows,
+    onChange,
+    disabled,
+    invalidKey,
+}: {
+    rows: SupplierRow[];
+    onChange: (next: SupplierRow[]) => void;
+    disabled?: boolean;
+    /** Die Zeile, an der der letzte Fehler hängt. */
+    invalidKey?: string | null;
+}) => {
+    const commit = (next: SupplierRow[]) => onChange(withBlankRow(next));
+    const setRow = (key: string, patch: Partial<SupplierRow>) =>
+        commit(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+
+    const pick = (key: string, value: SupplierValue | null) => {
+        if (value && rows.some((row) => row.key !== key && row.value
+            && (value.id ? row.value.id === value.id : sameText(row.value.name, value.name)))) {
+            toast.error(t('warehouse.supplier.duplicate', { name: value.name }));
+            return;
+        }
+        setRow(key, { value });
+    };
+
+    const remove = (key: string) => commit(rows.filter((row) => row.key !== key));
+
+    return (
+        <div className="ofi-wh-suppliers">
+            <div className="ofi-wh-suppliers__head" aria-hidden>
+                <span>{t('warehouse.supplier.columns.name')}</span>
+                <span>{t('warehouse.supplier.columns.barcode')}</span>
+            </div>
+            {rows.map((row, index) => {
+                const ready = index === rows.length - 1 && isBlankRow(row);
+                const name = row.value?.name ?? null;
+                return (
+                    <div key={row.key} className={`ofi-wh-suppliers__row ${ready ? 'is-ready' : ''}`}>
+                        <div className="ofi-wh-suppliers__pick">
+                            <SupplierSelect
+                                value={row.value}
+                                onChange={(next) => pick(row.key, next)}
+                                disabled={disabled}
+                                invalid={row.key === invalidKey && !row.value}
+                                taken={rows.flatMap((other) => (other.key !== row.key && other.value ? [other.value] : []))}
+                            />
+                        </div>
+                        <BarcodeInput
+                            value={row.barcode}
+                            onChange={(next) => setRow(row.key, { barcode: next })}
+                            ariaLabel={name
+                                ? t('warehouse.supplier.barcodeOf', { name })
+                                : t('warehouse.supplier.barcodeLabel', { index: index + 1 })}
+                            placeholder={t('warehouse.supplier.barcodePlaceholder')}
+                            scanTitle={name ? t('warehouse.supplier.scanTitleOf', { name }) : t('warehouse.supplier.scanTitle')}
+                            invalid={row.key === invalidKey}
+                            disabled={disabled}
+                        />
+                        {!disabled && (
+                            <button
+                                type="button"
+                                className="ofi-wh-suppliers__remove ofi-nosize"
+                                title={t('warehouse.supplier.remove')}
+                                aria-label={t('warehouse.supplier.remove')}
+                                disabled={ready}
+                                onClick={() => remove(row.key)}
+                            >
+                                <X />
+                            </button>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+};

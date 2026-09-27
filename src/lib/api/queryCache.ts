@@ -182,7 +182,11 @@ const WRITE_TAGS: Record<string, string[]> = {
     // Wortgleich mit WRITE_NAMESPACES im Server: die Lieferantenbestellung
     // trägt die Produktionszuordnung und die bestätigten Zeilen.
     inventory: ['catalog', 'production'],
-    production: ['production'],
+    // BOM (27.09.2026): Wareneingang, Reservierung und «Stoktan düş» schreiben ins Depo;
+    // Bestellungen, Preisanfragen und Revisionen der BOM schreiben Lieferantenbestellungen.
+    production: ['production', 'warehouse', 'catalog'],
+    // Depo (26.09.2026): eigene Tabellen, eigener Bereich.
+    warehouse: ['warehouse'],
     articles: ['catalog'],
     tenders: ['catalog', 'customers', 'tender', 'calendar'],
     'sales-orders': ['catalog', 'customers', 'tender', 'calendar'],

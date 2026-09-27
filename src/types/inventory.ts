@@ -1,3 +1,4 @@
+import type { BomOrigin } from './productionBom';
 import type { ProductionPurchaseAssignment, ProductionSelection } from './production';
 
 export type LocationType = 'MAIN_WAREHOUSE' | 'SUB_WAREHOUSE' | 'STATION_BUFFER' | 'PROJECT_RESERVE';
@@ -762,6 +763,8 @@ export interface PurchaseOrderItem {
     productionItemId?: string | null;
     /** Proje kaynağı (24.09.2026) — projenin pozisyonundan «Siparişe Git». */
     source?: PurchaseLineSource | null;
+    /** BOM (27.09.2026): die BOM-Zeile, aus der die Position bestellt wurde. */
+    bomLineId?: string | null;
 }
 
 /**
@@ -909,6 +912,8 @@ export interface PurchaseOrderRow {
     updatedAt: string;
     /** Produktion (19.09.2026): Projekt + Geräte — nur wo das Modul läuft. */
     production?: ProductionPurchaseAssignment | null;
+    /** BOM (27.09.2026): kam der Beleg aus einer BOM, stehen hier ihre Regeln. */
+    bomOrigin?: BomOrigin | null;
 }
 
 export interface PurchaseOrderListPage {
@@ -968,6 +973,8 @@ export interface PurchaseOrderItemInput {
     extras?: Array<{ key: string; name: string; value: string; width?: number }>;
     /** Produktion (19.09.2026): das Gerät der Zeile (Pflicht, wenn mehrere gewählt sind). */
     productionItemId?: string | null;
+    /** BOM (27.09.2026): die BOM-Zeile — unverändert zurück, sonst weist der Server ab. */
+    bomLineId?: string | null;
 }
 
 /**

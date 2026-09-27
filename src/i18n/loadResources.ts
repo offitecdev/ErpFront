@@ -45,15 +45,50 @@ const taskOnboardingLoaders: Record<SupportedLanguage, () => Promise<{ default: 
     de: () => import('./taskOnboarding.de.json'),
 };
 
+// Depo (26.09.2026): die Texte des Depos stehen in eigenen Dateien — die
+// einzeiligen manual.*.json bleiben unberührt (siehe i18n-Notizen).
+const warehouseLoaders: Record<SupportedLanguage, () => Promise<{ default: TranslationTree }>> = {
+    tr: () => import('./warehouse.tr.json'),
+    en: () => import('./warehouse.en.json'),
+    de: () => import('./warehouse.de.json'),
+};
+
+// Üretim · Görevlendirme (26.09.2026): Vorlagen und Aufgaben der Geräte —
+// ebenfalls in eigenen Dateien, damit die einzeiligen manual.*.json ruhen.
+const productionTasksLoaders: Record<SupportedLanguage, () => Promise<{ default: TranslationTree }>> = {
+    tr: () => import('./productionTasks.tr.json'),
+    en: () => import('./productionTasks.en.json'),
+    de: () => import('./productionTasks.de.json'),
+};
+
+// Üretim · BOM (27.09.2026): Vorlagen, BOMs der Geräte, Bestellungen — eigene Dateien.
+const productionBomLoaders: Record<SupportedLanguage, () => Promise<{ default: TranslationTree }>> = {
+    tr: () => import('./productionBom.tr.json'),
+    en: () => import('./productionBom.en.json'),
+    de: () => import('./productionBom.de.json'),
+};
+
 // Builds the full `translation` namespace bundle for one language by merging the
 // manual overlay over the base locale. Missing `auto.*` entries are formatted
 // on demand by i18next's parseMissingKeyHandler, so a large eager key table does
 // not need to be downloaded, parsed and expanded on every application start.
 export const loadResource = async (language: SupportedLanguage): Promise<TranslationResource> => {
-    const [locale, manual, taskOnboarding] = await Promise.all([
+    const [locale, manual, taskOnboarding, warehouse, productionTasks, productionBom] = await Promise.all([
         localeLoaders[language](),
         manualLoaders[language](),
         taskOnboardingLoaders[language](),
+        warehouseLoaders[language](),
+        productionTasksLoaders[language](),
+        productionBomLoaders[language](),
     ]);
-    return mergeTranslations(mergeTranslations(mergeTranslations(locale.default, manual.default), taskOnboarding.default), directInvoiceTranslations[language]);
+    return mergeTranslations(
+        mergeTranslations(
+            mergeTranslations(
+                mergeTranslations(mergeTranslations(mergeTranslations(locale.default, manual.default), taskOnboarding.default), directInvoiceTranslations[language]),
+                warehouse.default,
+            ),
+            productionTasks.default,
+        ),
+        productionBom.default,
+    );
 };

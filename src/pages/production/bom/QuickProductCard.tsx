@@ -1,0 +1,185 @@
+import { useEffect, useState } from 'react';
+import { Check, PackagePlus } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { PopupActions, PopupButton, PopupDialog } from '@/components/ui-shared/PopupKit';
+import { t } from '@/i18n/translate';
+import { readWarehouseCatalog, warehouseApi, warehouseErrorText } from '@/lib/api/warehouse';
+import type { BomProduct } from '@/types/productionBom';
+import type { WarehouseCatalog, WarehouseGroupRef } from '@/types/warehouse';
+import { MaterialGroupSelect } from '@/pages/warehouse/components/MaterialGroupSelect';
+import { SupplierSelect, type SupplierValue } from '@/pages/warehouse/components/SupplierSelect';
+import '@/styles/modules/warehouse.css';
+
+import { parseInputNumber } from './bomFormat';
+
+/** Sieht die Eingabe aus wie ein Code (Typennummer), nicht wie ein Name? */
+const looksLikeCode = (value: string): boolean => /\d/.test(value) && !/\s{2,}/.test(value) && value.length <= 40 && /^[A-Za-z0-9 ./_-]+$/.test(value);
+
+/**
+ * ── «ÜRÜN KARTI OLUŞTUR» — DAS KLEINE FENSTER NEBEN DER SUCHE ──────────────
+ *
+ * «Eğer yoksa hemen küçük modal yanında ürün kartı oluştur olmalıdır.» Die
+ * Felder, die eine BOM-Zeile braucht: Name, Marke, Modellnummer, die
+ * Materialgruppe (daraus der ERP-Code — ohne ihn lässt sich nicht bestellen),
+ * Lieferant, Seriennummernpflicht und die Mindestbestellmenge. Angelegt wird
+ * im Depo (wie auf der Produktkarte); die neue Karte kommt gleich als Zeile.
+ */
+export const QuickProductCard = ({
+    seed,
+    onClose,
+    onCreated,
+}: {
+    seed: string;
+    onClose: () => void;
+    onCreated: (product: BomProduct) => void;
+}) => {
+    const seedIsCode = looksLikeCode(seed);
+    const [name, setName] = useState(seedIsCode ? '' : seed);
+    const [brand, setBrand] = useState('');
+    const [modelNumber, setModelNumber] = useState(seedIsCode ? seed : '');
+    const [group, setGroup] = useState<WarehouseGroupRef | null>(null);
+    const [supplier, setSupplier] = useState<SupplierValue | null>(null);
+    const [serialRequired, setSerialRequired] = useState(false);
+    const [minimum, setMinimum] = useState('');
+    const [catalog, setCatalog] = useState<WarehouseCatalog | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => readWarehouseCatalog(
+        (value) => setCatalog(value),
+        () => setCatalog({ categories: [], ungroupedCount: 0 }),
+    ), []);
+
+    const minimumValue = parseInputNumber(minimum);
+    const minimumInvalid = minimum.trim() !== '' && (minimumValue === null || Number.isNaN(minimumValue) || minimumValue <= 0);
+    const canCreate = Boolean(name.trim()) && !minimumInvalid && !busy;
+
+    const create = async () => {
+        if (!canCreate) return;
+        setBusy(true);
+        setError(null);
+        try {
+            const detail = await warehouseApi.create({
+                name: name.trim(),
+                brand: brand.trim() || null,
+                modelNumber: modelNumber.trim() || null,
+                materialGroupId: group?.id ?? null,
+                suppliers: supplier ? [{ supplierId: supplier.id, name: supplier.name, barcode: null }] : [],
+                serialRequired,
+                quantity: 0,
+                // Die Mindestbestellmenge versteht der Server ab der Migration der BOM.
+                ...(minimumValue && minimumValue > 0 ? { minimumOrderQuantity: minimumValue } : {}),
+            } as Parameters<typeof warehouseApi.create>[0]);
+            const product = detail.product;
+            toast.success(t('productionBom.quickCard.created', { code: product.erpCode ?? product.name }));
+            onCreated({
+                id: product.id,
+                erpCode: product.erpCode,
+                name: product.name,
+                brand: product.brand,
+                modelNumber: product.modelNumber,
+                description: product.description,
+                supplierName: product.supplier?.name ?? null,
+                suppliers: product.suppliers.map((entry) => ({ id: entry.id, name: entry.name })),
+                quantity: product.quantity,
+                free: product.quantity,
+                serialRequired: product.serialRequired,
+                minimumOrderQuantity: minimumValue && minimumValue > 0 ? minimumValue : null,
+                hasErpCode: Boolean(product.erpCode),
+            });
+        } catch (failure) {
+            setError(warehouseErrorText(failure));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <PopupDialog
+            open
+            onClose={() => { if (!busy) onClose(); }}
+            title={t('productionBom.quickCard.title')}
+            subtitle={t('productionBom.quickCard.subtitle')}
+            icon={<PackagePlus size={18} />}
+            width={520}
+            footer={(
+                <PopupActions>
+                    <PopupButton onClick={onClose} disabled={busy}>{t('productionBom.common.cancel')}</PopupButton>
+                    <PopupButton variant="primary" loading={busy} disabled={!canCreate} onClick={() => void create()}>
+                        {t('productionBom.quickCard.create')}
+                    </PopupButton>
+                </PopupActions>
+            )}
+        >
+            <form
+                className="ofi-wh-pop ofi-bom-pop ofi-bom-quickcard"
+                onSubmit={(event) => { event.preventDefault(); void create(); }}
+            >
+                <section className="ofi-wh-group">
+                    <div className="ofi-wh-group__box">
+                        <div className="ofi-wh-row">
+                            <label className="ofi-wh-row__label" htmlFor="bom-qc-name">
+                                {t('productionBom.quickCard.name')}<b>*</b>
+                            </label>
+                            <div className="ofi-wh-row__control">
+                                <input id="bom-qc-name" className="ofi-wh-input" value={name} autoFocus={!seedIsCode} onChange={(event) => setName(event.target.value)} />
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <label className="ofi-wh-row__label" htmlFor="bom-qc-brand">{t('productionBom.quickCard.brand')}</label>
+                            <div className="ofi-wh-row__control">
+                                <input id="bom-qc-brand" className="ofi-wh-input" value={brand} onChange={(event) => setBrand(event.target.value)} />
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <label className="ofi-wh-row__label" htmlFor="bom-qc-model">{t('productionBom.quickCard.modelNumber')}</label>
+                            <div className="ofi-wh-row__control">
+                                <input id="bom-qc-model" className="ofi-wh-input is-mono" value={modelNumber} autoFocus={seedIsCode} onChange={(event) => setModelNumber(event.target.value)} />
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <span className="ofi-wh-row__label">{t('productionBom.quickCard.group')}</span>
+                            <div className="ofi-wh-row__control">
+                                <MaterialGroupSelect value={group} catalog={catalog} onChange={setGroup} />
+                                <span className="ofi-wh-row__hint">
+                                    {group ? t('productionBom.quickCard.groupHint') : t('productionBom.quickCard.noGroupWarn')}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <span className="ofi-wh-row__label">{t('productionBom.quickCard.supplier')}</span>
+                            <div className="ofi-wh-row__control">
+                                <SupplierSelect value={supplier} onChange={setSupplier} />
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row">
+                            <label className="ofi-wh-row__label" htmlFor="bom-qc-min">{t('productionBom.quickCard.minimum')}</label>
+                            <div className="ofi-wh-row__control">
+                                <input
+                                    id="bom-qc-min"
+                                    className={`ofi-wh-input is-num${minimumInvalid ? ' is-invalid' : ''}`}
+                                    inputMode="decimal"
+                                    value={minimum}
+                                    placeholder="—"
+                                    onChange={(event) => setMinimum(event.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="ofi-wh-row is-block">
+                            <div className="ofi-wh-row__control">
+                                <label className="ofi-wh-check">
+                                    <input type="checkbox" checked={serialRequired} onChange={(event) => setSerialRequired(event.target.checked)} />
+                                    <span className="ofi-wh-check__box" aria-hidden><Check /></span>
+                                    <span className="ofi-wh-check__text"><b>{t('productionBom.quickCard.serialRequired')}</b></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {error && <p className="ofi-bom-inline-error" role="alert">{error}</p>}
+                <button type="submit" hidden aria-hidden tabIndex={-1} />
+            </form>
+        </PopupDialog>
+    );
+};

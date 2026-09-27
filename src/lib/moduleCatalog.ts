@@ -101,8 +101,10 @@ export const MODULE_CATALOG: ModuleDefinition[] = [
         key: 'production',
         labelKey: 'nav.production',
         labelDefault: 'Üretim',
-        menuKeys: ['production'],
-        pathPrefixes: ['/production'],
+        // Das Depo (26.09.2026) gehört zur Produktion: eigenes Menü und
+        // eigene Adresse, dieselbe Firmenkategorie und dasselbe Rollenpaket.
+        menuKeys: ['production', 'warehouse'],
+        pathPrefixes: ['/production', '/warehouse'],
         actions: {
             read: ['production.view', 'panels.view'],
             write: ['production.manage', 'panels.manage'],

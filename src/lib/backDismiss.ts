@@ -51,10 +51,42 @@ const MARK = 'ofiBackDismiss';
    Darum wird eine eigene Rücknahme angemeldet: das nächste `popstate` gilt als
    verbraucht und schliesst nichts. Die Marke fällt nach kurzer Zeit von selbst
    weg — käme der Griff nie an (der Eintrag war schon fort), dürfte sie nicht
-   liegen bleiben und den nächsten ECHTEN Zurück-Griff schlucken. */
+   liegen bleiben und den nächsten ECHTEN Zurück-Griff schlucken.
+
+   ── DIE FÜNFTE FALLE: andere Hörer desselben `popstate` ─────────────────────
+   Eine Seite mit ungespeicherten Änderungen hört ebenfalls auf den Zurück-
+   Griff (useUnsavedChangesGuard) und fragt dann «Kaydedilmemiş değişiklikler
+   var». Sie hielt die Rücknahme eines eben geschlossenen Fensters für ein
+   Verlassen der Seite — nach jedem Barcode-Scan im Depo stand die Frage da
+   (Vorgabe Samet, 26.09.2026: «öyle olmayacak asla»). Ebenso ein Zurück-
+   Griff, der nur das offene Fenster schliessen soll. Darum gilt die Marke für
+   ALLE Hörer desselben Ereignisses (erst danach fällt sie weg), und
+   `isBackDismissPop` sagt ihnen, ob der Griff einem Fenster gehört. */
 let unwinding = false;
+let unwindTimer: number | undefined;
+/** Fenster, die gerade offen sind und auf den Zurück-Griff hören. */
+let openCount = 0;
 /** Wie lange eine angemeldete Rücknahme höchstens gilt (ms). */
 const UNWIND_GRACE_MS = 600;
+
+const armUnwind = (ms: number) => {
+    window.clearTimeout(unwindTimer);
+    unwindTimer = window.setTimeout(() => { unwinding = false; }, ms);
+};
+
+/**
+ * Für andere Hörer des Zurück-Griffs, im `popstate` selbst gefragt: gehört
+ * dieser Griff einem Fenster — die Rücknahme eines eben geschlossenen, oder
+ * einer, der ein offenes schliesst? Dann ist er kein Verlassen der Seite.
+ */
+export const isBackDismissPop = (): boolean => {
+    if (unwinding) {
+        // Jeder Hörer DIESES Ereignisses bekommt dieselbe Antwort; danach ist sie verbraucht.
+        armUnwind(0);
+        return true;
+    }
+    return openCount > 0;
+};
 
 const newMark = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -73,7 +105,7 @@ export const useBackDismiss = (open: boolean, close: () => void) => {
        die Wirkung an `open` hängen und legt nicht bei jedem Zeichnen einen
        neuen Verlaufseintrag an. */
     const closeRef = useRef(close);
-    closeRef.current = close;
+    useEffect(() => { closeRef.current = close; }, [close]);
 
     useEffect(() => {
         if (!open || typeof window === 'undefined') return undefined;
@@ -81,18 +113,20 @@ export const useBackDismiss = (open: boolean, close: () => void) => {
         const mark = newMark();
         const base = (window.history.state ?? {}) as Record<string, unknown>;
         window.history.pushState({ ...base, [MARK]: mark }, '');
+        openCount += 1;
 
         let popped = false;
         const onPop = () => {
             // Die Rücknahme eines gerade geschlossenen Fensters — sie gehört
             // nicht diesem hier (siehe oben, «die vierte Falle»).
-            if (unwinding) { unwinding = false; return; }
+            if (unwinding) { armUnwind(0); return; }
             popped = true;
             closeRef.current();
         };
         window.addEventListener('popstate', onPop);
 
         return () => {
+            openCount = Math.max(0, openCount - 1);
             window.removeEventListener('popstate', onPop);
             // Von Hand geschlossen: unseren Eintrag wieder abräumen, damit der
             // nächste Zurück-Griff nicht ins Leere greift. Liegt oben eine
@@ -100,7 +134,7 @@ export const useBackDismiss = (open: boolean, close: () => void) => {
             // der Verlauf unangetastet.
             if (!popped && topMark() === mark) {
                 unwinding = true;
-                window.setTimeout(() => { unwinding = false; }, UNWIND_GRACE_MS);
+                armUnwind(UNWIND_GRACE_MS);
                 window.history.back();
             }
         };
